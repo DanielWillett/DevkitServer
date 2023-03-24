@@ -1,22 +1,20 @@
-﻿using DevkitServer.Util.Terminals;
-using System;
-using System.Linq;
+﻿using DevkitServer.Multiplayer;
+using DevkitServer.Util.Terminals;
+using StackCleaner;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using StackCleaner;
 
 namespace DevkitServer.Util;
 internal static class Logger
 {
+    private static readonly NetCall<string, Severity> SendLogMessage = new NetCall<string, Severity>((ushort)NetCalls.SendLog);
     public static ITerminal Terminal;
     private const string TimeFormat = "yyyy-MM-dd hh:mm:ss";
     internal const string ANSIReset = "\u001b[39m";
     private static readonly StackTraceCleaner Cleaner;
-    private static readonly char[] TrimChars = { '\n', '\r' };
-    private static readonly char[] SplitChars = { '\n' };
     static Logger()
     {
-        UnturnedLog.info("test");
         StackCleanerConfiguration config = new StackCleanerConfiguration
         {
             ColorFormatting = StackColorFormatType.ExtendedANSIColor,
@@ -36,15 +34,15 @@ internal static class Logger
         else
         {
             Terminal = DevkitServerModule.GameObjectHost.AddComponent<BackgroundLoggingTerminal>();
-            config.ColorFormatting = StackColorFormatType.ANSIColor;
         }
+        config.ColorFormatting = StackColorFormatType.ANSIColor;
 #else
         if (Application.platform is not RuntimePlatform.WindowsPlayer and not RuntimePlatform.WindowsEditor)
             config.ColorFormatting = StackColorFormatType.ANSIColor;
         Terminal = DevkitServerModule.GameObjectHost.AddComponent<ServerTerminal>();
 #endif
         Cleaner = new StackTraceCleaner(config);
-        UnturnedLog.info("test2");
+        UnturnedLog.info("Loading logger with log type: " + Terminal.GetType().Name + ".");
     }
     internal static void InitLogger()
     {
@@ -59,7 +57,52 @@ internal static class Logger
         if (Terminal is Object obj)
             Object.Destroy(obj);
     }
-    public static void LogInfo(string message, ConsoleColor color = ConsoleColor.Gray)
+#if SERVER
+    public static void SendLog(ITransportConnection connection, string message, Severity severity)
+    {
+        SendLogMessage.Invoke(connection, message, severity);
+    }
+    public static void SendLog(IEnumerable<ITransportConnection> connections, string message, Severity severity)
+    {
+        SendLogMessage.Invoke(connections, message, severity);
+    }
+#else
+    public static void SendLog(string message, Severity severity)
+    {
+        SendLogMessage.Invoke(message, severity);
+    }
+#endif
+    [NetCall(NetCallSource.FromEither, (ushort)NetCalls.SendLog)]
+    private static void ReceiveLogMessage(MessageContext ctx, string message, Severity severity)
+    {
+        Log(severity, message);
+        ctx.Acknowledge(StandardErrorCode.Success);
+    }
+    public static void Log(Severity severity, string message, ConsoleColor? color = null)
+    {
+        switch (severity)
+        {
+            case Severity.Error:
+            case Severity.Fatal:
+                LogError(message, color ?? ConsoleColor.Red);
+                break;
+            case Severity.Warning:
+                LogError(message, color ?? ConsoleColor.Yellow);
+                break;
+            case Severity.Debug:
+                LogError(message, color ?? ConsoleColor.DarkGray);
+                break;
+            default: // Info
+                LogError(message, color ?? ConsoleColor.DarkCyan);
+                break;
+        }
+    }
+    [Conditional("DEBUG")]
+    public static void LogDebug(string message, ConsoleColor color = ConsoleColor.DarkGray)
+    {
+        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [DEBUG] " + message, color);
+    }
+    public static void LogInfo(string message, ConsoleColor color = ConsoleColor.DarkCyan)
     {
         Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [INFO]  " + message, color);
     }
@@ -70,6 +113,29 @@ internal static class Logger
     public static void LogError(string message, ConsoleColor color = ConsoleColor.Red, [CallerMemberName] string method = "")
     {
         Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [ERROR] " + "[" + method.ToUpperInvariant() + "] " + message, color);
+    }
+    public static void DumpGameObject(GameObject go, ConsoleColor color = ConsoleColor.White)
+    {
+        LogInfo("Gameobject Dump: \"" + go.name + "\":", color);
+        Terminal.Write("Transform:", color);
+        Terminal.Write($" Position: {go.transform.position:F2}", color);
+        Terminal.Write($" Rotation: {go.transform.rotation.eulerAngles:F2}", color);
+        Terminal.Write($" Scale:    {go.transform.localScale:F2}", color);
+        Terminal.Write("Components:", color);
+        Component[] comps = go.GetComponents<Component>();
+        Terminal.Write(" ========================================", color);
+        foreach (Component comp in comps)
+        {
+            Terminal.Write($" Parent: {comp.transform.gameObject.name}", color);
+            Terminal.Write($" Type: {comp.GetType().Name}", color);
+            Terminal.Write(" ========================================", color);
+        }
+        int childCt = go.transform.childCount;
+        Terminal.Write($"Children: {childCt}:", color);
+        for (int i = 0; i < childCt; ++i)
+        {
+            DumpGameObject(go.transform.GetChild(i).gameObject, color);
+        }
     }
     public static void LogError(Exception ex, bool cleanStack = true, [CallerMemberName] string method = "") => WriteExceptionIntl(ex, cleanStack, 0, method);
     private static void WriteExceptionIntl(Exception ex, bool cleanStack, int indent, string? method = null)
@@ -157,4 +223,13 @@ internal static class Logger
         if (!shouldhandle) return;
         LogInfo(input);
     }
+}
+
+public enum Severity : byte
+{
+    Debug,
+    Info,
+    Warning,
+    Error,
+    Fatal
 }

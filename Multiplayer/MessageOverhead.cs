@@ -1,12 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using DevkitServer.Util.Encoding;
 using System.Globalization;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.Multiplayer;
 
@@ -38,28 +33,28 @@ public readonly struct MessageOverhead
                                                  MessageFlags.RequestResponseWithAcknowledgeRequest;
     // All flags that use a response key
     private const MessageFlags ResponseKeyMask = MessageFlags.RequestResponseWithAcknowledgeRequest;
-
+    public ulong Sender => (Flags & MessageFlags.Relay) == 0 ? 0 : (ulong)RequestKey;
     public static unsafe void SetSize(ref MessageOverhead overhead, int size) => *(int*)((byte*)Unsafe.AsPointer(ref overhead) + 3) = size;
 
     /// <exception cref="IndexOutOfRangeException">If the pointer doesn't point to enough valid memory for the read.</exception>
-    public unsafe MessageOverhead(byte[] bytes)
+    public unsafe MessageOverhead(byte[] bytes, ulong sender = 0)
     {
         fixed (byte* ptr = bytes)
         {
-            Read(ptr, bytes.Length, out Flags, out MessageId, out Size, out RequestKey, out ResponseKey, out Length);
+            Read(ptr, sender, bytes.Length, out Flags, out MessageId, out Size, out RequestKey, out ResponseKey, out Length);
         }
     }
     /// <exception cref="AccessViolationException">If the pointer doesn't point to enough valid memory for the read.</exception>
-    public unsafe MessageOverhead(byte* ptr)
+    public unsafe MessageOverhead(byte* ptr, ulong sender = 0)
     {
-        Read(ptr, -1, out Flags, out MessageId, out Size, out RequestKey, out ResponseKey, out Length);
+        Read(ptr, sender, -1, out Flags, out MessageId, out Size, out RequestKey, out ResponseKey, out Length);
     }
     /// <exception cref="IndexOutOfRangeException">If the pointer doesn't point to enough valid memory for the read.</exception>
-    public unsafe MessageOverhead(byte* ptr, int len)
+    public unsafe MessageOverhead(byte* ptr, int len, ulong sender = 0)
     {
-        Read(ptr, len, out Flags, out MessageId, out Size, out RequestKey, out ResponseKey, out Length);
+        Read(ptr, sender, len, out Flags, out MessageId, out Size, out RequestKey, out ResponseKey, out Length);
     }
-    private static unsafe void Read(byte* ptr, int len, out MessageFlags flags, out ushort messageId, out int size, out long requestKey, out long responseKey, out int length)
+    private static unsafe void Read(byte* ptr, ulong sender, int len, out MessageFlags flags, out ushort messageId, out int size, out long requestKey, out long responseKey, out int length)
     {
         if (len != -1 && len < MinimumSize) throw new IndexOutOfRangeException();
         requestKey = default;
@@ -80,6 +75,11 @@ public readonly struct MessageOverhead
         {
             responseKey = UnsafeBitConverter.GetInt64(ptr, offset);
             offset += sizeof(long);
+        }
+        if (sender != 0)
+        {
+            flags |= MessageFlags.Relay;
+            requestKey = (long)sender;
         }
 
         length = offset;

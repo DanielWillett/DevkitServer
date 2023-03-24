@@ -21,7 +21,7 @@
     <DebugType>pdbonly</DebugType>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ClientDebug|AnyCPU'">
-    <DefineConstants>CLIENT</DefineConstants>
+    <DefineConstants>$(DefineConstants);DEBUG;CLIENT</DefineConstants>
     <DebugType>full</DebugType>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ClientRelease|AnyCPU'">
@@ -29,7 +29,7 @@
     <DebugType>pdbonly</DebugType>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ServerDebug|AnyCPU'">
-    <DefineConstants>SERVER</DefineConstants>
+    <DefineConstants>$(DefineConstants);DEBUG;SERVER</DefineConstants>
     <DebugType>full</DebugType>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ServerRelease|AnyCPU'">

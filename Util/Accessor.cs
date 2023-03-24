@@ -1,11 +1,12 @@
 ﻿using System.Reflection;
 using System.Reflection.Emit;
 using DevkitServer.Patches;
+using HarmonyLib;
 
 namespace DevkitServer.Util;
 internal static class Accessor
 {
-    public static InstanceSetter<TInstance, TValue> GenerateInstanceSetter<TInstance, TValue>(string fieldName, BindingFlags flags)
+    public static InstanceSetter<TInstance, TValue> GenerateInstanceSetter<TInstance, TValue>(string fieldName, BindingFlags flags = BindingFlags.NonPublic)
     {
         flags |= BindingFlags.Instance;
         flags &= ~BindingFlags.Static;
@@ -22,7 +23,7 @@ internal static class Accessor
         il.Emit(OpCodes.Ret);
         return (InstanceSetter<TInstance, TValue>)method.CreateDelegate(typeof(InstanceSetter<TInstance, TValue>));
     }
-    public static InstanceGetter<TInstance, TValue> GenerateInstanceGetter<TInstance, TValue>(string fieldName, BindingFlags flags)
+    public static InstanceGetter<TInstance, TValue> GenerateInstanceGetter<TInstance, TValue>(string fieldName, BindingFlags flags = BindingFlags.NonPublic)
     {
         flags |= BindingFlags.Instance;
         flags &= ~BindingFlags.Static;
@@ -37,7 +38,7 @@ internal static class Accessor
         il.Emit(OpCodes.Ret);
         return (InstanceGetter<TInstance, TValue>)method.CreateDelegate(typeof(InstanceGetter<TInstance, TValue>));
     }
-    public static StaticSetter<TValue> GenerateStaticSetter<TInstance, TValue>(string fieldName, BindingFlags flags)
+    public static StaticSetter<TValue> GenerateStaticSetter<TInstance, TValue>(string fieldName, BindingFlags flags = BindingFlags.NonPublic)
     {
         flags |= BindingFlags.Static;
         flags &= ~BindingFlags.Instance;
@@ -53,7 +54,7 @@ internal static class Accessor
         il.Emit(OpCodes.Ret);
         return (StaticSetter<TValue>)method.CreateDelegate(typeof(StaticSetter<TValue>));
     }
-    public static StaticGetter<TValue> GenerateStaticGetter<TInstance, TValue>(string fieldName, BindingFlags flags)
+    public static StaticGetter<TValue> GenerateStaticGetter<TInstance, TValue>(string fieldName, BindingFlags flags = BindingFlags.NonPublic)
     {
         flags |= BindingFlags.Static;
         flags &= ~BindingFlags.Instance;
@@ -76,6 +77,66 @@ internal static class Accessor
         catch (MemberAccessException)
         {
             return null!;
+        }
+    }
+    
+    /// <exception cref="ArgumentException"/>
+    public static TDelegate GetStaticMethod<TInstance, TDelegate>(string methodName, Type[]? parameterTypes = null, BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Static) where TDelegate : Delegate
+    {
+        Type type = typeof(TInstance);
+        MethodInfo? method;
+        try
+        {
+            method = parameterTypes == null ? type.GetMethod(methodName, flags) : type.GetMethod(methodName, flags, null, parameterTypes, null);
+        }
+        catch (AmbiguousMatchException ex)
+        {
+            if (parameterTypes == null)
+                throw new ArgumentException("Multiple methods match \"" + methodName + "\", try specifying parameter types.", nameof(parameterTypes), ex);
+            
+            throw;
+        }
+        if (method == null)
+            throw new ArgumentException("No methods match \"" + type.Name + "." + methodName + "\".", nameof(methodName));
+        if (!method.IsStatic)
+            throw new ArgumentException("Method \"" + type.Name + "." + methodName + "\" is not a static method.", nameof(methodName));
+
+        try
+        {
+            TDelegate dele = (TDelegate)method.CreateDelegate(typeof(TDelegate), null);
+            return dele;
+        }
+        catch (Exception ex)
+        {
+            throw new ArgumentException("Failed to create a delegate of type " + typeof(TDelegate).Name + ". Should match signature of: " + method.FullDescription() + ".", nameof(TDelegate), ex);
+        }
+    }
+    private static readonly MethodInfo isServerGetter = typeof(Provider).GetProperty(nameof(Provider.isServer), BindingFlags.Static | BindingFlags.Public)?.GetGetMethod()!;
+    private static readonly MethodInfo isEditorGetter = typeof(Level).GetProperty(nameof(Level.isEditor), BindingFlags.Static | BindingFlags.Public)?.GetGetMethod()!;
+    public static IEnumerable<CodeInstruction> AddIsEditorCall(IEnumerable<CodeInstruction> instructions, MethodBase __method)
+    {
+        if (isServerGetter == null || isEditorGetter == null)
+        {
+            Logger.LogError("IsServer: " + (isServerGetter != null) + ", IsEditor: " + (isEditorGetter != null) + ".");
+            foreach (CodeInstruction instr in instructions)
+                yield return instr;
+        }
+        foreach (CodeInstruction instr in instructions)
+        {
+            if (instr.Calls(isServerGetter))
+            {
+                yield return instr;
+                yield return new CodeInstruction(OpCodes.Not);
+                yield return new CodeInstruction(OpCodes.Call, isEditorGetter);
+                yield return new CodeInstruction(OpCodes.Or);
+                yield return new CodeInstruction(OpCodes.Not);
+                if (__method != null)
+                    Logger.LogInfo("Inserted editor call to " + __method.FullDescription() + ".");
+                else
+                    Logger.LogInfo("Inserted editor call to unknown method.");
+            }
+            else
+                yield return instr;
         }
     }
 }

@@ -22,5 +22,6 @@ public enum MessageFlags : byte
     /// <summary>An ACK message with an optional error code.</summary>
     AcknowledgeResponse = 16,
     /// <summary>Requests an ACK message to be returned from a response to a request.</summary>
-    RequestResponseWithAcknowledgeRequest = 32
+    RequestResponseWithAcknowledgeRequest = 32,
+    Relay = 64
 }
