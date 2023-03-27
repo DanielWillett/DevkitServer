@@ -1,16 +1,17 @@
-﻿using HarmonyLib;
+﻿using DevkitServer.Multiplayer;
+using HarmonyLib;
+using JetBrains.Annotations;
 using SDG.Provider;
 using System.Reflection;
+#if SERVER
 using System.Reflection.Emit;
-using DevkitServer.Multiplayer;
-using JetBrains.Annotations;
+#endif
 using Action = System.Action;
 
 namespace DevkitServer.Patches;
 [HarmonyPatch]
 internal static class PatchesMain
 {
-    // private static readonly MethodInfo logMethod = typeof(Logger).GetMethod(nameof(Logger.LogInfo))!;
     public const string HarmonyId = "dw.devkitserver";
     internal static Harmony Patcher { get; private set; } = null!;
     internal static void Init()
@@ -24,6 +25,8 @@ internal static class PatchesMain
         catch (Exception ex)
         {
             Logger.LogError(ex);
+            DevkitServerModule.Fault();
+            Unpatch();
         }
     }
     internal static void Unpatch()
@@ -108,19 +111,27 @@ internal static class PatchesMain
     }
 
 #if SERVER
+    [UsedImplicitly]
     [HarmonyPatch(typeof(LevelLighting), nameof(LevelLighting.updateLocal), typeof(Vector3), typeof(float), typeof(IAmbianceNode))]
     [HarmonyPrefix]
     private static bool UpdateLighting(Vector3 point, float windOverride, IAmbianceNode effectNode) => !DevkitServerModule.IsEditing;
+
+    [UsedImplicitly]
     [HarmonyPatch("EditorInteract", "Update", MethodType.Normal)]
     [HarmonyPrefix]
     private static bool EditorInteractUpdate() => !DevkitServerModule.IsEditing;
+
+    [UsedImplicitly]
     [HarmonyPatch("EditorUI", "Start", MethodType.Normal)]
     [HarmonyPrefix]
     private static bool EditorUIStart() => !DevkitServerModule.IsEditing;
+
+    [UsedImplicitly]
     [HarmonyPatch("MainCamera", "Awake", MethodType.Normal)]
     [HarmonyPrefix]
     private static bool MainCameraAwake() => !DevkitServerModule.IsEditing;
 
+    [UsedImplicitly]
     [HarmonyPatch(typeof(Provider), "AdvertiseConfig", MethodType.Normal)]
     [HarmonyPrefix]
     private static void AdvertiseConfig()
@@ -134,7 +145,7 @@ internal static class PatchesMain
     [HarmonyPatch(typeof(Provider), "onDedicatedUGCInstalled")]
     [HarmonyTranspiler]
     [UsedImplicitly]
-    static IEnumerable<CodeInstruction> DedicatedUgcLoadedTranspiler(IEnumerable<CodeInstruction> instructions)
+    private static IEnumerable<CodeInstruction> DedicatedUgcLoadedTranspiler(IEnumerable<CodeInstruction> instructions)
     {
         foreach (CodeInstruction instr in instructions)
         {

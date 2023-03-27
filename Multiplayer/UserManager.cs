@@ -1,9 +1,11 @@
-﻿#if SERVER
-using DevkitServer.Players;
+﻿using DevkitServer.Players;
 
 namespace DevkitServer.Multiplayer;
+[EarlyTypeInit]
 public static class UserManager
 {
+    public static event Action<EditorUser>? OnUserConnected;
+    public static event Action<EditorUser>? OnUserDisconnected;
     private static readonly List<EditorUser> _users = new List<EditorUser>(16);
     public static IReadOnlyList<EditorUser> Users { get; } = _users.AsReadOnly();
     public static EditorUser? FromId(ulong id)
@@ -26,6 +28,7 @@ public static class UserManager
                 return _users[i];
         return null;
     }
+#if SERVER
     public static EditorUser? FromConnection(ITransportConnection connection)
     {
         if (connection == null) return null;
@@ -38,6 +41,7 @@ public static class UserManager
 
         return null;
     }
+#endif
     public static EditorUser? FromId(CSteamID id) => FromId(id.m_SteamID);
     public static EditorUser? FromSteamPlayer(SteamPlayer player) => player == null ? null : FromId(player.playerID.steamID.m_SteamID);
     public static EditorUser? FromPlayer(Player player) => player == null ? null : FromId(player.channel.owner.playerID.steamID.m_SteamID);
@@ -72,6 +76,7 @@ public static class UserManager
                         if (!added) _users.Add(user);
                     }
                     _users.Add(user);
+                    OnUserConnected?.Invoke(user);
                     Logger.LogInfo("Player added: " + user.DisplayName + " {" + user.SteamId.m_SteamID + "}.");
                     return;
                 }
@@ -89,9 +94,8 @@ public static class UserManager
 
         _users.Remove(user);
         user.IsOnline = false;
+        OnUserDisconnected?.Invoke(user);
         Logger.LogInfo("Player removed: " + user.DisplayName + " {" + user.SteamId.m_SteamID + "}.");
         Object.DestroyImmediate(user);
     }
-
 }
-#endif

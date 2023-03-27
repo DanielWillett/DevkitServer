@@ -145,3 +145,16 @@ public delegate void InstanceSetter<in TInstance, in T>(TInstance owner, T value
 public delegate T InstanceGetter<in TInstance, out T>(TInstance owner);
 public delegate void StaticSetter<in T>(T value);
 public delegate T StaticGetter<out T>();
+
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+internal sealed class EarlyTypeInitAttribute : Attribute
+{
+    public int Priority { get; }
+
+    public EarlyTypeInitAttribute() : this (0) { }
+
+    public EarlyTypeInitAttribute(int priority)
+    {
+        Priority = priority;
+    }
+}

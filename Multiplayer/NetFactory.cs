@@ -1,12 +1,12 @@
-﻿using System.Globalization;
-using DevkitServer.Patches;
+﻿using DevkitServer.Patches;
+using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
 using JetBrains.Annotations;
 using SDG.NetPak;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using DevkitServer.Players;
 
 namespace DevkitServer.Multiplayer;
 public static class NetFactory
@@ -288,10 +288,12 @@ public static class NetFactory
                     goto fail;
             }
 
-            if (!reader.ReadBytesPtr(len, out byte[] src, out int offset))
+
+            byte[] msg = new byte[len];
+            if (!reader.ReadBytes(msg))
                 goto fail;
             byte[] output;
-            fixed (byte* ptr = &src[offset])
+            fixed (byte* ptr = msg)
             {
                 output = new byte[sizeof(ushort) + sizeof(ulong) + len];
                 fixed (byte* ptr2 = output)
@@ -304,25 +306,34 @@ public static class NetFactory
 
             if (amt == 0)
             {
-                Send(Provider.EnumerateClients(), output);
+                Send(Provider.clients
+                    .Where(x => x.playerID.steamID.m_SteamID != user.SteamId.m_SteamID)
+                    .Select(x => x.transportConnection), output);
             }
             else
             {
                 Send(Provider.clients.Where(x =>
                 {
-                    for (int i = 0; i < amt; ++i)
+                    if (x.playerID.steamID.m_SteamID != user.SteamId.m_SteamID)
                     {
-                        if (relays[i] == x.playerID.steamID.m_SteamID)
-                            return true;
+                        for (int i = 0; i < amt; ++i)
+                        {
+                            if (relays[i] == x.playerID.steamID.m_SteamID)
+                                return true;
+                        }
                     }
 
                     return false;
                 }).Select(x => x.transportConnection), output);
             }
+
+            MessageOverhead ovh = new MessageOverhead(msg, user.SteamId.m_SteamID);
+            if ((ovh.Flags & (MessageFlags.LayeredResponse | MessageFlags.LayeredRequest)) != 0)
+                OnReceived(msg, transportConnection, in ovh);
         }
         return;
         fail:
-        Logger.LogWarning("Unable to read incomming relay message from: " + transportConnection.GetAddressString(true) + ".");
+        Logger.LogWarning("Unable to read incoming relay message from: " + transportConnection.GetAddressString(true) + ".");
 #endif
     }
     [UsedImplicitly]
@@ -782,7 +793,7 @@ public static class NetFactory
         }
     }
 #if CLIENT
-    public static void SendRelay(byte[] bytes, IList<ulong>? users = null)
+    public static void SendRelay(byte[] bytes, bool reliable = true, IList<ulong>? users = null)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -802,8 +813,7 @@ public static class NetFactory
         Logger.LogInfo("Sending " + bytes.Length + " bytes to server as a relay to " + 
                        (users == null ? "all" : users.Count.ToString(CultureInfo.InvariantCulture)) + " user(s).");
 #endif
-
-        GetPlayerTransportConnection().Send(Writer.buffer, Writer.writeByteIndex, ENetReliability.Reliable);
+        GetPlayerTransportConnection().Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
     }
 #endif
     public static void Send(this
@@ -812,7 +822,7 @@ public static class NetFactory
 #else
         IClientTransport
 #endif
-        connection, byte[] bytes)
+        connection, byte[] bytes, bool reliable = true)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -836,10 +846,10 @@ public static class NetFactory
 #endif
 #endif
         );
-        connection.Send(Writer.buffer, Writer.writeByteIndex, ENetReliability.Reliable);
+        connection.Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
     }
 #if SERVER
-    public static void Send(this IEnumerable<ITransportConnection> connections, byte[] bytes)
+    public static void Send(this IEnumerable<ITransportConnection> connections, byte[] bytes, bool reliable = true)
     {
         Writer.Reset();
         Writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)DevkitMessage.InvokeMethod));
@@ -847,8 +857,18 @@ public static class NetFactory
         Writer.WriteBytes(bytes);
         Writer.Flush();
         Logger.LogInfo("Sending " + bytes.Length + " bytes.");
-        foreach (ITransportConnection connection in connections)
-            connection.Send(Writer.buffer, Writer.writeByteIndex, ENetReliability.Reliable);
+        if (connections is IList<ITransportConnection> list)
+        {
+            for (int i = 0; i < list.Count; ++i)
+            {
+                list[i].Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
+            }
+        }
+        else
+        {
+            foreach (ITransportConnection connection in connections)
+                connection.Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
+        }
     }
 #endif
     private readonly struct Listener

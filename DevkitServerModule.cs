@@ -12,8 +12,10 @@ public sealed class DevkitServerModule : IModuleNexus
     public static GameObject GameObjectHost { get; private set; } = null!;
     public static DevkitServerModule Instance { get; private set; } = null!;
     public static bool IsEditing { get; internal set; }
+    public static bool LoadFaulted { get; private set; }
     public static void EarlyInitialize()
     {
+        LoadFaulted = false;
         GameObjectHost = new GameObject("DevkitServer");
         Provider.gameMode = new DevkitServerGamemode();
         Object.DontDestroyOnLoad(GameObjectHost);
@@ -22,6 +24,7 @@ public sealed class DevkitServerModule : IModuleNexus
         Logger.LogInfo("DevkitServer by BlazingFlame#0001 (https://github.com/DanielWillett) initialized.");
         PatchesMain.Init();
     }
+
     public void initialize()
     {
         try
@@ -29,17 +32,47 @@ public sealed class DevkitServerModule : IModuleNexus
             Instance = this;
             Logger.LogInfo("DevkitServer loading...");
 
+            if (LoadFaulted)
+                return;
+
             if (!NetFactory.Init())
             {
+                Fault();
                 Logger.LogError("Failed to load! Loading cancelled. Check for updates on https://github.com/DanielWillett/DevkitServer.");
                 return;
             }
 
+            foreach (Type type in Assembly.GetExecutingAssembly()
+                         .GetTypes()
+                         .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x,
+                             (EarlyTypeInitAttribute?)Attribute.GetCustomAttribute(x, typeof(EarlyTypeInitAttribute))))
+                         .Where(x => x.Value != null)
+                         .OrderByDescending(x => x.Value!.Priority)
+                         .ThenBy(x => x.Key.Name)
+                         .Select(x => x.Key))
+            {
+                try
+                {
+                    RuntimeHelpers.RunClassConstructor(type.TypeHandle);
+                    Logger.LogDebug("Initialized static module \"" + type.Name + "\".");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Error while initializing static module \"" + type.Name + "\".");
+                    Logger.LogError(ex);
+                    Fault();
+                    break;
+                }
+            }
+
+            if (LoadFaulted)
+                return;
+
+            Editor.onEditorCreated += OnEditorCreated;
 #if SERVER
             Provider.onServerConnected += UserManager.AddPlayer;
             Provider.onServerDisconnected += UserManager.RemovePlayer;
             Level.onLevelLoaded += OnLevelLoaded;
-            Editor.onEditorCreated += OnEditorCreated;
 #else
             Provider.onClientConnected += EditorUser.OnClientConnected;
             Provider.onClientDisconnected += EditorUser.OnClientDisconnected;
@@ -49,30 +82,42 @@ public sealed class DevkitServerModule : IModuleNexus
         {
             Logger.LogError("Error loading...");
             Logger.LogError(ex);
+            Fault();
         }
     }
 
-#if SERVER
+    internal static void Fault() => LoadFaulted = false;
+
     private static void OnEditorCreated()
     {
         Logger.LogInfo("Editor loaded.");
+#if SERVER
         Assembly sdg = typeof(Provider).Assembly;
         Component comp = Level.editing.GetComponentInChildren(sdg.GetType("SDG.Unturned.EditorInteract"));
+        if (comp != null)
+            Object.Destroy(comp);
+        if (comp != null)
+            comp = Level.editing.GetComponentInChildren(typeof(EditorMovement));
         Object.Destroy(comp);
-        comp = Level.editing.GetComponentInChildren(typeof(EditorMovement));
+        if (comp != null)
+            comp = Level.editing.GetComponentInChildren(typeof(EditorLook));
         Object.Destroy(comp);
-        comp = Level.editing.GetComponentInChildren(typeof(EditorLook));
-        Object.Destroy(comp);
-        comp = Level.editing.GetComponentInChildren(typeof(EditorArea));
-        Object.Destroy(comp);
+        if (comp != null)
+            comp = Level.editing.GetComponentInChildren(typeof(EditorArea));
+        if (comp != null)
+            Object.Destroy(comp);
+#if DEBUG
+        Logger.DumpGameObject(Level.editing.gameObject);
+#endif
+#endif
     }
+#if SERVER
     private void OnLevelLoaded(int level)
     {
         Logger.LogInfo("Level loaded: " + level + ".");
         if (level != Level.BUILD_INDEX_GAME)
             return;
         
-        Logger.DumpGameObject(Level.editing.gameObject);
     }
 #endif
 
@@ -93,6 +138,7 @@ public sealed class DevkitServerModule : IModuleNexus
 
         Instance = null!;
         GameObjectHost = null!;
+        LoadFaulted = false;
     }
     [ModuleInitializer]
     public static void ModuleInitializer()

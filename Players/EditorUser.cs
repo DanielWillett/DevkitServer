@@ -1,4 +1,7 @@
 ﻿using System.Globalization;
+#if CLIENT
+using DevkitServer.Players.UI;
+#endif
 using JetBrains.Annotations;
 
 namespace DevkitServer.Players;
@@ -13,10 +16,12 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 #else
     public IClientTransport Connection { get; private set; } = null!;
 #endif
+    public UserInput Input { get; private set; } = null!;
     public string DisplayName { get; private set; } = null!;
     public SteamPlayer? Player { get; internal set; }
 
     public bool IsOnline { get; internal set; }
+    public bool IsOwner { get; private set; }
 
     internal void Init(CSteamID player,
 #if SERVER
@@ -29,7 +34,17 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         SteamId = player;
         Connection = connection;
         DisplayName = displayName;
+#if CLIENT
+        IsOwner = User == EditorUser.User;
+#endif
         Logger.LogDebug("Editor User initialized: " + player.m_SteamID.ToString(CultureInfo.InvariantCulture) + " (" + displayName + ").");
+
+        SetupComponents();
+    }
+
+    private void SetupComponents()
+    {
+        Input = this.gameObject.AddComponent<UserInput>();
     }
 
     [UsedImplicitly]
@@ -44,6 +59,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     {
         if (!DevkitServerModule.IsEditing)
             return;
+        DevkitEditorHUD.Open();
         if (!SDG.Unturned.Player.player.TryGetComponent(out EditorUser user))
         {
             Logger.LogWarning("Unable to find Editor user in client-side player.");
@@ -58,7 +74,8 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         {
             if (User.isActiveAndEnabled)
                 Destroy(User);
-            
+
+            DevkitEditorHUD.Close(true);
             User = null;
             Logger.LogDebug("Deregistered client-side editor user.");
             return;

@@ -74,6 +74,22 @@ public class NetCallCustom : BaseNetCall
         reader.LoadNew(message);
         return true;
     }
+
+    public byte[] Write(WriterTask task)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, task);
+    }
+    public byte[] Write(ref MessageOverhead overhead, WriterTask task)
+    {
+        lock (_writer)
+        {
+            _writer.Flush();
+            task(_writer);
+            _writer.PrependData(ref overhead);
+            return _writer.ToArray();
+        }
+    }
     public void Invoke(ref MessageOverhead overhead,
 #if SERVER
         ITransportConnection connection, 
@@ -191,6 +207,8 @@ public sealed class NetCall : BaseNetCall
     public NetCall(Method method) : base(method) { }
     public NetCall(MethodAsync method) : base(method) { }
     private byte[]? _bytes;
+    public byte[] Write() => _bytes ??= new MessageOverhead(DefaultFlags, ID, 0).GetBytes();
+    public byte[] Write(ref MessageOverhead overhead) => overhead.GetBytes();
     public void Invoke(
 #if SERVER
         ITransportConnection connection
@@ -396,6 +414,13 @@ public sealed class NetCallRaw<T> : NetCallRaw
             arg);
         return task;
     }
+    public byte[] Write(T arg)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T arg) => _writer.Get(ref overhead, arg);
 }
 /// <summary>Leave any reader or writer null to auto-fill.</summary>
 public sealed class NetCallRaw<T1, T2> : NetCallRaw
@@ -535,6 +560,15 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
             arg1, arg2);
         return task;
     }
+
+    public byte[] Write(T1 arg1, T2 arg2)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg1, arg2);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2)
+        => _writer.Get(ref overhead, arg1, arg2);
 }
 /// <summary>Leave any reader or writer null to auto-fill.</summary>
 public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
@@ -675,6 +709,15 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
             arg1, arg2, arg3);
         return task;
     }
+
+    public byte[] Write(T1 arg1, T2 arg2, T3 arg3)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg1, arg2, arg3);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3)
+        => _writer.Get(ref overhead, arg1, arg2, arg3);
 }
 /// <summary>Leave any reader or writer null to auto-fill.</summary>
 public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
@@ -816,6 +859,15 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
             arg1, arg2, arg3, arg4);
         return task;
     }
+
+    public byte[] Write(T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg1, arg2, arg3, arg4);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        => _writer.Get(ref overhead, arg1, arg2, arg3, arg4);
 }
 public sealed class NetCall<T> : DynamicNetCall
 {
@@ -949,6 +1001,15 @@ public sealed class NetCall<T> : DynamicNetCall
             arg);
         return task;
     }
+
+    public byte[] Write(T arg)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T arg)
+        => _writer.Get(ref overhead, arg);
 }
 public sealed class NetCall<T1, T2> : DynamicNetCall
 {
@@ -1083,6 +1144,15 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
             arg1, arg2);
         return task;
     }
+
+    public byte[] Write(T1 arg1, T2 arg2)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg1, arg2);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2)
+        => _writer.Get(ref overhead, arg1, arg2);
 }
 public sealed class NetCall<T1, T2, T3> : DynamicNetCall
 {
@@ -1218,6 +1288,15 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
             arg1, arg2, arg3);
         return task;
     }
+
+    public byte[] Write(T1 arg1, T2 arg2, T3 arg3)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg1, arg2, arg3);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3)
+        => _writer.Get(ref overhead, arg1, arg2, arg3);
 }
 public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
 {
@@ -1354,6 +1433,15 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
             arg1, arg2, arg3, arg4);
         return task;
     }
+
+    public byte[] Write(T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg1, arg2, arg3, arg4);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        => _writer.Get(ref overhead, arg1, arg2, arg3, arg4);
 }
 public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
 {
@@ -1491,6 +1579,15 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
             arg1, arg2, arg3, arg4, arg5);
         return task;
     }
+
+    public byte[] Write(T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg1, arg2, arg3, arg4, arg5);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5);
 }
 public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
 {
@@ -1629,32 +1726,50 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
             arg1, arg2, arg3, arg4, arg5, arg6);
         return task;
     }
+
+    public byte[] Write(T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6);
 }
+
 public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
 {
     private readonly DynamicByteReader<T1, T2, T3, T4, T5, T6, T7> _reader;
     private readonly DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7> _writer;
+
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7);
-    public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7);
+
+    public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6,
+        T7 arg7);
+
     public NetCall(ushort method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7>(capacity: capacity);
     }
+
     public NetCall(Method method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7>(capacity: capacity);
     }
+
     public NetCall(MethodAsync method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7>(capacity: capacity);
     }
+
     internal override void SetThrowOnError(bool value) => _reader.ThrowOnError = value;
+
     public void Invoke(ref MessageOverhead overhead,
 #if SERVER
-        ITransportConnection connection, 
+        ITransportConnection connection,
 #endif
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
     {
@@ -1670,7 +1785,8 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
 #if SERVER
             connection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7));
 #else
-            NetFactory.GetPlayerTransportConnection().Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7));
+            NetFactory.GetPlayerTransportConnection()
+                .Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7));
 #endif
         }
         catch (Exception ex)
@@ -1683,16 +1799,17 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
             Logger.LogError(ex);
         }
     }
+
     public void Invoke(
 #if SERVER
-        ITransportConnection connection, 
+        ITransportConnection connection,
 #endif
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
     {
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         Invoke(ref overhead,
 #if SERVER
-            connection, 
+            connection,
 #endif
             arg1, arg2, arg3, arg4, arg5, arg6, arg7);
     }
@@ -1712,7 +1829,8 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         }
     }
 #endif
-    public bool Read(byte[] message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7)
+    public bool Read(byte[] message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6,
+        out T7 arg7)
     {
         try
         {
@@ -1732,15 +1850,18 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
             return false;
         }
     }
+
     public override bool Read(byte[] message, out object[] parameters)
     {
-        bool success = Read(message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7);
+        bool success = Read(message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6,
+            out T7 arg7);
         parameters = success ? new object[] { arg1!, arg2!, arg3!, arg4!, arg5!, arg6!, arg7! } : Array.Empty<object>();
         return success;
     }
+
     public NetTask Request(BaseNetCall listener,
 #if SERVER
-        ITransportConnection connection, 
+        ITransportConnection connection,
 #endif
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
@@ -1748,14 +1869,15 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
         this.Invoke(ref overhead,
 #if SERVER
-            connection, 
+            connection,
 #endif
             arg1, arg2, arg3, arg4, arg5, arg6, arg7);
         return task;
     }
+
     public NetTask RequestAck(
 #if SERVER
-        ITransportConnection connection, 
+        ITransportConnection connection,
 #endif
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
@@ -1763,12 +1885,23 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
         this.Invoke(ref overhead,
 #if SERVER
-            connection, 
+            connection,
 #endif
             arg1, arg2, arg3, arg4, arg5, arg6, arg7);
         return task;
+
     }
+
+    public byte[] Write(T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+        => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
+
 public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
 {
     private readonly DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8> _reader;
@@ -1908,6 +2041,14 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
             arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
         return task;
     }
+    public byte[] Write(T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+        => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
 {
@@ -2049,6 +2190,14 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
             arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
         return task;
     }
+    public byte[] Write(T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
+        => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
 }
 public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNetCall
 {
@@ -2191,4 +2340,12 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
             arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
         return task;
     }
+    public byte[] Write(T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)
+        => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
 }

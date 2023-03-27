@@ -11,22 +11,32 @@ public class DevkitServerGamemode : GameMode
 {
     public override GameObject getPlayerGameObject(SteamPlayerID playerID)
     {
-        GameObject go = base.getPlayerGameObject(playerID);
         if (!DevkitServerModule.IsEditing)
-            return go;
-        EditorUser euser = go.AddComponent<EditorUser>();
-        euser.Init(playerID.steamID,
+            return base.getPlayerGameObject(playerID);
+        bool owner = playerID.steamID.m_SteamID == Provider.client.m_SteamID;
+        GameObject obj;
+        if (!owner)
+        {
+            obj = base.getPlayerGameObject(playerID);
+            if (obj.TryGetComponent(out Rigidbody body))
+            {
+                body.useGravity = false;
+                body.detectCollisions = false;
+            }
+        }
+        else
+        {
+            obj = Level.editing.gameObject;
+        }
+        EditorUser user = obj.AddComponent<EditorUser>();
+        user.Init(playerID.steamID,
 #if SERVER
             Provider.findTransportConnection(playerID.steamID),
 #else
             NetFactory.GetPlayerTransportConnection(),
 #endif
-            playerID.characterName);
-        if (go.TryGetComponent(out Rigidbody body))
-        {
-            body.useGravity = false;
-            body.detectCollisions = false;
-        }
-        return go;
+            playerID.playerName);
+
+        return obj;
     }
 }
