@@ -21,21 +21,27 @@ internal static class Logger
             Colors = UnityColor32Config.Default,
             IncludeNamespaces = false,
 #if DEBUG
-            IncludeFileData = true
+            IncludeFileData = true,
+            IncludeSourceData = true,
+            IncludeILOffset = true
 #else
-            IncludeFileData = false
+            IncludeFileData = false,
+            IncludeSourceData = false,
+            IncludeILOffset = false
 #endif
         };
 #if !SERVER
         if (Application.platform is RuntimePlatform.WindowsPlayer or RuntimePlatform.WindowsEditor)
         {
             Terminal = DevkitServerModule.GameObjectHost.AddComponent<WindowsClientTerminal>();
+            LogInfo("Initalized Windows terminal.", ConsoleColor.DarkCyan);
         }
         else
         {
             Terminal = DevkitServerModule.GameObjectHost.AddComponent<BackgroundLoggingTerminal>();
+            LogInfo("Did not initialize a terminal.", ConsoleColor.DarkCyan);
         }
-        config.ColorFormatting = StackColorFormatType.ANSIColor;
+        config.ColorFormatting = StackColorFormatType.ExtendedANSIColor;
 #else
         if (Application.platform is not RuntimePlatform.WindowsPlayer and not RuntimePlatform.WindowsEditor)
             config.ColorFormatting = StackColorFormatType.ANSIColor;
@@ -46,7 +52,6 @@ internal static class Logger
     }
     internal static void InitLogger()
     {
-        UnturnedLog.info("test3");
         Terminal.Init();
         Terminal.OnInput += OnTerminalInput;
     }
@@ -62,7 +67,7 @@ internal static class Logger
     {
         SendLogMessage.Invoke(connection, message, severity);
     }
-    public static void SendLog(IEnumerable<ITransportConnection> connections, string message, Severity severity)
+    public static void SendLog(List<ITransportConnection> connections, string message, Severity severity)
     {
         SendLogMessage.Invoke(connections, message, severity);
     }

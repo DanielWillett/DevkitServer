@@ -41,7 +41,7 @@ public class UserInput : MonoBehaviour
             return;
         }
         FieldInfo? toolField = type.GetField("activeTool", BindingFlags.Instance | BindingFlags.NonPublic);
-        if (toolField == null || toolField.IsStatic || !typeof(IDevkitTool).IsAssignableFrom(instanceField.FieldType))
+        if (toolField == null || toolField.IsStatic || !typeof(IDevkitTool).IsAssignableFrom(toolField.FieldType))
         {
             Logger.LogWarning("Unable to find field: EditorInteract.activeTool.");
             return;
@@ -51,7 +51,7 @@ public class UserInput : MonoBehaviour
             CallingConventions.Standard, typeof(IDevkitTool),
             Array.Empty<Type>(), type, true);
         ILGenerator il = method.GetILGenerator();
-        il.Emit(OpCodes.Ldfld, instanceField);
+        il.Emit(OpCodes.Ldsfld, instanceField);
         il.Emit(OpCodes.Ldfld, toolField);
         il.Emit(OpCodes.Ret);
         GetDevkitTool = (Func<IDevkitTool>)method.CreateDelegate(typeof(Func<IDevkitTool>));
@@ -93,6 +93,12 @@ public class UserInput : MonoBehaviour
         UserInputPacket packet = new UserInputPacket();
         packet.Read(reader);
         (packets ??= new Queue<UserInputPacket>(1)).Enqueue(packet);
+    }
+
+    [UsedImplicitly]
+    private void OnDestroy()
+    {
+        User = null!;
     }
 
     [UsedImplicitly]

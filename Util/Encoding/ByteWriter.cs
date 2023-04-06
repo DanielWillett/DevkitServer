@@ -651,6 +651,39 @@ public class ByteWriter
         }
         else Write(false);
     }
+    
+
+
+    private static readonly MethodInfo WriteBoundsMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Bounds) }, null);
+    public void Write(Bounds n)
+    {
+        if (!_streamMode)
+        {
+            int newsize = _size + sizeof(float) * 6;
+            if (newsize > _buffer.Length)
+                ExtendBufferIntl(newsize);
+        }
+        Vector3 c = n.center;
+        Vector3 s = n.size;
+        WriteInternal(c.x);
+        WriteInternal(c.y);
+        WriteInternal(c.z);
+        WriteInternal(s.x);
+        WriteInternal(s.y);
+        WriteInternal(s.z);
+    }
+
+
+    private static readonly MethodInfo WriteNullableBoundsMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Bounds?) }, null);
+    public void WriteNullable(Bounds? n)
+    {
+        if (n.HasValue)
+        {
+            Write(true);
+            Write(n.Value);
+        }
+        else Write(false);
+    }
 
 
     private static readonly MethodInfo WriteQuaternionMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Quaternion) }, null);
@@ -1392,6 +1425,10 @@ public class ByteWriter
         else if (type == typeof(Vector4))
         {
             il.EmitCall(OpCodes.Call, isNullable ? WriteNullableVector4Method : WriteVector4Method, null);
+        }
+        else if (type == typeof(Bounds))
+        {
+            il.EmitCall(OpCodes.Call, isNullable ? WriteNullableBoundsMethod : WriteBoundsMethod, null);
         }
         else if (type == typeof(Quaternion))
         {

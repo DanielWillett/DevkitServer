@@ -1,15 +1,13 @@
 ﻿#if CLIENT
-using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading;
 using ThreadPriority = System.Threading.ThreadPriority;
 
 namespace DevkitServer.Util.Terminals;
 internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
 {
     private const uint UTF8_CODEPAGE = 65001U;
+    private const int STD_OUTPUT_HANDLE = -11;
 
     public event TerminalReadDelegate? OnInput;
     public event TerminalWriteDelegate? OnOutput;
@@ -25,6 +23,9 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
         AllocConsole();
         SetConsoleOutputCP(UTF8_CODEPAGE);
         SetConsoleCP(UTF8_CODEPAGE);
+        IntPtr handle = GetStdHandle(STD_OUTPUT_HANDLE);
+        GetConsoleMode(handle, out uint mode1);
+        SetConsoleMode(handle, mode1 | 0x0004); // enable extended ANSI support for older terminals
         Console.OutputEncoding = new UTF8Encoding(false);
         Console.InputEncoding = new UTF8Encoding(false);
         Console.Title = "Devkit Server Client";
@@ -105,6 +106,12 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool AllocConsole();
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern IntPtr GetStdHandle(int nStdHandle);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool FreeConsole();

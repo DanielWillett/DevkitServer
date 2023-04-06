@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using DevkitServer.Multiplayer;
 #if CLIENT
 using DevkitServer.Players.UI;
 #endif
@@ -17,6 +18,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     public IClientTransport Connection { get; private set; } = null!;
 #endif
     public UserInput Input { get; private set; } = null!;
+    public EditorTerrain Terrain { get; private set; } = null!;
     public string DisplayName { get; private set; } = null!;
     public SteamPlayer? Player { get; internal set; }
 
@@ -45,6 +47,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     private void SetupComponents()
     {
         Input = this.gameObject.AddComponent<UserInput>();
+        Terrain = this.gameObject.AddComponent<EditorTerrain>();
     }
 
     [UsedImplicitly]

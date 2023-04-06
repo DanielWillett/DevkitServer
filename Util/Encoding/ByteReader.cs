@@ -524,6 +524,7 @@ public class ByteReader
     private static readonly Vector2 V2NaN = new Vector2(float.NaN, float.NaN);
     private static readonly Vector3 V3NaN = new Vector3(float.NaN, float.NaN, float.NaN);
     private static readonly Vector4 V4NaN = new Vector4(float.NaN, float.NaN, float.NaN, float.NaN);
+    private static readonly Bounds BoundsNaN = new Bounds(V3NaN, V3NaN);
     private static readonly Color32 C32NaN = new Color32(byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue);
 
     private static readonly MethodInfo ReadVector2Method = typeof(ByteReader).GetMethod(nameof(ReadVector2), BindingFlags.Instance | BindingFlags.Public);
@@ -559,6 +560,21 @@ public class ByteReader
     {
         if (!ReadBool()) return null;
         return ReadVector4();
+    }
+
+
+    private static readonly MethodInfo ReadBoundsMethod = typeof(ByteReader).GetMethod(nameof(ReadVector4), BindingFlags.Instance | BindingFlags.Public);
+    public Bounds ReadBounds() =>
+        !EnsureMoreLength(sizeof(float) * 6)
+            ? BoundsNaN
+            : new Bounds(new Vector3(Read<float>(), Read<float>(), Read<float>()), new Vector3(Read<float>(), Read<float>(), Read<float>()));
+
+
+    private static readonly MethodInfo ReadNullableBoundsMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableBounds), BindingFlags.Instance | BindingFlags.Public);
+    public Bounds? ReadNullableBounds()
+    {
+        if (!ReadBool()) return null;
+        return ReadBounds();
     }
 
 
@@ -1064,6 +1080,10 @@ public class ByteReader
         else if (type == typeof(Vector4))
         {
             il.EmitCall(OpCodes.Call, isNullable ? ReadNullableVector4Method : ReadVector4Method, null);
+        }
+        else if (type == typeof(Bounds))
+        {
+            il.EmitCall(OpCodes.Call, isNullable ? ReadNullableBoundsMethod : ReadBoundsMethod, null);
         }
         else if (type == typeof(Quaternion))
         {

@@ -22,6 +22,7 @@ public static class NetFactory
     private static readonly List<Listener> localAckRequests = new List<Listener>(16);
     private static readonly List<NetMethodInfo> registeredMethods = new List<NetMethodInfo>(16);
     private static readonly Dictionary<ushort, BaseNetCall> invokers = new Dictionary<ushort, BaseNetCall>(16);
+    private static Func<PooledTransportConnectionList>? PullFromTransportConnectionListPool;
     /// <summary>The maximum amount of time in seconds a listener is guaranteed to stay active.</summary>
     public const double MaxListenTimeout = 60d;
     private static readonly object sync = new object();
@@ -225,9 +226,72 @@ public static class NetFactory
         if (!ClaimMessageBlock())
             return false;
 
+        PullFromTransportConnectionListPool = null;
+        try
+        {
+            MethodInfo? method = typeof(Provider).Assembly
+                .GetType("SDG.Unturned.TransportConnectionListPool", true, false)?.GetMethod("Get",
+                    BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            if (method != null)
+            {
+                PullFromTransportConnectionListPool = (Func<PooledTransportConnectionList>)method.CreateDelegate(typeof(Func<PooledTransportConnectionList>));
+            }
+            else
+            {
+                Logger.LogWarning("Couldn't find Get in TransportConnectionListPool, list pooling will not be used.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("Couldn't get Get from TransportConnectionListPool, list pooling will not be used (" + ex.Message + ").");
+        }
+
         return true;
     }
+    public static PooledTransportConnectionList GetPooledTransportConnectionList(int capacity = -1)
+    {
+        PooledTransportConnectionList? rtn = null;
+        Exception? ex2 = null;
+        if (PullFromTransportConnectionListPool != null)
+        {
+            try
+            {
+                rtn = PullFromTransportConnectionListPool();
+            }
+            catch (Exception ex)
+            {
+                ex2 = ex;
+                Logger.LogError(ex);
+                PullFromTransportConnectionListPool = null;
+            }
+        }
+        if (rtn == null)
+        {
+            if (capacity == -1)
+                capacity = Provider.clients.Count;
+            try
+            {
+                rtn = (PooledTransportConnectionList)Activator.CreateInstance(typeof(PooledTransportConnectionList),
+                    BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance, null, new object[] { capacity }, CultureInfo.InvariantCulture, null);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex);
+                if (ex2 != null)
+                    throw new AggregateException("Unable to create pooled transport connection!", ex2, ex);
 
+                throw new Exception("Unable to create pooled transport connection!", ex);
+            }
+        }
+
+        return rtn;
+    }
+    public static PooledTransportConnectionList GetPooledTransportConnectionList(IEnumerable<ITransportConnection> selector, int capacity = -1)
+    {
+        PooledTransportConnectionList rtn = GetPooledTransportConnectionList(capacity);
+        rtn.AddRange(selector);
+        return rtn;
+    }
     [UsedImplicitly]
     private static void ReceiveMessage(
 #if SERVER
@@ -304,28 +368,39 @@ public static class NetFactory
                 }
             }
 
+            PooledTransportConnectionList tempList;
+
             if (amt == 0)
             {
-                Send(Provider.clients
-                    .Where(x => x.playerID.steamID.m_SteamID != user.SteamId.m_SteamID)
-                    .Select(x => x.transportConnection), output);
+                tempList = GetPooledTransportConnectionList(UserManager.Users.Count - 1);
+                for (int i = 0; i < UserManager.Users.Count; ++i)
+                {
+                    EditorUser user2 = UserManager.Users[i];
+                    if (user.SteamId.m_SteamID != user2.SteamId.m_SteamID)
+                        tempList.Add(user2.Connection);
+                }
             }
             else
             {
-                Send(Provider.clients.Where(x =>
+                tempList = GetPooledTransportConnectionList(amt);
+                for (int i = 0; i < UserManager.Users.Count; ++i)
                 {
-                    if (x.playerID.steamID.m_SteamID != user.SteamId.m_SteamID)
+                    EditorUser user2 = UserManager.Users[i];
+                    if (user.SteamId.m_SteamID != user2.SteamId.m_SteamID)
                     {
-                        for (int i = 0; i < amt; ++i)
+                        for (int j = 0; j < amt; ++j)
                         {
-                            if (relays[i] == x.playerID.steamID.m_SteamID)
-                                return true;
+                            if (relays[j] == user2.SteamId.m_SteamID)
+                            {
+                                tempList.Add(user2.Connection);
+                                break;
+                            }
                         }
                     }
-
-                    return false;
-                }).Select(x => x.transportConnection), output);
+                }
             }
+
+            Send(tempList, output);
 
             MessageOverhead ovh = new MessageOverhead(msg, user.SteamId.m_SteamID);
             if ((ovh.Flags & (MessageFlags.LayeredResponse | MessageFlags.LayeredRequest)) != 0)
@@ -849,26 +924,16 @@ public static class NetFactory
         connection.Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
     }
 #if SERVER
-    public static void Send(this IEnumerable<ITransportConnection> connections, byte[] bytes, bool reliable = true)
+    public static void Send(this IList<ITransportConnection> connections, byte[] bytes, bool reliable = true)
     {
         Writer.Reset();
         Writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)DevkitMessage.InvokeMethod));
         Writer.WriteUInt16((ushort)bytes.Length);
         Writer.WriteBytes(bytes);
         Writer.Flush();
-        Logger.LogInfo("Sending " + bytes.Length + " bytes.");
-        if (connections is IList<ITransportConnection> list)
-        {
-            for (int i = 0; i < list.Count; ++i)
-            {
-                list[i].Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
-            }
-        }
-        else
-        {
-            foreach (ITransportConnection connection in connections)
-                connection.Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
-        }
+        Logger.LogInfo("Sending " + bytes.Length + " bytes to " + connections.Count + " user(s).");
+        for (int i = 0; i < connections.Count; ++i)
+            connections[i].Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
     }
 #endif
     private readonly struct Listener
