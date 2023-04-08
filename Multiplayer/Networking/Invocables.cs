@@ -1,7 +1,7 @@
 ﻿using DevkitServer.Util.Encoding;
 using System.Reflection;
 
-namespace DevkitServer.Multiplayer;
+namespace DevkitServer.Multiplayer.Networking;
 
 public abstract class BaseNetCall
 {
@@ -13,16 +13,16 @@ public abstract class BaseNetCall
 
     protected BaseNetCall(ushort method)
     {
-        this.ID = method;
+        ID = method;
     }
 
     protected BaseNetCall(Delegate method)
     {
         MethodInfo info = method.GetMethodInfo();
         if (Attribute.GetCustomAttribute(info, typeof(NetCallAttribute)) is NetCallAttribute attribute)
-            this.ID = attribute.MethodID;
+            ID = attribute.MethodID;
 
-        if (this.ID == 0)
+        if (ID == 0)
             throw new ArgumentException($"Method provided for {info.Name} does not contain " +
                                         $"a {nameof(NetCallAttribute)} attribute.", nameof(method));
     }
@@ -168,7 +168,7 @@ public class NetCallCustom : BaseNetCall
     {
         NetTask task2 = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -179,7 +179,7 @@ public class NetCallCustom : BaseNetCall
     {
         NetTask task2 = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -255,7 +255,7 @@ public sealed class NetCall : BaseNetCall
     {
         NetTask task = listener.Listen(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead
+        Invoke(ref overhead
 #if SERVER
             , connection
 #endif
@@ -270,7 +270,7 @@ public sealed class NetCall : BaseNetCall
     {
         NetTask task = ListenAck(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead
+        Invoke(ref overhead
 #if SERVER
             , connection
 #endif
@@ -287,8 +287,8 @@ public sealed class NetCallRaw<T> : NetCallRaw
     /// <summary>Leave <paramref name="reader"/> or <paramref name="writer"/> null to auto-fill.</summary>
     public NetCallRaw(ushort method, ByteReader.Reader<T>? reader, ByteWriter.Writer<T>? writer, int capacity = 0) : base(method)
     {
-        this._writer = new ByteWriterRaw<T>(writer, capacity: capacity);
-        this._reader = new ByteReaderRaw<T>(reader);
+        _writer = new ByteWriterRaw<T>(writer, capacity: capacity);
+        _reader = new ByteReaderRaw<T>(reader);
     }
     /// <summary>Leave <paramref name="reader"/> or <paramref name="writer"/> null to auto-fill.</summary>
     public NetCallRaw(Method method, ByteReader.Reader<T>? reader, ByteWriter.Writer<T>? writer, int capacity = 0) : base(method)
@@ -392,7 +392,7 @@ public sealed class NetCallRaw<T> : NetCallRaw
     {
         NetTask task = listener.Listen(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -407,7 +407,7 @@ public sealed class NetCallRaw<T> : NetCallRaw
     {
         NetTask task = ListenAck(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -432,20 +432,20 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, int capacity = 0) : base(method)
     {
-        this._writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
-        this._reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
+        _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(Method method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, int capacity = 0) : base(method)
     {
-        this._writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
-        this._reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
+        _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(MethodAsync method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, int capacity = 0) : base(method)
     {
-        this._writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
-        this._reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
+        _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
     }
     internal override void SetThrowOnError(bool value) => _reader.ThrowOnError = value;
     public void Invoke(ref MessageOverhead overhead,
@@ -538,7 +538,7 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
     {
         NetTask task = listener.Listen(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -553,7 +553,7 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
     {
         NetTask task = ListenAck(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -580,20 +580,20 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, int capacity = 0) : base(method)
     {
-        this._writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
-        this._reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
+        _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(Method method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, int capacity = 0) : base(method)
     {
-        this._writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
-        this._reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
+        _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(MethodAsync method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, int capacity = 0) : base(method)
     {
-        this._writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
-        this._reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
+        _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
     }
     internal override void SetThrowOnError(bool value) => _reader.ThrowOnError = value;
     public void Invoke(ref MessageOverhead overhead,
@@ -687,7 +687,7 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
     {
         NetTask task = listener.Listen(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -702,7 +702,7 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
     {
         NetTask task = ListenAck(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -729,20 +729,20 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, int capacity = 0) : base(method)
     {
-        this._writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
-        this._reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
+        _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(Method method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, int capacity = 0) : base(method)
     {
-        this._writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
-        this._reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
+        _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(MethodAsync method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, int capacity = 0) : base(method)
     {
-        this._writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
-        this._reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
+        _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
     }
     internal override void SetThrowOnError(bool value) => _reader.ThrowOnError = value;
     public void Invoke(ref MessageOverhead overhead,
@@ -837,7 +837,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
     {
         NetTask task = listener.Listen(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -852,7 +852,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
     {
         NetTask task = ListenAck(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -979,7 +979,7 @@ public sealed class NetCall<T> : DynamicNetCall
     {
         NetTask task = listener.Listen(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -994,7 +994,7 @@ public sealed class NetCall<T> : DynamicNetCall
     {
         NetTask task = ListenAck(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -1122,7 +1122,7 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
     {
         NetTask task = listener.Listen(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -1137,7 +1137,7 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
     {
         NetTask task = ListenAck(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -1266,7 +1266,7 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
     {
         NetTask task = listener.Listen(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -1281,7 +1281,7 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
     {
         NetTask task = ListenAck(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -1411,7 +1411,7 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
     {
         NetTask task = listener.Listen(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -1426,7 +1426,7 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
     {
         NetTask task = ListenAck(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -1557,7 +1557,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
     {
         NetTask task = listener.Listen(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -1572,7 +1572,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
     {
         NetTask task = ListenAck(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -1704,7 +1704,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
     {
         NetTask task = listener.Listen(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -1719,7 +1719,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
     {
         NetTask task = ListenAck(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -1867,7 +1867,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
     {
         NetTask task = listener.Listen(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection,
 #endif
@@ -1883,7 +1883,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
     {
         NetTask task = ListenAck(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection,
 #endif
@@ -2019,7 +2019,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
     {
         NetTask task = listener.Listen(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -2034,7 +2034,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
     {
         NetTask task = ListenAck(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -2168,7 +2168,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
     {
         NetTask task = listener.Listen(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -2183,7 +2183,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
     {
         NetTask task = ListenAck(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -2318,7 +2318,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
     {
         NetTask task = listener.Listen(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif
@@ -2333,7 +2333,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
     {
         NetTask task = ListenAck(TimeoutMS);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
-        this.Invoke(ref overhead,
+        Invoke(ref overhead,
 #if SERVER
             connection, 
 #endif

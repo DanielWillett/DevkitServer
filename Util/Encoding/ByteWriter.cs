@@ -1,4 +1,4 @@
-﻿using DevkitServer.Multiplayer;
+﻿using DevkitServer.Multiplayer.Networking;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;

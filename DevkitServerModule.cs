@@ -4,19 +4,24 @@ using DevkitServer.Patches;
 using DevkitServer.Players;
 using SDG.Framework.Modules;
 using System.Runtime.CompilerServices;
+using DevkitServer.Multiplayer.Networking;
 
 namespace DevkitServer;
 
 public sealed class DevkitServerModule : IModuleNexus
 {
+    public static readonly string ServerRule = "DevkitServer";
     public static GameObject GameObjectHost { get; private set; } = null!;
+    public static DevkitServerModuleComponent ComponentHost { get; private set; } = null!;
     public static DevkitServerModule Instance { get; private set; } = null!;
     public static bool IsEditing { get; internal set; }
     public static bool LoadFaulted { get; private set; }
+    public static LevelInfo? PendingLevelInfo { get; internal set; }
     public static void EarlyInitialize()
     {
         LoadFaulted = false;
         GameObjectHost = new GameObject("DevkitServer");
+        ComponentHost = GameObjectHost.AddComponent<DevkitServerModuleComponent>();
         Provider.gameMode = new DevkitServerGamemode();
         Object.DontDestroyOnLoad(GameObjectHost);
 
@@ -152,4 +157,9 @@ public sealed class DevkitServerModule : IModuleNexus
         Logger.LogInfo("No longer connected to a DevkitServer host.");
     }
 #endif
+}
+
+public sealed class DevkitServerModuleComponent : MonoBehaviour
+{
+
 }

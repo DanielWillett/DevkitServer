@@ -1,6 +1,6 @@
 ﻿using DevkitServer.Util.Encoding;
 
-namespace DevkitServer.Multiplayer;
+namespace DevkitServer.Multiplayer.Networking;
 public readonly struct MessageContext
 {
     public static readonly MessageContext Nil = new MessageContext(null!, new MessageOverhead(MessageFlags.None, 0, 0));
@@ -20,8 +20,8 @@ public readonly struct MessageContext
 #endif
             connection, MessageOverhead overhead)
     {
-        this.Connection = connection;
-        this.Overhead = overhead;
+        Connection = connection;
+        Overhead = overhead;
     }
     public MessageOverhead GetReplyOverhead(ushort id, bool layered, bool ack)
     {
@@ -66,7 +66,7 @@ public readonly struct MessageContext
     {
         if (Connection is null)
             return false;
-        
+
         if ((Overhead.Flags & MessageFlags.AcknowledgeRequest) == MessageFlags.AcknowledgeRequest)
         {
             MessageFlags flags = Overhead.Flags & ~MessageFlags.AcknowledgeRequest;
@@ -82,7 +82,7 @@ public readonly struct MessageContext
                     overhead.GetBytes(ttlPtr, out _);
                     UnsafeBitConverter.GetBytes(ttlPtr, errorCode, overhead.Length);
                 }
-                
+
                 Connection.Send(ttl);
                 return true;
             }

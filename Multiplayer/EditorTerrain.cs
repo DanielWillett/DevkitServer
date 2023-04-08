@@ -1,15 +1,15 @@
-﻿using DevkitServer.Patches;
+﻿using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Patches;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
 using JetBrains.Annotations;
+using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Landscapes;
 using SDG.Framework.Utilities;
 using System.Reflection;
-using SDG.Framework.Devkit.Tools;
-using SDG.Framework.IO.Serialization;
 
 namespace DevkitServer.Multiplayer;
-public partial class EditorTerrain : MonoBehaviour
+public sealed partial class EditorTerrain : MonoBehaviour
 {
     public static readonly NetCallCustom FlushEditBuffer = new NetCallCustom((int)NetCalls.FlushEditBuffer, short.MaxValue);
     public const ushort DataVersion = 0;
@@ -103,7 +103,6 @@ public partial class EditorTerrain : MonoBehaviour
         }
     }
 
-
     private void WriteEditBuffer(ByteWriter writer)
     {
         ThreadUtil.assertIsGameThread();
@@ -193,6 +192,9 @@ public partial class EditorTerrain : MonoBehaviour
             {
                 // todo Keep Updated
                 TerrainTransactionType.HeightmapRamp => new HeightmapRampAction(),
+                TerrainTransactionType.HeightmapFlatten => new HeightmapFlattenAction(),
+                TerrainTransactionType.HeightmapAdjust => new HeightmapAdjustAction(),
+                TerrainTransactionType.HeightmapSmooth => new HeightmapSmoothAction(),
                 _ => null
             };
             if (action != null)

@@ -38,6 +38,42 @@ public static unsafe class UnsafeBitConverter
         *(int*)(ptr + offset + sizeof(int) * 3) = ints[3];
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void GetBytes(byte[] arr, bool value, int offset = 0) { fixed (byte* ptr = arr) { *(ptr + offset) = value ? (byte)1 : (byte)0; } }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void GetBytes(byte[] arr, byte value, int offset = 0) { fixed (byte* ptr = arr) { *(ptr + offset) = value; } }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void GetBytes(byte[] arr, sbyte value, int offset = 0) { fixed (byte* ptr = arr) { *(sbyte*)(ptr + offset) = value; } }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void GetBytes(byte[] arr, char value, int offset = 0) { fixed (byte* ptr = arr) { *(short*)(ptr + offset) = unchecked((short)value); } }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void GetBytes(byte[] arr, ushort value, int offset = 0) { fixed (byte* ptr = arr) { *(short*)(ptr + offset) = unchecked((short)value); } }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void GetBytes(byte[] arr, uint value, int offset = 0) { fixed (byte* ptr = arr) { *(int*)(ptr + offset) = unchecked((int)value); } }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void GetBytes(byte[] arr, ulong value, int offset = 0) { fixed (byte* ptr = arr) { *(long*)(ptr + offset) = unchecked((long)value); } }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void GetBytes(byte[] arr, short value, int offset = 0) { fixed (byte* ptr = arr) { *(short*)(ptr + offset) = value; } }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void GetBytes(byte[] arr, int value, int offset = 0) { fixed (byte* ptr = arr) { *(int*)(ptr + offset) = value; } }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void GetBytes(byte[] arr, long value, int offset = 0) { fixed (byte* ptr = arr) { *(long*)(ptr + offset) = value; } }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void GetBytes(byte[] arr, float value, int offset = 0) { fixed (byte* ptr = arr) { *(int*)(ptr + offset) = *(int*)&value; } }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void GetBytes(byte[] arr, double value, int offset = 0) { fixed (byte* ptr = arr) { *(long*)(ptr + offset) = *(long*)&value; } }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void GetBytes(byte[] arr, decimal value, int offset = 0)
+    {
+        int[] ints = decimal.GetBits(value);
+        fixed (byte* ptr = &arr[offset])
+        {
+            *(int*)ptr = ints[0];
+            *(int*)(ptr + sizeof(int)) = ints[1];
+            *(int*)(ptr + sizeof(int) * 2) = ints[2];
+            *(int*)(ptr + sizeof(int) * 3) = ints[3];
+        }
+    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static decimal GetDecimal(byte* ptr, int offset = 0)
     {
         // ReSharper disable once InconsistentlySynchronizedField

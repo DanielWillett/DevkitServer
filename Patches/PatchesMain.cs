@@ -1,15 +1,18 @@
 ﻿using DevkitServer.Multiplayer;
 using HarmonyLib;
 using JetBrains.Annotations;
-using SDG.Provider;
 using System.Reflection;
+#if CLIENT
+using DevkitServer.Multiplayer.LevelData;
+using SDG.Provider;
+#endif
 #if SERVER
 using System.Reflection.Emit;
 #endif
-using Action = System.Action;
 
 namespace DevkitServer.Patches;
 [HarmonyPatch]
+[EarlyTypeInit]
 internal static class PatchesMain
 {
     public const string HarmonyId = "dw.devkitserver";
@@ -44,12 +47,12 @@ internal static class PatchesMain
 
 #if CLIENT
     private static readonly InstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>> GetServerPendingIDs =
-        Accessor.GenerateInstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>>("serverPendingIDs", BindingFlags.NonPublic);
+        Accessor.GenerateInstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>>("serverPendingIDs", BindingFlags.NonPublic, true)!;
 
     private static readonly Action<LevelInfo, List<PublishedFileId_t>> ApplyServerAssetMapping =
-        Accessor.GetStaticMethod<Assets, Action<LevelInfo, List<PublishedFileId_t>>>("ApplyServerAssetMapping");
+        Accessor.GenerateStaticCaller<Assets, Action<LevelInfo, List<PublishedFileId_t>>>("ApplyServerAssetMapping", null, true)!;
 
-    private static readonly Action LoadGameMode = Accessor.GetStaticMethod<Provider, Action>("loadGameMode");
+    //private static readonly Action LoadGameMode = Accessor.GenerateStaticCaller<Provider, Action>("loadGameMode", throwOnError: true)!;
 
     [HarmonyPatch(typeof(Provider), nameof(Provider.launch))]
     [HarmonyPrefix]
@@ -57,8 +60,18 @@ internal static class PatchesMain
     {
         Provider.provider.matchmakingService.refreshRules(Provider.currentServerInfo.ip, Provider.currentServerInfo.queryPort);
         Provider.provider.matchmakingService.onRulesQueryRefreshed += RulesReady;
+        return false;
+    }
+    internal static void Launch()
+    {
+        if (!DevkitServerModule.IsEditing)
+        {
+            Provider.launch();
+            return;
+        }
 
-        LevelInfo level = Level.getLevel(Provider.map);
+        LevelInfo level = DevkitServerModule.PendingLevelInfo ?? Level.getLevel(Provider.map);
+        DevkitServerModule.PendingLevelInfo = null;
         if (level == null)
         {
             Provider._connectionFailureInfo = ESteamConnectionFailureInfo.MAP;
@@ -72,26 +85,29 @@ internal static class PatchesMain
             Provider.gameMode = new DevkitServerGamemode();
         }
 
-        return false;
     }
-
     private static void RulesReady(Dictionary<string, string> rulesmap)
     {
+        Provider.provider.matchmakingService.onRulesQueryRefreshed -= RulesReady;
+#if DEBUG
+        Logger.LogInfo("Server rules: ");
         foreach (KeyValuePair<string, string> kvp in rulesmap)
         {
             Logger.LogInfo($"{kvp.Key}: {kvp.Value}.");
         }
-        if (rulesmap.TryGetValue("DevkitServer", out string val) && val.Equals("True", StringComparison.Ordinal))
+#endif
+        if (rulesmap.TryGetValue(DevkitServerModule.ServerRule, out string val) && val.Equals("True", StringComparison.InvariantCultureIgnoreCase))
         {
             DevkitServerModule.IsEditing = true;
-            Logger.LogInfo("Found tag 'DevkitServer'.");
+            Logger.LogDebug("Found tag '" + DevkitServerModule.ServerRule + "'.");
+            EditorLevel.RequestLevel();
         }
         else
         {
-            Logger.LogInfo("Did not find tag 'DevkitServer'.");
+            Logger.LogDebug("Did not find tag '" + DevkitServerModule.ServerRule + "'.");
             DevkitServerModule.IsEditing = false;
+            Launch();
         }
-        Provider.provider.matchmakingService.onRulesQueryRefreshed -= RulesReady;
     }
 
 #endif
@@ -132,12 +148,22 @@ internal static class PatchesMain
     private static bool MainCameraAwake() => !DevkitServerModule.IsEditing;
 
     [UsedImplicitly]
+    [HarmonyPatch(typeof(ObjectManager), "Update")]
+    [HarmonyPrefix]
+    private static bool ObjectManagerUpdate() => !DevkitServerModule.IsEditing;
+
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(Editor), "save")]
+    [HarmonyPrefix]
+    private static bool SaveEditorSettings() => !DevkitServerModule.IsEditing;
+
+    [UsedImplicitly]
     [HarmonyPatch(typeof(Provider), "AdvertiseConfig", MethodType.Normal)]
     [HarmonyPrefix]
     private static void AdvertiseConfig()
     {
-        Logger.LogInfo("Setting SteamGameServer KeyValue 'DevkitServer' to 'True'.");
-        SteamGameServer.SetKeyValue("DevkitServer", "True");
+        Logger.LogDebug("Setting SteamGameServer KeyValue '" + DevkitServerModule.ServerRule + "' to 'True'.");
+        SteamGameServer.SetKeyValue(DevkitServerModule.ServerRule, "True");
     }
     private static readonly MethodInfo lvlLoad = typeof(Level).GetMethod(nameof(Level.load))!;
     private static readonly MethodInfo lvlEdit = typeof(PatchesMain).GetMethod(nameof(OnLoadEdit), BindingFlags.NonPublic | BindingFlags.Static)!;

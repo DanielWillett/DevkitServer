@@ -1,4 +1,4 @@
-﻿namespace DevkitServer.Multiplayer;
+﻿namespace DevkitServer.Multiplayer.Networking;
 
 [Flags]
 public enum MessageFlags : byte

@@ -6,6 +6,8 @@ using HarmonyLib;
 namespace DevkitServer.Util;
 internal static class Accessor
 {
+    private static Type[]? _funcTypeList;
+    private static Type[]? _actionTypeList;
     public static InstanceSetter<TInstance, TValue>? GenerateInstanceSetter<TInstance, TValue>(string fieldName, BindingFlags flags = BindingFlags.NonPublic, bool throwOnError = false)
     {
         try
@@ -124,37 +126,6 @@ internal static class Accessor
         }
     }
     
-    /// <exception cref="ArgumentException"/>
-    public static TDelegate GetStaticMethod<TInstance, TDelegate>(string methodName, Type[]? parameterTypes = null, BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Static) where TDelegate : Delegate
-    {
-        Type type = typeof(TInstance);
-        MethodInfo? method;
-        try
-        {
-            method = parameterTypes == null ? type.GetMethod(methodName, flags) : type.GetMethod(methodName, flags, null, parameterTypes, null);
-        }
-        catch (AmbiguousMatchException ex)
-        {
-            if (parameterTypes == null)
-                throw new ArgumentException("Multiple methods match \"" + methodName + "\", try specifying parameter types.", nameof(parameterTypes), ex);
-            
-            throw;
-        }
-        if (method == null)
-            throw new ArgumentException("No methods match \"" + type.Name + "." + methodName + "\".", nameof(methodName));
-        if (!method.IsStatic)
-            throw new ArgumentException("Method \"" + type.Name + "." + methodName + "\" is not a static method.", nameof(methodName));
-
-        try
-        {
-            TDelegate dele = (TDelegate)method.CreateDelegate(typeof(TDelegate), null);
-            return dele;
-        }
-        catch (Exception ex)
-        {
-            throw new ArgumentException("Failed to create a delegate of type " + typeof(TDelegate).Name + ". Should match signature of: " + method.FullDescription() + ".", nameof(TDelegate), ex);
-        }
-    }
     private static readonly MethodInfo isServerGetter = typeof(Provider).GetProperty(nameof(Provider.isServer), BindingFlags.Static | BindingFlags.Public)?.GetGetMethod()!;
     private static readonly MethodInfo isEditorGetter = typeof(Level).GetProperty(nameof(Level.isEditor), BindingFlags.Static | BindingFlags.Public)?.GetGetMethod()!;
     public static IEnumerable<CodeInstruction> AddIsEditorCall(IEnumerable<CodeInstruction> instructions, MethodBase __method)
@@ -175,12 +146,373 @@ internal static class Accessor
                 yield return new CodeInstruction(OpCodes.Or);
                 yield return new CodeInstruction(OpCodes.Not);
                 if (__method != null)
-                    Logger.LogInfo("Inserted editor call to " + __method.FullDescription() + ".");
+                    Logger.LogInfo("Inserted editor call to " + __method.Format() + ".");
                 else
                     Logger.LogInfo("Inserted editor call to unknown method.");
             }
             else
                 yield return instr;
+        }
+    }
+    private static void CheckFuncArrays()
+    {
+        _funcTypeList ??= new Type[]
+        {
+            typeof(Func<,>),
+            typeof(Func<,,>),
+            typeof(Func<,,,>),
+            typeof(Func<,,,,>),
+            typeof(Func<,,,,,>),
+            typeof(Func<,,,,,,>),
+            typeof(Func<,,,,,,,>),
+            typeof(Func<,,,,,,,,>),
+            typeof(Func<,,,,,,,,,>),
+            typeof(Func<,,,,,,,,,,>),
+            typeof(Func<,,,,,,,,,,,>),
+            typeof(Func<,,,,,,,,,,,,>),
+            typeof(Func<,,,,,,,,,,,,,>),
+            typeof(Func<,,,,,,,,,,,,,,>),
+            typeof(Func<,,,,,,,,,,,,,,,>),
+            typeof(Func<,,,,,,,,,,,,,,,,>)
+        };
+        _actionTypeList ??= new Type[]
+        {
+            typeof(Action<>),
+            typeof(Action<,>),
+            typeof(Action<,,>),
+            typeof(Action<,,,>),
+            typeof(Action<,,,,>),
+            typeof(Action<,,,,,>),
+            typeof(Action<,,,,,,>),
+            typeof(Action<,,,,,,,>),
+            typeof(Action<,,,,,,,,>),
+            typeof(Action<,,,,,,,,,>),
+            typeof(Action<,,,,,,,,,,>),
+            typeof(Action<,,,,,,,,,,,>),
+            typeof(Action<,,,,,,,,,,,,>),
+            typeof(Action<,,,,,,,,,,,,,>),
+            typeof(Action<,,,,,,,,,,,,,,>),
+            typeof(Action<,,,,,,,,,,,,,,,>)
+        };
+    }
+
+    public static Delegate? GenerateInstanceCaller<TInstance>(string methodName, Type[]? parameters = null, bool throwOnError = false)
+    {
+        MethodInfo? method = null;
+        if (parameters == null)
+        {
+            try
+            {
+                method = typeof(TInstance).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            }
+            catch (AmbiguousMatchException)
+            {
+                // ignored
+            }
+        }
+        if (parameters != null)
+        {
+            method = typeof(TInstance)
+                .GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+                    null, CallingConventions.Any, parameters, null);
+        }
+
+        if (method == null)
+        {
+            Logger.LogError("Unable to find matching method " + methodName + ".");
+            if (throwOnError)
+                throw new Exception("Unable to find matching method: " + methodName + ".");
+            return null;
+        }
+
+        return GenerateInstanceCaller(method);
+    }
+    public static TDelegate? GenerateInstanceCaller<TInstance, TDelegate>(string methodName, Type[]? parameters = null, bool throwOnError = false) where TDelegate : Delegate
+    {
+        MethodInfo? method = null;
+        if (parameters == null)
+        {
+            try
+            {
+                method = typeof(TInstance).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            }
+            catch (AmbiguousMatchException)
+            {
+                // ignored
+            }
+        }
+        if (parameters != null)
+        {
+            method = typeof(TInstance)
+                .GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
+                    null, CallingConventions.Any, parameters, null);
+        }
+
+        if (method == null)
+        {
+            Logger.LogError("Unable to find matching method " + methodName + ".");
+            if (throwOnError)
+                throw new Exception("Unable to find matching method: " + methodName + ".");
+            return null;
+        }
+
+        return GenerateInstanceCaller<TDelegate>(method);
+    }
+    public static Delegate? GenerateInstanceCaller(MethodInfo method, bool throwOnError = false)
+    {
+        CheckFuncArrays();
+
+        bool rtn = method.ReturnType != typeof(void);
+        ParameterInfo[] p = method.GetParameters();
+        if (p.Length + 1 > (rtn ? _funcTypeList!.Length : _actionTypeList!.Length))
+        {
+            if (throwOnError)
+                throw new ArgumentException("Method can not have more than " + ((rtn ? _funcTypeList!.Length : _actionTypeList!.Length) - 1) + " arguments!", nameof(method));
+            Logger.LogWarning("Method " + method.Format() + " can not have more than " + ((rtn ? _funcTypeList!.Length : _actionTypeList!.Length) - 1) + " arguments!");
+            return null;
+        }
+        Type deleType;
+        try
+        {
+            if (rtn)
+            {
+                Type[] p2 = new Type[p.Length + 2];
+                p2[0] = method.DeclaringType!;
+                for (int i = 1; i < p2.Length - 1; ++i)
+                    p2[i] = p[i - 1].ParameterType;
+                p2[p2.Length - 1] = method.ReturnType;
+                deleType = _funcTypeList![p.Length].MakeGenericType(p2);
+            }
+            else
+            {
+                Type[] p2 = new Type[p.Length + 1];
+                p2[0] = method.DeclaringType!;
+                for (int i = 1; i < p2.Length; ++i)
+                    p2[i] = p[i - 1].ParameterType;
+                deleType = _actionTypeList![p.Length];
+                deleType = deleType.MakeGenericType(p2);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error generating instance caller for " + method.Format() + ".");
+            Logger.LogError(ex);
+            if (throwOnError)
+                throw;
+            return null;
+        }
+
+        return GenerateInstanceCaller(deleType, method);
+    }
+    public static TDelegate? GenerateInstanceCaller<TDelegate>(MethodInfo info, bool throwOnError = false) where TDelegate : Delegate
+    {
+        Delegate? d = GenerateInstanceCaller(typeof(TDelegate), info);
+        if (d is TDelegate dele)
+        {
+            return dele;
+        }
+
+        if (d != null)
+        {
+            Logger.LogError("Error generating instance caller for " + info.Format() + ".");
+            if (throwOnError)
+                throw new InvalidCastException("Failed to convert from " + d.GetType() + " to " + typeof(TDelegate) + ".");
+        }
+        else if (throwOnError)
+            throw new Exception("Error generating instance caller for " + info.Format() + ".");
+
+        return null;
+    }
+    public static Delegate? GenerateInstanceCaller(Type delegateType, MethodInfo method, bool throwOnError = false)
+    {
+        ParameterInfo[] p = method.GetParameters();
+        Type[] paramTypes = new Type[p.Length + 1];
+        paramTypes[0] = method.DeclaringType!;
+        for (int i = 1; i < paramTypes.Length; ++i)
+            paramTypes[i] = p[i - 1].ParameterType;
+        try
+        {
+            DynamicMethod dm = new DynamicMethod("Invoke" + method.Name, method.ReturnType, paramTypes, method.DeclaringType?.Module ?? typeof(Accessor).Module, true);
+            ILGenerator generator = dm.GetILGenerator();
+            for (int i = 0; i < paramTypes.Length; ++i)
+            {
+                if (paramTypes[i].IsByRef)
+                {
+                    generator.Emit(OpCodes.Ldarga_S, (byte)i);
+                }
+                else
+                {
+                    OpCode c = i switch
+                    {
+                        0 => OpCodes.Ldarg_0,
+                        1 => OpCodes.Ldarg_1,
+                        2 => OpCodes.Ldarg_2,
+                        3 => OpCodes.Ldarg_3,
+                        _ => OpCodes.Ldarg_S
+                    };
+                    if (i > 3)
+                        generator.Emit(c, (byte)i);
+                    else
+                        generator.Emit(c);
+                }
+            }
+            generator.Emit(OpCodes.Callvirt, method);
+            generator.Emit(OpCodes.Ret);
+            return dm.CreateDelegate(delegateType);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("Unable to create instance caller for " + (method.DeclaringType?.Name ?? "<unknown-type>") + "." + method.Name);
+            Logger.LogError(ex);
+            if (throwOnError)
+                throw;
+            return null;
+        }
+    }
+
+    public static Delegate? GenerateStaticCaller<TInstance>(string methodName, Type[]? parameters = null, bool throwOnError = false)
+    {
+        MethodInfo? method = null;
+        if (parameters == null)
+        {
+            try
+            {
+                method = typeof(TInstance).GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            }
+            catch (AmbiguousMatchException)
+            {
+                // ignored
+            }
+        }
+        if (parameters != null)
+        {
+            method = typeof(TInstance)
+                .GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public,
+                    null, CallingConventions.Any, parameters, null);
+        }
+
+        if (method == null)
+        {
+            Logger.LogError("Unable to find matching method " + methodName + ".");
+            if (throwOnError)
+                throw new Exception("Unable to find matching method: " + methodName + ".");
+            return null;
+        }
+
+        return GenerateStaticCaller(method);
+    }
+    public static TDelegate? GenerateStaticCaller<TInstance, TDelegate>(string methodName, Type[]? parameters = null, bool throwOnError = false) where TDelegate : Delegate
+    {
+        MethodInfo? method = null;
+        if (parameters == null)
+        {
+            try
+            {
+                method = typeof(TInstance).GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            }
+            catch (AmbiguousMatchException)
+            {
+                // ignored
+            }
+        }
+        if (parameters != null)
+        {
+            method = typeof(TInstance)
+                .GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public,
+                    null, CallingConventions.Any, parameters, null);
+        }
+
+        if (method == null)
+        {
+            Logger.LogError("Unable to find matching method " + methodName + ".");
+            if (throwOnError)
+                throw new Exception("Unable to find matching method: " + methodName + ".");
+            return null;
+        }
+
+        return GenerateStaticCaller<TDelegate>(method);
+    }
+    public static Delegate? GenerateStaticCaller(MethodInfo method, bool throwOnError = false)
+    {
+        CheckFuncArrays();
+
+        bool rtn = method.ReturnType != typeof(void);
+        ParameterInfo[] p = method.GetParameters();
+        if (p.Length > (rtn ? _funcTypeList!.Length : _actionTypeList!.Length))
+        {
+            if (throwOnError)
+                throw new ArgumentException("Method can not have more than " + (rtn ? _funcTypeList!.Length : _actionTypeList!.Length) + " arguments!", nameof(method));
+            Logger.LogWarning("Method " + method.Format() + " can not have more than " + (rtn ? _funcTypeList!.Length : _actionTypeList!.Length) + " arguments!");
+            return null;
+        }
+        Type deleType;
+        try
+        {
+            if (rtn)
+            {
+                Type[] p2 = new Type[p.Length + 1];
+                for (int i = 1; i < p2.Length - 1; ++i)
+                    p2[i] = p[i].ParameterType;
+                p2[p2.Length - 1] = method.ReturnType;
+                deleType = _funcTypeList![p.Length].MakeGenericType(p2);
+            }
+            else
+            {
+                Type[] p2 = new Type[p.Length];
+                for (int i = 1; i < p2.Length; ++i)
+                    p2[i] = p[i].ParameterType;
+                deleType = _actionTypeList![p.Length];
+                deleType = deleType.MakeGenericType(p2);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error generating static caller for " + method.Format() + ".");
+            Logger.LogError(ex);
+            if (throwOnError)
+                throw;
+            return null;
+        }
+
+        return GenerateInstanceCaller(deleType, method);
+    }
+    public static TDelegate? GenerateStaticCaller<TDelegate>(MethodInfo info, bool throwOnError = false) where TDelegate : Delegate
+    {
+        Delegate? d = GenerateStaticCaller(typeof(TDelegate), info);
+        if (d is TDelegate dele)
+        {
+            return dele;
+        }
+
+        if (d != null)
+        {
+            Logger.LogError("Error generating static caller for " + info.Format() + ".");
+            if (throwOnError)
+                throw new InvalidCastException("Failed to convert from " + d.GetType() + " to " + typeof(TDelegate) + ".");
+        }
+        else if (throwOnError)
+            throw new Exception("Error generating static caller for " + info.Format() + ".");
+
+        return null;
+    }
+    public static Delegate? GenerateStaticCaller(Type delegateType, MethodInfo method, bool throwOnError = false)
+    {
+        ParameterInfo[] p = method.GetParameters();
+        Type[] paramTypes = new Type[p.Length + 1];
+        paramTypes[0] = method.DeclaringType!;
+        for (int i = 1; i < paramTypes.Length; ++i)
+            paramTypes[i] = p[i - 1].ParameterType;
+        try
+        {
+            return method.CreateDelegate(delegateType);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("Unable to create static caller for " + (method.DeclaringType?.Format() ?? "<unknown-type>") + "." + method.Name);
+            Logger.LogError(ex);
+            if (throwOnError)
+                throw;
+            return null;
         }
     }
 }

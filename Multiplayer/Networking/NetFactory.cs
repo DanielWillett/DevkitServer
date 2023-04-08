@@ -8,7 +8,9 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
-namespace DevkitServer.Multiplayer;
+namespace DevkitServer.Multiplayer.Networking;
+
+[EarlyTypeInit]
 public static class NetFactory
 {
     public enum DevkitMessage
@@ -24,7 +26,7 @@ public static class NetFactory
     private static readonly Dictionary<ushort, BaseNetCall> invokers = new Dictionary<ushort, BaseNetCall>(16);
     private static Func<PooledTransportConnectionList>? PullFromTransportConnectionListPool;
     /// <summary>The maximum amount of time in seconds a listener is guaranteed to stay active.</summary>
-    public const double MaxListenTimeout = 60d;
+    public const double MaxListenTimeout = 600d;
     private static readonly object sync = new object();
     private static readonly NetPakWriter Writer = new NetPakWriter();
     public static int ReceiveBlockOffset { get; private set; }
@@ -33,10 +35,17 @@ public static class NetFactory
     public static int NewReceiveBitCount { get; private set; }
     public static int NewWriteBitCount { get; private set; }
     public static Delegate[] Listeners { get; private set; } = Array.Empty<Delegate>();
+#if DEBUG
+    private static readonly InstanceGetter<ClientMethodHandle, ClientMethodInfo>? ServerGetMethodInfo = Accessor.GenerateInstanceGetter<ClientMethodHandle, ClientMethodInfo>("clientMethodInfo");
+    private static readonly InstanceGetter<ServerMethodHandle, ServerMethodInfo>? ClientGetMethodInfo = Accessor.GenerateInstanceGetter<ServerMethodHandle, ServerMethodInfo>("serverMethodInfo");
+    private static readonly InstanceGetter<ClientMethodInfo, string>? ServerGetMethodName = Accessor.GenerateInstanceGetter<ClientMethodInfo, string>("name");
+    private static readonly InstanceGetter<ServerMethodInfo, string>? ClientGetMethodName = Accessor.GenerateInstanceGetter<ServerMethodInfo, string>("name");
+#endif
+
 
 #if CLIENT
     internal static StaticGetter<IClientTransport> GetPlayerTransportConnection =
-        Accessor.GenerateStaticGetter<Provider, IClientTransport>("clientTransport", BindingFlags.NonPublic);
+        Accessor.GenerateStaticGetter<Provider, IClientTransport>("clientTransport", BindingFlags.NonPublic, throwOnError: true)!;
 #endif
     private static bool ClaimMessageBlock()
     {
@@ -52,14 +61,14 @@ public static class NetFactory
         // calculates the minimum amount of bits needed to represent the number.
         int GetMinBitCount(int n) => (int)Math.Floor(Math.Log(n, 2)) + 1;
 
-        ReceiveBlockOffset  = vanilla.GetFields(BindingFlags.Static | BindingFlags.Public).Length;
-        WriteBlockOffset    = vanillaSend.GetFields(BindingFlags.Static | BindingFlags.Public).Length;
-        BlockSize           = devkitType.GetFields(BindingFlags.Static | BindingFlags.Public).Length;
+        ReceiveBlockOffset = vanilla.GetFields(BindingFlags.Static | BindingFlags.Public).Length;
+        WriteBlockOffset = vanillaSend.GetFields(BindingFlags.Static | BindingFlags.Public).Length;
+        BlockSize = devkitType.GetFields(BindingFlags.Static | BindingFlags.Public).Length;
         int origReceiveBitCount = GetMinBitCount(ReceiveBlockOffset);
-        int origWriteBitCount   = GetMinBitCount(WriteBlockOffset);
+        int origWriteBitCount = GetMinBitCount(WriteBlockOffset);
 
         NewReceiveBitCount = GetMinBitCount(ReceiveBlockOffset + BlockSize);
-        NewWriteBitCount   = GetMinBitCount(WriteBlockOffset + BlockSize);
+        NewWriteBitCount = GetMinBitCount(WriteBlockOffset + BlockSize);
 
         Logger.LogDebug($"Collected enum values: Offsets: (rec {ReceiveBlockOffset}, wrt {WriteBlockOffset}) | Size: {BlockSize} | Orig bit ct: (rec {origReceiveBitCount}, wrt {origWriteBitCount}). Bit cts: (rec {NewReceiveBitCount}, wrt {NewWriteBitCount}).");
 
@@ -67,7 +76,7 @@ public static class NetFactory
         MethodInfo[] methods = new MethodInfo[BlockSize];
 
         methods[(int)DevkitMessage.InvokeMethod] = typeof(NetFactory).GetMethod(nameof(ReceiveMessage), BindingFlags.NonPublic | BindingFlags.Static)!;
-        methods[(int)DevkitMessage.RelayPacket]  = typeof(NetFactory).GetMethod(nameof(ReceiveRelayPacket), BindingFlags.NonPublic | BindingFlags.Static)!;
+        methods[(int)DevkitMessage.RelayPacket] = typeof(NetFactory).GetMethod(nameof(ReceiveRelayPacket), BindingFlags.NonPublic | BindingFlags.Static)!;
 
         Listeners = new Delegate[methods.Length];
 
@@ -77,12 +86,12 @@ public static class NetFactory
         Type readEnum  = typeof(EServerMessage_NetEnum);
         Type writeEnum = typeof(EClientMessage_NetEnum);
 #else
-        Type readEnum  = typeof(EClientMessage_NetEnum);
+        Type readEnum = typeof(EClientMessage_NetEnum);
         Type writeEnum = typeof(EServerMessage_NetEnum);
 #endif
         bool p1 = false;
         bool p2 = false;
-        MethodInfo? readMethod  = readEnum.GetMethod("ReadEnum", BindingFlags.Static | BindingFlags.Public);
+        MethodInfo? readMethod = readEnum.GetMethod("ReadEnum", BindingFlags.Static | BindingFlags.Public);
         MethodInfo? writeMethod = writeEnum.GetMethod("WriteEnum", BindingFlags.Static | BindingFlags.Public);
         if (readMethod == null)
         {
@@ -101,7 +110,7 @@ public static class NetFactory
 
         try
         {
-            PatchesMain.Patcher.Patch(readMethod,  prefix: new HarmonyMethod(typeof(NetFactory).GetMethod("ReadEnumPatch",  BindingFlags.Static | BindingFlags.NonPublic)));
+            PatchesMain.Patcher.Patch(readMethod, prefix: new HarmonyMethod(typeof(NetFactory).GetMethod("ReadEnumPatch", BindingFlags.Static | BindingFlags.NonPublic)));
             p1 = true;
             PatchesMain.Patcher.Patch(writeMethod, prefix: new HarmonyMethod(typeof(NetFactory).GetMethod("WriteEnumPatch", BindingFlags.Static | BindingFlags.NonPublic)));
             p2 = true;
@@ -116,7 +125,7 @@ public static class NetFactory
                 }
                 catch (Exception ex2)
                 {
-                    Logger.LogWarning("Unable to unpatch " + readEnum.Name + ".ReadEnum(...) after an error patching " + writeEnum.Name + ".WriteEnum(...).");
+                    Logger.LogWarning($"Unable to unpatch {readEnum.Format()}.ReadEnum(...) after an error patching {writeEnum.Format()}.WriteEnum(...).");
                     Logger.LogError(ex2);
                 }
             }
@@ -124,6 +133,20 @@ public static class NetFactory
             Logger.LogError(ex);
             goto reset;
         }
+#if DEBUG
+        try
+        {
+            PatchesMain.Patcher.Patch(typeof(ClientMethodHandle).GetMethod("GetWriterWithStaticHeader", BindingFlags.Instance | BindingFlags.NonPublic),
+                prefix: new HarmonyMethod(typeof(NetFactory).GetMethod(nameof(PatchServerGetWriterWithStaticHeader), BindingFlags.Static | BindingFlags.NonPublic)));
+            PatchesMain.Patcher.Patch(typeof(ServerMethodHandle).GetMethod("GetWriterWithStaticHeader", BindingFlags.Instance | BindingFlags.NonPublic),
+                prefix: new HarmonyMethod(typeof(NetFactory).GetMethod(nameof(PatchClientGetWriterWithStaticHeader), BindingFlags.Static | BindingFlags.NonPublic)));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Failed to patch in debug prints for GetWriterWithStaticHeader in client and server method handle.");
+            Logger.LogError(ex);
+        }
+#endif
 
         const string netMessagesName = "SDG.Unturned.NetMessages";
         Type? netMessagesType;
@@ -154,7 +177,7 @@ public static class NetFactory
         FieldInfo? field = netMessagesType.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Static);
         if (field == null)
         {
-            Logger.LogError("Unable to find " + fieldName + ".WriteEnum(...) !");
+            Logger.LogError("Unable to find " + netMessagesType.Format() + "." + fieldName + "!");
             goto reset;
         }
         Array readCallbacks = (Array)field.GetValue(null);
@@ -177,11 +200,11 @@ public static class NetFactory
                 goto reset;
             }
         }
-        
+
         field.SetValue(null, nArr);
         return true;
 
-        reset:
+    reset:
         NewReceiveBitCount = origReceiveBitCount;
         NewWriteBitCount = origWriteBitCount;
         BlockSize = 0;
@@ -194,7 +217,7 @@ public static class NetFactory
             }
             catch (Exception ex)
             {
-                Logger.LogWarning("Unable to unpatch " + readEnum.Name + ".ReadEnum(...) while cancelling initialization.");
+                Logger.LogWarning("Unable to unpatch " + readEnum.Format() + ".ReadEnum(...) while cancelling initialization.");
                 Logger.LogError(ex);
             }
             if (p2)
@@ -205,13 +228,27 @@ public static class NetFactory
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogWarning("Unable to unpatch " + writeEnum.Name + ".WriteEnum(...) while cancelling initialization.");
+                    Logger.LogWarning("Unable to unpatch " + writeEnum.Format() + ".WriteEnum(...) while cancelling initialization.");
                     Logger.LogError(ex);
                 }
             }
         }
         return false;
     }
+#if DEBUG
+    private static void PatchServerGetWriterWithStaticHeader(ClientMethodHandle __instance)
+    {
+        ClientMethodInfo? info = ServerGetMethodInfo?.Invoke(__instance);
+        string name = (info == null || ServerGetMethodName == null ? null : ServerGetMethodName(info)) ?? "unknown";
+        Logger.LogDebug($"[CLIENT MTD HNDL] Unturned.InvokeMessage sending: {name,-36} (Type: {__instance.GetType().Format(),-24})");
+    }
+    private static void PatchClientGetWriterWithStaticHeader(ServerMethodHandle __instance)
+    {
+        ServerMethodInfo? info = ClientGetMethodInfo?.Invoke(__instance);
+        string name = (info == null || ClientGetMethodName == null ? null : ClientGetMethodName(info)) ?? "unknown";
+        Logger.LogDebug($"[SERVER MTD HNDL] Unturned.InvokeMessage sending: {name,-36} (Type: {__instance.GetType().Format(),-24})");
+    }
+#endif
     internal static bool Init()
     {
         Writer.buffer = Block.buffer;
@@ -430,7 +467,7 @@ public static class NetFactory
 #else
                 value = (EClientMessage)num;
 #endif
-                Logger.LogDebug("Reading net message enum " + num + ": " + (num < ReceiveBlockOffset ? value.ToString() : ("d_" + ((DevkitMessage)(num - ReceiveBlockOffset)).ToString())));
+                Logger.LogDebug($"Reading net message enum {num,2}: {(num <= ReceiveBlockOffset ? ("Unturned." + value) : ("DevkitServer." + (DevkitMessage)(num - ReceiveBlockOffset)))}");
                 __result = flag;
             }
             else
@@ -456,7 +493,12 @@ public static class NetFactory
         if (DevkitServerModule.IsEditing)
         {
             uint v = (uint)value;
-            Logger.LogDebug("Writing net message enum: " + v + (v < WriteBlockOffset ? value.ToString() : ("d_" + ((DevkitMessage)(v - WriteBlockOffset)).ToString())));
+#if SERVER
+            if (value != EClientMessage.InvokeMethod)
+#else
+            if (value != EServerMessage.InvokeMethod)
+#endif
+                Logger.LogDebug($"Writing net message enum {v, 2}: {(v < WriteBlockOffset ? ("Unturned." + value) : ("DevkitServer." + (DevkitMessage)(v - WriteBlockOffset)))}");
             __result = writer.WriteBits(v, NewWriteBitCount);
             return false;
         }
@@ -467,7 +509,7 @@ public static class NetFactory
     internal static string GetInvokerName(ushort id) =>
         invokers.TryGetValue(id, out BaseNetCall bnc) ? bnc.Name : id.ToString();
     internal static T? GetInvoker<T>(ushort id) where T : BaseNetCall =>
-        invokers.TryGetValue(id, out BaseNetCall bnc) ? bnc as T : null; 
+        invokers.TryGetValue(id, out BaseNetCall bnc) ? bnc as T : null;
     internal static void OnReceived(byte[] message,
 #if SERVER
         ITransportConnection
@@ -489,6 +531,7 @@ public static class NetFactory
                 Logger.LogError("Message overhead read a size larger than the message payload: " + size + " bytes.");
                 goto rtn;
             }
+            Logger.LogDebug("Received method invocation: " + overhead + " ( in data: " + message.Length + " size: " + size + " )");
             byte[] data = new byte[size];
             Buffer.BlockCopy(message, overhead.Length, data, 0, size);
             if (invokers.TryGetValue(overhead.MessageId, out BaseNetCall call))
@@ -587,6 +630,7 @@ public static class NetFactory
                         try
                         {
                             object res = info.Method.Invoke(null, parameters);
+                            Logger.LogDebug("Invoked received method: " + info.Method.Format() + ".");
                             if (res is int resp)
                             {
                                 ((MessageContext)parameters[0]).Acknowledge(resp);
@@ -616,8 +660,8 @@ public static class NetFactory
                                         }
                                         catch (Exception ex)
                                         {
-                                            Logger.LogError("Error running async method " + info.Method.DeclaringType!.Namespace + "." + info.Method.DeclaringType.Name + "." + info.Method.Name + ":");
-                                            Logger.LogError("Message: " + ovh.ToString() + ".");
+                                            Logger.LogError("Error running method " + info.Method.Format());
+                                            Logger.LogError("Message: " + ovh + ".");
                                             Logger.LogError(ex);
                                         }
                                     });
@@ -634,12 +678,12 @@ public static class NetFactory
                         }
                         catch (ArgumentException)
                         {
-                            Logger.LogError("Method " + info.Method.DeclaringType!.Namespace + "." + info.Method.DeclaringType.Name + "." + info.Method.Name + " doesn't have the correct signature for " + call.GetType().Name);
+                            Logger.LogError("Method " + info.Method.Format());
                             Logger.LogError("Message: " + overhead.ToString() + ".");
                         }
                         catch (Exception ex)
                         {
-                            Logger.LogError("Error running method " + info.Method.DeclaringType!.Namespace + "." + info.Method.DeclaringType.Name + "." + info.Method.Name + ":");
+                            Logger.LogError("Error running method " + info.Method.Format());
                             Logger.LogError("Message: " + overhead.ToString() + ".");
                             Logger.LogError(ex);
                         }
@@ -707,12 +751,12 @@ public static class NetFactory
                 ParameterInfo[] parameters = method.GetParameters();
                 if (parameters.Length < 1)
                 {
-                    Logger.LogWarning($"Method {method.Name} at {method.DeclaringType?.Namespace}.{method.DeclaringType?.Name} has no parameters. Expected first argument to be of type {nameof(MessageContext)}.");
+                    Logger.LogWarning($"Method {method.Format()} has no parameters. Expected first argument to be of type {nameof(MessageContext)}.");
                     continue;
                 }
                 else if (parameters[0].ParameterType != typeof(MessageContext))
                 {
-                    Logger.LogWarning($"Method {method.Name} at {method.DeclaringType?.Namespace}.{method.DeclaringType?.Name} has an invalid first parameter: " + parameters[0].ParameterType.FullName + $". Expected first argument to be of type {nameof(MessageContext)}.");
+                    Logger.LogWarning($"Method {method.Format()} has an invalid first parameter: " + parameters[0].ParameterType.Format() + $". Expected first argument to be of type {nameof(MessageContext)}.");
                     continue;
                 }
 
@@ -738,7 +782,7 @@ public static class NetFactory
                         if (invokers.TryGetValue(call.ID, out BaseNetCall c2))
                         {
                             if (c2.GetType() != call.GetType())
-                                Logger.LogWarning("Inconsistant duplicate invoker " + call.ID + " at field " + field.Name + " at " + field.DeclaringType?.Namespace + "." + field.DeclaringType?.Name);
+                                Logger.LogWarning("Inconsistant duplicate invoker " + call.ID + " at field " + field.Format() + ".");
                             continue;
                         }
                         Type[] generics = callType.GetGenericArguments();
@@ -750,16 +794,16 @@ public static class NetFactory
                                 ParameterInfo[] parameters = info.Method.GetParameters();
                                 if (parameters.Length == 0 || parameters[0].ParameterType != typeof(MessageContext))
                                 {
-                                    Logger.LogWarning($"Method \"{info.Method.DeclaringType?.Namespace}.{info.Method.DeclaringType?.Name}.{info.Method.Name}\" has the wrong first parameter " +
-                                                       $"for invoker \"{field.DeclaringType?.Namespace}.{field.DeclaringType?.Name}.{field.Name}\". (Expected {nameof(MessageContext)}).");
+                                    Logger.LogWarning($"Method \"{info.Method.Format()}\" has the wrong first parameter " +
+                                                       $"for invoker \"{field.Format()}\". (Expected {nameof(MessageContext)}).");
                                     registeredMethods.RemoveAt(index);
                                 }
                                 else if (callType == typeof(NetCall))
                                 {
                                     if (parameters.Length != 1)
                                     {
-                                        Logger.LogWarning($"Method \"{info.Method.DeclaringType?.Namespace}.{info.Method.DeclaringType?.Name}.{info.Method.Name}\" has the wrong " +
-                                            $"parameters for invoker \"{field.DeclaringType?.Namespace}.{field.DeclaringType?.Name}.{field.Name}\" ({nameof(MessageContext)}).");
+                                        Logger.LogWarning($"Method \"{info.Method.Format()}\" has the wrong " +
+                                            $"parameters for invoker \"{field.Format()}\" ({nameof(MessageContext)}).");
                                         registeredMethods.RemoveAt(index);
                                     }
                                 }
@@ -767,8 +811,8 @@ public static class NetFactory
                                 {
                                     if (parameters.Length != 2 || parameters[1].ParameterType != typeof(ByteReader))
                                     {
-                                        Logger.LogWarning($"Method \"{info.Method.DeclaringType?.Namespace}.{info.Method.DeclaringType?.Name}.{info.Method.Name}\" has the wrong " +
-                                                           $"parameters for invoker \"{field.DeclaringType?.Namespace}.{field.DeclaringType?.Name}.{field.Name}\" ({nameof(MessageContext)}, {nameof(ByteReader)}).");
+                                        Logger.LogWarning($"Method \"{info.Method.Format()}\" has the wrong " +
+                                                           $"parameters for invoker \"{field.Format()}\" ({nameof(MessageContext)}, {nameof(ByteReader)}).");
                                         registeredMethods.RemoveAt(index);
                                     }
                                 }
@@ -780,9 +824,9 @@ public static class NetFactory
                                     {
                                         if (!(parameters.Length == 2 && generics[0].IsAssignableFrom(parameters[1].ParameterType)))
                                         {
-                                            Logger.LogWarning($"Method  \"{info.Method.DeclaringType?.Namespace}.{info.Method.DeclaringType?.Name}.{info.Method.Name}\" has the wrong " +
-                                                $"parameters for invoker \"{field.DeclaringType?.Namespace}.{field.DeclaringType?.Name}.{field.Name}\" " +
-                                                $"({nameof(MessageContext)}, {(generics.Length > 0 ? generics[0].Name : "?")}).");
+                                            Logger.LogWarning($"Method  \"{info.Method.Format()}\" has the wrong " +
+                                                $"parameters for invoker \"{field.Format()}\" " +
+                                                $"({nameof(MessageContext)}, {(generics.Length > 0 ? generics[0].Format() : "?")}).");
                                             registeredMethods.RemoveAt(index);
                                         }
                                     }
@@ -792,9 +836,9 @@ public static class NetFactory
                                         {
                                             if (!generics[t].IsAssignableFrom(parameters[t + 1].ParameterType))
                                             {
-                                                Logger.LogWarning($"Method  \"{info.Method.DeclaringType?.Namespace}.{info.Method.DeclaringType?.Name}.{info.Method.Name}\" has the wrong " +
-                                                    $"parameters for invoker \"{field.DeclaringType?.Namespace}.{field.DeclaringType?.Name}.{field.Name}\" " +
-                                                    $"({nameof(MessageContext)}, {string.Join(", ", generics.Select(x => x.Name))}).");
+                                                Logger.LogWarning($"Method  \"{info.Method.Format()}\" has the wrong " +
+                                                    $"parameters for invoker \"{field.Format()}\" " +
+                                                    $"({nameof(MessageContext)}, {string.Join(", ", generics.Select(x => x.Format()))}).");
                                                 registeredMethods.RemoveAt(index);
                                                 break;
                                             }
@@ -802,10 +846,10 @@ public static class NetFactory
                                     }
                                     else
                                     {
-                                        Logger.LogWarning($"Method  \"{info.Method.DeclaringType?.Namespace}.{info.Method.DeclaringType?.Name}.{info.Method.Name}\" has the wrong " +
-                                            $"parameters for invoker \"{field.DeclaringType?.Namespace}.{field.DeclaringType?.Name}.{field.Name}\" " +
-                                            $"({nameof(MessageContext)}, {string.Join(", ", generics.Select(x => x.Name))}).");
-                                        registeredMethods.RemoveAt(index);  
+                                        Logger.LogWarning($"Method  \"{info.Method.Format()}\" has the wrong " +
+                                            $"parameters for invoker \"{field.Format()}\" " +
+                                            $"({nameof(MessageContext)}, {string.Join(", ", generics.Select(x => x.Format()))}).");
+                                        registeredMethods.RemoveAt(index);
                                     }
                                 }
                             }
@@ -876,7 +920,7 @@ public static class NetFactory
         Writer.WriteEnum((EServerMessage)(WriteBlockOffset + (int)DevkitMessage.RelayPacket));
         int len = Math.Min(ushort.MaxValue, bytes.Length);
         Writer.WriteUInt16((ushort)len);
-        
+
         int c = Math.Min(byte.MaxValue, users == null ? 0 : users.Count);
         Writer.WriteUInt8((byte)c);
         for (int i = 0; i < c; ++i)
@@ -885,7 +929,7 @@ public static class NetFactory
         Writer.WriteBytes(bytes, len);
         Writer.Flush();
 #if DEBUG
-        Logger.LogInfo("Sending " + bytes.Length + " bytes to server as a relay to " + 
+        Logger.LogInfo("Sending " + bytes.Length + " bytes to server as a relay to " +
                        (users == null ? "all" : users.Count.ToString(CultureInfo.InvariantCulture)) + " user(s).");
 #endif
         GetPlayerTransportConnection().Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
@@ -897,7 +941,7 @@ public static class NetFactory
 #else
         IClientTransport
 #endif
-        connection, byte[] bytes, bool reliable = true)
+        connection, byte[] bytes, bool reliable = true, int count = -1, int offset = -1)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -910,7 +954,7 @@ public static class NetFactory
 #endif
         int len = Math.Min(ushort.MaxValue, bytes.Length);
         Writer.WriteUInt16((ushort)len);
-        Writer.WriteBytes(bytes);
+        Writer.WriteBytes(bytes, offset < 0 ? 0 : offset, count < 0 ? bytes.Length : count);
         Writer.Flush();
 #if DEBUG
         Logger.LogInfo("Sending " + bytes.Length + " bytes to " +
@@ -919,8 +963,8 @@ public static class NetFactory
 #else
         "server"
 #endif
-#endif
         );
+#endif
         connection.Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
     }
 #if SERVER

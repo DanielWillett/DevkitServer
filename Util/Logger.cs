@@ -1,4 +1,4 @@
-﻿using DevkitServer.Multiplayer;
+﻿using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Terminals;
 using StackCleaner;
 using System.Diagnostics;
@@ -8,11 +8,11 @@ using System.Runtime.CompilerServices;
 namespace DevkitServer.Util;
 internal static class Logger
 {
+    public static readonly StackTraceCleaner StackCleaner;
     private static readonly NetCall<string, Severity> SendLogMessage = new NetCall<string, Severity>((ushort)NetCalls.SendLog);
     public static ITerminal Terminal;
     private const string TimeFormat = "yyyy-MM-dd hh:mm:ss";
     internal const string ANSIReset = "\u001b[39m";
-    private static readonly StackTraceCleaner Cleaner;
     static Logger()
     {
         StackCleanerConfiguration config = new StackCleanerConfiguration
@@ -35,19 +35,20 @@ internal static class Logger
         {
             Terminal = DevkitServerModule.GameObjectHost.AddComponent<WindowsClientTerminal>();
             LogInfo("Initalized Windows terminal.", ConsoleColor.DarkCyan);
+            config.ColorFormatting = StackColorFormatType.ExtendedANSIColor;
         }
         else
         {
             Terminal = DevkitServerModule.GameObjectHost.AddComponent<BackgroundLoggingTerminal>();
             LogInfo("Did not initialize a terminal.", ConsoleColor.DarkCyan);
+            config.ColorFormatting = StackColorFormatType.None;
         }
-        config.ColorFormatting = StackColorFormatType.ExtendedANSIColor;
 #else
         if (Application.platform is not RuntimePlatform.WindowsPlayer and not RuntimePlatform.WindowsEditor)
             config.ColorFormatting = StackColorFormatType.ANSIColor;
         Terminal = DevkitServerModule.GameObjectHost.AddComponent<ServerTerminal>();
 #endif
-        Cleaner = new StackTraceCleaner(config);
+        StackCleaner = new StackTraceCleaner(config);
         UnturnedLog.info("Loading logger with log type: " + Terminal.GetType().Name + ".");
     }
     internal static void InitLogger()
@@ -179,7 +180,7 @@ internal static class Logger
             {
                 if (cleanStack)
                 {
-                    string str = Cleaner.GetString(ex);
+                    string str = StackCleaner.GetString(ex);
                     Terminal.Write(str, ConsoleColor.DarkGray);
                 }
                 /*
@@ -228,6 +229,10 @@ internal static class Logger
         if (!shouldhandle) return;
         LogInfo(input);
     }
+
+    public static string Format(this FieldInfo field) => (field.DeclaringType != null ? StackCleaner.GetString(field.DeclaringType) : "global::") + field.Name;
+    public static string Format(this MethodBase method) => StackCleaner.GetString(method);
+    public static string Format(this Type typedef) => StackCleaner.GetString(typedef);
 }
 
 public enum Severity : byte

@@ -6,9 +6,9 @@ using System.Threading;
 using UnityEngine;
 using Action = System.Action;
 
-namespace DevkitServer.Multiplayer;
+namespace DevkitServer.Multiplayer.Networking;
 
-public sealed class NetTask
+public sealed class NetTask : CustomYieldInstruction
 {
     internal const int DEFAULT_TIMEOUT_MS = 5000;
     internal const int POLL_SPEED_MS = 25;
@@ -20,6 +20,7 @@ public sealed class NetTask
     internal bool isCompleted = false;
     internal RequestResponse _parameters = RequestResponse.FAIL;
     internal readonly bool isAck;
+    public override bool keepWaiting => !isCompleted;
     public NetTask(bool ack, int timeoutMs = DEFAULT_TIMEOUT_MS)
     {
         isAck = ack;
@@ -67,7 +68,7 @@ public sealed class NetTask
         }
         else
         {
-            object[] p = parameters.Length == 1 ? new object[0] : new object[parameters.Length - 1];
+            object[] p = parameters.Length == 1 ? Array.Empty<object>() : new object[parameters.Length - 1];
             if (p.Length > 0)
                 Array.Copy(parameters, 1, p, 0, p.Length);
             _parameters = new RequestResponse(true, ctx, p);
@@ -120,13 +121,14 @@ public sealed class NetTask
         public RequestResponse GetResult()
         {
             if (task.isCompleted || task.timer == null) return task._parameters;
-            NetTask task1 = this.task;
+            NetTask task1 = task;
             SpinWait.SpinUntil(() => task1.isCompleted || DateTime.UtcNow > task1._awaiter.end);
             if (!task.isCompleted)
                 NetFactory.RemoveListener(task);
             return task._parameters.Parameters is null ? RequestResponse.FAIL : task._parameters;
         }
     }
+
 }
 public readonly struct RequestResponse
 {
@@ -138,7 +140,7 @@ public readonly struct RequestResponse
 
     public RequestResponse(bool responded, MessageContext context, int errorCode) : this(responded, context, Array.Empty<object>())
     {
-        this.ErrorCode = errorCode;
+        ErrorCode = errorCode;
     }
     public RequestResponse(bool responded, MessageContext context, object[] parameters)
     {

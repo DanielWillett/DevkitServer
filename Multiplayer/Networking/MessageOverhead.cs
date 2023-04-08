@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace DevkitServer.Multiplayer;
+namespace DevkitServer.Multiplayer.Networking;
 
 [StructLayout(LayoutKind.Explicit, Size = MaximumSize)]
 public readonly struct MessageOverhead
@@ -97,6 +97,11 @@ public readonly struct MessageOverhead
             Length += sizeof(long);
         if ((flags & ResponseKeyMask) > 0)
             Length += sizeof(long);
+    }
+    public unsafe void GetBytes(byte[] output, int index)
+    {
+        fixed (byte* ptr = &output[index])
+            GetBytes(ptr, out _);
     }
     public unsafe void GetBytes(byte* output, out int length)
     {

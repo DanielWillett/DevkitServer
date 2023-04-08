@@ -1,4 +1,5 @@
 ﻿using DevkitServer.Multiplayer;
+using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 using JetBrains.Annotations;
 using SDG.Framework.Devkit;
@@ -140,7 +141,7 @@ public class UserInput : MonoBehaviour
                             : (InputEx.GetKey(ControlsSettings.descend) ? -1f : 0f)
                     }
                 };
-                MessageOverhead overhead = new MessageOverhead(MessageFlags.None, SendInputPacket.ID, 0);
+                MessageOverhead overhead = new MessageOverhead(MessageFlags.LayeredRequest, SendInputPacket.ID, 0);
                 byte[] data = SendInputPacket.Write(ref overhead, _lastPacket.Write);
                 NetFactory.SendRelay(data, false);
             }
@@ -151,7 +152,7 @@ public class UserInput : MonoBehaviour
                 {
                     Flags = Flags.StopMsg
                 };
-                MessageOverhead overhead = new MessageOverhead(MessageFlags.None, SendInputPacket.ID, 0);
+                MessageOverhead overhead = new MessageOverhead(MessageFlags.LayeredRequest, SendInputPacket.ID, 0);
                 byte[] data = SendInputPacket.Write(ref overhead, _lastPacket.Write);
                 NetFactory.SendRelay(data);
             }

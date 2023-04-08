@@ -230,13 +230,13 @@ public static class ClientEvents
                     if (invoker != null)
                     {
                         yield return new CodeInstruction(OpCodes.Call, invoker);
-                        Logger.LogDebug("Patched in " + invoker.Name + " call.");
+                        Logger.LogDebug("Patched in " + invoker.Format() + " call.");
                         ++pCt;
                     }
                     else
                     {
                         yield return new CodeInstruction(OpCodes.Pop);
-                        Logger.LogWarning("Unknown function pointer-based method call: " + method.FullDescription() + ".");
+                        Logger.LogWarning("Unknown function pointer-based method call: " + method.Format() + ".");
                     }
 
                     i += 3;
@@ -696,7 +696,7 @@ public static class ClientEvents
         ParameterInfo[] p2 = invoker.GetParameters();
         if (p.Length != p2.Length)
         {
-            Logger.LogWarning("Method patch out of date: " + original.FullDescription() + ".");
+            Logger.LogWarning("Method patch out of date: " + original.Format() + ".");
             original = null!;
         }
         else
@@ -708,7 +708,7 @@ public static class ClientEvents
                     if (p[i].ParameterType.IsByRef &&
                         p2[i].ParameterType.IsAssignableFrom(p[i].ParameterType.GetElementType()))
                         continue;
-                    Logger.LogWarning("Method patch out of date: " + original.FullDescription() + ".");
+                    Logger.LogWarning("Method patch out of date: " + original.Format() + ".");
                     original = null!;
                     return;
                 }
