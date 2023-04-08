@@ -37,7 +37,7 @@ public static class EditorLevel
         float startTime = Time.realtimeSinceStartup;
         string lvlName = Level.info.name;
         LevelData levelDataAtTimeOfRequest = LevelData.GatherLevelData();
-
+        
         Folder folder = levelDataAtTimeOfRequest.LevelFolderContent;
         Folder.Write(LevelWriter, in folder);
         byte[] data = LevelWriter.ToArray();
@@ -136,7 +136,9 @@ public static class EditorLevel
     private static readonly ByteReader LevelReader = new ByteReader { ThrowOnError = true };
     private static readonly Func<string, bool, ulong, LevelInfo?> LoadLevelInfo =
         Accessor.GenerateStaticCaller<Level, Func<string, bool, ulong, LevelInfo?>>("loadLevelInfo", new Type[] { typeof(string), typeof(bool), typeof(ulong) }, true)!;
-    
+    private static readonly System.Action? EnableAnimation = Accessor.GenerateStaticCaller<LoadingUI, System.Action>("EnableBackgroundAnim", throwOnError: false);
+    private static readonly System.Action? DisableAnimation = Accessor.GenerateStaticCaller<LoadingUI, System.Action>("DisableBackgroundAnim", throwOnError: false);
+
     private static byte[][]? _pendingLevel;
     private static long _pendingCancelKey;
     private static int _pendingLevelIndex;
@@ -175,32 +177,34 @@ public static class EditorLevel
         _pendingCancelKey = 0;
         _missingPackets = 0;
         _startingMissingPackets = 0;
+        EnableAnimation?.Invoke();
         DevkitServerModule.ComponentHost.StartCoroutine(TryReceiveLevelCoroutine());
     }
     private static void UpdateLoadingUI()
     {
         if (_missingPackets > 0)
         {
-            LoadingUI.updateKey("Recovering Missing Packets [ " + (_startingMissingPackets - _missingPackets) + " / " + _startingMissingPackets + " ]");
+            LoadingUI.updateKey("Downloading Level / Recovering Missing Packets [ " + (_startingMissingPackets - _missingPackets) + " / " + _startingMissingPackets + " ]");
             LoadingUI.updateProgress((float)(_startingMissingPackets - _missingPackets) / _startingMissingPackets);
             return;
         }
         if (_pendingLevelIndex >= _pendingLevelLength)
         {
-            LoadingUI.updateKey("Installing Level " + _pendingLevelName + ".");
+            LoadingUI.updateKey("Downloading Level / Installing Level " + _pendingLevelName + ".");
+            LoadingUI.updateProgress(1f);
         }
         else
         {
             float time = Time.realtimeSinceStartup;
-            string t = "Downloading Level " + _pendingLevelName + " [ " + DevkitServerUtility.FormatBytes(_pendingLevelIndex) +
-                       " / " + DevkitServerUtility.FormatBytes(_pendingLevelLength) + " ].";
-            if ((time - _pendingLevelStartTime) > 10f)
+            string t = "Downloading Level / " + _pendingLevelName + " [ " + DevkitServerUtility.FormatBytes(_pendingLevelIndex) +
+                       " / " + DevkitServerUtility.FormatBytes(_pendingLevelLength) + " ]";
+            if ((time - _pendingLevelStartTime) > 2f)
             {
                 float remaining = (time - _pendingLevelStartTime) / _pendingLevelIndex * (_pendingLevelLength - _pendingLevelIndex);
                 t += " @ " + DevkitServerUtility.FormatBytes((long)(_pendingLevelIndex / (time - _pendingLevelStartTime))) + " / sec |" +
                     " Remaining: " + Mathf.FloorToInt(remaining / 60).ToString("00") + ":" + Mathf.FloorToInt(remaining % 60).ToString("00");
             }
-            else t += " Calculating Speed...";
+            else t += " | Calculating Speed...";
             LoadingUI.updateKey(t);
         }
         LoadingUI.updateProgress((float)_pendingLevelIndex / _pendingLevelLength);
@@ -215,6 +219,7 @@ public static class EditorLevel
         _pendingCancelKey = reqId;
         _missingPackets = 0;
         _startingMissingPackets = 0;
+        _pendingLevelStartTime = Time.realtimeSinceStartup;
         Logger.LogInfo($"[RECEIVE LEVEL] Started receiving level data ({DevkitServerUtility.FormatBytes(length)}) for level {lvlName}.", ConsoleColor.DarkCyan);
         UpdateLoadingUI();
     }
@@ -248,12 +253,12 @@ public static class EditorLevel
         {
             if (_missingPackets > 0)
                 --_missingPackets;
-            Logger.LogInfo($"[RECEIVE LEVEL] Recovered ({DevkitServerUtility.FormatBytes(len)}) (#{packet}) for level {_pendingLevelName}.", ConsoleColor.DarkCyan);
+            Logger.LogInfo($"[RECEIVE LEVEL] Recovered ({DevkitServerUtility.FormatBytes(len)}) (#{packet + 1}) for level {_pendingLevelName}.", ConsoleColor.DarkCyan);
         }
         else
         {
             _pendingLevelIndex += len;
-            Logger.LogInfo($"[RECEIVE LEVEL] Received ({DevkitServerUtility.FormatBytes(len)}) (#{packet}) for level {_pendingLevelName}.", ConsoleColor.DarkCyan);
+            Logger.LogInfo($"[RECEIVE LEVEL] Received ({DevkitServerUtility.FormatBytes(len)}) (#{packet + 1}) for level {_pendingLevelName}.", ConsoleColor.DarkCyan);
         }
         UpdateLoadingUI();
         ctx.Acknowledge();
@@ -264,6 +269,7 @@ public static class EditorLevel
         {
             MessageOverhead ovh = new MessageOverhead(MessageFlags.RequestResponse, EndSendLevel.ID, 0, 0, _pendingCancelKey);
             EndSendLevel.Invoke(ref ovh, true);
+            DisableAnimation?.Invoke();
         }
     }
 
@@ -293,7 +299,11 @@ public static class EditorLevel
             }
             if (missing == null)
             {
+                LoadingUI.updateScene();
+                LoadingUI.updateKey("Downloading Level / Installing Level " + _pendingLevelName + ".");
+                LoadingUI.updateProgress(0.5f);
                 ctx.Reply(RequestPackets, Array.Empty<int>());
+                Logger.LogDebug($"[RECEIVE LEVEL] Allocating {_pendingLevelLength} bytes to level data array.");
                 byte[] lvl = new byte[_pendingLevelLength];
                 int index = 0;
                 for (int i = 0; i < _pendingLevel.Length; ++i)
@@ -302,18 +312,24 @@ public static class EditorLevel
                     Buffer.BlockCopy(b, 0, lvl, index, b.Length);
                     index += b.Length;
                 }
+                Logger.LogDebug($"[RECEIVE LEVEL] Reading level folder.");
                 LevelReader.LoadNew(lvl);
                 Folder folder = Folder.Read(LevelReader);
+                LoadingUI.updateProgress(0.75f);
+                Logger.LogDebug($"[RECEIVE LEVEL] Writing level folder.");
                 folder.WriteContentsToDisk(dir);
-                OnLevelReady(Path.Combine(dir, folder.FolderName));
                 Logger.LogInfo($"[RECEIVE LEVEL] Finished receiving level data ({DevkitServerUtility.FormatBytes(_pendingLevel.Length)}) for level {_pendingLevelName}.", ConsoleColor.DarkCyan);
-                LoadingUI.updateKey("Downloading Level / Level Installed");
+                LoadingUI.updateKey("Downloading Level / Level " + _pendingLevelName + " Installed");
+                LoadingUI.updateProgress(1f);
+                DisableAnimation?.Invoke();
+                OnLevelReady(Path.Combine(dir, folder.FolderName));
             }
             else
             {
                 _startingMissingPackets = _missingPackets = missing.Count;
                 ctx.Reply(RequestPackets, missing.ToArray());
                 Logger.LogWarning($"[RECEIVE LEVEL] Missing {missing.Count} / {_pendingLevel.Length} ({(float)missing.Count / _pendingLevel.Length:P0}).");
+                UpdateLoadingUI();
                 return;
             }
 
@@ -323,6 +339,7 @@ public static class EditorLevel
             ctx.Reply(RequestPackets, Array.Empty<int>());
             Logger.LogInfo("[RECEIVE LEVEL] Cancelled level load.");
             LoadingUI.updateKey("Downloading Level / Level Load Cancelled");
+            DisableAnimation?.Invoke();
             Provider.disconnect();
         }
 
@@ -332,6 +349,8 @@ public static class EditorLevel
         _pendingCancelKey = 0;
         _pendingLevelStartTime = 0;
         _pendingLevelName = null;
+        _startingMissingPackets = 0;
+        _missingPackets = 0;
     }
 
     private static void OnLevelReady(string dir)
