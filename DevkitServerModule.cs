@@ -1,9 +1,11 @@
 ﻿using System.Reflection;
+using System.Reflection.Emit;
 using DevkitServer.Multiplayer;
 using DevkitServer.Patches;
 using DevkitServer.Players;
 using SDG.Framework.Modules;
 using System.Runtime.CompilerServices;
+using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Networking;
 
 namespace DevkitServer;
@@ -28,6 +30,9 @@ public sealed class DevkitServerModule : IModuleNexus
         Logger.InitLogger();
         Logger.LogInfo("DevkitServer by BlazingFlame#0001 (https://github.com/DanielWillett) initialized.");
         PatchesMain.Init();
+#if CLIENT
+        Logger.PostPatcherSetupInitLogger();
+#endif
     }
 
     public void initialize()
@@ -36,9 +41,13 @@ public sealed class DevkitServerModule : IModuleNexus
         {
             Instance = this;
             Logger.LogInfo("DevkitServer loading...");
+            DevkitServerConfig.Reload();
 
             if (LoadFaulted)
+            {
+                Provider.shutdown(1, "Failed to load config.");
                 return;
+            }
 
             if (!NetFactory.Init())
             {
@@ -80,7 +89,9 @@ public sealed class DevkitServerModule : IModuleNexus
             Level.onLevelLoaded += OnLevelLoaded;
 #else
             Provider.onClientConnected += EditorUser.OnClientConnected;
+            Provider.onEnemyConnected += EditorUser.OnEnemyConnected;
             Provider.onClientDisconnected += EditorUser.OnClientDisconnected;
+            Provider.onEnemyDisconnected += EditorUser.OnEnemyDisconnected;
 #endif
         }
         catch (Exception ex)
@@ -138,7 +149,9 @@ public sealed class DevkitServerModule : IModuleNexus
         Level.onLevelLoaded -= OnLevelLoaded;
 #else
         Provider.onClientConnected -= EditorUser.OnClientConnected;
+        Provider.onEnemyConnected -= EditorUser.OnEnemyConnected;
         Provider.onClientDisconnected -= EditorUser.OnClientDisconnected;
+        Provider.onEnemyDisconnected -= EditorUser.OnEnemyDisconnected;
 #endif
 
         Instance = null!;

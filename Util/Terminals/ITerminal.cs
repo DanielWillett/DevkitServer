@@ -5,7 +5,8 @@ internal interface ITerminal
 {
     event TerminalReadDelegate? OnInput;
     event TerminalWriteDelegate? OnOutput;
-    void Write(string input, ConsoleColor color);
+    bool IsCommitingToUnturnedLog { get; }
+    void Write(string input, ConsoleColor color, bool save);
     void Init();
     void Close();
 }

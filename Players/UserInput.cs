@@ -11,19 +11,44 @@ namespace DevkitServer.Players;
 [EarlyTypeInit(-1)]
 public class UserInput : MonoBehaviour
 {
+    private MovementController _controller;
     public static event Action<EditorUser>? OnUserPositionUpdated;
-    public EditorUser User { get; private set; } = null!;
+    public EditorUser User { get; internal set; } = null!;
     private int sim = 0;
     private int expected = 0;
     private bool _hasStopped = false;
     public static NetCallCustom SendInputPacket = new NetCallCustom((int)NetCalls.SendMovementPacket, 64);
     public bool IsOwner { get; private set; }
+
+    public MovementController Controller
+    {
+        get => _controller;
+        set
+        {
+            if (_controller == value || value is not MovementController.Editor and not MovementController.Player)
+                return;
+            switch (value)
+            {
+                case MovementController.Editor:
+                    this.controllerObj = User.EditorObject;
+                    break;
+                case MovementController.Player:
+                    this.controllerObj = User.Player!.player.gameObject;
+                    break;
+            }
+            _controller = value;
+
+            HandleControllerUpdated();
+        }
+    }
     private static readonly Func<IDevkitTool>? GetDevkitTool;
-    private static readonly InstanceGetter<EditorMovement, float> GetSpeed = Accessor.GenerateInstanceGetter<EditorMovement, float>("speed", BindingFlags.NonPublic);
-    private static readonly InstanceGetter<EditorMovement, Vector3> GetInput = Accessor.GenerateInstanceGetter<EditorMovement, Vector3>("input", BindingFlags.NonPublic);
+    private static readonly InstanceGetter<EditorMovement, float> GetSpeed = Accessor.GenerateInstanceGetter<EditorMovement, float>("speed", BindingFlags.NonPublic, throwOnError: true)!;
+    private static readonly InstanceGetter<EditorMovement, Vector3> GetInput = Accessor.GenerateInstanceGetter<EditorMovement, Vector3>("input", BindingFlags.NonPublic, throwOnError: true)!;
+    private static readonly InstanceSetter<PlayerInput, float>? SetLastInputted = Accessor.GenerateInstanceSetter<PlayerInput, float>("lastInputed");
     private EditorMovement _movement = null!;
     private Queue<UserInputPacket>? packets;
     private UserInputPacket _lastPacket;
+    private GameObject controllerObj;
 
     public static IDevkitTool? ActiveTool => GetDevkitTool?.Invoke();
 
@@ -61,14 +86,13 @@ public class UserInput : MonoBehaviour
     [UsedImplicitly]
     private void Start()
     {
-        if (!TryGetComponent(out EditorUser u))
+        if (User == null)
         {
             Destroy(this);
             Logger.LogError("Invalid UserInput setup; EditorUser not found!");
             return;
         }
-
-        User = u;
+        
 #if CLIENT
         IsOwner = User == EditorUser.User;
         if (IsOwner && !Level.editing.TryGetComponent(out _movement))
@@ -78,9 +102,24 @@ public class UserInput : MonoBehaviour
             return;
         }
 #endif
+        if (IsOwner)
+            Controller = MovementController.Editor;
 
         Logger.LogDebug("User input module created for " + User.SteamId.m_SteamID + " ( owner: " + IsOwner + " ).");
     }
+
+    private void HandleControllerUpdated()
+    {
+        if (IsOwner)
+        {
+            GameObject ctrl = controllerObj;
+            if (ctrl == User.EditorObject)
+            {
+
+            }
+        }
+    }
+
     [NetCall(NetCallSource.FromServer, (int)NetCalls.SendMovementPacket)]
     private static void ReceiveInputPacket(MessageContext ctx, ByteReader reader)
     {
@@ -94,6 +133,8 @@ public class UserInput : MonoBehaviour
         UserInputPacket packet = new UserInputPacket();
         packet.Read(reader);
         (packets ??= new Queue<UserInputPacket>(1)).Enqueue(packet);
+        if (User.Player != null)
+            SetLastInputted?.Invoke(User.Player.player.input, Time.realtimeSinceStartup);
     }
 
     [UsedImplicitly]
@@ -268,4 +309,10 @@ public class UserInput : MonoBehaviour
         None = 1,
         StopMsg = 2
     }
+}
+
+public enum MovementController
+{
+    Player = 1,
+    Editor
 }

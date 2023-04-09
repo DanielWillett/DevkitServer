@@ -125,24 +125,26 @@ internal static class Accessor
             return null!;
         }
     }
-    
-    private static readonly MethodInfo isServerGetter = typeof(Provider).GetProperty(nameof(Provider.isServer), BindingFlags.Static | BindingFlags.Public)?.GetGetMethod()!;
-    private static readonly MethodInfo isEditorGetter = typeof(Level).GetProperty(nameof(Level.isEditor), BindingFlags.Static | BindingFlags.Public)?.GetGetMethod()!;
+
+    internal static readonly MethodInfo IsServerGetter = typeof(Provider).GetProperty(nameof(Provider.isServer), BindingFlags.Static | BindingFlags.Public)?.GetGetMethod()!;
+    internal static readonly MethodInfo IsEditorGetter = typeof(Level).GetProperty(nameof(Level.isEditor), BindingFlags.Static | BindingFlags.Public)?.GetGetMethod()!;
+    internal static readonly MethodInfo IsDevkitServerGetter = typeof(DevkitServerModule).GetProperty(nameof(DevkitServerModule.IsEditing), BindingFlags.Static | BindingFlags.Public)?.GetGetMethod()!;
+    private static readonly MethodInfo LogDebug = typeof(Logger).GetMethod(nameof(Logger.LogDebug), BindingFlags.Public | BindingFlags.Static)!;
     public static IEnumerable<CodeInstruction> AddIsEditorCall(IEnumerable<CodeInstruction> instructions, MethodBase __method)
     {
-        if (isServerGetter == null || isEditorGetter == null)
+        if (IsServerGetter == null || IsEditorGetter == null)
         {
-            Logger.LogError("IsServer: " + (isServerGetter != null) + ", IsEditor: " + (isEditorGetter != null) + ".");
+            Logger.LogError("IsServer: " + (IsServerGetter != null) + ", IsEditor: " + (IsEditorGetter != null) + ".");
             foreach (CodeInstruction instr in instructions)
                 yield return instr;
         }
         foreach (CodeInstruction instr in instructions)
         {
-            if (instr.Calls(isServerGetter))
+            if (instr.Calls(IsServerGetter))
             {
                 yield return instr;
                 yield return new CodeInstruction(OpCodes.Not);
-                yield return new CodeInstruction(OpCodes.Call, isEditorGetter);
+                yield return new CodeInstruction(OpCodes.Call, IsEditorGetter);
                 yield return new CodeInstruction(OpCodes.Or);
                 yield return new CodeInstruction(OpCodes.Not);
                 if (__method != null)
@@ -152,6 +154,37 @@ internal static class Accessor
             }
             else
                 yield return instr;
+        }
+    }
+
+    public static void AddFunctionBreakpoints(MethodBase method) => PatchesMain.Patcher.Patch(method,
+        transpiler: new HarmonyMethod(typeof(Accessor).GetMethod(nameof(AddFunctionBreakpointsTranspiler),
+            BindingFlags.NonPublic | BindingFlags.Static)));
+    private static IEnumerable<CodeInstruction> AddFunctionBreakpointsTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase __method)
+    {
+        yield return new CodeInstruction(OpCodes.Ldstr, "Breakpointing Method: " + __method.Format() + ":");
+        yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
+        yield return new CodeInstruction(OpCodes.Call, LogDebug);
+        foreach (CodeInstruction instr in instructions)
+        {
+            foreach (ExceptionBlock block in instr.blocks)
+            {
+                yield return new CodeInstruction(OpCodes.Ldstr, "  " + block.Format());
+                yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
+                yield return new CodeInstruction(OpCodes.Call, LogDebug);
+            }
+            foreach (Label label in instr.labels)
+            {
+                yield return new CodeInstruction(OpCodes.Ldstr, "  " + label.Format() + ":");
+                yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
+                yield return new CodeInstruction(OpCodes.Call, LogDebug);
+            }
+
+            yield return new CodeInstruction(OpCodes.Ldstr, "  " + instr.Format());
+            yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
+            yield return new CodeInstruction(OpCodes.Call, LogDebug);
+
+            yield return instr;
         }
     }
     private static void CheckFuncArrays()

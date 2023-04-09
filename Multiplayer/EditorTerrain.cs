@@ -22,20 +22,19 @@ public sealed partial class EditorTerrain : MonoBehaviour
 
     // edit buffer is reversed for everyone but the owner.
     private readonly List<ITerrainAction> _editBuffer = new List<ITerrainAction>();
-    public EditorUser User { get; private set; } = null!;
+    public EditorUser User { get; internal set; } = null!;
     public bool IsOwner { get; private set; }
 
     [UsedImplicitly]
     private void Start()
     {
-        if (!TryGetComponent(out EditorUser u))
+        if (User == null)
         {
             Destroy(this);
-            Logger.LogError("Invalid UserInput setup; EditorUser not found!");
+            Logger.LogError("Invalid EditorTerrain setup; EditorUser not found!");
             return;
         }
-
-        User = u;
+        
 #if CLIENT
         IsOwner = User == EditorUser.User;
 #endif

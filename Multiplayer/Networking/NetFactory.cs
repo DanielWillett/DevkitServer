@@ -238,12 +238,14 @@ public static class NetFactory
 #if DEBUG
     private static void PatchServerGetWriterWithStaticHeader(ClientMethodHandle __instance)
     {
+        return;
         ClientMethodInfo? info = ServerGetMethodInfo?.Invoke(__instance);
         string name = (info == null || ServerGetMethodName == null ? null : ServerGetMethodName(info)) ?? "unknown";
         Logger.LogDebug($"[CLIENT MTD HNDL] Unturned.InvokeMessage sending: {name,-36} (Type: {__instance.GetType().Format(),-24})");
     }
     private static void PatchClientGetWriterWithStaticHeader(ServerMethodHandle __instance)
     {
+        return;
         ServerMethodInfo? info = ClientGetMethodInfo?.Invoke(__instance);
         string name = (info == null || ClientGetMethodName == null ? null : ClientGetMethodName(info)) ?? "unknown";
         Logger.LogDebug($"[SERVER MTD HNDL] Unturned.InvokeMessage sending: {name,-36} (Type: {__instance.GetType().Format(),-24})");
@@ -467,7 +469,7 @@ public static class NetFactory
 #else
                 value = (EClientMessage)num;
 #endif
-                Logger.LogDebug($"Reading net message enum {num,2}: {(num <= ReceiveBlockOffset ? ("Unturned." + value) : ("DevkitServer." + (DevkitMessage)(num - ReceiveBlockOffset)))}");
+                // Logger.LogDebug($"Reading net message enum {num,2}: {(num <= ReceiveBlockOffset ? ("Unturned." + value) : ("DevkitServer." + (DevkitMessage)(num - ReceiveBlockOffset)))}");
                 __result = flag;
             }
             else
@@ -494,11 +496,11 @@ public static class NetFactory
         {
             uint v = (uint)value;
 #if SERVER
-            if (value != EClientMessage.InvokeMethod)
+            // if (value != EClientMessage.InvokeMethod)
 #else
-            if (value != EServerMessage.InvokeMethod)
+            // if (value != EServerMessage.InvokeMethod)
 #endif
-                Logger.LogDebug($"Writing net message enum {v, 2}: {(v < WriteBlockOffset ? ("Unturned." + value) : ("DevkitServer." + (DevkitMessage)(v - WriteBlockOffset)))}");
+                // Logger.LogDebug($"Writing net message enum {v, 2}: {(v < WriteBlockOffset ? ("Unturned." + value) : ("DevkitServer." + (DevkitMessage)(v - WriteBlockOffset)))}");
             __result = writer.WriteBits(v, NewWriteBitCount);
             return false;
         }
@@ -531,7 +533,7 @@ public static class NetFactory
                 Logger.LogError("Message overhead read a size larger than the message payload: " + size + " bytes.");
                 goto rtn;
             }
-            Logger.LogDebug("Received method invocation: " + overhead + " ( in data: " + message.Length + " size: " + size + " )");
+            // Logger.LogDebug("Received method invocation: " + overhead + " ( in data: " + message.Length + " size: " + size + " )");
             byte[] data = new byte[size];
             Buffer.BlockCopy(message, overhead.Length, data, 0, size);
             if (invokers.TryGetValue(overhead.MessageId, out BaseNetCall call))

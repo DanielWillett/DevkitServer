@@ -75,6 +75,9 @@ public static class UserManager
                         }
                         if (!added) _users.Add(user);
                     }
+
+                    user.Player = pl;
+                    user.IsOnline = true;
                     _users.Add(user);
                     OnUserConnected?.Invoke(user);
                     Logger.LogInfo("Player added: " + user.DisplayName + " {" + user.SteamId.m_SteamID + "}.");
@@ -93,9 +96,10 @@ public static class UserManager
             return;
 
         _users.Remove(user);
-        user.IsOnline = false;
         OnUserDisconnected?.Invoke(user);
+        user.IsOnline = false;
+        user.Player = null;
         Logger.LogInfo("Player removed: " + user.DisplayName + " {" + user.SteamId.m_SteamID + "}.");
-        Object.DestroyImmediate(user);
+        Object.Destroy(user);
     }
 }

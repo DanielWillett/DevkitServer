@@ -188,7 +188,7 @@ public class ByteReader
         fail:
         failure = true;
         string ex = "Failed to read " + byteCt.ToString(CultureInfo.InvariantCulture) +
-                    " at offset " + _index.ToString(CultureInfo.InvariantCulture) + ".";
+                    " B at offset " + _index.ToString(CultureInfo.InvariantCulture) + " / " + _length.ToString(CultureInfo.InvariantCulture) + ".";
         if (ThrowOnError)
             throw new ByteBufferOverflowException(ex);
         Logger.LogWarning(ex);

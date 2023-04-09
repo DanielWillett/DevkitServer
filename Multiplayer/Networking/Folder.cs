@@ -26,14 +26,14 @@ public struct Folder
             Folders = new string[dirs.Length];
             for (int i = 0; i < dirs.Length; i++)
             {
-                Folders[i] = FormatPath(GetRelativePath(parentPath, dirs[i].FullName));
+                Folders[i] = GetRelativePath(parentPath, dirs[i].FullName);
             }
             this.Files = new File[files.Length];
             for (int i = 0; i < files.Length; i++)
             {
                 this.Files[i] = new File
                 {
-                    Path = FormatPath(GetRelativePath(parentPath, files[i].FullName)),
+                    Path = GetRelativePath(parentPath, files[i].FullName),
                     Content = System.IO.File.ReadAllBytes(files[i].FullName)
                 };
             }
@@ -150,19 +150,22 @@ public struct Folder
         Folder folder = new Folder
         {
             FolderName = reader.ReadString(),
-            Folders = reader.ReadStringArray()
+            Folders = new string[reader.ReadInt32()]
         };
         for (int i = 0; i < folder.Folders.Length; ++i)
-            folder.Folders[i] = UnformatPath(folder.Folders[i]);
+        {
+            Logger.LogInfo("Folder: " + (folder.Folders[i] = UnformatPath(reader.ReadString())));
+        }
         int len = reader.ReadInt32();
         folder.Files = new File[len];
         for (int i = 0; i < len; ++i)
         {
-            folder.Files[i] = new File()
+            folder.Files[i] = new File
             {
                 Path = UnformatPath(reader.ReadString()),
                 Content = reader.ReadLongBytes() ?? Array.Empty<byte>()
             };
+            Logger.LogInfo("File: " + folder.Files[i].Path + " (" + DevkitServerUtility.FormatBytes(folder.Files[i].Content.Length) + ")");
         }
         return folder;
     }
@@ -171,13 +174,16 @@ public struct Folder
     public static void Write(ByteWriter writer, in Folder folder)
     {
         writer.Write(folder.FolderName);
-        writer.Write(folder.Folders);
+        writer.Write(folder.Folders.Length);
+        for (int i = 0; i < folder.Folders.Length; ++i)
+            writer.Write(FormatPath(folder.Folders[i]));
+        
         File[] fls = folder.Files;
         writer.Write(fls.Length);
         for (int i = 0; i < fls.Length; ++i)
         {
             ref File file = ref fls[i];
-            writer.Write(file.Path);
+            writer.Write(FormatPath(file.Path));
             writer.WriteLong(file.Content);
         }
     }

@@ -7,24 +7,32 @@ using System.Threading.Tasks;
 namespace DevkitServer.Util.Terminals;
 internal sealed class BackgroundLoggingTerminal : MonoBehaviour, ITerminal
 {
+    private bool _writing;
     public event TerminalReadDelegate? OnInput;
     public event TerminalWriteDelegate? OnOutput;
-    public void Write(string input, ConsoleColor color)
+    public bool IsCommitingToUnturnedLog => _writing;
+    
+    public void Write(string input, ConsoleColor color, bool save)
     {
         OnOutput?.Invoke(ref input, ref color);
-        switch (color)
+        if (save)
         {
-            case ConsoleColor.Yellow:
-            case ConsoleColor.DarkYellow:
-                UnturnedLog.warn(input);
-                break;
-            case ConsoleColor.Red:
-            case ConsoleColor.DarkRed:
-                UnturnedLog.error(input);
-                break;
-            default:
-                UnturnedLog.info(input);
-                break;
+            _writing = true;
+            switch (color)
+            {
+                case ConsoleColor.Yellow:
+                case ConsoleColor.DarkYellow:
+                    UnturnedLog.warn(input);
+                    break;
+                case ConsoleColor.Red:
+                case ConsoleColor.DarkRed:
+                    UnturnedLog.error(input);
+                    break;
+                default:
+                    UnturnedLog.info(input);
+                    break;
+            }
+            _writing = false;
         }
     }
     public void Init() { }

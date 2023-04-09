@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -62,6 +63,7 @@ public static class DevkitServerUtility
 
         return len.ToString("N1") + " " + _sizeCodes[inc];
     }
+    public static unsafe int GetLabelId(this Label label) => *(int*)&label;
     public static void PrintBytesHex(byte[] bytes, int columnCount = 16, int len = -1)
     {
         Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, columnCount, len));

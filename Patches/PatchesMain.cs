@@ -1,13 +1,19 @@
-﻿using DevkitServer.Multiplayer;
+﻿using System.Diagnostics;
+using DevkitServer.Multiplayer;
 using HarmonyLib;
 using JetBrains.Annotations;
 using System.Reflection;
 #if CLIENT
 using DevkitServer.Multiplayer.LevelData;
+using DevkitServer.Players;
 using SDG.Provider;
 #endif
 #if SERVER
 using System.Reflection.Emit;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using DevkitServer.Configuration;
+using SDG.NetPak;
 #endif
 
 namespace DevkitServer.Patches;
@@ -23,6 +29,7 @@ internal static class PatchesMain
         {
             Patcher = new Harmony(HarmonyId);
             Patcher.PatchAll();
+
             Logger.LogInfo("Patched");
         }
         catch (Exception ex)
@@ -56,6 +63,7 @@ internal static class PatchesMain
 
     [HarmonyPatch(typeof(Provider), nameof(Provider.launch))]
     [HarmonyPrefix]
+    [UsedImplicitly]
     private static bool LaunchPatch()
     {
         Provider.provider.matchmakingService.refreshRules(Provider.currentServerInfo.ip, Provider.currentServerInfo.queryPort);
@@ -81,7 +89,7 @@ internal static class PatchesMain
         {
             ApplyServerAssetMapping(level, GetServerPendingIDs(Provider.provider.workshopService));
             UnturnedLog.info("Loading server level ({0})", Provider.map);
-            Level.load(level, false);
+            Level.edit(level);
             Provider.gameMode = new DevkitServerGamemode();
         }
 
@@ -109,6 +117,42 @@ internal static class PatchesMain
             Launch();
         }
     }
+    private static bool IsEditorMode(PlayerCaller caller)
+    {
+        if (!DevkitServerModule.IsEditing)
+            return false;
+
+        return !(EditorUser.User != null && (!caller.player.channel.isOwner || EditorUser.User.Input.Controller == MovementController.Player));
+    }
+
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(PlayerLook), "Update")]
+    [HarmonyPrefix]
+    private static bool PlayerLookUpdate(PlayerLook __instance) => !IsEditorMode(__instance);
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(PlayerAnimator), "Update")]
+    [HarmonyPrefix]
+    private static bool PlayerAnimatorUpdate(PlayerAnimator __instance) => !IsEditorMode(__instance);
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(PlayerAnimator), "LateUpdate")]
+    [HarmonyPrefix]
+    private static bool PlayerAnimatorLateUpdate(PlayerAnimator __instance) => !IsEditorMode(__instance);
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(PlayerEquipment), "Update")]
+    [HarmonyPrefix]
+    private static bool PlayerEquipmentUpdate(PlayerEquipment __instance) => !IsEditorMode(__instance);
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(PlayerMovement), "Update")]
+    [HarmonyPrefix]
+    private static bool PlayerMovementUpdate(PlayerMovement __instance) => !IsEditorMode(__instance);
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(PlayerStance), "Update")]
+    [HarmonyPrefix]
+    private static bool PlayerStanceUpdate(PlayerStance __instance) => !IsEditorMode(__instance);
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(PlayerInput), "FixedUpdate")]
+    [HarmonyPrefix]
+    private static bool PlayerInputFixedUpdate(PlayerInput __instance) => !IsEditorMode(__instance);
 
 #endif
 
@@ -124,6 +168,17 @@ internal static class PatchesMain
         }
 
         return true;
+    }
+
+
+    [UsedImplicitly]
+    private static Exception SteamPlayerConstructorFinalizer(Exception? __exception)
+    {
+        if (__exception != null)
+            Logger.LogError(__exception);
+        else
+            Logger.LogDebug("No exception");
+        return null!;
     }
 
 #if SERVER
@@ -171,17 +226,86 @@ internal static class PatchesMain
     [HarmonyPatch(typeof(Provider), "onDedicatedUGCInstalled")]
     [HarmonyTranspiler]
     [UsedImplicitly]
-    private static IEnumerable<CodeInstruction> DedicatedUgcLoadedTranspiler(IEnumerable<CodeInstruction> instructions)
+    private static IEnumerable<CodeInstruction> DedicatedUgcLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
+        bool one = false;
         foreach (CodeInstruction instr in instructions)
         {
-            if (instr.Calls(lvlLoad))
+            if (!one && instr.Calls(lvlLoad))
             {
                 yield return new CodeInstruction(OpCodes.Pop);
                 yield return new CodeInstruction(OpCodes.Call, lvlEdit);
+                Logger.LogDebug("Inserted patch to " + method.Format() + " to load editor instead of player.");
+                one = true;
             }
             else
                 yield return instr;
+        }
+        if (!one)
+        {
+            Logger.LogWarning("Failed to insert " + method.Format() + " patch to load editor instead of player.");
+            DevkitServerModule.Fault();
+        }
+    }
+
+    private static readonly MethodInfo? getLvlHash = typeof(Level).GetProperty(nameof(Level.hash), BindingFlags.Public | BindingFlags.Static)?.GetGetMethod(true);
+
+    [UsedImplicitly]
+    private static bool OnCheckingLevelHash(ITransportConnection connection)
+    {
+        Logger.LogInfo(connection.GetAddressString(true) + " checking hash...");
+        return DevkitServerModule.IsEditing;
+    }
+
+    [HarmonyPatch("ServerMessageHandler_ReadyToConnect", "ReadMessage", MethodType.Normal)]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    private static IEnumerable<CodeInstruction> OnVerifyingPlayerDataTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
+    {
+        MethodInfo mtd = typeof(PatchesMain).GetMethod(nameof(OnCheckingLevelHash), BindingFlags.Static | BindingFlags.NonPublic)!;
+        MethodInfo? reject = typeof(Provider).GetMethods(BindingFlags.Static | BindingFlags.Public).FirstOrDefault(x =>
+        {
+            if (!x.Name.Equals(nameof(Provider.reject), StringComparison.Ordinal))
+                return false;
+            ParameterInfo[] ps = x.GetParameters();
+            return ps.Length == 2 && ps[0].ParameterType == typeof(ITransportConnection) && ps[1].ParameterType == typeof(ESteamRejection);
+        });
+        if (reject == null)
+        {
+            Logger.LogWarning("Unable to find method: Provider.reject(ITransportConnection, ESteamRejection).");
+            DevkitServerModule.Fault();
+        }
+        List<CodeInstruction> list = new List<CodeInstruction>(instructions);
+        int c = 0;
+        for (int i = 0; i < list.Count; ++i)
+        {
+            CodeInstruction ins = list[i];
+            if (c < 2 && i < list.Count - 5 && getLvlHash != null && mtd != null
+                && Accessor.IsDevkitServerGetter != null &&
+                list[i].opcode == OpCodes.Ldarg_0 && list[i + 1].LoadsConstant(ESteamRejection.WRONG_HASH_LEVEL) &&
+                list[i + 2].Calls(reject) && list[i + 3].opcode == OpCodes.Ret)
+            {
+                Label label = generator.DefineLabel();
+                yield return new CodeInstruction(OpCodes.Ldarg_0);
+                yield return new CodeInstruction(OpCodes.Call, mtd);
+                yield return new CodeInstruction(OpCodes.Brtrue_S, label);
+                Logger.LogDebug("Inserted patch to " + method.Format() + " to skip level hash verification.");
+                yield return ins;
+                yield return list[i + 1];
+                yield return list[i + 2];
+                yield return list[i + 3];
+                i += 3;
+                list[i + 4].labels.Add(label);
+                ++c;
+                continue;
+            }
+            
+            yield return ins;
+        }
+        if (c != 2)
+        {
+            Logger.LogWarning("Failed to insert two " + method.Format() + " patches to skip level hash verification.");
+            DevkitServerModule.Fault();
         }
     }
     private static void OnLoadEdit(LevelInfo info)

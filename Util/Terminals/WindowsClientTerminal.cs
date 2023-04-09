@@ -1,6 +1,9 @@
 ﻿#if CLIENT
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using DevkitServer.Patches;
+using JetBrains.Annotations;
 using ThreadPriority = System.Threading.ThreadPriority;
 
 namespace DevkitServer.Util.Terminals;
@@ -14,9 +17,12 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
     private readonly Queue<LogMessage> _messageQueue = new Queue<LogMessage>();
     private readonly Queue<string> _inputQueue = new Queue<string>();
     private volatile bool _cancellationRequested;
-    private Thread _keyMonitor;
-    private bool setup;
-    private bool inText;
+    private Thread? _keyMonitor;
+    private uint? _closeHandler;
+    private bool _setup;
+    private bool _inText;
+    private bool _writing;
+    public bool IsCommitingToUnturnedLog => _writing;
     public void Init()
     {
         FreeConsole();
@@ -26,6 +32,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
         IntPtr handle = GetStdHandle(STD_OUTPUT_HANDLE);
         GetConsoleMode(handle, out uint mode1);
         SetConsoleMode(handle, mode1 | 0x0004); // enable extended ANSI support for older terminals
+        SetConsoleCtrlHandler(OnExitRequested, true);
         Console.OutputEncoding = new UTF8Encoding(false);
         Console.InputEncoding = new UTF8Encoding(false);
         Console.Title = "Devkit Server Client";
@@ -41,11 +48,13 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
             Name = curThread.Name + " Terminal Reader"
         };
         _keyMonitor.Start();
-        setup = true;
+        _setup = true;
     }
+
+    [UsedImplicitly]
     void Update()
     {
-        if (setup)
+        if (_setup)
         {
             while (_inputQueue.Count > 0)
             {
@@ -55,8 +64,9 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
             }
             if (_messageQueue.Count > 0)
             {
+                _writing = true;
                 ConsoleColor temp = Console.ForegroundColor;
-                if (inText)
+                if (_inText)
                 {
                     int x = Console.CursorLeft;
                     int y = Console.CursorTop;
@@ -64,32 +74,71 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                     Console.SetCursorPosition(0, y);
                     while (_messageQueue.Count > 0)
                     {
-                        _messageQueue.Dequeue().Write();
+                        LogMessage msg = _messageQueue.Dequeue();
+                        msg.Write();
+                        if (msg.Save)
+                        {
+                            string message = msg.Message;
+                            Logger.TryRemoveDateFromLine(ref message);
+                            Logs.printLine(Logger.RemoveANSIFormatting(message));
+                        }
                     }
+
                     Console.SetCursorPosition(x, y + 1);
                 }
                 else
                 {
                     while (_messageQueue.Count > 0)
                     {
-                        _messageQueue.Dequeue().Write();
+                        LogMessage msg = _messageQueue.Dequeue();
+                        msg.Write();
+                        if (msg.Save)
+                        {
+                            string message = msg.Message;
+                            Logger.TryRemoveDateFromLine(ref message);
+                            Logs.printLine(Logger.RemoveANSIFormatting(message));
+                        }
                     }
                 }
                 Console.ForegroundColor = temp;
+                _writing = false;
+            }
+            if (_closeHandler.HasValue && _closeHandler.Value != uint.MaxValue)
+            {
+                Write("Closing from control signal \"" +
+                      _closeHandler.Value switch
+                      {
+                          0 => "Ctrl + C",
+                          1 => "Ctrl + Break",
+                          2 => "Window Closed",
+                          5 => "Logging Off",
+                          6 => "Shutting Down",
+                          _ => "Unknown: " + _closeHandler.Value
+                      } + "\".", ConsoleColor.Red, true);
+                Provider.shutdown(2, "Closed by Console: No Explanation");
+                _closeHandler = uint.MaxValue;
             }
         }
     }
-    public void Write(string input, ConsoleColor color)
+
+
+    public void Write(string input, ConsoleColor color, bool save)
     {
         OnOutput?.Invoke(ref input, ref color);
-        _messageQueue.Enqueue(new LogMessage(input, color));
+        _messageQueue.Enqueue(new LogMessage(input, color, save));
+    }
+    private bool OnExitRequested(uint val)
+    {
+        _closeHandler = val;
+        return true;
     }
     public void Close()
     {
         _cancellationRequested = true;
         _keyMonitor?.Abort();
-        inText = false;
+        _inText = false;
         Console.SetCursorPosition(0, Console.CursorTop);
+        SetConsoleCtrlHandler(OnExitRequested, false);
         if (_messageQueue.Count > 0)
         {
             ConsoleColor temp = Console.ForegroundColor;
@@ -99,17 +148,20 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
             }
             Console.ForegroundColor = temp;
         }
-        setup = false;
+        _setup = false;
         FreeConsole();
     }
 
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool AllocConsole();
+
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
+
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);
+
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern IntPtr GetStdHandle(int nStdHandle);
 
@@ -121,7 +173,10 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool SetConsoleCP(uint wCodePageID);
-    
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetConsoleCtrlHandler(Func<uint, bool> handler, bool add);
+
     private void MonitorKeypress()
     {
         while (!_cancellationRequested)
@@ -139,7 +194,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                         break;
                     }
 
-                    inText = true;
+                    _inText = true;
                 }
                 if (key.Key == ConsoleKey.Escape)
                 {
@@ -160,7 +215,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                     }
                     if (current.Length == 0)
                     {
-                        inText = false;
+                        _inText = false;
                     }
                 }
                 else if (key.Key == ConsoleKey.Enter)
@@ -189,17 +244,19 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
             {
                 _inputQueue.Enqueue(current);
             }
-            inText = false;
+            _inText = false;
         }
     }
     internal readonly struct LogMessage
     {
         public readonly string Message;
         public readonly ConsoleColor Color;
-        public LogMessage(string message, ConsoleColor color)
+        public readonly bool Save;
+        public LogMessage(string message, ConsoleColor color, bool save)
         {
             Message = message;
             Color = color;
+            Save = save;
         }
         public void Write()
         {
