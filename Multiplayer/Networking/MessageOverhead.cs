@@ -139,8 +139,10 @@ public readonly struct MessageOverhead
         else
             msg = "Msg: " + NetFactory.GetInvokerName(MessageId) + ";";
         msg += " " + Size.ToString(CultureInfo.InvariantCulture) + " B;";
-        if (ResponseKey != 0)
+        if ((Flags & MessageFlags.Relay) == 0 && ResponseKey != 0)
             msg += " Snowflake: " + RequestKey.ToString(CultureInfo.InvariantCulture) + ";";
+        if ((Flags & MessageFlags.Relay) != 0 && Sender != 0)
+            msg += " Sender: " + Sender.ToString(CultureInfo.InvariantCulture) + ";";
         if (RequestKey != 0)
             msg += (ResponseKey == 0 ? " Snowflake: " : " Request Key: ") + RequestKey.ToString(CultureInfo.InvariantCulture) + ";";
         if (Flags is not MessageFlags.None)

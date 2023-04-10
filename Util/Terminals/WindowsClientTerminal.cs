@@ -114,7 +114,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                           5 => "Logging Off",
                           6 => "Shutting Down",
                           _ => "Unknown: " + _closeHandler.Value
-                      } + "\".", ConsoleColor.Red, true);
+                      } + "\".", ConsoleColor.Red, true, Severity.Info);
                 Provider.shutdown(2, "Closed by Console: No Explanation");
                 _closeHandler = uint.MaxValue;
             }
@@ -122,7 +122,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
     }
 
 
-    public void Write(string input, ConsoleColor color, bool save)
+    public void Write(string input, ConsoleColor color, bool save, Severity severity)
     {
         OnOutput?.Invoke(ref input, ref color);
         _messageQueue.Enqueue(new LogMessage(input, color, save));

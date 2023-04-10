@@ -5,35 +5,40 @@ using JetBrains.Annotations;
 using SDG.Framework.Devkit;
 using System.Reflection;
 using System.Reflection.Emit;
+using SDG.NetPak;
 
 namespace DevkitServer.Players;
 
 [EarlyTypeInit(-1)]
 public class UserInput : MonoBehaviour
 {
-    private MovementController _controller;
+    private CameraController _controller;
     public static event Action<EditorUser>? OnUserPositionUpdated;
     public EditorUser User { get; internal set; } = null!;
-    private int sim = 0;
-    private int expected = 0;
-    private bool _hasStopped = false;
-    public static NetCallCustom SendInputPacket = new NetCallCustom((int)NetCalls.SendMovementPacket, 64);
+    private bool _hasStopped = true;
+#if CLIENT
+    private float _lastFlush;
+    private Vector3 _lastPos;
+    private Quaternion _lastRot;
+    private bool _bufferHasStop;
+#endif
+    private float _nextPacketApplyTime;
     public bool IsOwner { get; private set; }
-
-    public MovementController Controller
+    public GameObject? ControllerObject { get; private set; }
+    public CameraController Controller
     {
         get => _controller;
         set
         {
-            if (_controller == value || value is not MovementController.Editor and not MovementController.Player)
+            if (_controller == value || value is not CameraController.Editor and not CameraController.Player)
                 return;
             switch (value)
             {
-                case MovementController.Editor:
-                    this.controllerObj = User.EditorObject;
+                case CameraController.Editor:
+                    ControllerObject = User.EditorObject;
                     break;
-                case MovementController.Player:
-                    this.controllerObj = User.Player!.player.gameObject;
+                case CameraController.Player:
+                    ControllerObject = User.Player!.player.gameObject;
                     break;
             }
             _controller = value;
@@ -45,10 +50,14 @@ public class UserInput : MonoBehaviour
     private static readonly InstanceGetter<EditorMovement, float> GetSpeed = Accessor.GenerateInstanceGetter<EditorMovement, float>("speed", BindingFlags.NonPublic, throwOnError: true)!;
     private static readonly InstanceGetter<EditorMovement, Vector3> GetInput = Accessor.GenerateInstanceGetter<EditorMovement, Vector3>("input", BindingFlags.NonPublic, throwOnError: true)!;
     private static readonly InstanceSetter<PlayerInput, float>? SetLastInputted = Accessor.GenerateInstanceSetter<PlayerInput, float>("lastInputed");
-    private EditorMovement _movement = null!;
-    private Queue<UserInputPacket>? packets;
+
+#if CLIENT
+    private EditorMovement? _movement;
+    private static readonly ByteWriter Writer = new ByteWriter(false, 245);
+#endif
+    private static readonly ByteReader Reader = new ByteReader { ThrowOnError = true };
+    private Queue<UserInputPacket> packets = new Queue<UserInputPacket>();
     private UserInputPacket _lastPacket;
-    private GameObject controllerObj;
 
     public static IDevkitTool? ActiveTool => GetDevkitTool?.Invoke();
 
@@ -92,48 +101,182 @@ public class UserInput : MonoBehaviour
             Logger.LogError("Invalid UserInput setup; EditorUser not found!");
             return;
         }
-        
+
 #if CLIENT
         IsOwner = User == EditorUser.User;
-        if (IsOwner && !Level.editing.TryGetComponent(out _movement))
+        if (IsOwner && !User.EditorObject.TryGetComponent(out _movement))
         {
             Destroy(this);
             Logger.LogError("Invalid UserInput setup; EditorMovement not found!");
             return;
         }
 #endif
+
+        _nextPacketApplyTime = Time.realtimeSinceStartup;
+        _lastPacket = new UserInputPacket
+        {
+            Flags = Flags.StopMsg,
+            DeltaTime = Time.deltaTime,
+            Position = transform.position,
+            Rotation = IsOwner ? MainCamera.instance.transform.rotation : Quaternion.Euler(Vector3.forward)
+        };
+
         if (IsOwner)
-            Controller = MovementController.Editor;
+            Controller = CameraController.Editor;
 
         Logger.LogDebug("User input module created for " + User.SteamId.m_SteamID + " ( owner: " + IsOwner + " ).");
     }
-
     private void HandleControllerUpdated()
     {
         if (IsOwner)
         {
-            GameObject ctrl = controllerObj;
+            GameObject? ctrl = ControllerObject;
+            if (ctrl == null || !SetActiveMainCamera(ctrl.transform))
+                return;
             if (ctrl == User.EditorObject)
-            {
-
-            }
+                Logger.LogInfo("Camera controller set to {Editor}.", ConsoleColor.DarkCyan);
+            else if (ctrl == User.Player!.player.gameObject)
+                Logger.LogInfo("Camera controller set to {Player}.", ConsoleColor.DarkCyan);
+            else
+                Logger.LogInfo("Camera controller set to \"" + ctrl.name + "\".", ConsoleColor.DarkCyan);
         }
     }
-
-    [NetCall(NetCallSource.FromServer, (int)NetCalls.SendMovementPacket)]
-    private static void ReceiveInputPacket(MessageContext ctx, ByteReader reader)
+    private static bool SetActiveMainCamera(Transform tranform)
     {
-        if (UserManager.FromId(ctx.Overhead.Sender) is { } sender)
+        Transform? child = tranform.FindChildRecursive("Camera");
+        if (child == null)
         {
-            sender.Input.ReceiveInputPacket(reader);
+            Logger.LogWarning("Failed to find 'Camera' child.");
+            return false;
         }
+
+        MainCamera? cameraObj = child.GetComponentInChildren<MainCamera>();
+        if (cameraObj == null)
+        {
+            Logger.LogWarning("Failed to find MainCamera component.");
+            return false;
+        }
+        
+        if (!cameraObj.transform.TryGetComponent(out Camera camera))
+        {
+            Logger.LogWarning("Failed to find Camera component on MainCamera object.");
+            return false;
+        }
+
+        if (MainCamera.instance == camera)
+        {
+            Logger.LogDebug("Camera already set to the correct instance.");
+            return true;
+        }
+        camera.enabled = true;
+        Logger.LogDebug("Camera enabled: " + camera.gameObject.name + ".");
+
+        Camera oldCamera = MainCamera.instance;
+        if (oldCamera != null)
+        {
+            oldCamera.enabled = false;
+            Logger.LogDebug("Camera disabled: " + oldCamera.gameObject.name + ".");
+        }
+
+        try
+        {
+            cameraObj.Awake();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Failed to set camera instance to \"" + tranform.gameObject.name + "\".");
+            Logger.LogError(ex);
+        }
+
+        return false;
     }
-    private void ReceiveInputPacket(ByteReader reader)
+
+    internal static void ReceiveMovementRelay(
+#if SERVER
+        ITransportConnection transportConnection,
+#endif
+        NetPakReader reader)
     {
-        UserInputPacket packet = new UserInputPacket();
-        packet.Read(reader);
-        (packets ??= new Queue<UserInputPacket>(1)).Enqueue(packet);
-        if (User.Player != null)
+        if (!reader.ReadUInt16(out ushort len))
+        {
+            Logger.LogError("Failed to read incoming movement packet length.");
+            return;
+        }
+
+        byte[] bytes = new byte[len];
+#if SERVER
+        EditorUser? user = UserManager.FromConnection(transportConnection);
+#else
+        if (!reader.ReadUInt64(out ulong userId))
+        {
+            Logger.LogError("Failed to read incoming movement packet user ID.");
+            return;
+        }
+
+        EditorUser? user = UserManager.FromId(userId);
+#endif
+        if (user == null)
+        {
+            Logger.LogError("Failed to find user for movement packet.");
+            return;
+        }
+        if (!reader.ReadBytesPtr(len, out byte[] buffer, out int offset))
+        {
+            Logger.LogError("Failed to read movement packet.");
+            return;
+        }
+        Reader.LoadNew(buffer);
+        Reader.Skip(offset);
+        user.Input.HandleReadPackets(Reader);
+
+#if SERVER
+        if (Provider.clients.Count > 1)
+        {
+            byte[] sendBytes = new byte[sizeof(ulong) + len];
+            Buffer.BlockCopy(bytes, 0, sendBytes, sizeof(ulong), len);
+            UnsafeBitConverter.GetBytes(sendBytes, user.SteamId.m_SteamID);
+            IList<ITransportConnection> list = NetFactory.GetPooledTransportConnectionList(Provider.clients.Count - 1);
+            for (int i = 0; i < Provider.clients.Count; ++i)
+            {
+                SteamPlayer pl = Provider.clients[i];
+                if (pl.playerID.steamID.m_SteamID != user.SteamId.m_SteamID)
+                    list.Add(pl.transportConnection);
+            }
+
+            NetFactory.SendGeneric(NetFactory.DevkitMessage.RelayPacket, sendBytes, list);
+        }
+#endif
+    }
+#if CLIENT
+    private void FlushPackets()
+    {
+        if (packets.Count < 1) return;
+        Logger.LogDebug("Flushing " + packets.Count + " movement packet(s).");
+        HandleFlushPackets(Writer);
+        int len = Writer.Count;
+        NetFactory.SendGeneric(NetFactory.DevkitMessage.MovementRelay, Writer.FinishWrite(), 0, len);
+        _bufferHasStop = false;
+    }
+    private void HandleFlushPackets(ByteWriter writer)
+    {
+        int c = Math.Min(byte.MaxValue, packets!.Count);
+        writer.Write((byte)c);
+        for (int i = 0; i < c; ++i)
+            packets.Dequeue().Write(writer);
+    }
+#endif
+    private void HandleReadPackets(ByteReader reader)
+    {
+        byte c = reader.ReadUInt8();
+        for (int i = 0; i < c; ++i)
+        {
+            UserInputPacket p = new UserInputPacket();
+            p.Read(reader);
+            packets.Enqueue(p);
+        }
+        Logger.LogDebug("Received " + c + " movement packet(s).");
+        if (User.Player != null && User.Player.player != null)
             SetLastInputted?.Invoke(User.Player.player.input, Time.realtimeSinceStartup);
     }
 
@@ -144,14 +287,6 @@ public class UserInput : MonoBehaviour
     }
 
     [UsedImplicitly]
-    private void FixedUpdate()
-    {
-        ++sim;
-        if ((sim % PlayerInput.SAMPLES) == 0)
-            ++expected;
-    }
-
-    [UsedImplicitly]
     private void LateUpdate()
     {
         if (!User.IsOnline)
@@ -159,63 +294,79 @@ public class UserInput : MonoBehaviour
             Destroy(this);
             return;
         }
+        float t = Time.realtimeSinceStartup;
 #if CLIENT
         if (IsOwner)
         {
-            if (expected <= 0)
+            if (_movement == null)
                 return;
-            --expected;
-            if (EditorMovement.isMoving)
+            bool posDiff = this.transform.position != _lastPos;
+            bool rotDiff = MainCamera.instance.transform.rotation != _lastRot;
+            if (posDiff || rotDiff)
             {
                 OnUserPositionUpdated?.Invoke(User);
                 _hasStopped = false;
+                Flags flags = Flags.None;
+                if (posDiff)
+                    flags |= Flags.Position;
+                if (rotDiff)
+                    flags |= Flags.Rotation;
                 _lastPacket = new UserInputPacket
                 {
-                    Rotation = MainCamera.instance.transform.rotation,
-                    Position = transform.position,
-                    Flags = Flags.None,
+                    Rotation = _lastRot = MainCamera.instance.transform.rotation,
+                    Position = _lastPos = transform.position,
+                    Flags = flags,
                     Speed = GetSpeed(_movement),
                     Input = GetInput(_movement) with
                     {
                         y = InputEx.GetKey(ControlsSettings.ascend)
                             ? 1f
                             : (InputEx.GetKey(ControlsSettings.descend) ? -1f : 0f)
-                    }
+                    },
+                    DeltaTime = Time.deltaTime
                 };
-                MessageOverhead overhead = new MessageOverhead(MessageFlags.LayeredRequest, SendInputPacket.ID, 0);
-                byte[] data = SendInputPacket.Write(ref overhead, _lastPacket.Write);
-                NetFactory.SendRelay(data, false);
+                (packets ??= new Queue<UserInputPacket>(1)).Enqueue(_lastPacket);
+                Logger.LogInfo($"Send position: {transform.position:F2}.");
             }
             else if (!_hasStopped)
             {
                 _hasStopped = true;
                 _lastPacket = new UserInputPacket
                 {
-                    Flags = Flags.StopMsg
+                    Flags = Flags.StopMsg,
+                    DeltaTime = Time.deltaTime,
+                    Rotation = _lastRot,
+                    Position = _lastPos
                 };
-                MessageOverhead overhead = new MessageOverhead(MessageFlags.LayeredRequest, SendInputPacket.ID, 0);
-                byte[] data = SendInputPacket.Write(ref overhead, _lastPacket.Write);
-                NetFactory.SendRelay(data);
+                (packets ??= new Queue<UserInputPacket>(1)).Enqueue(_lastPacket);
+                _bufferHasStop = true;
+            }
+
+            if (t - _lastFlush > Time.fixedDeltaTime * PlayerInput.SAMPLES)
+            {
+                FlushPackets();
+                _lastFlush = t;
             }
         }
         else
 #endif
-        if (expected > 0)
-        {
-            ApplyPacket();
-            --expected;
-        }
-        else if (packets is { Count: > 0 })
+        while (packets is { Count: > 0 } && t >= _nextPacketApplyTime)
         {
             UserInputPacket packet = packets.Dequeue();
+            _nextPacketApplyTime += packet.DeltaTime;
             if ((packet.Flags & Flags.StopMsg) == 0)
             {
+                if (_hasStopped)
+                    _nextPacketApplyTime = t + packet.DeltaTime;
+                _hasStopped = false;
                 _lastPacket = packet;
                 ApplyPacket();
             }
-            else if ((_lastPacket.Flags & Flags.StopMsg) == 0)
+            else
             {
-                this.transform.position = _lastPacket.Position;
+                _hasStopped = true;
+                this.transform.SetPositionAndRotation(packet.Position, packet.Rotation);
+                Logger.LogInfo($"Received {User.SteamId.m_SteamID} end position: {transform.position:F2}.");
                 OnUserPositionUpdated?.Invoke(User);
                 _lastPacket = packet;
             }
@@ -223,22 +374,30 @@ public class UserInput : MonoBehaviour
     }
     private void ApplyPacket()
     {
-        float dt = (Time.fixedDeltaTime * PlayerInput.SAMPLES);
-        Vector3 pos = this.transform.position + _lastPacket.Rotation *
-                                   _lastPacket.Input with { y = 0 } *
-                                   _lastPacket.Speed *
-                                   dt
-                                   +
-                                   Vector3.up *
-                                   _lastPacket.Input.y *
-                                   dt *
-                                   _lastPacket.Speed;
-        if ((pos - _lastPacket.Position).sqrMagnitude > 25f)
+        float dt = _lastPacket.DeltaTime;
+        if ((_lastPacket.Flags & Flags.Position) != 0)
         {
-            pos = _lastPacket.Position;
+            Vector3 pos = this.transform.position + _lastPacket.Rotation *
+                                                  _lastPacket.Input with { y = 0 } *
+                                                  _lastPacket.Speed *
+                                                  dt
+                                                  +
+                                                  Vector3.up *
+                                                  _lastPacket.Input.y *
+                                                  dt *
+                                                  _lastPacket.Speed;
+            if ((pos - _lastPacket.Position).sqrMagnitude > 25f)
+            {
+                pos = _lastPacket.Position;
+            }
+            this.transform.position = pos;
         }
-        this.transform.position = pos;
+        if ((_lastPacket.Flags & Flags.Rotation) != 0)
+        {
+            this.transform.rotation = _lastPacket.Rotation;
+        }
         OnUserPositionUpdated?.Invoke(User);
+        Logger.LogInfo($"Received {User.SteamId.m_SteamID} position: {transform.position:F2}, rotation: {transform.rotation.eulerAngles:F1}.");
     }
 
     private struct UserInputPacket
@@ -247,6 +406,7 @@ public class UserInput : MonoBehaviour
         public Vector3 Position { get; set; }
         public Quaternion Rotation { get; set; }
         public float Speed { get; set; }
+        public float DeltaTime { get; set; }
         public Flags Flags { get; set; }
 
         // Y = ascend
@@ -256,43 +416,67 @@ public class UserInput : MonoBehaviour
         {
             _ = reader.ReadUInt16();
             Flags = reader.ReadEnum<Flags>();
-            if ((Flags & Flags.StopMsg) != 0)
-                return;
-            Speed = reader.ReadFloat();
-            byte inputFlag = reader.ReadUInt8();
-            Input = new Vector3((sbyte)((byte)((inputFlag & 0b00001100) >> 2) - 1),
-                (sbyte)((byte)(inputFlag & 0b00000011) - 1),
-                (sbyte)((byte)((inputFlag & 0b00110000) >> 4) - 1));
-            Position = ReadLowPrecisionVector3Pos(reader);
-            Rotation = ReadLowPrecisionQuaternion(reader);
+            DeltaTime = reader.ReadFloat();
+            if ((Flags & Flags.StopMsg) == 0)
+            {
+                if ((Flags & Flags.Position) != 0)
+                {
+                    Speed = reader.ReadFloat();
+                    byte inputFlag = reader.ReadUInt8();
+                    Input = new Vector3((sbyte)((byte)((inputFlag & 0b00001100) >> 2) - 1),
+                        (sbyte)((byte)(inputFlag & 0b00000011) - 1),
+                        (sbyte)((byte)((inputFlag & 0b00110000) >> 4) - 1));
+                    Position = ReadLowPrecisionVector3Pos(reader);
+                }
+
+                if ((Flags & Flags.Rotation) != 0)
+                    Rotation = ReadLowPrecisionQuaternion(reader);
+            }
+            else
+            {
+                Position = reader.ReadVector3();
+                Rotation = reader.ReadQuaternion();
+            }
         }
 
         public void Write(ByteWriter writer)
         {
             writer.Write(DataVersion);
             writer.Write(Flags);
-            if ((Flags & Flags.StopMsg) != 0)
-                return;
-            writer.Write(Speed);
-            byte inputFlag = (byte)((byte)(Mathf.Clamp(Input.y, -1, 1) + 1) |
-                                    (byte)((byte)(Mathf.Clamp(Input.x, -1, 1) + 1) << 2) |
-                                    (byte)((byte)(Mathf.Clamp(Input.z, -1, 1) + 1) << 4));
-            writer.Write(inputFlag);
-            WriteLowPrecisionVector3Pos(writer, Position);
-            WriteLowPrecisionQuaternion(writer, Rotation);
+            writer.Write(DeltaTime);
+            if ((Flags & Flags.StopMsg) == 0)
+            {
+                if ((Flags & Flags.Position) != 0)
+                {
+                    writer.Write(Speed);
+                    byte inputFlag = (byte)((byte)(Mathf.Clamp(Input.y, -1, 1) + 1) |
+                                            (byte)((byte)(Mathf.Clamp(Input.x, -1, 1) + 1) << 2) |
+                                            (byte)((byte)(Mathf.Clamp(Input.z, -1, 1) + 1) << 4));
+                    writer.Write(inputFlag);
+                    WriteLowPrecisionVector3Pos(writer, Position);
+                }
+                    
+                if ((Flags & Flags.Rotation) != 0)
+                    WriteLowPrecisionQuaternion(writer, Rotation);
+            }
+            else
+            {
+                writer.Write(Position);
+                writer.Write(Rotation);
+            }
         }
 
-        private static Vector3 ReadLowPrecisionVector3Pos(ByteReader reader) => new Vector3(reader.ReadInt16() / 5f,
-            reader.ReadInt16() / 5f, reader.ReadInt16() / 5f);
+        private static Vector3 ReadLowPrecisionVector3Pos(ByteReader reader) => new Vector3(reader.ReadInt24(),
+            reader.ReadInt24(), reader.ReadInt24());
 
         private static Quaternion ReadLowPrecisionQuaternion(ByteReader reader) => new Quaternion(reader.ReadInt8() / 127f,
-            reader.ReadInt16() / 5f, reader.ReadInt16() / 5f, reader.ReadInt16() / 5f);
+            reader.ReadInt8() / 127f, reader.ReadInt8() / 127f, reader.ReadInt8() / 127f);
 
         private static void WriteLowPrecisionVector3Pos(ByteWriter writer, Vector3 pos)
         {
-            writer.Write((short)Mathf.Clamp(pos.x * 5f, short.MinValue, short.MaxValue));
-            writer.Write((short)Mathf.Clamp(pos.y * 5f, short.MinValue, short.MaxValue));
-            writer.Write((short)Mathf.Clamp(pos.z * 5f, short.MinValue, short.MaxValue));
+            writer.WriteInt24((int)Mathf.Clamp(pos.x, -DevkitServerUtility.Int24Bounds, DevkitServerUtility.Int24Bounds));
+            writer.WriteInt24((int)Mathf.Clamp(pos.y, -DevkitServerUtility.Int24Bounds, DevkitServerUtility.Int24Bounds));
+            writer.WriteInt24((int)Mathf.Clamp(pos.z, -DevkitServerUtility.Int24Bounds, DevkitServerUtility.Int24Bounds));
         }
 
         private static void WriteLowPrecisionQuaternion(ByteWriter writer, Quaternion rot)
@@ -307,11 +491,13 @@ public class UserInput : MonoBehaviour
     public enum Flags : byte
     {
         None = 1,
-        StopMsg = 2
+        StopMsg = 2,
+        Position = 4,
+        Rotation = 8
     }
 }
 
-public enum MovementController
+public enum CameraController
 {
     Player = 1,
     Editor

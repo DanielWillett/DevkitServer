@@ -362,6 +362,25 @@ public class ByteReader
     private static readonly MethodInfo ReadInt16Method = typeof(ByteReader).GetMethod(nameof(ReadInt16), BindingFlags.Instance | BindingFlags.Public);
     public short ReadInt16() => !EnsureMoreLength(sizeof(short)) ? default : Read<short>();
 
+#pragma warning disable CS0675
+    public int ReadInt24()
+    {
+        if (!EnsureMoreLength(3))
+            return default;
+        ushort sh = Read<ushort>();
+        byte bt = _buffer![_index];
+        ++_index;
+        return (sh | (bt << 16)) - DevkitServerUtility.Int24Bounds;
+    }
+#pragma warning restore CS0675
+
+    public uint ReadUInt24() => unchecked((uint)ReadInt24());
+
+    public int? ReadNullableInt24()
+    {
+        if (!ReadBool()) return null;
+        return ReadInt24();
+    }
 
     private static readonly MethodInfo ReadNullableInt16Method = typeof(ByteReader).GetMethod(nameof(ReadNullableInt16), BindingFlags.Instance | BindingFlags.Public);
     public short? ReadNullableInt16()

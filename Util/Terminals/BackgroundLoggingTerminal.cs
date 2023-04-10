@@ -12,7 +12,7 @@ internal sealed class BackgroundLoggingTerminal : MonoBehaviour, ITerminal
     public event TerminalWriteDelegate? OnOutput;
     public bool IsCommitingToUnturnedLog => _writing;
     
-    public void Write(string input, ConsoleColor color, bool save)
+    public void Write(string input, ConsoleColor color, bool save, Severity severity)
     {
         OnOutput?.Invoke(ref input, ref color);
         if (save)

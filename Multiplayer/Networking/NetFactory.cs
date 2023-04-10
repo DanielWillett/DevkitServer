@@ -16,7 +16,8 @@ public static class NetFactory
     public enum DevkitMessage
     {
         InvokeMethod,
-        RelayPacket
+        RelayPacket,
+        MovementRelay
     }
     public const EClientMessage ClientMessageType = (EClientMessage)18;
     public const EServerMessage ServerMessageType = (EServerMessage)9;
@@ -77,6 +78,7 @@ public static class NetFactory
 
         methods[(int)DevkitMessage.InvokeMethod] = typeof(NetFactory).GetMethod(nameof(ReceiveMessage), BindingFlags.NonPublic | BindingFlags.Static)!;
         methods[(int)DevkitMessage.RelayPacket] = typeof(NetFactory).GetMethod(nameof(ReceiveRelayPacket), BindingFlags.NonPublic | BindingFlags.Static)!;
+        methods[(int)DevkitMessage.MovementRelay] = typeof(UserInput).GetMethod(nameof(UserInput.ReceiveMovementRelay), BindingFlags.NonPublic | BindingFlags.Static)!;
 
         Listeners = new Delegate[methods.Length];
 
@@ -391,7 +393,6 @@ public static class NetFactory
                     goto fail;
             }
 
-
             byte[] msg = new byte[len];
             if (!reader.ReadBytes(msg))
                 goto fail;
@@ -442,8 +443,10 @@ public static class NetFactory
             Send(tempList, output);
 
             MessageOverhead ovh = new MessageOverhead(msg, user.SteamId.m_SteamID);
-            if ((ovh.Flags & (MessageFlags.LayeredResponse | MessageFlags.LayeredRequest)) != 0)
+            if ((ovh.Flags & MessageFlags.RunOriginalMethodOnRequest) != 0)
+            {
                 OnReceived(msg, transportConnection, in ovh);
+            }
         }
         return;
         fail:
@@ -536,6 +539,12 @@ public static class NetFactory
             // Logger.LogDebug("Received method invocation: " + overhead + " ( in data: " + message.Length + " size: " + size + " )");
             byte[] data = new byte[size];
             Buffer.BlockCopy(message, overhead.Length, data, 0, size);
+//#if DEBUG
+//            if (overhead.MessageId is not (ushort)NetCalls.SendLevel)
+//            {
+//                DevkitServerUtility.PrintBytesHex(data, 32);
+//            }
+//#endif
             if (invokers.TryGetValue(overhead.MessageId, out BaseNetCall call))
             {
                 object[]? parameters = null;
@@ -632,7 +641,7 @@ public static class NetFactory
                         try
                         {
                             object res = info.Method.Invoke(null, parameters);
-                            Logger.LogDebug("Invoked received method: " + info.Method.Format() + ".");
+                            // Logger.LogDebug("Invoked received method: " + info.Method.Format() + ".");
                             if (res is int resp)
                             {
                                 ((MessageContext)parameters[0]).Acknowledge(resp);
@@ -913,6 +922,53 @@ public static class NetFactory
             Attribute = attribute;
         }
     }
+    public static void SendGeneric(DevkitMessage message,
+#if SERVER
+        ITransportConnection connection,
+#endif
+        byte[] bytes, int offset = 0, int length = -1, bool reliable = true)
+    {
+        if (length == -1)
+            length = bytes.Length - offset;
+
+        Writer.Reset();
+#if CLIENT
+        Writer.WriteEnum((EServerMessage)(WriteBlockOffset + (int)message));
+#else
+        Writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)message));
+#endif
+        Writer.WriteUInt16((ushort)length);
+        Writer.WriteBytes(bytes, offset, length);
+        Writer.Flush();
+#if CLIENT
+        GetPlayerTransportConnection().Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
+#else
+        connection.Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
+#endif
+    }
+#if SERVER
+    public static void SendGeneric(DevkitMessage message, byte[] bytes, IList<ITransportConnection>? connections = null, int offset = 0, int length = -1, bool reliable = true)
+    {
+        if (length == -1)
+            length = bytes.Length - offset;
+
+        connections ??= Provider.GatherRemoteClientConnections();
+        if (connections.Count == 0)
+            return;
+        Writer.Reset();
+#if CLIENT
+        Writer.WriteEnum((EServerMessage)(WriteBlockOffset + (int)message));
+#else
+        Writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)message));
+#endif
+        Writer.WriteUInt16((ushort)length);
+        Writer.WriteBytes(bytes, offset, length);
+        Writer.Flush();
+        ENetReliability reliability = reliable ? ENetReliability.Reliable : ENetReliability.Unreliable;
+        for (int i = 0; i < connections.Count; ++i)
+            connections[i].Send(Writer.buffer, Writer.writeByteIndex, reliability);
+    }
+#endif
 #if CLIENT
     public static void SendRelay(byte[] bytes, bool reliable = true, IList<ulong>? users = null)
     {
@@ -933,6 +989,7 @@ public static class NetFactory
 #if DEBUG
         Logger.LogInfo("Sending " + bytes.Length + " bytes to server as a relay to " +
                        (users == null ? "all" : users.Count.ToString(CultureInfo.InvariantCulture)) + " user(s).");
+        DevkitServerUtility.PrintBytesHex(bytes, 32);
 #endif
         GetPlayerTransportConnection().Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
     }
@@ -959,13 +1016,13 @@ public static class NetFactory
         Writer.WriteBytes(bytes, offset < 0 ? 0 : offset, count < 0 ? bytes.Length : count);
         Writer.Flush();
 #if DEBUG
-        Logger.LogInfo("Sending " + bytes.Length + " bytes to " +
+        Logger.LogDebug("Sending " + bytes.Length + " bytes to " +
 #if SERVER
-        connection.GetAddressString(true)
+            connection.GetAddressString(true)
 #else
-        "server"
+            "server"
 #endif
-        );
+            + ".");
 #endif
         connection.Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
     }
@@ -977,7 +1034,7 @@ public static class NetFactory
         Writer.WriteUInt16((ushort)bytes.Length);
         Writer.WriteBytes(bytes);
         Writer.Flush();
-        Logger.LogInfo("Sending " + bytes.Length + " bytes to " + connections.Count + " user(s).");
+        Logger.LogDebug("Sending " + bytes.Length + " bytes to " + connections.Count + " user(s).");
         for (int i = 0; i < connections.Count; ++i)
             connections[i].Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
     }

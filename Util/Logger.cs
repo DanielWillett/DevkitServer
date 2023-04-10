@@ -94,7 +94,7 @@ internal static class Logger
         line = RemoveANSIFormatting(line);
         string msg2 = line;
         TryRemoveDateFromLine(ref msg2);
-        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [UNTURNED]      [LOG]   " + msg2, ConsoleColor.DarkGray, true);
+        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [UNTURNED]      [LOG]   " + msg2, ConsoleColor.DarkGray, false, Severity.Info);
     }
 #endif
     internal static void TryRemoveDateFromLine(ref string message)
@@ -161,42 +161,42 @@ internal static class Logger
     public static void LogDebug(string message, ConsoleColor color = ConsoleColor.DarkGray)
     {
         ChangeResets(ref message, color);
-        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [DEBUG] " + message, color, true);
+        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [DEBUG] " + message, color, true, Severity.Debug);
     }
     public static void LogInfo(string message, ConsoleColor color = ConsoleColor.DarkCyan)
     {
         ChangeResets(ref message, color);
-        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [INFO]  " + message, color, true);
+        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [INFO]  " + message, color, true, Severity.Info);
     }
     public static void LogWarning(string message, ConsoleColor color = ConsoleColor.Yellow, [CallerMemberName] string method = "")
     {
         ChangeResets(ref message, color);
-        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [WARN]  " + "[" + method.ToUpperInvariant() + "] " + message, color, true);
+        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [WARN]  " + "[" + method.ToUpperInvariant() + "] " + message, color, true, Severity.Warning);
     }
     public static void LogError(string message, ConsoleColor color = ConsoleColor.Red, [CallerMemberName] string method = "")
     {
         ChangeResets(ref message, color);
-        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [ERROR] " + "[" + method.ToUpperInvariant() + "] " + message, color, true);
+        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [ERROR] " + "[" + method.ToUpperInvariant() + "] " + message, color, true, Severity.Error);
     }
     public static void DumpGameObject(GameObject go, ConsoleColor color = ConsoleColor.White)
     {
         LogInfo("Gameobject Dump: \"" + go.name + "\":", color);
-        Terminal.Write("Transform:", color, true);
-        Terminal.Write($" Parent: {(go.transform.parent == null ? "none" : go.transform.parent.name)}", color, true);
-        Terminal.Write($" Position: {go.transform.position:F2}", color, true);
-        Terminal.Write($" Rotation: {go.transform.rotation.eulerAngles:F2}", color, true);
-        Terminal.Write($" Scale:    {go.transform.localScale:F2}", color, true);
-        Terminal.Write("Components:", color, true);
+        Terminal.Write("Transform:", color, true, Severity.Debug);
+        Terminal.Write($" Parent: {(go.transform.parent == null ? "none" : go.transform.parent.name)}", color, true, Severity.Debug);
+        Terminal.Write($" Position: {go.transform.position:F2}", color, true, Severity.Debug);
+        Terminal.Write($" Rotation: {go.transform.rotation.eulerAngles:F2}", color, true, Severity.Debug);
+        Terminal.Write($" Scale:    {go.transform.localScale:F2}", color, true, Severity.Debug);
+        Terminal.Write("Components:", color, true, Severity.Debug);
         Component[] comps = go.GetComponents<Component>();
-        Terminal.Write(" ========================================", color, true);
+        Terminal.Write(" ========================================", color, true, Severity.Debug);
         foreach (Component comp in comps)
         {
-            Terminal.Write($" Parent: {comp.transform.gameObject.name}", color, true);
-            Terminal.Write($" Type: {comp.GetType().Format()}{GetANSIForegroundString(color)}", color, true);
-            Terminal.Write(" ========================================", color, true);
+            Terminal.Write($" Parent: {comp.transform.gameObject.name}", color, true, Severity.Debug);
+            Terminal.Write($" Type: {comp.GetType().Format()}{GetANSIForegroundString(color)}", color, true, Severity.Debug);
+            Terminal.Write(" ========================================", color, true, Severity.Debug);
         }
         int childCt = go.transform.childCount;
-        Terminal.Write($"Children: {childCt}:", color, true);
+        Terminal.Write($"Children: {childCt}:", color, true, Severity.Debug);
         for (int i = 0; i < childCt; ++i)
         {
             DumpGameObject(go.transform.GetChild(i).gameObject, color);
@@ -211,17 +211,17 @@ internal static class Logger
         {
             if (inner)
             {
-                Terminal.Write(string.Empty, ConsoleColor.Red, true);
+                Terminal.Write(string.Empty, ConsoleColor.Red, true, Severity.Error);
             }
-            Terminal.Write(ind + (inner ? "Inner Exception: " : ((string.IsNullOrEmpty(method) ? string.Empty : ("[" + method!.ToUpper() + "] ")) + "Exception: ")) + ex.GetType().Format() + GetANSIForegroundString(ConsoleColor.Red), ConsoleColor.Red, true);
-            Terminal.Write(ind + (ex.Message ?? "No message"), ConsoleColor.DarkRed, true);
+            Terminal.Write(ind + (inner ? "Inner Exception: " : ((string.IsNullOrEmpty(method) ? string.Empty : ("[" + method!.ToUpper() + "] ")) + "Exception: ")) + ex.GetType().Format() + GetANSIForegroundString(ConsoleColor.Red), ConsoleColor.Red, true, Severity.Error);
+            Terminal.Write(ind + (ex.Message ?? "No message"), ConsoleColor.DarkRed, true, Severity.Error);
             if (ex is TypeLoadException t)
             {
-                Terminal.Write(ind + "Type: " + t.TypeName, ConsoleColor.DarkRed, true);
+                Terminal.Write(ind + "Type: " + t.TypeName, ConsoleColor.DarkRed, true, Severity.Error);
             }
             else if (ex is ReflectionTypeLoadException t2)
             {
-                Terminal.Write(ind + "Type load exceptions:", ConsoleColor.DarkRed, true);
+                Terminal.Write(ind + "Type load exceptions:", ConsoleColor.DarkRed, true, Severity.Error);
                 foreach (Exception ex2 in t2.LoaderExceptions)
                 {
                     WriteExceptionIntl(ex2, cleanStack, indent + 1);
@@ -229,12 +229,12 @@ internal static class Logger
             }
             else if (ex is TargetInvocationException { InnerException: not null } t4)
             {
-                Terminal.Write(ind + "Invoked exception:", ConsoleColor.DarkRed, true);
+                Terminal.Write(ind + "Invoked exception:", ConsoleColor.DarkRed, true, Severity.Error);
                 WriteExceptionIntl(t4.InnerException, cleanStack, indent + 1);
             }
             else if (ex is AggregateException t3)
             {
-                Terminal.Write(ind + "Inner exceptions:", ConsoleColor.DarkRed, true);
+                Terminal.Write(ind + "Inner exceptions:", ConsoleColor.DarkRed, true, Severity.Error);
                 foreach (Exception ex2 in t3.InnerExceptions)
                 {
                     WriteExceptionIntl(ex2, cleanStack, indent + 1);
@@ -255,7 +255,7 @@ internal static class Logger
                         str = ex.StackTrace;
                     }
                     
-                    Terminal.Write(str, ConsoleColor.DarkGray, true);
+                    Terminal.Write(str, ConsoleColor.DarkGray, true, Severity.Error);
                 }
                 /*
                 Terminal.Write(indent != 0

@@ -13,9 +13,9 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 #endif
     public CSteamID SteamId { get; private set; }
 #if SERVER
-    public ITransportConnection Connection { get; private set; } = null!;
+    public ITransportConnection Connection { get; internal set; } = null!;
 #else
-    public IClientTransport Connection { get; private set; } = null!;
+    public IClientTransport? Connection { get; internal set; }
 #endif
     public UserInput Input { get; private set; } = null!;
     public EditorTerrain Terrain { get; private set; } = null!;
@@ -26,30 +26,21 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     public bool IsOwner { get; private set; }
     public GameObject EditorObject { get; private set; } = null!;
 
-    internal void Init(CSteamID player,
-#if SERVER
-        ITransportConnection connection,
-#else
-        IClientTransport connection,
-#endif
-        string displayName)
+    internal void Init(CSteamID player, string displayName)
     {
         SteamId = player;
-        Connection = connection;
         DisplayName = displayName;
-        if (IsOwner)
-        {
-            EditorObject = Editor.editor.gameObject;
-            Logger.DumpGameObject(EditorObject);
-        }
-        else
-            EditorObject = new GameObject("Editor {" + SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture) + "}");
+#if SERVER
+        Connection = Provider.findTransportConnection(player);
+#endif
 #if CLIENT
         IsOwner = this == User;
 #endif
+        EditorObject = IsOwner ? Editor.editor.gameObject : new GameObject("Editor {" + SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture) + "}");
         DevkitServerGamemode.SetupEditorObject(EditorObject, this);
         Input = EditorObject.GetComponent<UserInput>();
         Terrain = EditorObject.GetComponent<EditorTerrain>();
+        Logger.DumpGameObject(EditorObject);
         if (Input == null)
         {
             Logger.LogError("Invalid EditorUser setup; UserInput not found!");

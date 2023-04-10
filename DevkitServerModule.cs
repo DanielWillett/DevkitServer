@@ -87,6 +87,7 @@ public sealed class DevkitServerModule : IModuleNexus
             Provider.onServerConnected += UserManager.AddPlayer;
             Provider.onServerDisconnected += UserManager.RemovePlayer;
             Level.onLevelLoaded += OnLevelLoaded;
+            UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
 #else
             Provider.onClientConnected += EditorUser.OnClientConnected;
             Provider.onEnemyConnected += EditorUser.OnEnemyConnected;
@@ -147,6 +148,7 @@ public sealed class DevkitServerModule : IModuleNexus
         Provider.onServerConnected -= UserManager.AddPlayer;
         Provider.onServerDisconnected -= UserManager.RemovePlayer;
         Level.onLevelLoaded -= OnLevelLoaded;
+        UserInput.OnUserPositionUpdated -= OnUserPositionUpdated;
 #else
         Provider.onClientConnected -= EditorUser.OnClientConnected;
         Provider.onEnemyConnected -= EditorUser.OnEnemyConnected;
@@ -158,6 +160,25 @@ public sealed class DevkitServerModule : IModuleNexus
         GameObjectHost = null!;
         LoadFaulted = false;
     }
+
+#if SERVER
+    private static EffectAsset? _debugEffectAsset;
+    private static void OnUserPositionUpdated(EditorUser obj)
+    {
+        _debugEffectAsset ??= Assets.find<EffectAsset>(new Guid("5e2a0073025849d39322932d88609777"));
+        if (_debugEffectAsset != null && obj.Input != null)
+        {
+            TriggerEffectParameters p = new TriggerEffectParameters(_debugEffectAsset)
+            {
+                position = obj.Input.transform.position,
+                direction = obj.Input.transform.forward,
+                relevantDistance = Level.size
+            };
+            EffectManager.triggerEffect(p);
+        }
+    }
+#endif
+
     [ModuleInitializer]
     public static void ModuleInitializer()
     {

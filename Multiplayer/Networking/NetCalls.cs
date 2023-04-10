@@ -8,11 +8,10 @@ namespace DevkitServer.Multiplayer.Networking;
 internal enum NetCalls : ushort
 {
     SendLog = 1,
-    SendMovementPacket = 2,
-    FlushEditBuffer = 3,
-    RequestLevel = 4,
-    StartSendLevel = 5,
-    SendLevel = 6,
-    EndSendLevel = 7,
-    RequestLevelPackets = 8
+    FlushEditBuffer = 2,
+    RequestLevel = 3,
+    StartSendLevel = 4,
+    SendLevel = 5,
+    EndSendLevel = 6,
+    RequestLevelPackets = 7
 }

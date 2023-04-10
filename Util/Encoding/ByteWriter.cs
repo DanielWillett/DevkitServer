@@ -340,6 +340,20 @@ public class ByteWriter
     private static readonly MethodInfo WriteUInt16Method = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(ushort) }, null);
     public void Write(ushort n) => WriteInternal(n);
 
+    public void WriteInt24(int n)
+    {
+        if (n > DevkitServerUtility.Int24Bounds)
+            n = DevkitServerUtility.Int24Bounds;
+        if (n < -DevkitServerUtility.Int24Bounds)
+            n = -DevkitServerUtility.Int24Bounds;
+        n += DevkitServerUtility.Int24Bounds;
+        // sign bit
+        byte b = (byte)((n >> 16) & 0xFF);
+        WriteInternal((ushort)(n & 0xFFFF));
+        WriteInternal(b);
+    }
+
+    public void WriteUInt24(uint n) => WriteInt24(unchecked((int)n));
 
     private static readonly MethodInfo WriteNullableUInt16Method = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(ushort?) }, null);
     public void WriteNullable(ushort? n)

@@ -27,20 +27,22 @@ public sealed class LevelData
     
     private static bool ShouldSendFile(FileInfo file)
     {
-        if (file.Name.Equals("Level.png", StringComparison.Ordinal)
-            || file.Name.Equals("Map.png", StringComparison.Ordinal)
-            || file.Name.Equals("Preview.png", StringComparison.Ordinal)
-            || file.Name.Equals("Icon.png", StringComparison.Ordinal)
-            || file.Name.Equals("Chart.png", StringComparison.Ordinal)
-            || file.Name.Equals("Camera.dat", StringComparison.Ordinal)
-            || file.Name.Equals("Height.dat", StringComparison.Ordinal)
-            || file.Name.Equals("Materials.dat", StringComparison.Ordinal)
-            || file.Name.Equals("Objects.dat", StringComparison.Ordinal)
-            || file.Name.Equals("Spawns.dat", StringComparison.Ordinal))
+        string nm = file.Name;
+        string? origDir = file.DirectoryName;
+        if (nm.Equals("Level.png", StringComparison.Ordinal)
+            || nm.Equals("Map.png", StringComparison.Ordinal)
+            || nm.Equals("Preview.png", StringComparison.Ordinal)
+            || nm.Equals("Icon.png", StringComparison.Ordinal)
+            || nm.Equals("Chart.png", StringComparison.Ordinal)
+            || nm.Equals("Camera.dat", StringComparison.Ordinal) && origDir != null && origDir.EndsWith("Editor")
+            || nm.Equals("Height.dat", StringComparison.Ordinal) && origDir != null && origDir.EndsWith("Editor")
+            || nm.Equals("Materials.dat", StringComparison.Ordinal) && origDir != null && origDir.EndsWith("Editor")
+            || nm.Equals("Objects.dat", StringComparison.Ordinal) && origDir != null && origDir.EndsWith("Editor")
+            || nm.Equals("Spawns.dat", StringComparison.Ordinal) && origDir != null && origDir.EndsWith("Editor"))
             return false;
 
-        string? dir = Path.GetFileName(file.DirectoryName);
-        if (Path.GetExtension(file.Name).Equals(".png") && dir != null &&
+        string? dir = Path.GetFileName(origDir);
+        if (Path.GetExtension(nm).Equals(".png") && dir != null &&
             dir.Equals("Screenshots", StringComparison.Ordinal))
             return false;
 

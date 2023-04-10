@@ -30,6 +30,11 @@ internal static class PatchesMain
             Patcher = new Harmony(HarmonyId);
             Patcher.PatchAll();
 
+            // Accessor.AddFunctionBreakpoints(AccessTools.Method(typeof(ObjectManager), "ReceiveObjects"));
+            //ConstructorInfo? info = typeof(MenuConfigurationOptionsUI).GetConstructors(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
+            //if (info != null)
+            //    Accessor.AddFunctionBreakpoints(info);
+
             Logger.LogInfo("Patched");
         }
         catch (Exception ex)
@@ -122,7 +127,7 @@ internal static class PatchesMain
         if (!DevkitServerModule.IsEditing)
             return false;
 
-        return !(EditorUser.User != null && (!caller.player.channel.isOwner || EditorUser.User.Input.Controller == MovementController.Player));
+        return !(EditorUser.User != null && (!caller.player.channel.isOwner || EditorUser.User.Input.Controller == CameraController.Player));
     }
 
     [UsedImplicitly]
@@ -343,10 +348,10 @@ internal static class PatchesMain
     [UsedImplicitly]
     private static IEnumerable<CodeInstruction> GroupManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.AddIsEditorCall(instructions, __method);
 
-    [HarmonyPatch(typeof(ObjectManager), "onLevelLoaded")]
-    [HarmonyTranspiler]
-    [UsedImplicitly]
-    private static IEnumerable<CodeInstruction> ObjectManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.AddIsEditorCall(instructions, __method);
+    // [HarmonyPatch(typeof(ObjectManager), "onLevelLoaded")]
+    // [HarmonyTranspiler]
+    // [UsedImplicitly]
+    // private static IEnumerable<CodeInstruction> ObjectManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.AddIsEditorCall(instructions, __method);
 
     [HarmonyPatch(typeof(StructureManager), "onLevelLoaded")]
     [HarmonyTranspiler]

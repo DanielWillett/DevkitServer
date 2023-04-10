@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 namespace DevkitServer.Util;
 public static class DevkitServerUtility
 {
+    public const int Int24Bounds = 8388607;
     public static string QuickFormat(string input, string? val)
     {
         int ind = input.IndexOf("{0}", StringComparison.Ordinal);

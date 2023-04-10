@@ -73,8 +73,8 @@ public sealed partial class EditorTerrain : MonoBehaviour
             MessageOverhead overhead = new MessageOverhead(MessageFlags.LayeredRequest, (int)NetCalls.FlushEditBuffer, 0);
             FlushEditBuffer.Invoke(ref overhead, WriteEditBuffer);
             _editBuffer.Clear();
+            Logger.LogDebug("Flushed " + _editBuffer.Count + " action(s).");
         }
-        Logger.LogDebug("Flushed " + _editBuffer.Count + " action(s).");
     }
 #endif
     [UsedImplicitly]

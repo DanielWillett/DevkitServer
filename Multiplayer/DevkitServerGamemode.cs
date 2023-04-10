@@ -22,47 +22,47 @@ public class DevkitServerGamemode : GameMode
             return base.getPlayerGameObject(playerID);
         bool owner = playerID.steamID.m_SteamID == Provider.client.m_SteamID;
         GameObject obj = base.getPlayerGameObject(playerID);
-        MainCamera? c = obj.GetComponentInChildren<MainCamera>();
-        Transform? cam = obj.transform.FindChildRecursive("Camera");
-        if (c != null)
-        {
-            Object.Destroy(c);
-            Logger.LogDebug("Removed main camera from character object.");
-        }
-        if (cam != null)
-        {
-            cam.gameObject.SetActive(false);
-            Logger.LogDebug("Disabled camera object on character object.");
-            if (owner)
-            {
-                c = Editor.editor.transform.GetComponentInChildren<MainCamera>();
-                GameObject parent = c.gameObject;
-                if (c != null)
-                    Object.Destroy(c);
-                parent.AddComponent<MainCamera>();
-                Logger.LogDebug("Replaced camera object on editor object.");
-            }
-        }
-        Logger.DumpGameObject(obj);
-        if (!owner)
-        {
-            if (obj.TryGetComponent(out Rigidbody body))
-            {
-                body.useGravity = false;
-                body.detectCollisions = false;
-            }
-        }
+        //MainCamera? c = obj.GetComponentInChildren<MainCamera>();
+        //Transform? cam = obj.transform.FindChildRecursive("Camera");
+        //if (c != null)
+        //{
+        //    Object.Destroy(c);
+        //    Logger.LogDebug("Removed main camera from character object.");
+        //}
+        //if (cam != null)
+        //{
+        //    cam.gameObject.SetActive(false);
+        //    Logger.LogDebug("Disabled camera object on character object.");
+        //    if (owner)
+        //    {
+        //        c = Editor.editor.transform.GetComponentInChildren<MainCamera>();
+        //        GameObject parent = c.gameObject;
+        //        if (c != null)
+        //            Object.Destroy(c);
+        //        parent.AddComponent<MainCamera>();
+        //        Logger.LogDebug("Replaced camera object on editor object.");
+        //    }
+        //}
+        //if (!owner)
+        //{
+        //    if (obj.TryGetComponent(out Rigidbody body))
+        //    {
+        //        body.useGravity = true;
+        //        body.detectCollisions = true;
+        //    }
+        //}
         
         EditorUser user = obj.AddComponent<EditorUser>();
-        
-        user.Init(playerID.steamID,
-#if SERVER
-            Provider.findTransportConnection(playerID.steamID),
-#else
-            NetFactory.GetPlayerTransportConnection(),
+#if CLIENT
+        if (owner)
+        {
+            user.Connection = NetFactory.GetPlayerTransportConnection();
+            EditorUser.User = user;
+        }
 #endif
-            playerID.playerName);
+        user.Init(playerID.steamID, playerID.playerName);
 
+        Logger.DumpGameObject(obj);
         return obj;
     }
 }

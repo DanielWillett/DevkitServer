@@ -511,6 +511,14 @@ internal static class Accessor
     }
     public static TDelegate? GenerateStaticCaller<TDelegate>(MethodInfo info, bool throwOnError = false) where TDelegate : Delegate
     {
+        if (info == null)
+        {
+            Logger.LogError("Error generating static caller of type " + typeof(TDelegate).Format() + ".");
+            if (throwOnError)
+                throw new MissingMethodException("Error generating static caller of type " + typeof(TDelegate).Format() + ".");
+            
+            return null;
+        }
         Delegate? d = GenerateStaticCaller(typeof(TDelegate), info);
         if (d is TDelegate dele)
         {
