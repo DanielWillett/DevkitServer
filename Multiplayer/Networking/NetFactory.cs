@@ -17,10 +17,10 @@ public static class NetFactory
     {
         InvokeMethod,
         RelayPacket,
-        MovementRelay
+        MovementRelay,
+        SendTileData
     }
-    public const EClientMessage ClientMessageType = (EClientMessage)18;
-    public const EServerMessage ServerMessageType = (EServerMessage)9;
+    public const int MaxPacketSize = 61440;
     private static readonly List<Listener> localListeners = new List<Listener>(16);
     private static readonly List<Listener> localAckRequests = new List<Listener>(16);
     private static readonly List<NetMethodInfo> registeredMethods = new List<NetMethodInfo>(16);
@@ -79,6 +79,9 @@ public static class NetFactory
         methods[(int)DevkitMessage.InvokeMethod] = typeof(NetFactory).GetMethod(nameof(ReceiveMessage), BindingFlags.NonPublic | BindingFlags.Static)!;
         methods[(int)DevkitMessage.RelayPacket] = typeof(NetFactory).GetMethod(nameof(ReceiveRelayPacket), BindingFlags.NonPublic | BindingFlags.Static)!;
         methods[(int)DevkitMessage.MovementRelay] = typeof(UserInput).GetMethod(nameof(UserInput.ReceiveMovementRelay), BindingFlags.NonPublic | BindingFlags.Static)!;
+#if CLIENT
+        methods[(int)DevkitMessage.SendTileData] = typeof(TileSync).GetMethod(nameof(TileSync.ReceiveTileData), BindingFlags.NonPublic | BindingFlags.Static)!;
+#endif
 
         Listeners = new Delegate[methods.Length];
 
@@ -191,9 +194,12 @@ public static class NetFactory
 
         for (int i = 0; i < methods.Length; ++i)
         {
+            MethodInfo m = methods[i];
+            if (m == null)
+                continue;
             try
             {
-                nArr.SetValue(Listeners[i] = methods[i].CreateDelegate(callbackType), readCallbacks.Length + i);
+                nArr.SetValue(Listeners[i] = m.CreateDelegate(callbackType), readCallbacks.Length + i);
             }
             catch (Exception ex)
             {

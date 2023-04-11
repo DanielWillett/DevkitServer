@@ -188,6 +188,7 @@ public static class ClientEvents
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
         int addTileCt = 0;
         int addTileLcl = -1;
+        LocalBuilder? addTileLcl2 = null;
         int pCt = 0;
         bool pAddTile = false, pRemoveTile = false;
         for (int i = 0; i < ins.Count; ++i)
@@ -247,8 +248,8 @@ public static class ClientEvents
             else if (addTileCt == 0 && addTile != null && c.Calls(addTile) && n != null)
             {
                 addTileCt = lHMarkDirty == null ? 2 : 1;
-                addTileLcl = GetLocalIndex(n, true);
-                if (addTileLcl == -1)
+                addTileLcl2 = DevkitServerUtility.GetLocal(n, out addTileLcl, true);
+                if (addTileLcl2 == null)
                     addTileCt = 2;
                 if (addTileCt == 2)
                 {
@@ -259,7 +260,7 @@ public static class ClientEvents
             else if (addTileCt == 1 && c.Calls(lHMarkDirty!))
             {
                 yield return c;
-                yield return GetLocalCodeInstruction(addTileLcl, false);
+                yield return DevkitServerUtility.GetLocalCodeInstruction(addTileLcl2, addTileLcl, false);
                 yield return new CodeInstruction(OpCodes.Call, addTileInvoker);
                 Logger.LogDebug("Patched in OnAddTile call.");
                 addTileCt = 2;
@@ -283,65 +284,6 @@ public static class ClientEvents
             Logger.LogWarning($"Patching error for TerrainEditor.update. Invalid transpiler operation: Remove Tile: {pRemoveTile}, Add Tile: {pAddTile}, invoker counts: {pCt} / 8.");
             DevkitServerModule.Fault();
         }
-    }
-    private static CodeInstruction GetLocalCodeInstruction(int index, bool set, bool byref = false)
-    {
-        if (index > byte.MaxValue)
-            return new CodeInstruction(GetLocalCode(index, set, byref), (ushort)index);
-        else
-            return new CodeInstruction(GetLocalCode(index, set, byref), (byte)index);
-    }
-    private static OpCode GetLocalCode(int index, bool set, bool byref = false)
-    {
-        if (index > ushort.MaxValue)
-            throw new ArgumentOutOfRangeException(nameof(index));
-        if (!set && byref)
-        {
-            return index > byte.MaxValue ? OpCodes.Ldloca : OpCodes.Ldloca_S;
-        }
-        return index switch
-        {
-            0 => set ? OpCodes.Stloc_0 : OpCodes.Ldloc_0,
-            1 => set ? OpCodes.Stloc_1 : OpCodes.Ldloc_1,
-            2 => set ? OpCodes.Stloc_2 : OpCodes.Ldloc_2,
-            3 => set ? OpCodes.Stloc_3 : OpCodes.Ldloc_3,
-            _ => set ? (index > byte.MaxValue ? OpCodes.Stloc : OpCodes.Stloc_S) : (index > byte.MaxValue ? OpCodes.Ldloc : OpCodes.Ldloc_S)
-        };
-    }
-    private static int GetLocalIndex(CodeInstruction code, bool set)
-    {
-        if (code.opcode.OperandType == OperandType.ShortInlineVar &&
-            (set && code.opcode == OpCodes.Stloc_S ||
-             !set && code.opcode == OpCodes.Ldloc_S || !set && code.opcode == OpCodes.Ldloca_S))
-            return ((LocalBuilder)code.operand).LocalIndex;
-        if (code.opcode.OperandType == OperandType.InlineVar &&
-            (set && code.opcode == OpCodes.Stloc ||
-             !set && code.opcode == OpCodes.Ldloc || !set && code.opcode == OpCodes.Ldloca))
-            return ((LocalBuilder)code.operand).LocalIndex;
-        if (set)
-        {
-            if (code.opcode == OpCodes.Stloc_0)
-                return 0;
-            if (code.opcode == OpCodes.Stloc_1)
-                return 1;
-            if (code.opcode == OpCodes.Stloc_2)
-                return 2;
-            if (code.opcode == OpCodes.Stloc_3)
-                return 3;
-        }
-        else
-        {
-            if (code.opcode == OpCodes.Ldloc_0)
-                return 0;
-            if (code.opcode == OpCodes.Ldloc_1)
-                return 1;
-            if (code.opcode == OpCodes.Ldloc_2)
-                return 2;
-            if (code.opcode == OpCodes.Ldloc_3)
-                return 3;
-        }
-
-        return -1;
     }
 
     internal static readonly InstanceGetter<TerrainEditor, Vector3>? GetRampStart =
@@ -566,8 +508,9 @@ public static class ClientEvents
                 {
                     if (ps[ps.Length - 1].ParameterType is { IsByRef: true } p && p.GetElementType() == typeof(int))
                     {
-                        yield return GetLocalCodeInstruction(GetLocalIndex(ins[i - 1], false), false);
-                        yield return GetLocalCodeInstruction(sampleCount.LocalIndex, true);
+                        LocalBuilder? bld = DevkitServerUtility.GetLocal(ins[i - 1], out int index, false);
+                        yield return DevkitServerUtility.GetLocalCodeInstruction(bld!, index, false);
+                        yield return DevkitServerUtility.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, true);
                         Logger.LogDebug("Inserted set sample count local instruction.");
                     }
                     yield return c;
@@ -576,7 +519,7 @@ public static class ClientEvents
                         CodeInstruction l = ins[j];
                         if (l.opcode == OpCodes.Ldloca_S || l.opcode == OpCodes.Ldloca)
                         {
-                            yield return GetLocalCodeInstruction(sampleCount.LocalIndex, false);
+                            yield return DevkitServerUtility.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, false);
                             Logger.LogDebug("Inserted get sample count local instruction.");
                         }
                         else

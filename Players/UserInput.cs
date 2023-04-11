@@ -263,7 +263,6 @@ public class UserInput : MonoBehaviour
             return;
         }
 
-        byte[] bytes = new byte[len];
 #if SERVER
         EditorUser? user = UserManager.FromConnection(transportConnection);
 #else
@@ -293,7 +292,7 @@ public class UserInput : MonoBehaviour
         if (Provider.clients.Count > 1)
         {
             byte[] sendBytes = new byte[sizeof(ulong) + len];
-            Buffer.BlockCopy(bytes, 0, sendBytes, sizeof(ulong), len);
+            Buffer.BlockCopy(buffer, offset, sendBytes, sizeof(ulong), len);
             UnsafeBitConverter.GetBytes(sendBytes, user.SteamId.m_SteamID);
             IList<ITransportConnection> list = NetFactory.GetPooledTransportConnectionList(Provider.clients.Count - 1);
             for (int i = 0; i < Provider.clients.Count; ++i)

@@ -83,6 +83,7 @@ public sealed class DevkitServerModule : IModuleNexus
                 return;
 
             Editor.onEditorCreated += OnEditorCreated;
+            Level.onPostLevelLoaded += OnPostLevelLoaded;
 #if SERVER
             Provider.onServerConnected += UserManager.AddPlayer;
             Provider.onServerDisconnected += UserManager.RemovePlayer;
@@ -101,6 +102,12 @@ public sealed class DevkitServerModule : IModuleNexus
             Logger.LogError(ex);
             Fault();
         }
+    }
+
+    private void OnPostLevelLoaded(int level)
+    {
+        if (level == Level.BUILD_INDEX_GAME)
+            GameObjectHost.AddComponent<TileSync>();
     }
 
     internal static void Fault() => LoadFaulted = true;
@@ -172,17 +179,17 @@ public sealed class DevkitServerModule : IModuleNexus
     private static EffectAsset? _debugEffectAsset;
     private static void OnUserPositionUpdated(EditorUser obj)
     {
-        _debugEffectAsset ??= Assets.find<EffectAsset>(new Guid("5e2a0073025849d39322932d88609777"));
-        if (_debugEffectAsset != null && obj.Input != null)
-        {
-            TriggerEffectParameters p = new TriggerEffectParameters(_debugEffectAsset)
-            {
-                position = obj.Input.transform.position,
-                direction = obj.Input.transform.forward,
-                relevantDistance = Level.size
-            };
-            EffectManager.triggerEffect(p);
-        }
+        //_debugEffectAsset ??= Assets.find<EffectAsset>(new Guid("5e2a0073025849d39322932d88609777"));
+        //if (_debugEffectAsset != null && obj.Input != null)
+        //{
+        //    TriggerEffectParameters p = new TriggerEffectParameters(_debugEffectAsset)
+        //    {
+        //        position = obj.Input.transform.position,
+        //        direction = obj.Input.transform.forward,
+        //        relevantDistance = Level.size
+        //    };
+        //    EffectManager.triggerEffect(p);
+        //}
     }
 #endif
 

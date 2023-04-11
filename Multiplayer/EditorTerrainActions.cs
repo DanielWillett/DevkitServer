@@ -1,10 +1,8 @@
-﻿using System.Text;
-using DevkitServer.Patches;
-using DevkitServer.Players;
-using DevkitServer.Util.Encoding;
+﻿using DevkitServer.Util.Encoding;
 using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Landscapes;
 using SDG.Framework.Utilities;
+using System.Text;
 
 namespace DevkitServer.Multiplayer;
 
@@ -248,7 +246,7 @@ public partial class EditorTerrain
             float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
             if (distance > BrushRadius * BrushRadius)
                 return currentHeight;
-            distance = Mathf.Sqrt(distance / BrushRadius);
+            distance = Mathf.Sqrt(distance) / BrushRadius;
             float num = DeltaTime * BrushStrength * GetBrushAlpha(distance) * BrushSensitivity;
             if (InputEx.GetKey(KeyCode.LeftShift))
                 num = -num;
@@ -295,7 +293,7 @@ public partial class EditorTerrain
             float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
             if (distance > BrushRadius * BrushRadius)
                 return currentHeight;
-            distance = Mathf.Sqrt(distance / BrushRadius);
+            distance = Mathf.Sqrt(distance) / BrushRadius;
             float brushAlpha = GetBrushAlpha(distance);
             float a = (BrushTarget + Landscape.TILE_HEIGHT / 2f) / Landscape.TILE_HEIGHT;
             a = FlattenMethod switch
@@ -348,7 +346,7 @@ public partial class EditorTerrain
             float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
             if (distance > BrushRadius * BrushRadius)
                 return currentHeight;
-            distance = Mathf.Sqrt(distance / BrushRadius);
+            distance = Mathf.Sqrt(distance) / BrushRadius;
             float brushAlpha = GetBrushAlpha(distance);
             currentHeight = Mathf.Lerp(currentHeight, SmoothTarget, DeltaTime * BrushStrength * brushAlpha);
             return currentHeight;

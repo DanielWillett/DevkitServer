@@ -12,7 +12,7 @@ namespace DevkitServer.Multiplayer.LevelData;
 [EarlyTypeInit]
 public static class EditorLevel
 {
-    public const int DataBufferPacketSize = 61440; // 60 KiB (must be slightly under ushort.MaxValue, 60 KB is a good middle ground to allow for future overhead expansion, etc).
+    public const int DataBufferPacketSize = NetFactory.MaxPacketSize; // 60 KiB (must be slightly under ushort.MaxValue, 60 KB is a good middle ground to allow for future overhead expansion, etc).
     private static readonly NetCall SendRequestLevel = new NetCall((ushort)NetCalls.RequestLevel);
     private static readonly NetCall<int, string, long, int> StartSendLevel = new NetCall<int, string, long, int>((ushort)NetCalls.StartSendLevel);
     private static readonly NetCallCustom SendLevelPacket = new NetCallCustom((ushort)NetCalls.SendLevel);
