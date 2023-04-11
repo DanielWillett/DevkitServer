@@ -1,4 +1,5 @@
-﻿using DevkitServer.Patches;
+﻿using System.Text;
+using DevkitServer.Patches;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
 using SDG.Framework.Devkit.Tools;
@@ -22,13 +23,60 @@ public partial class EditorTerrain
     }
     private BrushSettingsCollection? GetBrushSettings(BrushValueFlags value)
     {
-        int v = (int)(value - 1);
-        return v is < 0 or >= BrushFlagLength ? null : ReadBrushSettingsMask[v];
+        for (int i = 0; i < BrushFlagLength; ++i)
+            if ((value & (BrushValueFlags)(1 << i)) != 0)
+                return i is < 0 or >= BrushFlagLength ? null : ReadBrushSettingsMask[i];
+
+        return null;
+    }
+    private void SetBrushSettings(BrushSettingsCollection collection)
+    {
+        for (int i = 0; i < BrushFlagLength; ++i)
+        {
+            if ((collection.Flags & (BrushValueFlags)(1 << i)) != 0)
+                ReadBrushSettingsMask[i] = collection;
+        }
+        if ((collection.Flags & BrushValueFlags.SplatmapPaintInfo) != 0 && collection.Splatmap != null)
+        {
+            SplatmapSettingsCollection sc = collection.Splatmap;
+            for (int i = 0; i < SplatmapFlagLength; ++i)
+            {
+                if ((sc.Flags & (SplatmapValueFlags)(1 << i)) != 0)
+                    ReadSplatmapSettingsMask[i] = sc;
+            }
+        }
+    }
+    private void SetBrushSettings(BrushValueFlags value, BrushSettingsCollection? settings)
+    {
+        for (int i = 0; i < BrushFlagLength; ++i)
+        {
+            if ((value & (BrushValueFlags)(1 << i)) != 0)
+            {
+                if (i is not (< 0 or >= BrushFlagLength))
+                    ReadBrushSettingsMask[i] = settings;
+                break;
+            }
+        }
     }
     private SplatmapSettingsCollection? GetSplatmapSettings(SplatmapValueFlags value)
     {
-        int v = (int)(value - 1);
-        return v is < 0 or >= SplatmapFlagLength ? null : ReadSplatmapSettingsMask[v];
+        for (int i = 0; i < SplatmapFlagLength; ++i)
+            if ((value & (SplatmapValueFlags)(1 << i)) != 0)
+                return i is < 0 or >= SplatmapFlagLength ? null : ReadSplatmapSettingsMask[i];
+
+        return null;
+    }
+    private void SetSplatmapSettings(SplatmapValueFlags value, SplatmapSettingsCollection? settings)
+    {
+        for (int i = 0; i < SplatmapFlagLength; ++i)
+        {
+            if ((value & (SplatmapValueFlags)(1 << i)) != 0)
+            {
+                if (i is not (< 0 or >= SplatmapFlagLength))
+                    ReadSplatmapSettingsMask[i] = settings;
+                break;
+            }
+        }
     }
     public enum TerrainTransactionType : byte
     {
@@ -409,6 +457,25 @@ public partial class EditorTerrain
                 else
                     Splatmap.Write(writer);
             }
+        }
+
+        public override string ToString()
+        {
+            StringBuilder bld = new StringBuilder();
+            if ((Flags & BrushValueFlags.Radius) != 0)
+                bld.Append(" Radius: ").Append(Radius);
+            if ((Flags & BrushValueFlags.Falloff) != 0)
+                bld.Append(" Falloff: ").Append(Falloff);
+            if ((Flags & BrushValueFlags.Strength) != 0)
+                bld.Append(" Strength: ").Append(Strength);
+            if ((Flags & BrushValueFlags.Sensitivity) != 0)
+                bld.Append(" Sensitivity: ").Append(Sensitivity);
+            if ((Flags & BrushValueFlags.Target) != 0)
+                bld.Append(" Target: ").Append(Target);
+            if ((Flags & BrushValueFlags.SplatmapPaintInfo) != 0 && Splatmap != null)
+                bld.Append(" Splatmap: ").Append(Splatmap);
+
+            return bld.ToString();
         }
     }
     private sealed class SplatmapSettingsCollection

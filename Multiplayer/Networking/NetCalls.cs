@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace DevkitServer.Multiplayer.Networking;
+﻿namespace DevkitServer.Multiplayer.Networking;
 internal enum NetCalls : ushort
 {
     SendLog = 1,

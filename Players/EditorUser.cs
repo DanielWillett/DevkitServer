@@ -4,6 +4,7 @@ using DevkitServer.Multiplayer;
 using DevkitServer.Players.UI;
 #endif
 using JetBrains.Annotations;
+using UnityEngine.PlayerLoop;
 
 namespace DevkitServer.Players;
 public class EditorUser : MonoBehaviour, IComparable<EditorUser>
@@ -26,6 +27,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     public bool IsOwner { get; private set; }
     public GameObject EditorObject { get; private set; } = null!;
 
+
     internal void Init(CSteamID player, string displayName)
     {
         SteamId = player;
@@ -40,7 +42,10 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         DevkitServerGamemode.SetupEditorObject(EditorObject, this);
         Input = EditorObject.GetComponent<UserInput>();
         Terrain = EditorObject.GetComponent<EditorTerrain>();
+#if DEBUG
+        Logger.LogInfo("Editor Object Dump (" + player.m_SteamID + "):", ConsoleColor.Cyan);
         Logger.DumpGameObject(EditorObject);
+#endif
         if (Input == null)
         {
             Logger.LogError("Invalid EditorUser setup; UserInput not found!");

@@ -99,7 +99,7 @@ internal static class Logger
 #endif
     internal static void TryRemoveDateFromLine(ref string message)
     {
-        int ind = message.Length > 19 ? message.IndexOf(']', 0, 19) : -1;
+        int ind = message.Length > 21 ? message.IndexOf(']', 0, 21) : -1;
         if (ind != -1)
             message = message.Substring(ind + (message.Length > ind + 2 && message[ind + 1] == ' ' ? 2 : (message.Length > ind + 1 ? 1 : 0)));
     }

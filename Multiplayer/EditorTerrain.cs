@@ -11,13 +11,12 @@ using System.Reflection;
 namespace DevkitServer.Multiplayer;
 public sealed partial class EditorTerrain : MonoBehaviour
 {
-    public static readonly NetCallCustom FlushEditBuffer = new NetCallCustom((int)NetCalls.FlushEditBuffer, short.MaxValue);
+    public static readonly NetCallCustom FlushEditBuffer = new NetCallCustom((ushort)NetCalls.FlushEditBuffer, short.MaxValue);
     public const ushort DataVersion = 0;
     internal static ushort ReadDataVersion = DataVersion;
     internal static bool SaveTransactions = true;
     internal static ITerrainAction? ActiveAction;
     internal static FieldInfo SaveTransactionsField = typeof(EditorTerrain).GetField("SaveTransactions", BindingFlags.Static | BindingFlags.NonPublic)!;
-    private BrushSettingsCollection? _lastAction;
     private float _lastFlush;
 
     // edit buffer is reversed for everyone but the owner.
@@ -58,12 +57,18 @@ public sealed partial class EditorTerrain : MonoBehaviour
     }
 #endif
 
-    [NetCall(NetCallSource.FromEither, (int)NetCalls.FlushEditBuffer)]
+    [NetCall(NetCallSource.FromEither, (ushort)NetCalls.FlushEditBuffer)]
     private static void ReceiveEditBuffer(MessageContext ctx, ByteReader reader)
     {
+#if CLIENT
         EditorUser? user = UserManager.FromId(ctx.Overhead.Sender);
+#else
+        EditorUser? user = UserManager.FromConnection(ctx.Connection);
+#endif
         if (user != null && user.IsOnline)
+        {
             user.Terrain.ReadEditBuffer(reader);
+        }
     }
 #if CLIENT
     internal void FlushEdits()
@@ -71,9 +76,8 @@ public sealed partial class EditorTerrain : MonoBehaviour
         if (_editBuffer.Count > 0)
         {
             MessageOverhead overhead = new MessageOverhead(MessageFlags.LayeredRequest, (int)NetCalls.FlushEditBuffer, 0);
+            Logger.LogDebug("Flushing " + _editBuffer.Count + " action(s).");
             FlushEditBuffer.Invoke(ref overhead, WriteEditBuffer);
-            _editBuffer.Clear();
-            Logger.LogDebug("Flushed " + _editBuffer.Count + " action(s).");
         }
     }
 #endif
@@ -107,25 +111,26 @@ public sealed partial class EditorTerrain : MonoBehaviour
         ThreadUtil.assertIsGameThread();
 
         writer.Write(DataVersion);
-        byte ct = (byte)Mathf.Clamp((byte)_editBuffer.Count, 0, byte.MaxValue);
+        byte ct = (byte)Math.Min(_editBuffer.Count, byte.MaxValue);
         writer.Write(ct);
         List<BrushSettingsCollection> c = ListPool<BrushSettingsCollection>.claim();
         for (int i = 0; i < ct; ++i)
         {
             ITerrainAction action = _editBuffer[i];
             BrushSettingsCollection? toAdd = null;
+            const float tol = 0.0001f;
             switch (action.EditorType)
             {
                 case TerrainEditorType.Heightmap:
-                    if (action is IBrushRadius r && (_lastAction == null || _lastAction.Radius != r.BrushRadius))
+                    if (action is IBrushRadius r && (GetBrushSettings(BrushValueFlags.Radius) == null || !MathfEx.IsNearlyEqual(GetBrushSettings(BrushValueFlags.Radius)!.Radius, r.BrushRadius, tol)))
                         (toAdd ??= BrushCollectionPool.claim().Reset()).WithRadius(r.BrushRadius);
-                    if (action is IBrushFalloff f && (_lastAction == null || _lastAction.Falloff != f.BrushFalloff))
+                    if (action is IBrushFalloff f && (GetBrushSettings(BrushValueFlags.Falloff) == null || !MathfEx.IsNearlyEqual(GetBrushSettings(BrushValueFlags.Falloff)!.Falloff, f.BrushFalloff, tol)))
                         (toAdd ??= BrushCollectionPool.claim().Reset()).WithFalloff(f.BrushFalloff);
-                    if (action is IBrushStrength s1 && (_lastAction == null || _lastAction.Strength != s1.BrushStrength))
+                    if (action is IBrushStrength s1 && (GetBrushSettings(BrushValueFlags.Strength) == null || !MathfEx.IsNearlyEqual(GetBrushSettings(BrushValueFlags.Strength)!.Strength, s1.BrushStrength, tol)))
                         (toAdd ??= BrushCollectionPool.claim().Reset()).WithStrength(s1.BrushStrength);
-                    if (action is IBrushSensitivity s2 && (_lastAction == null || _lastAction.Sensitivity != s2.BrushSensitivity))
+                    if (action is IBrushSensitivity s2 && (GetBrushSettings(BrushValueFlags.Sensitivity) == null || !MathfEx.IsNearlyEqual(GetBrushSettings(BrushValueFlags.Sensitivity)!.Sensitivity, s2.BrushSensitivity, tol)))
                         (toAdd ??= BrushCollectionPool.claim().Reset()).WithSensitivity(s2.BrushSensitivity);
-                    if (action is IBrushTarget t && (_lastAction == null || _lastAction.Target != t.BrushTarget))
+                    if (action is IBrushTarget t && (GetBrushSettings(BrushValueFlags.Target) == null || !MathfEx.IsNearlyEqual(GetBrushSettings(BrushValueFlags.Target)!.Target, t.BrushTarget, tol)))
                         (toAdd ??= BrushCollectionPool.claim().Reset()).WithTarget(t.BrushTarget);
                     break;
                 case TerrainEditorType.Splatmap:
@@ -134,28 +139,33 @@ public sealed partial class EditorTerrain : MonoBehaviour
             }
             if (toAdd != null)
             {
-                _lastAction = toAdd;
+                SetBrushSettings(toAdd);
                 toAdd.StartIndex = (byte)i;
                 c.Add(toAdd);
+                Logger.LogDebug("Queued " + toAdd.Flags + "@" + toAdd.StartIndex + ": " + toAdd + ".");
             }
         }
 
-        byte ct2 = (byte)Mathf.Clamp((byte)_editBuffer.Count, 0, byte.MaxValue);
-        writer.Write(ct);
+        byte ct2 = (byte)c.Count;
+        writer.Write(ct2);
+        Logger.LogDebug("Writing " + ct2 + " collections.");
         for (int i = 0; i < ct2; ++i)
         {
-            BrushSettingsCollection collection = c[ct2];
+            BrushSettingsCollection collection = c[i];
             collection.Write(writer);
             if (collection.Splatmap != null)
             {
+                collection.Splatmap.Write(writer);
                 SplatmapCollectionPool.release(collection.Splatmap);
                 collection.Splatmap = null;
             }
+
             BrushCollectionPool.release(collection);
         }
 
         ListPool<BrushSettingsCollection>.release(c);
 
+        Logger.LogDebug("Writing " + ct + " actions.");
         for (int i = 0; i < ct; ++i)
         {
             ITerrainAction action = _editBuffer[i];
@@ -220,6 +230,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
             _editBuffer.RemoveRange(stInd, tempBuffer.Length);
             Array.Reverse(tempBuffer);
             _editBuffer.InsertRange(0, tempBuffer);
+            Logger.LogDebug("Received actions: " + tempBuffer.Length + ".");
         }
 
         void LoadCollection(int index)
@@ -228,20 +239,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
                 return;
             collIndex = index;
             BrushSettingsCollection collection = c[collIndex];
-            for (int i = 0; i < BrushFlagLength; ++i)
-            {
-                if ((collection.Flags & (BrushValueFlags)(1 << i)) != 0)
-                    ReadBrushSettingsMask[i] = collection;
-            }
-            if ((collection.Flags & BrushValueFlags.SplatmapPaintInfo) != 0 && collection.Splatmap != null)
-            {
-                SplatmapSettingsCollection sc = collection.Splatmap;
-                for (int i = 0; i < SplatmapFlagLength; ++i)
-                {
-                    if ((sc.Flags & (SplatmapValueFlags)(1 << i)) != 0)
-                        ReadSplatmapSettingsMask[i] = sc;
-                }
-            }
+            SetBrushSettings(collection);
         }
     }
     private static float GetBrushAlpha(float distance)

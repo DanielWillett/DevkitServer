@@ -103,12 +103,19 @@ public sealed class DevkitServerModule : IModuleNexus
         }
     }
 
-    internal static void Fault() => LoadFaulted = false;
+    internal static void Fault() => LoadFaulted = true;
 
     private static void OnEditorCreated()
     {
         Logger.LogInfo("Editor loaded.");
 #if SERVER
+        Provider.modeConfigData.Gameplay.Group_Map = true;
+        Provider.modeConfigData.Gameplay.Chart = true;
+        Provider.modeConfigData.Gameplay.Satellite = true;
+        Provider.modeConfigData.Gameplay.Compass = true;
+        Provider.modeConfigData.Gameplay.Timer_Exit = 0;
+        Provider.modeConfigData.Gameplay.Timer_Home = 0;
+        Provider.modeConfigData.Gameplay.Timer_Home = 0;
         Assembly sdg = typeof(Provider).Assembly;
         Component comp = Level.editing.GetComponentInChildren(sdg.GetType("SDG.Unturned.EditorInteract"));
         if (comp != null)

@@ -10,23 +10,21 @@ using System.Threading.Tasks;
 namespace DevkitServer.Players;
 public class UserTPVControl : MonoBehaviour
 {
-    public EditorUser User { get; private set; } = null!;
+    public EditorUser User { get; internal set; } = null!;
     public GameObject _host;
 
     public void Start()
     {
-        if (!TryGetComponent(out EditorUser u))
+        if (User == null)
         {
             Destroy(this);
             Logger.LogError("Invalid UserTPVControl setup; EditorUser not found!");
             return;
         }
 
-        User = u;
-
-        _host = new GameObject("TPV_Editor_" + u.SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture));
+        _host = new GameObject("TPV_Editor_" + User.SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture));
         MeshFilter filter = _host.AddComponent<MeshFilter>();
-        
+
         // cube
         const float size = 1f;
         filter.mesh = new Mesh
@@ -48,7 +46,9 @@ public class UserTPVControl : MonoBehaviour
             }
         };
         MeshRenderer renderer = _host.AddComponent<MeshRenderer>();
-        renderer.material = new Material(Shader.Find("Diffuse")) { color = Color.red };
+        // renderer.material = new Material(Shader.Find("Diffuse")) { color = Color.red };
+        _host.transform.parent = transform;
+        _host.transform.localPosition += Vector3.forward * 2;
     }
 
     [UsedImplicitly]

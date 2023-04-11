@@ -1,19 +1,15 @@
-﻿using System.Diagnostics;
-using DevkitServer.Multiplayer;
+﻿using DevkitServer.Multiplayer;
 using HarmonyLib;
 using JetBrains.Annotations;
 using System.Reflection;
 #if CLIENT
+using System.Reflection.Emit;
 using DevkitServer.Multiplayer.LevelData;
 using DevkitServer.Players;
 using SDG.Provider;
 #endif
 #if SERVER
 using System.Reflection.Emit;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using DevkitServer.Configuration;
-using SDG.NetPak;
 #endif
 
 namespace DevkitServer.Patches;
@@ -31,9 +27,9 @@ internal static class PatchesMain
             Patcher.PatchAll();
 
             // Accessor.AddFunctionBreakpoints(AccessTools.Method(typeof(ObjectManager), "ReceiveObjects"));
-            //ConstructorInfo? info = typeof(MenuConfigurationOptionsUI).GetConstructors(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
-            //if (info != null)
-            //    Accessor.AddFunctionBreakpoints(info);
+            // ConstructorInfo? info = typeof(MenuConfigurationOptionsUI).GetConstructors(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
+            // if (info != null)
+            //     Accessor.AddFunctionBreakpoints(info);
 
             Logger.LogInfo("Patched");
         }
@@ -130,6 +126,19 @@ internal static class PatchesMain
         return !(EditorUser.User != null && (!caller.player.channel.isOwner || EditorUser.User.Input.Controller == CameraController.Player));
     }
 
+    private static readonly MethodInfo IsPlayerControlledOrNotEditingMethod =
+        typeof(PatchesMain).GetMethod(nameof(IsPlayerControlledOrNotEditing),
+            BindingFlags.Static | BindingFlags.NonPublic)!;
+
+    private static bool IsPlayerControlledOrNotEditing()
+    {
+        return !DevkitServerModule.IsEditing || !Level.isEditor || EditorUser.User != null && EditorUser.User.Input.Controller == CameraController.Player;
+    }
+    private static bool IsEditorControlledOrNotEditing()
+    {
+        return !DevkitServerModule.IsEditing || !Level.isEditor || EditorUser.User != null && EditorUser.User.Input.Controller == CameraController.Editor;
+    }
+
     [UsedImplicitly]
     [HarmonyPatch(typeof(PlayerLook), "Update")]
     [HarmonyPrefix]
@@ -158,7 +167,57 @@ internal static class PatchesMain
     [HarmonyPatch(typeof(PlayerInput), "FixedUpdate")]
     [HarmonyPrefix]
     private static bool PlayerInputFixedUpdate(PlayerInput __instance) => !IsEditorMode(__instance);
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(PlayerUI), "Update")]
+    [HarmonyPrefix]
+    private static bool PlayerUIUpdate() => IsPlayerControlledOrNotEditing();
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(EditorUI), "Update")]
+    [HarmonyPrefix]
+    private static bool EditorUIUpdate() => IsEditorControlledOrNotEditing();
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(MenuConfigurationOptionsUI), MethodType.Constructor)]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> MenuConfigurationOptionsUITranspiler(ILGenerator generator, IEnumerable<CodeInstruction> instructions)
+        => MenuConfigurationUITranspiler(generator, instructions);
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(MenuConfigurationGraphicsUI), MethodType.Constructor)]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> MenuConfigurationGraphicsUITranspiler(ILGenerator generator, IEnumerable<CodeInstruction> instructions)
+        => MenuConfigurationUITranspiler(generator, instructions);
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(MenuConfigurationDisplayUI), MethodType.Constructor)]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> MenuConfigurationDisplayUITranspiler(ILGenerator generator, IEnumerable<CodeInstruction> instructions)
+        => MenuConfigurationUITranspiler(generator, instructions);
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(MenuConfigurationControlsUI), MethodType.Constructor)]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> MenuConfigurationControlsUITranspiler(ILGenerator generator, IEnumerable<CodeInstruction> instructions)
+        => MenuConfigurationUITranspiler(generator, instructions);
 
+    private static IEnumerable<CodeInstruction> MenuConfigurationUITranspiler(ILGenerator generator, IEnumerable<CodeInstruction> instructions)
+    {
+        MethodInfo? isConnected = typeof(Provider).GetProperty(nameof(Provider.isConnected), BindingFlags.Static | BindingFlags.Public)?.GetMethod;
+        if (isConnected == null)
+        {
+            Logger.LogWarning("Unable to find getter: Provider.isConnected.");
+            DevkitServerModule.Fault();
+        }
+        List<CodeInstruction> inst = new List<CodeInstruction>(instructions);
+        bool one = isConnected == null;
+        for (int i = 0; i < inst.Count; ++i)
+        {
+            CodeInstruction c = inst[i];
+            yield return c;
+            if (!one && c.Calls(isConnected))
+            {
+                yield return new CodeInstruction(OpCodes.Call, IsPlayerControlledOrNotEditingMethod);
+                yield return new CodeInstruction(OpCodes.And);
+                one = true;
+            }
+        }
+    }
 #endif
 
     [HarmonyPatch(typeof(Provider), "loadGameMode")]

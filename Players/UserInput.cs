@@ -6,6 +6,7 @@ using SDG.Framework.Devkit;
 using System.Reflection;
 using System.Reflection.Emit;
 using SDG.NetPak;
+using EditorUI = SDG.Unturned.EditorUI;
 
 namespace DevkitServer.Players;
 
@@ -50,6 +51,9 @@ public class UserInput : MonoBehaviour
     private static readonly InstanceGetter<EditorMovement, float> GetSpeed = Accessor.GenerateInstanceGetter<EditorMovement, float>("speed", BindingFlags.NonPublic, throwOnError: true)!;
     private static readonly InstanceGetter<EditorMovement, Vector3> GetInput = Accessor.GenerateInstanceGetter<EditorMovement, Vector3>("input", BindingFlags.NonPublic, throwOnError: true)!;
     private static readonly InstanceSetter<PlayerInput, float>? SetLastInputted = Accessor.GenerateInstanceSetter<PlayerInput, float>("lastInputed");
+    private static readonly Action<PlayerUI> RestartPlayerUI = Accessor.GenerateInstanceCaller<PlayerUI, Action<PlayerUI>>("InitializePlayer", throwOnError: true)!;
+    private static readonly StaticGetter<EditorUI?> GetEditorUIInstance = Accessor.GenerateStaticGetter<EditorUI, EditorUI?>("instance", throwOnError: true)!;
+    private static readonly StaticGetter<PlayerUI?> GetPlayerUIInstance = Accessor.GenerateStaticGetter<PlayerUI, PlayerUI?>("instance", throwOnError: true)!;
 
 #if CLIENT
     private EditorMovement? _movement;
@@ -58,6 +62,8 @@ public class UserInput : MonoBehaviour
     private static readonly ByteReader Reader = new ByteReader { ThrowOnError = true };
     private Queue<UserInputPacket> packets = new Queue<UserInputPacket>();
     private UserInputPacket _lastPacket;
+    private Transform? _playerUiObject;
+    private Transform? _editorUiObject;
 
     public static IDevkitTool? ActiveTool => GetDevkitTool?.Invoke();
 
@@ -122,7 +128,15 @@ public class UserInput : MonoBehaviour
         };
 
         if (IsOwner)
+        {
+            PlayerUI? plUi = User.gameObject.GetComponentInChildren<PlayerUI>();
+            if (plUi != null)
+                _playerUiObject = plUi.transform;
+            EditorUI? edUi = User.EditorObject.GetComponentInChildren<EditorUI>();
+            if (edUi != null)
+                _editorUiObject = edUi.transform;
             Controller = CameraController.Editor;
+        }
 
         Logger.LogDebug("User input module created for " + User.SteamId.m_SteamID + " ( owner: " + IsOwner + " ).");
     }
@@ -134,11 +148,56 @@ public class UserInput : MonoBehaviour
             if (ctrl == null || !SetActiveMainCamera(ctrl.transform))
                 return;
             if (ctrl == User.EditorObject)
+            {
                 Logger.LogInfo("Camera controller set to {Editor}.", ConsoleColor.DarkCyan);
+                ChangeUI(true);
+            }
             else if (ctrl == User.Player!.player.gameObject)
+            {
                 Logger.LogInfo("Camera controller set to {Player}.", ConsoleColor.DarkCyan);
+                ChangeUI(false);
+            }
             else
                 Logger.LogInfo("Camera controller set to \"" + ctrl.name + "\".", ConsoleColor.DarkCyan);
+        }
+    }
+    private void ChangeUI(bool editor)
+    {
+        Component? ui = !editor ? GetEditorUIInstance() : GetPlayerUIInstance();
+        if (ui != null)
+        {
+            Destroy(ui);
+            if (!editor)
+                _editorUiObject = ui.transform;
+            else
+                _playerUiObject = ui.transform;
+            Logger.LogInfo("Cleaned up " + (editor ? "EditorUI." : "PlayerUI."));
+        }
+        else
+        {
+            Logger.LogWarning((editor ? "EditorUI" : "PlayerUI") + " not available to clean up.");
+        }
+        Transform? parent = editor ? _editorUiObject : _playerUiObject;
+        if (parent == null)
+        {
+            Logger.LogWarning("Failed to find parent of " + (editor ? "EditorUI." : "PlayerUI."));
+            return;
+        }
+        StartCoroutine(SwitchToUI(parent.gameObject, editor)); // need to wait for OnDestroy to run
+    }
+    private static IEnumerator SwitchToUI(GameObject parent, bool editor)
+    {
+        yield return null;
+        if (parent == null) // check parent wasn't destroyed
+            yield break;
+
+        Component comp = parent.gameObject.AddComponent(editor ? typeof(EditorUI) : typeof(PlayerUI));
+        Logger.LogInfo("Added " + (editor ? "EditorUI." : "PlayerUI."));
+        if (comp is PlayerUI player && Player.player.first != null) // loaded
+        {
+            yield return null;
+            RestartPlayerUI(player);
+            Logger.LogInfo("Restarted PlayerUI.");
         }
     }
     private static bool SetActiveMainCamera(Transform tranform)
@@ -252,7 +311,6 @@ public class UserInput : MonoBehaviour
     private void FlushPackets()
     {
         if (packets.Count < 1) return;
-        Logger.LogDebug("Flushing " + packets.Count + " movement packet(s).");
         HandleFlushPackets(Writer);
         int len = Writer.Count;
         NetFactory.SendGeneric(NetFactory.DevkitMessage.MovementRelay, Writer.FinishWrite(), 0, len);
@@ -275,7 +333,6 @@ public class UserInput : MonoBehaviour
             p.Read(reader);
             packets.Enqueue(p);
         }
-        Logger.LogDebug("Received " + c + " movement packet(s).");
         if (User.Player != null && User.Player.player != null)
             SetLastInputted?.Invoke(User.Player.player.input, Time.realtimeSinceStartup);
     }
@@ -326,7 +383,6 @@ public class UserInput : MonoBehaviour
                     DeltaTime = Time.deltaTime
                 };
                 (packets ??= new Queue<UserInputPacket>(1)).Enqueue(_lastPacket);
-                Logger.LogInfo($"Send position: {transform.position:F2}.");
             }
             else if (!_hasStopped)
             {
@@ -342,7 +398,7 @@ public class UserInput : MonoBehaviour
                 _bufferHasStop = true;
             }
 
-            if (t - _lastFlush > Time.fixedDeltaTime * PlayerInput.SAMPLES)
+            if (t - _lastFlush > Time.fixedDeltaTime * 16)
             {
                 FlushPackets();
                 _lastFlush = t;
@@ -359,45 +415,40 @@ public class UserInput : MonoBehaviour
                 if (_hasStopped)
                     _nextPacketApplyTime = t + packet.DeltaTime;
                 _hasStopped = false;
-                _lastPacket = packet;
-                ApplyPacket();
+                ApplyPacket(in packet);
             }
             else
             {
                 _hasStopped = true;
                 this.transform.SetPositionAndRotation(packet.Position, packet.Rotation);
-                Logger.LogInfo($"Received {User.SteamId.m_SteamID} end position: {transform.position:F2}.");
                 OnUserPositionUpdated?.Invoke(User);
                 _lastPacket = packet;
             }
         }
     }
-    private void ApplyPacket()
+    private void ApplyPacket(in UserInputPacket packet)
     {
-        float dt = _lastPacket.DeltaTime;
-        if ((_lastPacket.Flags & Flags.Position) != 0)
+        float dt = packet.DeltaTime;
+        if ((packet.Flags & Flags.Position) != 0)
         {
-            Vector3 pos = this.transform.position + _lastPacket.Rotation *
-                                                  _lastPacket.Input with { y = 0 } *
-                                                  _lastPacket.Speed *
+            Vector3 pos = this.transform.position + packet.Rotation *
+                                                  packet.Input with { y = 0 } *
+                                                  packet.Speed *
                                                   dt
                                                   +
                                                   Vector3.up *
-                                                  _lastPacket.Input.y *
+                                                  packet.Input.y *
                                                   dt *
-                                                  _lastPacket.Speed;
-            if ((pos - _lastPacket.Position).sqrMagnitude > 25f)
-            {
-                pos = _lastPacket.Position;
-            }
+                                                  packet.Speed;
+            pos = Vector3.Lerp(pos, packet.Position, 1f / packets.Count * ((pos - packet.Position).sqrMagnitude / 36f));
             this.transform.position = pos;
         }
-        if ((_lastPacket.Flags & Flags.Rotation) != 0)
+        if ((packet.Flags & Flags.Rotation) != 0)
         {
-            this.transform.rotation = _lastPacket.Rotation;
+            this.transform.rotation = packet.Rotation;
         }
         OnUserPositionUpdated?.Invoke(User);
-        Logger.LogInfo($"Received {User.SteamId.m_SteamID} position: {transform.position:F2}, rotation: {transform.rotation.eulerAngles:F1}.");
+        _lastPacket = packet;
     }
 
     private struct UserInputPacket
@@ -466,17 +517,17 @@ public class UserInput : MonoBehaviour
             }
         }
 
-        private static Vector3 ReadLowPrecisionVector3Pos(ByteReader reader) => new Vector3(reader.ReadInt24(),
-            reader.ReadInt24(), reader.ReadInt24());
+        private static Vector3 ReadLowPrecisionVector3Pos(ByteReader reader) => new Vector3(reader.ReadInt24() / 2f,
+            reader.ReadInt24() / 2f, reader.ReadInt24() / 2f);
 
         private static Quaternion ReadLowPrecisionQuaternion(ByteReader reader) => new Quaternion(reader.ReadInt8() / 127f,
             reader.ReadInt8() / 127f, reader.ReadInt8() / 127f, reader.ReadInt8() / 127f);
 
         private static void WriteLowPrecisionVector3Pos(ByteWriter writer, Vector3 pos)
         {
-            writer.WriteInt24((int)Mathf.Clamp(pos.x, -DevkitServerUtility.Int24Bounds, DevkitServerUtility.Int24Bounds));
-            writer.WriteInt24((int)Mathf.Clamp(pos.y, -DevkitServerUtility.Int24Bounds, DevkitServerUtility.Int24Bounds));
-            writer.WriteInt24((int)Mathf.Clamp(pos.z, -DevkitServerUtility.Int24Bounds, DevkitServerUtility.Int24Bounds));
+            writer.WriteInt24((int)Mathf.Clamp(pos.x * 2, -DevkitServerUtility.Int24Bounds, DevkitServerUtility.Int24Bounds));
+            writer.WriteInt24((int)Mathf.Clamp(pos.y * 2, -DevkitServerUtility.Int24Bounds, DevkitServerUtility.Int24Bounds));
+            writer.WriteInt24((int)Mathf.Clamp(pos.z * 2, -DevkitServerUtility.Int24Bounds, DevkitServerUtility.Int24Bounds));
         }
 
         private static void WriteLowPrecisionQuaternion(ByteWriter writer, Quaternion rot)
