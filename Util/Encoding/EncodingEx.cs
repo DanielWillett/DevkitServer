@@ -190,10 +190,9 @@ public static class EncodingEx
             }
         }
     }
-
-    public static int CeilToIntIgnoreSign(float val) => val < 0 ? Mathf.FloorToInt(val) : Mathf.CeilToInt(val);
-    public static int FloorToIntIgnoreSign(float val) => val < 0 ? Mathf.CeilToInt(val) : Mathf.FloorToInt(val);
-    public static void Expand(ref Vector3 v3, float by)
+    public static int CeilToIntIgnoreSign(this float val) => val < 0 ? Mathf.FloorToInt(val) : Mathf.CeilToInt(val);
+    public static int FloorToIntIgnoreSign(this float val) => val < 0 ? Mathf.CeilToInt(val) : Mathf.FloorToInt(val);
+    public static void Expand(this ref Vector3 v3, float by)
     {
         if (v3.x < 0)
             v3.x -= by;

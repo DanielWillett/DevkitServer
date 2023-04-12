@@ -1,13 +1,13 @@
 ﻿using JetBrains.Annotations;
 using SDG.Framework.Landscapes;
 using DevkitServer.Multiplayer.Networking;
+#if CLIENT
 using SDG.Framework.Devkit;
 using SDG.NetPak;
+#endif
 #if SERVER
 using HarmonyLib;
 using DevkitServer.Util.Encoding;
-using System.Reflection;
-using System.Reflection.Emit;
 #endif
 
 namespace DevkitServer.Multiplayer;
@@ -17,35 +17,38 @@ namespace DevkitServer.Multiplayer;
 public class TileSync : MonoBehaviour
 {
     private const int MaxPacketSize = (int)(NetFactory.MaxPacketSize * 0.75f); // leave some space for other packets
-    private const int PacketOffset = sizeof(ushort) + sizeof(ushort) + 1 + 2 * sizeof(int);
+    private const int PacketOffset = sizeof(ushort) + 1 + 7 * sizeof(int);
     public static int HeightmapPacketCount { get; }
     public static int SplatmapPacketCount { get; }
     public static int HolePacketCount { get; }
     public static int TotalHeightmapLength { get; }
     public static int TotalSplatmapLength { get; }
     public static int TotalHoleLength { get; }
-
-    private Syncing _syncing;
-    private enum Syncing
+     
+    private DataType _dataType;
+    public enum DataType
     {
         None,
-        Splatmap,
         Heightmap,
+        Splatmap,
         Holes
     }
+#if CLIENT
+    private int _index;
+#else
+    private int _index = -1;
+#endif
 #if SERVER
     private static readonly byte[] _packetBuffer = new byte[PacketOffset + MaxPacketSize];
-    private int _index = -1;
     private int _packetId;
-    private Syncing _lastSyncing;
+    private DataType _lastDataType;
     private float _lastSent;
-    private int _hmIndex = -1;
-    private int _smIndex = -1;
-    private int _holeIndex = -1;
+    private int _hmIndex;
+    private int _smIndex;
+    private int _holeIndex;
 #endif
-    private static readonly byte[] _hmBuffer = new byte[TotalHeightmapLength];
-    private static readonly byte[] _smBuffer = new byte[TotalSplatmapLength];
-    private static readonly byte[] _holeBuffer = new byte[TotalHoleLength];
+    private static readonly byte[] _buffer;
+    private static int _bufferLen;
     public static TileSync? Instance { get; private set; }
     static TileSync()
     {
@@ -55,6 +58,7 @@ public class TileSync : MonoBehaviour
         HeightmapPacketCount = Mathf.CeilToInt((float)TotalHeightmapLength / MaxPacketSize);
         SplatmapPacketCount = Mathf.CeilToInt((float)TotalSplatmapLength / MaxPacketSize);
         HolePacketCount = Mathf.CeilToInt((float)TotalHoleLength / MaxPacketSize);
+        _buffer = new byte[Math.Max(TotalHeightmapLength, Math.Max(TotalSplatmapLength, TotalHoleLength))];
     }
 
     [UsedImplicitly]
@@ -66,89 +70,123 @@ public class TileSync : MonoBehaviour
         Instance = this;
     }
 #if SERVER
-    private readonly List<KeyValuePair<LandscapeTile, float>> _hmTiles = new List<KeyValuePair<LandscapeTile, float>>(8);
-    private readonly List<KeyValuePair<LandscapeTile, float>> _smTiles = new List<KeyValuePair<LandscapeTile, float>>(8);
-    private readonly List<KeyValuePair<LandscapeTile, float>> _holeTiles = new List<KeyValuePair<LandscapeTile, float>>(2);
+    private readonly List<MapInvalidation<HeightmapBounds>> _hmInvalidated = new List<MapInvalidation<HeightmapBounds>>(32);
+    private readonly List<MapInvalidation<SplatmapBounds>> _smInvalidated = new List<MapInvalidation<SplatmapBounds>>(32);
+    private readonly List<MapInvalidation<SplatmapBounds>> _holeInvalidated = new List<MapInvalidation<SplatmapBounds>>(32);
+    private struct MapInvalidation<T> where T : unmanaged
+    {
+        public readonly LandscapeCoord Tile;
+        public T Bounds;
+        public float Time;
+        public MapInvalidation(LandscapeCoord tile, T bounds, float time)
+        {
+            Tile = tile;
+            Bounds = bounds;
+            Time = time;
+        }
+    }
 #endif
 #if CLIENT
     private void ReceiveTileData(byte[] data, int offset)
     {
-        _syncing = (Syncing)data[offset];
-        int packetId = BitConverter.ToInt16(data, offset + 1);
+        _dataType = (DataType)data[offset];
+        int packetId = BitConverter.ToUInt16(data, offset + 1);
         LandscapeCoord coords = new LandscapeCoord(BitConverter.ToInt32(data, offset + 1 + sizeof(ushort)), BitConverter.ToInt32(data, offset + sizeof(ushort) + 1 + sizeof(int)));
-        int len = BitConverter.ToInt32(data, PacketOffset - sizeof(ushort));
-        int index = packetId * MaxPacketSize;
-        Logger.LogDebug($"Receiving packet #{packetId} for tile {coords} ({DevkitServerUtility.FormatBytes(len)} @ {DevkitServerUtility.FormatBytes(index)})");
-        byte[] buffer = _syncing switch
+        int sx = BitConverter.ToInt32(data, offset + sizeof(ushort) + 1 + sizeof(int) * 2);
+        int sy = BitConverter.ToInt32(data, offset + sizeof(ushort) + 1 + sizeof(int) * 3);
+        int ox = BitConverter.ToInt32(data, offset + sizeof(ushort) + 1 + sizeof(int) * 4);
+        int oy = BitConverter.ToInt32(data, offset + sizeof(ushort) + 1 + sizeof(int) * 5);
+        int len = BitConverter.ToInt32(data, offset + sizeof(ushort) + 1 + sizeof(int) * 6);
+        _bufferLen = _dataType switch
         {
-            Syncing.Heightmap => _hmBuffer,
-            Syncing.Splatmap => _smBuffer,
-            _ => _holeBuffer
+            DataType.Heightmap => (sx + 1) * (sy + 1) * sizeof(float),
+            DataType.Splatmap => (sx + 1) * (sy + 1) * Landscape.SPLATMAP_LAYERS * sizeof(float),
+            _ => Mathf.CeilToInt((sx + 1) * (sy + 1) / 8f)
         };
-        if (index + len > buffer.Length)
-            len = buffer.Length - index;
-        Buffer.BlockCopy(data, offset + PacketOffset, buffer, index, len);
-        if (len + index >= buffer.Length)
+        Logger.LogDebug($"[TILE SYNC] Receiving packet #{packetId} for tile {coords} ({DevkitServerUtility.FormatBytes(len)} @ {DevkitServerUtility.FormatBytes(_index)})");
+        if (_index + len > _bufferLen)
+            len = _bufferLen - _index;
+        Logger.LogDebug($"[TILE SYNC] srcLen: {data.Length}, srcInd: {offset + PacketOffset}, dstLen: {_buffer.Length} ({_bufferLen}), dstInd: {_index}, count: {len}.");
+        Buffer.BlockCopy(data, offset + PacketOffset, _buffer, _index, len);
+        _index += len;
+        if (len + _index >= _bufferLen)
         {
-            FinalizeBuffer(coords);
-            Logger.LogDebug($"Finalizing tile {coords}.");
+            FinalizeBuffer(coords, sx, sy, ox, oy);
+            Logger.LogDebug($"[TILE SYNC] Finalizing tile {coords}.");
         }
     }
-    private unsafe void FinalizeBuffer(LandscapeCoord coords)
+    private unsafe void FinalizeBuffer(LandscapeCoord coords, int sx, int sy, int ox, int oy)
     {
-        byte[] buffer = _syncing switch
-        {
-            Syncing.Heightmap => _hmBuffer,
-            Syncing.Splatmap => _smBuffer,
-            _ => _holeBuffer
-        };
+        _index = 0;
         LandscapeTile? tile = Landscape.getTile(coords);
         if (tile == null)
         {
             Logger.LogWarning("[TILE SYNC] Tile not found in FinalizeBuffer: " + coords + ".");
             return;
         }
-        switch (_syncing)
+
+        switch (_dataType)
         {
-            case Syncing.Heightmap:
-                fixed (byte* ptr2 = buffer)
+            case DataType.Heightmap:
+                fixed (byte* ptr2 = _buffer)
                 fixed (float* ptr3 = tile.heightmap)
                 {
                     if (!BitConverter.IsLittleEndian)
                     {
-                        for (int i = 0; i < buffer.Length; i += sizeof(float))
+                        for (int i = 0; i < _buffer.Length; i += sizeof(float))
                             DevkitServerUtility.ReverseFloat(ptr2, i);
                     }
-                    Buffer.MemoryCopy(ptr2, ptr3, TotalHeightmapLength, buffer.Length);
+                    int len = (sy + 1) * sizeof(float);
+                    for (int x = ox; x <= ox + sx; ++x)
+                    {
+                        int offset = (x - ox) * (sy + 1) * sizeof(float);
+                        Buffer.MemoryCopy(ptr2 + offset, ptr3 + x * (sy + 1) * sizeof(float), _buffer.Length - offset, len);
+                    }
                 }
 
+                Logger.LogDebug("[TILE SYNC] Applying heightmap to " + tile.coord + ".");
                 tile.SetHeightsDelayLOD();
                 LevelHierarchy.MarkDirty();
                 break;
-            case Syncing.Splatmap:
-                fixed (byte* ptr2 = buffer)
+            case DataType.Splatmap:
+                fixed (byte* ptr2 = _buffer)
                 fixed (float* ptr3 = tile.splatmap)
                 {
                     if (!BitConverter.IsLittleEndian)
                     {
-                        for (int i = 0; i < buffer.Length; i += sizeof(float))
+                        for (int i = 0; i < _buffer.Length; i += sizeof(float))
                             DevkitServerUtility.ReverseFloat(ptr2, i);
                     }
-                    Buffer.MemoryCopy(ptr2, ptr3, TotalSplatmapLength, buffer.Length);
+                    int len = (sy + 1) * Landscape.SPLATMAP_LAYERS * sizeof(float);
+                    for (int x = ox; x <= ox + sx; ++x)
+                    {
+                        int offset = (x - ox) * (sy + 1) * Landscape.SPLATMAP_LAYERS * sizeof(float);
+                        Buffer.MemoryCopy(ptr2 + offset, ptr3 + x * (sy + 1) * Landscape.SPLATMAP_LAYERS * sizeof(float), _buffer.Length - offset, len);
+                    }
                 }
 
+                Logger.LogDebug("[TILE SYNC] Applying splatmap to " + tile.coord + ".");
                 tile.data.SetAlphamaps(0, 0, tile.splatmap);
                 LevelHierarchy.MarkDirty();
                 break;
-            case Syncing.Holes:
-                fixed (byte* ptr2 = buffer)
+            case DataType.Holes:
+                fixed (byte* ptr2 = _buffer)
                 fixed (bool* ptr3 = tile.holes)
                 {
                     // decompress the array from indivdual bits.
-                    const int c = Landscape.HOLES_RESOLUTION * Landscape.HOLES_RESOLUTION;
-                    for (int i = 0; i < c; ++i)
-                        ptr3[i] = (ptr2[i / 8] & (1 << (i % 8))) > 0;
+                    int bitCt = -1;
+                    for (int x = ox; x <= ox + sx; ++x)
+                    {
+                        for (int y = oy; y <= oy + sy; ++y)
+                        {
+                            bool val = (ptr2[++bitCt / 8] & (1 << (bitCt % 8))) > 0;
+                            ptr3[x * Landscape.HOLES_RESOLUTION + y] = val;
+                            tile.hasAnyHolesData |= val;
+                        }
+                    }
                 }
+
+                Logger.LogDebug("[TILE SYNC] Applying holes to " + tile.coord + ".");
                 tile.data.SetHoles(0, 0, tile.holes);
                 LevelHierarchy.MarkDirty();
                 break;
@@ -175,215 +213,365 @@ public class TileSync : MonoBehaviour
     }
 #endif
 #if SERVER
-    [UsedImplicitly]
-    private unsafe void Update()
+    private static bool AddHeightmapBounds(List<MapInvalidation<HeightmapBounds>> list, LandscapeCoord coord, HeightmapBounds bounds, float time)
     {
-        float time = Time.realtimeSinceStartup;
-
-        if (_syncing == Syncing.None && time - _lastSent > 60f)
+        for (int i = list.Count - 1; i >= 0; --i)
         {
-            _syncing = (Syncing)(((int)_lastSyncing % 3) + 1);
-            int c = 0;
-            int index;
-            List<KeyValuePair<LandscapeTile, float>> tiles;
-            byte[] buffer;
-            do
+            MapInvalidation<HeightmapBounds> inv = list[i];
+            if (inv.Tile == coord && inv.Bounds.Overlaps(in bounds))
             {
-                switch (_syncing)
-                {
-                    case Syncing.Heightmap:
-                        if (_hmTiles.Count <= _hmIndex)
-                        {
-                            if (_hmTiles.Count > 0)
-                                _hmTiles.Clear();
-                            _hmIndex = 0;
-                            _syncing = Syncing.Splatmap;
-                            if (++c < 3)
-                                goto case Syncing.Splatmap;
-                            return;
-                        }
+                list.RemoveAt(i);
+                HeightmapBounds b3 = inv.Bounds;
+                Logger.LogDebug("[TILE SYNC]   Combined bounds " + b3 + " <- " + bounds + ".");
+                b3.Encapsulate(bounds);
+                Logger.LogDebug("[TILE SYNC]    Result: " + b3 + ".");
+                if (AddHeightmapBounds(list, coord, b3, time))
+                    return true;
 
-                        index = _hmIndex;
-                        break;
-                    case Syncing.Splatmap:
-                        if (_smTiles.Count <= _smIndex)
-                        {
-                            if (_smTiles.Count > 0)
-                                _smTiles.Clear();
-                            _smIndex = 0;
-                            _syncing = Syncing.Holes;
-                            if (++c < 3)
-                                goto case Syncing.Holes;
-                            return;
-                        }
-
-                        index = _smIndex;
-                        break;
-                    case Syncing.Holes:
-                        if (_holeTiles.Count <= _holeIndex)
-                        {
-                            if (_holeTiles.Count > 0)
-                                _holeTiles.Clear();
-                            _holeIndex = 0;
-                            _syncing = Syncing.Heightmap;
-                            if (++c < 3)
-                                goto case Syncing.Heightmap;
-                            return;
-                        }
-
-                        index = _holeIndex;
-                        break;
-                    default: return;
-                }
-                buffer = GetBuffer(_syncing);
-                tiles = GetTiles(_syncing);
+                inv.Bounds = b3;
+                inv.Time = time;
+                list.Add(inv);
+                Logger.LogDebug("[TILE SYNC]    Re-added: " + b3 + ".");
+                return true;
             }
-            while (time < tiles[index].Value);
-            LandscapeTile tile = tiles[index].Key;
-            switch (_syncing)
-            {
-                case Syncing.Heightmap:
-                    fixed (byte* ptr2 = buffer)
-                    fixed (float* ptr3 = tile.heightmap)
-                    {
-                        Buffer.MemoryCopy(ptr3, ptr2, buffer.Length, TotalHeightmapLength);
-                        if (!BitConverter.IsLittleEndian)
-                        {
-                            for (int i = 0; i < buffer.Length; i += sizeof(float))
-                                DevkitServerUtility.ReverseFloat(ptr2, i);
-                        }
-                    }
-                    break;
-                case Syncing.Splatmap:
-                    fixed (byte* ptr2 = buffer)
-                    fixed (float* ptr3 = tile.splatmap)
-                    {
-                        Buffer.MemoryCopy(ptr3, ptr2, buffer.Length, TotalSplatmapLength);
-                        if (!BitConverter.IsLittleEndian)
-                        {
-                            for (int i = 0; i < buffer.Length; i += sizeof(float))
-                                DevkitServerUtility.ReverseFloat(ptr2, i);
-                        }
-                    }
-                    break;
-                case Syncing.Holes:
-                    fixed (byte* ptr2 = buffer)
-                    fixed (bool* ptr3 = tile.holes)
-                    {
-                        // compress the array to indivdual bits.
-                        int bitCt = -1;
-                        for (int i = 0; i < Landscape.HOLES_RESOLUTION * Landscape.HOLES_RESOLUTION; ++i)
-                            ptr2[bitCt / 8] |= (byte)(ptr3[i] ? 1 << (++bitCt % 8) : 0);
-                    }
-
-                    break;
-            }
-
-            _index = 0;
         }
-        else if (_syncing != Syncing.None && _index > -1 && time - _lastSent > 0.1)
+
+        return false;
+    }
+    private static bool AddSplatmapBounds(List<MapInvalidation<SplatmapBounds>> list, LandscapeCoord coord, SplatmapBounds bounds, float time)
+    {
+        for (int i = list.Count - 1; i >= 0; --i)
         {
-            byte[] buffer = GetBuffer(_syncing);
-            int index = GetIndex(_syncing);
-            List<KeyValuePair<LandscapeTile, float>> tiles = GetTiles(_syncing);
-            LandscapeTile? tile = index < 0 || index >= tiles.Count ? null : tiles[index].Key;
-            int ttl = _syncing switch
+            MapInvalidation<SplatmapBounds> inv = list[i];
+            if (inv.Tile == coord && inv.Bounds.Overlaps(in bounds))
             {
-                Syncing.Heightmap => TotalHeightmapLength,
-                Syncing.Splatmap => TotalSplatmapLength,
-                _ => TotalHoleLength
-            };
-            if (tile != null)
+                list.RemoveAt(i);
+                SplatmapBounds b3 = inv.Bounds;
+                Logger.LogDebug("[TILE SYNC]   Combined bounds " + b3 + " <- " + bounds + ".");
+                b3.Encapsulate(bounds);
+                Logger.LogDebug("[TILE SYNC]    Result: " + b3 + ".");
+                if (AddSplatmapBounds(list, coord, b3, time))
+                    return true;
+
+                inv.Bounds = b3;
+                inv.Time = time;
+                list[i] = inv;
+                list.Add(inv);
+                Logger.LogDebug("[TILE SYNC]    Re-added: " + b3 + ".");
+                return true;
+            }
+        }
+
+        return false;
+    }
+    public void InvalidateBounds(Bounds bounds, DataType type, float time)
+    {
+        Logger.LogDebug("[TILE SYNC] Invalidating bounds " + bounds + " for " + type + ".");
+        LandscapeBounds b2 = new LandscapeBounds(bounds);
+        for (int x1 = b2.min.x; x1 <= b2.max.x; ++x1)
+        {
+            for (int y1 = b2.min.y; y1 <= b2.max.y; ++y1)
+            {
+                LandscapeCoord c2 = new LandscapeCoord(x1, y1);
+                Logger.LogDebug("[TILE SYNC]  Checking tile " + c2 + ".");
+                if (Landscape.getTile(c2) != null)
+                {
+                    switch (type)
+                    {
+                        case DataType.Heightmap:
+                            HeightmapBounds hmBounds = new HeightmapBounds(c2, bounds);
+                            if (!AddHeightmapBounds(_hmInvalidated, c2, hmBounds, time))
+                            {
+                                _hmInvalidated.Add(new MapInvalidation<HeightmapBounds>(c2, hmBounds, time));
+                                Logger.LogDebug("[TILE SYNC]   Added bounds: " + _hmInvalidated.TailOrDefault().Bounds + ".");
+                            }
+                            
+                            break;
+                        case DataType.Splatmap:
+                            SplatmapBounds smBounds = new SplatmapBounds(c2, bounds);
+
+                            if (!AddSplatmapBounds(_smInvalidated, c2, smBounds, time))
+                            {
+                                _smInvalidated.Add(new MapInvalidation<SplatmapBounds>(c2, smBounds, time));
+                                Logger.LogDebug("[TILE SYNC]   Added bounds: " + _smInvalidated.TailOrDefault().Bounds + ".");
+                            }
+                            
+                            break;
+                        case DataType.Holes:
+                            smBounds = new SplatmapBounds(c2, bounds);
+
+                            if (!AddSplatmapBounds(_holeInvalidated, c2, smBounds, time))
+                            {
+                                _holeInvalidated.Add(new MapInvalidation<SplatmapBounds>(c2, smBounds, time));
+                                Logger.LogDebug("[TILE SYNC]   Added bounds: " + _holeInvalidated.TailOrDefault().Bounds + ".");
+                            }
+                            
+                            break;
+                    }
+                }
+            }
+        }
+    }
+    private unsafe void BufferData()
+    {
+        _index = 0;
+        switch (_dataType)
+        {
+            case DataType.Heightmap:
+                Logger.LogDebug("[TILE SYNC] Buffering " + _dataType + "[" + _hmIndex + "].");
+                MapInvalidation<HeightmapBounds> inv = _hmInvalidated[_hmIndex];
+                LandscapeTile? tile = Landscape.getTile(inv.Tile);
+                if (tile == null)
+                {
+                    Logger.LogWarning("[TILE SYNC]  Tile not found in BufferData (HM): " + inv.Tile + ".");
+                    return;
+                }
+                int sy = inv.Bounds.max.y - inv.Bounds.min.y;
+                fixed (byte* ptr2 = _buffer)
+                fixed (float* ptr3 = tile.heightmap)
+                {
+                    int len = (sy + 1) * sizeof(float);
+                    for (int x = inv.Bounds.min.x; x <= inv.Bounds.max.x; ++x)
+                    {
+                        int offset = (x - inv.Bounds.min.x) * (sy + 1) * sizeof(float);
+                        Logger.LogDebug($"[TILE SYNC]   Offset: {offset}, Length: {len}, BufferLen: {offset + len}, hm offset = {x * (sy + 1) * sizeof(float)}.");
+                        Buffer.MemoryCopy(ptr3 + x * (sy + 1) * sizeof(float), ptr2 + offset, _buffer.Length - offset, len);
+                        _bufferLen = offset + len;
+                    }
+                    Logger.LogDebug("[TILE SYNC]  Buffered " + DevkitServerUtility.FormatBytes(_bufferLen) + " (HM).");
+                    if (!BitConverter.IsLittleEndian)
+                    {
+                        for (int i = 0; i < _bufferLen; i += sizeof(float))
+                            DevkitServerUtility.ReverseFloat(ptr2, i);
+                    }
+                }
+                break;
+            case DataType.Splatmap:
+                Logger.LogDebug("[TILE SYNC]  Buffering " + _dataType + "[" + _smIndex + "].");
+                MapInvalidation<SplatmapBounds> inv2 = _smInvalidated[_smIndex];
+                tile = Landscape.getTile(inv2.Tile);
+                if (tile == null)
+                {
+                    Logger.LogWarning("[TILE SYNC]  Tile not found in BufferData (SM): " + inv2.Tile + ".");
+                    return;
+                }
+                sy = inv2.Bounds.max.y - inv2.Bounds.min.y;
+                fixed (byte* ptr2 = _buffer)
+                fixed (float* ptr3 = tile.splatmap)
+                {
+                    int len = (sy + 1) * Landscape.SPLATMAP_LAYERS * sizeof(float);
+                    for (int x = inv2.Bounds.min.x; x <= inv2.Bounds.max.x; ++x)
+                    {
+                        int offset = (x - inv2.Bounds.min.x) * (sy + 1) * Landscape.SPLATMAP_LAYERS * sizeof(float);
+                        Buffer.MemoryCopy(ptr3 + x * (sy + 1) * Landscape.SPLATMAP_LAYERS * sizeof(float), ptr2 + offset, _buffer.Length - offset, len);
+                        _bufferLen = offset + len;
+                    }
+                    Logger.LogDebug("[TILE SYNC]  Buffered " + DevkitServerUtility.FormatBytes(_bufferLen) + " (SM).");
+                    if (!BitConverter.IsLittleEndian)
+                    {
+                        for (int i = 0; i < _bufferLen; i += sizeof(float))
+                            DevkitServerUtility.ReverseFloat(ptr2, i);
+                    }
+                }
+                break;
+            case DataType.Holes:
+                Logger.LogDebug("[TILE SYNC] Buffering " + _dataType + "[" + _holeIndex + "].");
+                inv2 = _holeInvalidated[_holeIndex];
+                tile = Landscape.getTile(inv2.Tile);
+                if (tile == null)
+                {
+                    Logger.LogWarning("[TILE SYNC]  Tile not found in BufferData (HOLES): " + inv2.Tile + ".");
+                    return;
+                }
+                fixed (byte* ptr2 = _buffer)
+                fixed (bool* ptr3 = tile.holes)
+                {
+                    // compress the array to indivdual bits.
+                    int bitCt = -1;
+                    for (int x = inv2.Bounds.min.x; x <= inv2.Bounds.max.x; ++x)
+                    {
+                        for (int y = inv2.Bounds.min.y; y <= inv2.Bounds.max.y; ++y)
+                            ptr2[bitCt / 8] |= (byte)(ptr3[x * Landscape.HOLES_RESOLUTION + y] ? 1 << (++bitCt % 8) : 0);
+                    }
+
+                    _bufferLen = Mathf.CeilToInt(bitCt / 8f);
+                    Logger.LogDebug("[TILE SYNC]  Buffered " + DevkitServerUtility.FormatBytes(_bufferLen) + " (HOLES).");
+                }
+
+                break;
+        }
+    }
+    [UsedImplicitly]
+    private void Update()
+    {
+        if (Provider.clients.Count == 0)
+            return;
+        float time = Time.realtimeSinceStartup;
+        if (_dataType == DataType.None && time - _lastSent > 5f)
+        {
+            try
             {
                 _lastSent = time;
-                ushort len = (ushort)Math.Min(ttl - _index, MaxPacketSize);
-                Buffer.BlockCopy(buffer, _index, _packetBuffer, PacketOffset, len);
-                _packetBuffer[0] = (byte)_syncing;
+                _lastDataType = _dataType = (DataType)(((int)_lastDataType % 3) + 1);
+                Logger.LogDebug("[TILE SYNC] New data type: " + _dataType + ".");
+                switch (_dataType)
+                {
+                    case DataType.Heightmap:
+                        if (_hmInvalidated.Count == 0)
+                        {
+                            Logger.LogDebug("[TILE SYNC] No heightmaps.");
+                            _dataType = DataType.None;
+                            return;
+                        }
+
+                        while (_hmIndex < _hmInvalidated.Count && time - _hmInvalidated[_hmIndex].Time < 5f)
+                            ++_hmIndex;
+                        if (_hmIndex >= _hmInvalidated.Count)
+                        {
+                            _hmIndex = 0;
+                            Logger.LogDebug("[TILE SYNC] No available heightmaps.");
+                            _dataType = DataType.None;
+                            return;
+                        }
+                        Logger.LogDebug("[TILE SYNC] Next heightmap: " + _hmIndex + ".");
+                        break;
+                    case DataType.Splatmap:
+                        if (_smInvalidated.Count == 0)
+                        {
+                            Logger.LogDebug("[TILE SYNC] No splatmaps.");
+                            _dataType = DataType.None;
+                            return;
+                        }
+
+                        while (_smIndex < _smInvalidated.Count && time - _smInvalidated[_smIndex].Time < 5f)
+                            ++_smIndex;
+                        if (_smIndex >= _smInvalidated.Count)
+                        {
+                            _smIndex = 0;
+                            Logger.LogDebug("[TILE SYNC] No available splatmaps.");
+                            _dataType = DataType.None;
+                            return;
+                        }
+                        Logger.LogDebug("[TILE SYNC] Next splatmap: " + _smIndex + ".");
+                        break;
+                    case DataType.Holes:
+                        if (_holeInvalidated.Count == 0)
+                        {
+                            Logger.LogDebug("[TILE SYNC] No holes.");
+                            _dataType = DataType.None;
+                            return;
+                        }
+
+                        while (_holeIndex < _holeInvalidated.Count && time - _holeInvalidated[_holeIndex].Time < 5f)
+                            ++_holeIndex;
+                        if (_holeIndex >= _holeInvalidated.Count)
+                        {
+                            _holeIndex = 0;
+                            Logger.LogDebug("[TILE SYNC] No available holes.");
+                            _dataType = DataType.None;
+                            return;
+                        }
+                        Logger.LogDebug("[TILE SYNC] Next holes: " + _holeIndex + ".");
+                        break;
+                }
+
+                BufferData();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex);
+                _dataType = DataType.None;
+            }
+        }
+        else if (_dataType != DataType.None && _index > -1 && time - _lastSent > 0.2)
+        {
+            LandscapeCoord coord = _dataType switch
+            {
+                DataType.Heightmap => _hmInvalidated[_hmIndex].Tile,
+                DataType.Splatmap => _smInvalidated[_smIndex].Tile,
+                _ => _holeInvalidated[_holeIndex].Tile
+            };
+            LandscapeTile? tile = Landscape.getTile(coord);
+            if (tile == null)
+            {
+                Logger.LogWarning("[TILE SYNC] Tile not found in BufferData (HOLES): " + coord + ".");
+            }
+            else
+            {
+                int ox = _dataType switch
+                {
+                    DataType.Heightmap => _hmInvalidated[_hmIndex].Bounds.min.x,
+                    DataType.Splatmap => _smInvalidated[_smIndex].Bounds.min.x,
+                    _ => _holeInvalidated[_holeIndex].Bounds.min.x
+                };
+                int oy = _dataType switch
+                {
+                    DataType.Heightmap => _hmInvalidated[_hmIndex].Bounds.min.y,
+                    DataType.Splatmap => _smInvalidated[_smIndex].Bounds.min.y,
+                    _ => _holeInvalidated[_holeIndex].Bounds.min.y
+                };
+                int sx = _dataType switch
+                {
+                    DataType.Heightmap => _hmInvalidated[_hmIndex].Bounds.max.x - ox,
+                    DataType.Splatmap => _smInvalidated[_smIndex].Bounds.max.x - ox,
+                    _ => _holeInvalidated[_holeIndex].Bounds.max.x - ox
+                };
+                int sy = _dataType switch
+                {
+                    DataType.Heightmap => _hmInvalidated[_hmIndex].Bounds.max.y - oy,
+                    DataType.Splatmap => _smInvalidated[_smIndex].Bounds.max.y - oy,
+                    _ => _holeInvalidated[_holeIndex].Bounds.max.y - oy
+                };
+                _lastSent = time;
+                ushort len = (ushort)Math.Min(_bufferLen - _index, MaxPacketSize);
+                Buffer.BlockCopy(_buffer, _index, _packetBuffer, PacketOffset, len);
+                _packetBuffer[0] = (byte)_dataType;
                 UnsafeBitConverter.GetBytes(_packetBuffer, (ushort)_packetId, 1);
                 ++_packetId;
                 UnsafeBitConverter.GetBytes(_packetBuffer, tile.coord.x, sizeof(ushort) + 1);
                 UnsafeBitConverter.GetBytes(_packetBuffer, tile.coord.y, sizeof(ushort) + 1 + sizeof(int));
-                UnsafeBitConverter.GetBytes(_packetBuffer, len, PacketOffset - sizeof(ushort));
+                UnsafeBitConverter.GetBytes(_packetBuffer, sx, sizeof(ushort) + 1 + 2 * sizeof(int));
+                UnsafeBitConverter.GetBytes(_packetBuffer, sy, sizeof(ushort) + 1 + 3 * sizeof(int));
+                UnsafeBitConverter.GetBytes(_packetBuffer, ox, sizeof(ushort) + 1 + 4 * sizeof(int));
+                UnsafeBitConverter.GetBytes(_packetBuffer, oy, sizeof(ushort) + 1 + 5 * sizeof(int));
+                UnsafeBitConverter.GetBytes(_packetBuffer, len, sizeof(ushort) + 1 + 6 * sizeof(int));
                 _index += len;
                 NetFactory.SendGeneric(NetFactory.DevkitMessage.SendTileData, _packetBuffer, null, length: PacketOffset + len);
             }
-            if (_index >= ttl || tile == null)
+
+            // flush buffer
+            if (_index >= _bufferLen || tile == null)
             {
-                _lastSyncing = _syncing;
-                if (_syncing == Syncing.Heightmap)
-                    ++_hmIndex;
-                else if (_syncing == Syncing.Splatmap)
-                    ++_smIndex;
+                _lastDataType = _dataType;
+                if (_dataType == DataType.Heightmap)
+                {
+                    _hmInvalidated.RemoveAt(_hmIndex);
+                }
+                else if (_dataType == DataType.Splatmap)
+                {
+                    _smInvalidated.RemoveAt(_smIndex);
+                }
                 else
-                    ++_holeIndex;
-                _syncing = Syncing.None;
+                {
+                    _holeInvalidated.RemoveAt(_holeIndex);
+                }
+                _dataType = DataType.None;
+                _bufferLen = 0;
                 _index = -1;
+                _packetId = 0;
             }
         }
-        List<KeyValuePair<LandscapeTile, float>> GetTiles(Syncing sync) => sync switch
-        {
-            Syncing.Heightmap => _hmTiles,
-            Syncing.Splatmap => _smTiles,
-            _ => _holeTiles
-        };
-        byte[] GetBuffer(Syncing sync) => sync switch
-        {
-            Syncing.Heightmap => _hmBuffer,
-            Syncing.Splatmap => _smBuffer,
-            _ => _holeBuffer
-        };
-        int GetIndex(Syncing sync) => sync switch
-        {
-            Syncing.Heightmap => _hmIndex,
-            Syncing.Splatmap => _smIndex,
-            _ => _holeIndex
-        };
-    }
-    private void TryQueueHeightmapUpdate(LandscapeTile tile)
-    {
-        Logger.LogDebug("[TILE SYNC] Tile heightmap updated: " + tile.coord + ".");
-        for (int i = _hmTiles.Count - 1; i > _hmIndex; --i)
-        {
-            if (_hmTiles[i].Key.coord == tile.coord)
-            {
-                _hmTiles.RemoveAt(i);
-            }
-        }
-
-        _hmTiles.Add(new KeyValuePair<LandscapeTile, float>(tile, Time.realtimeSinceStartup + 10f));
-    }
-    private void TryQueueSplatmapUpdate(LandscapeTile tile)
-    {
-        Logger.LogDebug("[TILE SYNC] Tile splatmap updated: " + tile.coord + ".");
-        for (int i = _smTiles.Count - 1; i > _smIndex; --i)
-        {
-            if (_smTiles[i].Key.coord == tile.coord)
-            {
-                _smTiles.RemoveAt(i);
-            }
-        }
-
-        _smTiles.Add(new KeyValuePair<LandscapeTile, float>(tile, Time.realtimeSinceStartup + 10f));
-    }
-    private void TryQueueHoleUpdate(LandscapeTile tile)
-    {
-        Logger.LogDebug("[TILE SYNC] Tile holes updated: " + tile.coord + ".");
-        for (int i = _holeTiles.Count - 1; i > _holeIndex; --i)
-        {
-            if (_holeTiles[i].Key.coord == tile.coord)
-            {
-                _holeTiles.RemoveAt(i);
-            }
-        }
-
-        _holeTiles.Add(new KeyValuePair<LandscapeTile, float>(tile, Time.realtimeSinceStartup + 10f));
-    }
-    private static void OnTileUpdated(LandscapeTile tile, Syncing type)
-    {
-        if (type == Syncing.Heightmap)
-            Instance?.TryQueueHeightmapUpdate(tile);
     }
 
+    [HarmonyPatch(typeof(Landscape), nameof(Landscape.writeHeightmap))]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void OnWriteHeightmap(Bounds worldBounds, Landscape.LandscapeWriteHeightmapHandler callback)
+    {
+        Instance?.InvalidateBounds(worldBounds, DataType.Heightmap, Time.realtimeSinceStartup);
+    }
+
+    /*
     [HarmonyPatch(typeof(Landscape), nameof(Landscape.writeHeightmap))]
     [HarmonyTranspiler]
     [UsedImplicitly]
@@ -473,7 +661,7 @@ public class TileSync : MonoBehaviour
                             yield return DevkitServerUtility.GetLocalCodeInstruction(oldHeight, oldHeightInd, false);
                             yield return new CodeInstruction(OpCodes.Beq, label);
                             yield return DevkitServerUtility.GetLocalCodeInstruction(tile, tileInd, false);
-                            yield return DevkitServerUtility.LoadConstantI4((int)Syncing.Heightmap);
+                            yield return DevkitServerUtility.LoadConstantI4((int)DataType.Heightmap);
                             yield return new CodeInstruction(OpCodes.Call, onUpdatedMethod);
                             nextLbl = label;
                             Logger.LogInfo("[TILE SYNC] Inserted OnUpdated call to original edit method in " + method.Format() + ".");
@@ -524,7 +712,7 @@ public class TileSync : MonoBehaviour
                         yield return list[i + 1];
                         ++i;
                         yield return DevkitServerUtility.GetLocalCodeInstruction(tile, tileInd, false);
-                        yield return DevkitServerUtility.LoadConstantI4((int)Syncing.Heightmap);
+                        yield return DevkitServerUtility.LoadConstantI4((int)DataType.Heightmap);
                         yield return new CodeInstruction(OpCodes.Call, onUpdatedMethod);
                         yield return new CodeInstruction(OpCodes.Br, label2);
                         CodeInstruction pop = new CodeInstruction(OpCodes.Pop);
@@ -555,5 +743,6 @@ public class TileSync : MonoBehaviour
             DevkitServerModule.Fault();
         }
     }
+    */
 #endif
 }

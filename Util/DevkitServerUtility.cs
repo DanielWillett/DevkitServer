@@ -4,7 +4,9 @@ using System.Linq;
 using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
+using DevkitServer.Util.Encoding;
 using HarmonyLib;
+using SDG.Framework.Landscapes;
 
 namespace DevkitServer.Util;
 public static class DevkitServerUtility
@@ -64,6 +66,12 @@ public static class DevkitServerUtility
         if (neg) len = -len;
 
         return len.ToString("N1") + " " + _sizeCodes[inc];
+    }
+    public static Bounds InflateBounds(in Bounds bounds)
+    {
+        Vector3 c = bounds.center;
+        Vector3 e = bounds.extents;
+        return new Bounds(new Vector3(Mathf.Round(c.x), Mathf.Round(c.y), Mathf.Round(c.z)), new Vector3((e.x + 0.5f).CeilToIntIgnoreSign(), (e.y + 0.5f).CeilToIntIgnoreSign(), (e.z + 0.5f).CeilToIntIgnoreSign()));
     }
     public static unsafe int GetLabelId(this Label label) => *(int*)&label;
     public static void PrintBytesHex(byte[] bytes, int columnCount = 16, int len = -1)
@@ -245,5 +253,50 @@ public static class DevkitServerUtility
         b = ptr[index];
         ptr[index] = ptr[index + 3];
         ptr[index + 3] = b;
+    }
+    public static bool Encapsulates(this in LandscapeBounds outer, in LandscapeBounds inner) =>
+        outer.min.x < inner.min.x && outer.min.y < inner.min.y && outer.max.x > inner.max.x && outer.max.y > inner.max.y;
+    public static bool Encapsulates(this in HeightmapBounds outer, in HeightmapBounds inner) =>
+        outer.min.x < inner.min.x && outer.min.y < inner.min.y && outer.max.x > inner.max.x && outer.max.y > inner.max.y;
+    public static bool Encapsulates(this in SplatmapBounds outer, in SplatmapBounds inner) =>
+        outer.min.x < inner.min.x && outer.min.y < inner.min.y && outer.max.x > inner.max.x && outer.max.y > inner.max.y;
+    public static bool Overlaps(this in LandscapeBounds left, in LandscapeBounds right) =>
+        !(left.max.x < right.min.x || left.max.y < right.min.y || left.min.x > right.max.x || left.min.y > right.max.y);
+    public static bool Overlaps(this in HeightmapBounds left, in HeightmapBounds right) =>
+        !(left.max.x < right.min.x || left.max.y < right.min.y || left.min.x > right.max.x || left.min.y > right.max.y);
+    public static bool Overlaps(this in SplatmapBounds left, in SplatmapBounds right) =>
+        !(left.max.x < right.min.x || left.max.y < right.min.y || left.min.x > right.max.x || left.min.y > right.max.y);
+    public static void Encapsulate(this ref LandscapeBounds left, in LandscapeBounds right)
+    {
+        if (left.min.x > right.min.x)
+            left.min.x = right.min.x;
+        if (left.min.y > right.min.y)
+            left.min.y = right.min.y;
+        if (left.max.x < right.max.x)
+            left.max.x = right.max.x;
+        if (left.max.y < right.max.y)
+            left.max.y = right.max.y;
+    }
+    public static void Encapsulate(this ref HeightmapBounds left, in HeightmapBounds right)
+    {
+        if (left.min.x > right.min.x)
+            left.min.x = right.min.x;
+        if (left.min.y > right.min.y)
+            left.min.y = right.min.y;
+        if (left.max.x < right.max.x)
+            left.max.x = right.max.x;
+        if (left.max.y < right.max.y)
+            left.max.y = right.max.y;
+    }
+    public static void Encapsulate(this ref SplatmapBounds left, in SplatmapBounds right)
+    {
+        if (left.min.x > right.min.x)
+            left.min.x = right.min.x;
+        if (left.min.y > right.min.y)
+            left.min.y = right.min.y;
+        if (left.max.x < right.max.x)
+            left.max.x = right.max.x;
+        if (left.max.y < right.max.y)
+            left.max.y = right.max.y;
     }
 }
