@@ -13,7 +13,7 @@ using DevkitServer.Players;
 
 namespace DevkitServer.Patches;
 
-public delegate void PaintHoleAction(Bounds bounds, bool put);
+public delegate void PaintHoleAction(Bounds bounds, Vector3 position, float radius, bool put);
 public delegate void LandscapeTileAction(LandscapeTile bounds);
 public delegate void AddFoliageAction(Vector3 position, Quaternion rotation, Vector3 scale, bool clearWhenBaked);
 public delegate void RemoveFoliageAction(FoliageTile foliageTile, FoliageInstanceList list, float sqrBrushRadius, float sqrBrushFalloffRadius, bool allowRemoveBaked, int sampleCount);
@@ -23,8 +23,8 @@ public delegate void RampAction(Bounds bounds, Vector3 start, Vector3 end, float
 public delegate void AdjustAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, bool subtracting, float dt);
 public delegate void FlattenAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, float target, EDevkitLandscapeToolHeightmapFlattenMethod method, float dt);
 public delegate void SmoothAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float target, EDevkitLandscapeToolHeightmapSmoothMethod method, float dt);
-public delegate void PaintAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float target, bool useWeightTarget, bool autoSlope, bool autoFoundation, float autoMinAngleBegin, float autoMinAngleEnd, float autoMaxAngleBegin, float autoMaxAngleEnd, float autoRayLength, float autoRayRadius, ERayMask autoRayMask, float dt);
-public delegate void PaintSmoothAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, EDevkitLandscapeToolSplatmapSmoothMethod method, float dt);
+public delegate void PaintAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float target, bool useWeightTarget, bool autoSlope, bool autoFoundation, float autoMinAngleBegin, float autoMinAngleEnd, float autoMaxAngleBegin, float autoMaxAngleEnd, float autoRayLength, float autoRayRadius, ERayMask autoRayMask, bool isRemove, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt);
+public delegate void PaintSmoothAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, EDevkitLandscapeToolSplatmapSmoothMethod method, List<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>> averages, int sampleCount, float dt);
 
 [HarmonyPatch]
 [EarlyTypeInit]
@@ -295,6 +295,12 @@ public static class ClientEvents
     internal static readonly InstanceGetter<TerrainEditor, Vector3>? GetBrushWorldPosition =
         Accessor.GenerateInstanceGetter<TerrainEditor, Vector3>("brushWorldPosition");
 
+    internal static readonly InstanceGetter<TerrainEditor, int>? GetSampleCount =
+        Accessor.GenerateInstanceGetter<TerrainEditor, int>("splatmapSmoothSampleCount");
+
+    internal static readonly InstanceGetter<TerrainEditor, Dictionary<AssetReference<LandscapeMaterialAsset>, float>>? GetSampleAverage =
+        Accessor.GenerateInstanceGetter<TerrainEditor, Dictionary<AssetReference<LandscapeMaterialAsset>, float>>("splatmapSmoothSampleAverage");
+
     internal static readonly InstanceGetter<TerrainEditor, float>? GetHeightmapSmoothTarget =
         Accessor.GenerateInstanceGetter<TerrainEditor, float>("heightmapSmoothTarget");
 
@@ -356,7 +362,8 @@ public static class ClientEvents
             settings.autoMinAngleBegin, settings.autoMinAngleEnd,
             settings.autoMaxAngleBegin, settings.autoMaxAngleEnd,
             settings.autoRayLength, settings.autoRayRadius,
-            settings.autoRayMask, Time.deltaTime);
+            settings.autoRayMask, InputEx.GetKey(KeyCode.LeftShift),
+            TerrainEditor.splatmapMaterialTarget, Time.deltaTime);
     }
     [UsedImplicitly]
     private static void OnAutoPaintConfirm(Bounds bounds)
@@ -372,25 +379,26 @@ public static class ClientEvents
             settings.autoMinAngleBegin, settings.autoMinAngleEnd,
             settings.autoMaxAngleBegin, settings.autoMaxAngleEnd,
             settings.autoRayLength, settings.autoRayRadius,
-            settings.autoRayMask, Time.deltaTime);
+            settings.autoRayMask, InputEx.GetKey(KeyCode.LeftShift),
+            TerrainEditor.splatmapMaterialTarget, Time.deltaTime);
     }
     [UsedImplicitly]
     private static void OnPaintSmoothConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null) return;
+        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null || GetSampleAverage == null || GetSampleCount == null) return;
 
         EDevkitLandscapeToolSplatmapSmoothMethod method = DevkitLandscapeToolSplatmapOptions.instance.smoothMethod;
         Logger.LogDebug("Paint smooth (" + method + " performed on bounds " + bounds.ToString("F2", CultureInfo.InvariantCulture) + ".");
         OnPaintSmoothed?.Invoke(bounds, GetBrushWorldPosition(editor), editor.splatmapBrushRadius,
-            editor.splatmapBrushFalloff, editor.splatmapBrushStrength, method, Time.deltaTime);
+            editor.splatmapBrushFalloff, editor.splatmapBrushStrength, method, GetSampleAverage(editor).ToList(), GetSampleCount(editor), Time.deltaTime);
     }
     [UsedImplicitly]
     private static void OnHoleConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor) return;
+        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null) return;
 
         Logger.LogDebug("Hole paint performed on bounds " + bounds.ToString("F2", CultureInfo.InvariantCulture) + ".");
-        OnHolePainted?.Invoke(bounds, InputEx.GetKey(KeyCode.LeftShift));
+        OnHolePainted?.Invoke(bounds, GetBrushWorldPosition(editor), editor.splatmapBrushRadius, InputEx.GetKey(KeyCode.LeftShift));
     }
     [UsedImplicitly]
     private static void OnAddTile(LandscapeTile tile)
@@ -412,16 +420,32 @@ public static class ClientEvents
     }
     #endregion
 
-    #region Landscape.writeHeightmap
+    #region Landscape.writeMaps
+
     [HarmonyPatch(typeof(Landscape), nameof(Landscape.writeHeightmap))]
     [HarmonyTranspiler]
     [UsedImplicitly]
-    private static IEnumerable<CodeInstruction> LandscapeWriteHeightmapTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
+    private static IEnumerable<CodeInstruction> LandscapeWriteHeightmapTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+        => LandscapeWriteTranspilerGeneric(instructions, method, "heightmapTransactions");
+
+    [HarmonyPatch(typeof(Landscape), nameof(Landscape.writeSplatmap))]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    private static IEnumerable<CodeInstruction> LandscapeWriteSplatmapTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+        => LandscapeWriteTranspilerGeneric(instructions, method, "splatmapTransactions");
+
+    [HarmonyPatch(typeof(Landscape), nameof(Landscape.writeHoles))]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    private static IEnumerable<CodeInstruction> LandscapeWriteHolesTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+        => LandscapeWriteTranspilerGeneric(instructions, method, "holeTransactions");
+
+    private static IEnumerable<CodeInstruction> LandscapeWriteTranspilerGeneric(IEnumerable<CodeInstruction> instructions, MethodBase method, string fieldName)
     {
-        FieldInfo? hmTransactions = typeof(Landscape).GetField("heightmapTransactions", BindingFlags.NonPublic | BindingFlags.Static);
+        FieldInfo? hmTransactions = typeof(Landscape).GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Static);
         if (hmTransactions == null)
         {
-            Logger.LogWarning("Unable to find field: Landscape.heightmapTransactions.");
+            Logger.LogWarning("Unable to find field: Landscape." + fieldName + " in " + method.Format() + ".");
             DevkitServerModule.Fault();
         }
 
@@ -432,28 +456,20 @@ public static class ClientEvents
         {
             CodeInstruction c = ins[i];
             if (!ld && c.LoadsField(hmTransactions))
-            {
-                for (int j = i + 1; j < ins.Count; ++j)
-                {
-                    if (ins[j].Branches(out Label? lbl) && lbl.HasValue)
-                    {
-                        st = true;
-                        yield return new CodeInstruction(OpCodes.Ldsfld, EditorTerrain.SaveTransactionsField);
-                        yield return new CodeInstruction(OpCodes.Not);
-                        yield return ins[j];
-                        Logger.LogDebug("Inserted save transactions check in writeLandscape.");
-                        break;
-                    }
-                }
-                    
                 ld = true;
+            else if (ld && !st && c.Branches(out Label? lbl) && lbl.HasValue)
+            {
+                st = true;
+                yield return new CodeInstruction(OpCodes.Ldsfld, EditorTerrain.SaveTransactionsField);
+                yield return new CodeInstruction(OpCodes.And);
+                Logger.LogDebug("Inserted save transactions check in " + method.Format() + ".");
             }
 
             yield return c;
         }
         if (!st)
         {
-            Logger.LogWarning("Patching error for Landscape.writeHeightmap. Invalid transpiler operation.");
+            Logger.LogWarning("Patching error for " + method.Format() + ". Invalid transpiler operation.");
             DevkitServerModule.Fault();
         }
     }

@@ -299,4 +299,9 @@ public static class DevkitServerUtility
         if (left.max.y < right.max.y)
             left.max.y = right.max.y;
     }
+
+    public static Vector2 ToVector2(this in Vector3 v3) => new Vector2(v3.x, v3.z);
+    public static Vector3 ToVector3(this in Vector2 v2) => new Vector3(v2.x, 0f, v2.y);
+    public static Vector3 ToVector3(this in Vector2 v2, float y) => new Vector3(v2.x, y, v2.y);
+    public static CodeInstruction CopyWithoutSpecial(this CodeInstruction instruction) => new CodeInstruction(instruction.opcode, instruction.operand);
 }

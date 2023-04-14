@@ -199,7 +199,7 @@ public class DevkitEditorHUD : MonoBehaviour
         {
             if (Instance == null)
             {
-                Instance = EditorUser.User.gameObject.AddComponent<DevkitEditorHUD>();
+                Instance = DevkitServerModule.GameObjectHost.AddComponent<DevkitEditorHUD>();
             }
             if (Instance.IsActive)
                 return;

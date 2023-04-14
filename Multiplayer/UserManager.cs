@@ -95,7 +95,6 @@ public static class UserManager
 
         Provider.kick(player, "Player not properly set up.");
     }
-
     internal static void RemovePlayer(CSteamID player)
     {
         EditorUser? user = FromId(player);

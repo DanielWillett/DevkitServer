@@ -390,6 +390,8 @@ public static class NetFactory
 
         if (!reader.ReadUInt16(out ushort len) || !reader.ReadUInt8(out byte amt))
             goto fail;
+        bool reliable = (amt & 0b10000000) > 0;
+        amt &= 0b01111111;
         unsafe
         {
             ulong* relays = stackalloc ulong[amt];
@@ -402,18 +404,13 @@ public static class NetFactory
             byte[] msg = new byte[len];
             if (!reader.ReadBytes(msg))
                 goto fail;
-            byte[] output;
-            fixed (byte* ptr = msg)
-            {
-                output = new byte[sizeof(ushort) + sizeof(ulong) + len];
-                fixed (byte* ptr2 = output)
-                {
-                    UnsafeBitConverter.GetBytes(ptr2, len, 0);
-                    UnsafeBitConverter.GetBytes(ptr2, user.SteamId.m_SteamID, sizeof(ushort));
-                    Buffer.MemoryCopy(ptr, ptr2 + sizeof(ushort) + sizeof(ulong), len, len);
-                }
-            }
 
+            Writer.Reset();
+            Writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)DevkitMessage.RelayPacket));
+            Writer.WriteUInt16(len);
+            Writer.WriteUInt64(user.SteamId.m_SteamID);
+            Writer.WriteBytes(msg, 0, msg.Length);
+            Writer.Flush();
             PooledTransportConnectionList tempList;
 
             if (amt == 0)
@@ -446,7 +443,8 @@ public static class NetFactory
                 }
             }
 
-            Send(tempList, output);
+            for (int i = 0; i < tempList.Count; ++i)
+                tempList[i].Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
 
             MessageOverhead ovh = new MessageOverhead(msg, user.SteamId.m_SteamID);
             if ((ovh.Flags & MessageFlags.RunOriginalMethodOnRequest) != 0)
@@ -985,7 +983,7 @@ public static class NetFactory
         int len = Math.Min(ushort.MaxValue, bytes.Length);
         Writer.WriteUInt16((ushort)len);
 
-        int c = Math.Min(byte.MaxValue, users == null ? 0 : users.Count);
+        int c = Math.Min(0b01111111, users == null ? 0 : users.Count) | (reliable ? (1 << 7) : 0);
         Writer.WriteUInt8((byte)c);
         for (int i = 0; i < c; ++i)
             Writer.WriteUInt64(users![i]);

@@ -162,8 +162,6 @@ public static class EditorLevel
     private static readonly ByteReader LevelReader = new ByteReader { ThrowOnError = true };
     private static readonly Func<string, bool, ulong, LevelInfo?> LoadLevelInfo =
         Accessor.GenerateStaticCaller<Level, Func<string, bool, ulong, LevelInfo?>>("loadLevelInfo", new Type[] { typeof(string), typeof(bool), typeof(ulong) }, true)!;
-    private static readonly System.Action? EnableAnimation = Accessor.GenerateStaticCaller<LoadingUI, System.Action>("EnableBackgroundAnim", throwOnError: false);
-    private static readonly System.Action? DisableAnimation = Accessor.GenerateStaticCaller<LoadingUI, System.Action>("DisableBackgroundAnim", throwOnError: false);
 
     private static byte[][]? _pendingLevel;
     private static long _pendingCancelKey;
@@ -203,7 +201,6 @@ public static class EditorLevel
         _pendingCancelKey = 0;
         _missingPackets = 0;
         _startingMissingPackets = 0;
-        EnableAnimation?.Invoke();
         DevkitServerModule.ComponentHost.StartCoroutine(TryReceiveLevelCoroutine());
     }
     private static void UpdateLoadingUI()
@@ -299,7 +296,6 @@ public static class EditorLevel
         {
             MessageOverhead ovh = new MessageOverhead(MessageFlags.RequestResponse, EndSendLevel.ID, 0, 0, _pendingCancelKey);
             EndSendLevel.Invoke(ref ovh, true, false);
-            DisableAnimation?.Invoke();
             Provider.disconnect();
         }
     }
@@ -369,7 +365,6 @@ public static class EditorLevel
                 Logger.LogInfo($"[RECEIVE LEVEL] Finished receiving level data ({DevkitServerUtility.FormatBytes(_pendingLevel.Length)}) for level {_pendingLevelName}.", ConsoleColor.DarkCyan);
                 LoadingUI.updateKey("Downloading Level / Level " + _pendingLevelName + " Installed");
                 LoadingUI.updateProgress(1f);
-                DisableAnimation?.Invoke();
                 OnLevelReady(Path.Combine(dir, folder.FolderName));
                 GC.Collect();
             }
@@ -388,7 +383,6 @@ public static class EditorLevel
             ctx.Reply(RequestPackets, Array.Empty<int>());
             Logger.LogInfo("[RECEIVE LEVEL] Cancelled level load.");
             LoadingUI.updateKey("Downloading Level / Level Load Cancelled");
-            DisableAnimation?.Invoke();
             Provider.disconnect();
         }
 

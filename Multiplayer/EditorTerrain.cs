@@ -1,12 +1,14 @@
 ﻿using DevkitServer.Multiplayer.Networking;
-using DevkitServer.Patches;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
 using JetBrains.Annotations;
-using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Landscapes;
 using SDG.Framework.Utilities;
 using System.Reflection;
+#if CLIENT
+using DevkitServer.Patches;
+using SDG.Framework.Devkit.Tools;
+#endif
 
 namespace DevkitServer.Multiplayer;
 public sealed partial class EditorTerrain : MonoBehaviour
@@ -17,7 +19,9 @@ public sealed partial class EditorTerrain : MonoBehaviour
     internal static bool SaveTransactions = true;
     internal static ITerrainAction? ActiveAction;
     internal static FieldInfo SaveTransactionsField = typeof(EditorTerrain).GetField("SaveTransactions", BindingFlags.Static | BindingFlags.NonPublic)!;
+#if CLIENT
     private float _lastFlush;
+#endif
 
     // edit buffer is reversed for everyone but the owner.
     private readonly List<ITerrainAction> _editBuffer = new List<ITerrainAction>();
@@ -119,24 +123,39 @@ public sealed partial class EditorTerrain : MonoBehaviour
             ITerrainAction action = _editBuffer[i];
             BrushSettingsCollection? toAdd = null;
             const float tol = 0.0001f;
-            switch (action.EditorType)
+            if (action is IBrushRadius r && (GetBrushSettings(BrushValueFlags.Radius) is not { } v1 || !MathfEx.IsNearlyEqual(v1.Radius, r.BrushRadius, tol)))
+                (toAdd ??= BrushCollectionPool.claim().Reset()).WithRadius(r.BrushRadius);
+            if (action is IBrushFalloff f && (GetBrushSettings(BrushValueFlags.Falloff) is not { } v2 || !MathfEx.IsNearlyEqual(v2.Falloff, f.BrushFalloff, tol)))
+                (toAdd ??= BrushCollectionPool.claim().Reset()).WithFalloff(f.BrushFalloff);
+            if (action is IBrushStrength s1 && (GetBrushSettings(BrushValueFlags.Strength) is not { } v3 || !MathfEx.IsNearlyEqual(v3.Strength, s1.BrushStrength, tol)))
+                (toAdd ??= BrushCollectionPool.claim().Reset()).WithStrength(s1.BrushStrength);
+            if (action is IBrushSensitivity s2 && (GetBrushSettings(BrushValueFlags.Sensitivity) is not { } v4 || !MathfEx.IsNearlyEqual(v4.Sensitivity, s2.BrushSensitivity, tol)))
+                (toAdd ??= BrushCollectionPool.claim().Reset()).WithSensitivity(s2.BrushSensitivity);
+            if (action is IBrushTarget t && (GetBrushSettings(BrushValueFlags.Target) is not { } v5 || !MathfEx.IsNearlyEqual(v5.Target, t.BrushTarget, tol)))
+                (toAdd ??= BrushCollectionPool.claim().Reset()).WithTarget(t.BrushTarget);
+            if (action is IAutoSlope slope)
             {
-                case TerrainEditorType.Heightmap:
-                    if (action is IBrushRadius r && (GetBrushSettings(BrushValueFlags.Radius) == null || !MathfEx.IsNearlyEqual(GetBrushSettings(BrushValueFlags.Radius)!.Radius, r.BrushRadius, tol)))
-                        (toAdd ??= BrushCollectionPool.claim().Reset()).WithRadius(r.BrushRadius);
-                    if (action is IBrushFalloff f && (GetBrushSettings(BrushValueFlags.Falloff) == null || !MathfEx.IsNearlyEqual(GetBrushSettings(BrushValueFlags.Falloff)!.Falloff, f.BrushFalloff, tol)))
-                        (toAdd ??= BrushCollectionPool.claim().Reset()).WithFalloff(f.BrushFalloff);
-                    if (action is IBrushStrength s1 && (GetBrushSettings(BrushValueFlags.Strength) == null || !MathfEx.IsNearlyEqual(GetBrushSettings(BrushValueFlags.Strength)!.Strength, s1.BrushStrength, tol)))
-                        (toAdd ??= BrushCollectionPool.claim().Reset()).WithStrength(s1.BrushStrength);
-                    if (action is IBrushSensitivity s2 && (GetBrushSettings(BrushValueFlags.Sensitivity) == null || !MathfEx.IsNearlyEqual(GetBrushSettings(BrushValueFlags.Sensitivity)!.Sensitivity, s2.BrushSensitivity, tol)))
-                        (toAdd ??= BrushCollectionPool.claim().Reset()).WithSensitivity(s2.BrushSensitivity);
-                    if (action is IBrushTarget t && (GetBrushSettings(BrushValueFlags.Target) == null || !MathfEx.IsNearlyEqual(GetBrushSettings(BrushValueFlags.Target)!.Target, t.BrushTarget, tol)))
-                        (toAdd ??= BrushCollectionPool.claim().Reset()).WithTarget(t.BrushTarget);
-                    break;
-                case TerrainEditorType.Splatmap:
-                    // todo
-                    break;
+                if (GetSplatmapSettings(SplatmapValueFlags.AutoSlopeMinAngleBegin) is not { } v6 || !MathfEx.IsNearlyEqual(v6.AutoSlopeMinAngleBegin, slope.AutoSlopeMinAngleBegin, tol))
+                    (toAdd ??= BrushCollectionPool.claim().Reset()).WithSplatmapInfo((toAdd.Splatmap ?? SplatmapCollectionPool.claim().Reset()).WithAutoSlopeMinAngleBegin(slope.AutoSlopeMinAngleBegin));
+                if (GetSplatmapSettings(SplatmapValueFlags.AutoSlopeMinAngleEnd) is not { } v7 || !MathfEx.IsNearlyEqual(v7.AutoSlopeMinAngleEnd, slope.AutoSlopeMinAngleEnd, tol))
+                    (toAdd ??= BrushCollectionPool.claim().Reset()).WithSplatmapInfo((toAdd.Splatmap ?? SplatmapCollectionPool.claim().Reset()).WithAutoSlopeMinAngleEnd(slope.AutoSlopeMinAngleEnd));
+                if (GetSplatmapSettings(SplatmapValueFlags.AutoSlopeMaxAngleBegin) is not { } v8 || !MathfEx.IsNearlyEqual(v8.AutoSlopeMaxAngleBegin, slope.AutoSlopeMaxAngleBegin, tol))
+                    (toAdd ??= BrushCollectionPool.claim().Reset()).WithSplatmapInfo((toAdd.Splatmap ?? SplatmapCollectionPool.claim().Reset()).WithAutoSlopeMaxAngleBegin(slope.AutoSlopeMaxAngleBegin));
+                if (GetSplatmapSettings(SplatmapValueFlags.AutoSlopeMaxAngleEnd) is not { } v9 || !MathfEx.IsNearlyEqual(v9.AutoSlopeMaxAngleEnd, slope.AutoSlopeMaxAngleEnd, tol))
+                    (toAdd ??= BrushCollectionPool.claim().Reset()).WithSplatmapInfo((toAdd.Splatmap ?? SplatmapCollectionPool.claim().Reset()).WithAutoSlopeMaxAngleEnd(slope.AutoSlopeMaxAngleEnd));
             }
+            if (action is IAutoFoundation found)
+            {
+                if (GetSplatmapSettings(SplatmapValueFlags.AutoFoundationRayLength) is not { } v6 || !MathfEx.IsNearlyEqual(v6.AutoFoundationRayLength, found.AutoFoundationRayLength, tol))
+                    (toAdd ??= BrushCollectionPool.claim().Reset()).WithSplatmapInfo((toAdd.Splatmap ?? SplatmapCollectionPool.claim().Reset()).WithAutoFoundationRayLength(found.AutoFoundationRayLength));
+                if (GetSplatmapSettings(SplatmapValueFlags.AutoFoundationRayRadius) is not { } v7 || !MathfEx.IsNearlyEqual(v7.AutoFoundationRayRadius, found.AutoFoundationRayRadius, tol))
+                    (toAdd ??= BrushCollectionPool.claim().Reset()).WithSplatmapInfo((toAdd.Splatmap ?? SplatmapCollectionPool.claim().Reset()).WithAutoFoundationRayRadius(found.AutoFoundationRayRadius));
+                if (GetSplatmapSettings(SplatmapValueFlags.AutoFoundationRayMask) is not { } v8 || v8.AutoFoundationRayMask != found.AutoFoundationRayMask)
+                    (toAdd ??= BrushCollectionPool.claim().Reset()).WithSplatmapInfo((toAdd.Splatmap ?? SplatmapCollectionPool.claim().Reset()).WithAutoFoundationRayMask(found.AutoFoundationRayMask));
+            }
+            if (action is ISplatmapMaterial material && (GetSplatmapSettings(SplatmapValueFlags.SplatmapMaterial) is not { } v10 || v10.SplatmapMaterial.GUID != material.SplatmapMaterial.GUID))
+                (toAdd ??= BrushCollectionPool.claim().Reset()).WithSplatmapInfo((toAdd.Splatmap ?? SplatmapCollectionPool.claim().Reset()).WithSplatmapMaterial(material.SplatmapMaterial));
+            
             if (toAdd != null)
             {
                 SetBrushSettings(toAdd);
@@ -204,6 +223,10 @@ public sealed partial class EditorTerrain : MonoBehaviour
                 TerrainTransactionType.HeightmapFlatten => new HeightmapFlattenAction(),
                 TerrainTransactionType.HeightmapAdjust => new HeightmapAdjustAction(),
                 TerrainTransactionType.HeightmapSmooth => new HeightmapSmoothAction(),
+                TerrainTransactionType.SplatmapPaint => new SplatmapPaintAction(),
+                TerrainTransactionType.SplatmapAutoPaint => new SplatmapPaintAction { IsAuto = true },
+                TerrainTransactionType.SplatmapSmooth => new SplatmapSmoothAction(),
+                TerrainTransactionType.HolesCut => new HolemapPaintAction(),
                 _ => null
             };
             if (action != null)
@@ -219,6 +242,28 @@ public sealed partial class EditorTerrain : MonoBehaviour
                     s2.BrushSensitivity = st4.Sensitivity;
                 if (action is IBrushTarget t && GetBrushSettings(BrushValueFlags.Target) is { } st5)
                     t.BrushTarget = st5.Target;
+                if (action is IAutoSlope slope)
+                {
+                    if (GetSplatmapSettings(SplatmapValueFlags.AutoSlopeMinAngleBegin) is { } st6)
+                        slope.AutoSlopeMinAngleBegin = st6.AutoSlopeMinAngleBegin;
+                    if (GetSplatmapSettings(SplatmapValueFlags.AutoSlopeMinAngleEnd) is { } st7)
+                        slope.AutoSlopeMinAngleEnd = st7.AutoSlopeMinAngleEnd;
+                    if (GetSplatmapSettings(SplatmapValueFlags.AutoSlopeMaxAngleBegin) is { } st8)
+                        slope.AutoSlopeMaxAngleBegin = st8.AutoSlopeMaxAngleBegin;
+                    if (GetSplatmapSettings(SplatmapValueFlags.AutoSlopeMaxAngleEnd) is { } st9)
+                        slope.AutoSlopeMaxAngleEnd = st9.AutoSlopeMaxAngleEnd;
+                }
+                if (action is IAutoFoundation found)
+                {
+                    if (GetSplatmapSettings(SplatmapValueFlags.AutoFoundationRayLength) is { } st6)
+                        found.AutoFoundationRayLength = st6.AutoFoundationRayLength;
+                    if (GetSplatmapSettings(SplatmapValueFlags.AutoFoundationRayRadius) is { } st7)
+                        found.AutoFoundationRayRadius = st7.AutoFoundationRayRadius;
+                    if (GetSplatmapSettings(SplatmapValueFlags.AutoFoundationRayMask) is { } st8)
+                        found.AutoFoundationRayMask = st8.AutoFoundationRayMask;
+                }
+                if (action is ISplatmapMaterial material && GetSplatmapSettings(SplatmapValueFlags.SplatmapMaterial) is { } st10)
+                    material.SplatmapMaterial = st10.SplatmapMaterial;
                 _editBuffer.Add(action);
             }
         }
@@ -270,6 +315,44 @@ public sealed partial class EditorTerrain : MonoBehaviour
             SaveTransactions = true;
         }
     }
+    private static void WriteSplatmapNoTransactions(Bounds worldBounds, Landscape.LandscapeWriteSplatmapHandler callback)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        SaveTransactions = false;
+        try
+        {
+            Landscape.writeSplatmap(worldBounds, callback);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error writing to splatmap.");
+            Logger.LogError(ex);
+        }
+        finally
+        {
+            SaveTransactions = true;
+        }
+    }
+    private static void WriteHolesNoTransactions(Bounds worldBounds, Landscape.LandscapeWriteHolesHandler callback)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        SaveTransactions = false;
+        try
+        {
+            Landscape.writeHoles(worldBounds, callback);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error writing to holes.");
+            Logger.LogError(ex);
+        }
+        finally
+        {
+            SaveTransactions = true;
+        }
+    }
     
     public void Init()
     {
@@ -280,6 +363,10 @@ public sealed partial class EditorTerrain : MonoBehaviour
             ClientEvents.OnAdjusted += OnHeightmapAdjust;
             ClientEvents.OnFlattened += OnHeightmapFlatten;
             ClientEvents.OnSmoothed += OnHeightmapSmooth;
+            ClientEvents.OnPainted += OnPaint;
+            ClientEvents.OnAutoPainted += OnAutoPaint;
+            ClientEvents.OnPaintSmoothed += OnPaintSmooth;
+            ClientEvents.OnHolePainted += OnPaintHole;
         }
 #endif
     }
@@ -287,13 +374,16 @@ public sealed partial class EditorTerrain : MonoBehaviour
     public void Deinit()
     {
 #if CLIENT
-
         if (IsOwner)
         {
             ClientEvents.OnRampComplete -= OnHeightmapRampConfirmed;
             ClientEvents.OnAdjusted -= OnHeightmapAdjust;
             ClientEvents.OnFlattened -= OnHeightmapFlatten;
             ClientEvents.OnSmoothed -= OnHeightmapSmooth;
+            ClientEvents.OnPainted -= OnPaint;
+            ClientEvents.OnAutoPainted -= OnAutoPaint;
+            ClientEvents.OnPaintSmoothed -= OnPaintSmooth;
+            ClientEvents.OnHolePainted -= OnPaintHole;
         }
 #endif
     }
@@ -315,7 +405,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
         QueueAction(new HeightmapAdjustAction
         {
             Bounds = bounds,
-            BrushPosition = position,
+            BrushPosition = position.ToVector2(),
             BrushRadius = radius,
             BrushFalloff = falloff,
             BrushStrength = strength,
@@ -329,7 +419,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
         QueueAction(new HeightmapFlattenAction
         {
             Bounds = bounds,
-            BrushPosition = position,
+            BrushPosition = position.ToVector2(),
             BrushRadius = radius,
             BrushFalloff = falloff,
             BrushStrength = strength,
@@ -344,13 +434,87 @@ public sealed partial class EditorTerrain : MonoBehaviour
         QueueAction(new HeightmapSmoothAction
         {
             Bounds = bounds,
-            BrushPosition = position,
+            BrushPosition = position.ToVector2(),
             BrushRadius = radius,
             BrushFalloff = falloff,
             BrushStrength = strength,
             SmoothTarget = target,
             SmoothMethod = method,
             DeltaTime = dt
+        });
+    }
+    private void OnPaint(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float target, bool useWeightTarget, bool autoSlope, bool autoFoundation, float autoMinAngleBegin, float autoMinAngleEnd, float autoMaxAngleBegin, float autoMaxAngleEnd, float autoRayLength, float autoRayRadius, ERayMask autoRayMask, bool isRemoving, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt)
+    {
+        QueueAction(new SplatmapPaintAction
+        {
+            Bounds = bounds,
+            BrushPosition = position.ToVector2(),
+            BrushRadius = radius,
+            BrushFalloff = falloff,
+            BrushStrength = strength,
+            BrushTarget = target,
+            UseWeightTarget = useWeightTarget,
+            UseAutoSlope = autoSlope,
+            UseAutoFoundation = autoFoundation,
+            AutoSlopeMinAngleBegin = autoMinAngleBegin,
+            AutoSlopeMinAngleEnd = autoMinAngleEnd,
+            AutoSlopeMaxAngleBegin = autoMaxAngleBegin,
+            AutoSlopeMaxAngleEnd = autoMaxAngleEnd,
+            AutoFoundationRayLength = autoRayLength,
+            AutoFoundationRayRadius = autoRayRadius,
+            AutoFoundationRayMask = autoRayMask,
+            IsRemoving = isRemoving,
+            SplatmapMaterial = selectedMaterial,
+            DeltaTime = dt
+        });
+    }
+    private void OnAutoPaint(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float target, bool useWeightTarget, bool autoSlope, bool autoFoundation, float autoMinAngleBegin, float autoMinAngleEnd, float autoMaxAngleBegin, float autoMaxAngleEnd, float autoRayLength, float autoRayRadius, ERayMask autoRayMask, bool isRemoving, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt)
+    {
+        QueueAction(new SplatmapPaintAction
+        {
+            IsAuto = true,
+            Bounds = bounds,
+            BrushPosition = position.ToVector2(),
+            BrushRadius = radius,
+            BrushFalloff = falloff,
+            BrushStrength = strength,
+            BrushTarget = target,
+            UseWeightTarget = useWeightTarget,
+            UseAutoSlope = autoSlope,
+            UseAutoFoundation = autoFoundation,
+            AutoSlopeMinAngleBegin = autoMinAngleBegin,
+            AutoSlopeMinAngleEnd = autoMinAngleEnd,
+            AutoSlopeMaxAngleBegin = autoMaxAngleBegin,
+            AutoSlopeMaxAngleEnd = autoMaxAngleEnd,
+            AutoFoundationRayLength = autoRayLength,
+            AutoFoundationRayRadius = autoRayRadius,
+            AutoFoundationRayMask = autoRayMask,
+            IsRemoving = isRemoving,
+            SplatmapMaterial = selectedMaterial,
+            DeltaTime = dt
+        });
+    }
+    private void OnPaintSmooth(Bounds bounds, Vector3 position, float radius, float falloff, float strength, EDevkitLandscapeToolSplatmapSmoothMethod method, List<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>> averages, int sampleCount, float dt)
+    {
+        QueueAction(new SplatmapSmoothAction
+        {
+            Bounds = bounds,
+            BrushPosition = position.ToVector2(),
+            BrushRadius = radius,
+            BrushFalloff = falloff,
+            BrushStrength = strength,
+            SmoothMethod = method,
+            DeltaTime = dt
+        });
+    }
+    private void OnPaintHole(Bounds bounds, Vector3 position, float radius, bool put)
+    {
+        QueueAction(new HolemapPaintAction
+        {
+            Bounds = bounds,
+            BrushPosition = position.ToVector2(),
+            BrushRadius = radius,
+            IsFilling = put
         });
     }
 #endif

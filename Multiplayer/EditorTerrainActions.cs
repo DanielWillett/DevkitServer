@@ -1,8 +1,10 @@
-﻿using DevkitServer.Util.Encoding;
+﻿using System.Reflection;
+using DevkitServer.Util.Encoding;
 using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Landscapes;
 using SDG.Framework.Utilities;
 using System.Text;
+using HarmonyLib;
 
 namespace DevkitServer.Multiplayer;
 
@@ -15,9 +17,8 @@ public partial class EditorTerrain
     static EditorTerrain()
     {
         ListPool<BrushSettingsCollection>.warmup((uint)(Provider.isServer ? 16 : 2));
-        BrushCollectionPool.warmup((uint)(Provider.isServer ? 240 : 30));
-        SplatmapCollectionPool.warmup((uint)(Provider.isServer ? 240 : 30));
-        HeightmapRampAction.Pool.warmup((uint)(Provider.isServer ? 16 : 2));
+        BrushCollectionPool.warmup((uint)(Provider.isServer ? 32 : 5));
+        SplatmapCollectionPool.warmup((uint)(Provider.isServer ? 32 : 5));
     }
     private BrushSettingsCollection? GetBrushSettings(BrushValueFlags value)
     {
@@ -84,7 +85,8 @@ public partial class EditorTerrain
         HeightmapSmooth,
         SplatmapPaint,
         SplatmapAutoPaint,
-        SplatmapSmooth
+        SplatmapSmooth,
+        HolesCut
     }
     private const int BrushFlagLength = 5;
     [Flags]
@@ -98,21 +100,26 @@ public partial class EditorTerrain
         Target = 1 << 4,
         SplatmapPaintInfo = 1 << 7
     }
-    private const int SplatmapFlagLength = 4;
+    private const int SplatmapFlagLength = 8;
     [Flags]
     public enum SplatmapValueFlags : byte
     {
         None = 0,
-        AutoFoundationInfo = 1 << 0,
-        AutoSlopeInfo = 1 << 1,
-        UseAutoFoundation = 1 << 6,
-        UseAutoSlope = 1 << 7
+        AutoSlopeMinAngleBegin = 1 << 0,
+        AutoSlopeMinAngleEnd = 1 << 1,
+        AutoSlopeMaxAngleBegin = 1 << 2,
+        AutoSlopeMaxAngleEnd = 1 << 3,
+        AutoFoundationRayLength = 1 << 4,
+        AutoFoundationRayRadius = 1 << 5,
+        AutoFoundationRayMask = 1 << 6,
+        SplatmapMaterial = 1 << 7
     }
 
     public interface ITerrainAction
     {
         TerrainTransactionType Type { get; }
         TerrainEditorType EditorType { get; }
+        float DeltaTime { get; set; }
         void Apply();
         void Write(ByteWriter writer);
         void Read(ByteReader reader);
@@ -122,6 +129,7 @@ public partial class EditorTerrain
     {
         Heightmap,
         Splatmap,
+        Holes,
         Resources
     }
     public interface IBounds : ITerrainAction
@@ -148,19 +156,30 @@ public partial class EditorTerrain
     {
         float BrushTarget { get; set; }
     }
-    public interface IDeltaTime : ITerrainAction
+    public interface IAutoSlope : ITerrainAction
     {
-        float DeltaTime { get; set; }
+        float AutoSlopeMinAngleBegin { get; set; }
+        float AutoSlopeMinAngleEnd { get; set; }
+        float AutoSlopeMaxAngleBegin { get; set; }
+        float AutoSlopeMaxAngleEnd { get; set; }
+    }
+    public interface IAutoFoundation : ITerrainAction
+    {
+        float AutoFoundationRayLength { get; set; }
+        float AutoFoundationRayRadius { get; set; }
+        ERayMask AutoFoundationRayMask { get; set; }
     }
     public interface IBrushPosition : ITerrainAction
     {
         Vector2 BrushPosition { get; set; }
     }
+    public interface ISplatmapMaterial : ITerrainAction
+    {
+        AssetReference<LandscapeMaterialAsset> SplatmapMaterial { get; set; }
+    }
 
     public sealed class HeightmapRampAction : IBrushRadius, IBrushFalloff, IBounds
     {
-        internal static readonly Pool<HeightmapRampAction> Pool = new Pool<HeightmapRampAction>();
-
         public TerrainTransactionType Type => TerrainTransactionType.HeightmapRamp;
         public TerrainEditorType EditorType => TerrainEditorType.Heightmap;
         public Bounds Bounds { get; set; }
@@ -168,7 +187,7 @@ public partial class EditorTerrain
         public Vector3 EndPosition { get; set; }
         public float BrushRadius { get; set; }
         public float BrushFalloff { get; set; }
-
+        public float DeltaTime { get; set; }
         public void Apply()
         {
             WriteHeightmapNoTransactions(Bounds, IntlHandleHeightmapWriteRamp);
@@ -178,12 +197,14 @@ public partial class EditorTerrain
             Bounds = reader.ReadInflatedBounds();
             StartPosition = reader.ReadVector3();
             EndPosition = reader.ReadVector3();
+            DeltaTime = reader.ReadFloat();
         }
         public void Write(ByteWriter writer)
         {
             writer.WriteHeightmapBounds(Bounds);
             writer.Write(StartPosition);
             writer.Write(EndPosition);
+            writer.Write(DeltaTime);
         }
         private float IntlHandleHeightmapWriteRamp(LandscapeCoord tileCoord, HeightmapCoord heightmapCoord, Vector3 worldPosition, float currentHeight)
         {
@@ -209,10 +230,8 @@ public partial class EditorTerrain
             return Mathf.Clamp01(currentHeight);
         }
     }
-    public sealed class HeightmapAdjustAction : IBrushRadius, IBrushFalloff, IBrushStrength, IBrushSensitivity, IDeltaTime, IBrushPosition, IBounds
+    public sealed class HeightmapAdjustAction : IBrushRadius, IBrushFalloff, IBrushStrength, IBrushSensitivity, IBrushPosition, IBounds
     {
-        internal static readonly Pool<HeightmapAdjustAction> Pool = new Pool<HeightmapAdjustAction>();
-
         public TerrainTransactionType Type => TerrainTransactionType.HeightmapAdjust;
         public TerrainEditorType EditorType => TerrainEditorType.Heightmap;
         public Bounds Bounds { get; set; }
@@ -254,10 +273,8 @@ public partial class EditorTerrain
             return currentHeight;
         }
     }
-    public sealed class HeightmapFlattenAction : IBrushRadius, IBrushFalloff, IBrushStrength, IBrushSensitivity, IBrushTarget, IBrushPosition, IDeltaTime, IBounds
+    public sealed class HeightmapFlattenAction : IBrushRadius, IBrushFalloff, IBrushStrength, IBrushSensitivity, IBrushTarget, IBrushPosition, IBounds
     {
-        internal static readonly Pool<HeightmapFlattenAction> Pool = new Pool<HeightmapFlattenAction>();
-
         public TerrainTransactionType Type => TerrainTransactionType.HeightmapFlatten;
         public TerrainEditorType EditorType => TerrainEditorType.Heightmap;
         public EDevkitLandscapeToolHeightmapFlattenMethod FlattenMethod { get; set; }
@@ -307,10 +324,8 @@ public partial class EditorTerrain
             return currentHeight + amt;
         }
     }
-    public sealed class HeightmapSmoothAction : IBrushRadius, IBrushFalloff, IBrushStrength, IBrushPosition, IDeltaTime, IBounds
+    public sealed class HeightmapSmoothAction : IBrushRadius, IBrushFalloff, IBrushStrength, IBrushPosition, IBounds
     {
-        internal static readonly Pool<HeightmapSmoothAction> Pool = new Pool<HeightmapSmoothAction>();
-
         public TerrainTransactionType Type => TerrainTransactionType.HeightmapFlatten;
         public TerrainEditorType EditorType => TerrainEditorType.Heightmap;
         public EDevkitLandscapeToolHeightmapSmoothMethod SmoothMethod { get; set; }
@@ -352,6 +367,263 @@ public partial class EditorTerrain
             return currentHeight;
         }
     }
+    [HarmonyPatch]
+    public sealed class SplatmapPaintAction : IBrushRadius, IBrushFalloff, IBrushStrength, IBrushPosition, IBounds, IBrushTarget, IBrushSensitivity, IAutoSlope, IAutoFoundation, ISplatmapMaterial
+    {
+        private static readonly RaycastHit[] FoundationHits;
+        static SplatmapPaintAction()
+        {
+            // to sync with buffer length changes in the base game
+            try
+            {
+                FoundationHits = (RaycastHit[])typeof(TerrainEditor).GetField("FOUNDATION_HITS", BindingFlags.Static | BindingFlags.NonPublic)?
+                    .GetValue(null)!;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Failed to get foundation buffer (not a huge deal).");
+                Logger.LogError(ex);
+            }
+
+            FoundationHits ??= new RaycastHit[4];
+        }
+        public TerrainTransactionType Type => IsAuto ? TerrainTransactionType.SplatmapAutoPaint : TerrainTransactionType.SplatmapPaint;
+        public TerrainEditorType EditorType => TerrainEditorType.Splatmap;
+        public Bounds Bounds { get; set; }
+        public Vector2 BrushPosition { get; set; }
+        public AssetReference<LandscapeMaterialAsset> SplatmapMaterial { get; set; }
+        public bool IsAuto { get; set; }
+        public float BrushRadius { get; set; }
+        public float BrushFalloff { get; set; }
+        public float BrushStrength { get; set; }
+        public float BrushTarget { get; set; }
+        public float DeltaTime { get; set; }
+        public float BrushSensitivity { get; set; }
+        public bool UseWeightTarget { get; set; }
+        public bool UseAutoSlope { get; set; }
+        public bool UseAutoFoundation { get; set; }
+        public bool IsRemoving { get; set; }
+        public float AutoSlopeMinAngleBegin { get; set; }
+        public float AutoSlopeMinAngleEnd { get; set; }
+        public float AutoSlopeMaxAngleBegin { get; set; }
+        public float AutoSlopeMaxAngleEnd { get; set; }
+        public float AutoFoundationRayLength { get; set; }
+        public float AutoFoundationRayRadius { get; set; }
+        public ERayMask AutoFoundationRayMask { get; set; }
+        public void Apply()
+        {
+            WriteSplatmapNoTransactions(Bounds, IntlHandleSplatmapWritePaint);
+        }
+        public void Read(ByteReader reader)
+        {
+            Bounds = reader.ReadInflatedBounds();
+            byte flags = reader.ReadUInt8();
+            IsAuto = (flags & 1) != 0;
+            UseWeightTarget = (flags & (1 << 1)) != 0;
+            UseAutoSlope = (flags & (1 << 2)) != 0;
+            UseAutoFoundation = (flags & (1 << 3)) != 0;
+            IsRemoving = (flags & (1 << 4)) != 0;
+            BrushPosition = reader.ReadVector2();
+            DeltaTime = reader.ReadFloat();
+        }
+        public void Write(ByteWriter writer)
+        {
+            writer.WriteHeightmapBounds(Bounds);
+            byte flags = (byte)((IsAuto ? 1 : 0) | (UseWeightTarget ? 1 << 1 : 0) | (UseAutoSlope ? 1 << 2 : 0) | (UseAutoFoundation ? 1 << 3 : 0) | (IsRemoving ? 1 << 4 : 0));
+            writer.Write(flags);
+            writer.Write(BrushPosition);
+            writer.Write(DeltaTime);
+        }
+        private void IntlHandleSplatmapWritePaint(LandscapeCoord tileCoord, SplatmapCoord splatmapCoord, Vector3 worldPosition, float[] currentWeights)
+        {
+            float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
+            if (distance > BrushRadius * BrushRadius)
+                return;
+            LandscapeTile? tile = Landscape.getTile(tileCoord);
+            if (tile?.materials == null)
+                return;
+            int materialLayerIndex = GetSplatmapTargetMaterialLayerIndex(null, tile, SplatmapMaterial);
+            if (materialLayerIndex == -1)
+                return;
+            distance = Mathf.Sqrt(distance) / BrushRadius;
+            float targetWeight = 0.5f;
+            if (UseAutoFoundation || UseAutoSlope)
+            {
+                bool consumedAuto = false;
+                if (UseAutoFoundation)
+                {
+                    int ct = Physics.SphereCastNonAlloc(
+                        worldPosition + new Vector3(0.0f, AutoFoundationRayLength, 0.0f),
+                        AutoFoundationRayRadius, Vector3.down, FoundationHits,
+                        AutoFoundationRayLength, (int)AutoFoundationRayMask, QueryTriggerInteraction.Ignore);
+                    for (int i = 0; i < ct; ++i)
+                    {
+                        ObjectAsset? asset = LevelObjects.getAsset(FoundationHits[i].transform);
+                        if (asset is not { isSnowshoe: true })
+                        {
+                            consumedAuto = true;
+                            targetWeight = UseWeightTarget ? BrushTarget : 1f;
+                            break;
+                        }
+                    }
+                }
+
+                if (!consumedAuto && UseAutoSlope && Landscape.getNormal(worldPosition, out Vector3 normal))
+                {
+                    float angle = Vector3.Angle(Vector3.up, normal);
+                    if (angle >= AutoSlopeMinAngleBegin && angle <= AutoSlopeMaxAngleEnd)
+                    {
+                        targetWeight = angle >= AutoSlopeMinAngleEnd
+                            ? (angle <= AutoSlopeMaxAngleBegin
+                                ? 1f
+                                : (1f - Mathf.InverseLerp(AutoSlopeMaxAngleBegin, AutoSlopeMaxAngleEnd, angle)))
+                            : (Mathf.InverseLerp(AutoSlopeMinAngleBegin, AutoSlopeMinAngleEnd, angle));
+                        consumedAuto = true;
+                    }
+
+                    if (!consumedAuto)
+                        return;
+                }
+            }
+            else if (IsAuto)
+                return;
+            else
+                targetWeight = UseWeightTarget ? BrushTarget : (IsRemoving ? 0f : 1f);
+
+            float speed = DeltaTime * BrushStrength * GetBrushAlpha(distance) * BrushSensitivity;
+            BlendSplatmapWeights(null, currentWeights, materialLayerIndex, targetWeight, speed);
+        }
+
+        [HarmonyReversePatch]
+        [HarmonyPatch(typeof(TerrainEditor), "blendSplatmapWeights")]
+        private static void BlendSplatmapWeights(object? instance, float[] currentWeights, int targetMaterialLayer, float targetWeight, float speed) { }
+
+        [HarmonyReversePatch]
+        [HarmonyPatch(typeof(TerrainEditor), "getSplatmapTargetMaterialLayerIndex")]
+        private static int GetSplatmapTargetMaterialLayerIndex(object? instance, LandscapeTile tile, AssetReference<LandscapeMaterialAsset> targetMaterial) => 0;
+    }
+    public sealed class SplatmapSmoothAction : IBounds, IBrushPosition, IBrushRadius, IBrushFalloff, IBrushStrength
+    {
+        public TerrainTransactionType Type => TerrainTransactionType.SplatmapSmooth;
+        public TerrainEditorType EditorType => TerrainEditorType.Splatmap;
+        public Bounds Bounds { get; set; }
+        public Vector2 BrushPosition { get; set; }
+        public AssetReference<LandscapeMaterialAsset> SelectedMaterial { get; set; }
+        public EDevkitLandscapeToolSplatmapSmoothMethod SmoothMethod { get; set; }
+        public float BrushRadius { get; set; }
+        public float BrushFalloff { get; set; }
+        public float BrushStrength { get; set; }
+        public float DeltaTime { get; set; }
+        public List<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>>? Averages { get; set; }
+        public int SampleCount { get; set; }
+        public void Apply()
+        {
+            WriteSplatmapNoTransactions(Bounds, IntlHandleSplatmapWriteSmooth);
+        }
+        public void Read(ByteReader reader)
+        {
+            Bounds = reader.ReadInflatedBounds(out bool pixel);
+            SmoothMethod = pixel ? EDevkitLandscapeToolSplatmapSmoothMethod.PIXEL_AVERAGE : EDevkitLandscapeToolSplatmapSmoothMethod.BRUSH_AVERAGE;
+            BrushPosition = reader.ReadVector2();
+            DeltaTime = reader.ReadFloat();
+            Averages ??= ListPool<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>>.claim();
+            int len = reader.ReadUInt8();
+            if (Averages.Capacity < len)
+                Averages.Capacity = len;
+            for (int i = 0; i < len; ++i)
+                Averages.Add(new KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>(
+                    new AssetReference<LandscapeMaterialAsset>(reader.ReadGuid()), reader.ReadFloat()));
+        }
+        public void Write(ByteWriter writer)
+        {
+            writer.WriteHeightmapBounds(Bounds, SmoothMethod == EDevkitLandscapeToolSplatmapSmoothMethod.PIXEL_AVERAGE);
+            writer.Write(BrushPosition);
+            writer.Write(DeltaTime);
+            int len = Math.Min(byte.MaxValue, Averages == null ? 0 : Averages.Count);
+            writer.Write((byte)len);
+            for (int i = 0; i < len; ++i)
+            {
+                writer.Write(Averages![i].Key.GUID);
+                writer.Write(Averages![i].Value);
+            }
+        }
+        private void IntlHandleSplatmapWriteSmooth(LandscapeCoord tileCoord, SplatmapCoord splatmapCoord, Vector3 worldPosition, float[] currentWeights)
+        {
+            if (SampleCount < 1 || Averages == null)
+                return;
+            LandscapeTile? tile = Landscape.getTile(tileCoord);
+            if (tile?.materials == null)
+                return;
+            float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
+            if (distance > BrushRadius * BrushRadius)
+                return;
+            distance = Mathf.Sqrt(distance) / BrushRadius;
+            float speed = DeltaTime * BrushStrength * GetBrushAlpha(distance);
+            float total = 0f;
+            for (int i = 0; i < Landscape.SPLATMAP_LAYERS; ++i)
+            {
+                AssetReference<LandscapeMaterialAsset> r = tile.materials[i];
+                for (int j = 0; j < Averages.Count; ++j)
+                {
+                    if (Averages[j].Key == r)
+                    {
+                        total += Averages[j].Value;
+                        break;
+                    }
+                }
+            }
+
+            total = 1f / total;
+            for (int i = 0; i < Landscape.SPLATMAP_LAYERS; ++i)
+            {
+                AssetReference<LandscapeMaterialAsset> r = tile.materials[i];
+                float weight = 0;
+                for (int j = 0; j < Averages.Count; ++j)
+                {
+                    if (Averages[j].Key == r)
+                    {
+                        weight = Averages[j].Value / SampleCount * total;
+                        break;
+                    }
+                }
+                currentWeights[i] += (weight - currentWeights[i]) * speed;
+            }
+        }
+    }
+    public sealed class HolemapPaintAction : IBounds, IBrushPosition, IBrushRadius
+    {
+        public TerrainTransactionType Type => TerrainTransactionType.HolesCut;
+        public TerrainEditorType EditorType => TerrainEditorType.Holes;
+        public Bounds Bounds { get; set; }
+        public Vector2 BrushPosition { get; set; }
+        public float BrushRadius { get; set; }
+        public bool IsFilling { get; set; }
+        public float DeltaTime { get; set; }
+        public void Read(ByteReader reader)
+        {
+            Bounds = reader.ReadInflatedBounds(out bool put);
+            IsFilling = put;
+            BrushPosition = reader.ReadVector2();
+            DeltaTime = reader.ReadFloat();
+        }
+        public void Write(ByteWriter writer)
+        {
+            writer.WriteHeightmapBounds(Bounds, IsFilling);
+            writer.Write(BrushPosition);
+            writer.Write(DeltaTime);
+        }
+        public void Apply()
+        {
+            WriteHolesNoTransactions(Bounds, IntlHandleHolesWriteCut);
+        }
+        private bool IntlHandleHolesWriteCut(Vector3 worldPosition, bool currentlyVisible)
+        {
+            if (currentlyVisible == IsFilling || new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude > BrushRadius * BrushRadius)
+                return currentlyVisible;
+            return IsFilling;
+        }
+    }
+
     private sealed class BrushSettingsCollection
     {
         public BrushValueFlags Flags { get; set; }
@@ -399,8 +671,9 @@ public partial class EditorTerrain
             else
                 Flags |= BrushValueFlags.SplatmapPaintInfo;
 
+            if (collection != Splatmap && Splatmap != null)
+                SplatmapCollectionPool.release(Splatmap);
             Splatmap = collection;
-            Flags |= BrushValueFlags.Target;
             return this;
         }
         public void Read(ByteReader reader)
@@ -433,7 +706,6 @@ public partial class EditorTerrain
                 Splatmap.Read(reader);
             }
         }
-
         public void Write(ByteWriter writer)
         {
             writer.Write(StartIndex);
@@ -456,7 +728,6 @@ public partial class EditorTerrain
                     Splatmap.Write(writer);
             }
         }
-
         public override string ToString()
         {
             StringBuilder bld = new StringBuilder();
@@ -479,45 +750,73 @@ public partial class EditorTerrain
     private sealed class SplatmapSettingsCollection
     {
         public SplatmapValueFlags Flags { get; set; }
-        public bool AutoFoundation { get; set; }
-        public bool AutoSlope { get; set; }
         public float AutoFoundationRayLength { get; set; }
         public float AutoFoundationRayRadius { get; set; }
-        public ERayMask AutoFoundationRayMask { get; set; }
-        public float AutoSlopeMinAngleStart { get; set; }
+        public float AutoSlopeMinAngleBegin { get; set; }
         public float AutoSlopeMinAngleEnd { get; set; }
-        public float AutoSlopeMaxAngleStart { get; set; }
+        public float AutoSlopeMaxAngleBegin { get; set; }
         public float AutoSlopeMaxAngleEnd { get; set; }
+        public ERayMask AutoFoundationRayMask { get; set; }
+        public AssetReference<LandscapeMaterialAsset> SplatmapMaterial { get; set; }
         public SplatmapSettingsCollection Reset()
         {
             Flags = default;
             return this;
         }
-        public SplatmapSettingsCollection WithAutoSlope()
+        public SplatmapSettingsCollection WithAutoFoundationRayLength(float rayLength)
         {
-            Flags |= SplatmapValueFlags.UseAutoSlope;
-            return this;
-        }
-        public SplatmapSettingsCollection WithAutoFoundation()
-        {
-            Flags |= SplatmapValueFlags.UseAutoFoundation;
-            return this;
-        }
-        public SplatmapSettingsCollection WithAutoFoundationSettings(float rayLength, float rayRadius, ERayMask mask)
-        {
-            Flags |= SplatmapValueFlags.AutoFoundationInfo;
+            Flags |= SplatmapValueFlags.AutoFoundationRayLength;
             AutoFoundationRayLength = rayLength;
+            return this;
+        }
+        public SplatmapSettingsCollection WithAutoFoundationRayRadius(float rayRadius)
+        {
+            Flags |= SplatmapValueFlags.AutoFoundationRayRadius;
             AutoFoundationRayRadius = rayRadius;
+            return this;
+        }
+        public SplatmapSettingsCollection WithAutoFoundationRayMask(ERayMask mask)
+        {
+            Flags |= SplatmapValueFlags.AutoFoundationRayMask;
             AutoFoundationRayMask = mask;
             return this;
         }
-        public SplatmapSettingsCollection WithAutoSlopeSettings(float minAngleStart, float minAngleEnd, float maxAngleStart, float maxAngleEnd)
+        public SplatmapSettingsCollection WithAutoSlopeMinAngleBegin(float minAngleBegin)
         {
-            Flags |= SplatmapValueFlags.AutoSlopeInfo;
-            AutoSlopeMinAngleStart = minAngleStart;
-            AutoSlopeMinAngleEnd = maxAngleEnd;
-            AutoSlopeMaxAngleStart = maxAngleStart;
+            Flags |= SplatmapValueFlags.AutoSlopeMinAngleBegin;
+            AutoSlopeMinAngleBegin = minAngleBegin;
+            return this;
+        }
+        public SplatmapSettingsCollection WithAutoSlopeMinAngleEnd(float minAngleEnd)
+        {
+            Flags |= SplatmapValueFlags.AutoSlopeMinAngleEnd;
+            AutoSlopeMinAngleEnd = minAngleEnd;
+            return this;
+        }
+        public SplatmapSettingsCollection WithAutoSlopeMaxAngleBegin(float maxAngleBegin)
+        {
+            Flags |= SplatmapValueFlags.AutoSlopeMaxAngleBegin;
+            AutoSlopeMaxAngleBegin = maxAngleBegin;
+            return this;
+        }
+        public SplatmapSettingsCollection WithAutoSlopeMaxAngleEnd(float maxAngleEnd)
+        {
+            Flags |= SplatmapValueFlags.AutoSlopeMaxAngleEnd;
             AutoSlopeMaxAngleEnd = maxAngleEnd;
+            return this;
+        }
+        public SplatmapSettingsCollection WithSplatmapMaterial(AssetReference<LandscapeMaterialAsset> material)
+        {
+            if (material.isValid)
+            {
+                Flags |= SplatmapValueFlags.SplatmapMaterial;
+                SplatmapMaterial = material;
+            }
+            else
+            {
+                SplatmapMaterial = default;
+                Flags &= ~SplatmapValueFlags.SplatmapMaterial;
+            }
             return this;
         }
         public static SplatmapSettingsCollection ReadToPool(ByteReader reader)
@@ -529,56 +828,78 @@ public partial class EditorTerrain
         public void Read(ByteReader reader)
         {
             Flags = reader.ReadEnum<SplatmapValueFlags>();
-            AutoFoundation = (Flags & SplatmapValueFlags.UseAutoFoundation) != 0;
-            AutoSlope = (Flags & SplatmapValueFlags.UseAutoSlope) != 0;
-            if ((Flags & SplatmapValueFlags.AutoFoundationInfo) != 0)
-            {
-                AutoFoundationRayLength = reader.ReadFloat();
-                AutoFoundationRayRadius = reader.ReadFloat();
-                AutoFoundationRayMask = reader.ReadEnum<ERayMask>();
-            }
-            else
-            {
-                AutoFoundationRayLength = 0;
-                AutoFoundationRayRadius = 0;
-                AutoFoundationRayMask = 0;
-            }
-            if ((Flags & SplatmapValueFlags.AutoSlopeInfo) != 0)
-            {
-                AutoSlopeMinAngleStart = reader.ReadFloat();
-                AutoSlopeMaxAngleStart = reader.ReadFloat();
-                AutoSlopeMinAngleEnd = reader.ReadFloat();
-                AutoSlopeMaxAngleEnd = reader.ReadFloat();
-            }
-            else
-            {
-                AutoSlopeMinAngleStart = 0;
-                AutoSlopeMaxAngleStart = 0;
-                AutoSlopeMinAngleEnd = 0;
-                AutoSlopeMaxAngleEnd = 0;
-            }
-        }
 
+            if ((Flags & SplatmapValueFlags.SplatmapMaterial) != 0)
+                SplatmapMaterial = new AssetReference<LandscapeMaterialAsset>(reader.ReadGuid());
+            else SplatmapMaterial = default;
+
+            if ((Flags & SplatmapValueFlags.AutoFoundationRayLength) != 0)
+                AutoFoundationRayLength = reader.ReadFloat();
+            else AutoFoundationRayLength = 0;
+            if ((Flags & SplatmapValueFlags.AutoFoundationRayRadius) != 0)
+                AutoFoundationRayRadius = reader.ReadFloat();
+            else AutoFoundationRayRadius = 0;
+            if ((Flags & SplatmapValueFlags.AutoFoundationRayMask) != 0)
+                AutoFoundationRayMask = (ERayMask)reader.ReadInt32();
+            else AutoFoundationRayMask = 0;
+
+            if ((Flags & SplatmapValueFlags.AutoSlopeMinAngleBegin) != 0)
+                AutoSlopeMinAngleBegin = reader.ReadFloat();
+            else AutoSlopeMinAngleBegin = 0;
+            if ((Flags & SplatmapValueFlags.AutoSlopeMinAngleEnd) != 0)
+                AutoSlopeMinAngleEnd = reader.ReadFloat();
+            else AutoSlopeMinAngleEnd = 0;
+            if ((Flags & SplatmapValueFlags.AutoSlopeMaxAngleBegin) != 0)
+                AutoSlopeMaxAngleBegin = reader.ReadFloat();
+            else AutoSlopeMaxAngleBegin = 0;
+            if ((Flags & SplatmapValueFlags.AutoSlopeMaxAngleEnd) != 0)
+                AutoSlopeMaxAngleEnd = reader.ReadFloat();
+            else AutoSlopeMaxAngleEnd = 0;
+        }
         public void Write(ByteWriter writer)
         {
-            if (AutoFoundation)
-                Flags |= SplatmapValueFlags.UseAutoFoundation;
-            if (AutoSlope)
-                Flags |= SplatmapValueFlags.UseAutoSlope;
             writer.Write(Flags);
-            if ((Flags & SplatmapValueFlags.AutoFoundationInfo) != 0)
-            {
+
+            if ((Flags & SplatmapValueFlags.SplatmapMaterial) != 0)
+                writer.Write(SplatmapMaterial.GUID);
+
+            if ((Flags & SplatmapValueFlags.AutoFoundationRayLength) != 0)
                 writer.Write(AutoFoundationRayLength);
+            if ((Flags & SplatmapValueFlags.AutoFoundationRayRadius) != 0)
                 writer.Write(AutoFoundationRayRadius);
-                writer.Write(AutoFoundationRayMask);
-            }
-            if ((Flags & SplatmapValueFlags.AutoSlopeInfo) != 0)
-            {
-                writer.Write(AutoSlopeMinAngleStart);
-                writer.Write(AutoSlopeMaxAngleStart);
+            if ((Flags & SplatmapValueFlags.AutoFoundationRayMask) != 0)
+                writer.Write((int)AutoFoundationRayMask);
+
+            if ((Flags & SplatmapValueFlags.AutoSlopeMinAngleBegin) != 0)
+                writer.Write(AutoSlopeMinAngleBegin);
+            if ((Flags & SplatmapValueFlags.AutoSlopeMinAngleEnd) != 0)
                 writer.Write(AutoSlopeMinAngleEnd);
+            if ((Flags & SplatmapValueFlags.AutoSlopeMaxAngleBegin) != 0)
+                writer.Write(AutoSlopeMaxAngleBegin);
+            if ((Flags & SplatmapValueFlags.AutoSlopeMaxAngleEnd) != 0)
                 writer.Write(AutoSlopeMaxAngleEnd);
-            }
+        }
+        public override string ToString()
+        {
+            StringBuilder bld = new StringBuilder();
+            if ((Flags & SplatmapValueFlags.AutoSlopeMinAngleBegin) != 0)
+                bld.Append(" Min Angle Begin: ").Append(AutoSlopeMinAngleBegin);
+            if ((Flags & SplatmapValueFlags.AutoSlopeMinAngleEnd) != 0)
+                bld.Append(" Min Angle End: ").Append(AutoSlopeMinAngleEnd);
+            if ((Flags & SplatmapValueFlags.AutoSlopeMaxAngleBegin) != 0)
+                bld.Append(" Max Angle Begin: ").Append(AutoSlopeMaxAngleBegin);
+            if ((Flags & SplatmapValueFlags.AutoSlopeMaxAngleEnd) != 0)
+                bld.Append(" Max Angle End: ").Append(AutoSlopeMaxAngleEnd);
+            if ((Flags & SplatmapValueFlags.AutoFoundationRayLength) != 0)
+                bld.Append(" Ray Length: ").Append(AutoFoundationRayLength);
+            if ((Flags & SplatmapValueFlags.AutoFoundationRayRadius) != 0)
+                bld.Append(" Ray Radius: ").Append(AutoFoundationRayRadius);
+            if ((Flags & SplatmapValueFlags.AutoFoundationRayMask) != 0)
+                bld.Append(" Ray Mask: ").Append(AutoFoundationRayMask.ToString());
+            if ((Flags & SplatmapValueFlags.SplatmapMaterial) != 0)
+                bld.Append(" Material: ").Append(SplatmapMaterial);
+
+            return bld.ToString();
         }
     }
 }
