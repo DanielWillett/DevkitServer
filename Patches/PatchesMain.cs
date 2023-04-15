@@ -10,6 +10,7 @@ using SDG.Provider;
 #endif
 #if SERVER
 using System.Reflection.Emit;
+using SDG.Framework.Landscapes;
 #endif
 
 namespace DevkitServer.Patches;
@@ -25,6 +26,7 @@ internal static class PatchesMain
         {
             Patcher = new Harmony(HarmonyId);
             Patcher.PatchAll();
+            EditorTerrain.Patch();
 
             // Accessor.AddFunctionBreakpoints(AccessTools.Method(typeof(ObjectManager), "ReceiveObjects"));
             // ConstructorInfo? info = typeof(MenuConfigurationOptionsUI).GetConstructors(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
@@ -284,6 +286,26 @@ internal static class PatchesMain
         Logger.LogDebug("Setting SteamGameServer KeyValue '" + DevkitServerModule.ServerRule + "' to 'True'.");
         SteamGameServer.SetKeyValue(DevkitServerModule.ServerRule, "True");
     }
+
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(LandscapeTile), "updatePrototypes")]
+    [HarmonyPrefix]
+    private static void UpdatePrototypesPrefix(LandscapeTile __instance, ref TerrainLayer?[] ___terrainLayers)
+    {
+        // this function is commented out on the server build
+
+        ___terrainLayers ??= new TerrainLayer[Landscape.SPLATMAP_LAYERS];
+
+        for (int index = 0; index < Landscape.SPLATMAP_LAYERS; ++index)
+        {
+            AssetReference<LandscapeMaterialAsset> material = __instance.materials[index];
+            LandscapeMaterialAsset landscapeMaterialAsset = material.Find();
+            ___terrainLayers[index] = landscapeMaterialAsset?.getOrCreateLayer();
+        }
+
+        __instance.data.terrainLayers = ___terrainLayers;
+    }
+
     private static readonly MethodInfo lvlLoad = typeof(Level).GetMethod(nameof(Level.load))!;
     private static readonly MethodInfo lvlEdit = typeof(PatchesMain).GetMethod(nameof(OnLoadEdit), BindingFlags.NonPublic | BindingFlags.Static)!;
 

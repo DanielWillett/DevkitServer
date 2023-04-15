@@ -18,6 +18,7 @@ public static class EditorLevel
     private static readonly NetCallCustom SendLevelPacket = new NetCallCustom((ushort)NetCalls.SendLevel);
     private static readonly NetCall<bool, bool> EndSendLevel = new NetCall<bool, bool>((ushort)NetCalls.EndSendLevel);
     private static readonly NetCall<int[]> RequestPackets = new NetCall<int[]>((ushort)NetCalls.RequestLevelPackets);
+    private static readonly NetCall<int, int> SendCheckup = new NetCall<int, int>((ushort)NetCalls.RequestLevelCheckup);
     public static string TempLevelPath => Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer",
 #if SERVER
         Provider.serverID,
@@ -43,6 +44,8 @@ public static class EditorLevel
     }
     private static IEnumerator SendLevelCoroutine(ITransportConnection connection)
     {
+        const float defaultDelay = 0.25f;
+        const int firstCheckupPosition = 25 - 1;
         float startTime = Time.realtimeSinceStartup;
         string lvlName = Level.info.name;
         LevelData levelDataAtTimeOfRequest = LevelData.GatherLevelData();
@@ -85,6 +88,12 @@ public static class EditorLevel
         yield return new WaitForSecondsRealtime(0.25f);
         if (!connection.TryGetPort(out _))
             yield break;
+        float packetDelay = defaultDelay;
+        string ip = connection.GetAddressString(false);
+        if (ip.Equals("127.0.0.1", StringComparison.Ordinal))
+            packetDelay = 0.05f;
+        int checkup = firstCheckupPosition;
+        int lastCheckup = 0;
         startTime = Time.realtimeSinceStartup;
         Logger.LogInfo($"[SEND LEVEL] Sending {ttl} packets for level data ({lvlName}).", ConsoleColor.DarkCyan);
         while (true)
@@ -101,7 +110,55 @@ public static class EditorLevel
             //yield return null;
             // DevkitServerUtility.PrintBytesHex(dataBuffer, 32, 64);
             // Logger.LogDebug($"[SEND LEVEL] Sent {DevkitServerUtility.FormatBytes(len)} from index #{index} as packet {c + 1} / {ttl} at time {Time.realtimeSinceStartup - startTime:F3} for level ({lvlName}).");
-            yield return new WaitForSeconds(0.05f);
+
+            if (c == checkup)
+            {
+                yield return new WaitForSeconds(0.5f);
+                bool retried = false;
+                retry2:
+                NetTask task3 = SendCheckup.RequestAck(connection, lastCheckup, c, 10000);
+                while (!task3.isCompleted)
+                    yield return null;
+                if (task3._parameters.Responded && task3._parameters.ErrorCode.HasValue)
+                {
+                    int misses = task3._parameters.ErrorCode.Value;
+                    if (misses == 0)
+                    {
+                        float old = packetDelay;
+                        if (packetDelay > 0.06f)
+                        {
+                            packetDelay *= 0.75f;
+                            checkup += firstCheckupPosition;
+                            Logger.LogDebug($"[SEND LEVEL] Packet delay decreased from {old} -> {packetDelay}.");
+                        }
+                    }
+                    else if (misses < 0)
+                    {
+                        Logger.LogInfo($"[SEND LEVEL] User errored at checkup {c + 1} / {ttl}.", ConsoleColor.DarkCyan);
+                        yield break;
+                    }
+                    else
+                    {
+                        float old = packetDelay;
+                        packetDelay /= (float)misses / (c - lastCheckup);
+                        Logger.LogDebug($"[SEND LEVEL] Packet delay increasesd from {old} -> {packetDelay} after missing {misses} / {c - lastCheckup} packet(s).");
+                    }
+                }
+                else if (!retried)
+                {
+                    retried = true;
+                    yield return new WaitForSeconds(0.25f);
+                    goto retry2;
+                }
+                else
+                {
+                    Logger.LogInfo($"[SEND LEVEL] User failed to respond to checkup at {c + 1} / {ttl}.", ConsoleColor.DarkCyan);
+                    yield break;
+                }
+
+                lastCheckup = c;
+            }
+            yield return new WaitForSeconds(packetDelay);
             if (!connection.TryGetPort(out _))
             {
                 Logger.LogInfo($"[SEND LEVEL] User disconnected at packet {c + 1} / {ttl}.", ConsoleColor.DarkCyan);
@@ -109,7 +166,7 @@ public static class EditorLevel
             }
         }
 
-        yield return new WaitForSecondsRealtime(0.125f);
+        yield return new WaitForSecondsRealtime(0.25f);
         if (!connection.TryGetPort(out _))
             yield break;
         rerequest:
@@ -207,14 +264,16 @@ public static class EditorLevel
     {
         if (_missingPackets > 0)
         {
+            if (_missingPackets == _startingMissingPackets)
+                LoadingUI.updateScene();
             LoadingUI.updateKey("Downloading Level / Recovering Missing Packets [ " + (_startingMissingPackets - _missingPackets) + " / " + _startingMissingPackets + " ]");
             LoadingUI.updateProgress((float)(_startingMissingPackets - _missingPackets) / _startingMissingPackets);
-            return;
         }
-        if (_pendingLevelIndex >= _pendingLevelLength)
+        else if (_pendingLevelIndex >= _pendingLevelLength || _startingMissingPackets > 0)
         {
             LoadingUI.updateKey("Downloading Level / Installing Level " + _pendingLevelName + ".");
             LoadingUI.updateProgress(1f);
+            LoadingUI.updateScene();
         }
         else
         {
@@ -229,8 +288,27 @@ public static class EditorLevel
             }
             else t += " | Calculating Speed...";
             LoadingUI.updateKey(t);
+            LoadingUI.updateProgress((float)_pendingLevelIndex / _pendingLevelLength);
         }
-        LoadingUI.updateProgress((float)_pendingLevelIndex / _pendingLevelLength);
+    }
+    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.RequestLevelCheckup)]
+    private static int ReceiveLevelCheckup(MessageContext ctx, int start, int end)
+    {
+        if (_pendingLevel == null)
+        {
+            Logger.LogError("[RECEIVE LEVEL] Received level data before a start level message.");
+            return -1;
+        }
+
+        Logger.LogDebug($"[RECEIVE LEVEL] Received level checkup: {start} -> {end}.");
+        int missing = 0;
+        for (int i = start - 1; i < end; ++i)
+        {
+            if (_pendingLevel[start] == null)
+                ++missing;
+        }
+
+        return missing;
     }
     [NetCall(NetCallSource.FromServer, (ushort)NetCalls.StartSendLevel)]
     private static void ReceiveStartLevel(MessageContext ctx, int length, string lvlName, long reqId, int packetCount)
@@ -253,7 +331,6 @@ public static class EditorLevel
         if (_pendingLevel == null || _pendingLevelName == null)
         {
             Logger.LogError("[RECEIVE LEVEL] Received level data before a start level message.");
-            DevkitServerUtility.PrintBytesHex(reader.InternalBuffer!, 32, 128);
             return;
         }
         
@@ -261,14 +338,12 @@ public static class EditorLevel
         if (packet < 0 || packet >= _pendingLevel.Length)
         {
             Logger.LogError($"[RECEIVE LEVEL] Received level data packet out of range of expected ({packet + 1} / {_pendingLevel.Length}), ignoring.");
-            DevkitServerUtility.PrintBytesHex(reader.InternalBuffer!, 32, 128);
             return;
         }
         
         if (_pendingLevel[packet] != null)
         {
             Logger.LogWarning($"[RECEIVE LEVEL] Packet already downloaded ({packet + 1} / {_pendingLevel.Length}), replacing.");
-            DevkitServerUtility.PrintBytesHex(reader.InternalBuffer!, 32, 128);
         }
 
         int len = reader.InternalBuffer!.Length - reader.Position;

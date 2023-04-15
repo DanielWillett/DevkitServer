@@ -4,7 +4,9 @@ using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Landscapes;
 using SDG.Framework.Utilities;
 using System.Text;
+using DevkitServer.Patches;
 using HarmonyLib;
+using SDG.Framework.Devkit;
 
 namespace DevkitServer.Multiplayer;
 
@@ -33,7 +35,24 @@ public partial class EditorTerrain
         for (int i = 0; i < BrushFlagLength; ++i)
         {
             if ((collection.Flags & (BrushValueFlags)(1 << i)) != 0)
-                ReadBrushSettingsMask[i] = collection;
+            {
+                ref BrushSettingsCollection? col = ref ReadBrushSettingsMask[i];
+                if (col != null)
+                {
+                    bool stillUsed = false;
+                    for (int j = 0; j < BrushFlagLength; ++j)
+                    {
+                        if (i != j && ReadBrushSettingsMask[j] == col)
+                        {
+                            stillUsed = true;
+                            break;
+                        }
+                    }
+                    if (!stillUsed)
+                        BrushCollectionPool.release(col);
+                }
+                col = collection;
+            }
         }
         if ((collection.Flags & BrushValueFlags.SplatmapPaintInfo) != 0 && collection.Splatmap != null)
         {
@@ -41,7 +60,24 @@ public partial class EditorTerrain
             for (int i = 0; i < SplatmapFlagLength; ++i)
             {
                 if ((sc.Flags & (SplatmapValueFlags)(1 << i)) != 0)
-                    ReadSplatmapSettingsMask[i] = sc;
+                {
+                    ref SplatmapSettingsCollection? col = ref ReadSplatmapSettingsMask[i];
+                    if (col != null)
+                    {
+                        bool stillUsed = false;
+                        for (int j = 0; j < SplatmapFlagLength; ++j)
+                        {
+                            if (i != j && ReadSplatmapSettingsMask[j] == col)
+                            {
+                                stillUsed = true;
+                                break;
+                            }
+                        }
+                        if (!stillUsed)
+                            SplatmapCollectionPool.release(col);
+                    }
+                    col = sc;
+                }
             }
         }
     }
@@ -86,7 +122,9 @@ public partial class EditorTerrain
         SplatmapPaint,
         SplatmapAutoPaint,
         SplatmapSmooth,
-        HolesCut
+        HolesCut,
+        AddTile,
+        DeleteTile
     }
     private const int BrushFlagLength = 5;
     [Flags]
@@ -120,6 +158,7 @@ public partial class EditorTerrain
         TerrainTransactionType Type { get; }
         TerrainEditorType EditorType { get; }
         float DeltaTime { get; set; }
+        CSteamID Instigator { get; set; }
         void Apply();
         void Write(ByteWriter writer);
         void Read(ByteReader reader);
@@ -130,6 +169,7 @@ public partial class EditorTerrain
         Heightmap,
         Splatmap,
         Holes,
+        Tiles,
         Resources
     }
     public interface IBounds : ITerrainAction
@@ -182,6 +222,7 @@ public partial class EditorTerrain
     {
         public TerrainTransactionType Type => TerrainTransactionType.HeightmapRamp;
         public TerrainEditorType EditorType => TerrainEditorType.Heightmap;
+        public CSteamID Instigator { get; set; }
         public Bounds Bounds { get; set; }
         public Vector3 StartPosition { get; set; }
         public Vector3 EndPosition { get; set; }
@@ -234,6 +275,7 @@ public partial class EditorTerrain
     {
         public TerrainTransactionType Type => TerrainTransactionType.HeightmapAdjust;
         public TerrainEditorType EditorType => TerrainEditorType.Heightmap;
+        public CSteamID Instigator { get; set; }
         public Bounds Bounds { get; set; }
         public Vector2 BrushPosition { get; set; }
         public float BrushRadius { get; set; }
@@ -264,12 +306,16 @@ public partial class EditorTerrain
         {
             float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
             if (distance > BrushRadius * BrushRadius)
+            {
+                Logger.LogDebug("Returning out of range: " + (Mathf.Sqrt(distance) / BrushRadius) + "m.");
                 return currentHeight;
+            }
             distance = Mathf.Sqrt(distance) / BrushRadius;
             float num = DeltaTime * BrushStrength * GetBrushAlpha(distance) * BrushSensitivity;
-            if (InputEx.GetKey(KeyCode.LeftShift))
+            if (Subtracting)
                 num = -num;
             currentHeight += num;
+            Logger.LogDebug("Changed: " + (currentHeight - num) + " -> " + (currentHeight) + ".");
             return currentHeight;
         }
     }
@@ -278,6 +324,7 @@ public partial class EditorTerrain
         public TerrainTransactionType Type => TerrainTransactionType.HeightmapFlatten;
         public TerrainEditorType EditorType => TerrainEditorType.Heightmap;
         public EDevkitLandscapeToolHeightmapFlattenMethod FlattenMethod { get; set; }
+        public CSteamID Instigator { get; set; }
         public Bounds Bounds { get; set; }
         public Vector2 BrushPosition { get; set; }
         public float BrushRadius { get; set; }
@@ -294,16 +341,16 @@ public partial class EditorTerrain
         public void Read(ByteReader reader)
         {
             Bounds = reader.ReadInflatedBounds();
+            FlattenMethod = (EDevkitLandscapeToolHeightmapFlattenMethod)reader.ReadUInt8();
             BrushPosition = reader.ReadVector2();
             DeltaTime = reader.ReadFloat();
-            FlattenMethod = (EDevkitLandscapeToolHeightmapFlattenMethod)reader.ReadUInt8();
         }
         public void Write(ByteWriter writer)
         {
             writer.WriteHeightmapBounds(Bounds);
+            writer.Write((byte)FlattenMethod);
             writer.Write(BrushPosition);
             writer.Write(DeltaTime);
-            writer.Write((byte)FlattenMethod);
         }
         private float IntlHandleHeightmapWriteFlatten(LandscapeCoord tileCoord, HeightmapCoord heightmapCoord, Vector3 worldPosition, float currentHeight)
         {
@@ -329,6 +376,7 @@ public partial class EditorTerrain
         public TerrainTransactionType Type => TerrainTransactionType.HeightmapFlatten;
         public TerrainEditorType EditorType => TerrainEditorType.Heightmap;
         public EDevkitLandscapeToolHeightmapSmoothMethod SmoothMethod { get; set; }
+        public CSteamID Instigator { get; set; }
         public Bounds Bounds { get; set; }
         public Vector2 BrushPosition { get; set; }
         public float BrushRadius { get; set; }
@@ -367,7 +415,6 @@ public partial class EditorTerrain
             return currentHeight;
         }
     }
-    [HarmonyPatch]
     public sealed class SplatmapPaintAction : IBrushRadius, IBrushFalloff, IBrushStrength, IBrushPosition, IBounds, IBrushTarget, IBrushSensitivity, IAutoSlope, IAutoFoundation, ISplatmapMaterial
     {
         private static readonly RaycastHit[] FoundationHits;
@@ -378,6 +425,8 @@ public partial class EditorTerrain
             {
                 FoundationHits = (RaycastHit[])typeof(TerrainEditor).GetField("FOUNDATION_HITS", BindingFlags.Static | BindingFlags.NonPublic)?
                     .GetValue(null)!;
+                if (FoundationHits == null)
+                    Logger.LogWarning("Failed to get foundation buffer (not a huge deal).");
             }
             catch (Exception ex)
             {
@@ -387,8 +436,69 @@ public partial class EditorTerrain
 
             FoundationHits ??= new RaycastHit[4];
         }
+        internal static void Patch()
+        {
+            try
+            {
+                PatchesMain.Patcher.CreateReversePatcher(
+                        typeof(TerrainEditor).GetMethod("blendSplatmapWeights", BindingFlags.Instance | BindingFlags.NonPublic),
+                        new HarmonyMethod(typeof(SplatmapPaintAction).GetMethod(nameof(BlendSplatmapWeights), BindingFlags.Static | BindingFlags.NonPublic)))
+                    .Patch(HarmonyReversePatchType.Original);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error reverse patching TerrainEditor.blendSplatmapWeights.");
+                Logger.LogError(ex);
+                DevkitServerModule.Fault();
+            }
+
+            try
+            {
+                BlendSplatmapWeights(null, null!, 0, 0, 0);
+            }
+            catch (NotImplementedException)
+            {
+                Logger.LogError("Failed to reverse patch " + Accessor.GetMethodInfo(BlendSplatmapWeights)?.Format() + ".");
+                DevkitServerModule.Fault();
+            }
+            catch (NullReferenceException)
+            {
+                Logger.LogInfo("Reverse patched " + Accessor.GetMethodInfo(BlendSplatmapWeights)?.Format() + ".");
+            }
+
+            try
+            {
+                PatchesMain.Patcher.CreateReversePatcher(
+                        typeof(TerrainEditor).GetMethod("getSplatmapTargetMaterialLayerIndex", BindingFlags.Instance | BindingFlags.NonPublic),
+                        new HarmonyMethod(typeof(SplatmapPaintAction).GetMethod(nameof(GetSplatmapTargetMaterialLayerIndex), BindingFlags.Static | BindingFlags.NonPublic)))
+                    .Patch(HarmonyReversePatchType.Original);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error reverse patching TerrainEditor.getSplatmapTargetMaterialLayerIndex.");
+                Logger.LogError(ex);
+                DevkitServerModule.Fault();
+            }
+
+            try
+            {
+                int val = GetSplatmapTargetMaterialLayerIndex(null, null!, default); // invalid material returns -1
+                if (val == -1)
+                    Logger.LogInfo("Reverse patched " + Accessor.GetMethodInfo(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
+            }
+            catch (NotImplementedException)
+            {
+                Logger.LogError("Failed to reverse patch " + Accessor.GetMethodInfo(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
+                DevkitServerModule.Fault();
+            }
+            catch (NullReferenceException)
+            {
+                Logger.LogInfo("Reverse patched " + Accessor.GetMethodInfo(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
+            }
+        }
         public TerrainTransactionType Type => IsAuto ? TerrainTransactionType.SplatmapAutoPaint : TerrainTransactionType.SplatmapPaint;
         public TerrainEditorType EditorType => TerrainEditorType.Splatmap;
+        public CSteamID Instigator { get; set; }
         public Bounds Bounds { get; set; }
         public Vector2 BrushPosition { get; set; }
         public AssetReference<LandscapeMaterialAsset> SplatmapMaterial { get; set; }
@@ -442,9 +552,11 @@ public partial class EditorTerrain
             LandscapeTile? tile = Landscape.getTile(tileCoord);
             if (tile?.materials == null)
                 return;
+
             int materialLayerIndex = GetSplatmapTargetMaterialLayerIndex(null, tile, SplatmapMaterial);
             if (materialLayerIndex == -1)
                 return;
+
             distance = Mathf.Sqrt(distance) / BrushRadius;
             float targetWeight = 0.5f;
             if (UseAutoFoundation || UseAutoSlope)
@@ -483,6 +595,7 @@ public partial class EditorTerrain
 
                     if (!consumedAuto)
                         return;
+                    
                 }
             }
             else if (IsAuto)
@@ -491,24 +604,26 @@ public partial class EditorTerrain
                 targetWeight = UseWeightTarget ? BrushTarget : (IsRemoving ? 0f : 1f);
 
             float speed = DeltaTime * BrushStrength * GetBrushAlpha(distance) * BrushSensitivity;
+            
             BlendSplatmapWeights(null, currentWeights, materialLayerIndex, targetWeight, speed);
         }
-
-        [HarmonyReversePatch]
-        [HarmonyPatch(typeof(TerrainEditor), "blendSplatmapWeights")]
-        private static void BlendSplatmapWeights(object? instance, float[] currentWeights, int targetMaterialLayer, float targetWeight, float speed) { }
-
-        [HarmonyReversePatch]
-        [HarmonyPatch(typeof(TerrainEditor), "getSplatmapTargetMaterialLayerIndex")]
-        private static int GetSplatmapTargetMaterialLayerIndex(object? instance, LandscapeTile tile, AssetReference<LandscapeMaterialAsset> targetMaterial) => 0;
+        private static void BlendSplatmapWeights(object? instance, float[] currentWeights, int targetMaterialLayer, float targetWeight, float speed)
+        {
+            throw new NotImplementedException();
+        }
+        private static int GetSplatmapTargetMaterialLayerIndex(object? instance, LandscapeTile tile, AssetReference<LandscapeMaterialAsset> targetMaterial)
+        {
+            throw new NotImplementedException();
+        }
     }
-    public sealed class SplatmapSmoothAction : IBounds, IBrushPosition, IBrushRadius, IBrushFalloff, IBrushStrength
+    public sealed class SplatmapSmoothAction : IBounds, IBrushPosition, IBrushRadius, IBrushFalloff, IBrushStrength, IDisposable, ISplatmapMaterial
     {
         public TerrainTransactionType Type => TerrainTransactionType.SplatmapSmooth;
         public TerrainEditorType EditorType => TerrainEditorType.Splatmap;
+        public CSteamID Instigator { get; set; }
         public Bounds Bounds { get; set; }
         public Vector2 BrushPosition { get; set; }
-        public AssetReference<LandscapeMaterialAsset> SelectedMaterial { get; set; }
+        public AssetReference<LandscapeMaterialAsset> SplatmapMaterial { get; set; }
         public EDevkitLandscapeToolSplatmapSmoothMethod SmoothMethod { get; set; }
         public float BrushRadius { get; set; }
         public float BrushFalloff { get; set; }
@@ -527,12 +642,30 @@ public partial class EditorTerrain
             BrushPosition = reader.ReadVector2();
             DeltaTime = reader.ReadFloat();
             Averages ??= ListPool<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>>.claim();
+            List<KeyValuePair<byte, float>> proxies = ListPool<KeyValuePair<byte, float>>.claim();
             int len = reader.ReadUInt8();
             if (Averages.Capacity < len)
                 Averages.Capacity = len;
+            if (proxies.Capacity < len)
+                proxies.Capacity = len;
             for (int i = 0; i < len; ++i)
-                Averages.Add(new KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>(
-                    new AssetReference<LandscapeMaterialAsset>(reader.ReadGuid()), reader.ReadFloat()));
+                proxies.Add(new KeyValuePair<byte, float>(reader.ReadUInt8(), reader.ReadFloat()));
+
+            List<Guid> index = ListPool<Guid>.claim();
+            len = reader.ReadUInt8();
+            if (index.Capacity < len)
+                index.Capacity = len;
+            for (int i = 0; i < len; ++i)
+                index.Add(reader.ReadGuid());
+
+            for (int i = 0; i < proxies.Count; ++i)
+            {
+                KeyValuePair<byte, float> proxy = proxies[i];
+                Averages.Add(new KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>(new AssetReference<LandscapeMaterialAsset>(index[proxy.Key]), proxy.Value));
+            }
+
+            ListPool<Guid>.release(index);
+            ListPool<KeyValuePair<byte, float>>.release(proxies);
         }
         public void Write(ByteWriter writer)
         {
@@ -541,11 +674,24 @@ public partial class EditorTerrain
             writer.Write(DeltaTime);
             int len = Math.Min(byte.MaxValue, Averages == null ? 0 : Averages.Count);
             writer.Write((byte)len);
+            List<Guid> index = ListPool<Guid>.claim();
             for (int i = 0; i < len; ++i)
             {
-                writer.Write(Averages![i].Key.GUID);
-                writer.Write(Averages![i].Value);
+                KeyValuePair<AssetReference<LandscapeMaterialAsset>, float> v = Averages![i];
+                int ind = index.IndexOf(v.Key.GUID);
+                if (ind == -1)
+                {
+                    ind = index.Count;
+                    index.Add(v.Key.GUID);
+                }
+                writer.Write((byte)ind);
+                writer.Write(v.Value);
             }
+            len = Math.Min(byte.MaxValue, index.Count);
+            writer.Write((byte)len);
+            for (int i = 0; i < len; ++i)
+                writer.Write(index[i]);
+            ListPool<Guid>.release(index);
         }
         private void IntlHandleSplatmapWriteSmooth(LandscapeCoord tileCoord, SplatmapCoord splatmapCoord, Vector3 worldPosition, float[] currentWeights)
         {
@@ -589,11 +735,18 @@ public partial class EditorTerrain
                 currentWeights[i] += (weight - currentWeights[i]) * speed;
             }
         }
+
+        public void Dispose()
+        {
+            if (Averages != null)
+                ListPool<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>>.release(Averages);
+        }
     }
     public sealed class HolemapPaintAction : IBounds, IBrushPosition, IBrushRadius
     {
         public TerrainTransactionType Type => TerrainTransactionType.HolesCut;
         public TerrainEditorType EditorType => TerrainEditorType.Holes;
+        public CSteamID Instigator { get; set; }
         public Bounds Bounds { get; set; }
         public Vector2 BrushPosition { get; set; }
         public float BrushRadius { get; set; }
@@ -621,6 +774,51 @@ public partial class EditorTerrain
             if (currentlyVisible == IsFilling || new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude > BrushRadius * BrushRadius)
                 return currentlyVisible;
             return IsFilling;
+        }
+    }
+    public sealed class TileModifyAction : ITerrainAction
+    {
+        public TerrainTransactionType Type => IsDelete ? TerrainTransactionType.DeleteTile : TerrainTransactionType.AddTile;
+        public TerrainEditorType EditorType => TerrainEditorType.Tiles;
+        public CSteamID Instigator { get; set; }
+        public float DeltaTime { get; set; }
+        public bool IsDelete { get; set; }
+        public LandscapeCoord Coordinates { get; set; }
+        public void Apply()
+        {
+            if (IsDelete)
+            {
+                Landscape.removeTile(Coordinates);
+                LevelHierarchy.MarkDirty();
+                Logger.LogInfo("Tile deleted: " + Coordinates + ".", ConsoleColor.DarkRed);
+                return;
+            }
+
+            LandscapeTile tile = Landscape.addTile(Coordinates);
+            if (tile != null)
+            {
+                tile.readHeightmaps();
+                tile.readSplatmaps();
+                Landscape.linkNeighbors();
+                Landscape.reconcileNeighbors(tile);
+                Landscape.applyLOD();
+                LevelHierarchy.MarkDirty();
+                Logger.LogInfo("Tile added: " + Coordinates + ".", ConsoleColor.Green);
+            }
+        }
+        public void Write(ByteWriter writer)
+        {
+            writer.Write(IsDelete);
+            writer.Write(DeltaTime);
+            writer.Write(Coordinates.x);
+            writer.Write(Coordinates.y);
+        }
+
+        public void Read(ByteReader reader)
+        {
+            IsDelete = reader.ReadBool();
+            DeltaTime = reader.ReadFloat();
+            Coordinates = new LandscapeCoord(reader.ReadInt32(), reader.ReadInt32());
         }
     }
 

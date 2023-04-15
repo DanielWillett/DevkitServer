@@ -10,6 +10,7 @@ using SDG.Framework.Landscapes;
 using SDG.Framework.Devkit;
 using SDG.Framework.Foliage;
 using DevkitServer.Players;
+using SDG.Framework.Utilities;
 
 namespace DevkitServer.Patches;
 
@@ -23,8 +24,8 @@ public delegate void RampAction(Bounds bounds, Vector3 start, Vector3 end, float
 public delegate void AdjustAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, bool subtracting, float dt);
 public delegate void FlattenAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, float target, EDevkitLandscapeToolHeightmapFlattenMethod method, float dt);
 public delegate void SmoothAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float target, EDevkitLandscapeToolHeightmapSmoothMethod method, float dt);
-public delegate void PaintAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float target, bool useWeightTarget, bool autoSlope, bool autoFoundation, float autoMinAngleBegin, float autoMinAngleEnd, float autoMaxAngleBegin, float autoMaxAngleEnd, float autoRayLength, float autoRayRadius, ERayMask autoRayMask, bool isRemove, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt);
-public delegate void PaintSmoothAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, EDevkitLandscapeToolSplatmapSmoothMethod method, List<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>> averages, int sampleCount, float dt);
+public delegate void PaintAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, float target, bool useWeightTarget, bool autoSlope, bool autoFoundation, float autoMinAngleBegin, float autoMinAngleEnd, float autoMaxAngleBegin, float autoMaxAngleEnd, float autoRayLength, float autoRayRadius, ERayMask autoRayMask, bool isRemove, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt);
+public delegate void PaintSmoothAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, EDevkitLandscapeToolSplatmapSmoothMethod method, List<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>> averages, int sampleCount, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt);
 
 [HarmonyPatch]
 [EarlyTypeInit]
@@ -357,6 +358,7 @@ public static class ClientEvents
         Logger.LogDebug("Paint performed on bounds " + bounds.ToString("F2", CultureInfo.InvariantCulture) + ".");
         OnPainted?.Invoke(bounds, GetBrushWorldPosition(editor), editor.splatmapBrushRadius,
             editor.splatmapBrushFalloff, editor.splatmapBrushStrength, editor.splatmapWeightTarget,
+            editor.splatmapPaintSensitivity,
             InputEx.GetKey(KeyCode.LeftControl) || editor.splatmapUseWeightTarget,
             settings.useAutoSlope, settings.useAutoFoundation,
             settings.autoMinAngleBegin, settings.autoMinAngleEnd,
@@ -374,6 +376,7 @@ public static class ClientEvents
         Logger.LogDebug("Auto-paint performed on bounds " + bounds.ToString("F2", CultureInfo.InvariantCulture) + ".");
         OnAutoPainted?.Invoke(bounds, GetBrushWorldPosition(editor), editor.splatmapBrushRadius,
             editor.splatmapBrushFalloff, editor.splatmapBrushStrength, editor.splatmapWeightTarget,
+            editor.splatmapPaintSensitivity,
             InputEx.GetKey(KeyCode.LeftControl) || editor.splatmapUseWeightTarget,
             settings.useAutoSlope, settings.useAutoFoundation,
             settings.autoMinAngleBegin, settings.autoMinAngleEnd,
@@ -389,8 +392,20 @@ public static class ClientEvents
 
         EDevkitLandscapeToolSplatmapSmoothMethod method = DevkitLandscapeToolSplatmapOptions.instance.smoothMethod;
         Logger.LogDebug("Paint smooth (" + method + " performed on bounds " + bounds.ToString("F2", CultureInfo.InvariantCulture) + ".");
-        OnPaintSmoothed?.Invoke(bounds, GetBrushWorldPosition(editor), editor.splatmapBrushRadius,
-            editor.splatmapBrushFalloff, editor.splatmapBrushStrength, method, GetSampleAverage(editor).ToList(), GetSampleCount(editor), Time.deltaTime);
+        if (OnPaintSmoothed != null)
+        {
+            Dictionary<AssetReference<LandscapeMaterialAsset>, float> averages = GetSampleAverage(editor);
+            List<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>> averagesList = ListPool<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>>.claim();
+            foreach (KeyValuePair<AssetReference<LandscapeMaterialAsset>, float> kvp in averages)
+            {
+                if (kvp.Value > 0f)
+                    averagesList.Add(new KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>(kvp.Key, kvp.Value));
+            }
+
+            OnPaintSmoothed.Invoke(bounds, GetBrushWorldPosition(editor), editor.splatmapBrushRadius,
+            editor.splatmapBrushFalloff, editor.splatmapBrushStrength, method, averagesList, GetSampleCount(editor),
+            TerrainEditor.splatmapMaterialTarget, Time.deltaTime);
+        }
     }
     [UsedImplicitly]
     private static void OnHoleConfirm(Bounds bounds)
@@ -586,7 +601,7 @@ public static class ClientEvents
                         yield return c;
                         for (int j = i - ps.Length; j < i; ++j)
                         {
-                            yield return ins[j];
+                            yield return ins[j].CopyWithoutSpecial();
                         }
                         yield return new CodeInstruction(OpCodes.Call, addFoliageInvoker);
                         Logger.LogDebug("Patched OnAddFoliage.");

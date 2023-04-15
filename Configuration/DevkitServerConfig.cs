@@ -11,7 +11,12 @@ public class DevkitServerConfig
 
     private static readonly JsonConverter[] Converters =
     {
-        new Vector3JsonConverter()
+        new Vector3JsonConverter(),
+        new Vector2JsonConverter(),
+        new ColorJsonConverter(),
+        new Color32JsonConverter(),
+        new CSteamIDJsonConverter(),
+        new AssetReferenceJsonConverterFactory()
     };
 
     internal static readonly InstanceSetter<Utf8JsonWriter, JsonWriterOptions>? SetWriterOptions = Accessor.GenerateInstanceSetter<Utf8JsonWriter, JsonWriterOptions>("_options");
@@ -21,14 +26,16 @@ public class DevkitServerConfig
         WriteIndented = true,
         IncludeFields = true,
         AllowTrailingCommas = true,
-        Encoder = Encoder
+        Encoder = Encoder,
+        MaxDepth = 32
     };
     public static readonly JsonSerializerOptions CondensedSerializerSettings = new JsonSerializerOptions
     {
         WriteIndented = false,
         IncludeFields = true,
         AllowTrailingCommas = true,
-        Encoder = Encoder
+        Encoder = Encoder,
+        MaxDepth = 32
     };
 
     public static readonly JsonWriterOptions WriterOptions = new JsonWriterOptions { Indented = true, Encoder = Encoder };

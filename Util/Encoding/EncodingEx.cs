@@ -81,30 +81,30 @@ public static class EncodingEx
     public static void WriteHeightmapBounds(this ByteWriter writer, Bounds bounds, bool extraFlag = false) => writer.WriteInflatedBounds(bounds, true, true, false, extraFlag);
     public static void WriteInflatedBounds(this ByteWriter writer, Bounds bounds, bool ignoreCenterY = false, bool ignoreSizeY = false, bool preserveSizeSigns = false, bool extraFlag = false)
     {
-        // 1 = sz full, 2 = sz ushort, 4 = pos full, 8 = pos ushort, 16 = ignore center y, 32 = ignore size y, 64 = preserve size signs
-        byte flags = 0;
+        // 1 = sz full, 2 = sz ushort, 4 = pos full, 8 = pos ushort, 16 = ignore center y, 32 = ignore size y, 64 = preserve size signs, 128 = extra flag
+        byte flags = (byte)(extraFlag ? 128 : 0);
         Vector3 c = bounds.center;
         Vector3 s = bounds.size;
         Expand(ref s, 0.5f);
         if (!preserveSizeSigns)
         {
             s = new Vector3(Mathf.Abs(s.x), Mathf.Abs(s.y), Mathf.Abs(s.z));
-            if (s.x > ushort.MaxValue || s.y > ushort.MaxValue || s.z > ushort.MaxValue)
+            if (s.x > ushort.MaxValue || (!ignoreSizeY && s.y > ushort.MaxValue) || s.z > ushort.MaxValue)
                 flags = 1;
-            else if (s.x > byte.MaxValue || s.y > byte.MaxValue || s.z > byte.MaxValue)
+            else if (s.x > byte.MaxValue || (!ignoreSizeY && s.y > byte.MaxValue) || s.z > byte.MaxValue)
                 flags = 2;
         }
         else
         {
-            if (s.x > short.MaxValue || s.y > short.MaxValue || s.z > short.MaxValue)
+            if (s.x is > short.MaxValue or < short.MinValue || (!ignoreSizeY && s.y is > short.MaxValue or < short.MinValue) || s.z is > short.MaxValue or < short.MinValue)
                 flags = 1;
-            else if (s.x > sbyte.MaxValue || s.y > sbyte.MaxValue || s.z > sbyte.MaxValue)
+            else if (s.x is > sbyte.MaxValue or < sbyte.MinValue || (!ignoreSizeY && s.y is > sbyte.MaxValue or < sbyte.MinValue) || s.z is > sbyte.MaxValue or < sbyte.MinValue)
                 flags = 2;
         }
 
-        if (c.x is > short.MaxValue or < short.MinValue || c.y is > short.MaxValue or < short.MinValue || s.z is > short.MaxValue or < short.MinValue)
+        if (c.x is > short.MaxValue or < short.MinValue || (!ignoreCenterY && c.y is > short.MaxValue or < short.MinValue) || s.z is > short.MaxValue or < short.MinValue)
             flags |= 4;
-        else if (c.x is > sbyte.MaxValue or < sbyte.MinValue || c.y is > sbyte.MaxValue or < sbyte.MinValue || s.z is > sbyte.MaxValue or < sbyte.MinValue)
+        else if (c.x is > sbyte.MaxValue or < sbyte.MinValue || (!ignoreCenterY && c.y is > sbyte.MaxValue or < sbyte.MinValue) || s.z is > sbyte.MaxValue or < sbyte.MinValue)
             flags |= 8;
 
         if (ignoreCenterY)
@@ -144,7 +144,6 @@ public static class EncodingEx
 
         if ((flags & 1) == 1)
         {
-            s = bounds.size;
             if (!ignoreSizeY)
                 writer.Write(s);
             else

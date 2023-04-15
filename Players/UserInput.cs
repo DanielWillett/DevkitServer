@@ -302,7 +302,7 @@ public class UserInput : MonoBehaviour
                     list.Add(pl.transportConnection);
             }
 
-            NetFactory.SendGeneric(NetFactory.DevkitMessage.RelayPacket, sendBytes, list);
+            NetFactory.SendGeneric(NetFactory.DevkitMessage.MovementRelay, sendBytes, list, reliable: false);
         }
 #endif
     }

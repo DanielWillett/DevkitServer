@@ -13,16 +13,23 @@ using SDG.Framework.Devkit.Tools;
 namespace DevkitServer.Multiplayer;
 public sealed partial class EditorTerrain : MonoBehaviour
 {
-    public static readonly NetCallCustom FlushEditBuffer = new NetCallCustom((ushort)NetCalls.FlushEditBuffer, short.MaxValue);
+    private static readonly NetCallCustom FlushEditBuffer = new NetCallCustom((ushort)NetCalls.FlushEditBuffer, short.MaxValue);
     public const ushort DataVersion = 0;
+
+    /// <summary>Ran before an action is applied.</summary>
+    public static event ApplyingAction? OnApplyingAction;
+
+    /// <summary>Ran after an action is applied.</summary>
+    public static event AppliedAction? OnAppliedAction;
+
     internal static ushort ReadDataVersion = DataVersion;
     internal static bool SaveTransactions = true;
     internal static ITerrainAction? ActiveAction;
-    internal static FieldInfo SaveTransactionsField = typeof(EditorTerrain).GetField("SaveTransactions", BindingFlags.Static | BindingFlags.NonPublic)!;
+    internal static FieldInfo SaveTransactionsField = typeof(EditorTerrain).GetField(nameof(SaveTransactions), BindingFlags.Static | BindingFlags.NonPublic)!;
 #if CLIENT
     private float _lastFlush;
 #endif
-
+    private float _nextApply;
     // edit buffer is reversed for everyone but the owner.
     private readonly List<ITerrainAction> _editBuffer = new List<ITerrainAction>();
     public EditorUser User { get; internal set; } = null!;
@@ -55,9 +62,10 @@ public sealed partial class EditorTerrain : MonoBehaviour
 #if CLIENT
     private void QueueAction(ITerrainAction action)
     {
+        action.Instigator = Provider.client;
         _editBuffer.Add(action);
 
-        Logger.LogDebug("Queued action: " + action.GetType().Name);
+        Logger.LogDebug("Queued action: " + action.GetType().Format() + ".");
     }
 #endif
 
@@ -88,28 +96,41 @@ public sealed partial class EditorTerrain : MonoBehaviour
     [UsedImplicitly]
     private void Update()
     {
+        float t = Time.realtimeSinceStartup;
 #if CLIENT
         if (IsOwner)
         {
-            float t = Time.realtimeSinceStartup;
             if (t - _lastFlush >= 1f)
             {
                 _lastFlush = t;
                 FlushEdits();
             }
+
+            return;
         }
-        else
 #endif
-        if (_editBuffer.Count > 0)
+        while (_editBuffer.Count > 0 && t >= _nextApply)
         {
             ITerrainAction action = _editBuffer[_editBuffer.Count - 1];
+            if (OnApplyingAction != null)
+            {
+                bool allow = true;
+                OnApplyingAction.Invoke(action, ref allow);
+                if (!allow) continue;
+            }
+            _nextApply += action.DeltaTime;
             ActiveAction = action;
             action.Apply();
+            Logger.LogDebug("Applying " + action.GetType().Format() + ".");
+            Logger.DumpJson(action, condensed: true);
             ActiveAction = null;
+            if (action is IDisposable disposable)
+                disposable.Dispose();
             _editBuffer.RemoveAt(_editBuffer.Count - 1);
+            OnAppliedAction?.Invoke(action);
         }
     }
-
+#if CLIENT
     private void WriteEditBuffer(ByteWriter writer)
     {
         ThreadUtil.assertIsGameThread();
@@ -161,7 +182,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
                 SetBrushSettings(toAdd);
                 toAdd.StartIndex = (byte)i;
                 c.Add(toAdd);
-                Logger.LogDebug("Queued " + toAdd.Flags + "@" + toAdd.StartIndex + ": " + toAdd + ".");
+                Logger.LogDebug("Queued data: " + toAdd.Flags + " at index " + toAdd.StartIndex + ": " + toAdd + ".");
             }
         }
 
@@ -174,7 +195,6 @@ public sealed partial class EditorTerrain : MonoBehaviour
             collection.Write(writer);
             if (collection.Splatmap != null)
             {
-                collection.Splatmap.Write(writer);
                 SplatmapCollectionPool.release(collection.Splatmap);
                 collection.Splatmap = null;
             }
@@ -190,10 +210,14 @@ public sealed partial class EditorTerrain : MonoBehaviour
             ITerrainAction action = _editBuffer[i];
             writer.Write(action.Type);
             action.Write(writer);
+            if (action is IDisposable disposable)
+                disposable.Dispose();
         }
         
         _editBuffer.Clear();
     }
+#endif
+
     private void ReadEditBuffer(ByteReader reader)
     {
         ThreadUtil.assertIsGameThread();
@@ -211,6 +235,8 @@ public sealed partial class EditorTerrain : MonoBehaviour
         int collIndex = -1;
         LoadCollection(0);
         int stInd = _editBuffer.Count;
+        if (stInd == 0)
+            _nextApply = Time.realtimeSinceStartup;
         for (int i = 0; i < ct; ++i)
         {
             if (c.Count > collIndex + 1 && c[collIndex + 1].StartIndex >= i)
@@ -227,15 +253,18 @@ public sealed partial class EditorTerrain : MonoBehaviour
                 TerrainTransactionType.SplatmapAutoPaint => new SplatmapPaintAction { IsAuto = true },
                 TerrainTransactionType.SplatmapSmooth => new SplatmapSmoothAction(),
                 TerrainTransactionType.HolesCut => new HolemapPaintAction(),
+                TerrainTransactionType.AddTile => new TileModifyAction(),
+                TerrainTransactionType.DeleteTile => new TileModifyAction { IsDelete = true },
                 _ => null
             };
             if (action != null)
             {
+                action.Instigator = User.SteamId;
                 action.Read(reader);
                 if (action is IBrushRadius r && GetBrushSettings(BrushValueFlags.Radius) is { } st1)
                     r.BrushRadius = st1.Radius;
                 if (action is IBrushFalloff f && GetBrushSettings(BrushValueFlags.Falloff) is { } st2)
-                    f.BrushFalloff = st2.Radius;
+                    f.BrushFalloff = st2.Falloff;
                 if (action is IBrushStrength s1 && GetBrushSettings(BrushValueFlags.Strength) is { } st3)
                     s1.BrushStrength = st3.Strength;
                 if (action is IBrushSensitivity s2 && GetBrushSettings(BrushValueFlags.Sensitivity) is { } st4)
@@ -278,6 +307,8 @@ public sealed partial class EditorTerrain : MonoBehaviour
             Logger.LogDebug("Received actions: " + tempBuffer.Length + ".");
         }
 
+        ListPool<BrushSettingsCollection>.release(c);
+
         void LoadCollection(int index)
         {
             if (c.Count <= index)
@@ -287,11 +318,11 @@ public sealed partial class EditorTerrain : MonoBehaviour
             SetBrushSettings(collection);
         }
     }
-    private static float GetBrushAlpha(float distance)
+    private static float GetBrushAlpha(float sqrDistance)
     {
         if (ActiveAction is IBrushFalloff f)
         {
-            return distance < f.BrushFalloff ? 1f : (1f - distance) / (1f - f.BrushFalloff);
+            return sqrDistance < f.BrushFalloff ? 1f : (1f - sqrDistance) / (1f - f.BrushFalloff);
         }
 
         return 1f;
@@ -353,7 +384,10 @@ public sealed partial class EditorTerrain : MonoBehaviour
             SaveTransactions = true;
         }
     }
-    
+    public static void Patch()
+    {
+        SplatmapPaintAction.Patch();
+    }
     public void Init()
     {
 #if CLIENT
@@ -367,6 +401,8 @@ public sealed partial class EditorTerrain : MonoBehaviour
             ClientEvents.OnAutoPainted += OnAutoPaint;
             ClientEvents.OnPaintSmoothed += OnPaintSmooth;
             ClientEvents.OnHolePainted += OnPaintHole;
+            ClientEvents.OnTileAdded += OnTileAdded;
+            ClientEvents.OnTileDeleted += OnTileDeleted;
         }
 #endif
     }
@@ -384,6 +420,8 @@ public sealed partial class EditorTerrain : MonoBehaviour
             ClientEvents.OnAutoPainted -= OnAutoPaint;
             ClientEvents.OnPaintSmoothed -= OnPaintSmooth;
             ClientEvents.OnHolePainted -= OnPaintHole;
+            ClientEvents.OnTileAdded -= OnTileAdded;
+            ClientEvents.OnTileDeleted -= OnTileDeleted;
         }
 #endif
     }
@@ -397,7 +435,8 @@ public sealed partial class EditorTerrain : MonoBehaviour
             StartPosition = start,
             EndPosition = end,
             BrushRadius = radius,
-            BrushFalloff = falloff
+            BrushFalloff = falloff,
+            DeltaTime = Time.deltaTime
         });
     }
     private void OnHeightmapAdjust(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, bool subtracting, float dt)
@@ -443,7 +482,10 @@ public sealed partial class EditorTerrain : MonoBehaviour
             DeltaTime = dt
         });
     }
-    private void OnPaint(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float target, bool useWeightTarget, bool autoSlope, bool autoFoundation, float autoMinAngleBegin, float autoMinAngleEnd, float autoMaxAngleBegin, float autoMaxAngleEnd, float autoRayLength, float autoRayRadius, ERayMask autoRayMask, bool isRemoving, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt)
+    private void OnPaint(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, float target,
+        bool useWeightTarget, bool autoSlope, bool autoFoundation, float autoMinAngleBegin, float autoMinAngleEnd,
+        float autoMaxAngleBegin, float autoMaxAngleEnd, float autoRayLength, float autoRayRadius, ERayMask autoRayMask,
+        bool isRemoving, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt)
     {
         QueueAction(new SplatmapPaintAction
         {
@@ -452,6 +494,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
             BrushRadius = radius,
             BrushFalloff = falloff,
             BrushStrength = strength,
+            BrushSensitivity = sensitivity,
             BrushTarget = target,
             UseWeightTarget = useWeightTarget,
             UseAutoSlope = autoSlope,
@@ -468,7 +511,10 @@ public sealed partial class EditorTerrain : MonoBehaviour
             DeltaTime = dt
         });
     }
-    private void OnAutoPaint(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float target, bool useWeightTarget, bool autoSlope, bool autoFoundation, float autoMinAngleBegin, float autoMinAngleEnd, float autoMaxAngleBegin, float autoMaxAngleEnd, float autoRayLength, float autoRayRadius, ERayMask autoRayMask, bool isRemoving, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt)
+    private void OnAutoPaint(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, float target,
+        bool useWeightTarget, bool autoSlope, bool autoFoundation, float autoMinAngleBegin, float autoMinAngleEnd,
+        float autoMaxAngleBegin, float autoMaxAngleEnd, float autoRayLength, float autoRayRadius, ERayMask autoRayMask,
+        bool isRemoving, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt)
     {
         QueueAction(new SplatmapPaintAction
         {
@@ -478,6 +524,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
             BrushRadius = radius,
             BrushFalloff = falloff,
             BrushStrength = strength,
+            BrushSensitivity = sensitivity,
             BrushTarget = target,
             UseWeightTarget = useWeightTarget,
             UseAutoSlope = autoSlope,
@@ -494,7 +541,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
             DeltaTime = dt
         });
     }
-    private void OnPaintSmooth(Bounds bounds, Vector3 position, float radius, float falloff, float strength, EDevkitLandscapeToolSplatmapSmoothMethod method, List<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>> averages, int sampleCount, float dt)
+    private void OnPaintSmooth(Bounds bounds, Vector3 position, float radius, float falloff, float strength, EDevkitLandscapeToolSplatmapSmoothMethod method, List<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>> averages, int sampleCount, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt)
     {
         QueueAction(new SplatmapSmoothAction
         {
@@ -504,6 +551,9 @@ public sealed partial class EditorTerrain : MonoBehaviour
             BrushFalloff = falloff,
             BrushStrength = strength,
             SmoothMethod = method,
+            Averages = averages,
+            SampleCount = sampleCount,
+            SplatmapMaterial = selectedMaterial,
             DeltaTime = dt
         });
     }
@@ -514,8 +564,29 @@ public sealed partial class EditorTerrain : MonoBehaviour
             Bounds = bounds,
             BrushPosition = position.ToVector2(),
             BrushRadius = radius,
-            IsFilling = put
+            IsFilling = put,
+            DeltaTime = Time.deltaTime
+        });
+    }
+    private void OnTileAdded(LandscapeTile tile)
+    {
+        QueueAction(new TileModifyAction
+        {
+            Coordinates = tile.coord,
+            DeltaTime = Time.deltaTime
+        });
+    }
+    private void OnTileDeleted(LandscapeTile tile)
+    {
+        QueueAction(new TileModifyAction
+        {
+            IsDelete = true,
+            Coordinates = tile.coord,
+            DeltaTime = Time.deltaTime
         });
     }
 #endif
+
+    public delegate void AppliedAction(ITerrainAction action);
+    public delegate void ApplyingAction(ITerrainAction action, ref bool execute);
 }

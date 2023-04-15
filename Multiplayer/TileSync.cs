@@ -536,7 +536,7 @@ public class TileSync : MonoBehaviour
                 UnsafeBitConverter.GetBytes(_packetBuffer, oy, sizeof(ushort) + 1 + 5 * sizeof(int));
                 UnsafeBitConverter.GetBytes(_packetBuffer, len, sizeof(ushort) + 1 + 6 * sizeof(int));
                 _index += len;
-                NetFactory.SendGeneric(NetFactory.DevkitMessage.SendTileData, _packetBuffer, null, length: PacketOffset + len);
+                NetFactory.SendGeneric(NetFactory.DevkitMessage.SendTileData, _packetBuffer, null, length: PacketOffset + len, reliable: true);
             }
 
             // flush buffer

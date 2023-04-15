@@ -107,8 +107,8 @@ public sealed class DevkitServerModule : IModuleNexus
 
     private void OnPostLevelLoaded(int level)
     {
-        if (level == Level.BUILD_INDEX_GAME)
-            GameObjectHost.AddComponent<TileSync>();
+       // if (level == Level.BUILD_INDEX_GAME)
+       //     GameObjectHost.AddComponent<TileSync>();
     }
 
     internal static void Fault() => LoadFaulted = true;

@@ -6,6 +6,8 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
+using DevkitServer.Configuration;
 using DevkitServer.Patches;
 using HarmonyLib;
 
@@ -177,6 +179,24 @@ internal static class Logger
     {
         ChangeResets(ref message, color);
         Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [ERROR] " + "[" + method.ToUpperInvariant() + "] " + message, color, true, Severity.Error);
+    }
+    public static void DumpJson<T>(T obj, ConsoleColor color = ConsoleColor.DarkGray, bool condensed = false)
+    {
+        if (obj == null)
+            Terminal.Write("null", color, true, Severity.Debug);
+        else
+        {
+            try
+            {
+                Terminal.Write(JsonSerializer.Serialize(obj, obj!.GetType(), condensed ? DevkitServerConfig.CondensedSerializerSettings : DevkitServerConfig.SerializerSettings),
+                    color, true, Severity.Debug);
+            }
+            catch (Exception ex)
+            {
+                LogError("Error serializing " + obj + ".");
+                LogError(ex);
+            }
+        }
     }
     public static void DumpGameObject(GameObject go, ConsoleColor color = ConsoleColor.White)
     {

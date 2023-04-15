@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Reflection.Emit;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
@@ -72,6 +74,37 @@ public static class DevkitServerUtility
         Vector3 c = bounds.center;
         Vector3 e = bounds.extents;
         return new Bounds(new Vector3(Mathf.Round(c.x), Mathf.Round(c.y), Mathf.Round(c.z)), new Vector3((e.x + 0.5f).CeilToIntIgnoreSign(), (e.y + 0.5f).CeilToIntIgnoreSign(), (e.z + 0.5f).CeilToIntIgnoreSign()));
+    }
+    /// <summary>Convert an HTMLColor string to a actual color.</summary>
+    /// <param name="htmlColorCode">A hexadecimal/HTML color key.</param>
+    public static Color Hex(this string htmlColorCode)
+    {
+        if (htmlColorCode.Length == 0)
+            return Color.white;
+        if (htmlColorCode[0] != '#')
+            htmlColorCode = "#" + htmlColorCode;
+        return ColorUtility.TryParseHtmlString(htmlColorCode, out Color color) ? color : Color.white;
+    }
+    /// <summary>Convert an HTMLColor string to a actual color.</summary>
+    /// <param name="htmlColorCode">A hexadecimal/HTML color key.</param>
+    public static bool TryParseHex(this string htmlColorCode, out Color color)
+    {
+        if (htmlColorCode.Length == 0)
+        {
+            color = Color.white;
+            return false;
+        }
+
+        if (htmlColorCode[0] != '#')
+            htmlColorCode = "#" + htmlColorCode;
+
+        if (!ColorUtility.TryParseHtmlString(htmlColorCode, out color))
+        {
+            color = Color.white;
+            return false;
+        }
+
+        return true;
     }
     public static unsafe int GetLabelId(this Label label) => *(int*)&label;
     public static void PrintBytesHex(byte[] bytes, int columnCount = 16, int len = -1)
@@ -304,4 +337,175 @@ public static class DevkitServerUtility
     public static Vector3 ToVector3(this in Vector2 v2) => new Vector3(v2.x, 0f, v2.y);
     public static Vector3 ToVector3(this in Vector2 v2, float y) => new Vector3(v2.x, y, v2.y);
     public static CodeInstruction CopyWithoutSpecial(this CodeInstruction instruction) => new CodeInstruction(instruction.opcode, instruction.operand);
+
+    public static bool TryParseSteamId(string str, out CSteamID steamId)
+    {
+        if (str.Equals("Nil", StringComparison.InvariantCultureIgnoreCase) ||
+            str.Equals("null", StringComparison.InvariantCultureIgnoreCase))
+        {
+            steamId = CSteamID.Nil;
+            return true;
+        }
+        if (str.Equals("OutofDateGS", StringComparison.InvariantCultureIgnoreCase) ||
+            str.Equals("out-of-date-gs", StringComparison.InvariantCultureIgnoreCase) ||
+            str.Equals("out_of_date_gs", StringComparison.InvariantCultureIgnoreCase))
+        {
+            steamId = CSteamID.OutofDateGS;
+            return true;
+        }
+        if (str.Equals("LanModeGS", StringComparison.InvariantCultureIgnoreCase) ||
+            str.Equals("lan-mode-gs", StringComparison.InvariantCultureIgnoreCase) ||
+            str.Equals("lan_mode_gs", StringComparison.InvariantCultureIgnoreCase))
+        {
+            steamId = CSteamID.LanModeGS;
+            return true;
+        }
+        if (str.Equals("NotInitYetGS", StringComparison.InvariantCultureIgnoreCase) ||
+            str.Equals("not-init-yet-gs", StringComparison.InvariantCultureIgnoreCase) ||
+            str.Equals("not_init_yet_gs", StringComparison.InvariantCultureIgnoreCase))
+        {
+            steamId = CSteamID.NotInitYetGS;
+            return true;
+        }
+        if (str.Equals("NonSteamGS", StringComparison.InvariantCultureIgnoreCase) ||
+            str.Equals("non-steam-gs", StringComparison.InvariantCultureIgnoreCase) ||
+            str.Equals("non_steam_gs", StringComparison.InvariantCultureIgnoreCase))
+        {
+            steamId = CSteamID.NonSteamGS;
+            return true;
+        }
+
+        if (ulong.TryParse(str, NumberStyles.Number, CultureInfo.InvariantCulture, out ulong id))
+        {
+            steamId = new CSteamID(id);
+            return true;
+        }
+
+        if (uint.TryParse(str, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint acctId1))
+        {
+            steamId = new CSteamID(new AccountID_t(acctId1), EUniverse.k_EUniversePublic, EAccountType.k_EAccountTypeIndividual);
+            return true;
+        }
+
+        if (ulong.TryParse(str, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong acctId2))
+        {
+            steamId = new CSteamID(acctId2);
+            return true;
+        }
+
+        if (str.StartsWith("STEAM_", StringComparison.InvariantCultureIgnoreCase) && str.Length > 10)
+        {
+            if (str[7] != ':' || str[9] != ':')
+                goto fail;
+            char uv = str[6];
+            if (!char.IsDigit(uv))
+                goto fail;
+            EUniverse universe = (EUniverse)(uv - 48);
+            if (universe == EUniverse.k_EUniverseInvalid)
+                universe = EUniverse.k_EUniversePublic;
+
+            bool y;
+            if (str[8] == '1')
+                y = true;
+            else if (str[8] == '0')
+                y = false;
+            else goto fail;
+            if (!uint.TryParse(str.Substring(10), NumberStyles.Number, CultureInfo.InvariantCulture, out uint acctId))
+                goto fail;
+
+            steamId = new CSteamID(new AccountID_t((uint)(acctId * 2 + (y ? 1 : 0))), universe,
+                EAccountType.k_EAccountTypeIndividual);
+            return true;
+        }
+
+        if (str.Length > 8 && str[0] == '[')
+        {
+            if (str[2] != ':' || str[4] != ':' || str[str.Length - 1] != ']')
+                goto fail;
+            EAccountType type;
+            char c = str[1];
+            if (c is 'I' or 'i')
+                type = EAccountType.k_EAccountTypeInvalid;
+            else if (c == 'U')
+                type = EAccountType.k_EAccountTypeIndividual;
+            else if (c == 'M')
+                type = EAccountType.k_EAccountTypeMultiseat;
+            else if (c == 'G')
+                type = EAccountType.k_EAccountTypeGameServer;
+            else if (c == 'A')
+                type = EAccountType.k_EAccountTypeAnonGameServer;
+            else if (c == 'P')
+                type = EAccountType.k_EAccountTypePending;
+            else if (c == 'C')
+                type = EAccountType.k_EAccountTypeContentServer;
+            else if (c == 'g')
+                type = EAccountType.k_EAccountTypeClan;
+            else if (c is 'T' or 'L' or 'c')
+                type = EAccountType.k_EAccountTypeChat;
+            else if (c == 'a')
+                type = EAccountType.k_EAccountTypeAnonUser;
+            else goto fail;
+            char uv = str[3];
+            if (!char.IsDigit(uv))
+                goto fail;
+            uint acctId;
+            if (str[str.Length - 3] != ':')
+            {
+                if (!uint.TryParse(str.Substring(5, str.Length - 6), NumberStyles.Number, CultureInfo.InvariantCulture,
+                        out acctId))
+                    goto fail;
+            }
+            else
+            {
+                if (!uint.TryParse(str.Substring(5, str.Length - 8), NumberStyles.Number, CultureInfo.InvariantCulture,
+                        out acctId))
+                    goto fail;
+                acctId *= 2;
+                uv = str[str.Length - 2];
+                if (uv == '1')
+                    ++acctId;
+                else if (uv != '0')
+                    goto fail;
+            }
+
+            EUniverse universe = (EUniverse)(uv - 48);
+            if (universe == EUniverse.k_EUniverseInvalid)
+                universe = EUniverse.k_EUniversePublic;
+
+            steamId = new CSteamID(new AccountID_t(acctId), universe, type);
+            return true;
+        }
+
+        fail:
+        steamId = CSteamID.Nil;
+        return false;
+    }
+}
+
+public static class AssetTypeHelper<TAsset>
+{
+    public static readonly EAssetType Type = GetAssetType();
+    private static EAssetType GetAssetType()
+    {
+        Type c = typeof(TAsset);
+        if (typeof(ItemAsset).IsAssignableFrom(c))
+            return EAssetType.ITEM;
+        if (typeof(EffectAsset).IsAssignableFrom(c))
+            return EAssetType.EFFECT;
+        if (typeof(VehicleAsset).IsAssignableFrom(c))
+            return EAssetType.VEHICLE;
+        if (typeof(ObjectAsset).IsAssignableFrom(c))
+            return EAssetType.OBJECT;
+        if (typeof(ResourceAsset).IsAssignableFrom(c))
+            return EAssetType.RESOURCE;
+        if (typeof(AnimalAsset).IsAssignableFrom(c))
+            return EAssetType.ANIMAL;
+        if (typeof(MythicAsset).IsAssignableFrom(c))
+            return EAssetType.MYTHIC;
+        if (typeof(SkinAsset).IsAssignableFrom(c))
+            return EAssetType.SKIN;
+        if (typeof(SpawnAsset).IsAssignableFrom(c))
+            return EAssetType.SPAWN;
+        return typeof(DialogueAsset).IsAssignableFrom(c) || typeof(VendorAsset).IsAssignableFrom(c) || typeof(QuestAsset).IsAssignableFrom(c) ? EAssetType.NPC : EAssetType.NONE;
+    }
 }

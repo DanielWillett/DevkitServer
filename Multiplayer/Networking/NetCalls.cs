@@ -8,5 +8,6 @@ internal enum NetCalls : ushort
     SendLevel = 5,
     EndSendLevel = 6,
     RequestLevelPackets = 7,
-    SendTileData = 8
+    SendTileData = 8,
+    RequestLevelCheckup = 9
 }
