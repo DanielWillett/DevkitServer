@@ -55,8 +55,20 @@ internal static class Logger
             config.ColorFormatting = StackColorFormatType.ANSIColor;
         Terminal = DevkitServerModule.GameObjectHost.AddComponent<ServerTerminal>();
 #endif
+        if (!DevkitServerConfig.Config.ConsoleVisualANSISupport)
+        {
+            config.ColorFormatting = StackColorFormatType.None;
+            config.Colors = Color4Config.Default;
+        }
+        else if (!DevkitServerConfig.Config.ConsoleExtendedVisualANSISupport)
+        {
+            config.ColorFormatting = StackColorFormatType.ANSIColor;
+            config.Colors = Color4Config.Default;
+        }
+
         StackCleaner = new StackTraceCleaner(config);
-        UnturnedLog.info("Loading logger with log type: " + Terminal.GetType().Name + ".");
+        
+        UnturnedLog.info("Loading logger with log type: " + Terminal.GetType().Format() + " colorized with: " + config.ColorFormatting.Format() + ".");
     }
     internal static void InitLogger()
     {
@@ -638,6 +650,62 @@ internal static class Logger
             return clr + instruction.Name + ANSIReset;
 
         return instruction.Name;
+    }
+    public static string Format(this object obj)
+    {
+        Type type = obj.GetType();
+        string str = obj.ToString();
+        if (str.Equals(type.ToString(), StringComparison.Ordinal))
+            return "{" + type.Format() + "}";
+        
+        if (StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+        {
+            if (obj is string)
+                return GetColor(ToArgb(new Color32(214, 157, 133, 255))) + "\"" + str + "\"" + ANSIReset;
+
+            if (type.IsPrimitive)
+                return GetColor(StackCleaner.Configuration.Colors!.KeywordColor) + str + ANSIReset;
+            
+            if (type.IsEnum)
+                return GetColor(StackCleaner.Configuration.Colors!.EnumColor) + str + ANSIReset;
+            
+            if (type.IsInterface)
+                return GetColor(StackCleaner.Configuration.Colors!.InterfaceColor) + str + ANSIReset;
+            
+            if (type.IsValueType)
+                return GetColor(StackCleaner.Configuration.Colors!.StructColor) + str + ANSIReset;
+
+            return GetColor(StackCleaner.Configuration.Colors!.ClassColor) + str + ANSIReset;
+        }
+
+        return str;
+
+        string GetColor(int argb)
+        {
+            return (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
+                ? string.Empty
+                : (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                    ? GetExtANSIForegroundString(argb)
+                    : GetANSIForegroundString(ToConsoleColor(argb))));
+        }
+    }
+    public static string Colorize(this string str, ConsoleColor color)
+    {
+        if (StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+        {
+            return GetANSIForegroundString(color) + str + ANSIReset;
+        }
+
+        return str;
+    }
+    public static string Colorize(this string str, Color color)
+    {
+        if (StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+        {
+            return GetExtANSIForegroundString(ToArgb(color)) + str + ANSIReset;
+        }
+
+        return str;
     }
 }
 

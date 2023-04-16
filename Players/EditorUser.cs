@@ -42,6 +42,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         DevkitServerGamemode.SetupEditorObject(EditorObject, this);
         Input = EditorObject.GetComponent<UserInput>();
         Terrain = EditorObject.GetComponent<EditorTerrain>();
+        /*
 #if DEBUG
         Logger.LogInfo("Editor Object Dump (" + player.m_SteamID + "):", ConsoleColor.Cyan);
         Logger.DumpGameObject(EditorObject);
@@ -58,7 +59,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
             Provider.kick(player, "Invalid setup [2].");
             return;
         }
-
+        */
         Logger.LogDebug("Editor User initialized: " + SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture) + " (" + displayName + ").");
     }
 
@@ -90,6 +91,8 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     }
     internal static void OnClientDisconnected()
     {
+        DevkitServerModule.Instance.UnloadBundle();
+
         if (User != null || User is not null)
         {
             if (User.isActiveAndEnabled)

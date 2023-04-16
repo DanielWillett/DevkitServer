@@ -1,0 +1,162 @@
+﻿namespace DevkitServer.Multiplayer.Networking;
+public class NetworkBuffer : IDisposable
+{
+    public byte[] Buffer;
+    public readonly int BufferSize;
+    private readonly Action<byte[]> _onMsgReady;
+    private byte[]? _pendingData;
+    private int _pendingLength;
+    public MessageOverhead PendingOverhead;
+    private bool _disposed;
+    public readonly ITransportConnection Owner;
+    public event NetworkBufferProgressUpdate? BufferProgressUpdated;
+    public NetworkBuffer(Action<byte[]> onMsgReady, int capacity, ITransportConnection owner)
+    {
+        _onMsgReady = onMsgReady;
+        BufferSize = capacity;
+        Buffer = new byte[capacity];
+        Owner = owner;
+    }
+    public unsafe void ProcessBuffer(int amtReceived, int offset = 0)
+    {
+        if (_disposed) return;
+        try
+        {
+            lock (Buffer)
+            {
+                fixed (byte* bytes = &Buffer[offset])
+                {
+                    bool isNewMsg = _pendingData is null;
+                    if (isNewMsg)
+                    {
+                        if (amtReceived < MessageOverhead.MinimumSize)
+                        {
+                            Logger.LogWarning("Received message less than " + DevkitServerUtility.FormatBytes(MessageOverhead.MinimumSize) + " long!");
+                            BufferProgressUpdated?.Invoke(0, 0);
+                            return;
+                        }
+                        PendingOverhead = new MessageOverhead(bytes);
+                    }
+                    int size = PendingOverhead.Size;
+                    int expSize = size + PendingOverhead.Length;
+                    if (isNewMsg)
+                    {
+                        if (expSize == amtReceived) // new single packet, process all
+                        {
+                            _pendingData = new byte[amtReceived];
+                            fixed (byte* ptr = _pendingData)
+                                System.Buffer.MemoryCopy(bytes, ptr, amtReceived, amtReceived);
+                            _onMsgReady(_pendingData);
+                            BufferProgressUpdated?.Invoke(amtReceived, amtReceived);
+                            goto reset;
+                        }
+
+                        if (amtReceived < expSize) // starting a new packet that continues past the current data, copy to buffer and return
+                        {
+                            _pendingData = new byte[expSize];
+                            fixed (byte* ptr = _pendingData)
+                                System.Buffer.MemoryCopy(bytes, ptr, expSize, amtReceived);
+                            _pendingLength = amtReceived;
+                            BufferProgressUpdated?.Invoke(amtReceived, expSize);
+                            return;
+                        }
+                        // multiple messages in one.
+                        _pendingData = new byte[expSize];
+                        fixed (byte* ptr = _pendingData)
+                            System.Buffer.MemoryCopy(bytes, ptr, expSize, expSize);
+                        _onMsgReady(_pendingData);
+                        _pendingData = null;
+                        PendingOverhead = default;
+                        _pendingLength = 0;
+                        amtReceived -= expSize;
+                        offset = expSize;
+                        BufferProgressUpdated?.Invoke(expSize, expSize);
+                        goto next;
+                    }
+                    else
+                    {
+                        // this data will complete the pending packet
+                        int ttlSize = _pendingLength + amtReceived;
+                        if (ttlSize == expSize)
+                        {
+                            fixed (byte* ptr = &_pendingData![_pendingLength])
+                                System.Buffer.MemoryCopy(bytes, ptr, amtReceived, amtReceived);
+                            _onMsgReady(_pendingData);
+                            BufferProgressUpdated?.Invoke(ttlSize, expSize);
+                            goto reset;
+                        }
+                        // continue the data for another packet
+                        if (ttlSize < expSize)
+                        {
+                            fixed (byte* ptr = &_pendingData![_pendingLength])
+                                System.Buffer.MemoryCopy(bytes, ptr, amtReceived, amtReceived);
+                            _pendingLength += amtReceived;
+                            BufferProgressUpdated?.Invoke(ttlSize, expSize);
+                            return;
+                        }
+
+                        // end off the current message, start the next one
+                        int remaining = expSize - _pendingLength;
+                        fixed (byte* ptr = &_pendingData![_pendingLength])
+                            System.Buffer.MemoryCopy(bytes, ptr, remaining, remaining);
+                        _onMsgReady(_pendingData);
+                        _pendingData = null;
+                        PendingOverhead = default;
+                        _pendingLength = 0;
+                        GC.Collect();
+                        amtReceived -= remaining;
+                        offset = remaining;
+                        BufferProgressUpdated?.Invoke(expSize, expSize);
+                        goto next;
+                    }
+                    reset:
+                    _pendingData = null;
+                    PendingOverhead = default;
+                    _pendingLength = 0;
+                    GC.Collect();
+                }
+            }
+            return;
+        next:
+            ProcessBuffer(amtReceived, offset);
+        }
+        catch (OverflowException)
+        {
+            Logger.LogError("Overflow exception hit trying to allocate " + DevkitServerUtility.FormatBytes(PendingOverhead.Size) + " for message " + PendingOverhead.Format() + ".");
+            _pendingData = null;
+            PendingOverhead = default;
+            Buffer = null!;
+            GC.Collect();
+        }
+        catch (OutOfMemoryException)
+        {
+            Logger.LogError("Out of Memory exception hit trying to allocate " + DevkitServerUtility.FormatBytes(PendingOverhead.Size) + " for message " + PendingOverhead.Format() + ".");
+        }
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed)
+        {
+            Buffer = null!;
+            if (_pendingData != null)
+            {
+                _pendingData = null;
+                GC.Collect();
+            }
+            PendingOverhead = default;
+            _disposed = true;
+        }
+    }
+    ~NetworkBuffer()
+    {
+        Dispose(disposing: false);
+    }
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+}
+
+public delegate void NetworkBufferProgressUpdate(int bytesDownloaded, int totalBytes);

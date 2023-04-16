@@ -15,12 +15,12 @@ public class DevkitServerGamemode : GameMode
         bool isOwner = user.IsOwner;
         editor.AddComponent<EditorTerrain>().User = user;
         editor.AddComponent<UserInput>().User = user;
-        if (!isOwner || true)
-        {
 #if CLIENT
+        if (!isOwner)
+        {
             editor.AddComponent<UserTPVControl>().User = user;
-#endif
         }
+#endif
     }
     public override GameObject getPlayerGameObject(SteamPlayerID playerID)
     {
@@ -67,11 +67,11 @@ public class DevkitServerGamemode : GameMode
         }
 #endif
         user.Init(playerID.steamID, playerID.playerName);
-
+        /*
 #if DEBUG
         Logger.LogInfo("Editor Object Dump (" + playerID.steamID.m_SteamID + "):", ConsoleColor.Cyan);
         Logger.DumpGameObject(obj);
-#endif
+#endif*/
         return obj;
     }
 }

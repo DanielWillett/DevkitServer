@@ -5,7 +5,8 @@ namespace DevkitServer.Multiplayer.LevelData;
 public sealed class LevelData
 {
     public Folder LevelFolderContent { get; private set; }
-    
+    public byte[] Data { get; internal set; }
+    public bool Compressed { get; internal set; }
     private LevelData() { }
     public static LevelData GatherLevelData()
     {

@@ -57,16 +57,16 @@ public class DevkitServerConfig
     public static readonly string FilePath = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer", Provider.serverID, "server_config.json");
 #endif
 
-    private static SystemConfig? _client;
+    private static SystemConfig? _config;
     public static SystemConfig Config
     {
         get
         {
             lock (Sync)
             {
-                if (_client == null)
+                if (_config == null)
                     Reload();
-                return _client!;
+                return _config!;
             }
         }
     }
@@ -76,7 +76,7 @@ public class DevkitServerConfig
     }
     public static void Reload()
     {
-        _client = Read();
+        _config = Read();
         Save();
     }
     public static void Save()
@@ -89,7 +89,7 @@ public class DevkitServerConfig
                 if (Path.GetDirectoryName(path) is { } dir)
                     Directory.CreateDirectory(dir);
                 using FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
-                SystemConfig? config = _client;
+                SystemConfig? config = _config;
                 if (config == null)
                 {
                     config = new SystemConfig();
@@ -97,7 +97,7 @@ public class DevkitServerConfig
                 }
                 Utf8JsonWriter writer = new Utf8JsonWriter(fs, WriterOptions);
                 JsonSerializer.Serialize(writer, config, SerializerSettings);
-                _client = config;
+                _config = config;
             }
             catch (Exception ex)
             {
@@ -171,11 +171,36 @@ public class DevkitServerConfig
 }
 public class SystemConfig
 {
+    [JsonPropertyName("extended_visual_ansi_support")]
+    public bool ConsoleExtendedVisualANSISupport { get; set; }
+
+    [JsonPropertyName("visual_ansi_support")]
+    public bool ConsoleVisualANSISupport { get; set; }
+
+#if SERVER
     [JsonPropertyName("disable_map_download")]
     public bool DisableMapDownload { get; set; }
 
+    [JsonPropertyName("high_speed")]
+    public TcpServerInfo? TcpSettings;
+
+    public class TcpServerInfo
+    {
+        [JsonPropertyName("enable_high_speed_support")]
+        public bool EnableHighSpeedSupport { get; set; }
+
+        [JsonPropertyName("high_speed_tcp_port")]
+        public ushort HighSpeedPort { get; set; }
+    }
+#endif
+
     public void SetDefaults()
     {
+        ConsoleExtendedVisualANSISupport = true;
+        ConsoleVisualANSISupport = true;
+#if SERVER
         DisableMapDownload = false;
+        TcpSettings = new TcpServerInfo { EnableHighSpeedSupport = false, HighSpeedPort = (ushort)(Provider.port + 2) };
+#endif
     }
 }

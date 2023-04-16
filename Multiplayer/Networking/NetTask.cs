@@ -10,6 +10,7 @@ namespace DevkitServer.Multiplayer.Networking;
 
 public sealed class NetTask : CustomYieldInstruction
 {
+    public static readonly NetTask Completed = new NetTask();
     internal const int DEFAULT_TIMEOUT_MS = 5000;
     internal const int POLL_SPEED_MS = 25;
     private readonly NetTaskAwaiter _awaiter;
@@ -18,9 +19,14 @@ public sealed class NetTask : CustomYieldInstruction
     private Timer? timer;
     private static long lastReqId = 0;
     internal bool isCompleted = false;
-    internal RequestResponse _parameters = RequestResponse.FAIL;
+    public RequestResponse Parameters = RequestResponse.FAIL;
     internal readonly bool isAck;
     public override bool keepWaiting => !isCompleted;
+    private NetTask()
+    {
+        _awaiter = new NetTaskAwaiter(this);
+        isCompleted = true;
+    }
     public NetTask(bool ack, int timeoutMs = DEFAULT_TIMEOUT_MS)
     {
         isAck = ack;
@@ -64,14 +70,14 @@ public sealed class NetTask : CustomYieldInstruction
         isCompleted = true;
         if (!responded || parameters is null || parameters.Length == 0 || parameters[0] is not MessageContext ctx)
         {
-            _parameters = RequestResponse.FAIL;
+            Parameters = RequestResponse.FAIL;
         }
         else
         {
             object[] p = parameters.Length == 1 ? Array.Empty<object>() : new object[parameters.Length - 1];
             if (p.Length > 0)
                 Array.Copy(parameters, 1, p, 0, p.Length);
-            _parameters = new RequestResponse(true, ctx, p);
+            Parameters = new RequestResponse(true, ctx, p);
         }
         if (timer != null)
         {
@@ -83,7 +89,7 @@ public sealed class NetTask : CustomYieldInstruction
     internal void TellCompleted(in MessageContext ctx, bool responded, int? errorCode)
     {
         isCompleted = true;
-        _parameters = !responded
+        Parameters = !responded
             ? RequestResponse.FAIL
             : errorCode.HasValue
                 ? new RequestResponse(true, ctx, errorCode.Value)
@@ -120,12 +126,12 @@ public sealed class NetTask : CustomYieldInstruction
         }
         public RequestResponse GetResult()
         {
-            if (task.isCompleted || task.timer == null) return task._parameters;
+            if (task.isCompleted || task.timer == null) return task.Parameters;
             NetTask task1 = task;
             SpinWait.SpinUntil(() => task1.isCompleted || DateTime.UtcNow > task1._awaiter.end);
             if (!task.isCompleted)
                 NetFactory.RemoveListener(task);
-            return task._parameters.Parameters is null ? RequestResponse.FAIL : task._parameters;
+            return task.Parameters.Parameters is null ? RequestResponse.FAIL : task.Parameters;
         }
     }
 

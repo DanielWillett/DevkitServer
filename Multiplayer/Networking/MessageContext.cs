@@ -3,7 +3,7 @@
 namespace DevkitServer.Multiplayer.Networking;
 public readonly struct MessageContext
 {
-    public static readonly MessageContext Nil = new MessageContext(null!, new MessageOverhead(MessageFlags.None, 0, 0));
+    public static readonly MessageContext Nil = new MessageContext(null!, new MessageOverhead(MessageFlags.None, 0, 0), false);
     public readonly
 #if SERVER
         ITransportConnection
@@ -12,16 +12,18 @@ public readonly struct MessageContext
 #endif
         Connection;
     public readonly MessageOverhead Overhead;
+    public readonly bool HighSpeed;
     public MessageContext(
 #if SERVER
         ITransportConnection
 #else
         IClientTransport
 #endif
-            connection, MessageOverhead overhead)
+            connection, MessageOverhead overhead, bool hs)
     {
         Connection = connection;
         Overhead = overhead;
+        HighSpeed = hs;
     }
     public MessageOverhead GetReplyOverhead(ushort id, bool layered, bool ack)
     {

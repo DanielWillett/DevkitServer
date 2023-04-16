@@ -20,6 +20,9 @@ public sealed class DevkitServerModule : IModuleNexus
     public static bool IsEditing { get; internal set; }
     public static bool LoadFaulted { get; private set; }
     public static LevelInfo? PendingLevelInfo { get; internal set; }
+    public static bool HasLoadedBundle { get; private set; }
+    public static MasterBundle? Bundle { get; private set; }
+    public static bool IsMainThread => ThreadUtil.gameThread == Thread.CurrentThread;
     public static void EarlyInitialize()
     {
         LoadFaulted = false;
@@ -89,12 +92,14 @@ public sealed class DevkitServerModule : IModuleNexus
             Provider.onServerConnected += UserManager.AddPlayer;
             Provider.onServerDisconnected += UserManager.RemovePlayer;
             Level.onLevelLoaded += OnLevelLoaded;
+            Assets.onAssetsRefreshed += OnAssetsRefreshed;
             UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
 #else
             Provider.onClientConnected += EditorUser.OnClientConnected;
             Provider.onEnemyConnected += EditorUser.OnEnemyConnected;
             Provider.onClientDisconnected += EditorUser.OnClientDisconnected;
             Provider.onEnemyDisconnected += EditorUser.OnEnemyDisconnected;
+            UserTPVControl.Init();
 #endif
         }
         catch (Exception ex)
@@ -104,13 +109,78 @@ public sealed class DevkitServerModule : IModuleNexus
             Fault();
         }
     }
+#if SERVER
+    private void OnAssetsRefreshed()
+    {
+        TryLoadBundle();
+    }
+#endif
 
     private void OnPostLevelLoaded(int level)
     {
        // if (level == Level.BUILD_INDEX_GAME)
        //     GameObjectHost.AddComponent<TileSync>();
     }
+    internal void UnloadBundle()
+    {
+        if (!HasLoadedBundle || Bundle == null)
+        {
+            Bundle = null;
+            HasLoadedBundle = false;
+            return;
+        }
 
+        try
+        {
+            Bundle.unload();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error unloading " + "devkitserver.masterbundle".Format() + " bundle.");
+            Logger.LogError(ex);
+        }
+        Bundle = null;
+        HasLoadedBundle = false;
+    }
+    internal void TryLoadBundle()
+    {
+        if (HasLoadedBundle) return;
+        string path = Path.Combine(ReadWrite.PATH, "Modules", "DevkitServer", "Bundles");
+        if (!Directory.Exists(path))
+        {
+            Logger.LogError("Failed to find DevkitServer bundle folder: " + path.Format() + ".");
+            return;
+        }
+
+        try
+        {
+            Assets.load(path, new AssetOrigin { name = "DevkitServer", workshopFileId = 0ul }, true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error loading " + "devkitserver.masterbundle".Format() + " bundle.");
+            Logger.LogError(ex); 
+            return;
+        }
+        MasterBundleConfig? bundle = Assets.findMasterBundleByPath(path);
+        if (bundle == null)
+        {
+            foreach (MasterBundleConfig config in (List<MasterBundleConfig>)typeof(Assets).GetField("allMasterBundles", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null))
+                Logger.LogDebug("Bundle: " + config.assetBundleName.Format() + " (" + config.directoryPath.Format() + ").");
+            
+            Logger.LogError("Failed to find DevkitServer bundle: " + Path.Combine(path, "devkitserver.masterbundle").Format() + ".");
+            return;
+        }
+        Bundle = new MasterBundle(bundle, string.Empty, "DevkitServer Base");
+        Logger.LogInfo("Loaded bundle: " + bundle.assetBundleNameWithoutExtension.Format() + " from " + path.Format() + ".");
+        HasLoadedBundle = true;
+#if FALSE
+        Logger.LogDebug("Assets:");
+        foreach (string asset in Bundle.cfg.assetBundle.GetAllAssetNames())
+            Logger.LogDebug("Asset: " + asset.Format() + ".");
+#endif
+
+    }
     internal static void Fault() => LoadFaulted = true;
 
     private static void OnEditorCreated()
@@ -139,7 +209,7 @@ public sealed class DevkitServerModule : IModuleNexus
         if (comp != null)
             Object.Destroy(comp);
 #if DEBUG
-        Logger.DumpGameObject(Level.editing.gameObject);
+        // Logger.DumpGameObject(Level.editing.gameObject);
 #endif
 #endif
     }
@@ -149,7 +219,8 @@ public sealed class DevkitServerModule : IModuleNexus
         Logger.LogInfo("Level loaded: " + level + ".");
         if (level != Level.BUILD_INDEX_GAME)
             return;
-        
+        if (DevkitServerConfig.Config.TcpSettings is { EnableHighSpeedSupport: true })
+            _ = HighSpeedServer.Instance;
     }
 #endif
 
@@ -159,16 +230,19 @@ public sealed class DevkitServerModule : IModuleNexus
         Object.Destroy(GameObjectHost);
         Logger.LogInfo("Shutting down...");
         PatchesMain.Unpatch();
+        UnloadBundle();
 #if SERVER
         Provider.onServerConnected -= UserManager.AddPlayer;
         Provider.onServerDisconnected -= UserManager.RemovePlayer;
         Level.onLevelLoaded -= OnLevelLoaded;
         UserInput.OnUserPositionUpdated -= OnUserPositionUpdated;
+        HighSpeedServer.Deinit();
 #else
         Provider.onClientConnected -= EditorUser.OnClientConnected;
         Provider.onEnemyConnected -= EditorUser.OnEnemyConnected;
         Provider.onClientDisconnected -= EditorUser.OnClientDisconnected;
         Provider.onEnemyDisconnected -= EditorUser.OnEnemyDisconnected;
+        UserTPVControl.Deinit();
 #endif
 
         Instance = null!;
@@ -210,5 +284,28 @@ public sealed class DevkitServerModule : IModuleNexus
 
 public sealed class DevkitServerModuleComponent : MonoBehaviour
 {
-
+    internal static Queue<MainThreadTask.MainThreadResult> ThreadActionRequests = new Queue<MainThreadTask.MainThreadResult>(4);
+    void Update()
+    {
+        while (ThreadActionRequests.Count > 0)
+        {
+            MainThreadTask.MainThreadResult? res = null;
+            try
+            {
+                res = ThreadActionRequests.Dequeue();
+                res.Task.Token.ThrowIfCancellationRequested();
+                res.Continuation();
+            }
+            catch (OperationCanceledException) { Logger.LogDebug("Execution on update cancelled."); }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error executing main thread operation.");
+                Logger.LogError(ex);
+            }
+            finally
+            {
+                res?.Complete();
+            }
+        }
+    }
 }

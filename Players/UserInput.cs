@@ -22,6 +22,7 @@ public class UserInput : MonoBehaviour
     private Vector3 _lastPos;
     private Quaternion _lastRot;
     private bool _bufferHasStop;
+    private bool _applied = false;
 #endif
     private float _nextPacketApplyTime;
     public bool IsOwner { get; private set; }
@@ -265,20 +266,12 @@ public class UserInput : MonoBehaviour
 
 #if SERVER
         EditorUser? user = UserManager.FromConnection(transportConnection);
-#else
-        if (!reader.ReadUInt64(out ulong userId))
-        {
-            Logger.LogError("Failed to read incoming movement packet user ID.");
-            return;
-        }
-
-        EditorUser? user = UserManager.FromId(userId);
-#endif
         if (user == null)
         {
-            Logger.LogError("Failed to find user for movement packet.");
+            Logger.LogError("Failed to find user for movement packet from transport connection: " + transportConnection.GetAddressString(true).Format() + ".");
             return;
         }
+#endif
         if (!reader.ReadBytesPtr(len, out byte[] buffer, out int offset))
         {
             Logger.LogError("Failed to read movement packet.");
@@ -286,10 +279,19 @@ public class UserInput : MonoBehaviour
         }
         Reader.LoadNew(buffer);
         Reader.Skip(offset);
+#if CLIENT
+        ulong s64 = Reader.ReadUInt64();
+        EditorUser? user = UserManager.FromId(s64);
+        if (user == null)
+        {
+            Logger.LogError("Failed to find user for movement packet from a steam id: " + s64.Format() + ".");
+            return;
+        }
+#endif
         user.Input.HandleReadPackets(Reader);
 
 #if SERVER
-        if (Provider.clients.Count > 1)
+        if (Provider.clients.Count > 0)//1)
         {
             byte[] sendBytes = new byte[sizeof(ulong) + len];
             Buffer.BlockCopy(buffer, offset, sendBytes, sizeof(ulong), len);
@@ -298,7 +300,7 @@ public class UserInput : MonoBehaviour
             for (int i = 0; i < Provider.clients.Count; ++i)
             {
                 SteamPlayer pl = Provider.clients[i];
-                if (pl.playerID.steamID.m_SteamID != user.SteamId.m_SteamID)
+                //if (pl.playerID.steamID.m_SteamID != user.SteamId.m_SteamID)
                     list.Add(pl.transportConnection);
             }
 
@@ -312,7 +314,7 @@ public class UserInput : MonoBehaviour
         if (packets.Count < 1) return;
         HandleFlushPackets(Writer);
         int len = Writer.Count;
-        NetFactory.SendGeneric(NetFactory.DevkitMessage.MovementRelay, Writer.FinishWrite(), 0, len);
+        NetFactory.SendGeneric(NetFactory.DevkitMessage.MovementRelay, Writer.FinishWrite(), 0, len, _bufferHasStop);
         _bufferHasStop = false;
     }
     private void HandleFlushPackets(ByteWriter writer)
@@ -439,7 +441,7 @@ public class UserInput : MonoBehaviour
                                                   packet.Input.y *
                                                   dt *
                                                   packet.Speed;
-            pos = Vector3.Lerp(pos, packet.Position, 1f / packets.Count * ((pos - packet.Position).sqrMagnitude / 36f));
+            pos = Vector3.Lerp(pos, packet.Position, 1f / (packets.Count + 1) * ((pos - packet.Position).sqrMagnitude / 49f));
             this.transform.position = pos;
         }
         if ((packet.Flags & Flags.Rotation) != 0)
@@ -476,7 +478,7 @@ public class UserInput : MonoBehaviour
                     Input = new Vector3((sbyte)((byte)((inputFlag & 0b00001100) >> 2) - 1),
                         (sbyte)((byte)(inputFlag & 0b00000011) - 1),
                         (sbyte)((byte)((inputFlag & 0b00110000) >> 4) - 1));
-                    Position = ReadLowPrecisionVector3Pos(reader);
+                    Position = reader.ReadVector3();
                 }
 
                 if ((Flags & Flags.Rotation) != 0)
@@ -503,7 +505,7 @@ public class UserInput : MonoBehaviour
                                             (byte)((byte)(Mathf.Clamp(Input.x, -1, 1) + 1) << 2) |
                                             (byte)((byte)(Mathf.Clamp(Input.z, -1, 1) + 1) << 4));
                     writer.Write(inputFlag);
-                    WriteLowPrecisionVector3Pos(writer, Position);
+                    writer.Write(Position);
                 }
                     
                 if ((Flags & Flags.Rotation) != 0)
@@ -515,19 +517,9 @@ public class UserInput : MonoBehaviour
                 writer.Write(Rotation);
             }
         }
-
-        private static Vector3 ReadLowPrecisionVector3Pos(ByteReader reader) => new Vector3(reader.ReadInt24() / 2f,
-            reader.ReadInt24() / 2f, reader.ReadInt24() / 2f);
-
+        
         private static Quaternion ReadLowPrecisionQuaternion(ByteReader reader) => new Quaternion(reader.ReadInt8() / 127f,
             reader.ReadInt8() / 127f, reader.ReadInt8() / 127f, reader.ReadInt8() / 127f);
-
-        private static void WriteLowPrecisionVector3Pos(ByteWriter writer, Vector3 pos)
-        {
-            writer.WriteInt24((int)Mathf.Clamp(pos.x * 2, -DevkitServerUtility.Int24Bounds, DevkitServerUtility.Int24Bounds));
-            writer.WriteInt24((int)Mathf.Clamp(pos.y * 2, -DevkitServerUtility.Int24Bounds, DevkitServerUtility.Int24Bounds));
-            writer.WriteInt24((int)Mathf.Clamp(pos.z * 2, -DevkitServerUtility.Int24Bounds, DevkitServerUtility.Int24Bounds));
-        }
 
         private static void WriteLowPrecisionQuaternion(ByteWriter writer, Quaternion rot)
         {

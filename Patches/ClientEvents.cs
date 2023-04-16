@@ -202,12 +202,12 @@ public static class ClientEvents
                 if (ins.Count > i + 3 && ins[i + 2].opcode == OpCodes.Newobj && writeHeightmap != null && (ins[i + 3].Calls(writeHeightmap) || ins[i + 3].Calls(writeSplatmap) || ins[i + 3].Calls(writeHoles)))
                 {
                     yield return new CodeInstruction(OpCodes.Dup);
-                    yield return new CodeInstruction(OpCodes.Stloc_S, localBounds.LocalIndex);
+                    yield return DevkitServerUtility.GetLocalCodeInstruction(localBounds, localBounds.LocalIndex, true);
                     yield return c;
                     yield return n;
                     yield return ins[i + 2];
                     yield return ins[i + 3];
-                    yield return new CodeInstruction(OpCodes.Ldloc_S, localBounds.LocalIndex);
+                    yield return DevkitServerUtility.GetLocalCodeInstruction(localBounds, localBounds.LocalIndex, false);
                     MethodInfo? invoker = null;
                     // heightmap
                     if (method == rampHandler)

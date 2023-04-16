@@ -17,7 +17,7 @@ public static class EncodingEx
     {
         typeof(ulong), typeof(float), typeof(long), typeof(ushort), typeof(short), typeof(byte), typeof(int), typeof(uint), typeof(bool), typeof(char), typeof(sbyte), typeof(double),
         typeof(string), typeof(decimal), typeof(DateTime), typeof(DateTimeOffset), typeof(TimeSpan), typeof(Guid),
-        typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Quaternion), typeof(Color), typeof(Color32)
+        typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Quaternion), typeof(Color), typeof(Color32), typeof(Bounds)
     };
     internal static readonly Type[] ValidArrayTypes =
     {
@@ -38,7 +38,7 @@ public static class EncodingEx
     public static Bounds ReadInflatedBounds(this ByteReader reader) => ReadInflatedBounds(reader, out _);
     public static Bounds ReadInflatedBounds(this ByteReader reader, out bool extraFlag)
     {
-        // 1 = sz full, 2 = sz ushort, 4 = pos full, 8 = pos ushort, 16 = ignore center y, 32 = ignore size y, 64 = preserve size signs
+        // 1 = sz full, 2 = sz ushort, 4 = pos full, 8 = pos ushort, 16 = ignore center y, 32 = ignore size y, 64 = preserve size signs, 128 = extra flag
         byte flags = reader.ReadUInt8();
         extraFlag = (flags & 128) == 128;
         bool ignoreCenterY = (flags & 16) == 16, ignoreSizeY = (flags & 32) == 32, preserveSizeSigns = (flags & 64) == 64;

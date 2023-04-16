@@ -25,6 +25,7 @@ public static class NetFactory
     private static readonly List<Listener> localAckRequests = new List<Listener>(16);
     private static readonly List<NetMethodInfo> registeredMethods = new List<NetMethodInfo>(16);
     private static readonly Dictionary<ushort, BaseNetCall> invokers = new Dictionary<ushort, BaseNetCall>(16);
+    private static readonly Dictionary<ushort, BaseNetCall> hsInvokers = new Dictionary<ushort, BaseNetCall>(16);
     private static Func<PooledTransportConnectionList>? PullFromTransportConnectionListPool;
     /// <summary>The maximum amount of time in seconds a listener is guaranteed to stay active.</summary>
     public const double MaxListenTimeout = 600d;
@@ -353,9 +354,9 @@ public static class NetFactory
             return;
         MessageOverhead ovh = new MessageOverhead(bytes);
 #if SERVER
-        OnReceived(bytes, transportConnection, ovh);
+        OnReceived(bytes, transportConnection, ovh, false);
 #else
-        OnReceived(bytes, GetPlayerTransportConnection(), ovh);
+        OnReceived(bytes, GetPlayerTransportConnection(), ovh, false);
 #endif
     }
     [UsedImplicitly]
@@ -378,7 +379,7 @@ public static class NetFactory
             return;
         }
         MessageOverhead ovh = new MessageOverhead(bytes, sender);
-        OnReceived(bytes, GetPlayerTransportConnection(), ovh);
+        OnReceived(bytes, GetPlayerTransportConnection(), ovh, false);
 #endif
 #if SERVER
         EditorUser? user = UserManager.FromConnection(transportConnection);
@@ -449,7 +450,7 @@ public static class NetFactory
             MessageOverhead ovh = new MessageOverhead(msg, user.SteamId.m_SteamID);
             if ((ovh.Flags & MessageFlags.RunOriginalMethodOnRequest) != 0)
             {
-                OnReceived(msg, transportConnection, in ovh);
+                OnReceived(msg, transportConnection, in ovh, false);
             }
         }
         return;
@@ -525,7 +526,7 @@ public static class NetFactory
 #else
         IClientTransport
 #endif
-            connection, in MessageOverhead overhead)
+            connection, in MessageOverhead overhead, bool hs)
     {
         lock (sync)
         {
@@ -549,11 +550,12 @@ public static class NetFactory
 //                DevkitServerUtility.PrintBytesHex(data, 32);
 //            }
 //#endif
-            if (invokers.TryGetValue(overhead.MessageId, out BaseNetCall call))
+            if ((hs ? hsInvokers : invokers).TryGetValue(overhead.MessageId, out BaseNetCall call))
             {
+                bool verified = !hs || connection is not HighSpeedConnection hsc || hsc.Verified;
                 object[]? parameters = null;
                 bool one = false;
-                if (overhead.RequestKey != default)
+                if (overhead.RequestKey != default && verified)
                 {
                     if ((overhead.Flags & MessageFlags.RequestResponse) == MessageFlags.RequestResponse)
                     {
@@ -564,7 +566,7 @@ public static class NetFactory
                             if (localListeners[l].RequestId == rk)
                             {
                                 Listener lt = localListeners[l];
-                                if (lt.Caller.ID == call.ID)
+                                if (lt.Caller.ID == call.ID && lt.Caller.HighSpeed == hs)
                                 {
                                     if (lt.Task != null && !lt.Task.isCompleted)
                                     {
@@ -580,7 +582,7 @@ public static class NetFactory
 
                                         object[] old = parameters;
                                         parameters = new object[old.Length + 1];
-                                        parameters[0] = new MessageContext(connection, overhead);
+                                        parameters[0] = new MessageContext(connection, overhead, hs);
                                         Array.Copy(old, 0, parameters, 1, old.Length);
                                         lt.Task.TellCompleted(parameters, true);
                                     }
@@ -599,7 +601,7 @@ public static class NetFactory
                             if (localAckRequests[l].RequestId == rk)
                             {
                                 Listener lt = localAckRequests[l];
-                                if (lt.Caller.ID == call.ID)
+                                if (lt.Caller.ID == call.ID && lt.Caller.HighSpeed == hs)
                                 {
                                     int? errorCode = null;
                                     if (overhead.Size == sizeof(int))
@@ -609,7 +611,7 @@ public static class NetFactory
                                     }
                                     if (lt.Task != null && !lt.Task.isCompleted)
                                     {
-                                        lt.Task.TellCompleted(new MessageContext(connection, overhead), true, errorCode);
+                                        lt.Task.TellCompleted(new MessageContext(connection, overhead, hs), true, errorCode);
                                     }
                                     localAckRequests.RemoveAt(l);
                                     break;
@@ -622,7 +624,7 @@ public static class NetFactory
                     goto rtn;
                 for (int i = 0; i < registeredMethods.Count; ++i)
                 {
-                    if (registeredMethods[i].Attribute.MethodID == call.ID)
+                    if (registeredMethods[i].Attribute.MethodID == call.ID && registeredMethods[i].Attribute.HighSpeed == hs && (verified || registeredMethods[i].Attribute.HighSpeedAllowUnverified))
                     {
                         NetMethodInfo info = registeredMethods[i];
                         if (parameters == null)
@@ -639,7 +641,7 @@ public static class NetFactory
 
                             object[] old = parameters;
                             parameters = new object[old.Length + 1];
-                            parameters[0] = new MessageContext(connection, overhead);
+                            parameters[0] = new MessageContext(connection, overhead, hs);
                             Array.Copy(old, 0, parameters, 1, old.Length);
                         }
                         try
@@ -794,7 +796,7 @@ public static class NetFactory
                         if (Attribute.GetCustomAttribute(field, typeof(IgnoreInvokerAttribute)) != null || field.GetValue(null) is not BaseNetCall call)
                             continue;
                         Type callType = call.GetType();
-                        if (invokers.TryGetValue(call.ID, out BaseNetCall c2))
+                        if (!call.HighSpeed && invokers.TryGetValue(call.ID, out BaseNetCall c2) || call.HighSpeed && hsInvokers.TryGetValue(call.ID, out c2))
                         {
                             if (c2.GetType() != call.GetType())
                                 Logger.LogWarning("Inconsistant duplicate invoker " + call.ID + " at field " + field.Format() + ".");
@@ -804,7 +806,7 @@ public static class NetFactory
                         for (int index = registeredMethods.Count - 1; index >= 0; --index)
                         {
                             NetMethodInfo info = registeredMethods[index];
-                            if (info.Attribute.MethodID == call.ID)
+                            if (info.Attribute.MethodID == call.ID && info.Attribute.HighSpeed == call.HighSpeed)
                             {
                                 ParameterInfo[] parameters = info.Method.GetParameters();
                                 if (parameters.Length == 0 || parameters[0].ParameterType != typeof(MessageContext))
@@ -871,12 +873,13 @@ public static class NetFactory
                         }
                         call.Name = field.Name;
                         call.SetThrowOnError(true);
-                        invokers.Add(call.ID, call);
+                        (call.HighSpeed ? hsInvokers : invokers).Add(call.ID, call);
                     }
                 }
-                catch (TypeLoadException)
+                catch (TypeLoadException ex)
                 {
-                    // ignored
+                    Logger.LogWarning("Error loading type to check for NetCalls:");
+                    Logger.LogError(ex);
                 }
             }
         }
@@ -1072,6 +1075,8 @@ public sealed class NetCallAttribute : Attribute
     }
     public NetCallSource Type => type;
     public ushort MethodID => methodId;
+    public bool HighSpeed { get; set; }
+    public bool HighSpeedAllowUnverified { get; set; }
 }
 
 [AttributeUsage(AttributeTargets.Field)]

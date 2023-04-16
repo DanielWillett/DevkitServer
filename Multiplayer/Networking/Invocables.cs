@@ -10,6 +10,7 @@ public abstract class BaseNetCall
     internal const MessageFlags AcknowledgeRequestFlags = DefaultFlags | MessageFlags.AcknowledgeRequest;
     public readonly ushort ID;
     public string Name { get; internal set; } = null!;
+    public bool HighSpeed { get; set; }
 
     protected BaseNetCall(ushort method)
     {
@@ -164,7 +165,55 @@ public class NetCallCustom : BaseNetCall
 #endif
             task);
     }
-    public NetTask Request(BaseNetCall listener, ITransportConnection connection, WriterTask task, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, WriterTask task)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        try
+        {
+            lock (_writer)
+            {
+                _writer.Flush();
+                task(_writer);
+                _writer.PrependData(ref overhead);
+                connection.Send(_writer.ToArray());
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID} to server (HS).");
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, WriterTask task)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection, task);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, WriterTask task, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, task);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, WriterTask task, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, task);
+        return task2;
+    }
+#endif
+    public NetTask Request(BaseNetCall listener,
+#if SERVER
+        ITransportConnection connection,
+#endif
+        WriterTask task, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
@@ -175,7 +224,11 @@ public class NetCallCustom : BaseNetCall
             task);
         return task2;
     }
-    public NetTask RequestAck(ITransportConnection connection, WriterTask task, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    public NetTask RequestAck(
+#if SERVER
+        ITransportConnection connection,
+#endif
+        WriterTask task, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
@@ -247,6 +300,36 @@ public sealed class NetCall : BaseNetCall
         parameters = Array.Empty<object>();
         return true;
     }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        connection.Send(overhead.GetBytes());
+    }
+    public void Invoke(HighSpeedConnection connection)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection);
+        return task2;
+    }
+#endif
     public NetTask Request(BaseNetCall listener,
 #if SERVER
         ITransportConnection connection, 
@@ -384,6 +467,45 @@ public sealed class NetCallRaw<T> : NetCallRaw
         parameters = success ? new object[] { a1! } : Array.Empty<object>();
         return success;
     }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T arg)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T arg)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection, arg);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T arg, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T arg, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg);
+        return task2;
+    }
+#endif
     public NetTask Request(BaseNetCall listener,
 #if SERVER
         ITransportConnection connection, 
@@ -530,6 +652,45 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
         parameters = success ? new object[] { a1!, a2! } : Array.Empty<object>();
         return success;
     }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T1 arg1, T2 arg2)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg1, arg2));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection, arg1, arg2);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2);
+        return task2;
+    }
+#endif
     public NetTask Request(BaseNetCall listener,
 #if SERVER
         ITransportConnection connection, 
@@ -679,6 +840,45 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
         parameters = success ? new object[] { a1!, a2!, a3! } : Array.Empty<object>();
         return success;
     }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg1, arg2, arg3));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection, arg1, arg2, arg3);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3);
+        return task2;
+    }
+#endif
     public NetTask Request(BaseNetCall listener,
 #if SERVER
         ITransportConnection connection, 
@@ -829,6 +1029,45 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
         parameters = success ? new object[] { a1!, a2!, a3!, a4! } : Array.Empty<object>();
         return success;
     }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4);
+        return task2;
+    }
+#endif
     public NetTask Request(BaseNetCall listener,
 #if SERVER
         ITransportConnection connection, 
@@ -951,17 +1190,17 @@ public sealed class NetCall<T> : DynamicNetCall
         }
     }
 #endif
-    public bool Read(byte[] message, out T arg1)
+    public bool Read(byte[] message, out T arg)
     {
         try
         {
-            return _reader.Read(message, out arg1);
+            return _reader.Read(message, out arg);
         }
         catch (Exception ex)
         {
             Logger.LogError($"Error reading method {ID}.");
             Logger.LogError(ex);
-            arg1 = default!;
+            arg = default!;
             return false;
         }
     }
@@ -971,6 +1210,45 @@ public sealed class NetCall<T> : DynamicNetCall
         parameters = success ? new object[] { a1! } : Array.Empty<object>();
         return success;
     }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T arg)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T arg)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection, arg);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T arg, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T arg, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg);
+        return task2;
+    }
+#endif
     public NetTask Request(BaseNetCall listener,
 #if SERVER
         ITransportConnection connection, 
@@ -1114,6 +1392,45 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
         parameters = success ? new object[] { a1!, a2! } : Array.Empty<object>();
         return success;
     }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T1 arg1, T2 arg2)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg1, arg2));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection, arg1, arg2);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2);
+        return task2;
+    }
+#endif
     public NetTask Request(BaseNetCall listener,
 #if SERVER
         ITransportConnection connection, 
@@ -1258,6 +1575,45 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
         parameters = success ? new object[] { arg1!, arg2!, arg3! } : Array.Empty<object>();
         return success;
     }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg1, arg2, arg3));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection, arg1, arg2, arg3);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3);
+        return task2;
+    }
+#endif
     public NetTask Request(BaseNetCall listener,
 #if SERVER
         ITransportConnection connection, 
@@ -1403,6 +1759,45 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
         parameters = success ? new object[] { arg1!, arg2!, arg3!, arg4! } : Array.Empty<object>();
         return success;
     }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4);
+        return task2;
+    }
+#endif
     public NetTask Request(BaseNetCall listener,
 #if SERVER
         ITransportConnection connection, 
@@ -1549,6 +1944,45 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
         parameters = success ? new object[] { arg1!, arg2!, arg3!, arg4!, arg5! } : Array.Empty<object>();
         return success;
     }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5);
+        return task2;
+    }
+#endif
     public NetTask Request(BaseNetCall listener,
 #if SERVER
         ITransportConnection connection, 
@@ -1696,6 +2130,45 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
         parameters = success ? new object[] { arg1!, arg2!, arg3!, arg4!, arg5!, arg6! } : Array.Empty<object>();
         return success;
     }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6);
+        return task2;
+    }
+#endif
     public NetTask Request(BaseNetCall listener,
 #if SERVER
         ITransportConnection connection, 
@@ -1859,6 +2332,45 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         return success;
     }
 
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+        return task2;
+    }
+#endif
     public NetTask Request(BaseNetCall listener,
 #if SERVER
         ITransportConnection connection,
@@ -2011,6 +2523,45 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
         parameters = success ? new object[] { arg1!, arg2!, arg3!, arg4!, arg5!, arg6!, arg7!, arg8! } : Array.Empty<object>();
         return success;
     }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+        return task2;
+    }
+#endif
     public NetTask Request(BaseNetCall listener,
 #if SERVER
         ITransportConnection connection, 
@@ -2160,6 +2711,45 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
         parameters = success ? new object[] { arg1!, arg2!, arg3!, arg4!, arg5!, arg6!, arg7!, arg8!, arg9! } : Array.Empty<object>();
         return success;
     }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+        return task2;
+    }
+#endif
     public NetTask Request(BaseNetCall listener,
 #if SERVER
         ITransportConnection connection, 
@@ -2310,6 +2900,45 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
         parameters = success ? new object[] { arg1!, arg2!, arg3!, arg4!, arg5!, arg6!, arg7!, arg8!, arg9!, arg10! } : Array.Empty<object>();
         return success;
     }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+        return task2;
+    }
+#endif
     public NetTask Request(BaseNetCall listener,
 #if SERVER
         ITransportConnection connection, 

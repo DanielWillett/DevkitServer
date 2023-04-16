@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
 using SDG.Framework.Landscapes;
+using Action = System.Action;
 
 namespace DevkitServer.Util;
 public static class DevkitServerUtility
@@ -287,6 +288,7 @@ public static class DevkitServerUtility
         ptr[index] = ptr[index + 3];
         ptr[index + 3] = b;
     }
+    public static uint ReverseUInt32(uint val) => ((val >> 24) & 0xFF) | (((val >> 16) & 0xFF) << 8) | (((val >> 8) & 0xFF) << 16) | (val << 24);
     public static bool Encapsulates(this in LandscapeBounds outer, in LandscapeBounds inner) =>
         outer.min.x < inner.min.x && outer.min.y < inner.min.y && outer.max.x > inner.max.x && outer.max.y > inner.max.y;
     public static bool Encapsulates(this in HeightmapBounds outer, in HeightmapBounds inner) =>
@@ -332,12 +334,10 @@ public static class DevkitServerUtility
         if (left.max.y < right.max.y)
             left.max.y = right.max.y;
     }
-
     public static Vector2 ToVector2(this in Vector3 v3) => new Vector2(v3.x, v3.z);
     public static Vector3 ToVector3(this in Vector2 v2) => new Vector3(v2.x, 0f, v2.y);
     public static Vector3 ToVector3(this in Vector2 v2, float y) => new Vector3(v2.x, y, v2.y);
     public static CodeInstruction CopyWithoutSpecial(this CodeInstruction instruction) => new CodeInstruction(instruction.opcode, instruction.operand);
-
     public static bool TryParseSteamId(string str, out CSteamID steamId)
     {
         if (str.Equals("Nil", StringComparison.InvariantCultureIgnoreCase) ||
@@ -480,6 +480,21 @@ public static class DevkitServerUtility
         steamId = CSteamID.Nil;
         return false;
     }
+    public static bool QueueOnMainThread(Action action, bool skipFrame = false, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!skipFrame && DevkitServerModule.IsMainThread)
+        {
+            action();
+            return false;
+        }
+
+        MainThreadTask.MainThreadResult res = new MainThreadTask.MainThreadResult(new MainThreadTask(skipFrame, token));
+        res.OnCompleted(action);
+        return true;
+    }
+    public static MainThreadTask ToUpdate(CancellationToken token = default) => DevkitServerModule.IsMainThread ? MainThreadTask.CompletedNoSkip : new MainThreadTask(false, token);
+    public static MainThreadTask SkipFrame(CancellationToken token = default) => DevkitServerModule.IsMainThread ? MainThreadTask.CompletedSkip : new MainThreadTask(true, token);
 }
 
 public static class AssetTypeHelper<TAsset>
