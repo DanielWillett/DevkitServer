@@ -1,9 +1,7 @@
 ﻿using JetBrains.Annotations;
-using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
-using SDG.Framework.Utilities;
 
 namespace DevkitServer.Multiplayer.Networking;
 public class HighSpeedConnection : ITransportConnection
@@ -14,7 +12,6 @@ public class HighSpeedConnection : ITransportConnection
 #if CLIENT
     public static HighSpeedConnection? Instance { get; private set; }
 #endif
-    private readonly ConcurrentQueue<byte[]> _messageQueue = new ConcurrentQueue<byte[]>();
     private readonly byte[] _buffer = new byte[HighSpeedNetFactory.BufferSize];
     private readonly NetworkBuffer _netBuffer;
     public event NetworkBufferProgressUpdate? BufferProgressUpdated;
@@ -24,16 +21,19 @@ public class HighSpeedConnection : ITransportConnection
     public TcpClient Client { get; }
 #if SERVER
     public HighSpeedServer Server { get; }
-    public ITransportConnection SteamConnection { get; }
+    public ITransportConnection? SteamConnection { get; private set; }
+    public List<ITransportConnection>? SteamConnectionCandidates { get; private set; }
 #else
     public IClientTransport SteamConnection { get; }
 #endif
-    public ulong Steam64 { get; }
-    public HighSpeedConnection(TcpClient client,
+    public ulong Steam64 { get; private set; }
+    public HighSpeedConnection(TcpClient client
 #if SERVER
-        ITransportConnection steamConnection, 
+        , List<ITransportConnection> steamConnections
 #endif
-        ulong steam64
+#if CLIENT
+        , ulong steam64
+#endif
 #if SERVER
         , HighSpeedServer server
 #endif
@@ -41,24 +41,30 @@ public class HighSpeedConnection : ITransportConnection
     {
         Client = client;
 #if SERVER
-        SteamConnection = steamConnection;
+        if (steamConnections.Count == 1)
+        {
+            SteamConnection = steamConnections[0];
+            Steam64 = Provider.findTransportConnectionSteamId(SteamConnection).m_SteamID;
+        }
+        else
+            SteamConnectionCandidates = steamConnections;
         Server = server;
 #else
         SteamConnection = NetFactory.GetPlayerTransportConnection();
-        if (Instance != null)
-            Instance.Dispose();
+        Instance?.Dispose();
         Instance = this;
-#endif
         Steam64 = steam64;
-        _netBuffer = new NetworkBuffer(MessageReady, HighSpeedNetFactory.BufferSize, this);
-        _netBuffer.BufferProgressUpdated += BufferProgressUpdated;
-        TimeUtility.updated += Update;
+#endif
+        _netBuffer = new NetworkBuffer(MessageReady, this, _buffer);
+        _netBuffer.BufferProgressUpdated += OnBufferProgressUpdatedIntl;
     }
+
+    private void OnBufferProgressUpdatedIntl(int bytesDownloaded, int totalBytes) => BufferProgressUpdated?.Invoke(bytesDownloaded, totalBytes);
 
     public void Dispose()
     {
         if (_disposed) return;
-        TimeUtility.updated -= Update;
+        Logger.LogDebug("[HIGH SPEED CONNECTION] Closing high-speed connection.");
 #if SERVER
         if (Server != null)
         {
@@ -70,7 +76,7 @@ public class HighSpeedConnection : ITransportConnection
         if (Instance == this)
             Instance = null;
 #endif
-        _netBuffer.BufferProgressUpdated -= BufferProgressUpdated;
+        _netBuffer.BufferProgressUpdated -= OnBufferProgressUpdatedIntl;
         _netBuffer.Buffer = Array.Empty<byte>();
         Client.Dispose();
         _disposed = true;
@@ -136,6 +142,10 @@ public class HighSpeedConnection : ITransportConnection
         NetworkStream str = Client.GetStream();
         try
         {
+#if DEBUG
+            MessageOverhead ovh = new MessageOverhead(buffer);
+            Logger.LogDebug("Sending message: " + ovh.Format() + ".");
+#endif
             str.BeginWrite(buffer, 0, (int)size, EndWrite, str);
         }
         catch (IOException ex)
@@ -155,16 +165,7 @@ public class HighSpeedConnection : ITransportConnection
             CloseConnection();
         }
     }
-
-    [UsedImplicitly]
-    private void Update()
-    {
-        while (_messageQueue.TryDequeue(out byte[] msg))
-        {
-            _netBuffer.Buffer = msg;
-            _netBuffer.ProcessBuffer(msg.Length);
-        }
-    }
+    
     private void EndWrite(IAsyncResult ar)
     {
         try
@@ -178,6 +179,8 @@ public class HighSpeedConnection : ITransportConnection
         }
         catch (ObjectDisposedException ex)
         {
+            if (_disposed)
+                return;
             Logger.LogError("[HIGH SPEED CONNECTION] ObjectDisposedException in EndWrite.");
             Logger.LogError(ex);
             CloseConnection();
@@ -219,11 +222,14 @@ public class HighSpeedConnection : ITransportConnection
         try
         {
             int ct = (ar.AsyncState as NetworkStream ?? Client.GetStream()).EndRead(ar);
+            if (ct < 1)
+            {
+                CloseConnection();
+                return;
+            }
             ar.AsyncWaitHandle.Dispose();
-            byte[] bytes = new byte[ct];
-            Buffer.BlockCopy(_buffer, 0, bytes, 0, ct);
+            _netBuffer.ProcessBuffer(ct);
             Listen();
-            _messageQueue.Enqueue(bytes);
         }
         catch (IOException ex)
         {
@@ -231,6 +237,8 @@ public class HighSpeedConnection : ITransportConnection
         }
         catch (ObjectDisposedException ex)
         {
+            if (_disposed)
+                return;
             Logger.LogError("[HIGH SPEED CONNECTION] ObjectDisposedException in EndRead.");
             Logger.LogError(ex);
             CloseConnection();
@@ -258,10 +266,22 @@ public class HighSpeedConnection : ITransportConnection
     }
     private void MessageReady(byte[] payload)
     {
-        MessageOverhead overhead = new MessageOverhead(payload);
-        HighSpeedNetFactory.Receive(this, payload, in overhead);
-        Logger.LogDebug("[HIGH SPEED CONNECTION] HS message received: " + overhead.Format() + ".");
+        DevkitServerUtility.QueueOnMainThread(() =>
+        {
+            MessageOverhead overhead = new MessageOverhead(payload);
+            Logger.LogDebug("[HIGH SPEED CONNECTION] HS message received: " + overhead.Format() + ".");
+            HighSpeedNetFactory.Receive(this, payload, in overhead);
+        });
     }
+#if SERVER
+    internal void Verify(ITransportConnection connection, ulong steam64)
+    {
+        Verified = true;
+        SteamConnection = connection;
+        SteamConnectionCandidates = null;
+        Steam64 = steam64;
+    }
+#endif
 
 #if CLIENT
     void IClientTransport.Initialize(ClientTransportReady callback, ClientTransportFailure failureCallback) => throw new NotImplementedException();

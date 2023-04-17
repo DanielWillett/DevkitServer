@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using DevkitServer.Multiplayer;
 #if CLIENT
+using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players.UI;
 #endif
 using JetBrains.Annotations;
@@ -92,6 +93,15 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     internal static void OnClientDisconnected()
     {
         DevkitServerModule.Instance.UnloadBundle();
+        try
+        {
+            HighSpeedConnection.Instance?.CloseConnection();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("Unable to close high-speed server!");
+            Logger.LogError(ex);
+        }
 
         if (User != null || User is not null)
         {

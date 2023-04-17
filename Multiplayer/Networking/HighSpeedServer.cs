@@ -2,6 +2,8 @@
 using DevkitServer.Configuration;
 using System.Net;
 using System.Net.Sockets;
+using SDG.Framework.Debug;
+using SDG.NetTransport.SteamNetworkingSockets;
 
 namespace DevkitServer.Multiplayer.Networking;
 public class HighSpeedServer : IDisposable
@@ -33,7 +35,7 @@ public class HighSpeedServer : IDisposable
     {
         if (DevkitServerConfig.Config.TcpSettings == null)
             throw new Exception("High-speed settings not initialized to a value.");
-        _listener = new TcpListener(IPAddress.Loopback, DevkitServerConfig.Config.TcpSettings.HighSpeedPort);
+        _listener = new TcpListener(IPAddress.Any, DevkitServerConfig.Config.TcpSettings.HighSpeedPort);
         _listener.Start(24);
         VerifiedConnections = _connections.AsReadOnly();
         PendingConnections = _pending.AsReadOnly();
@@ -52,46 +54,23 @@ public class HighSpeedServer : IDisposable
                 Reject(client);
                 return;
             }
-
-            ITransportConnection? connection = null;
-            ulong steam64 = 0ul;
-            for (int i = 0; i < Provider.clients.Count; ++i)
+            
+            if (!DevkitServerUtility.TryGetConnections(ep.Address, out List<ITransportConnection> results))
             {
-                if (Provider.clients[i].transportConnection.GetAddress().Equals(ep.Address))
-                {
-                    connection = Provider.clients[i].transportConnection;
-                    steam64 = Provider.clients[i].playerID.steamID.m_SteamID;
-                    break;
-                }
-            }
-
-            if (connection == null)
-            {
-                for (int i = 0; i < Provider.pending.Count; ++i)
-                {
-                    if (Provider.pending[i].transportConnection.GetAddress().Equals(ep.Address))
-                    {
-                        connection = Provider.pending[i].transportConnection;
-                        steam64 = Provider.pending[i].playerID.steamID.m_SteamID;
-                        break;
-                    }
-                }
-
-                if (connection == null)
-                {
-                    Logger.LogWarning("[HIGH SPEED SERVER] Unknown client connecting from " + ep.Format() + ".");
-                    Reject(client);
-                    return;
-                }
+                Logger.LogWarning("[HIGH SPEED SERVER] Unknown client connecting from " + ep.Format() + ".");
+                Reject(client);
+                return;
             }
 
             client.SendBufferSize = HighSpeedNetFactory.BufferSize;
             client.ReceiveBufferSize = HighSpeedNetFactory.BufferSize;
 
-            Logger.LogInfo("[HIGH SPEED SERVER] Client connecting to high-speed server: {" + steam64.Format() + "}.");
-            HighSpeedConnection hsConn = new HighSpeedConnection(client, connection, steam64, this);
+            Logger.LogInfo("[HIGH SPEED SERVER] Client connecting to high-speed server: " +
+                           string.Join(" or ", results.Select(x => x.GetAddress().Format() + ":" + (x.TryGetPort(out ushort port) ? port.Format() : "XXXXX"))));
+            HighSpeedConnection hsConn = new HighSpeedConnection(client, results, this);
+            hsConn.Listen();
             _pending.Add(hsConn);
-            HighSpeedNetFactory.StartVerifying(hsConn);
+            DevkitServerUtility.QueueOnMainThread(() => HighSpeedNetFactory.StartVerifying(hsConn));
         }
         catch (Exception ex)
         {
@@ -103,18 +82,15 @@ public class HighSpeedServer : IDisposable
             _listener.BeginAcceptTcpClient(EndAccept, _listener);
         }
     }
-    internal void ReceiveVerifyPacket(ITransportConnection connection, Guid sent)
+    internal void ReceiveVerifyPacket(ITransportConnection connection, Guid sent, ulong steam64)
     {
         for (int i = 0; i < _pending.Count; ++i)
         {
             HighSpeedConnection hs = _pending[i];
-            if (connection.Equals(hs.SteamConnection))
+            if (hs.SteamToken == sent && !hs.Verified)
             {
-                if (sent != hs.SteamToken)
-                {
-                    Logger.LogInfo("[HIGH SPEED SERVER] High-speed connection not verified: incorrect token. (Sent: " + sent.Format() + ", Expected: " + hs.SteamToken.Format() + ".");
-                }
-                hs.Verified = true;
+                hs.Verify(connection, steam64);
+
                 _pending.RemoveAtFast(i);
                 _connections.Add(hs);
                 Logger.LogDebug("[HIGH SPEED SERVER] High-speed connection established to: " + hs.Steam64.Format() + " (" + hs.GetAddressString(true) + ").");
@@ -129,6 +105,16 @@ public class HighSpeedServer : IDisposable
         _pending.Remove(connection);
         _connections.Remove(connection);
         Logger.LogDebug("[HIGH SPEED SERVER] Client disconnected: " + connection.GetAddress().Format() + ".");
+    }
+    internal static void Disconnect(CSteamID player)
+    {
+        if (_instance != null)
+        {
+            foreach (HighSpeedConnection connection in _instance._connections.Concat(_instance._pending).Where(x => x.Steam64 == player.m_SteamID || x.Verified && (x.SteamConnection == null || !x.SteamConnection.TryGetPort(out _))))
+            {
+                connection.CloseConnection();
+            }
+        }
     }
     private static void Reject(TcpClient client)
     {

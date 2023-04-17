@@ -152,9 +152,11 @@ public struct Folder
             FolderName = reader.ReadString(),
             Folders = new string[reader.ReadInt32()]
         };
+        
         for (int i = 0; i < folder.Folders.Length; ++i)
         {
-            Logger.LogInfo("Folder: " + (folder.Folders[i] = UnformatPath(reader.ReadString())));
+            folder.Folders[i] = UnformatPath(reader.ReadString());
+            Logger.LogInfo("Folder: " + folder.Folders[i]);
         }
         int len = reader.ReadInt32();
         folder.Files = new File[len];
@@ -165,7 +167,7 @@ public struct Folder
                 Path = UnformatPath(reader.ReadString()),
                 Content = reader.ReadLongBytes() ?? Array.Empty<byte>()
             };
-            Logger.LogInfo("File: " + folder.Files[i].Path + " (" + DevkitServerUtility.FormatBytes(folder.Files[i].Content.Length) + ")");
+            // Logger.LogInfo("File: " + folder.Files[i].Path + " (" + DevkitServerUtility.FormatBytes(folder.Files[i].Content.Length) + ")");
         }
         return folder;
     }

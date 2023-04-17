@@ -27,21 +27,28 @@ public sealed class NetTask : CustomYieldInstruction
         _awaiter = new NetTaskAwaiter(this);
         isCompleted = true;
     }
-    public NetTask(bool ack, int timeoutMs = DEFAULT_TIMEOUT_MS)
+    public NetTask(bool ack, int timeoutMs = DEFAULT_TIMEOUT_MS) : this(ack, GetNextRequestID(), timeoutMs) { }
+    internal NetTask(bool ack, long reqId, int timeoutMs = DEFAULT_TIMEOUT_MS)
     {
         isAck = ack;
+        requestId = reqId;
         if (timeoutMs / 1000d > NetFactory.MaxListenTimeout)
         {
             Logger.LogWarning("Started a listener or ack listener with a timeout longer than the max timeout (" +
-                               NetFactory.MaxListenTimeout.ToString("0.##", CultureInfo.InvariantCulture) +
-                               " seconds). Using max as timeout.");
+                              NetFactory.MaxListenTimeout.ToString("0.##", CultureInfo.InvariantCulture) +
+                              " seconds). Using max as timeout.");
             Logger.LogWarning(new StackTrace().ToString());
             timeoutMs = (int)Math.Floor(NetFactory.MaxListenTimeout * 1000d);
         }
-        requestId = GetNextRequestID();
         _awaiter = new NetTaskAwaiter(this);
         timer = new Timer(TimerMethod, this, timeoutMs, Timeout.Infinite);
         this.timeoutMs = timeoutMs;
+    }
+    public void KeepAlive()
+    {
+        _awaiter.end = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        timer?.Change((int)Math.Round((_awaiter.end - _awaiter.start).TotalMilliseconds) + timeoutMs, Timeout.Infinite);
+        NetFactory.KeepAlive(this);
     }
     internal static long GetNextRequestID()
     {
@@ -105,8 +112,8 @@ public sealed class NetTask : CustomYieldInstruction
     public sealed class NetTaskAwaiter : INotifyCompletion
     {
         private readonly NetTask task;
-        private readonly DateTime start;
-        private readonly DateTime end;
+        internal readonly DateTime start;
+        internal DateTime end;
         public NetTaskAwaiter(NetTask task)
         {
             this.task = task ?? throw new ArgumentNullException(nameof(task), "Task was null in NetTaskResult constructor.");

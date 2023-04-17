@@ -1,4 +1,5 @@
-﻿using DevkitServer.Players;
+﻿using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Players;
 
 namespace DevkitServer.Multiplayer;
 [EarlyTypeInit]
@@ -100,6 +101,8 @@ public static class UserManager
         EditorUser? user = FromId(player);
         if (user == null)
             return;
+
+        HighSpeedServer.Disconnect(player);
 
         _users.Remove(user);
         OnUserDisconnected?.Invoke(user);

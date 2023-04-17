@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace DevkitServer.Util.Terminals;
+﻿namespace DevkitServer.Util.Terminals;
 internal sealed class BackgroundLoggingTerminal : MonoBehaviour, ITerminal
 {
     private bool _writing;
@@ -18,14 +12,13 @@ internal sealed class BackgroundLoggingTerminal : MonoBehaviour, ITerminal
         if (save)
         {
             _writing = true;
-            switch (color)
+            switch (severity)
             {
-                case ConsoleColor.Yellow:
-                case ConsoleColor.DarkYellow:
+                case Severity.Warning:
                     UnturnedLog.warn(input);
                     break;
-                case ConsoleColor.Red:
-                case ConsoleColor.DarkRed:
+                case Severity.Error:
+                case Severity.Fatal:
                     UnturnedLog.error(input);
                     break;
                 default:

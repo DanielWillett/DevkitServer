@@ -10,11 +10,12 @@ public class NetworkBuffer : IDisposable
     private bool _disposed;
     public readonly ITransportConnection Owner;
     public event NetworkBufferProgressUpdate? BufferProgressUpdated;
-    public NetworkBuffer(Action<byte[]> onMsgReady, int capacity, ITransportConnection owner)
+    public NetworkBuffer(Action<byte[]> onMsgReady, int capacity, ITransportConnection owner) : this (onMsgReady, owner, new byte[capacity]) { }
+    public NetworkBuffer(Action<byte[]> onMsgReady, ITransportConnection owner, byte[] buffer)
     {
         _onMsgReady = onMsgReady;
-        BufferSize = capacity;
-        Buffer = new byte[capacity];
+        BufferSize = buffer.Length;
+        Buffer = buffer;
         Owner = owner;
     }
     public unsafe void ProcessBuffer(int amtReceived, int offset = 0)
@@ -22,7 +23,7 @@ public class NetworkBuffer : IDisposable
         if (_disposed) return;
         try
         {
-            lock (Buffer)
+            lock (this)
             {
                 fixed (byte* bytes = &Buffer[offset])
                 {
@@ -46,8 +47,8 @@ public class NetworkBuffer : IDisposable
                             _pendingData = new byte[amtReceived];
                             fixed (byte* ptr = _pendingData)
                                 System.Buffer.MemoryCopy(bytes, ptr, amtReceived, amtReceived);
-                            _onMsgReady(_pendingData);
                             BufferProgressUpdated?.Invoke(amtReceived, amtReceived);
+                            _onMsgReady(_pendingData);
                             goto reset;
                         }
 
@@ -64,13 +65,13 @@ public class NetworkBuffer : IDisposable
                         _pendingData = new byte[expSize];
                         fixed (byte* ptr = _pendingData)
                             System.Buffer.MemoryCopy(bytes, ptr, expSize, expSize);
+                        BufferProgressUpdated?.Invoke(expSize, expSize);
                         _onMsgReady(_pendingData);
                         _pendingData = null;
                         PendingOverhead = default;
                         _pendingLength = 0;
                         amtReceived -= expSize;
                         offset = expSize;
-                        BufferProgressUpdated?.Invoke(expSize, expSize);
                         goto next;
                     }
                     else
@@ -81,8 +82,8 @@ public class NetworkBuffer : IDisposable
                         {
                             fixed (byte* ptr = &_pendingData![_pendingLength])
                                 System.Buffer.MemoryCopy(bytes, ptr, amtReceived, amtReceived);
-                            _onMsgReady(_pendingData);
                             BufferProgressUpdated?.Invoke(ttlSize, expSize);
+                            _onMsgReady(_pendingData);
                             goto reset;
                         }
                         // continue the data for another packet
@@ -99,6 +100,7 @@ public class NetworkBuffer : IDisposable
                         int remaining = expSize - _pendingLength;
                         fixed (byte* ptr = &_pendingData![_pendingLength])
                             System.Buffer.MemoryCopy(bytes, ptr, remaining, remaining);
+                        BufferProgressUpdated?.Invoke(expSize, expSize);
                         _onMsgReady(_pendingData);
                         _pendingData = null;
                         PendingOverhead = default;
@@ -106,7 +108,6 @@ public class NetworkBuffer : IDisposable
                         GC.Collect();
                         amtReceived -= remaining;
                         offset = remaining;
-                        BufferProgressUpdated?.Invoke(expSize, expSize);
                         goto next;
                     }
                     reset:

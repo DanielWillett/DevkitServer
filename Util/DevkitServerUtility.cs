@@ -2,12 +2,16 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Net;
 using System.Reflection.Emit;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Patches;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
+using SDG.Framework.Debug;
 using SDG.Framework.Landscapes;
 using Action = System.Action;
 
@@ -495,6 +499,47 @@ public static class DevkitServerUtility
     }
     public static MainThreadTask ToUpdate(CancellationToken token = default) => DevkitServerModule.IsMainThread ? MainThreadTask.CompletedNoSkip : new MainThreadTask(false, token);
     public static MainThreadTask SkipFrame(CancellationToken token = default) => DevkitServerModule.IsMainThread ? MainThreadTask.CompletedSkip : new MainThreadTask(true, token);
+#if SERVER
+    public static bool TryGetConnections(IPAddress ip, out List<ITransportConnection> results)
+    {
+        ip = ip.MapToIPv4();
+        results = new List<ITransportConnection>();
+        for (int i = 0; i < Provider.clients.Count; ++i)
+        {
+            Logger.LogDebug("[GET CONNECTION FROM IP] " + Provider.clients[i].transportConnection.GetAddress().Format() + " vs " + ip.Format() + ":");
+            if (Provider.clients[i].transportConnection.GetAddress().MapToIPv4().Equals(ip))
+            {
+                Logger.LogDebug("[GET CONNECTION FROM IP]  Matches");
+                results.Add(Provider.clients[i].transportConnection);
+                break;
+            }
+        }
+        
+        for (int i = 0; i < Provider.pending.Count; ++i)
+        {
+            Logger.LogDebug("[GET CONNECTION FROM IP] " + Provider.pending[i].transportConnection.GetAddress().Format() + " vs " + ip.Format() + ":");
+            if (Provider.pending[i].transportConnection.GetAddress().MapToIPv4().Equals(ip))
+            {
+                Logger.LogDebug("[GET CONNECTION FROM IP]  Matches");
+                results.Add(Provider.pending[i].transportConnection);
+                break;
+            }
+        }
+
+        for (int i = 0; i < PatchesMain.PendingConnections.Count; ++i)
+        {
+            Logger.LogDebug("[GET CONNECTION FROM IP] " + PatchesMain.PendingConnections[i].GetAddress().MapToIPv4().Format() + " vs " + ip.Format() + ":");
+            if (PatchesMain.PendingConnections[i].GetAddress().MapToIPv4().Equals(ip))
+            {
+                Logger.LogDebug("[GET CONNECTION FROM IP]  Matches");
+                results.Add(PatchesMain.PendingConnections[i]);
+                break;
+            }
+        }
+        
+        return results.Count != 0;
+    }
+#endif
 }
 
 public static class AssetTypeHelper<TAsset>

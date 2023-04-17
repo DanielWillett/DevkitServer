@@ -516,8 +516,8 @@ public static class NetFactory
         return true;
     }
 
-    internal static string GetInvokerName(ushort id) =>
-        invokers.TryGetValue(id, out BaseNetCall bnc) ? bnc.Name : id.ToString();
+    internal static string GetInvokerName(ushort id, bool hs = false) =>
+        (!hs ? invokers : hsInvokers).TryGetValue(id, out BaseNetCall bnc) ? bnc.Name : id.ToString();
     internal static T? GetInvoker<T>(ushort id) where T : BaseNetCall =>
         invokers.TryGetValue(id, out BaseNetCall bnc) ? bnc as T : null;
     internal static void OnReceived(byte[] message,
@@ -1011,6 +1011,18 @@ public static class NetFactory
     {
         ThreadUtil.assertIsGameThread();
 
+        if (connection is HighSpeedConnection conn2)
+        {
+            if (offset > 0)
+            {
+                byte[] newBytes = new byte[count];
+                Buffer.BlockCopy(bytes, offset, newBytes, 0, count);
+                bytes = newBytes;
+            }
+            conn2.Send(bytes, count < 0 ? bytes.Length : count, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
+            return;
+        }
+
         Writer.Reset();
         int msg = WriteBlockOffset + (int)DevkitMessage.InvokeMethod;
 #if SERVER
@@ -1046,6 +1058,16 @@ public static class NetFactory
             connections[i].Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
     }
 #endif
+    internal static void KeepAlive(NetTask task)
+    {
+        for (int i = 0; i < localAckRequests.Count; ++i)
+            if (localAckRequests[i].Task == task)
+                localAckRequests[i] = new Listener(task, localAckRequests[i].Caller);
+
+        for (int i = 0; i < localListeners.Count; ++i)
+            if (localListeners[i].Task == task)
+                localListeners[i] = new Listener(task, localListeners[i].Caller);
+    }
     private readonly struct Listener
     {
         public readonly long RequestId;

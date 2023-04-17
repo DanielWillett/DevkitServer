@@ -23,5 +23,6 @@ public enum MessageFlags : byte
     AcknowledgeResponse = 16,
     /// <summary>Requests an ACK message to be returned from a response to a request.</summary>
     RequestResponseWithAcknowledgeRequest = 32,
-    Relay = 64
+    Relay = 64,
+    HighSpeed = 128
 }

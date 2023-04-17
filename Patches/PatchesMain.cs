@@ -9,6 +9,7 @@ using DevkitServer.Players;
 using SDG.Provider;
 #endif
 #if SERVER
+using SDG.NetPak;
 using System.Reflection.Emit;
 using SDG.Framework.Landscapes;
 #endif
@@ -237,17 +238,41 @@ internal static class PatchesMain
     }
 
 
-    [UsedImplicitly]
-    private static Exception SteamPlayerConstructorFinalizer(Exception? __exception)
-    {
-        if (__exception != null)
-            Logger.LogError(__exception);
-        else
-            Logger.LogDebug("No exception");
-        return null!;
-    }
-
 #if SERVER
+    internal static List<ITransportConnection> PendingConnections = new List<ITransportConnection>(8);
+    internal static void RemoveExpiredConnections()
+    {
+        for (int i = PendingConnections.Count - 1; i >= 0; --i)
+        {
+            if (!PendingConnections[i].TryGetPort(out _))
+                PendingConnections.RemoveAt(i);
+        }
+    }
+    internal static void RemoveConnection(ITransportConnection connection)
+    {
+        for (int i = PendingConnections.Count - 1; i >= 0; --i)
+        {
+            if (PendingConnections[i].Equals(connection))
+                PendingConnections.RemoveAt(i);
+        }
+    }
+    [HarmonyPatch("ServerMessageHandler_GetWorkshopFiles", "ReadMessage", MethodType.Normal)]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    private static void OnConnectionPending(ITransportConnection transportConnection, NetPakReader reader)
+    {
+        RemoveExpiredConnections();
+        RemoveConnection(transportConnection);
+        PendingConnections.Add(transportConnection);
+    }
+    [HarmonyPatch("ServerMessageHandler_ReadyToConnect", "ReadMessage", MethodType.Normal)]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    private static void OnReadyToConnect(ITransportConnection transportConnection, NetPakReader reader)
+    {
+        RemoveExpiredConnections();
+        RemoveConnection(transportConnection);
+    }
     [UsedImplicitly]
     [HarmonyPatch(typeof(LevelLighting), nameof(LevelLighting.updateLocal), typeof(Vector3), typeof(float), typeof(IAmbianceNode))]
     [HarmonyPrefix]

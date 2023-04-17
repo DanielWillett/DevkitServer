@@ -1,18 +1,19 @@
-﻿using DevkitServer.Configuration;
+﻿#if SERVER
+using DevkitServer.Configuration;
+#endif
 #if CLIENT
 using System.Net;
 using System.Net.Sockets;
-using Action = System.Action;
 #endif
 
 namespace DevkitServer.Multiplayer.Networking;
 public static class HighSpeedNetFactory
 {
-    public const int BufferSize = 8192;
+    public const int BufferSize = ushort.MaxValue;
 
     internal static readonly NetCall<Guid> HighSpeedVerify = new NetCall<Guid>((ushort)HighSpeedNetCall.Verify) { HighSpeed = true };
     internal static readonly NetCall HighSpeedVerifyConfirm = new NetCall((ushort)HighSpeedNetCall.VerifyConfirm) { HighSpeed = true };
-    internal static readonly NetCall<Guid> SteamVerify = new NetCall<Guid>((ushort)NetCalls.SendSteamVerificationToken);
+    internal static readonly NetCall<Guid, ulong> SteamVerify = new NetCall<Guid, ulong>((ushort)NetCalls.SendSteamVerificationToken);
     internal static readonly NetCall<ushort> OpenHighSpeedClient = new NetCall<ushort>((ushort)NetCalls.OpenHighSpeedClient);
 #if SERVER
     internal static void StartVerifying(HighSpeedConnection pending)
@@ -23,7 +24,7 @@ public static class HighSpeedNetFactory
     }
 
     [NetCall(NetCallSource.FromClient, (ushort)NetCalls.SendSteamVerificationToken)]
-    private static void ReceiveSteamToken(MessageContext ctx, Guid received)
+    private static void ReceiveSteamToken(MessageContext ctx, Guid received, ulong steam64)
     {
         HighSpeedServer server = HighSpeedServer.Instance;
         if (server == null)
@@ -32,7 +33,7 @@ public static class HighSpeedNetFactory
             return;
         }
 
-        server.ReceiveVerifyPacket(ctx.Connection, received);
+        server.ReceiveVerifyPacket(ctx.Connection, received, steam64);
         Logger.LogDebug("Received steam token from: " + ctx.Connection.GetAddress().Format() + ".");
     }
 
@@ -70,8 +71,8 @@ public static class HighSpeedNetFactory
         }
         
         conn.SteamToken = received;
-        Logger.LogDebug("Send steam token for high-speed connection.");
-        SteamVerify.Invoke(received);
+        Logger.LogDebug("Sent steam token for high-speed connection.");
+        SteamVerify.Invoke(received, Provider.client.m_SteamID);
     }
     [NetCall(NetCallSource.FromServer, (ushort)HighSpeedNetCall.VerifyConfirm, HighSpeed = true, HighSpeedAllowUnverified = true)]
     private static void ReceiveVerified(MessageContext ctx)
@@ -84,20 +85,21 @@ public static class HighSpeedNetFactory
 
         conn.Verified = true;
         Logger.LogDebug("Verified high-speed connection.");
-        DevkitServerUtility.QueueOnMainThread(() =>
-        {
-            for (int i = 0; i < PendingConnects.Count; i++)
-                PendingConnects[i].Acknowledge(StandardErrorCode.Success);
+        for (int i = 0; i < PendingConnects.Count; i++)
+            PendingConnects[i].Acknowledge(StandardErrorCode.Success);
 
-            PendingConnects.Clear();
-        });
+        PendingConnects.Clear();
     }
 
     public static void BeginGetConnectionToServer(ushort port)
     {
         IPAddress ip = new IPAddress(DevkitServerUtility.ReverseUInt32(Provider.currentServerInfo.ip));
         Logger.LogInfo("Connecting to server at " + ip.Format() + ":" + port.Format() + ".");
-        TcpClient client = new TcpClient();
+        TcpClient client = new TcpClient
+        {
+            ReceiveBufferSize = BufferSize,
+            SendBufferSize = BufferSize
+        };
         try
         {
             client.BeginConnect(ip, port, EndConnect, client);
@@ -127,7 +129,9 @@ public static class HighSpeedNetFactory
             {
                 client.EndConnect(ar);
                 Logger.LogInfo("Finished connecting to " + client.Client.RemoteEndPoint.Format() + ".");
-                _ = new HighSpeedConnection(client, Provider.client.m_SteamID);
+                HighSpeedConnection conn = new HighSpeedConnection(client, Provider.client.m_SteamID);
+                conn.Listen();
+                return;
             }
             catch (SocketException ex)
             {

@@ -158,7 +158,11 @@ public class NetCallCustom : BaseNetCall
 #endif
         WriterTask task)
     {
-        MessageOverhead ovh = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead ovh = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                  | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                  , ID, 0);
         Invoke(ref ovh,
 #if SERVER
             connection, 
@@ -216,7 +220,11 @@ public class NetCallCustom : BaseNetCall
         WriterTask task, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                       , ID, 0, task2.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -231,7 +239,11 @@ public class NetCallCustom : BaseNetCall
         WriterTask task, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task2.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -268,6 +280,14 @@ public sealed class NetCall : BaseNetCall
 #endif
         )
     {
+#if SERVER
+        if (connection is HighSpeedConnection)
+        {
+            connection.Send(new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0).GetBytes());
+            return;
+        }
+#endif
+
         _bytes ??= new MessageOverhead(DefaultFlags, ID, 0).GetBytes();
 #if SERVER
         connection.Send(_bytes);
@@ -312,20 +332,20 @@ public sealed class NetCall : BaseNetCall
     }
     public void Invoke(HighSpeedConnection connection)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
         Invoke(ref overhead, connection);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection);
         return task2;
     }
@@ -337,7 +357,11 @@ public sealed class NetCall : BaseNetCall
         int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = listener.Listen(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead
 #if SERVER
             , connection
@@ -352,7 +376,11 @@ public sealed class NetCall : BaseNetCall
         int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = ListenAck(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead
 #if SERVER
             , connection
@@ -424,7 +452,11 @@ public sealed class NetCallRaw<T> : NetCallRaw
 #endif
         T arg)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -488,20 +520,20 @@ public sealed class NetCallRaw<T> : NetCallRaw
     }
     public void Invoke(HighSpeedConnection connection, T arg)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
         Invoke(ref overhead, connection, arg);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T arg, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, T arg, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg);
         return task2;
     }
@@ -513,7 +545,11 @@ public sealed class NetCallRaw<T> : NetCallRaw
         T arg, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = listener.Listen(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -528,7 +564,11 @@ public sealed class NetCallRaw<T> : NetCallRaw
         T arg, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = ListenAck(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -608,7 +648,11 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
 #endif
         T1 arg1, T2 arg2)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -673,20 +717,20 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
         Invoke(ref overhead, connection, arg1, arg2);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2);
         return task2;
     }
@@ -698,7 +742,11 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
         T1 arg1, T2 arg2, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = listener.Listen(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -713,7 +761,11 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
         T1 arg1, T2 arg2, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = ListenAck(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -795,7 +847,11 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
 #endif
         T1 arg1, T2 arg2, T3 arg3)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -861,20 +917,20 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
         Invoke(ref overhead, connection, arg1, arg2, arg3);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3);
         return task2;
     }
@@ -886,7 +942,11 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
         T1 arg1, T2 arg2, T3 arg3, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = listener.Listen(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -901,7 +961,11 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
         T1 arg1, T2 arg2, T3 arg3, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = ListenAck(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -983,7 +1047,11 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
 #endif
         T1 arg1, T2 arg2, T3 arg3, T4 arg4)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1050,20 +1118,20 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4);
         return task2;
     }
@@ -1075,7 +1143,11 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = listener.Listen(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1090,7 +1162,11 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = ListenAck(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1167,7 +1243,11 @@ public sealed class NetCall<T> : DynamicNetCall
 #endif
         T arg)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1231,20 +1311,20 @@ public sealed class NetCall<T> : DynamicNetCall
     }
     public void Invoke(HighSpeedConnection connection, T arg)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
         Invoke(ref overhead, connection, arg);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T arg, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, T arg, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg);
         return task2;
     }
@@ -1256,7 +1336,11 @@ public sealed class NetCall<T> : DynamicNetCall
         T arg, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = listener.Listen(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1271,7 +1355,11 @@ public sealed class NetCall<T> : DynamicNetCall
         T arg, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = ListenAck(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1348,7 +1436,11 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
 #endif
         T1 arg1, T2 arg2)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1413,20 +1505,20 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
         Invoke(ref overhead, connection, arg1, arg2);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2);
         return task2;
     }
@@ -1438,7 +1530,11 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
         T1 arg1, T2 arg2, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = listener.Listen(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1453,7 +1549,11 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
         T1 arg1, T2 arg2, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = ListenAck(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1530,7 +1630,11 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
 #endif
         T1 arg1, T2 arg2, T3 arg3)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1596,20 +1700,20 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
         Invoke(ref overhead, connection, arg1, arg2, arg3);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3);
         return task2;
     }
@@ -1621,7 +1725,11 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
         T1 arg1, T2 arg2, T3 arg3, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = listener.Listen(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1636,7 +1744,11 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
         T1 arg1, T2 arg2, T3 arg3, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = ListenAck(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1713,7 +1825,11 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
 #endif
         T1 arg1, T2 arg2, T3 arg3, T4 arg4)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1780,20 +1896,20 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4);
         return task2;
     }
@@ -1805,7 +1921,11 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = listener.Listen(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1820,7 +1940,11 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = ListenAck(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1897,7 +2021,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
 #endif
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -1965,20 +2093,20 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5);
         return task2;
     }
@@ -1990,7 +2118,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = listener.Listen(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -2005,7 +2137,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = ListenAck(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -2082,7 +2218,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
 #endif
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -2151,20 +2291,20 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6);
         return task2;
     }
@@ -2176,7 +2316,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = listener.Listen(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -2191,7 +2335,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = ListenAck(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -2279,7 +2427,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
 #endif
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
         Invoke(ref overhead,
 #if SERVER
             connection,
@@ -2353,20 +2505,20 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
         return task2;
     }
@@ -2378,7 +2530,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = listener.Listen(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection,
@@ -2394,7 +2550,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = ListenAck(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection,
@@ -2473,7 +2633,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
 #endif
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -2544,20 +2708,20 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
         return task2;
     }
@@ -2569,7 +2733,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = listener.Listen(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -2584,7 +2752,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = ListenAck(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -2660,7 +2832,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
 #endif
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -2732,20 +2908,20 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
         return task2;
     }
@@ -2757,7 +2933,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = listener.Listen(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -2772,7 +2952,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = ListenAck(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -2848,7 +3032,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
 #endif
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -2921,20 +3109,20 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task2.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
         Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
         return task2;
     }
@@ -2946,7 +3134,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = listener.Listen(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 
@@ -2961,7 +3153,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
         T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
     {
         NetTask task = ListenAck(TimeoutMS);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, ID, 0, task.requestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
         Invoke(ref overhead,
 #if SERVER
             connection, 

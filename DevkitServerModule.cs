@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Collections.Concurrent;
+using System.Reflection;
 using System.Reflection.Emit;
 using DevkitServer.Multiplayer;
 using DevkitServer.Patches;
@@ -284,15 +285,13 @@ public sealed class DevkitServerModule : IModuleNexus
 
 public sealed class DevkitServerModuleComponent : MonoBehaviour
 {
-    internal static Queue<MainThreadTask.MainThreadResult> ThreadActionRequests = new Queue<MainThreadTask.MainThreadResult>(4);
+    internal static ConcurrentQueue<MainThreadTask.MainThreadResult> ThreadActionRequests = new ConcurrentQueue<MainThreadTask.MainThreadResult>();
     void Update()
     {
-        while (ThreadActionRequests.Count > 0)
+        while (ThreadActionRequests.TryDequeue(out MainThreadTask.MainThreadResult res))
         {
-            MainThreadTask.MainThreadResult? res = null;
             try
             {
-                res = ThreadActionRequests.Dequeue();
                 res.Task.Token.ThrowIfCancellationRequested();
                 res.Continuation();
             }

@@ -12,5 +12,5 @@ internal enum NetCalls : ushort
     RequestLevelCheckup = 9,
     Ping = 10,
     SendSteamVerificationToken = 11,
-    OpenHighSpeedClient = 12,
+    OpenHighSpeedClient = 12
 }
