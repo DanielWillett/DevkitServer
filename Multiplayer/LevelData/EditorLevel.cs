@@ -2,13 +2,10 @@
 using DevkitServer.Util.Encoding;
 using System.IO.Compression;
 #if CLIENT
-using System.CodeDom;
 using DevkitServer.Patches;
 using SDG.Framework.Utilities;
-using UnityEngine.PlayerLoop;
 #endif
 #if SERVER
-using System.CodeDom;
 using CompressionLevel = System.IO.Compression.CompressionLevel;
 #endif
 
@@ -220,7 +217,7 @@ public static class EditorLevel
             }
             else
             {
-                Provider.reject(connection, ESteamRejection.PLUGIN, "bad download");
+                Provider.reject(connection, ESteamRejection.PLUGIN, "Downloads using Steamworks are temporarily disabled.");
                 throw new Exception("debug");
                 MessageOverhead cpy = new MessageOverhead(MessageFlags.None, (ushort)NetCalls.SendLevel, 0, 0);
                 byte[] dataBuffer = new byte[cpy.Length + sizeof(int) + DataBufferPacketSize];

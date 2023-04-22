@@ -5,6 +5,9 @@ using JetBrains.Annotations;
 using SDG.Framework.Devkit;
 using System.Reflection;
 using System.Reflection.Emit;
+#if CLIENT
+using DevkitServer.Players.UI;
+#endif
 using SDG.NetPak;
 using EditorUI = SDG.Unturned.EditorUI;
 
@@ -151,17 +154,22 @@ public class UserInput : MonoBehaviour
             if (ctrl == User.EditorObject)
             {
                 Logger.LogInfo("Camera controller set to {Editor}.", ConsoleColor.DarkCyan);
+#if CLIENT
                 ChangeUI(true);
-            }
+#endif
+}
             else if (ctrl == User.Player!.player.gameObject)
             {
                 Logger.LogInfo("Camera controller set to {Player}.", ConsoleColor.DarkCyan);
+#if CLIENT
                 ChangeUI(false);
+#endif
             }
             else
                 Logger.LogInfo("Camera controller set to \"" + ctrl.name + "\".", ConsoleColor.DarkCyan);
         }
     }
+#if CLIENT
     private void ChangeUI(bool editor)
     {
         Component? ui = !editor ? GetEditorUIInstance() : GetPlayerUIInstance();
@@ -199,8 +207,12 @@ public class UserInput : MonoBehaviour
             yield return null;
             RestartPlayerUI(player);
             Logger.LogInfo("Restarted PlayerUI.");
+            DevkitEditorHUD.Close(false);
         }
+        else if (editor)
+            DevkitEditorHUD.Open();
     }
+#endif
     private static bool SetActiveMainCamera(Transform tranform)
     {
         Transform? child = tranform.FindChildRecursive("Camera");

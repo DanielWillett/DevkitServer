@@ -101,9 +101,10 @@ public static class UserManager
         EditorUser? user = FromId(player);
         if (user == null)
             return;
-
-        HighSpeedServer.Disconnect(player);
-
+#if CLIENT
+        if (player.m_SteamID == Provider.client.m_SteamID)
+            HighSpeedConnection.Instance?.Dispose();
+#endif
         _users.Remove(user);
         OnUserDisconnected?.Invoke(user);
         user.IsOnline = false;

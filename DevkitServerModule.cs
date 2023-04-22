@@ -9,6 +9,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Plugins;
 
 namespace DevkitServer;
 
@@ -102,6 +103,7 @@ public sealed class DevkitServerModule : IModuleNexus
             Provider.onEnemyDisconnected += EditorUser.OnEnemyDisconnected;
             UserTPVControl.Init();
 #endif
+            PluginLoader.Load();
         }
         catch (Exception ex)
         {

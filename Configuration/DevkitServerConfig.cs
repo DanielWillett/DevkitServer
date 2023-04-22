@@ -52,9 +52,11 @@ public class DevkitServerConfig
     }
 
 #if CLIENT
-    public static readonly string FilePath = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer", "client_config.json");
+    public static readonly string FilePath = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer");
+    public static readonly string ConfigFilePath = Path.Combine(FilePath, "client_config.json");
 #else
-    public static readonly string FilePath = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer", Provider.serverID, "server_config.json");
+    public static readonly string FilePath = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer", Provider.serverID);
+    public static readonly string ConfigFilePath = Path.Combine(FilePath, "server_config.json");
 #endif
 
     private static SystemConfig? _config;
@@ -85,7 +87,7 @@ public class DevkitServerConfig
         {
             try
             {
-                string path = FilePath;
+                string path = ConfigFilePath;
                 if (Path.GetDirectoryName(path) is { } dir)
                     Directory.CreateDirectory(dir);
                 using FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
@@ -101,7 +103,7 @@ public class DevkitServerConfig
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error writing config file: \"" + FilePath + "\".");
+                Logger.LogError("Error writing config file: \"" + ConfigFilePath + "\".");
                 Logger.LogError(ex);
             }
         }
@@ -115,7 +117,7 @@ public class DevkitServerConfig
         {
             try
             {
-                string path = FilePath;
+                string path = ConfigFilePath;
                 if (File.Exists(path))
                 {
                     using FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -138,7 +140,7 @@ public class DevkitServerConfig
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error reading config file: \"" + FilePath + "\".");
+                Logger.LogError("Error reading config file: \"" + ConfigFilePath + "\".");
                 Logger.LogError(ex);
 
                 try
@@ -148,14 +150,14 @@ public class DevkitServerConfig
                     do
                     {
                         ++c;
-                        path = Path.Combine(Path.GetDirectoryName(FilePath)!, Path.GetFileNameWithoutExtension(FilePath) + "_backup_" + c + Path.GetExtension(FilePath));
+                        path = Path.Combine(Path.GetDirectoryName(ConfigFilePath)!, Path.GetFileNameWithoutExtension(ConfigFilePath) + "_backup_" + c + Path.GetExtension(ConfigFilePath));
                     }
                     while (File.Exists(path));
-                    File.Copy(FilePath, path);
+                    File.Copy(ConfigFilePath, path);
                 }
                 catch (Exception ex2)
                 {
-                    Logger.LogError("Error backing up config file from: \"" + FilePath + "\".");
+                    Logger.LogError("Error backing up config file from: \"" + ConfigFilePath + "\".");
                     Logger.LogError(ex2);
                 }
 #if SERVER

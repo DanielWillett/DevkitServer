@@ -20,6 +20,8 @@ Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "Unturned", "..\..\..\..\..\
 		IORedirection = Auto
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestPlugin", "TestPlugin\TestPlugin.csproj", "{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		ClientDebug|Any CPU = ClientDebug|Any CPU
@@ -72,6 +74,30 @@ Global
 		{6FE1178D-928F-471A-8B16-58F52D9872FB}.ServerDebug|x64.ActiveCfg = Release|x64
 		{6FE1178D-928F-471A-8B16-58F52D9872FB}.ServerRelease|Any CPU.ActiveCfg = Release|x64
 		{6FE1178D-928F-471A-8B16-58F52D9872FB}.ServerRelease|x64.ActiveCfg = Release|x64
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ClientDebug|Any CPU.ActiveCfg = Debug|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ClientDebug|Any CPU.Build.0 = Debug|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ClientDebug|x64.ActiveCfg = Debug|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ClientDebug|x64.Build.0 = Debug|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ClientRelease|Any CPU.ActiveCfg = Release|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ClientRelease|Any CPU.Build.0 = Release|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ClientRelease|x64.ActiveCfg = Release|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ClientRelease|x64.Build.0 = Release|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.Debug|x64.Build.0 = Debug|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.Release|x64.ActiveCfg = Release|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.Release|x64.Build.0 = Release|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ServerDebug|Any CPU.ActiveCfg = Debug|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ServerDebug|Any CPU.Build.0 = Debug|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ServerDebug|x64.ActiveCfg = Debug|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ServerDebug|x64.Build.0 = Debug|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ServerRelease|Any CPU.ActiveCfg = Release|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ServerRelease|Any CPU.Build.0 = Release|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ServerRelease|x64.ActiveCfg = Release|Any CPU
+		{93EF58E4-4CD0-4EDE-839F-8AC5FF9611A9}.ServerRelease|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

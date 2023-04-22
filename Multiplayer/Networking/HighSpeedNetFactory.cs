@@ -9,7 +9,7 @@ using System.Net.Sockets;
 namespace DevkitServer.Multiplayer.Networking;
 public static class HighSpeedNetFactory
 {
-    public const int BufferSize = ushort.MaxValue;
+    public const int BufferSize = 1048576;
 
     internal static readonly NetCall<Guid> HighSpeedVerify = new NetCall<Guid>((ushort)HighSpeedNetCall.Verify) { HighSpeed = true };
     internal static readonly NetCall HighSpeedVerifyConfirm = new NetCall((ushort)HighSpeedNetCall.VerifyConfirm) { HighSpeed = true };

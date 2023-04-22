@@ -651,8 +651,31 @@ internal static class Logger
 
         return instruction.Name;
     }
+    public static string Format(this string str, bool quotes)
+    {
+        if (StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+        {
+            string clr = (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                ? GetExtANSIForegroundString(ToArgb(new Color32(214, 157, 133, 255)))
+                : GetANSIForegroundString(ToConsoleColor(ToArgb(new Color32(214, 157, 133, 255)))));
+            
+            if (quotes)
+                return clr + "\"" + str + "\"" + ANSIReset;
+            else
+                return clr + str + ANSIReset;
+        }
+
+        return str;
+    }
     public static string Format(this object obj)
     {
+        if (obj == null)
+        {
+            if (StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+                return GetColor(StackCleaner.Configuration.Colors!.KeywordColor) + "null" + ANSIReset;
+            return "null";
+        }
+
         Type type = obj.GetType();
         string str = obj.ToString();
         if (str.Equals(type.ToString(), StringComparison.Ordinal))
@@ -702,7 +725,10 @@ internal static class Logger
     {
         if (StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            return GetExtANSIForegroundString(ToArgb(color)) + str + ANSIReset;
+            return (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                       ? GetExtANSIForegroundString(ToArgb(color))
+                       : GetANSIForegroundString(ToConsoleColor(ToArgb(color)))) 
+                + str + ANSIReset;
         }
 
         return str;
