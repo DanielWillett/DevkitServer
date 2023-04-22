@@ -89,7 +89,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
         {
             MessageOverhead overhead = new MessageOverhead(MessageFlags.LayeredRequest, (int)NetCalls.FlushEditBuffer, 0);
             Logger.LogDebug("Flushing " + _editBuffer.Count + " action(s).");
-            FlushEditBuffer.Invoke(ref overhead, WriteEditBuffer);
+            NetFactory.SendRelay(FlushEditBuffer.Write(ref overhead, WriteEditBuffer));
         }
     }
 #endif

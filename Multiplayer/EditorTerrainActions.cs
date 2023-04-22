@@ -373,7 +373,7 @@ public partial class EditorTerrain
     }
     public sealed class HeightmapSmoothAction : IBrushRadius, IBrushFalloff, IBrushStrength, IBrushPosition, IBounds
     {
-        public TerrainTransactionType Type => TerrainTransactionType.HeightmapFlatten;
+        public TerrainTransactionType Type => TerrainTransactionType.HeightmapSmooth;
         public TerrainEditorType EditorType => TerrainEditorType.Heightmap;
         public EDevkitLandscapeToolHeightmapSmoothMethod SmoothMethod { get; set; }
         public CSteamID Instigator { get; set; }

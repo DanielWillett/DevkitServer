@@ -303,7 +303,7 @@ public class UserInput : MonoBehaviour
         user.Input.HandleReadPackets(Reader);
 
 #if SERVER
-        if (Provider.clients.Count > 0)//1)
+        if (Provider.clients.Count > 1)
         {
             byte[] sendBytes = new byte[sizeof(ulong) + len];
             Buffer.BlockCopy(buffer, offset, sendBytes, sizeof(ulong), len);
@@ -312,7 +312,7 @@ public class UserInput : MonoBehaviour
             for (int i = 0; i < Provider.clients.Count; ++i)
             {
                 SteamPlayer pl = Provider.clients[i];
-                //if (pl.playerID.steamID.m_SteamID != user.SteamId.m_SteamID)
+                if (pl.playerID.steamID.m_SteamID != user.SteamId.m_SteamID)
                     list.Add(pl.transportConnection);
             }
 
@@ -404,8 +404,8 @@ public class UserInput : MonoBehaviour
                 {
                     Flags = Flags.StopMsg,
                     DeltaTime = Time.deltaTime,
-                    Rotation = _lastRot,
-                    Position = _lastPos
+                    Rotation = _lastRot = MainCamera.instance.transform.rotation,
+                    Position = _lastPos = transform.position
                 };
                 (packets ??= new Queue<UserInputPacket>(1)).Enqueue(_lastPacket);
                 _bufferHasStop = true;
@@ -442,20 +442,19 @@ public class UserInput : MonoBehaviour
     private void ApplyPacket(in UserInputPacket packet)
     {
         float dt = packet.DeltaTime;
+        Quaternion rot = (packet.Flags & Flags.Rotation) != 0 ? packet.Rotation : this.transform.rotation;
+        Vector3 pos = this.transform.position + rot *
+                                              packet.Input with { y = 0 } *
+                                              packet.Speed *
+                                              dt
+                                              +
+                                              Vector3.up *
+                                              packet.Input.y *
+                                              dt *
+                                              packet.Speed;
         if ((packet.Flags & Flags.Position) != 0)
-        {
-            Vector3 pos = this.transform.position + packet.Rotation *
-                                                  packet.Input with { y = 0 } *
-                                                  packet.Speed *
-                                                  dt
-                                                  +
-                                                  Vector3.up *
-                                                  packet.Input.y *
-                                                  dt *
-                                                  packet.Speed;
             pos = Vector3.Lerp(pos, packet.Position, 1f / (packets.Count + 1) * ((pos - packet.Position).sqrMagnitude / 49f));
-            this.transform.position = pos;
-        }
+        this.transform.position = pos;
         if ((packet.Flags & Flags.Rotation) != 0)
         {
             this.transform.rotation = packet.Rotation;

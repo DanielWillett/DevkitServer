@@ -11,6 +11,7 @@ public class DevkitServerConfig
 
     private static readonly JsonConverter[] Converters =
     {
+        new QuaternionJsonConverter(),
         new Vector3JsonConverter(),
         new Vector2JsonConverter(),
         new ColorJsonConverter(),

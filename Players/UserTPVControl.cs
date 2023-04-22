@@ -8,9 +8,10 @@ public class UserTPVControl : MonoBehaviour
     private static GameObject? _objectPrefab;
     private static bool _init;
     public EditorUser User { get; internal set; } = null!;
-    public GameObject Model { get; private set; }
+    public GameObject Model { get; private set; } = null!;
 
-    public void Start()
+    [UsedImplicitly]
+    private void Start()
     {
         if (User == null)
         {
@@ -37,6 +38,7 @@ public class UserTPVControl : MonoBehaviour
         }
 
         Model = Instantiate(_objectPrefab, transform, false);
+        Model.transform.rotation = Quaternion.Euler(90, 0, 0);
         Model.name = "TPV_Editor_" + User.SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture);
     }
 
