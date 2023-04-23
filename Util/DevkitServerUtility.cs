@@ -215,6 +215,39 @@ public static class DevkitServerUtility
              _ => new CodeInstruction(OpCodes.Ldc_I4, number),
         };
     }
+    public static CodeInstruction LoadParameter(int index)
+    {
+        return index switch
+        {
+             0 => new CodeInstruction(OpCodes.Ldarg_0),
+             1 => new CodeInstruction(OpCodes.Ldarg_1),
+             2 => new CodeInstruction(OpCodes.Ldarg_2),
+             3 => new CodeInstruction(OpCodes.Ldarg_3),
+             < ushort.MaxValue => new CodeInstruction(OpCodes.Ldarg_S, index),
+             _ => new CodeInstruction(OpCodes.Ldarg, index)
+        };
+    }
+    public static void LoadParameter(this ILGenerator generator, int index, bool byref = false)
+    {
+        if (byref)
+        {
+            generator.Emit(index > ushort.MaxValue ? OpCodes.Ldarga : OpCodes.Ldarga_S, index);
+            return;
+        }
+        OpCode code = index switch
+        {
+             0 => OpCodes.Ldarg_0,
+             1 => OpCodes.Ldarg_1,
+             2 => OpCodes.Ldarg_2,
+             3 => OpCodes.Ldarg_3,
+             <= ushort.MaxValue => OpCodes.Ldarg_S,
+             _ => OpCodes.Ldarg
+        };
+        if (index > 4)
+            generator.Emit(code, index);
+        else
+            generator.Emit(code);
+    }
     public static LocalBuilder? GetLocal(CodeInstruction code, out int index, bool set)
     {
         if (code.opcode.OperandType == OperandType.ShortInlineVar &&
@@ -591,6 +624,8 @@ public static class DevkitServerUtility
                 break;
         }
     }
+    public static unsafe bool UserSteam64(this ulong s64) => ((CSteamID*)&s64)->GetEAccountType() == EAccountType.k_EAccountTypeIndividual;
+    public static bool UserSteam64(this CSteamID s64) => s64.GetEAccountType() == EAccountType.k_EAccountTypeIndividual;
 }
 
 public static class AssetTypeHelper<TAsset>

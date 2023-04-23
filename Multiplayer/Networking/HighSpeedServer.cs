@@ -93,7 +93,7 @@ public class HighSpeedServer : IDisposable
 
                 _pending.RemoveAtFast(i);
                 _connections.Add(hs);
-                Logger.LogDebug("[HIGH SPEED SERVER] High-speed connection established to: " + hs.Steam64.Format() + " (" + hs.GetAddressString(true) + ").");
+                Logger.LogDebug("[HIGH SPEED SERVER] High-speed connection established to: " + hs.Steam64.Format() + " (" + hs.Format() + ").");
                 HighSpeedNetFactory.HighSpeedVerifyConfirm.Invoke(hs);
                 return;
             }

@@ -56,8 +56,6 @@ public class UserInput : MonoBehaviour
     private static readonly InstanceGetter<EditorMovement, Vector3> GetInput = Accessor.GenerateInstanceGetter<EditorMovement, Vector3>("input", BindingFlags.NonPublic, throwOnError: true)!;
     private static readonly InstanceSetter<PlayerInput, float>? SetLastInputted = Accessor.GenerateInstanceSetter<PlayerInput, float>("lastInputed");
     private static readonly Action<PlayerUI> RestartPlayerUI = Accessor.GenerateInstanceCaller<PlayerUI, Action<PlayerUI>>("InitializePlayer", throwOnError: true)!;
-    private static readonly StaticGetter<EditorUI?> GetEditorUIInstance = Accessor.GenerateStaticGetter<EditorUI, EditorUI?>("instance", throwOnError: true)!;
-    private static readonly StaticGetter<PlayerUI?> GetPlayerUIInstance = Accessor.GenerateStaticGetter<PlayerUI, PlayerUI?>("instance", throwOnError: true)!;
 
 #if CLIENT
     private EditorMovement? _movement;
@@ -172,7 +170,7 @@ public class UserInput : MonoBehaviour
 #if CLIENT
     private void ChangeUI(bool editor)
     {
-        Component? ui = !editor ? GetEditorUIInstance() : GetPlayerUIInstance();
+        Component? ui = !editor ? UIAccessTools.EditorUI : UIAccessTools.PlayerUI;
         if (ui != null)
         {
             Destroy(ui);
@@ -280,7 +278,7 @@ public class UserInput : MonoBehaviour
         EditorUser? user = UserManager.FromConnection(transportConnection);
         if (user == null)
         {
-            Logger.LogError("Failed to find user for movement packet from transport connection: " + transportConnection.GetAddressString(true).Format() + ".");
+            Logger.LogError("Failed to find user for movement packet from transport connection: " + transportConnection.Format() + ".");
             return;
         }
 #endif

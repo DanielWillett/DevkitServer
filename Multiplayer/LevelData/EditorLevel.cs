@@ -41,7 +41,7 @@ public static class EditorLevel
     [NetCall(NetCallSource.FromClient, (ushort)NetCalls.RequestLevel)]
     private static StandardErrorCode ReceiveLevelRequest(MessageContext ctx)
     {
-        Logger.LogInfo($"[SEND LEVEL] Received level request from ({ctx.Connection.GetAddressString(true) ?? "[unknown address]"}).", ConsoleColor.DarkCyan);
+        Logger.LogInfo($"[SEND LEVEL] Received level request from ({ctx.Connection.Format()}).", ConsoleColor.DarkCyan);
         DevkitServerModule.ComponentHost.StartCoroutine(SendLevelCoroutine(ctx.Connection));
         return StandardErrorCode.Success;
     }
@@ -170,7 +170,7 @@ public static class EditorLevel
             byte[] data = levelDataAtTimeOfRequest.Data;
             bool compressed = levelDataAtTimeOfRequest.Compressed;
 
-            Logger.LogInfo($"[SEND LEVEL] Gathered level data ({DevkitServerUtility.FormatBytes(data.Length)}) for ({connection.GetAddressString(true) ?? "[unknown address]"}) after {Time.realtimeSinceStartup - startTime:F2} seconds.", ConsoleColor.DarkCyan);
+            Logger.LogInfo($"[SEND LEVEL] Gathered level data ({DevkitServerUtility.FormatBytes(data.Length)}) for ({connection.Format()}) after {Time.realtimeSinceStartup - startTime:F2} seconds.", ConsoleColor.DarkCyan);
 
             if (!lowSpeedDownload)
             {

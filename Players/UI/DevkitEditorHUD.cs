@@ -46,6 +46,8 @@ public class DevkitEditorHUD : MonoBehaviour
             }
         }
         Container.AddChild(InfoBox);
+        EditorUI.window.AddChild(Container);
+        Logger.LogDebug("Inited hud");
     }
 
     private void UpdateInfoHeight()
@@ -83,6 +85,7 @@ public class DevkitEditorHUD : MonoBehaviour
         ViewportPlane.RemoveAllChildren();
         Container.RemoveAllChildren();
         Nametags.Clear();
+        EditorUI.window.RemoveChild(Container);
         if (Instance == this)
             Instance = null;
     }
@@ -195,21 +198,22 @@ public class DevkitEditorHUD : MonoBehaviour
 
     internal static void Open()
     {
-        if (EditorUser.User != null)
+        Logger.LogDebug("Opening HUD");
+
+        if (Instance == null)
         {
-            if (Instance == null)
-            {
-                Instance = DevkitServerModule.GameObjectHost.AddComponent<DevkitEditorHUD>();
-            }
-            if (Instance.IsActive)
-                return;
-            Instance.IsActive = true;
-            Instance.Container.AnimateIntoView();
-            Instance.UpdateAllNametags();
+            Instance = DevkitServerModule.GameObjectHost.AddComponent<DevkitEditorHUD>();
         }
+        if (Instance.IsActive)
+            return;
+        Instance.IsActive = true;
+        Instance.Container.AnimateIntoView();
+        Instance.UpdateAllNametags();
+        Logger.LogDebug(" Opened HUD");
     }
     internal static void Close(bool destroy)
     {
+        Logger.LogDebug("Closing HUD");
         if (Instance == null || !Instance.IsActive && destroy)
             return;
 
@@ -221,6 +225,7 @@ public class DevkitEditorHUD : MonoBehaviour
         {
             Instance.Container.AnimateOutOfView(0f, 1f);
         }
+        Logger.LogDebug(" Closed HUD");
         Instance.IsActive = false;
         Instance.UpdateAllNametags();
     }

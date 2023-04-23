@@ -26,6 +26,7 @@ public delegate void FlattenAction(Bounds bounds, Vector3 position, float radius
 public delegate void SmoothAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float target, EDevkitLandscapeToolHeightmapSmoothMethod method, float dt);
 public delegate void PaintAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, float target, bool useWeightTarget, bool autoSlope, bool autoFoundation, float autoMinAngleBegin, float autoMinAngleEnd, float autoMaxAngleBegin, float autoMaxAngleEnd, float autoRayLength, float autoRayRadius, ERayMask autoRayMask, bool isRemove, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt);
 public delegate void PaintSmoothAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, EDevkitLandscapeToolSplatmapSmoothMethod method, List<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>> averages, int sampleCount, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt);
+public delegate void SplatmapLayerMaterialsUpdateAction(LandscapeTile tile);
 
 [HarmonyPatch]
 [EarlyTypeInit]
@@ -45,6 +46,7 @@ public static class ClientEvents
     public static event RemoveFoliageAction? OnFoliageRemoved;
     public static event ResourceSpawnpointRemovedAction? OnResourceSpawnpointRemoved;
     public static event LevelObjectRemovedAction? OnLevelObjectRemoved;
+    public static event SplatmapLayerMaterialsUpdateAction? OnSplatmapLayerMaterialsUpdate;
 
     #region TerrainEditor.update
     [HarmonyPatch(typeof(TerrainEditor), nameof(TerrainEditor.update))]
@@ -435,61 +437,6 @@ public static class ClientEvents
     }
     #endregion
 
-    #region Landscape.writeMaps
-
-    [HarmonyPatch(typeof(Landscape), nameof(Landscape.writeHeightmap))]
-    [HarmonyTranspiler]
-    [UsedImplicitly]
-    private static IEnumerable<CodeInstruction> LandscapeWriteHeightmapTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
-        => LandscapeWriteTranspilerGeneric(instructions, method, "heightmapTransactions");
-
-    [HarmonyPatch(typeof(Landscape), nameof(Landscape.writeSplatmap))]
-    [HarmonyTranspiler]
-    [UsedImplicitly]
-    private static IEnumerable<CodeInstruction> LandscapeWriteSplatmapTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
-        => LandscapeWriteTranspilerGeneric(instructions, method, "splatmapTransactions");
-
-    [HarmonyPatch(typeof(Landscape), nameof(Landscape.writeHoles))]
-    [HarmonyTranspiler]
-    [UsedImplicitly]
-    private static IEnumerable<CodeInstruction> LandscapeWriteHolesTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
-        => LandscapeWriteTranspilerGeneric(instructions, method, "holeTransactions");
-
-    private static IEnumerable<CodeInstruction> LandscapeWriteTranspilerGeneric(IEnumerable<CodeInstruction> instructions, MethodBase method, string fieldName)
-    {
-        FieldInfo? hmTransactions = typeof(Landscape).GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Static);
-        if (hmTransactions == null)
-        {
-            Logger.LogWarning("Unable to find field: Landscape." + fieldName + " in " + method.Format() + ".");
-            DevkitServerModule.Fault();
-        }
-
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
-        bool ld = false;
-        bool st = false;
-        for (int i = 0; i < ins.Count; ++i)
-        {
-            CodeInstruction c = ins[i];
-            if (!ld && c.LoadsField(hmTransactions))
-                ld = true;
-            else if (ld && !st && c.Branches(out Label? lbl) && lbl.HasValue)
-            {
-                st = true;
-                yield return new CodeInstruction(OpCodes.Ldsfld, EditorTerrain.SaveTransactionsField);
-                yield return new CodeInstruction(OpCodes.And);
-                Logger.LogDebug("Inserted save transactions check in " + method.Format() + ".");
-            }
-
-            yield return c;
-        }
-        if (!st)
-        {
-            Logger.LogWarning("Patching error for " + method.Format() + ". Invalid transpiler operation.");
-            DevkitServerModule.Fault();
-        }
-    }
-    #endregion
-
     #region FoliageEditor.update
 
     [UsedImplicitly]
@@ -572,7 +519,7 @@ public static class ClientEvents
             {
                 yield return new CodeInstruction(OpCodes.Dup);
                 yield return c;
-                yield return new CodeInstruction(OpCodes.Call, lvlObjRemove);
+                yield return new CodeInstruction(OpCodes.Call, levelObjectRemovedInvoker);
                 Logger.LogDebug("Patched LevelObjectRemoved.");
             }
             else yield return c;
@@ -631,7 +578,7 @@ public static class ClientEvents
     [UsedImplicitly]
     private static void OnRemoveInstances(FoliageTile foliageTile, FoliageInstanceList list, float sqrBrushRadius, float sqrBrushFalloffRadius, bool allowRemoveBaked, int sampleCount)
     {
-        if (!DevkitServerModule.IsEditing) return;
+        if (!DevkitServerModule.IsEditing || !InputEx.GetKey(KeyCode.Mouse0)) return;
 
         Logger.LogDebug(sampleCount + " foliage removed from " +
                         foliageTile.coord.ToString() +
@@ -662,6 +609,19 @@ public static class ClientEvents
         OnLevelObjectRemoved?.Invoke(obj);
     }
 
+    #endregion
+
+    #region Tiles
+    [HarmonyPatch(typeof(LandscapeTile), nameof(LandscapeTile.updatePrototypes))]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void OnPrototypesUpdated(LandscapeTile __instance)
+    {
+        // was ran in the read method or during an apply call, no need to update.
+        if (!EditorTerrain.SaveTransactions || Landscape.getTile(__instance.coord) == null) return;
+
+        OnSplatmapLayerMaterialsUpdate?.Invoke(__instance);
+    }
     #endregion
 
     private static void CheckCopiedMethodPatchOutOfDate(ref MethodInfo original, MethodInfo invoker)

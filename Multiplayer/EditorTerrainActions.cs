@@ -5,6 +5,9 @@ using SDG.Framework.Landscapes;
 using SDG.Framework.Utilities;
 using System.Text;
 using DevkitServer.Patches;
+#if CLIENT
+using DevkitServer.Players.UI;
+#endif
 using HarmonyLib;
 using SDG.Framework.Devkit;
 
@@ -16,6 +19,17 @@ public partial class EditorTerrain
     private static readonly Pool<SplatmapSettingsCollection> SplatmapCollectionPool = new Pool<SplatmapSettingsCollection>();
     private readonly BrushSettingsCollection?[] ReadBrushSettingsMask = new BrushSettingsCollection?[BrushFlagLength];
     private readonly SplatmapSettingsCollection?[] ReadSplatmapSettingsMask = new SplatmapSettingsCollection?[SplatmapFlagLength];
+#if CLIENT
+    private static readonly Func<Array?>? GetUILayers = UIAccessTools.CreateUIFieldGetterReturn<Array>(UI.EditorTerrainTiles, "layers", false);
+    private static readonly Func<int>? GetSelectedLayer = UIAccessTools.CreateUIFieldGetterReturn<int>(UI.EditorTerrainTiles, "selectedLayerIndex", false);
+    private static readonly Action<int>? SetSelectedLayerIndex = UIAccessTools.GenerateUICaller<Action<int>>(UI.EditorTerrainTiles, "SetSelectedLayerIndex", throwOnFailure: false);
+    private static readonly Action<object>? CallUpdateSelectedTile =
+        Accessor.GenerateInstanceCaller<Action<object>>(
+            typeof(Provider).Assembly
+                .GetType("SDG.Unturned.TerrainTileLayer")?
+                .GetMethod("UpdateSelectedTile", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!
+            , false, useFptrReconstruction: true);
+#endif
     static EditorTerrain()
     {
         ListPool<BrushSettingsCollection>.warmup((uint)(Provider.isServer ? 16 : 2));
@@ -124,7 +138,8 @@ public partial class EditorTerrain
         SplatmapSmooth,
         HolesCut,
         AddTile,
-        DeleteTile
+        DeleteTile,
+        UpdateSplatmapLayers
     }
     private const int BrushFlagLength = 5;
     [Flags]
@@ -307,7 +322,6 @@ public partial class EditorTerrain
             float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
             if (distance > BrushRadius * BrushRadius)
             {
-                Logger.LogDebug("Returning out of range: " + (Mathf.Sqrt(distance) / BrushRadius) + "m.");
                 return currentHeight;
             }
             distance = Mathf.Sqrt(distance) / BrushRadius;
@@ -315,7 +329,6 @@ public partial class EditorTerrain
             if (Subtracting)
                 num = -num;
             currentHeight += num;
-            Logger.LogDebug("Changed: " + (currentHeight - num) + " -> " + (currentHeight) + ".");
             return currentHeight;
         }
     }
@@ -819,6 +832,84 @@ public partial class EditorTerrain
             IsDelete = reader.ReadBool();
             DeltaTime = reader.ReadFloat();
             Coordinates = new LandscapeCoord(reader.ReadInt32(), reader.ReadInt32());
+        }
+    }
+    public sealed class TileSplatmapLayersUpdateAction : ITerrainAction
+    {
+        public TerrainTransactionType Type => TerrainTransactionType.UpdateSplatmapLayers;
+        public TerrainEditorType EditorType => TerrainEditorType.Tiles;
+        public CSteamID Instigator { get; set; }
+        public float DeltaTime { get; set; }
+        public LandscapeCoord Coordinates { get; set; }
+        public AssetReference<LandscapeMaterialAsset>[]? Layers { get; set; }
+        public void Apply()
+        {
+            if (Layers == null)
+                return;
+            LandscapeTile tile = Landscape.getTile(Coordinates);
+            if (tile != null)
+            {
+                int diff = 0;
+                int len = Math.Min(Layers.Length, Landscape.SPLATMAP_LAYERS);
+                for (int i = 0; i < len; ++i)
+                {
+                    AssetReference<LandscapeMaterialAsset> layer = Layers[i];
+                    if (tile.materials[i] == layer)
+                        continue;
+
+                    tile.materials[i] = layer;
+                    diff |= 1 << i;
+                    Logger.LogDebug("Layer updated: " + Coordinates.Format() + ", #" + i.Format() + " (" + layer.Find()?.FriendlyName.Format() + ").");
+                }
+
+                if (diff == 0)
+                    return;
+                tile.updatePrototypes();
+
+#if CLIENT      // update tile UI
+                if (CallUpdateSelectedTile != null)
+                {
+                    Array? layers = GetUILayers?.Invoke();
+                    if (layers != null)
+                    {
+                        for (int i = 0; i < layers.Length; ++i)
+                        {
+                            if ((diff & (1 << i)) != 0)
+                                CallUpdateSelectedTile(layers.GetValue(i));
+                        }
+                    }
+                }
+                if (GetSelectedLayer != null && SetSelectedLayerIndex != null)
+                {
+                    int selectedIndex = GetSelectedLayer();
+                    if (selectedIndex > 0 && (diff & (1 << selectedIndex)) != 0)
+                        SetSelectedLayerIndex(selectedIndex);
+                }
+#endif
+                LevelHierarchy.MarkDirty();
+            }
+        }
+
+        public void Write(ByteWriter writer)
+        {
+            writer.Write(DeltaTime);
+            writer.Write(Coordinates.x);
+            writer.Write(Coordinates.y);
+            int amt = Math.Min(byte.MaxValue, Layers == null ? 0 : Layers.Length);
+            writer.Write((byte)amt);
+            for (int i = 0; i < amt; ++i)
+                writer.Write(Layers![i].GUID);
+        }
+
+        public void Read(ByteReader reader)
+        {
+            DeltaTime = reader.ReadFloat();
+            Coordinates = new LandscapeCoord(reader.ReadInt32(), reader.ReadInt32());
+            int amt = reader.ReadInt32();
+            if (Layers == null || Layers.Length != amt)
+                Layers = new AssetReference<LandscapeMaterialAsset>[amt];
+            for (int i = 0; i < amt; ++i)
+                Layers[i] = new AssetReference<LandscapeMaterialAsset>(reader.ReadGuid());
         }
     }
 

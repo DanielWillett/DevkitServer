@@ -100,7 +100,7 @@ public class NetCallCustom : BaseNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
 #endif
@@ -121,9 +121,9 @@ public class NetCallCustom : BaseNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {ID} to connection {connection.GetAddressString(true)}.");
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
 #endif
             Logger.LogError(ex);
         }
@@ -147,7 +147,7 @@ public class NetCallCustom : BaseNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to 1+ connection(s).");
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
             Logger.LogError(ex);
         }
     }
@@ -174,7 +174,7 @@ public class NetCallCustom : BaseNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         try
@@ -189,7 +189,7 @@ public class NetCallCustom : BaseNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to server (HS).");
+            Logger.LogError($"Error sending method {ID.Format()} to server (HS).");
             Logger.LogError(ex);
         }
     }
@@ -325,7 +325,7 @@ public sealed class NetCall : BaseNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         connection.Send(overhead.GetBytes());
@@ -423,7 +423,7 @@ public sealed class NetCallRaw<T> : NetCallRaw
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
 #endif
@@ -438,9 +438,9 @@ public sealed class NetCallRaw<T> : NetCallRaw
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {ID} to connection {connection.GetAddressString(true)}.");
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
 #endif
             Logger.LogError(ex);
             Logger.LogError(ex);
@@ -474,7 +474,7 @@ public sealed class NetCallRaw<T> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to 1+ connection(s).");
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
             Logger.LogError(ex);
         }
     }
@@ -487,7 +487,7 @@ public sealed class NetCallRaw<T> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {ID}.");
+            Logger.LogError($"Error reading method {ID.Format()}.");
             Logger.LogError(ex);
             arg = default!;
             return false;
@@ -504,7 +504,7 @@ public sealed class NetCallRaw<T> : NetCallRaw
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         try
@@ -513,7 +513,7 @@ public sealed class NetCallRaw<T> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
             Logger.LogError(ex);
             Logger.LogError(ex);
         }
@@ -619,7 +619,7 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
 #endif
@@ -634,9 +634,9 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {ID} to connection {connection.GetAddressString(true)}.");
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
 #endif
             Logger.LogError(ex);
             Logger.LogError(ex);
@@ -670,7 +670,7 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to 1+ connection(s).");
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
             Logger.LogError(ex);
         }
     }
@@ -683,7 +683,7 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {ID}.");
+            Logger.LogError($"Error reading method {ID.Format()}.");
             Logger.LogError(ex);
             arg1 = default!;
             arg2 = default!;
@@ -701,7 +701,7 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         try
@@ -710,7 +710,7 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
             Logger.LogError(ex);
             Logger.LogError(ex);
         }
@@ -818,7 +818,7 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
 #endif
@@ -833,9 +833,9 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {ID} to connection {connection.GetAddressString(true)}.");
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
 #endif
             Logger.LogError(ex);
             Logger.LogError(ex);
@@ -869,7 +869,7 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to 1+ connection(s).");
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
             Logger.LogError(ex);
         }
     }
@@ -882,7 +882,7 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {ID}.");
+            Logger.LogError($"Error reading method {ID.Format()}.");
             Logger.LogError(ex);
             arg1 = default!;
             arg2 = default!;
@@ -901,7 +901,7 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         try
@@ -910,7 +910,7 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
             Logger.LogError(ex);
             Logger.LogError(ex);
         }
@@ -1018,7 +1018,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
 #endif
@@ -1033,9 +1033,9 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {ID} to connection {connection.GetAddressString(true)}.");
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
 #endif
             Logger.LogError(ex);
             Logger.LogError(ex);
@@ -1069,7 +1069,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to 1+ connection(s).");
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
             Logger.LogError(ex);
         }
     }
@@ -1082,7 +1082,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {ID}.");
+            Logger.LogError($"Error reading method {ID.Format()}.");
             Logger.LogError(ex);
             arg1 = default!;
             arg2 = default!;
@@ -1102,7 +1102,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         try
@@ -1111,7 +1111,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
             Logger.LogError(ex);
             Logger.LogError(ex);
         }
@@ -1215,7 +1215,7 @@ public sealed class NetCall<T> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
 #endif
@@ -1230,9 +1230,9 @@ public sealed class NetCall<T> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {ID} to connection {connection.GetAddressString(true)}.");
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
 #endif
             Logger.LogError(ex);
         }
@@ -1265,7 +1265,7 @@ public sealed class NetCall<T> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to 1+ connection(s).");
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
             Logger.LogError(ex);
         }
     }
@@ -1278,7 +1278,7 @@ public sealed class NetCall<T> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {ID}.");
+            Logger.LogError($"Error reading method {ID.Format()}.");
             Logger.LogError(ex);
             arg = default!;
             return false;
@@ -1295,7 +1295,7 @@ public sealed class NetCall<T> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         try
@@ -1304,7 +1304,7 @@ public sealed class NetCall<T> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
             Logger.LogError(ex);
             Logger.LogError(ex);
         }
@@ -1408,7 +1408,7 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
 #endif
@@ -1423,9 +1423,9 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {ID} to connection {connection.GetAddressString(true)}.");
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
 #endif
             Logger.LogError(ex);
         }
@@ -1458,7 +1458,7 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to 1+ connection(s).");
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
             Logger.LogError(ex);
         }
     }
@@ -1471,7 +1471,7 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {ID}.");
+            Logger.LogError($"Error reading method {ID.Format()}.");
             Logger.LogError(ex);
             arg1 = default!;
             arg2 = default!;
@@ -1489,7 +1489,7 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         try
@@ -1498,7 +1498,7 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
             Logger.LogError(ex);
             Logger.LogError(ex);
         }
@@ -1602,7 +1602,7 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
 #endif
@@ -1617,9 +1617,9 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {ID} to connection {connection.GetAddressString(true)}.");
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
 #endif
             Logger.LogError(ex);
         }
@@ -1652,7 +1652,7 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to 1+ connection(s).");
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
             Logger.LogError(ex);
         }
     }
@@ -1665,7 +1665,7 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {ID}.");
+            Logger.LogError($"Error reading method {ID.Format()}.");
             Logger.LogError(ex);
             arg1 = default!;
             arg2 = default!;
@@ -1684,7 +1684,7 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         try
@@ -1693,7 +1693,7 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
             Logger.LogError(ex);
             Logger.LogError(ex);
         }
@@ -1797,7 +1797,7 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
 #endif
@@ -1812,9 +1812,9 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {ID} to connection {connection.GetAddressString(true)}.");
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
 #endif
             Logger.LogError(ex);
         }
@@ -1847,7 +1847,7 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to 1+ connection(s).");
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
             Logger.LogError(ex);
         }
     }
@@ -1860,7 +1860,7 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {ID}.");
+            Logger.LogError($"Error reading method {ID.Format()}.");
             Logger.LogError(ex);
             arg1 = default!;
             arg2 = default!;
@@ -1880,7 +1880,7 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         try
@@ -1889,7 +1889,7 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
             Logger.LogError(ex);
             Logger.LogError(ex);
         }
@@ -1993,7 +1993,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
 #endif
@@ -2008,9 +2008,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {ID} to connection {connection.GetAddressString(true)}.");
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
 #endif
             Logger.LogError(ex);
         }
@@ -2043,7 +2043,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to 1+ connection(s).");
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
             Logger.LogError(ex);
         }
     }
@@ -2056,7 +2056,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {ID}.");
+            Logger.LogError($"Error reading method {ID.Format()}.");
             Logger.LogError(ex);
             arg1 = default!;
             arg2 = default!;
@@ -2077,7 +2077,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         try
@@ -2086,7 +2086,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
             Logger.LogError(ex);
             Logger.LogError(ex);
         }
@@ -2190,7 +2190,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
 #endif
@@ -2205,9 +2205,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {ID} to connection {connection.GetAddressString(true)}.");
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
 #endif
             Logger.LogError(ex);
         }
@@ -2240,7 +2240,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to 1+ connection(s).");
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
             Logger.LogError(ex);
         }
     }
@@ -2253,7 +2253,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {ID}.");
+            Logger.LogError($"Error reading method {ID.Format()}.");
             Logger.LogError(ex);
             arg1 = default!;
             arg2 = default!;
@@ -2275,7 +2275,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         try
@@ -2284,7 +2284,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
             Logger.LogError(ex);
             Logger.LogError(ex);
         }
@@ -2397,7 +2397,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
 #endif
@@ -2413,9 +2413,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {ID} to connection {connection.GetAddressString(true)}.");
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
 #endif
             Logger.LogError(ex);
         }
@@ -2449,7 +2449,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to 1+ connection(s).");
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
             Logger.LogError(ex);
         }
     }
@@ -2463,7 +2463,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {ID}.");
+            Logger.LogError($"Error reading method {ID.Format()}.");
             Logger.LogError(ex);
             arg1 = default!;
             arg2 = default!;
@@ -2489,7 +2489,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         try
@@ -2498,7 +2498,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
             Logger.LogError(ex);
             Logger.LogError(ex);
         }
@@ -2605,7 +2605,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
 #endif
@@ -2620,9 +2620,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {ID} to connection {connection.GetAddressString(true)}.");
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
 #endif
             Logger.LogError(ex);
         }
@@ -2655,7 +2655,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to 1+ connection(s).");
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
             Logger.LogError(ex);
         }
     }
@@ -2668,7 +2668,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {ID}.");
+            Logger.LogError($"Error reading method {ID.Format()}.");
             Logger.LogError(ex);
             arg1 = default!;
             arg2 = default!;
@@ -2692,7 +2692,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         try
@@ -2701,7 +2701,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
             Logger.LogError(ex);
             Logger.LogError(ex);
         }
@@ -2804,7 +2804,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
 #endif
@@ -2819,9 +2819,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {ID} to connection {connection.GetAddressString(true)}.");
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
 #endif
             Logger.LogError(ex);
         }
@@ -2854,7 +2854,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to 1+ connection(s).");
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
             Logger.LogError(ex);
         }
     }
@@ -2867,7 +2867,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {ID}.");
+            Logger.LogError($"Error reading method {ID.Format()}.");
             Logger.LogError(ex);
             arg1 = default!;
             arg2 = default!;
@@ -2892,7 +2892,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         try
@@ -2901,7 +2901,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
             Logger.LogError(ex);
             Logger.LogError(ex);
         }
@@ -3004,7 +3004,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
 #endif
@@ -3019,9 +3019,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {ID} to connection {connection.GetAddressString(true)}.");
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
 #endif
             Logger.LogError(ex);
         }
@@ -3054,7 +3054,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to 1+ connection(s).");
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
             Logger.LogError(ex);
         }
     }
@@ -3067,7 +3067,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {ID}.");
+            Logger.LogError($"Error reading method {ID.Format()}.");
             Logger.LogError(ex);
             arg1 = default!;
             arg2 = default!;
@@ -3093,7 +3093,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {ID} to null connection.");
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
             return;
         }
         try
@@ -3102,7 +3102,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {ID} to server.");
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
             Logger.LogError(ex);
             Logger.LogError(ex);
         }

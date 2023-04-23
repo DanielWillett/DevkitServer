@@ -2,6 +2,8 @@
 using HarmonyLib;
 using JetBrains.Annotations;
 using System.Reflection;
+using DevkitServer.Multiplayer.Networking;
+using SDG.Framework.Landscapes;
 #if CLIENT
 using System.Reflection.Emit;
 using DevkitServer.Multiplayer.LevelData;
@@ -19,6 +21,7 @@ namespace DevkitServer.Patches;
 [EarlyTypeInit]
 internal static class PatchesMain
 {
+    private static NetCall SendPending = new NetCall((ushort)NetCalls.SendPending);
     public const string HarmonyId = "dw.devkitserver";
     internal static Harmony Patcher { get; private set; } = null!;
     internal static void Init()
@@ -81,6 +84,8 @@ internal static class PatchesMain
             Provider.launch();
             return;
         }
+
+        SendPending.Invoke();
 
         LevelInfo level = DevkitServerModule.PendingLevelInfo ?? Level.getLevel(Provider.map);
         DevkitServerModule.PendingLevelInfo = null;
@@ -256,14 +261,23 @@ internal static class PatchesMain
                 PendingConnections.RemoveAt(i);
         }
     }
+    [NetCall(NetCallSource.FromClient, (ushort)NetCalls.SendPending)]
+    [UsedImplicitly]
+    private static void OnConnectionPending(MessageContext ctx) => OnConnectionPending(ctx.Connection, null!);
+
     [HarmonyPatch("ServerMessageHandler_GetWorkshopFiles", "ReadMessage", MethodType.Normal)]
     [HarmonyPrefix]
-    [UsedImplicitly]
     private static void OnConnectionPending(ITransportConnection transportConnection, NetPakReader reader)
     {
         RemoveExpiredConnections();
-        RemoveConnection(transportConnection);
-        PendingConnections.Add(transportConnection);
+        if (!PendingConnections.Contains(transportConnection))
+        {
+            RemoveConnection(transportConnection);
+            PendingConnections.Add(transportConnection);
+            Logger.LogDebug("Connection pending: " + transportConnection.Format() + ".");
+        }
+        else
+            Logger.LogDebug("Connection already pending: " + transportConnection.Format() + ".");
     }
     [HarmonyPatch("ServerMessageHandler_ReadyToConnect", "ReadMessage", MethodType.Normal)]
     [HarmonyPrefix]
@@ -272,6 +286,7 @@ internal static class PatchesMain
     {
         RemoveExpiredConnections();
         RemoveConnection(transportConnection);
+        Logger.LogDebug("Connection ready: " + transportConnection.Format() + ".");
     }
     [UsedImplicitly]
     [HarmonyPatch(typeof(LevelLighting), nameof(LevelLighting.updateLocal), typeof(Vector3), typeof(float), typeof(IAmbianceNode))]
@@ -313,7 +328,7 @@ internal static class PatchesMain
     }
 
     [UsedImplicitly]
-    [HarmonyPatch(typeof(LandscapeTile), "updatePrototypes")]
+    [HarmonyPatch(typeof(LandscapeTile), nameof(LandscapeTile.updatePrototypes))]
     [HarmonyPrefix]
     private static void UpdatePrototypesPrefix(LandscapeTile __instance, ref TerrainLayer?[] ___terrainLayers)
     {
@@ -364,7 +379,7 @@ internal static class PatchesMain
     [UsedImplicitly]
     private static bool OnCheckingLevelHash(ITransportConnection connection)
     {
-        Logger.LogInfo(connection.GetAddressString(true) + " checking hash...");
+        Logger.LogInfo(connection.Format() + " checking hash...");
         return DevkitServerModule.IsEditing;
     }
 
@@ -469,4 +484,65 @@ internal static class PatchesMain
     [UsedImplicitly]
     private static IEnumerable<CodeInstruction> VehicleManagerPostLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.AddIsEditorCall(instructions, __method);
 #endif
+    #region Landscape.writeMaps
+
+    [HarmonyPatch(typeof(Landscape), nameof(Landscape.writeHeightmap))]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    [HarmonyPriority(1)]
+    private static IEnumerable<CodeInstruction> LandscapeWriteHeightmapTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+        => LandscapeWriteTranspilerGeneric(instructions, method, "heightmapTransactions");
+
+    [HarmonyPatch(typeof(Landscape), nameof(Landscape.writeSplatmap))]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    [HarmonyPriority(1)]
+    private static IEnumerable<CodeInstruction> LandscapeWriteSplatmapTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+        => LandscapeWriteTranspilerGeneric(instructions, method, "splatmapTransactions");
+
+    [HarmonyPatch(typeof(Landscape), nameof(Landscape.writeHoles))]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    [HarmonyPriority(1)]
+    private static IEnumerable<CodeInstruction> LandscapeWriteHolesTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+        => LandscapeWriteTranspilerGeneric(instructions, method, "holeTransactions");
+
+    private static IEnumerable<CodeInstruction> LandscapeWriteTranspilerGeneric(IEnumerable<CodeInstruction> instructions, MethodBase method, string fieldName)
+    {
+        FieldInfo? transactions = typeof(Landscape).GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Static);
+        if (transactions == null)
+        {
+            Logger.LogWarning("Unable to find field: Landscape." + fieldName.Format(false) + " in " + method.Format() + ".");
+            DevkitServerModule.Fault();
+        }
+
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        bool ld = false;
+        for (int i = 0; i < ins.Count; ++i)
+        {
+            CodeInstruction c = ins[i];
+            if (!ld && c.LoadsField(transactions))
+            {
+                ld = true;
+                for (int j = i + 1; j < ins.Count; ++j)
+                {
+                    if (ins[j].Branches(out Label? lbl) && lbl.HasValue)
+                    {
+                        yield return new CodeInstruction(OpCodes.Ldsfld, EditorTerrain.SaveTransactionsField);
+                        yield return new CodeInstruction(OpCodes.Brfalse_S, lbl);
+                        Logger.LogDebug("Inserted save transactions check in " + method.Format() + ".");
+                        break;
+                    }
+                }
+            }
+
+            yield return c;
+        }
+        if (!ld)
+        {
+            Logger.LogWarning("Patching error for " + method.Format() + ". Invalid transpiler operation.");
+            DevkitServerModule.Fault();
+        }
+    }
+    #endregion
 }

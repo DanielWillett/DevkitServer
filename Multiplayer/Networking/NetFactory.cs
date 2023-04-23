@@ -16,9 +16,9 @@ public static class NetFactory
     public enum DevkitMessage
     {
         InvokeMethod,
-        RelayPacket,
         MovementRelay,
-        SendTileData
+        SendTileData,
+        TerrainEditRelay
     }
     public const int MaxPacketSize = 61440;
     private static readonly List<Listener> localListeners = new List<Listener>(16);
@@ -78,11 +78,11 @@ public static class NetFactory
         MethodInfo[] methods = new MethodInfo[BlockSize];
 
         methods[(int)DevkitMessage.InvokeMethod] = typeof(NetFactory).GetMethod(nameof(ReceiveMessage), BindingFlags.NonPublic | BindingFlags.Static)!;
-        methods[(int)DevkitMessage.RelayPacket] = typeof(NetFactory).GetMethod(nameof(ReceiveRelayPacket), BindingFlags.NonPublic | BindingFlags.Static)!;
         methods[(int)DevkitMessage.MovementRelay] = typeof(UserInput).GetMethod(nameof(UserInput.ReceiveMovementRelay), BindingFlags.NonPublic | BindingFlags.Static)!;
 #if CLIENT
         methods[(int)DevkitMessage.SendTileData] = typeof(TileSync).GetMethod(nameof(TileSync.ReceiveTileData), BindingFlags.NonPublic | BindingFlags.Static)!;
 #endif
+        methods[(int)DevkitMessage.TerrainEditRelay] = typeof(EditorTerrain).GetMethod(nameof(EditorTerrain.ReceiveTerrainRelay), BindingFlags.NonPublic | BindingFlags.Static)!;
 
         Listeners = new Delegate[methods.Length];
 
@@ -877,131 +877,6 @@ public static class NetFactory
             connections[i].Send(Writer.buffer, Writer.writeByteIndex, reliability);
     }
 #endif
-
-    [UsedImplicitly]
-    private static void ReceiveRelayPacket(
-#if SERVER
-        ITransportConnection transportConnection,
-#endif
-        NetPakReader reader)
-    {
-#if CLIENT
-        if (!reader.ReadUInt16(out ushort len) || !reader.ReadUInt64(out ulong sender))
-        {
-            Logger.LogWarning("Unable to read incomming relay message from server.");
-            return;
-        }
-        byte[] bytes = new byte[len];
-        if (!reader.ReadBytes(bytes, len))
-        {
-            Logger.LogWarning("Unable to read incomming relay message from: " + sender + ".");
-            return;
-        }
-        MessageOverhead ovh = new MessageOverhead(bytes, sender);
-        OnReceived(bytes, GetPlayerTransportConnection(), ovh, false);
-#endif
-#if SERVER
-        EditorUser? user = UserManager.FromConnection(transportConnection);
-        if (user == null)
-        {
-            Logger.LogWarning("Unable to identify relay packet sender: " + transportConnection.GetAddressString(true) + ".");
-            return;
-        }
-
-        if (!reader.ReadUInt16(out ushort len) || !reader.ReadUInt8(out byte amt))
-            goto fail;
-        bool reliable = (amt & 0b10000000) != 0;
-        amt &= 0b01111111;
-        unsafe
-        {
-            ulong* relays = stackalloc ulong[amt];
-            for (int i = 0; i < amt; ++i)
-            {
-                if (!reader.ReadUInt64(out relays[i]))
-                    goto fail;
-            }
-
-            byte[] msg = new byte[len];
-            if (!reader.ReadBytes(msg))
-                goto fail;
-
-            Writer.Reset();
-            Writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)DevkitMessage.RelayPacket));
-            Writer.WriteUInt16(len);
-            Writer.WriteUInt64(user.SteamId.m_SteamID);
-            Writer.WriteBytes(msg, 0, msg.Length);
-            Writer.Flush();
-            PooledTransportConnectionList tempList;
-
-            if (amt == 0)
-            {
-                tempList = GetPooledTransportConnectionList(UserManager.Users.Count - 1);
-                for (int i = 0; i < UserManager.Users.Count; ++i)
-                {
-                    EditorUser user2 = UserManager.Users[i];
-                    if (user.SteamId.m_SteamID != user2.SteamId.m_SteamID)
-                        tempList.Add(user2.Connection);
-                }
-            }
-            else
-            {
-                tempList = GetPooledTransportConnectionList(amt);
-                for (int i = 0; i < UserManager.Users.Count; ++i)
-                {
-                    EditorUser user2 = UserManager.Users[i];
-                    if (user.SteamId.m_SteamID != user2.SteamId.m_SteamID)
-                    {
-                        for (int j = 0; j < amt; ++j)
-                        {
-                            if (relays[j] == user2.SteamId.m_SteamID)
-                            {
-                                tempList.Add(user2.Connection);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            for (int i = 0; i < tempList.Count; ++i)
-                tempList[i].Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
-
-            MessageOverhead ovh = new MessageOverhead(msg, user.SteamId.m_SteamID);
-            if ((ovh.Flags & MessageFlags.RunOriginalMethodOnRequest) != 0)
-            {
-                OnReceived(msg, transportConnection, in ovh, false);
-            }
-        }
-        return;
-        fail:
-        Logger.LogWarning("Unable to read incoming relay message from: " + transportConnection.GetAddressString(true) + ".");
-#endif
-    }
-#if CLIENT
-    public static void SendRelay(byte[] bytes, bool reliable = true, IList<ulong>? users = null)
-    {
-        ThreadUtil.assertIsGameThread();
-
-        Writer.Reset();
-        Writer.WriteEnum((EServerMessage)(WriteBlockOffset + (int)DevkitMessage.RelayPacket));
-        int len = Math.Min(ushort.MaxValue, bytes.Length);
-        Writer.WriteUInt16((ushort)len);
-
-        int c = Math.Min(0b01111111, users == null ? 0 : users.Count);
-        Writer.WriteUInt8((byte)(c | (reliable ? (1 << 7) : 0)));
-        for (int i = 0; i < c; ++i)
-            Writer.WriteUInt64(users![i]);
-
-        Writer.WriteBytes(bytes, len);
-        Writer.Flush();
-#if DEBUG
-        Logger.LogInfo("Sending " + bytes.Length + " bytes to server as a relay to " +
-                       (users == null ? "all" : users.Count.ToString(CultureInfo.InvariantCulture)) + " user(s).");
-        // DevkitServerUtility.PrintBytesHex(bytes, 32);
-#endif
-        GetPlayerTransportConnection().Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
-    }
-#endif
     public static void Send(this
 #if SERVER
         ITransportConnection
@@ -1038,7 +913,7 @@ public static class NetFactory
 #if DEBUG
         Logger.LogDebug("Sending " + bytes.Length + " bytes to " +
 #if SERVER
-            connection.GetAddressString(true)
+            connection.Format()
 #else
             "server"
 #endif

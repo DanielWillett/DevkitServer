@@ -222,16 +222,13 @@ public class TileSync : MonoBehaviour
             {
                 list.RemoveAt(i);
                 HeightmapBounds b3 = inv.Bounds;
-                Logger.LogDebug("[TILE SYNC]   Combined bounds " + b3 + " <- " + bounds + ".");
                 b3.Encapsulate(bounds);
-                Logger.LogDebug("[TILE SYNC]    Result: " + b3 + ".");
                 if (AddHeightmapBounds(list, coord, b3, time))
                     return true;
 
                 inv.Bounds = b3;
                 inv.Time = time;
                 list.Add(inv);
-                Logger.LogDebug("[TILE SYNC]    Re-added: " + b3 + ".");
                 return true;
             }
         }
@@ -247,17 +244,13 @@ public class TileSync : MonoBehaviour
             {
                 list.RemoveAt(i);
                 SplatmapBounds b3 = inv.Bounds;
-                Logger.LogDebug("[TILE SYNC]   Combined bounds " + b3 + " <- " + bounds + ".");
                 b3.Encapsulate(bounds);
-                Logger.LogDebug("[TILE SYNC]    Result: " + b3 + ".");
                 if (AddSplatmapBounds(list, coord, b3, time))
                     return true;
 
                 inv.Bounds = b3;
                 inv.Time = time;
-                list[i] = inv;
                 list.Add(inv);
-                Logger.LogDebug("[TILE SYNC]    Re-added: " + b3 + ".");
                 return true;
             }
         }
@@ -273,7 +266,6 @@ public class TileSync : MonoBehaviour
             for (int y1 = b2.min.y; y1 <= b2.max.y; ++y1)
             {
                 LandscapeCoord c2 = new LandscapeCoord(x1, y1);
-                Logger.LogDebug("[TILE SYNC]  Checking tile " + c2 + ".");
                 if (Landscape.getTile(c2) != null)
                 {
                     switch (type)
@@ -283,7 +275,6 @@ public class TileSync : MonoBehaviour
                             if (!AddHeightmapBounds(_hmInvalidated, c2, hmBounds, time))
                             {
                                 _hmInvalidated.Add(new MapInvalidation<HeightmapBounds>(c2, hmBounds, time));
-                                Logger.LogDebug("[TILE SYNC]   Added bounds: " + _hmInvalidated.TailOrDefault().Bounds + ".");
                             }
                             
                             break;
@@ -293,7 +284,6 @@ public class TileSync : MonoBehaviour
                             if (!AddSplatmapBounds(_smInvalidated, c2, smBounds, time))
                             {
                                 _smInvalidated.Add(new MapInvalidation<SplatmapBounds>(c2, smBounds, time));
-                                Logger.LogDebug("[TILE SYNC]   Added bounds: " + _smInvalidated.TailOrDefault().Bounds + ".");
                             }
                             
                             break;
@@ -303,7 +293,6 @@ public class TileSync : MonoBehaviour
                             if (!AddSplatmapBounds(_holeInvalidated, c2, smBounds, time))
                             {
                                 _holeInvalidated.Add(new MapInvalidation<SplatmapBounds>(c2, smBounds, time));
-                                Logger.LogDebug("[TILE SYNC]   Added bounds: " + _holeInvalidated.TailOrDefault().Bounds + ".");
                             }
                             
                             break;

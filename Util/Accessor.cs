@@ -1,13 +1,14 @@
 ﻿using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.Serialization;
 using DevkitServer.Patches;
 using HarmonyLib;
 
 namespace DevkitServer.Util;
 internal static class Accessor
 {
-    private static Type[]? _funcTypeList;
-    private static Type[]? _actionTypeList;
+    internal static Type[]? FuncTypes;
+    internal static Type[]? ActionTypes;
     public static InstanceSetter<TInstance, TValue>? GenerateInstanceSetter<TInstance, TValue>(string fieldName, BindingFlags flags = BindingFlags.NonPublic, bool throwOnError = false)
     {
         try
@@ -187,9 +188,9 @@ internal static class Accessor
             yield return instr;
         }
     }
-    private static void CheckFuncArrays()
+    internal static void CheckFuncArrays()
     {
-        _funcTypeList ??= new Type[]
+        FuncTypes ??= new Type[]
         {
             typeof(Func<,>),
             typeof(Func<,,>),
@@ -208,7 +209,7 @@ internal static class Accessor
             typeof(Func<,,,,,,,,,,,,,,,>),
             typeof(Func<,,,,,,,,,,,,,,,,>)
         };
-        _actionTypeList ??= new Type[]
+        ActionTypes ??= new Type[]
         {
             typeof(Action<>),
             typeof(Action<,>),
@@ -229,7 +230,7 @@ internal static class Accessor
         };
     }
 
-    public static Delegate? GenerateInstanceCaller<TInstance>(string methodName, Type[]? parameters = null, bool throwOnError = false)
+    public static Delegate? GenerateInstanceCaller<TInstance>(string methodName, Type[]? parameters = null, bool throwOnError = false, bool useFptrReconstruction = false)
     {
         MethodInfo? method = null;
         if (parameters == null)
@@ -258,9 +259,9 @@ internal static class Accessor
             return null;
         }
 
-        return GenerateInstanceCaller(method);
+        return GenerateInstanceCaller(method, throwOnError, useFptrReconstruction);
     }
-    public static TDelegate? GenerateInstanceCaller<TInstance, TDelegate>(string methodName, Type[]? parameters = null, bool throwOnError = false) where TDelegate : Delegate
+    public static TDelegate? GenerateInstanceCaller<TInstance, TDelegate>(string methodName, Type[]? parameters = null, bool throwOnError = false, bool useFptrReconstruction = false) where TDelegate : Delegate
     {
         MethodInfo? method = null;
         if (parameters == null)
@@ -289,42 +290,25 @@ internal static class Accessor
             return null;
         }
 
-        return GenerateInstanceCaller<TDelegate>(method);
+        return GenerateInstanceCaller<TDelegate>(method, throwOnError, useFptrReconstruction);
     }
-    public static Delegate? GenerateInstanceCaller(MethodInfo method, bool throwOnError = false)
+    public static Delegate? GenerateInstanceCaller(MethodInfo method, bool throwOnError = false, bool useFptrReconstruction = false)
     {
         CheckFuncArrays();
 
         bool rtn = method.ReturnType != typeof(void);
         ParameterInfo[] p = method.GetParameters();
-        if (p.Length + 1 > (rtn ? _funcTypeList!.Length : _actionTypeList!.Length))
+        if (p.Length + 1 > (rtn ? FuncTypes!.Length : ActionTypes!.Length))
         {
             if (throwOnError)
-                throw new ArgumentException("Method can not have more than " + ((rtn ? _funcTypeList!.Length : _actionTypeList!.Length) - 1) + " arguments!", nameof(method));
-            Logger.LogWarning("Method " + method.Format() + " can not have more than " + ((rtn ? _funcTypeList!.Length : _actionTypeList!.Length) - 1) + " arguments!");
+                throw new ArgumentException("Method can not have more than " + ((rtn ? FuncTypes!.Length : ActionTypes!.Length) - 1) + " arguments!", nameof(method));
+            Logger.LogWarning("Method " + method.Format() + " can not have more than " + ((rtn ? FuncTypes!.Length : ActionTypes!.Length) - 1) + " arguments!");
             return null;
         }
         Type deleType;
         try
         {
-            if (rtn)
-            {
-                Type[] p2 = new Type[p.Length + 2];
-                p2[0] = method.DeclaringType!;
-                for (int i = 1; i < p2.Length - 1; ++i)
-                    p2[i] = p[i - 1].ParameterType;
-                p2[p2.Length - 1] = method.ReturnType;
-                deleType = _funcTypeList![p.Length].MakeGenericType(p2);
-            }
-            else
-            {
-                Type[] p2 = new Type[p.Length + 1];
-                p2[0] = method.DeclaringType!;
-                for (int i = 1; i < p2.Length; ++i)
-                    p2[i] = p[i - 1].ParameterType;
-                deleType = _actionTypeList![p.Length];
-                deleType = deleType.MakeGenericType(p2);
-            }
+            deleType = GetDefaultDelegate(method.ReturnType, p, method.DeclaringType);
         }
         catch (Exception ex)
         {
@@ -335,11 +319,11 @@ internal static class Accessor
             return null;
         }
 
-        return GenerateInstanceCaller(deleType, method);
+        return GenerateInstanceCaller(deleType, method, throwOnError, useFptrReconstruction);
     }
-    public static TDelegate? GenerateInstanceCaller<TDelegate>(MethodInfo info, bool throwOnError = false) where TDelegate : Delegate
+    public static TDelegate? GenerateInstanceCaller<TDelegate>(MethodInfo info, bool throwOnError = false, bool useFptrReconstruction = false) where TDelegate : Delegate
     {
-        Delegate? d = GenerateInstanceCaller(typeof(TDelegate), info);
+        Delegate? d = GenerateInstanceCaller(typeof(TDelegate), info, throwOnError, useFptrReconstruction);
         if (d is TDelegate dele)
         {
             return dele;
@@ -356,8 +340,10 @@ internal static class Accessor
 
         return null;
     }
-    public static Delegate? GenerateInstanceCaller(Type delegateType, MethodInfo method, bool throwOnError = false)
+    public static Delegate? GenerateInstanceCaller(Type delegateType, MethodInfo method, bool throwOnError = false, bool useFptrReconstruction = false)
     {
+        if (method == null)
+            throw new ArgumentNullException(nameof(method));
         ParameterInfo[] p = method.GetParameters();
         Type[] paramTypes = new Type[p.Length + 1];
         paramTypes[0] = method.DeclaringType!;
@@ -369,29 +355,34 @@ internal static class Accessor
             ILGenerator generator = dm.GetILGenerator();
             for (int i = 0; i < paramTypes.Length; ++i)
             {
-                if (paramTypes[i].IsByRef)
+                generator.LoadParameter(i, paramTypes[i].IsByRef);
+            }
+            generator.Emit(method.IsVirtual || method.IsAbstract ? OpCodes.Callvirt : OpCodes.Call, method);
+            generator.Emit(OpCodes.Ret);
+
+            try
+            {
+                if (useFptrReconstruction)
                 {
-                    generator.Emit(OpCodes.Ldarga_S, (byte)i);
-                }
-                else
-                {
-                    OpCode c = i switch
+                    Type t = GetDefaultDelegate(method.ReturnType, method.GetParameters(), method.DeclaringType);
+                    if (t != delegateType)
                     {
-                        0 => OpCodes.Ldarg_0,
-                        1 => OpCodes.Ldarg_1,
-                        2 => OpCodes.Ldarg_2,
-                        3 => OpCodes.Ldarg_3,
-                        _ => OpCodes.Ldarg_S
-                    };
-                    if (i > 3)
-                        generator.Emit(c, (byte)i);
-                    else
-                        generator.Emit(c);
+                        Delegate d = method.CreateDelegate(t);
+                        IntPtr ptr = d.Method.MethodHandle.GetFunctionPointer();
+                        Delegate d2 = (Delegate)delegateType.GetConstructors()[0].Invoke(FormatterServices.GetUninitializedObject(delegateType), new object[] { null!, ptr });
+                        Logger.LogDebug("Created instance caller for " + method.Format() + " (using function pointer reconstruction) of type " + delegateType.Format() + ".");
+                        return d2;
+                    }
                 }
             }
-            generator.Emit(OpCodes.Callvirt, method);
-            generator.Emit(OpCodes.Ret);
-            return dm.CreateDelegate(delegateType);
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Error trying to use function pointer reconstruction.");
+                Logger.LogError(ex);
+            }
+            Delegate d3 = dm.CreateDelegate(delegateType);
+            Logger.LogDebug("Created instance caller for " + method.Format() + " of type " + delegateType.Format() + ".");
+            return d3;
         }
         catch (Exception ex)
         {
@@ -403,7 +394,7 @@ internal static class Accessor
         }
     }
 
-    public static Delegate? GenerateStaticCaller<TInstance>(string methodName, Type[]? parameters = null, bool throwOnError = false)
+    public static Delegate? GenerateStaticCaller<TInstance>(string methodName, Type[]? parameters = null, bool throwOnError = false, bool useFptrReconstruction = false)
     {
         MethodInfo? method = null;
         if (parameters == null)
@@ -432,9 +423,9 @@ internal static class Accessor
             return null;
         }
 
-        return GenerateStaticCaller(method);
+        return GenerateStaticCaller(method, throwOnError, useFptrReconstruction);
     }
-    public static TDelegate? GenerateStaticCaller<TInstance, TDelegate>(string methodName, Type[]? parameters = null, bool throwOnError = false) where TDelegate : Delegate
+    public static TDelegate? GenerateStaticCaller<TInstance, TDelegate>(string methodName, Type[]? parameters = null, bool throwOnError = false, bool useFptrReconstruction = false) where TDelegate : Delegate
     {
         MethodInfo? method = null;
         if (parameters == null)
@@ -463,40 +454,27 @@ internal static class Accessor
             return null;
         }
 
-        return GenerateStaticCaller<TDelegate>(method);
+        return GenerateStaticCaller<TDelegate>(method, throwOnError, useFptrReconstruction);
     }
-    public static Delegate? GenerateStaticCaller(MethodInfo method, bool throwOnError = false)
+    public static Delegate? GenerateStaticCaller(MethodInfo method, bool throwOnError = false, bool useFptrReconstruction = false)
     {
+        if (method == null)
+            throw new ArgumentNullException(nameof(method));
         CheckFuncArrays();
 
         bool rtn = method.ReturnType != typeof(void);
         ParameterInfo[] p = method.GetParameters();
-        if (p.Length > (rtn ? _funcTypeList!.Length : _actionTypeList!.Length))
+        if (p.Length > (rtn ? FuncTypes!.Length : ActionTypes!.Length))
         {
             if (throwOnError)
-                throw new ArgumentException("Method can not have more than " + (rtn ? _funcTypeList!.Length : _actionTypeList!.Length) + " arguments!", nameof(method));
-            Logger.LogWarning("Method " + method.Format() + " can not have more than " + (rtn ? _funcTypeList!.Length : _actionTypeList!.Length) + " arguments!");
+                throw new ArgumentException("Method can not have more than " + (rtn ? FuncTypes!.Length : ActionTypes!.Length) + " arguments!", nameof(method));
+            Logger.LogWarning("Method " + method.Format() + " can not have more than " + (rtn ? FuncTypes!.Length : ActionTypes!.Length) + " arguments!");
             return null;
         }
         Type deleType;
         try
         {
-            if (rtn)
-            {
-                Type[] p2 = new Type[p.Length + 1];
-                for (int i = 1; i < p2.Length - 1; ++i)
-                    p2[i] = p[i].ParameterType;
-                p2[p2.Length - 1] = method.ReturnType;
-                deleType = _funcTypeList![p.Length].MakeGenericType(p2);
-            }
-            else
-            {
-                Type[] p2 = new Type[p.Length];
-                for (int i = 1; i < p2.Length; ++i)
-                    p2[i] = p[i].ParameterType;
-                deleType = _actionTypeList![p.Length];
-                deleType = deleType.MakeGenericType(p2);
-            }
+            deleType = GetDefaultDelegate(method.ReturnType, p, null);
         }
         catch (Exception ex)
         {
@@ -507,9 +485,9 @@ internal static class Accessor
             return null;
         }
 
-        return GenerateInstanceCaller(deleType, method);
+        return GenerateInstanceCaller(deleType, method, throwOnError, useFptrReconstruction);
     }
-    public static TDelegate? GenerateStaticCaller<TDelegate>(MethodInfo info, bool throwOnError = false) where TDelegate : Delegate
+    public static TDelegate? GenerateStaticCaller<TDelegate>(MethodInfo info, bool throwOnError = false, bool useFptrReconstruction = false) where TDelegate : Delegate
     {
         if (info == null)
         {
@@ -519,7 +497,7 @@ internal static class Accessor
             
             return null;
         }
-        Delegate? d = GenerateStaticCaller(typeof(TDelegate), info);
+        Delegate? d = GenerateStaticCaller(typeof(TDelegate), info, throwOnError, useFptrReconstruction);
         if (d is TDelegate dele)
         {
             return dele;
@@ -536,16 +514,33 @@ internal static class Accessor
 
         return null;
     }
-    public static Delegate? GenerateStaticCaller(Type delegateType, MethodInfo method, bool throwOnError = false)
+    public static Delegate? GenerateStaticCaller(Type delegateType, MethodInfo method, bool throwOnError = false, bool useFptrReconstruction = false)
     {
-        ParameterInfo[] p = method.GetParameters();
-        Type[] paramTypes = new Type[p.Length + 1];
-        paramTypes[0] = method.DeclaringType!;
-        for (int i = 1; i < paramTypes.Length; ++i)
-            paramTypes[i] = p[i - 1].ParameterType;
         try
         {
-            return method.CreateDelegate(delegateType);
+            try
+            {
+                if (useFptrReconstruction)
+                {
+                    Type t = GetDefaultDelegate(method.ReturnType, method.GetParameters(), null);
+                    if (t != delegateType)
+                    {
+                        Delegate d = method.CreateDelegate(t);
+                        IntPtr ptr = d.Method.MethodHandle.GetFunctionPointer();
+                        Delegate d2 = (Delegate)delegateType.GetConstructors()[0].Invoke(FormatterServices.GetUninitializedObject(delegateType), new object[] { null!, ptr });
+                        Logger.LogDebug("Created caller for " + method.Format() + " (using function pointer reconstruction) of type " + delegateType.Format() + ".");
+                        return d2;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Error trying to use function pointer reconstruction.");
+                Logger.LogError(ex);
+            }
+            Delegate d3 = method.CreateDelegate(delegateType);
+            Logger.LogDebug("Created caller for " + method.Format() + " of type " + delegateType.Format() + ".");
+            return d3;
         }
         catch (Exception ex)
         {
@@ -554,6 +549,49 @@ internal static class Accessor
             if (throwOnError)
                 throw;
             return null;
+        }
+    }
+    private static Type GetDefaultDelegate(Type rtn, ParameterInfo[] p, Type? inst)
+    {
+        CheckFuncArrays();
+        
+        if (inst == null)
+        {
+            if (rtn != typeof(void))
+            {
+                Type[] p2 = new Type[p.Length + 1];
+                for (int i = 1; i < p2.Length - 1; ++i)
+                    p2[i] = p[i].ParameterType;
+                p2[p2.Length - 1] = rtn;
+                return FuncTypes![p.Length].MakeGenericType(p2);
+            }
+            else
+            {
+                Type[] p2 = new Type[p.Length];
+                for (int i = 1; i < p2.Length; ++i)
+                    p2[i] = p[i].ParameterType;
+                return ActionTypes![p.Length].MakeGenericType(p2);
+            }
+        }
+        else
+        {
+            if (rtn != typeof(void))
+            {
+                Type[] p2 = new Type[p.Length + 2];
+                p2[0] = inst;
+                for (int i = 1; i < p2.Length - 1; ++i)
+                    p2[i] = p[i - 1].ParameterType;
+                p2[p2.Length - 1] = rtn;
+                return FuncTypes![p.Length].MakeGenericType(p2);
+            }
+            else
+            {
+                Type[] p2 = new Type[p.Length + 1];
+                p2[0] = inst;
+                for (int i = 1; i < p2.Length; ++i)
+                    p2[i] = p[i - 1].ParameterType;
+                return ActionTypes![p.Length].MakeGenericType(p2);
+            }
         }
     }
 }

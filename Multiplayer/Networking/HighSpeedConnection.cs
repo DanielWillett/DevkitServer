@@ -90,7 +90,7 @@ public class HighSpeedConnection : ITransportConnection
             try
             {
 #pragma warning disable CS0618
-                address = (uint)ip.Address.MapToIPv4().Address;
+                address = DevkitServerUtility.ReverseUInt32((uint)ip.Address.MapToIPv4().Address);
 #pragma warning restore CS0618
                 return true;
             }

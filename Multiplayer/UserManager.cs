@@ -85,9 +85,9 @@ public static class UserManager
                     _users.Add(user);
                     OnUserConnected?.Invoke(user);
 #if SERVER
-                    Logger.LogInfo("Player added: " + user.DisplayName + " {" + user.SteamId.m_SteamID + "} @ " + user.Connection.GetAddressString(true) + ".");
+                    Logger.LogInfo("Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + user.Connection.Format() + ".");
 #else
-                    Logger.LogInfo("Player added: " + user.DisplayName + " {" + user.SteamId.m_SteamID + "} @ " + (user.Connection != null ? "Current Session" : "Remote Session") + ".");
+                    Logger.LogInfo("Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + (user.Connection != null ? "Current Session" : "Remote Session") + ".");
 #endif
                     return;
                 }

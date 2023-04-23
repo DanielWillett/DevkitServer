@@ -2,6 +2,7 @@
 using DevkitServer.Util.Terminals;
 using StackCleaner;
 using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
@@ -475,6 +476,21 @@ internal static class Logger
                                                                             ? GetExtANSIForegroundString(StackCleaner.Configuration.Colors!.PropertyColor)
                                                                             : GetANSIForegroundString(ToConsoleColor(StackCleaner.Configuration.Colors!.PropertyColor)))) + field.Name +
                                                                                                                          (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIReset);
+    public static string Format(this PropertyInfo property) => (property.DeclaringType != null ? StackCleaner.GetString(property.DeclaringType) : ((StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
+                                                             ? string.Empty
+                                                             : (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                                                                 ? GetExtANSIForegroundString(StackCleaner.Configuration.Colors!.KeywordColor)
+                                                                 : GetANSIForegroundString(ToConsoleColor(StackCleaner.Configuration.Colors!.KeywordColor)))) + "global" + (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
+                                                                 ? string.Empty
+                                                                 : (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                                                                     ? GetExtANSIForegroundString(StackCleaner.Configuration.Colors!.PunctuationColor)
+                                                                     : GetANSIForegroundString(ToConsoleColor(StackCleaner.Configuration.Colors!.PunctuationColor)))) + "::" +
+                                                             (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIReset))) + " " + (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
+                                                                        ? string.Empty
+                                                                        : (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                                                                            ? GetExtANSIForegroundString(StackCleaner.Configuration.Colors!.PropertyColor)
+                                                                            : GetANSIForegroundString(ToConsoleColor(StackCleaner.Configuration.Colors!.PropertyColor)))) + property.Name +
+                                                                                                                         (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIReset);
     public static string Format(this MethodBase method) => StackCleaner.GetString(method);
     public static string Format(this Type typedef) => StackCleaner.GetString(typedef);
     public static string Format(this ExceptionBlock block)
@@ -667,8 +683,19 @@ internal static class Logger
 
         return str;
     }
-    public static string Format(this object obj)
+    public static string Format(this object? obj)
     {
+        if (obj is MemberInfo)
+        {
+            if (obj is FieldInfo field)
+                return field.Format();
+            if (obj is PropertyInfo property)
+                return property.Format();
+            if (obj is MethodBase method)
+                return method.Format();
+            if (obj is Type type2)
+                return type2.Format();
+        }
         if (obj == null)
         {
             if (StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
@@ -678,19 +705,60 @@ internal static class Logger
 
         Type type = obj.GetType();
         string str = obj.ToString();
+        if (obj is ulong s64 && s64.UserSteam64())
+        {
+            if (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
+                return s64.ToString("D17");
+
+            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + s64.ToString("D17") + ANSIReset;
+        }
+        if (obj is CSteamID s642 && s642.UserSteam64())
+        {
+            if (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
+                return s642.m_SteamID.ToString("D17");
+
+            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + s642.m_SteamID.ToString("D17") + ANSIReset;
+        }
+        if (obj is ITransportConnection connection)
+        {
+            if (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
+                return connection.GetAddressString(true);
+
+            if (connection.TryGetIPv4Address(out uint addr))
+            {
+                str = GetColor(ToArgb(new Color32(204, 255, 102, 255)))
+                      + Parser.getIPFromUInt32(addr);
+                if (connection.TryGetPort(out ushort port))
+                    str += GetColor(StackCleaner.Configuration.Colors!.PunctuationColor) + ":" +
+                           GetColor(ToArgb(new Color32(170, 255, 0, 255))) +
+                           port.ToString(CultureInfo.InvariantCulture);
+
+                return str + ANSIReset;
+            }
+            
+            return GetColor(ToArgb(new Color32(204, 255, 102, 255))) + (connection.GetAddressString(true) ?? "<unknown address>") + ANSIReset;
+        }
+
+        if (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
+            return str;
         if (str.Equals(type.ToString(), StringComparison.Ordinal))
             return "{" + type.Format() + "}";
         
         if (StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            if (obj is string)
+            if (obj is string or char)
                 return GetColor(ToArgb(new Color32(214, 157, 133, 255))) + "\"" + str + "\"" + ANSIReset;
 
-            if (type.IsPrimitive)
-                return GetColor(StackCleaner.Configuration.Colors!.KeywordColor) + str + ANSIReset;
-            
             if (type.IsEnum)
                 return GetColor(StackCleaner.Configuration.Colors!.EnumColor) + str + ANSIReset;
+
+            if (type.IsPrimitive)
+            {
+                if (obj is bool)
+                    return GetColor(StackCleaner.Configuration.Colors!.KeywordColor) + str + ANSIReset;
+                
+                return GetColor(ToArgb(new Color32(181, 206, 168, 255))) + str + ANSIReset;
+            }
             
             if (type.IsInterface)
                 return GetColor(StackCleaner.Configuration.Colors!.InterfaceColor) + str + ANSIReset;

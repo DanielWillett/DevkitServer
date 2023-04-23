@@ -4,7 +4,9 @@ using DevkitServer.Util.Encoding;
 using JetBrains.Annotations;
 using SDG.Framework.Landscapes;
 using SDG.Framework.Utilities;
+using SDG.NetPak;
 using System.Reflection;
+using HarmonyLib;
 #if CLIENT
 using DevkitServer.Patches;
 using SDG.Framework.Devkit.Tools;
@@ -13,7 +15,8 @@ using SDG.Framework.Devkit.Tools;
 namespace DevkitServer.Multiplayer;
 public sealed partial class EditorTerrain : MonoBehaviour
 {
-    private static readonly NetCallCustom FlushEditBuffer = new NetCallCustom((ushort)NetCalls.FlushEditBuffer, short.MaxValue);
+    private static readonly ByteReader Reader = new ByteReader { ThrowOnError = true };
+    private static readonly ByteWriter Writer = new ByteWriter(false, 8192);
     public const ushort DataVersion = 0;
 
     /// <summary>Ran before an action is applied.</summary>
@@ -69,27 +72,71 @@ public sealed partial class EditorTerrain : MonoBehaviour
     }
 #endif
 
-    [NetCall(NetCallSource.FromEither, (ushort)NetCalls.FlushEditBuffer)]
-    private static void ReceiveEditBuffer(MessageContext ctx, ByteReader reader)
-    {
-#if CLIENT
-        EditorUser? user = UserManager.FromId(ctx.Overhead.Sender);
-#else
-        EditorUser? user = UserManager.FromConnection(ctx.Connection);
+    internal static void ReceiveTerrainRelay(
+#if SERVER
+        ITransportConnection transportConnection,
 #endif
-        if (user != null && user.IsOnline)
+        NetPakReader reader)
+    {
+        if (!reader.ReadUInt16(out ushort len))
         {
-            user.Terrain.ReadEditBuffer(reader);
+            Logger.LogError("Failed to read incoming terrain packet length.");
+            return;
         }
+
+#if SERVER
+        EditorUser? user = UserManager.FromConnection(transportConnection);
+        if (user == null)
+        {
+            Logger.LogError("Failed to find user for terrain packet from transport connection: " + transportConnection.Format() + ".");
+            return;
+        }
+#endif
+        if (!reader.ReadBytesPtr(len, out byte[] buffer, out int offset))
+        {
+            Logger.LogError("Failed to read terrain packet.");
+            return;
+        }
+        Reader.LoadNew(buffer);
+        Reader.Skip(offset);
+#if CLIENT
+        ulong s64 = Reader.ReadUInt64();
+        EditorUser? user = UserManager.FromId(s64);
+        if (user == null)
+        {
+            Logger.LogError("Failed to find user for terrain packet from a steam id: " + s64.Format() + ".");
+            return;
+        }
+#endif
+        user.Terrain.HandleReadPackets(Reader);
+
+#if SERVER
+        if (Provider.clients.Count > 1)
+        {
+            byte[] sendBytes = new byte[sizeof(ulong) + len];
+            Buffer.BlockCopy(buffer, offset, sendBytes, sizeof(ulong), len);
+            UnsafeBitConverter.GetBytes(sendBytes, user.SteamId.m_SteamID);
+            IList<ITransportConnection> list = NetFactory.GetPooledTransportConnectionList(Provider.clients.Count - 1);
+            for (int i = 0; i < Provider.clients.Count; ++i)
+            {
+                SteamPlayer pl = Provider.clients[i];
+                if (pl.playerID.steamID.m_SteamID != user.SteamId.m_SteamID)
+                    list.Add(pl.transportConnection);
+            }
+
+            NetFactory.SendGeneric(NetFactory.DevkitMessage.TerrainEditRelay, sendBytes, list, reliable: false);
+        }
+#endif
     }
 #if CLIENT
     internal void FlushEdits()
     {
         if (_editBuffer.Count > 0)
         {
-            MessageOverhead overhead = new MessageOverhead(MessageFlags.LayeredRequest, (int)NetCalls.FlushEditBuffer, 0);
-            Logger.LogDebug("Flushing " + _editBuffer.Count + " action(s).");
-            NetFactory.SendRelay(FlushEditBuffer.Write(ref overhead, WriteEditBuffer));
+            Logger.LogDebug("Flushing " + _editBuffer.Count.Format() + " action(s).");
+            WriteEditBuffer(Writer);
+            int len = Writer.Count;
+            NetFactory.SendGeneric(NetFactory.DevkitMessage.TerrainEditRelay, Writer.FinishWrite(), 0, len, true);
         }
     }
 #endif
@@ -120,9 +167,9 @@ public sealed partial class EditorTerrain : MonoBehaviour
             }
             _nextApply += action.DeltaTime;
             ActiveAction = action;
-            action.Apply();
             Logger.LogDebug("Applying " + action.GetType().Format() + ".");
             Logger.DumpJson(action, condensed: true);
+            action.Apply();
             ActiveAction = null;
             if (action is IDisposable disposable)
                 disposable.Dispose();
@@ -218,7 +265,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
     }
 #endif
 
-    private void ReadEditBuffer(ByteReader reader)
+    private void HandleReadPackets(ByteReader reader)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -255,6 +302,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
                 TerrainTransactionType.HolesCut => new HolemapPaintAction(),
                 TerrainTransactionType.AddTile => new TileModifyAction(),
                 TerrainTransactionType.DeleteTile => new TileModifyAction { IsDelete = true },
+                TerrainTransactionType.UpdateSplatmapLayers => new TileSplatmapLayersUpdateAction(),
                 _ => null
             };
             if (action != null)
@@ -327,6 +375,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
 
         return 1f;
     }
+
     private static void WriteHeightmapNoTransactions(Bounds worldBounds, Landscape.LandscapeWriteHeightmapHandler callback)
     {
         ThreadUtil.assertIsGameThread();
@@ -403,6 +452,11 @@ public sealed partial class EditorTerrain : MonoBehaviour
             ClientEvents.OnHolePainted += OnPaintHole;
             ClientEvents.OnTileAdded += OnTileAdded;
             ClientEvents.OnTileDeleted += OnTileDeleted;
+            ClientEvents.OnSplatmapLayerMaterialsUpdate += OnSplatmapLayerMaterialsUpdate;
+            //ClientEvents.OnFoliageAdded += OnFoliageAdded;
+            //ClientEvents.OnFoliageRemoved += OnFoliageRemoved;
+            //ClientEvents.OnResourceSpawnpointRemoved += OnResourceSpawnpointRemoved;
+            //ClientEvents.OnLevelObjectRemoved += OnLevelObjectRemoved;
         }
 #endif
     }
@@ -422,6 +476,11 @@ public sealed partial class EditorTerrain : MonoBehaviour
             ClientEvents.OnHolePainted -= OnPaintHole;
             ClientEvents.OnTileAdded -= OnTileAdded;
             ClientEvents.OnTileDeleted -= OnTileDeleted;
+            ClientEvents.OnSplatmapLayerMaterialsUpdate -= OnSplatmapLayerMaterialsUpdate;
+            //ClientEvents.OnFoliageAdded -= OnFoliageAdded;
+            //ClientEvents.OnFoliageRemoved -= OnFoliageRemoved;
+            //ClientEvents.OnResourceSpawnpointRemoved -= OnResourceSpawnpointRemoved;
+            //ClientEvents.OnLevelObjectRemoved -= OnLevelObjectRemoved;
         }
 #endif
     }
@@ -585,6 +644,24 @@ public sealed partial class EditorTerrain : MonoBehaviour
             DeltaTime = Time.deltaTime
         });
     }
+    private void OnSplatmapLayerMaterialsUpdate(LandscapeTile tile)
+    {
+        QueueAction(new TileModifyAction
+        {
+            IsDelete = true,
+            Coordinates = tile.coord,
+            DeltaTime = Time.deltaTime
+        });
+    }
+    //private void OnFoliageAdded(LandscapeTile tile)
+    //{
+    //    QueueAction(new FoliageAddAction
+    //    {
+    //        IsDelete = false,
+    //        Coordinates = tile.coord,
+    //        DeltaTime = Time.deltaTime
+    //    });
+    //}
 #endif
 
     public delegate void AppliedAction(ITerrainAction action);

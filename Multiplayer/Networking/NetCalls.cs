@@ -2,15 +2,15 @@
 internal enum NetCalls : ushort
 {
     SendLog = 1,
-    FlushEditBuffer = 2,
-    RequestLevel = 3,
-    StartSendLevel = 4,
-    SendLevel = 5,
-    EndSendLevel = 6,
-    RequestLevelPackets = 7,
-    SendTileData = 8,
-    RequestLevelCheckup = 9,
-    Ping = 10,
-    SendSteamVerificationToken = 11,
-    OpenHighSpeedClient = 12
+    RequestLevel = 2,
+    StartSendLevel = 3,
+    SendLevel = 4,
+    EndSendLevel = 5,
+    RequestLevelPackets = 6,
+    SendTileData = 7,
+    RequestLevelCheckup = 8,
+    Ping = 9,
+    SendSteamVerificationToken = 10,
+    OpenHighSpeedClient = 11,
+    SendPending = 12
 }
