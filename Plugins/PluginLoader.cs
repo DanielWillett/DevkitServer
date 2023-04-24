@@ -1,36 +1,177 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO.Compression;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.Hosting;
-using System.Security;
-using System.Security.Permissions;
-using System.Security.Policy;
-using System.Text;
-using System.Threading.Tasks;
-using DevkitServer.API;
+﻿using DevkitServer.API;
+using DevkitServer.API.Permissions;
+using DevkitServer.Commands.Subsystem;
 using DevkitServer.Configuration;
+using System.Reflection;
+using Action = System.Action;
 
 namespace DevkitServer.Plugins;
 public static class PluginLoader
 {
+    public static readonly string PluginDirectory = Path.Combine(DevkitServerConfig.FilePath, "Plugins");
+    public static readonly string LibraryDirectory = Path.Combine(DevkitServerConfig.FilePath, "Libraries");
+
     private static readonly List<IDevkitServerPlugin> _plugins = new List<IDevkitServerPlugin>();
     private static readonly List<PluginLibrary> _libs = new List<PluginLibrary>();
     private static readonly List<PluginAssembly> _pluginWrappers = new List<PluginAssembly>();
     private static readonly IReadOnlyList<IDevkitServerPlugin> _roPlugins = _plugins.AsReadOnly();
     private static readonly IReadOnlyList<PluginLibrary> _roLibs = _libs.AsReadOnly();
-    public static readonly string PluginDirectory = Path.Combine(DevkitServerConfig.FilePath, "Plugins");
-    public static readonly string LibraryDirectory = Path.Combine(DevkitServerConfig.FilePath, "Libraries");
-    public static event Action<IDevkitServerPlugin>? OnPluginLoaded; 
+
+    /// <summary>
+    /// Invoked a plugin loads, either on startup or by <see cref="RegisterPlugin"/>.
+    /// </summary>
+    /// <remarks>Exceptions will not break execution.</remarks>
+    public static event Action<IDevkitServerPlugin>? OnPluginLoaded;
+
+    /// <summary>
+    /// Invoked a plugin unloads, either on startup, shutdown or by <see cref="DeregisterPlugin"/>.
+    /// </summary>
+    /// <remarks>All plugins in an assembly will unload if any fail to load on startup, invoking this event. Exceptions will not break execution.</remarks>
     public static event Action<IDevkitServerPlugin>? OnPluginUnloaded;
+
+    /// <summary>
+    /// Invoked after all plugins load on startup.
+    /// </summary>
+    /// <remarks>Exceptions will not break execution.</remarks>
+    public static event Action? OnPluginsLoaded;
+
+    /// <summary>
+    /// Invoked after all plugins unload on shutdown.
+    /// </summary>
+    /// <remarks>Exceptions will not break execution.</remarks>
+    public static event Action? OnPluginsUnloaded;
+
+    /// <summary>
+    /// All currently loaded plugins.
+    /// </summary>
     public static IReadOnlyList<IDevkitServerPlugin> Plugins => _roPlugins;
+    /// <summary>
+    /// All loaded libraries.
+    /// </summary>
     public static IReadOnlyList<PluginLibrary> Libraries => _roLibs;
+    private static void AssertPluginValid(IDevkitServerPlugin plugin)
+    {
+        if (plugin.PermissionPrefix.IndexOf('.') != -1)
+            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not contain a period.");
+        string defaultModuleName = DevkitServerModule.MainLocalization.format("Name");
+        if (plugin.MenuName.Equals(defaultModuleName, StringComparison.InvariantCultureIgnoreCase))
+        {
+            plugin.LogError("Invalid MenuName: " + plugin.MenuName.Format() + ". MenuName can't be equal to " + defaultModuleName.Format() + ".");
+            throw new Exception("Plugin " + plugin.Name + "'s 'MenuName' can't be equal to \"" + defaultModuleName + "\".");
+        }
+    }
+    /// <exception cref="AggregateException">Error(s) loading the plugin.</exception>
+    /// <exception cref="ArgumentNullException"/>
+    public static void RegisterPlugin(IDevkitServerPlugin plugin)
+    {
+        if (plugin == null)
+            throw new ArgumentNullException(nameof(plugin));
+        bool dup = true;
+        while (dup)
+        {
+            dup = false;
+            for (int i = 0; i < _plugins.Count; i++)
+            {
+                IDevkitServerPlugin plugin2 = _plugins[i];
+                if (plugin2.PermissionPrefix.Equals(plugin.PermissionPrefix, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    plugin.PermissionPrefix = "_" + plugin.PermissionPrefix;
+                    plugin.LogWarning("Conflicting permission prefix with " + plugin2.Format() +
+                                      " (" + plugin2.PermissionPrefix.Format() + "). Overriding to " + plugin.PermissionPrefix.Format() + ".");
+                    dup = true;
+                }
+            }
+        }
+
+        try
+        {
+            plugin.Load();
+            AssertPluginValid(plugin);
+            PluginAdvertising.Get().AddPlugin(plugin.MenuName);
+            _plugins.Add(plugin);
+            Assembly asm = plugin.GetType().Assembly;
+            for (int i = 0; i < _pluginWrappers.Count; ++i)
+            {
+                if (_pluginWrappers[i].Assembly == asm)
+                {
+                    _pluginWrappers[i].Plugins.Add(plugin);
+                    goto skipAssemblyAdd;
+                }
+            }
+
+            PluginAssembly assemblyWrapper = new PluginAssembly(asm);
+            assemblyWrapper.Plugins.Add(plugin);
+            _pluginWrappers.Add(assemblyWrapper);
+            skipAssemblyAdd:
+            TryInvokeOnPluginLoaded(plugin);
+            Logger.LogInfo("[LOAD " + plugin.Name.ToUpperInvariant() + "] Loaded " + plugin.Name.Colorize(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Plugin failed to load: " + plugin.GetType().Format() + ".", method: "LOAD " + plugin.Name.ToUpperInvariant());
+            Logger.LogError(ex, method: "LOAD " + plugin.Name.ToUpperInvariant());
+            Exception? unloadEx = null;
+            try
+            {
+                plugin.Unload();
+                TryInvokeOnPluginUnloaded(plugin);
+            }
+            catch (Exception ex2)
+            {
+                unloadEx = ex2;
+                Logger.LogError("Plugin failed to unload: " + plugin.GetType().Format() + ".", method: "LOAD " + plugin.Name.ToUpperInvariant());
+                Logger.LogError(ex2, method: "LOAD " + plugin.Name.ToUpperInvariant());
+            }
+            throw new AggregateException("Plugin failed to load and unload: " + plugin.GetType().FullName + ".", unloadEx != null ? new Exception[] { ex, unloadEx } : new Exception[] { ex });
+        }
+    }
+
+    /// <exception cref="AggregateException">Error(s) unloading the plugin.</exception>
+    /// <exception cref="ArgumentNullException"/>
+    public static void DeregisterPlugin(IDevkitServerPlugin plugin)
+    {
+        if (plugin == null)
+            throw new ArgumentNullException(nameof(plugin));
+        for (int i = _plugins.Count - 1; i >= 0; --i)
+        {
+            if (_plugins[i].Equals(plugin))
+            {
+                plugin = _plugins[i];
+                PluginAdvertising.Get().RemovePlugin(plugin.MenuName);
+                _plugins.RemoveAt(i);
+                Assembly asm = plugin.GetType().Assembly;
+                for (int j = 0; j < _pluginWrappers.Count; ++j)
+                {
+                    if (_pluginWrappers[j].Assembly == asm)
+                    {
+                        _pluginWrappers[j].Plugins.Remove(plugin);
+                        break;
+                    }
+                }
+
+                try
+                {
+                    plugin.Unload();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Plugin failed to unload: " + plugin.GetType().Format() + ".", method: "LOAD " + plugin.Name.ToUpperInvariant());
+                    Logger.LogError(ex, method: "LOAD " + plugin.Name.ToUpperInvariant());
+                    throw new AggregateException("Plugin failed to unload: " + plugin.GetType().FullName + ".", ex);
+                }
+                finally
+                {
+                    TryInvokeOnPluginUnloaded(plugin);
+                }
+                break;
+            }
+        }
+    }
     internal static void Load()
     {
         Directory.CreateDirectory(PluginDirectory);
         Directory.CreateDirectory(LibraryDirectory);
-        
+
         string[] plugins = Directory.GetFiles(PluginDirectory, "*.dll", SearchOption.TopDirectoryOnly);
         string[] libraries = Directory.GetFiles(LibraryDirectory, "*.dll", SearchOption.TopDirectoryOnly);
 
@@ -67,13 +208,13 @@ public static class PluginLoader
             }
             foreach (Type type in types
                          .Where(x => typeof(IDevkitServerPlugin).IsAssignableFrom(x))
-                         .OrderByDescending(x => 
+                         .OrderByDescending(x =>
                              Attribute.GetCustomAttribute(x, typeof(PluginLoadPriorityAttribute)) is PluginLoadPriorityAttribute attr
                                  ? attr.Priority
                                  : 0
                          ))
             {
-                if (type.IsAbstract || Attribute.IsDefined(type, typeof(IgnorePluginAttribute)))
+                if (type.IsAbstract || Attribute.IsDefined(type, typeof(IgnoreAttribute)))
                 {
                     Logger.LogInfo("[LOAD " + assembly.GetName().Name.ToUpperInvariant() + "] Skipped loading " + type.Format() + ".");
                     continue;
@@ -96,7 +237,7 @@ public static class PluginLoader
             {
                 Logger.LogInfo("Found " + pluginsTemp.Count.Format() + " plugin" + (pluginsTemp.Count == 1 ? string.Empty : "s") +
                                " from " + Path.GetFileName(pluginDll).Format() + " (" + assembly.GetName().Version.Format() + ")");
-                PluginAssembly info = new PluginAssembly();
+                PluginAssembly info = new PluginAssembly(assembly);
                 info.Plugins.AddRange(pluginsTemp);
                 _pluginWrappers.Add(info);
                 _plugins.AddRange(pluginsTemp);
@@ -106,6 +247,29 @@ public static class PluginLoader
                 Logger.LogInfo("Found no plugins from " + Path.GetFileName(pluginDll).Format() + " (" + assembly.GetName().Version.Format() + ")");
             }
         }
+
+        bool dup = true;
+        while (dup)
+        {
+            dup = false;
+            for (int i = 0; i < _plugins.Count; i++)
+            {
+                IDevkitServerPlugin plugin = _plugins[i];
+                for (int j = i + 1; j < _plugins.Count; ++j)
+                {
+                    IDevkitServerPlugin plugin2 = _plugins[j];
+                    if (plugin2.PermissionPrefix.Equals(plugin.PermissionPrefix, StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        plugin2.PermissionPrefix = "_" + plugin2.PermissionPrefix;
+                        plugin2.LogWarning("Conflicting permission prefix with " + plugin.Format() +
+                                          " (" + plugin.PermissionPrefix.Format() + "). Overriding to " + plugin2.PermissionPrefix.Format() + ".");
+                        dup = true;
+                    }
+                }
+            }
+        }
+
+        UserPermissions.InitHandlers();
 
         pluginsTemp = pluginsTemp.OrderByDescending(x =>
             Attribute.GetCustomAttribute(x.GetType(), typeof(PluginLoadPriorityAttribute)) is
@@ -119,14 +283,15 @@ public static class PluginLoader
             try
             {
                 plugin.Load();
-                OnPluginLoaded?.Invoke(plugin);
-                Logger.LogInfo("[LOAD " + plugin.Name.ToUpperInvariant() + "] Loaded " + plugin.Name.Colorize(plugin is Plugin p ? p.Color : new Color32(204, 153, 255, 255)));
+                AssertPluginValid(plugin);
+                TryInvokeOnPluginLoaded(plugin);
+                Logger.LogInfo("[LOAD " + plugin.Name.ToUpperInvariant() + "] Loaded " + plugin.Name.Colorize(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor));
             }
             catch (Exception ex)
             {
                 Logger.LogError("Plugin failed to load: " + plugin.GetType().Format() + ".", method: "LOAD " + plugin.Name.ToUpperInvariant());
                 Logger.LogError(ex, method: "LOAD " + plugin.Name.ToUpperInvariant());
-                for (int j = i - 1; j >= 0; --j)
+                for (int j = i; j >= 0; --j)
                 {
                     IDevkitServerPlugin plugin2 = pluginsTemp[j];
                     if (plugin.Assembly == plugin2.Assembly)
@@ -134,7 +299,7 @@ public static class PluginLoader
                         try
                         {
                             plugin2.Unload();
-                            OnPluginUnloaded?.Invoke(plugin2);
+                            TryInvokeOnPluginUnloaded(plugin2);
                         }
                         catch (Exception ex2)
                         {
@@ -150,17 +315,182 @@ public static class PluginLoader
                 break;
             }
         }
+
+        foreach (IDevkitServerPlugin plugin in _plugins.OrderBy(x => x.Name))
+            PluginAdvertising.Get().AddPlugin(plugin.MenuName);
+
+        CommandHandler.InitImpl();
+        TryInvokeOnPluginsLoaded();
+    }
+    internal static void Unload()
+    {
+        foreach (IDevkitServerPlugin plugin in _plugins.ToList())
+        {
+            try
+            {
+                DeregisterPlugin(plugin);
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+
+        TryInvokeOnPluginsUnloaded();
+    }
+    private static void TryInvokeOnPluginLoaded(IDevkitServerPlugin plugin)
+    {
+        if (OnPluginLoaded == null)
+            return;
+        foreach (Action<IDevkitServerPlugin> action in OnPluginLoaded.GetInvocationList().Cast<Action<IDevkitServerPlugin>>())
+        {
+            try
+            {
+                action(plugin);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("A plugin threw an exception from " + nameof(PluginLoader) + "." + nameof(OnPluginLoaded) + ":");
+                Logger.LogError(ex);
+            }
+        }
+    }
+    private static void TryInvokeOnPluginUnloaded(IDevkitServerPlugin plugin)
+    {
+        if (OnPluginUnloaded == null)
+            return;
+        foreach (Action<IDevkitServerPlugin> action in OnPluginUnloaded.GetInvocationList().Cast<Action<IDevkitServerPlugin>>())
+        {
+            try
+            {
+                action(plugin);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("A plugin threw an exception from " + nameof(PluginLoader) + "." + nameof(OnPluginUnloaded) + ":");
+                Logger.LogError(ex);
+            }
+        }
+    }
+    private static void TryInvokeOnPluginsLoaded()
+    {
+        if (OnPluginsLoaded == null)
+            return;
+        foreach (Action action in OnPluginsLoaded.GetInvocationList().Cast<Action>())
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("A plugin threw an exception from " + nameof(PluginLoader) + "." + nameof(OnPluginsLoaded) + ":");
+                Logger.LogError(ex);
+            }
+        }
+    }
+    private static void TryInvokeOnPluginsUnloaded()
+    {
+        if (OnPluginsUnloaded == null)
+            return;
+        foreach (Action action in OnPluginsUnloaded.GetInvocationList().Cast<Action>())
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("A plugin threw an exception from " + nameof(PluginLoader) + "." + nameof(OnPluginsUnloaded) + ":");
+                Logger.LogError(ex);
+            }
+        }
     }
 
-    private static Assembly TryResolveType(object sender, ResolveEventArgs args)
+    public static IDevkitServerPlugin? FindPluginForMember(MemberInfo member)
     {
-        Logger.LogDebug("Type resolve args: " + args.Name + " (" + args.RequestingAssembly + ").");
-        return null!;
-    }
-    private static Assembly TryResolveAssembly(object sender, ResolveEventArgs args)
-    {
-        Logger.LogDebug("Assembly resolve args: " + args.Name + " (" + args.RequestingAssembly + ").");
-        return null!;
+        Type? relaventType = member as Type ?? member.DeclaringType;
+
+        if (relaventType == null)
+            return null;
+
+        // check if the assembly just has one plugin
+        Assembly asm = relaventType.Assembly;
+        if (asm == Assembly.GetExecutingAssembly()) return null;
+        for (int i = 0; i < _pluginWrappers.Count; ++i)
+        {
+            if (_pluginWrappers[i].Assembly == asm)
+            {
+                if (_pluginWrappers[i].Plugins.Count == 1)
+                    return _pluginWrappers[i].Plugins[0];
+                break;
+            }
+        }
+
+        IDevkitServerPlugin? plugin = null;
+
+        // find attribute on member
+        if (Attribute.GetCustomAttribute(member, typeof(PluginIdentifierAttribute)) is PluginIdentifierAttribute { PluginType: { } ptype })
+        {
+            for (int i = 0; i < _plugins.Count; ++i)
+            {
+                if (ptype == _plugins[i].GetType())
+                {
+                    plugin = _plugins[i];
+                    goto checkAssembly;
+                }
+            }
+            for (int i = 0; i < _plugins.Count; ++i)
+            {
+                if (ptype.IsInstanceOfType(_plugins[i]))
+                {
+                    plugin = _plugins[i];
+                    goto checkAssembly;
+                }
+            }
+        }
+
+        // check for nested type
+        for (Type? declType = relaventType; declType != null;)
+        {
+            plugin = FindPluginForType(declType);
+            if (plugin != null)
+                goto checkAssembly;
+            declType = declType.DeclaringType;
+        }
+
+        IDevkitServerPlugin? FindPluginInstanceOfType(Type type)
+        {
+            for (int i = 0; i < _plugins.Count; ++i)
+            {
+                if (type.IsInstanceOfType(_plugins[i]))
+                    return _plugins[i];
+            }
+            for (int i = 0; i < _plugins.Count; ++i)
+            {
+                if (type.IsInstanceOfType(_plugins[i]))
+                    return _plugins[i];
+            }
+
+            return null;
+        }
+
+        IDevkitServerPlugin? FindPluginForType(Type type)
+        {
+            if (FindPluginInstanceOfType(type) is { } p)
+                return p;
+            return Attribute.GetCustomAttribute(type, typeof(PluginIdentifierAttribute)) is PluginIdentifierAttribute { PluginType: { } ptype }
+                ? FindPluginInstanceOfType(ptype)
+                : null;
+        }
+
+        checkAssembly:
+        if (plugin == null)
+            return null;
+        if (plugin.Assembly != asm)
+            return null;
+
+        return plugin;
     }
 }
 
@@ -177,4 +507,10 @@ public class PluginLibrary
 internal class PluginAssembly
 {
     public List<IDevkitServerPlugin> Plugins { get; } = new List<IDevkitServerPlugin>();
+    public Assembly Assembly { get; }
+
+    public PluginAssembly(Assembly assembly)
+    {
+        Assembly = assembly;
+    }
 }

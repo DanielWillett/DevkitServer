@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
 
@@ -22,6 +23,15 @@ public class DevkitServerGamemode : GameMode
         }
 #endif
     }
+#if SERVER
+    public static ClientInfo GetClientInfo(EditorUser user)
+    {
+        return new ClientInfo
+        {
+            Permissions = UserPermissions.PlayerHandler.GetPermissions(user.SteamId.m_SteamID, true).ToArray()
+        };
+    }
+#endif
     public override GameObject getPlayerGameObject(SteamPlayerID playerID)
     {
         if (!DevkitServerModule.IsEditing)

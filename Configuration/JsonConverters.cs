@@ -879,3 +879,39 @@ public sealed class CSteamIDJsonConverter : JsonConverter<CSteamID>
             writer.WriteNumberValue(value.m_SteamID);
     }
 }
+public sealed class TypeJsonConverter : JsonConverter<Type>
+{
+    public override Type? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        switch (reader.TokenType)
+        {
+            case JsonTokenType.Null:
+                return null;
+            case JsonTokenType.String:
+                string? str = reader.GetString();
+                if (string.IsNullOrEmpty(str) || str!.Equals("null", StringComparison.InvariantCultureIgnoreCase) || str.Equals("<null>", StringComparison.InvariantCultureIgnoreCase))
+                    return null;
+                Type? type = Type.GetType(str, false, true);
+                if (type == null)
+                {
+                    type = Assembly.GetExecutingAssembly().GetType(str, false, true);
+                    if (type == null)
+                        throw new JsonException("Unknown type: \"" + str + "\".");
+                }
+
+                return type;
+            default:
+                throw new JsonException("Unexpected token " + reader.TokenType + " in JSON type converter.");
+        }
+    }
+
+    public override void Write(Utf8JsonWriter writer, Type value, JsonSerializerOptions options)
+    {
+        if (value == null)
+            writer.WriteNullValue();
+        else if (value.Assembly == Assembly.GetExecutingAssembly())
+            writer.WriteStringValue(value.FullName);
+        else
+            writer.WriteStringValue(value.AssemblyQualifiedName);
+    }
+}

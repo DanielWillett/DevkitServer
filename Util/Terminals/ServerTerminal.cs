@@ -5,16 +5,24 @@ namespace DevkitServer.Util.Terminals;
 internal class ServerTerminal : MonoBehaviour, ITerminal
 {
     private bool _writing;
-    public event TerminalReadDelegate? OnInput;
-    public event TerminalWriteDelegate? OnOutput;
-    public Action<CommandWindow, string>? LogInfoIntl = Accessor.GenerateInstanceCaller<CommandWindow, Action<CommandWindow, string>>("internalLogInformation");
-    public Action<CommandWindow, string>? LogWarnIntl = Accessor.GenerateInstanceCaller<CommandWindow, Action<CommandWindow, string>>("internalLogWarning");
-    public Action<CommandWindow, string>? LogErrorIntl = Accessor.GenerateInstanceCaller<CommandWindow, Action<CommandWindow, string>>("internalLogError");
-
+    public event TerminalPreReadDelegate? OnInput;
+    public event TerminalPreWriteDelegate? OnOutput;
+    public Action<CommandWindow, string>? LogInfoIntl;
+    public Action<CommandWindow, string>? LogWarnIntl;
+    public Action<CommandWindow, string>? LogErrorIntl;
+    private bool _init;
     public bool IsCommitingToUnturnedLog => _writing;
-
+    private void CheckInit()
+    {
+        if (_init) return;
+        _init = true;
+        LogInfoIntl = Accessor.GenerateInstanceCaller<CommandWindow, Action<CommandWindow, string>>("internalLogInformation");
+        LogWarnIntl = Accessor.GenerateInstanceCaller<CommandWindow, Action<CommandWindow, string>>("internalLogWarning");
+        LogErrorIntl = Accessor.GenerateInstanceCaller<CommandWindow, Action<CommandWindow, string>>("internalLogError");
+    }
     public void Write(string input, ConsoleColor color, bool save, Severity severity)
     {
+        CheckInit();
         OnOutput?.Invoke(ref input, ref color);
         string str = Logger.GetANSIForegroundString(color) + input + Logger.ANSIReset;
         _writing = true;

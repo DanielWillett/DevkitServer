@@ -2,8 +2,8 @@
 internal sealed class BackgroundLoggingTerminal : MonoBehaviour, ITerminal
 {
     private bool _writing;
-    public event TerminalReadDelegate? OnInput;
-    public event TerminalWriteDelegate? OnOutput;
+    public event TerminalPreReadDelegate? OnInput;
+    public event TerminalPreWriteDelegate? OnOutput;
     public bool IsCommitingToUnturnedLog => _writing;
     
     public void Write(string input, ConsoleColor color, bool save, Severity severity)

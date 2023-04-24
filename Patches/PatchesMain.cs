@@ -21,7 +21,6 @@ namespace DevkitServer.Patches;
 [EarlyTypeInit]
 internal static class PatchesMain
 {
-    private static NetCall SendPending = new NetCall((ushort)NetCalls.SendPending);
     public const string HarmonyId = "dw.devkitserver";
     internal static Harmony Patcher { get; private set; } = null!;
     internal static void Init()
@@ -84,8 +83,6 @@ internal static class PatchesMain
             Provider.launch();
             return;
         }
-
-        SendPending.Invoke();
 
         LevelInfo level = DevkitServerModule.PendingLevelInfo ?? Level.getLevel(Provider.map);
         DevkitServerModule.PendingLevelInfo = null;
@@ -176,6 +173,10 @@ internal static class PatchesMain
     [HarmonyPrefix]
     private static bool PlayerInputFixedUpdate(PlayerInput __instance) => !IsEditorMode(__instance);
     [UsedImplicitly]
+    [HarmonyPatch(typeof(PlayerInteract), "Update")]
+    [HarmonyPrefix]
+    private static bool PlayerInteractUpdate() => IsPlayerControlledOrNotEditing();
+    [UsedImplicitly]
     [HarmonyPatch(typeof(PlayerUI), "Update")]
     [HarmonyPrefix]
     private static bool PlayerUIUpdate() => IsPlayerControlledOrNotEditing();
@@ -263,7 +264,11 @@ internal static class PatchesMain
     }
     [NetCall(NetCallSource.FromClient, (ushort)NetCalls.SendPending)]
     [UsedImplicitly]
-    private static void OnConnectionPending(MessageContext ctx) => OnConnectionPending(ctx.Connection, null!);
+    private static void OnConnectionPending(MessageContext ctx)
+    {
+        OnConnectionPending(ctx.Connection, null!);
+        ctx.Acknowledge();
+    }
 
     [HarmonyPatch("ServerMessageHandler_GetWorkshopFiles", "ReadMessage", MethodType.Normal)]
     [HarmonyPrefix]

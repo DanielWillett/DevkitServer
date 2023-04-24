@@ -16,20 +16,23 @@ namespace DevkitServer.Players;
 [EarlyTypeInit(-1)]
 public class UserInput : MonoBehaviour
 {
+    private const ushort DataVersion = 0;
+    internal static readonly NetCall<Vector3, Quaternion> SendInitialPosition = new NetCall<Vector3, Quaternion>((ushort)NetCalls.SendInitialPosition);
     private CameraController _controller;
     public static event Action<EditorUser>? OnUserPositionUpdated;
-    public EditorUser User { get; internal set; } = null!;
     private bool _hasStopped = true;
 #if CLIENT
     private float _lastFlush;
+    private bool _bufferHasStop;
+#endif
+    private bool _networkedInitialPosition;
     private Vector3 _lastPos;
     private Quaternion _lastRot;
-    private bool _bufferHasStop;
-    private bool _applied = false;
-#endif
     private float _nextPacketApplyTime;
+    public EditorUser User { get; internal set; } = null!;
     public bool IsOwner { get; private set; }
     public GameObject? ControllerObject { get; private set; }
+
     public CameraController Controller
     {
         get => _controller;
@@ -51,6 +54,17 @@ public class UserInput : MonoBehaviour
             HandleControllerUpdated();
         }
     }
+
+    /// <summary>
+    /// Aim component used for raycasts. Changes based on the current <see cref="Controller"/>.
+    /// </summary>
+    public Transform? Aim => Controller switch
+    {
+        CameraController.Editor => IsOwner ? MainCamera.instance.transform : ControllerObject?.transform,
+        CameraController.Player => User.Player?.player.look.aim,
+        _ => null
+    };
+
     private static readonly Func<IDevkitTool>? GetDevkitTool;
     private static readonly InstanceGetter<EditorMovement, float> GetSpeed = Accessor.GenerateInstanceGetter<EditorMovement, float>("speed", BindingFlags.NonPublic, throwOnError: true)!;
     private static readonly InstanceGetter<EditorMovement, Vector3> GetInput = Accessor.GenerateInstanceGetter<EditorMovement, Vector3>("input", BindingFlags.NonPublic, throwOnError: true)!;
@@ -100,6 +114,27 @@ public class UserInput : MonoBehaviour
         GetDevkitTool = (Func<IDevkitTool>)method.CreateDelegate(typeof(Func<IDevkitTool>));
     }
 
+#if CLIENT
+    [UsedImplicitly]
+    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendInitialPosition)]
+    private static void ReceiveInitialPosition(MessageContext ctx, Vector3 pos, Quaternion rot)
+    {
+        if (EditorUser.User != null && EditorUser.User.Input != null)
+        {
+            UserInput input = EditorUser.User.Input;
+            if (!input.IsOwner)
+                input.transform.SetPositionAndRotation(pos, rot);
+            else
+            {
+                input.transform.position = pos;
+                MainCamera.instance.transform.rotation = rot;
+            }
+            input._networkedInitialPosition = true;
+            ctx.Acknowledge(StandardErrorCode.Success);
+        }
+    }
+#endif
+
     [UsedImplicitly]
     private void Start()
     {
@@ -139,6 +174,11 @@ public class UserInput : MonoBehaviour
                 _editorUiObject = edUi.transform;
             Controller = CameraController.Editor;
         }
+
+#if SERVER
+        Load();
+        SaveManager.onPostSave += Save;
+#endif
 
         Logger.LogDebug("User input module created for " + User.SteamId.m_SteamID + " ( owner: " + IsOwner + " ).");
     }
@@ -205,10 +245,13 @@ public class UserInput : MonoBehaviour
             yield return null;
             RestartPlayerUI(player);
             Logger.LogInfo("Restarted PlayerUI.");
-            DevkitEditorHUD.Close(false);
+            DevkitEditorHUD.Close(true);
         }
         else if (editor)
+        {
+            DevkitEditorHUD.Close(true);
             DevkitEditorHUD.Open();
+        }
     }
 #endif
     private static bool SetActiveMainCamera(Transform tranform)
@@ -351,6 +394,11 @@ public class UserInput : MonoBehaviour
     [UsedImplicitly]
     private void OnDestroy()
     {
+        Logger.LogDebug("EditorInput destroyed.");
+#if SERVER
+        SaveManager.onPostSave -= Save;
+        Save();
+#endif
         User = null!;
     }
 
@@ -366,10 +414,12 @@ public class UserInput : MonoBehaviour
 #if CLIENT
         if (IsOwner)
         {
-            if (_movement == null)
+            if (_networkedInitialPosition || _movement == null)
                 return;
-            bool posDiff = this.transform.position != _lastPos;
-            bool rotDiff = MainCamera.instance.transform.rotation != _lastRot;
+            Vector3 pos = transform.position;
+            Quaternion rot = MainCamera.instance.transform.rotation;
+            bool posDiff = pos != _lastPos;
+            bool rotDiff = rot != _lastRot;
             if (posDiff || rotDiff)
             {
                 OnUserPositionUpdated?.Invoke(User);
@@ -381,8 +431,8 @@ public class UserInput : MonoBehaviour
                     flags |= Flags.Rotation;
                 _lastPacket = new UserInputPacket
                 {
-                    Rotation = _lastRot = MainCamera.instance.transform.rotation,
-                    Position = _lastPos = transform.position,
+                    Rotation = _lastRot = rot,
+                    Position = _lastPos = pos,
                     Flags = flags,
                     Speed = GetSpeed(_movement),
                     Input = GetInput(_movement) with
@@ -402,8 +452,8 @@ public class UserInput : MonoBehaviour
                 {
                     Flags = Flags.StopMsg,
                     DeltaTime = Time.deltaTime,
-                    Rotation = _lastRot = MainCamera.instance.transform.rotation,
-                    Position = _lastPos = transform.position
+                    Rotation = _lastRot = rot,
+                    Position = _lastPos = pos
                 };
                 (packets ??= new Queue<UserInputPacket>(1)).Enqueue(_lastPacket);
                 _bufferHasStop = true;
@@ -432,6 +482,8 @@ public class UserInput : MonoBehaviour
             {
                 _hasStopped = true;
                 this.transform.SetPositionAndRotation(packet.Position, packet.Rotation);
+                _lastPos = packet.Position;
+                _lastRot = packet.Rotation;
                 OnUserPositionUpdated?.Invoke(User);
                 _lastPacket = packet;
             }
@@ -453,14 +505,57 @@ public class UserInput : MonoBehaviour
         if ((packet.Flags & Flags.Position) != 0)
             pos = Vector3.Lerp(pos, packet.Position, 1f / (packets.Count + 1) * ((pos - packet.Position).sqrMagnitude / 49f));
         this.transform.position = pos;
+        _lastPos = pos;
         if ((packet.Flags & Flags.Rotation) != 0)
         {
             this.transform.rotation = packet.Rotation;
+            _lastRot = packet.Rotation;
         }
         OnUserPositionUpdated?.Invoke(User);
         _lastPacket = packet;
     }
+#if SERVER
+    private void Load()
+    {
+        if (User?.Player == null) return;
+        if (PlayerSavedata.fileExists(User.Player.playerID, "/DevkitServer/Input.dat"))
+        {
+            Block block = PlayerSavedata.readBlock(User.Player.playerID, "/DevkitServer/Input.dat", 0);
+            _ = block.readUInt16();
+            Vector3 pos = block.readSingleVector3();
+            Quaternion rot = block.readSingleQuaternion();
+            this.transform.SetPositionAndRotation(pos, rot);
+            _lastPacket = new UserInputPacket
+            {
+                Position = pos,
+                Rotation = rot,
+                Flags = Flags.StopMsg,
+                DeltaTime = Time.deltaTime,
+                Input = Vector3.zero,
+                Speed = 0f
+            };
+            SendInitialPosition.Invoke(User.Connection, pos, rot);
+        }
+        else
+        {
+            PlayerSpawnpoint spawn = LevelPlayers.getSpawn(false);
+            SendInitialPosition.Invoke(User.Connection, spawn.point + new Vector3(0.0f, 2f, 0.0f), Quaternion.Euler(0.0f, spawn.angle, 0.0f));
+        }
 
+        _networkedInitialPosition = true;
+    }
+    private void Save()
+    {
+        if (!_networkedInitialPosition || User?.Player == null)
+            return;
+        Block block = new Block();
+        block.writeUInt16(DataVersion);
+        block.writeSingleVector3(_lastPos);
+        block.writeSingleQuaternion(_lastRot);
+        Logger.LogDebug(" Saved position: " + _lastPos.Format() + ", " + _lastRot.Format() + ".");
+        PlayerSavedata.writeBlock(User.Player.playerID, "/DevkitServer/Input.dat", block);
+    }
+#endif
     private struct UserInputPacket
     {
         private const ushort DataVersion = 0;

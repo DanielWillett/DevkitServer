@@ -112,4 +112,97 @@ public static class UserManager
         Logger.LogInfo("Player removed: " + user.DisplayName + " {" + user.SteamId.m_SteamID + "}.");
         Object.Destroy(user);
     }
+
+    public static EditorUser? FromName(string name, bool includeContains = false) => FromName(name, includeContains, Users);
+    public static EditorUser? FromName(string name, bool includeContains, IEnumerable<EditorUser> selection)
+    {
+        if (name == null) return null;
+        EditorUser? player = selection.Where(s => s.Player != null).FirstOrDefault(
+            s =>
+            s.Player!.playerID.characterName.Equals(name, StringComparison.InvariantCultureIgnoreCase) ||
+            s.Player!.playerID.nickName.Equals(name, StringComparison.InvariantCultureIgnoreCase) ||
+            s.Player!.playerID.playerName.Equals(name, StringComparison.InvariantCultureIgnoreCase)
+            );
+        if (includeContains && player == null)
+        {
+            player = selection.Where(s => s.Player != null).FirstOrDefault(s =>
+                s.Player!.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1 ||
+                s.Player!.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1 ||
+                s.Player!.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1);
+        }
+        return player;
+    }
+    /// <summary>Slow, use rarely.</summary>
+    public static EditorUser? FromName(string name, NameSearchType type)
+    {
+        if (type == NameSearchType.CharacterName)
+        {
+            foreach (EditorUser current in Users.Where(NotNull).OrderBy(SelectCharacterName))
+            {
+                if (current.Player!.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    return current;
+            }
+            foreach (EditorUser current in Users.Where(NotNull).OrderBy(SelectNickName))
+            {
+                if (current.Player!.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    return current;
+            }
+            foreach (EditorUser current in Users.Where(NotNull).OrderBy(SelectPlayerName))
+            {
+                if (current.Player!.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    return current;
+            }
+            return null;
+        }
+        else if (type == NameSearchType.NickName)
+        {
+            foreach (EditorUser current in Users.Where(NotNull).OrderBy(SelectNickName))
+            {
+                if (current.Player!.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    return current;
+            }
+            foreach (EditorUser current in Users.Where(NotNull).OrderBy(SelectCharacterName))
+            {
+                if (current.Player!.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    return current;
+            }
+            foreach (EditorUser current in Users.Where(NotNull).OrderBy(SelectPlayerName))
+            {
+                if (current.Player!.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    return current;
+            }
+            return null;
+        }
+        else if (type == NameSearchType.PlayerName)
+        {
+            foreach (EditorUser current in Users.Where(NotNull).OrderBy(SelectPlayerName))
+            {
+                if (current.Player!.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    return current;
+            }
+            foreach (EditorUser current in Users.Where(NotNull).OrderBy(SelectNickName))
+            {
+                if (current.Player!.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    return current;
+            }
+            foreach (EditorUser current in Users.Where(NotNull).OrderBy(SelectCharacterName))
+            {
+                if (current.Player!.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    return current;
+            }
+            return null;
+        }
+        else return FromName(name, NameSearchType.CharacterName);
+
+        bool NotNull(EditorUser u) => u.Player != null;
+        string SelectPlayerName(EditorUser u) => u.Player!.playerID.playerName;
+        string SelectNickName(EditorUser u) => u.Player!.playerID.nickName;
+        string SelectCharacterName(EditorUser u) => u.Player!.playerID.characterName;
+    }
+}
+public enum NameSearchType : byte
+{
+    CharacterName,
+    NickName,
+    PlayerName
 }

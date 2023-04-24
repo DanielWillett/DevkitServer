@@ -12,8 +12,8 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
     private const uint UTF8_CODEPAGE = 65001U;
     private const int STD_OUTPUT_HANDLE = -11;
 
-    public event TerminalReadDelegate? OnInput;
-    public event TerminalWriteDelegate? OnOutput;
+    public event TerminalPreReadDelegate? OnInput;
+    public event TerminalPreWriteDelegate? OnOutput;
     private readonly Queue<LogMessage> _messageQueue = new Queue<LogMessage>();
     private readonly Queue<string> _inputQueue = new Queue<string>();
     private volatile bool _cancellationRequested;
@@ -65,7 +65,6 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
             if (_messageQueue.Count > 0)
             {
                 _writing = true;
-                ConsoleColor temp = Console.ForegroundColor;
                 if (_inText)
                 {
                     int x = Console.CursorLeft;
@@ -100,7 +99,6 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                         }
                     }
                 }
-                Console.ForegroundColor = temp;
                 _writing = false;
             }
             if (_closeHandler.HasValue && _closeHandler.Value != uint.MaxValue)
@@ -250,17 +248,14 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
     internal readonly struct LogMessage
     {
         public readonly string Message;
-        public readonly ConsoleColor Color;
         public readonly bool Save;
         public LogMessage(string message, ConsoleColor color, bool save)
         {
-            Message = message;
-            Color = color;
+            Message = Logger.GetANSIForegroundString(color) + message + Logger.ANSIReset;
             Save = save;
         }
         public void Write()
         {
-            Console.ForegroundColor = Color;
             Console.WriteLine(Message);
         }
     }

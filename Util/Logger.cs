@@ -8,6 +8,7 @@ using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using DevkitServer.API;
 using DevkitServer.Configuration;
 using DevkitServer.Patches;
 using HarmonyLib;
@@ -15,9 +16,30 @@ using HarmonyLib;
 namespace DevkitServer.Util;
 internal static class Logger
 {
+    private static ITerminal _term;
     public static readonly StackTraceCleaner StackCleaner;
     private static readonly NetCall<string, Severity> SendLogMessage = new NetCall<string, Severity>((ushort)NetCalls.SendLog);
-    public static ITerminal Terminal;
+    public static event TerminalPreReadDelegate? OnInputting;
+    public static event TerminalPostReadDelegate? OnInputted;
+    public static event TerminalPreWriteDelegate? OnOutputting;
+    public static event TerminalPostWriteDelegate? OnOutputed;
+    public static ITerminal Terminal
+    {
+        get => _term;
+        set
+        {
+            ITerminal old = Interlocked.Exchange(ref _term, value);
+            if (old != null)
+            {
+                old.Close();
+                old.OnInput -= OnTerminalInput;
+                old.OnOutput -= OnTerminalOutput;
+            }
+            _term.Init();
+            _term.OnInput += OnTerminalInput;
+            _term.OnOutput += OnTerminalOutput;
+        }
+    }
     private const string TimeFormat = "yyyy-MM-dd hh:mm:ss";
     internal const string ANSIReset = "\u001b[39m";
     internal const char ConsoleEscapeCharacter = '\u001b';
@@ -69,7 +91,7 @@ internal static class Logger
 
         StackCleaner = new StackTraceCleaner(config);
         
-        UnturnedLog.info("Loading logger with log type: " + Terminal.GetType().Format() + " colorized with: " + config.ColorFormatting.Format() + ".");
+        CommandWindow.Log("Loading logger with log type: " + Terminal.GetType().Format() + " colorized with: " + config.ColorFormatting.Format() + ".");
     }
     internal static void InitLogger()
     {
@@ -456,8 +478,15 @@ internal static class Logger
     }
     private static void OnTerminalInput(string input, ref bool shouldhandle)
     {
+        OnInputting?.Invoke(input, ref shouldhandle);
         if (!shouldhandle) return;
+        OnInputted?.Invoke(input);
         LogInfo(input);
+    }
+    private static void OnTerminalOutput(ref string outputMessage, ref ConsoleColor color)
+    {
+        OnOutputting?.Invoke(ref outputMessage, ref color);
+        OnOutputed?.Invoke(outputMessage, color);
     }
 
     // this is not a mess, scroll away
@@ -685,6 +714,19 @@ internal static class Logger
     }
     public static string Format(this object? obj)
     {
+        if (obj == null)
+        {
+            if (StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+                return GetColor(StackCleaner.Configuration.Colors!.KeywordColor) + "null" + ANSIReset;
+            return "null";
+        }
+
+        if (obj is IDevkitServerPlugin plugin)
+        {
+            if (StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+                return GetColor(ToArgb(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor)) + plugin.Name + ANSIReset;
+            return "null";
+        }
         if (obj is MemberInfo)
         {
             if (obj is FieldInfo field)
@@ -696,13 +738,6 @@ internal static class Logger
             if (obj is Type type2)
                 return type2.Format();
         }
-        if (obj == null)
-        {
-            if (StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
-                return GetColor(StackCleaner.Configuration.Colors!.KeywordColor) + "null" + ANSIReset;
-            return "null";
-        }
-
         Type type = obj.GetType();
         string str = obj.ToString();
         if (obj is ulong s64 && s64.UserSteam64())

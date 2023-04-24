@@ -12,5 +12,9 @@ internal enum NetCalls : ushort
     Ping = 9,
     SendSteamVerificationToken = 10,
     OpenHighSpeedClient = 11,
-    SendPending = 12
+    SendPending = 12,
+    SendInitialPosition = 13,
+    SendClientInfo = 14,
+    SendPermissionState = 15,
+    SendClearPermissions = 16
 }

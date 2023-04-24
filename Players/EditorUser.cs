@@ -1,10 +1,12 @@
 ﻿using System.Globalization;
+using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer;
 #if CLIENT
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players.UI;
 #endif
 using JetBrains.Annotations;
+using SDG.Framework.Debug;
 using UnityEngine.PlayerLoop;
 
 namespace DevkitServer.Players;
@@ -15,7 +17,9 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 #endif
     public CSteamID SteamId { get; private set; }
 #if SERVER
+    private List<Permission> _perms = null!;
     public ITransportConnection Connection { get; internal set; } = null!;
+    public IReadOnlyList<Permission> Permissions { get; private set; } = null!;
 #else
     public IClientTransport? Connection { get; internal set; }
 #endif
@@ -43,33 +47,75 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         DevkitServerGamemode.SetupEditorObject(EditorObject, this);
         Input = EditorObject.GetComponent<UserInput>();
         Terrain = EditorObject.GetComponent<EditorTerrain>();
-        /*
-#if DEBUG
-        Logger.LogInfo("Editor Object Dump (" + player.m_SteamID + "):", ConsoleColor.Cyan);
-        Logger.DumpGameObject(EditorObject);
+#if SERVER
+        ClientInfo info = DevkitServerGamemode.GetClientInfo(this);
+        ClientInfo.SendClientInfo.Invoke(Connection, info);
+        _perms = info.Permissions.ToList();
+        Permissions = _perms.AsReadOnly();
 #endif
-        if (Input == null)
-        {
-            Logger.LogError("Invalid EditorUser setup; UserInput not found!");
-            Provider.kick(player, "Invalid setup [1].");
-            return;
-        }
-        if (Terrain == null)
-        {
-            Logger.LogError("Invalid EditorUser setup; EditorTerrain not found!");
-            Provider.kick(player, "Invalid setup [2].");
-            return;
-        }
-        */
         Logger.LogDebug("Editor User initialized: " + SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture) + " (" + displayName + ").");
     }
+
+#if SERVER
+    internal void AddPermission(Permission permission)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        for (int i = 0; i < _perms.Count; ++i)
+        {
+            if (_perms[i].Equals(permission))
+                return;
+        }
+
+        API.Permissions.UserPermissions.SendPermissionState.Invoke(Connection, permission, true);
+        _perms.Add(permission);
+    }
+
+    internal void RemovePermission(Permission permission)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        for (int i = _perms.Count - 1; i >= 0; --i)
+        {
+            if (_perms[i].Equals(permission))
+            {
+                API.Permissions.UserPermissions.SendPermissionState.Invoke(Connection, permission, false);
+                _perms.RemoveAt(i);
+                break;
+            }
+        }
+    }
+
+    internal void ClearPermissions()
+    {
+        ThreadUtil.assertIsGameThread();
+
+        _perms.Clear();
+        API.Permissions.UserPermissions.SendClearPermissions.Invoke(Connection);
+    }
+#endif
+
+#if CLIENT
+    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendPermissionState)]
+    private static void ReceivePermissionState(MessageContext ctx, Permission perm, bool state)
+    {
+        UserPermissions.PlayerHandler.ReceivePermissionState(perm, state);
+        ctx.Acknowledge();
+    }
+    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendClearPermissions)]
+    private static void ReceiveClearPermission(MessageContext ctx)
+    {
+        UserPermissions.PlayerHandler.ReceiveClearPermissions();
+        ctx.Acknowledge();
+    }
+#endif
 
     [UsedImplicitly]
     private void OnDestroy()
     {
         Player = null;
         IsOnline = false;
-        if (!IsOwner) Destroy(EditorObject);
+        if (!IsOwner && EditorObject != null) Destroy(EditorObject);
         Logger.LogDebug("Editor User destroyed: " + SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture) + ".");
     }
 #if CLIENT
@@ -77,7 +123,6 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     {
         if (!DevkitServerModule.IsEditing)
             return;
-        DevkitEditorHUD.Open();
         if (!SDG.Unturned.Player.player.TryGetComponent(out EditorUser user))
         {
             Logger.LogWarning("Unable to find Editor user in client-side player.");

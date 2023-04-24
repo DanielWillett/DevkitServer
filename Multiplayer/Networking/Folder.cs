@@ -156,7 +156,6 @@ public struct Folder
         for (int i = 0; i < folder.Folders.Length; ++i)
         {
             folder.Folders[i] = UnformatPath(reader.ReadString());
-            Logger.LogInfo("Folder: " + folder.Folders[i]);
         }
         int len = reader.ReadInt32();
         folder.Files = new File[len];

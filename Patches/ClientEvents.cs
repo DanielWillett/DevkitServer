@@ -311,8 +311,7 @@ public static class ClientEvents
     private static void OnRampConfirm(Bounds bounds)
     {
         if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetRampStart == null || GetRampEnd == null) return;
-
-        Logger.LogDebug("Ramp confirmed on bounds " + bounds.ToString("F2", CultureInfo.InvariantCulture) + ".");
+        
         OnRampComplete?.Invoke(bounds, GetRampStart(editor), GetRampEnd(editor),
             editor.heightmapBrushRadius, editor.heightmapBrushFalloff);
     }
@@ -320,8 +319,7 @@ public static class ClientEvents
     private static void OnAdjustConfirm(Bounds bounds)
     {
         if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null) return;
-
-        Logger.LogDebug("Adjustment performed on bounds " + bounds.ToString("F2", CultureInfo.InvariantCulture) + ".");
+        
         OnAdjusted?.Invoke(bounds, GetBrushWorldPosition(editor),
             editor.heightmapBrushRadius, editor.heightmapBrushFalloff,
             editor.heightmapBrushStrength, editor.heightmapAdjustSensitivity,
@@ -331,8 +329,7 @@ public static class ClientEvents
     private static void OnFlattenConfirm(Bounds bounds)
     {
         if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null) return;
-
-        Logger.LogDebug("Flatten performed on bounds " + bounds.ToString("F2", CultureInfo.InvariantCulture) + ".");
+        
         OnFlattened?.Invoke(bounds, GetBrushWorldPosition(editor),
             editor.heightmapBrushRadius, editor.heightmapBrushFalloff,
             editor.heightmapBrushStrength, editor.heightmapAdjustSensitivity,
@@ -345,7 +342,6 @@ public static class ClientEvents
         if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null || GetHeightmapSmoothTarget == null) return;
 
         EDevkitLandscapeToolHeightmapSmoothMethod method = DevkitLandscapeToolHeightmapOptions.instance.smoothMethod;
-        Logger.LogDebug("Smooth (" + method + ") performed on bounds " + bounds.ToString("F2", CultureInfo.InvariantCulture) + ".");
         OnSmoothed?.Invoke(bounds, GetBrushWorldPosition(editor),
             editor.heightmapBrushRadius, editor.heightmapBrushFalloff,
             editor.heightmapBrushStrength, GetHeightmapSmoothTarget(editor),
@@ -357,7 +353,6 @@ public static class ClientEvents
         if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null) return;
 
         DevkitLandscapeToolSplatmapOptions settings = DevkitLandscapeToolSplatmapOptions.instance;
-        Logger.LogDebug("Paint performed on bounds " + bounds.ToString("F2", CultureInfo.InvariantCulture) + ".");
         OnPainted?.Invoke(bounds, GetBrushWorldPosition(editor), editor.splatmapBrushRadius,
             editor.splatmapBrushFalloff, editor.splatmapBrushStrength, editor.splatmapWeightTarget,
             editor.splatmapPaintSensitivity,
@@ -375,7 +370,6 @@ public static class ClientEvents
         if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null) return;
 
         DevkitLandscapeToolSplatmapOptions settings = DevkitLandscapeToolSplatmapOptions.instance;
-        Logger.LogDebug("Auto-paint performed on bounds " + bounds.ToString("F2", CultureInfo.InvariantCulture) + ".");
         OnAutoPainted?.Invoke(bounds, GetBrushWorldPosition(editor), editor.splatmapBrushRadius,
             editor.splatmapBrushFalloff, editor.splatmapBrushStrength, editor.splatmapWeightTarget,
             editor.splatmapPaintSensitivity,
@@ -393,7 +387,6 @@ public static class ClientEvents
         if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null || GetSampleAverage == null || GetSampleCount == null) return;
 
         EDevkitLandscapeToolSplatmapSmoothMethod method = DevkitLandscapeToolSplatmapOptions.instance.smoothMethod;
-        Logger.LogDebug("Paint smooth (" + method + " performed on bounds " + bounds.ToString("F2", CultureInfo.InvariantCulture) + ".");
         if (OnPaintSmoothed != null)
         {
             Dictionary<AssetReference<LandscapeMaterialAsset>, float> averages = GetSampleAverage(editor);
@@ -413,8 +406,7 @@ public static class ClientEvents
     private static void OnHoleConfirm(Bounds bounds)
     {
         if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null) return;
-
-        Logger.LogDebug("Hole paint performed on bounds " + bounds.ToString("F2", CultureInfo.InvariantCulture) + ".");
+        
         OnHolePainted?.Invoke(bounds, GetBrushWorldPosition(editor), editor.splatmapBrushRadius, InputEx.GetKey(KeyCode.LeftShift));
     }
     [UsedImplicitly]
@@ -630,7 +622,7 @@ public static class ClientEvents
         ParameterInfo[] p2 = invoker.GetParameters();
         if (p.Length != p2.Length)
         {
-            Logger.LogWarning("Method patch out of date: " + original.Format() + ".");
+            Logger.LogWarning("Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".");
             original = null!;
         }
         else
@@ -642,7 +634,7 @@ public static class ClientEvents
                     if (p[i].ParameterType.IsByRef &&
                         p2[i].ParameterType.IsAssignableFrom(p[i].ParameterType.GetElementType()))
                         continue;
-                    Logger.LogWarning("Method patch out of date: " + original.Format() + ".");
+                    Logger.LogWarning("Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".");
                     original = null!;
                     return;
                 }

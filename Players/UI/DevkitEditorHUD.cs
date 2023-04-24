@@ -6,32 +6,85 @@ namespace DevkitServer.Players.UI;
 public class DevkitEditorHUD : MonoBehaviour
 {
     public List<KeyValuePair<ISleekLabel, ulong>> Nametags = new List<KeyValuePair<ISleekLabel, ulong>>(16);
-    public SleekWrapper ViewportPlane = new SleekWrapper();
-    public SleekFullscreenBox Container = new SleekFullscreenBox();
-    public readonly ISleekBox InfoBox = Glazier.Get().CreateBox();
-    public readonly ISleekLabel MapLabel = Glazier.Get().CreateLabel();
-    public readonly ISleekLabel UsersLabel = Glazier.Get().CreateLabel();
-    public readonly List<KeyValuePair<ISleekLabel, ulong>> PlayerLabels = new List<KeyValuePair<ISleekLabel, ulong>>(16);
+#nullable disable
+    public SleekWrapper ViewportPlane;
+    public SleekFullscreenBox Container;
+    public ISleekBox InfoBox;
+    public ISleekLabel MapLabel;
+    public ISleekLabel UsersLabel;
+    public ISleekLabel TestBox;
+#nullable restore
+    public List<KeyValuePair<ISleekLabel, ulong>> PlayerLabels = new List<KeyValuePair<ISleekLabel, ulong>>(16);
     public bool IsActive { get; private set; }
     public static DevkitEditorHUD? Instance { get; private set; }
-
-    public DevkitEditorHUD()
+    private void UpdateInfoHeight()
     {
+        InfoBox.sizeOffset_X = 60 + (UserManager.Users.Count - 1) * 20;
+    }
+    private static ISleekLabel CreateListLabelForPlayer(EditorUser user, int index)
+    {
+        ISleekLabel label = Glazier.Get().CreateLabel();
+
+        label.positionOffset_X = 10;
+        label.positionOffset_Y = 35 + 30 * index;
+        label.sizeOffset_X = 20;
+        label.sizeOffset_Y = 20;
+        label.sizeScale_X = 1f;
+        label.sizeScale_Y = 1f;
+        label.text = user.DisplayName;
+
+        return label;
+    }
+
+    [UsedImplicitly]
+    private void Awake()
+    {
+        UserManager.OnUserConnected += OnUserConnected;
+        UserManager.OnUserDisconnected += OnUserDisconnected;
+        UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
         Instance = this;
+        Container = new SleekFullscreenBox
+        {
+            positionOffset_X = 10,
+            positionOffset_Y = 10,
+            positionScale_X = 1f,
+            sizeOffset_X = -20,
+            sizeOffset_Y = -20,
+            sizeScale_X = 1f,
+            sizeScale_Y = 1f
+        };
+        EditorUI.window.AddChild(Container);
+        IsActive = false;
+        TestBox = Glazier.Get().CreateLabel();
+        TestBox.positionOffset_X = -100;
+        TestBox.positionOffset_Y = 5;
+        TestBox.positionScale_X = 0.5f;
+        TestBox.positionScale_Y = 0.5f;
+        TestBox.sizeOffset_X = 200;
+        TestBox.sizeOffset_Y = 30;
+        Container.AddChild(TestBox);
+        InfoBox = Glazier.Get().CreateBox();
         InfoBox.positionOffset_Y = -50;
         InfoBox.positionScale_X = 0.8f;
         InfoBox.positionScale_Y = 1f;
         UpdateInfoHeight();
         InfoBox.sizeScale_X = 0.2f;
+        InfoBox.sizeScale_Y = 1f;
+        MapLabel = Glazier.Get().CreateLabel();
         MapLabel.positionOffset_X = 5;
         MapLabel.positionOffset_Y = 5;
         MapLabel.sizeOffset_X = 20;
         MapLabel.sizeOffset_Y = 20;
+        MapLabel.sizeScale_X = 1f;
+        MapLabel.sizeScale_Y = 1f;
         MapLabel.text = Level.info.getLocalizedName();
+        UsersLabel = Glazier.Get().CreateLabel();
         UsersLabel.positionOffset_X = 5;
         UsersLabel.positionOffset_Y = 35;
         UsersLabel.sizeOffset_X = 20;
         UsersLabel.sizeOffset_Y = 20;
+        UsersLabel.sizeScale_X = 1f;
+        UsersLabel.sizeScale_Y = 1f;
         UsersLabel.text = "Users:";
         InfoBox.AddChild(MapLabel);
         InfoBox.AddChild(UsersLabel);
@@ -46,34 +99,7 @@ public class DevkitEditorHUD : MonoBehaviour
             }
         }
         Container.AddChild(InfoBox);
-        EditorUI.window.AddChild(Container);
         Logger.LogDebug("Inited hud");
-    }
-
-    private void UpdateInfoHeight()
-    {
-        InfoBox.sizeOffset_X = 60 + (UserManager.Users.Count - 1) * 20;
-    }
-
-    private ISleekLabel CreateListLabelForPlayer(EditorUser user, int index)
-    {
-        ISleekLabel label = Glazier.Get().CreateLabel();
-
-        label.positionOffset_X = 10;
-        label.positionOffset_Y = 35 + 30 * index;
-        label.sizeOffset_X = 20;
-        label.sizeOffset_Y = 20;
-        label.text = user.DisplayName;
-
-        return label;
-    }
-
-    [UsedImplicitly]
-    private void Awake()
-    {
-        UserManager.OnUserConnected += OnUserConnected;
-        UserManager.OnUserDisconnected += OnUserDisconnected;
-        UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
     }
 
     [UsedImplicitly]
@@ -104,12 +130,13 @@ public class DevkitEditorHUD : MonoBehaviour
         }
 
         // PlayerGroupUI.addGroup
-
         ISleekLabel label = Glazier.Get().CreateLabel();
         label.positionOffset_X = -100;
         label.positionOffset_Y = -15;
         label.sizeOffset_X = 200;
         label.sizeOffset_Y = 30;
+        label.sizeScale_X = 1f;
+        label.sizeScale_Y = 1f;
         label.shadowStyle = ETextContrastContext.ColorfulBackdrop;
         UpdateNametag(label, user);
         ViewportPlane.AddChild(label);
@@ -119,12 +146,12 @@ public class DevkitEditorHUD : MonoBehaviour
     // PlayerUI.updateGroupLabels
     private void UpdateNametag(ISleekLabel nametag, EditorUser user)
     {
-        Vector3 screenPos = MainCamera.instance.WorldToViewportPoint(user.transform.position);
         if (!IsActive && nametag.isVisible)
         {
             nametag.isVisible = false;
             return;
         }
+        Vector3 screenPos = MainCamera.instance.WorldToViewportPoint(user.transform.position);
         if (screenPos.z <= 0.0)
         {
             if (nametag.isVisible)

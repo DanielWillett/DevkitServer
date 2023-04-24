@@ -259,7 +259,6 @@ public class TileSync : MonoBehaviour
     }
     public void InvalidateBounds(Bounds bounds, DataType type, float time)
     {
-        Logger.LogDebug("[TILE SYNC] Invalidating bounds " + bounds + " for " + type + ".");
         LandscapeBounds b2 = new LandscapeBounds(bounds);
         for (int x1 = b2.min.x; x1 <= b2.max.x; ++x1)
         {
@@ -402,13 +401,11 @@ public class TileSync : MonoBehaviour
             {
                 _lastSent = time;
                 _lastDataType = _dataType = (DataType)(((int)_lastDataType % 3) + 1);
-                Logger.LogDebug("[TILE SYNC] New data type: " + _dataType + ".");
                 switch (_dataType)
                 {
                     case DataType.Heightmap:
                         if (_hmInvalidated.Count == 0)
                         {
-                            Logger.LogDebug("[TILE SYNC] No heightmaps.");
                             _dataType = DataType.None;
                             return;
                         }
@@ -418,16 +415,13 @@ public class TileSync : MonoBehaviour
                         if (_hmIndex >= _hmInvalidated.Count)
                         {
                             _hmIndex = 0;
-                            Logger.LogDebug("[TILE SYNC] No available heightmaps.");
                             _dataType = DataType.None;
                             return;
                         }
-                        Logger.LogDebug("[TILE SYNC] Next heightmap: " + _hmIndex + ".");
                         break;
                     case DataType.Splatmap:
                         if (_smInvalidated.Count == 0)
                         {
-                            Logger.LogDebug("[TILE SYNC] No splatmaps.");
                             _dataType = DataType.None;
                             return;
                         }
@@ -437,16 +431,13 @@ public class TileSync : MonoBehaviour
                         if (_smIndex >= _smInvalidated.Count)
                         {
                             _smIndex = 0;
-                            Logger.LogDebug("[TILE SYNC] No available splatmaps.");
                             _dataType = DataType.None;
                             return;
                         }
-                        Logger.LogDebug("[TILE SYNC] Next splatmap: " + _smIndex + ".");
                         break;
                     case DataType.Holes:
                         if (_holeInvalidated.Count == 0)
                         {
-                            Logger.LogDebug("[TILE SYNC] No holes.");
                             _dataType = DataType.None;
                             return;
                         }
@@ -456,11 +447,9 @@ public class TileSync : MonoBehaviour
                         if (_holeIndex >= _holeInvalidated.Count)
                         {
                             _holeIndex = 0;
-                            Logger.LogDebug("[TILE SYNC] No available holes.");
                             _dataType = DataType.None;
                             return;
                         }
-                        Logger.LogDebug("[TILE SYNC] Next holes: " + _holeIndex + ".");
                         break;
                 }
 
@@ -533,17 +522,11 @@ public class TileSync : MonoBehaviour
             {
                 _lastDataType = _dataType;
                 if (_dataType == DataType.Heightmap)
-                {
                     _hmInvalidated.RemoveAt(_hmIndex);
-                }
                 else if (_dataType == DataType.Splatmap)
-                {
                     _smInvalidated.RemoveAt(_smIndex);
-                }
-                else
-                {
+                else if (_dataType == DataType.Holes)
                     _holeInvalidated.RemoveAt(_holeIndex);
-                }
                 _dataType = DataType.None;
                 _bufferLen = 0;
                 _index = -1;

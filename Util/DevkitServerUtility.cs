@@ -6,7 +6,9 @@ using System.Net;
 using System.Reflection.Emit;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using DevkitServer.API;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Patches;
 using DevkitServer.Util.Encoding;
@@ -33,6 +35,10 @@ public static class DevkitServerUtility
 
     private static string[]? _sizeCodes;
     private static double[]? _sizeIncrements;
+    public static Regex RemoveRichTextRegex { get; } =
+        new Regex(@"(?<!(?:\<noparse\>(?!\<\/noparse\>)).*)\<\/{0,1}(?:(?:color=\""{0,1}[#a-z]{0,9}\""{0,1})|(?:color)|(?:size=\""{0,1}\d+\""{0,1})|(?:size)|(?:alpha)|(?:alpha=#[0-f]{1,2})|(?:#.{3,8})|(?:[isub])|(?:su[pb])|(?:lowercase)|(?:uppercase)|(?:smallcaps))\>", RegexOptions.IgnoreCase);
+    public static Regex RemoveTMProRichTextRegex { get; } =
+        new Regex(@"(?<!(?:\<noparse\>(?!\<\/noparse\>)).*)\<\/{0,1}(?:(?:noparse)|(?:alpha)|(?:alpha=#[0-f]{1,2})|(?:[su])|(?:su[pb])|(?:lowercase)|(?:uppercase)|(?:smallcaps))\>", RegexOptions.IgnoreCase);
     public static string FormatBytes(long length)
     {
         _sizeCodes ??= new string[]
@@ -626,6 +632,54 @@ public static class DevkitServerUtility
     }
     public static unsafe bool UserSteam64(this ulong s64) => ((CSteamID*)&s64)->GetEAccountType() == EAccountType.k_EAccountTypeIndividual;
     public static bool UserSteam64(this CSteamID s64) => s64.GetEAccountType() == EAccountType.k_EAccountTypeIndividual;
+    public static string GetPlayerSavedataLocation(ulong s64, string path, int characterId = 0) => PlayerSavedata.hasSync
+        ? (Path.Combine(ReadWrite.PATH, "Sync", s64 + "_" + characterId, Level.info.name, path))
+        : (Path.Combine(ReadWrite.PATH, ServerSavedata.directory, Provider.serverID, "Players", s64 + "_" + characterId, Level.info.name, path));
+    public static void UpdateLocalizationFile(ref Local read, DatDictionary @default, string directory)
+    {
+        DatDictionary def = @default;
+        DatDictionary @new = new DatDictionary();
+        foreach (KeyValuePair<string, IDatNode> pair in def)
+        {
+            if (!read.has(pair.Key))
+                @new.Add(pair.Key, pair.Value);
+            else @new.Add(pair.Key, new DatValue(read.format(pair.Key)));
+        }
+
+        read = new Local(@new, def);
+        string path = Path.Combine(directory, "English.dat");
+        bool eng = Provider.language.Equals("English", StringComparison.InvariantCultureIgnoreCase);
+        if (!File.Exists(path))
+        {
+            WriteData(path, eng ? @new : def);
+            if (eng) return;
+        }
+
+        path = Path.Combine(directory, Provider.language + ".dat");
+        WriteData(path, @new);
+    }
+    private const string NullValue = "null";
+    public static string Translate(this Local local, string format) => local.format(format);
+    public static string Translate(this Local local, string format, object? arg0) => local.format(format, arg0 ?? NullValue);
+    public static string Translate(this Local local, string format, object? arg0, object? arg1) => local.format(format, arg0 ?? NullValue, arg1 ?? NullValue);
+    public static string Translate(this Local local, string format, object? arg0, object? arg1, object? arg2) => local.format(format, arg0 ?? NullValue, arg1 ?? NullValue, arg2 ?? NullValue);
+    public static string Translate(this Local local, string format, params object?[] args)
+    {
+        for (int i = 0; i < args.Length; ++i)
+            args[i] ??= NullValue;
+        
+        return local.format(format, args);
+    }
+    public static string RemoveRichText(string text)
+    {
+        return RemoveRichTextRegex.Replace(text, string.Empty);
+    }
+    /// <remarks>Does not include &lt;#ffffff&gt; colors.</remarks>
+    public static string RemoveTMProRichText(string text)
+    {
+        return RemoveTMProRichTextRegex.Replace(text, string.Empty);
+    }
+    public static Color GetColor(this IDevkitServerPlugin? plugin) => plugin == null ? DevkitServerModule.PluginColor : (plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor);
 }
 
 public static class AssetTypeHelper<TAsset>

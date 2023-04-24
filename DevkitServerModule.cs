@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 using DevkitServer.Multiplayer;
@@ -7,15 +8,20 @@ using DevkitServer.Players;
 using SDG.Framework.Modules;
 using System.Runtime.CompilerServices;
 using System.Text;
+using DevkitServer.API.Permissions;
 using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Plugins;
+using JetBrains.Annotations;
 
 namespace DevkitServer;
 
 public sealed class DevkitServerModule : IModuleNexus
 {
     public static readonly string ServerRule = "DevkitServer";
+    private static CancellationTokenSource? _tknSrc;
+    internal static readonly Color PluginColor = new Color32(0, 255, 153, 255);
+    internal static readonly Color UnturnedColor = new Color32(99, 123, 99, 255);
     public static GameObject GameObjectHost { get; private set; } = null!;
     public static DevkitServerModuleComponent ComponentHost { get; private set; } = null!;
     public static DevkitServerModule Instance { get; private set; } = null!;
@@ -25,6 +31,10 @@ public sealed class DevkitServerModule : IModuleNexus
     public static bool HasLoadedBundle { get; private set; }
     public static MasterBundle? Bundle { get; private set; }
     public static bool IsMainThread => ThreadUtil.gameThread == Thread.CurrentThread;
+    public static CancellationToken UnloadToken => _tknSrc == null ? CancellationToken.None : _tknSrc.Token;
+    public static Local MainLocalization { get; private set; } = null!;
+    public static Local CommandLocalization { get; private set; } = null!;
+    public static CultureInfo CommandParseLocale { get; set; } = CultureInfo.InvariantCulture;
     public static void EarlyInitialize()
     {
         LoadFaulted = false;
@@ -46,6 +56,10 @@ public sealed class DevkitServerModule : IModuleNexus
         try
         {
             Instance = this;
+            ReloadMainLocalization();
+            ReloadCommandsLocalization();
+            PluginAdvertising.Get().AddPlugin(MainLocalization.format("Name"));
+            _tknSrc = new CancellationTokenSource();
             Logger.LogInfo("DevkitServer loading...");
             DevkitServerConfig.Reload();
 
@@ -211,9 +225,6 @@ public sealed class DevkitServerModule : IModuleNexus
             comp = Level.editing.GetComponentInChildren(typeof(EditorArea));
         if (comp != null)
             Object.Destroy(comp);
-#if DEBUG
-        // Logger.DumpGameObject(Level.editing.gameObject);
-#endif
 #endif
     }
 #if SERVER
@@ -229,11 +240,15 @@ public sealed class DevkitServerModule : IModuleNexus
 
     public void shutdown()
     {
-        Logger.CloseLogger();
+        PluginLoader.Unload();
+        _tknSrc?.Cancel();
+        _tknSrc = null;
         Object.Destroy(GameObjectHost);
         Logger.LogInfo("Shutting down...");
         PatchesMain.Unpatch();
         UnloadBundle();
+        Editor.onEditorCreated -= OnEditorCreated;
+        Level.onPostLevelLoaded -= OnPostLevelLoaded;
 #if SERVER
         Provider.onServerConnected -= UserManager.AddPlayer;
         Provider.onServerDisconnected -= UserManager.RemovePlayer;
@@ -251,6 +266,7 @@ public sealed class DevkitServerModule : IModuleNexus
         Instance = null!;
         GameObjectHost = null!;
         LoadFaulted = false;
+        Logger.CloseLogger();
     }
 
 #if SERVER
@@ -283,12 +299,40 @@ public sealed class DevkitServerModule : IModuleNexus
         Logger.LogInfo("No longer connected to a DevkitServer host.");
     }
 #endif
+    public static void ReloadMainLocalization()
+    {
+        string path = Path.Combine(DevkitServerConfig.LocalizationFilePath, "Main");
+        Local lcl = Localization.tryRead(path, false);
+        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultMainLocalization, path);
+        MainLocalization = lcl;
+    }
+    public static void ReloadCommandsLocalization()
+    {
+        string path = Path.Combine(DevkitServerConfig.LocalizationFilePath, "Commands");
+        Local lcl = Localization.tryRead(path, false);
+        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultCommandLocalization, path);
+        CommandLocalization = lcl;
+    }
+    private static readonly DatDictionary DefaultMainLocalization = new DatDictionary
+    {
+        { "Name", new DatValue("Devkit Server") },
+    };
+    private static readonly DatDictionary DefaultCommandLocalization = new DatDictionary
+    {
+        { "CorrectUsage", new DatValue("<#ff8c69>Correct usage: {0}.") },
+        { "UnknownCommand", new DatValue("<#ff8c69>Unknown command. <#b3ffb3>Type <#fff>/help</color> to learn more.") },
+        { "ConsoleOnly", new DatValue("<#ff8c69>This command can only be called from console.") },
+        { "PlayersOnly", new DatValue("<#ff8c69>This command can not be called from console.") },
+        { "Exception", new DatValue("<#ff8c69>Error executing command: <#4ec9b0>{0}</color>.") },
+        { "NoPermissions", new DatValue("<#ff8c69>You do not have permission to use this command.") }
+    };
 }
 
 public sealed class DevkitServerModuleComponent : MonoBehaviour
 {
     internal static ConcurrentQueue<MainThreadTask.MainThreadResult> ThreadActionRequests = new ConcurrentQueue<MainThreadTask.MainThreadResult>();
-    void Update()
+    [UsedImplicitly]
+    private void Update()
     {
         while (ThreadActionRequests.TryDequeue(out MainThreadTask.MainThreadResult res))
         {

@@ -1,6 +1,7 @@
 ﻿using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DevkitServer.API.Permissions;
 
 namespace DevkitServer.Configuration;
 public class DevkitServerConfig
@@ -17,7 +18,9 @@ public class DevkitServerConfig
         new ColorJsonConverter(),
         new Color32JsonConverter(),
         new CSteamIDJsonConverter(),
-        new AssetReferenceJsonConverterFactory()
+        new AssetReferenceJsonConverterFactory(),
+        new TypeJsonConverter(),
+        new PermissionConverter()
     };
 
     internal static readonly InstanceSetter<Utf8JsonWriter, JsonWriterOptions>? SetWriterOptions = Accessor.GenerateInstanceSetter<Utf8JsonWriter, JsonWriterOptions>("_options");
@@ -59,6 +62,8 @@ public class DevkitServerConfig
     public static readonly string FilePath = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer", Provider.serverID);
     public static readonly string ConfigFilePath = Path.Combine(FilePath, "server_config.json");
 #endif
+
+    public static readonly string LocalizationFilePath = Path.Combine(FilePath, "Localization");
 
     private static SystemConfig? _config;
     public static SystemConfig Config

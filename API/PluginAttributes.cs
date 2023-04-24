@@ -17,4 +17,10 @@ public sealed class PluginLoadPriorityAttribute : Attribute
     }
 }
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public sealed class IgnorePluginAttribute : Attribute { }
+public sealed class IgnoreAttribute : Attribute { }
+
+[AttributeUsage(AttributeTargets.All, Inherited = false)]
+public class PluginIdentifierAttribute : Attribute
+{
+    public Type? PluginType { get; set; }
+}

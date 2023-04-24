@@ -26,6 +26,7 @@ public static class EditorLevel
         , capacity: 80000000
 #endif
         ) { HighSpeed = true };
+    private static readonly NetCall SendPending = new NetCall((ushort)NetCalls.SendPending);
     internal static readonly NetCall Ping = new NetCall((ushort)NetCalls.Ping);
     public static string TempLevelPath => Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer",
 #if SERVER
@@ -387,20 +388,25 @@ public static class EditorLevel
 
     private static IEnumerator TryReceiveLevelCoroutine()
     {
-        NetTask task = SendRequestLevel.RequestAck(3000);
-        Logger.LogInfo("[RECEIVE LEVEL] Sent level request.", ConsoleColor.DarkCyan);
+        NetTask task = SendPending.RequestAck(1000);
         yield return task;
+        if (task.Parameters.Responded)
+        {
+            yield return new WaitForSeconds(0.1f);
+            task = SendRequestLevel.RequestAck(3000);
+            Logger.LogInfo("[RECEIVE LEVEL] Sent level request.", ConsoleColor.DarkCyan);
+            yield return task;
+        }
         if (!task.Parameters.Responded)
         {
             LoadingUI.updateKey("Downloading Level | Request Failed");
             Logger.LogWarning("[RECEIVE LEVEL] Did not receive acknowledgement to level request; request timed out.");
-            yield return new WaitForSeconds(1f);
+            yield return new WaitForSeconds(2f);
             Provider.disconnect();
         }
         else
         {
             Logger.LogInfo("[RECEIVE LEVEL] Received acknowledgement to level request.", ConsoleColor.DarkCyan);
-            LoadingUI.updateScene();
             LoadingUI.updateKey("Downloading Level | Server Compressing Level");
             LoadingUI.updateProgress(0f);
         }
@@ -475,8 +481,6 @@ public static class EditorLevel
         }
         if (_missingPackets > 0)
         {
-            if (_missingPackets == _startingMissingPackets)
-                LoadingUI.updateScene();
             LoadingUI.updateKey("Downloading Level / Recovering Missing Packets [ " + (_startingMissingPackets - _missingPackets) + " / " + _startingMissingPackets + " ]");
             LoadingUI.updateProgress((float)(_startingMissingPackets - _missingPackets) / _startingMissingPackets);
         }
@@ -484,7 +488,6 @@ public static class EditorLevel
         {
             LoadingUI.updateKey("Downloading Level / Installing Level " + _pendingLevelName + ".");
             LoadingUI.updateProgress(1f);
-            LoadingUI.updateScene();
         }
         else
         {

@@ -67,8 +67,6 @@ public sealed partial class EditorTerrain : MonoBehaviour
     {
         action.Instigator = Provider.client;
         _editBuffer.Add(action);
-
-        Logger.LogDebug("Queued action: " + action.GetType().Format() + ".");
     }
 #endif
 
@@ -167,8 +165,6 @@ public sealed partial class EditorTerrain : MonoBehaviour
             }
             _nextApply += action.DeltaTime;
             ActiveAction = action;
-            Logger.LogDebug("Applying " + action.GetType().Format() + ".");
-            Logger.DumpJson(action, condensed: true);
             action.Apply();
             ActiveAction = null;
             if (action is IDisposable disposable)
