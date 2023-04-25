@@ -2,7 +2,6 @@
 using HarmonyLib;
 using JetBrains.Annotations;
 using System.Reflection;
-using DevkitServer.Multiplayer.Networking;
 using SDG.Framework.Landscapes;
 #if CLIENT
 using System.Reflection.Emit;
@@ -13,7 +12,7 @@ using SDG.Provider;
 #if SERVER
 using SDG.NetPak;
 using System.Reflection.Emit;
-using SDG.Framework.Landscapes;
+using DevkitServer.Multiplayer.Networking;
 #endif
 
 namespace DevkitServer.Patches;

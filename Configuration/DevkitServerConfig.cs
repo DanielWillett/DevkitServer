@@ -64,6 +64,7 @@ public class DevkitServerConfig
 #endif
 
     public static readonly string LocalizationFilePath = Path.Combine(FilePath, "Localization");
+    public static readonly string CommandLocalizationFilePath = Path.Combine(LocalizationFilePath, "Commands");
 
     private static SystemConfig? _config;
     public static SystemConfig Config

@@ -16,7 +16,9 @@ using HarmonyLib;
 namespace DevkitServer.Util;
 internal static class Logger
 {
+#nullable disable
     private static ITerminal _term;
+#nullable restore
     public static readonly StackTraceCleaner StackCleaner;
     private static readonly NetCall<string, Severity> SendLogMessage = new NetCall<string, Severity>((ushort)NetCalls.SendLog);
     public static event TerminalPreReadDelegate? OnInputting;
@@ -95,8 +97,7 @@ internal static class Logger
     }
     internal static void InitLogger()
     {
-        Terminal.Init();
-        Terminal.OnInput += OnTerminalInput;
+        // empty
     }
 #if CLIENT
     internal static void PostPatcherSetupInitLogger()

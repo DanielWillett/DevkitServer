@@ -1,7 +1,10 @@
-﻿namespace DevkitServer.Util.Terminals;
+﻿using JetBrains.Annotations;
+
+namespace DevkitServer.Util.Terminals;
 internal sealed class BackgroundLoggingTerminal : MonoBehaviour, ITerminal
 {
     private bool _writing;
+    [UsedImplicitly]
     public event TerminalPreReadDelegate? OnInput;
     public event TerminalPreWriteDelegate? OnOutput;
     public bool IsCommitingToUnturnedLog => _writing;

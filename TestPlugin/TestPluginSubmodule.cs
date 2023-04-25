@@ -17,9 +17,9 @@ internal class TestPluginSubmodule : Plugin
         LogInfo("Unloaded " + Name + ".");
     }
 
-    protected override DatDictionary DefaultLocalization => new DatDictionary
+    protected override LocalDatDictionary DefaultLocalization => new LocalDatDictionary
     {
-        { "TestKey",  new DatValue("Test Value") },
-        { "TestKey2", new DatValue("Test Value 2") }
+        { "TestKey",  "Test Value" },
+        { "TestKey2", "Test Value 2" }
     };
 }

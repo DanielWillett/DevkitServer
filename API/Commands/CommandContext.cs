@@ -38,12 +38,13 @@ public class CommandContext : Exception
     /// </summary>
     /// <remarks>On the client-side build, this will never be true.</remarks>
     public bool IsConsole { get; }
-
+#nullable disable
     /// <summary>
     /// Caller of the command, or <see langword="null"/> if the caller was the console.
     /// </summary>
+    /// <remarks><see langword="null"/> when <see cref="IsConsole"/> is <see langword="true"/>. Not marked nullable for convenience.</remarks>
     public EditorUser Caller { get; }
-
+#nullable enable
     /// <summary>
     /// Useful for sub-commands, offsets any parsing methods.
     /// </summary>
@@ -66,7 +67,7 @@ public class CommandContext : Exception
         OriginalMessage = originalMessage;
 #if SERVER
         Caller = caller!;
-        IsConsole = Caller != null;
+        IsConsole = Caller == null;
 #else
         IsConsole = false;
         Caller = EditorUser.User!;
@@ -278,13 +279,7 @@ public class CommandContext : Exception
     public Exception ReplyString(string rawText)
     {
         if (IsConsole)
-        {
-            string n = Command.CommandName.ToUpperInvariant().Colorize(Plugin.GetColor());
-            if (Plugin != null)
-                Plugin.LogInfo("[" + n + "] " + rawText);
-            else
-                Logger.LogInfo("[" + n + "] " + rawText);
-        }
+            Command.LogInfo(rawText);
         else
         {
             if (DevkitServerModule.IsMainThread)
@@ -401,23 +396,6 @@ public class CommandContext : Exception
             if (CompareStrings(v, alternates[i]))
                 return true;
         }
-        return false;
-    }
-
-    /// <summary>
-    /// Compares the value of argument <paramref name="parameter"/> with <paramref name="alternates"/>. Case and culture insensitive.
-    /// </summary>
-    /// <remarks>Zero based indexing.</remarks>
-    /// <returns><see langword="true"/> if <paramref name="parameter"/> matches one of the values in <paramref name="alternates"/>.</returns>
-    public bool MatchFlag(string value, bool offset = true)
-    {
-        for (int i = offset ? ArgumentOffset : 0; i < Arguments.Length; ++i)
-        {
-            string arg = GetParamForParse(i);
-            if (arg.Length > 0 && arg[0] == '-' && CompareStrings(arg, value))
-                return true;
-        }
-
         return false;
     }
 
@@ -1390,4 +1368,7 @@ public class CommandContext : Exception
     /// Sends a generic 'correct usage' message with <paramref name="usage"/>.
     /// </summary>
     public Exception SendCorrectUsage(string usage) => Reply(DevkitServerModule.CommandLocalization, "CorrectUsage", usage);
+
+
+    public override string ToString() => $"\"/{Command.CommandName.ToLower()}\" ran by {(IsConsole ? "{CONSOLE}" : Caller)} with args [{string.Join(", ", Arguments)}].";
 }

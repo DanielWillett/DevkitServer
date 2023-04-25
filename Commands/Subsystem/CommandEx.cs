@@ -53,6 +53,7 @@ public static class CommandEx
 #if SERVER
         foreach (Command command in Commander.commands)
         {
+            if (command == null) continue;
             VanillaCommand cmd = new VanillaCommand(command);
 
             CommandHandler.Handler.TryRegisterCommand(cmd);

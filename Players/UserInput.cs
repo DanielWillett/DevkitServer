@@ -16,14 +16,17 @@ namespace DevkitServer.Players;
 [EarlyTypeInit(-1)]
 public class UserInput : MonoBehaviour
 {
-    private const ushort DataVersion = 0;
+    private const ushort DataVersion = 1;
     internal static readonly NetCall<Vector3, Quaternion> SendInitialPosition = new NetCall<Vector3, Quaternion>((ushort)NetCalls.SendInitialPosition);
+    internal static readonly NetCall<ulong, CameraController> SendUpdateController = new NetCall<ulong, CameraController>((ushort)NetCalls.SendUpdateController);
     private CameraController _controller;
     public static event Action<EditorUser>? OnUserPositionUpdated;
+    public static event Action<EditorUser>? OnUserControllerUpdated; 
     private bool _hasStopped = true;
 #if CLIENT
     private float _lastFlush;
     private bool _bufferHasStop;
+    private bool _nextPacketSendRotation;
 #endif
     private bool _networkedInitialPosition;
     private Vector3 _lastPos;
@@ -126,6 +129,7 @@ public class UserInput : MonoBehaviour
                 input.transform.SetPositionAndRotation(pos, rot);
             else
             {
+                input._nextPacketSendRotation = true;
                 input.transform.position = pos;
                 MainCamera.instance.transform.rotation = rot;
             }
@@ -184,6 +188,9 @@ public class UserInput : MonoBehaviour
     }
     private void HandleControllerUpdated()
     {
+#if SERVER
+        ReplicateControllerUpdated();
+#endif
         if (IsOwner)
         {
             GameObject? ctrl = ControllerObject;
@@ -206,6 +213,7 @@ public class UserInput : MonoBehaviour
             else
                 Logger.LogInfo("Camera controller set to \"" + ctrl.name + "\".", ConsoleColor.DarkCyan);
         }
+        OnUserControllerUpdated?.Invoke(User);
     }
 #if CLIENT
     private void ChangeUI(bool editor)
@@ -420,15 +428,18 @@ public class UserInput : MonoBehaviour
             Quaternion rot = MainCamera.instance.transform.rotation;
             bool posDiff = pos != _lastPos;
             bool rotDiff = rot != _lastRot;
-            if (posDiff || rotDiff)
+            if (posDiff || rotDiff || (_nextPacketSendRotation && _hasStopped))
             {
                 OnUserPositionUpdated?.Invoke(User);
                 _hasStopped = false;
                 Flags flags = Flags.None;
                 if (posDiff)
                     flags |= Flags.Position;
-                if (rotDiff)
+                if (rotDiff || _nextPacketSendRotation)
+                {
                     flags |= Flags.Rotation;
+                    _nextPacketSendRotation = false;
+                }
                 _lastPacket = new UserInputPacket
                 {
                     Rotation = _lastRot = rot,
@@ -503,7 +514,7 @@ public class UserInput : MonoBehaviour
                                               dt *
                                               packet.Speed;
         if ((packet.Flags & Flags.Position) != 0)
-            pos = Vector3.Lerp(pos, packet.Position, 1f / (packets.Count + 1) * ((pos - packet.Position).sqrMagnitude / 49f));
+            pos = Vector3.Lerp(pos, packet.Position, 1f / (packets.Count + 1) * ((pos - packet.Position).sqrMagnitude / 16f));
         this.transform.position = pos;
         _lastPos = pos;
         if ((packet.Flags & Flags.Rotation) != 0)
@@ -514,14 +525,29 @@ public class UserInput : MonoBehaviour
         OnUserPositionUpdated?.Invoke(User);
         _lastPacket = packet;
     }
+#if CLIENT
+    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendUpdateController)]
+    private void ReceiveControllerUpdated(MessageContext ctx, ulong steam64, CameraController controller)
+    {
+        EditorUser? user = UserManager.FromId(steam64);
+        if (user != null)
+            user.Input.Controller = controller;
+
+        ctx.Acknowledge();
+    }
+#endif
 #if SERVER
+    private void ReplicateControllerUpdated()
+    {
+        SendUpdateController.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, Controller);
+    }
     private void Load()
     {
         if (User?.Player == null) return;
         if (PlayerSavedata.fileExists(User.Player.playerID, "/DevkitServer/Input.dat"))
         {
             Block block = PlayerSavedata.readBlock(User.Player.playerID, "/DevkitServer/Input.dat", 0);
-            _ = block.readUInt16();
+            ushort v = block.readUInt16();
             Vector3 pos = block.readSingleVector3();
             Quaternion rot = block.readSingleQuaternion();
             this.transform.SetPositionAndRotation(pos, rot);
@@ -534,12 +560,19 @@ public class UserInput : MonoBehaviour
                 Input = Vector3.zero,
                 Speed = 0f
             };
-            SendInitialPosition.Invoke(User.Connection, pos, rot);
+            if (v > 0)
+            {
+                CameraController orig = Controller;
+                Controller = (CameraController)block.readByte();
+                if (Controller != orig)
+                    ReplicateControllerUpdated();
+            }
+            SendInitialPosition.Invoke(Provider.GatherRemoteClientConnections(), pos, rot);
         }
         else
         {
             PlayerSpawnpoint spawn = LevelPlayers.getSpawn(false);
-            SendInitialPosition.Invoke(User.Connection, spawn.point + new Vector3(0.0f, 2f, 0.0f), Quaternion.Euler(0.0f, spawn.angle, 0.0f));
+            SendInitialPosition.Invoke(Provider.GatherRemoteClientConnections(), spawn.point + new Vector3(0.0f, 2f, 0.0f), Quaternion.Euler(0.0f, spawn.angle, 0.0f));
         }
 
         _networkedInitialPosition = true;
@@ -552,6 +585,7 @@ public class UserInput : MonoBehaviour
         block.writeUInt16(DataVersion);
         block.writeSingleVector3(_lastPos);
         block.writeSingleQuaternion(_lastRot);
+        block.writeByte((byte)Controller);
         Logger.LogDebug(" Saved position: " + _lastPos.Format() + ", " + _lastRot.Format() + ".");
         PlayerSavedata.writeBlock(User.Player.playerID, "/DevkitServer/Input.dat", block);
     }
@@ -643,7 +677,7 @@ public class UserInput : MonoBehaviour
     }
 }
 
-public enum CameraController
+public enum CameraController : byte
 {
     Player = 1,
     Editor

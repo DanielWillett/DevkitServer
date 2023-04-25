@@ -16,5 +16,6 @@ internal enum NetCalls : ushort
     SendInitialPosition = 13,
     SendClientInfo = 14,
     SendPermissionState = 15,
-    SendClearPermissions = 16
+    SendClearPermissions = 16,
+    SendUpdateController = 17
 }

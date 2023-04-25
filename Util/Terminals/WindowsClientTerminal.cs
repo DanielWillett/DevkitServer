@@ -1,16 +1,14 @@
 ﻿#if CLIENT
-using System.Reflection;
+using JetBrains.Annotations;
 using System.Runtime.InteropServices;
 using System.Text;
-using DevkitServer.Patches;
-using JetBrains.Annotations;
 using ThreadPriority = System.Threading.ThreadPriority;
 
 namespace DevkitServer.Util.Terminals;
 internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
 {
-    private const uint UTF8_CODEPAGE = 65001U;
-    private const int STD_OUTPUT_HANDLE = -11;
+    private const uint CodepageUTF8 = 65001U;
+    private const int StdOutputHandle = -11;
 
     public event TerminalPreReadDelegate? OnInput;
     public event TerminalPreWriteDelegate? OnOutput;
@@ -27,9 +25,11 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
     {
         FreeConsole();
         AllocConsole();
-        SetConsoleOutputCP(UTF8_CODEPAGE);
-        SetConsoleCP(UTF8_CODEPAGE);
-        IntPtr handle = GetStdHandle(STD_OUTPUT_HANDLE);
+        Thread.Sleep(200);
+        SetConsoleOutputCP(CodepageUTF8);
+        SetConsoleCP(CodepageUTF8);
+        Thread.Sleep(200);
+        IntPtr handle = GetStdHandle(StdOutputHandle);
         GetConsoleMode(handle, out uint mode1);
         SetConsoleMode(handle, mode1 | 0x0004); // enable extended ANSI support for older terminals
         SetConsoleCtrlHandler(OnExitRequested, true);
@@ -67,35 +67,47 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                 _writing = true;
                 if (_inText)
                 {
-                    int x = Console.CursorLeft;
-                    int y = Console.CursorTop;
-                    Console.MoveBufferArea(0, y, Console.WindowWidth, 1, 0, y + 1);
-                    Console.SetCursorPosition(0, y);
-                    while (_messageQueue.Count > 0)
+                    lock (this)
                     {
-                        LogMessage msg = _messageQueue.Dequeue();
-                        msg.Write();
-                        if (msg.Save)
+                        int x = Console.CursorLeft;
+                        int y = Console.CursorTop;
+                        while (_messageQueue.Count > 0)
                         {
-                            string message = msg.Message;
-                            Logger.TryRemoveDateFromLine(ref message);
-                            Logs.printLine(Logger.RemoveANSIFormatting(message));
-                        }
-                    }
+                            LogMessage msg = _messageQueue.Dequeue();
+                            int h = 1;
+                            for (int i = 0; i < msg.Message.Length; ++i)
+                                if (msg.Message[i] == '\n') ++h;
+                            Console.MoveBufferArea(0, y, x, 1, 0, y + h);
+                            Console.SetCursorPosition(0, y);
+                            Console.Write(new string(' ', x));
+                            Console.SetCursorPosition(0, y);
+                            msg.Write();
+                            y += h;
 
-                    Console.SetCursorPosition(x, y + 1);
+                            if (msg.Save)
+                            {
+                                string message = msg.Message;
+                                Logger.TryRemoveDateFromLine(ref message);
+                                Logs.printLine(Logger.RemoveANSIFormatting(message));
+                            }
+                        }
+                        Console.SetCursorPosition(x, y);
+                    }
                 }
                 else
                 {
-                    while (_messageQueue.Count > 0)
+                    lock (this)
                     {
-                        LogMessage msg = _messageQueue.Dequeue();
-                        msg.Write();
-                        if (msg.Save)
+                        while (_messageQueue.Count > 0)
                         {
-                            string message = msg.Message;
-                            Logger.TryRemoveDateFromLine(ref message);
-                            Logs.printLine(Logger.RemoveANSIFormatting(message));
+                            LogMessage msg = _messageQueue.Dequeue();
+                            msg.Write();
+                            if (msg.Save)
+                            {
+                                string message = msg.Message;
+                                Logger.TryRemoveDateFromLine(ref message);
+                                Logs.printLine(Logger.RemoveANSIFormatting(message));
+                            }
                         }
                     }
                 }
@@ -139,12 +151,8 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
         SetConsoleCtrlHandler(OnExitRequested, false);
         if (_messageQueue.Count > 0)
         {
-            ConsoleColor temp = Console.ForegroundColor;
             while (_messageQueue.Count > 0)
-            {
                 _messageQueue.Dequeue().Write();
-            }
-            Console.ForegroundColor = temp;
         }
         _setup = false;
         FreeConsole();
@@ -177,72 +185,84 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
 
     private void MonitorKeypress()
     {
-        while (!_cancellationRequested)
+        Logger.LogDebug("Console keypress monitor thread starting.");
+        try
         {
-            string current = string.Empty;
-            int oldlength = 0;
-            while (true)
+            while (!_cancellationRequested)
             {
-                ConsoleKeyInfo key = Console.ReadKey();
-                if (current.Length == 0)
+                string current = string.Empty;
+                int oldlength = 0;
+                while (true)
                 {
-                    if (key.Key is (< ConsoleKey.NumPad0 or > ConsoleKey.NumPad9) and (< ConsoleKey.A or > ConsoleKey.Z) and (< ConsoleKey.Oem1 or > ConsoleKey.Oem8))
+                    ConsoleKeyInfo key = Console.ReadKey();
+                    lock (this)
                     {
-                        Console.SetCursorPosition(0, Console.CursorTop);
-                        break;
-                    }
+                        if (current.Length == 0)
+                        {
+                            if (key.Key is (< ConsoleKey.NumPad0 or > ConsoleKey.NumPad9) and (< ConsoleKey.A or > ConsoleKey.Z) and (< ConsoleKey.Oem1 or > ConsoleKey.Oem8))
+                            {
+                                Console.SetCursorPosition(0, Console.CursorTop);
+                                break;
+                            }
 
-                    _inText = true;
-                }
-                if (key.Key == ConsoleKey.Escape)
-                {
-                    current = string.Empty;
-                    break;
-                }
-                if (key.Key == ConsoleKey.Backspace)
-                {
-                    if ((key.Modifiers & ConsoleModifiers.Control) != 0)
-                    {
-                        string[] n = current.Split(' ');
-                        if (n.Length < 2) current = string.Empty;
-                        else current = string.Join(" ", n, 0, n.Length - 1);
+                            _inText = true;
+                        }
+                        if (key.Key == ConsoleKey.Escape)
+                        {
+                            current = string.Empty;
+                            break;
+                        }
+                        if (key.Key == ConsoleKey.Backspace)
+                        {
+                            if ((key.Modifiers & ConsoleModifiers.Control) != 0)
+                            {
+                                string[] n = current.Split(' ');
+                                if (n.Length < 2) current = string.Empty;
+                                else current = string.Join(" ", n, 0, n.Length - 1);
+                            }
+                            else
+                            {
+                                current = current.Substring(0, current.Length - 1);
+                            }
+                            if (current.Length == 0)
+                            {
+                                _inText = false;
+                            }
+                        }
+                        else if (key.Key == ConsoleKey.Enter)
+                        {
+                            Console.SetCursorPosition(0, Console.CursorTop);
+                            Console.Write(new string(' ', Console.BufferWidth));
+                            break;
+                        }
+                        else if (key.KeyChar == 0 || key.Key == ConsoleKey.OemClear || (key.Key >= ConsoleKey.LeftArrow && key.Key <= ConsoleKey.DownArrow))
+                        {
+                            Console.SetCursorPosition(current.Length, Console.CursorTop);
+                            continue;
+                        }
+                        else
+                        {
+                            current += (key.Modifiers & ConsoleModifiers.Shift) != 0 ? char.ToUpper(key.KeyChar) : char.ToLower(key.KeyChar);
+                        }
+                        if (oldlength > current.Length)
+                            Console.Write("\r" + current + new string(' ', oldlength - current.Length));
+                        else
+                            Console.Write("\r" + current);
+                        oldlength = current.Length;
+                        Console.SetCursorPosition(current.Length, Console.CursorTop);
                     }
-                    else
-                    {
-                        current = current.Substring(0, current.Length - 1);
-                    }
-                    if (current.Length == 0)
-                    {
-                        _inText = false;
-                    }
                 }
-                else if (key.Key == ConsoleKey.Enter)
+                if (current.Length > 0)
                 {
-                    Console.SetCursorPosition(0, Console.CursorTop);
-                    Console.Write(new string(' ', Console.BufferWidth));
-                    break;
+                    _inputQueue.Enqueue(current);
                 }
-                else if (key.KeyChar == 0 || key.Key == ConsoleKey.OemClear || (key.Key >= ConsoleKey.LeftArrow && key.Key <= ConsoleKey.DownArrow))
-                {
-                    Console.SetCursorPosition(current.Length, Console.CursorTop);
-                    continue;
-                }
-                else
-                {
-                    current += (key.Modifiers & ConsoleModifiers.Shift) != 0 ? char.ToUpper(key.KeyChar) : char.ToLower(key.KeyChar);
-                }
-                if (oldlength > current.Length)
-                    Console.Write("\r" + current + new string(' ', oldlength - current.Length));
-                else
-                    Console.Write("\r" + current);
-                oldlength = current.Length;
-                Console.SetCursorPosition(current.Length, Console.CursorTop);
+                _inText = false;
             }
-            if (current.Length > 0)
-            {
-                _inputQueue.Enqueue(current);
-            }
-            _inText = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error in key monitor thread.");
+            Logger.LogError(ex);
         }
     }
     internal readonly struct LogMessage

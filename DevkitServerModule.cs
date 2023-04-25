@@ -8,6 +8,7 @@ using DevkitServer.Players;
 using SDG.Framework.Modules;
 using System.Runtime.CompilerServices;
 using System.Text;
+using DevkitServer.API;
 using DevkitServer.API.Permissions;
 using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Networking;
@@ -109,12 +110,13 @@ public sealed class DevkitServerModule : IModuleNexus
             Provider.onServerDisconnected += UserManager.RemovePlayer;
             Level.onLevelLoaded += OnLevelLoaded;
             Assets.onAssetsRefreshed += OnAssetsRefreshed;
-            UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
+            // UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
 #else
             Provider.onClientConnected += EditorUser.OnClientConnected;
             Provider.onEnemyConnected += EditorUser.OnEnemyConnected;
             Provider.onClientDisconnected += EditorUser.OnClientDisconnected;
             Provider.onEnemyDisconnected += EditorUser.OnEnemyDisconnected;
+            ChatManager.onChatMessageReceived += OnChatMessageReceived;
             UserTPVControl.Init();
 #endif
             PluginLoader.Load();
@@ -126,10 +128,20 @@ public sealed class DevkitServerModule : IModuleNexus
             Fault();
         }
     }
+
 #if SERVER
     private void OnAssetsRefreshed()
     {
         TryLoadBundle();
+    }
+#else
+    private void OnChatMessageReceived()
+    {
+        if (ChatManager.receivedChatHistory.Count > 0)
+        {
+            ReceivedChatMessage msg = ChatManager.receivedChatHistory[0];
+            Logger.LogInfo("[" + msg.mode + " CHAT] [" + (msg.speaker.playerID?.characterName ?? "SERVER") + "] " + msg.contents + ".");
+        }
     }
 #endif
 
@@ -253,13 +265,14 @@ public sealed class DevkitServerModule : IModuleNexus
         Provider.onServerConnected -= UserManager.AddPlayer;
         Provider.onServerDisconnected -= UserManager.RemovePlayer;
         Level.onLevelLoaded -= OnLevelLoaded;
-        UserInput.OnUserPositionUpdated -= OnUserPositionUpdated;
+        // UserInput.OnUserPositionUpdated -= OnUserPositionUpdated;
         HighSpeedServer.Deinit();
 #else
         Provider.onClientConnected -= EditorUser.OnClientConnected;
         Provider.onEnemyConnected -= EditorUser.OnEnemyConnected;
         Provider.onClientDisconnected -= EditorUser.OnClientDisconnected;
         Provider.onEnemyDisconnected -= EditorUser.OnEnemyDisconnected;
+        ChatManager.onChatMessageReceived -= OnChatMessageReceived;
         UserTPVControl.Deinit();
 #endif
 
@@ -270,21 +283,23 @@ public sealed class DevkitServerModule : IModuleNexus
     }
 
 #if SERVER
+/*
     private static EffectAsset? _debugEffectAsset;
     private static void OnUserPositionUpdated(EditorUser obj)
     {
-        //_debugEffectAsset ??= Assets.find<EffectAsset>(new Guid("5e2a0073025849d39322932d88609777"));
-        //if (_debugEffectAsset != null && obj.Input != null)
-        //{
-        //    TriggerEffectParameters p = new TriggerEffectParameters(_debugEffectAsset)
-        //    {
-        //        position = obj.Input.transform.position,
-        //        direction = obj.Input.transform.forward,
-        //        relevantDistance = Level.size
-        //    };
-        //    EffectManager.triggerEffect(p);
-        //}
+        _debugEffectAsset ??= Assets.find<EffectAsset>(new Guid("5e2a0073025849d39322932d88609777"));
+        if (_debugEffectAsset != null && obj.Input != null)
+        {
+            TriggerEffectParameters p = new TriggerEffectParameters(_debugEffectAsset)
+            {
+                position = obj.Input.transform.position,
+                direction = obj.Input.transform.forward,
+                relevantDistance = Level.size
+            };
+            EffectManager.triggerEffect(p);
+        }
     }
+    */
 #endif
 
     [ModuleInitializer]
@@ -313,18 +328,18 @@ public sealed class DevkitServerModule : IModuleNexus
         DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultCommandLocalization, path);
         CommandLocalization = lcl;
     }
-    private static readonly DatDictionary DefaultMainLocalization = new DatDictionary
+    private static readonly LocalDatDictionary DefaultMainLocalization = new LocalDatDictionary
     {
-        { "Name", new DatValue("Devkit Server") },
+        { "Name", "Devkit Server" },
     };
-    private static readonly DatDictionary DefaultCommandLocalization = new DatDictionary
+    private static readonly LocalDatDictionary DefaultCommandLocalization = new LocalDatDictionary
     {
-        { "CorrectUsage", new DatValue("<#ff8c69>Correct usage: {0}.") },
-        { "UnknownCommand", new DatValue("<#ff8c69>Unknown command. <#b3ffb3>Type <#fff>/help</color> to learn more.") },
-        { "ConsoleOnly", new DatValue("<#ff8c69>This command can only be called from console.") },
-        { "PlayersOnly", new DatValue("<#ff8c69>This command can not be called from console.") },
-        { "Exception", new DatValue("<#ff8c69>Error executing command: <#4ec9b0>{0}</color>.") },
-        { "NoPermissions", new DatValue("<#ff8c69>You do not have permission to use this command.") }
+        { "CorrectUsage", "<#ff8c69>Correct usage: {0}." },
+        { "UnknownCommand", "<#ff8c69>Unknown command. <#b3ffb3>Type <#fff>/help</color> to learn more." },
+        { "ConsoleOnly", "<#ff8c69>This command can only be called from console." },
+        { "PlayersOnly", "<#ff8c69>This command can not be called from console." },
+        { "Exception", "<#ff8c69>Error executing command: <#4ec9b0>{0}</color>." },
+        { "NoPermissions", "<#ff8c69>You do not have permission to use this command." }
     };
 }
 
@@ -339,7 +354,7 @@ public sealed class DevkitServerModuleComponent : MonoBehaviour
             try
             {
                 res.Task.Token.ThrowIfCancellationRequested();
-                res.Continuation();
+                res.Continuation?.Invoke();
             }
             catch (OperationCanceledException) { Logger.LogDebug("Execution on update cancelled."); }
             catch (Exception ex)

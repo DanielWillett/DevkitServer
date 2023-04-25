@@ -1,4 +1,6 @@
-﻿using DevkitServer.API.Commands;
+﻿using DevkitServer.API;
+using DevkitServer.API.Commands;
+using DevkitServer.Configuration;
 using DevkitServer.Multiplayer;
 using DevkitServer.Players;
 
@@ -387,7 +389,7 @@ public class CommandHandler : ICommandHandler, IDisposable
     {
         if (!shouldHandle) return;
         shouldHandle = false;
-        if (!Parser.TryRunCommand(
+        if (inputmessage.Length > 0 && !Parser.TryRunCommand(
 #if SERVER
                 null,
 #endif
@@ -396,7 +398,11 @@ public class CommandHandler : ICommandHandler, IDisposable
 #if SERVER
             SendHelpMessage(null);
 #else
-            SendHelpMessage();
+            // run as server command or send chat
+            if (Provider.isConnected)
+                ChatManager.sendChat(EChatMode.LOCAL, inputmessage[0] == '/' ? inputmessage : ("/" + inputmessage));
+            else
+                SendHelpMessage();
 #endif
         }
     }
@@ -472,19 +478,21 @@ public class CommandHandler : ICommandHandler, IDisposable
         {
             if (file.Translations == null)
             {
-                if (string.IsNullOrWhiteSpace(file.TranslationsDirectory))
+                string dir = file.TranslationsDirectory;
+                if (string.IsNullOrWhiteSpace(dir))
                     command.LogError("No localization path provided.");
                 else
                 {
-                    Local lcl = Localization.tryRead(file.TranslationsDirectory, false);
-                    DatDictionary def = file.DefaultTranslations;
+                    dir = Path.Combine(command.Plugin == null ? DevkitServerConfig.CommandLocalizationFilePath : command.Plugin.LocalizationDirectory, dir);
+                    Local lcl = Localization.tryRead(dir, false);
+                    LocalDatDictionary def = file.DefaultTranslations;
                     if (def == null)
                         command.LogError("No default translations provided.");
                     else
                     {
                         try
                         {
-                            DevkitServerUtility.UpdateLocalizationFile(ref lcl, def, file.TranslationsDirectory);
+                            DevkitServerUtility.UpdateLocalizationFile(ref lcl, def, dir);
                         }
                         catch (Exception ex)
                         {

@@ -26,6 +26,18 @@ public interface IDevkitServerPlugin
     string MenuName { get; }
 
     /// <summary>
+    /// The data path of the plugin. Config, localization, etc will root from here. This should be a directory.
+    /// </summary>
+    /// <remarks>Must be set in the constructor.</remarks>
+    string DataDirectory { get; }
+
+    /// <summary>
+    /// The data path of the base localization folder for commands, etc. This should be a directory.
+    /// </summary>
+    /// <remarks>Must be set in the constructor.</remarks>
+    string LocalizationDirectory { get; }
+
+    /// <summary>
     /// Assembly containing the plugin.
     /// </summary>
     Assembly Assembly { get; }

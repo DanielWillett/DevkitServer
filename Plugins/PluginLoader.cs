@@ -51,8 +51,27 @@ public static class PluginLoader
     public static IReadOnlyList<PluginLibrary> Libraries => _roLibs;
     private static void AssertPluginValid(IDevkitServerPlugin plugin)
     {
+        if (string.IsNullOrWhiteSpace(plugin.DataDirectory) || !Uri.TryCreate(plugin.DataDirectory, UriKind.Absolute, out Uri uri) || !uri.IsFile)
+        {
+            plugin.LogError("DataDirectory invalid: " + plugin.DataDirectory.Format() + ".");
+            throw new Exception("DataDirectory invalid: \"" + plugin.DataDirectory + "\".");
+        }
+        if (string.IsNullOrWhiteSpace(plugin.LocalizationDirectory) || !Uri.TryCreate(plugin.LocalizationDirectory, UriKind.Absolute, out uri) || !uri.IsFile)
+        {
+            plugin.LogError("LocalizationDirectory invalid: " + plugin.LocalizationDirectory.Format() + ".");
+            throw new Exception("LocalizationDirectory invalid: \"" + plugin.LocalizationDirectory + "\".");
+        }
+        if (plugin is Plugin p && (string.IsNullOrWhiteSpace(p.MainLocalizationDirectory) || !Uri.TryCreate(p.MainLocalizationDirectory, UriKind.Absolute, out uri) || !uri.IsFile))
+        {
+            plugin.LogError("MainLocalizationDirectory invalid: " + p.MainLocalizationDirectory.Format() + ".");
+            throw new Exception("MainLocalizationDirectory invalid: \"" + p.MainLocalizationDirectory + "\".");
+        }
+
         if (plugin.PermissionPrefix.IndexOf('.') != -1)
+        {
+            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not contain a period.");
             throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not contain a period.");
+        }
         string defaultModuleName = DevkitServerModule.MainLocalization.format("Name");
         if (plugin.MenuName.Equals(defaultModuleName, StringComparison.InvariantCultureIgnoreCase))
         {
@@ -229,6 +248,7 @@ public static class PluginLoader
                     Logger.LogError("Failed to load assembly:" + pluginDll.Format() + ".", method: "LOAD " + type.Name.ToUpperInvariant());
                     Logger.LogError(" Plugin failed to load: " + type.Format() + ".", method: "LOAD " + type.Name.ToUpperInvariant());
                     Logger.LogError(ex);
+                    pluginsTemp.RemoveAll(x => x.GetType().Assembly == assembly);
                     break;
                 }
             }

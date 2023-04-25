@@ -103,8 +103,8 @@ public static class EditorLevel
                 float stTime = Time.realtimeSinceStartup;
                 if (!lowSpeedDownload)
                 {
-                    hsConn = HighSpeedServer.Instance.VerifiedConnections.FirstOrDefault(x => x.SteamConnection.Equals(connection)) ??
-                             HighSpeedServer.Instance.PendingConnections.FirstOrDefault(x => x.SteamConnection.Equals(connection));
+                    hsConn = HighSpeedServer.Instance.VerifiedConnections.FirstOrDefault(x => x.SteamConnection != null && x.SteamConnection.Equals(connection)) ??
+                             HighSpeedServer.Instance.PendingConnections.FirstOrDefault(x => x.SteamConnection != null && x.SteamConnection.Equals(connection));
                     if (hsConn == null)
                     {
                         lowSpeedDownload = true;
@@ -218,8 +218,6 @@ public static class EditorLevel
             }
             else
             {
-                Provider.reject(connection, ESteamRejection.PLUGIN, "Downloads using Steamworks are temporarily disabled.");
-                throw new Exception("debug");
                 MessageOverhead cpy = new MessageOverhead(MessageFlags.None, (ushort)NetCalls.SendLevel, 0, 0);
                 byte[] dataBuffer = new byte[cpy.Length + sizeof(int) + DataBufferPacketSize];
                 int index = 0;

@@ -247,17 +247,19 @@ public static class NetFactory
 #if DEBUG
     private static void PatchServerGetWriterWithStaticHeader(ClientMethodHandle __instance)
     {
-        return;
+        /* Uncomment for netmessage logging
         ClientMethodInfo? info = ServerGetMethodInfo?.Invoke(__instance);
         string name = (info == null || ServerGetMethodName == null ? null : ServerGetMethodName(info)) ?? "unknown";
         Logger.LogDebug($"[CLIENT MTD HNDL] Unturned.InvokeMessage sending: {name,-36} (Type: {__instance.GetType().Format(),-24})");
+        */
     }
     private static void PatchClientGetWriterWithStaticHeader(ServerMethodHandle __instance)
     {
-        return;
+        /* Uncomment for netmessage logging
         ServerMethodInfo? info = ClientGetMethodInfo?.Invoke(__instance);
         string name = (info == null || ClientGetMethodName == null ? null : ClientGetMethodName(info)) ?? "unknown";
         Logger.LogDebug($"[SERVER MTD HNDL] Unturned.InvokeMessage sending: {name,-36} (Type: {__instance.GetType().Format(),-24})");
+        */
     }
 #endif
     internal static bool Init()

@@ -170,4 +170,12 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     }
 #endif
     public int CompareTo(EditorUser other) => SteamId.m_SteamID.CompareTo(other.SteamId.m_SteamID);
+
+    public override string ToString() => $"{{{SteamId.m_SteamID}}} ({Player?.playerID.playerName}/{Player?.playerID.characterName}/{Player?.playerID.nickName})";
+
+    public static implicit operator ulong(EditorUser user) => user.SteamId.m_SteamID;
+    public static implicit operator CSteamID(EditorUser user) => user.SteamId;
+    public static explicit operator SteamPlayer?(EditorUser user) => user.Player;
+    public static explicit operator Player?(EditorUser user) => user.Player?.player;
+    public static explicit operator SteamPlayerID?(EditorUser user) => user.Player?.playerID;
 }

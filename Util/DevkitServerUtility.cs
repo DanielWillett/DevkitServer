@@ -594,7 +594,7 @@ public static class DevkitServerUtility
     {
         if (data is DatValue value)
         {
-            writer.WriteLine(writeBrackets ? (" " + value) : value);
+            writer.WriteLine(writeBrackets ? (" " + value.value) : value.value);
             return;
         }
         string ind = indent < 1 ? string.Empty : new string('\t', indent);
@@ -635,23 +635,25 @@ public static class DevkitServerUtility
     public static string GetPlayerSavedataLocation(ulong s64, string path, int characterId = 0) => PlayerSavedata.hasSync
         ? (Path.Combine(ReadWrite.PATH, "Sync", s64 + "_" + characterId, Level.info.name, path))
         : (Path.Combine(ReadWrite.PATH, ServerSavedata.directory, Provider.serverID, "Players", s64 + "_" + characterId, Level.info.name, path));
-    public static void UpdateLocalizationFile(ref Local read, DatDictionary @default, string directory)
+    public static void UpdateLocalizationFile(ref Local read, LocalDatDictionary @default, string directory)
     {
-        DatDictionary def = @default;
+        LocalDatDictionary def = @default;
         DatDictionary @new = new DatDictionary();
-        foreach (KeyValuePair<string, IDatNode> pair in def)
+        DatDictionary def2 = new DatDictionary();
+        foreach (KeyValuePair<string, string> pair in def)
         {
             if (!read.has(pair.Key))
-                @new.Add(pair.Key, pair.Value);
+                @new.Add(pair.Key, new DatValue(pair.Value));
             else @new.Add(pair.Key, new DatValue(read.format(pair.Key)));
+            def2.Add(pair.Key, new DatValue(pair.Value));
         }
 
-        read = new Local(@new, def);
+        read = new Local(@new, def2);
         string path = Path.Combine(directory, "English.dat");
         bool eng = Provider.language.Equals("English", StringComparison.InvariantCultureIgnoreCase);
         if (!File.Exists(path))
         {
-            WriteData(path, eng ? @new : def);
+            WriteData(path, eng ? @new : def2);
             if (eng) return;
         }
 

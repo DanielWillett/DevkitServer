@@ -105,7 +105,7 @@ public interface ILocalizedCommand : IExecutableCommand
 public interface ICommandLocalizationFile : ILocalizedCommand
 {
     /// <summary>
-    /// Relative to your plugin's data folder.
+    /// Relative to your plugin's <see cref="IDevkitServerPlugin.LocalizationDirectory"/>.
     /// </summary>
     string TranslationsDirectory { get; }
 
@@ -113,5 +113,5 @@ public interface ICommandLocalizationFile : ILocalizedCommand
     /// Default translations for this command. All keys must be unique.
     /// </summary>
     /// <remarks>This getter is only ran once during registration.</remarks>
-    DatDictionary DefaultTranslations { get; }
+    LocalDatDictionary DefaultTranslations { get; }
 }

@@ -30,6 +30,18 @@ public interface IPlayerPermissionHandler
 
 public static class PermissionsEx
 {
+    public static bool Has(this Permission permission
+#if SERVER
+        , ulong player
+#endif
+    )
+    {
+        return UserPermissions.PlayerHandler.HasPermission(
+#if SERVER
+            player,
+#endif
+            permission);
+    }
     public static bool HasPermission(this IPlayerPermissionHandler handler,
 #if SERVER
         ulong player,

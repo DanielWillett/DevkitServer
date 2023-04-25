@@ -27,6 +27,11 @@ public sealed class Permission
         Core = plugin == null && core;
         DevkitServer = plugin == null && devkitServer;
     }
+    internal Permission(string permissionId, bool core = false, bool devkitServer = false) : this (permissionId)
+    {
+        Core = core;
+        DevkitServer = devkitServer;
+    }
 
     public static void WritePermission(ByteWriter writer, Permission permission) => writer.Write(permission.ToString());
     public static Permission ReadPermission(ByteReader reader) => TryParse(reader.ReadString(), out Permission permission) ? permission : null!;

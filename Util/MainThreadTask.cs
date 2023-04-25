@@ -9,7 +9,7 @@ public class MainThreadTask
     internal static MainThreadTask CompletedSkip => new MainThreadTask(true);
     internal const int DefaultTimeout = 5000;
     protected readonly bool SkipFrame;
-    protected volatile bool IsCompleted = false;
+    protected volatile bool IsCompleted;
     protected readonly MainThreadResult Awaiter;
     public readonly CancellationToken Token;
 
@@ -33,7 +33,7 @@ public class MainThreadTask
     }
     public sealed class MainThreadResult : INotifyCompletion
     {
-        internal Action Continuation;
+        internal Action? Continuation;
         public readonly MainThreadTask Task;
         public MainThreadResult(MainThreadTask task)
         {
