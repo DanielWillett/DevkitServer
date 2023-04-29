@@ -7,7 +7,6 @@ public class DevkitEditorHUD : MonoBehaviour
 {
     public List<KeyValuePair<ISleekLabel, ulong>> Nametags = new List<KeyValuePair<ISleekLabel, ulong>>(16);
 #nullable disable
-    public SleekWrapper ViewportPlane;
     public SleekFullscreenBox Container;
     public ISleekBox InfoBox;
     public ISleekLabel MapLabel;
@@ -39,6 +38,7 @@ public class DevkitEditorHUD : MonoBehaviour
     [UsedImplicitly]
     private void Awake()
     {
+        IsActive = false;
         UserManager.OnUserConnected += OnUserConnected;
         UserManager.OnUserDisconnected += OnUserDisconnected;
         UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
@@ -48,13 +48,14 @@ public class DevkitEditorHUD : MonoBehaviour
             positionOffset_X = 10,
             positionOffset_Y = 10,
             positionScale_X = 1f,
+            positionScale_Y = 1f,
             sizeOffset_X = -20,
             sizeOffset_Y = -20,
             sizeScale_X = 1f,
-            sizeScale_Y = 1f
+            sizeScale_Y = 1f,
+            isVisible = true
         };
         EditorUI.window.AddChild(Container);
-        IsActive = false;
         TestBox = Glazier.Get().CreateLabel();
         TestBox.positionOffset_X = -100;
         TestBox.positionOffset_Y = 5;
@@ -62,6 +63,7 @@ public class DevkitEditorHUD : MonoBehaviour
         TestBox.positionScale_Y = 0.5f;
         TestBox.sizeOffset_X = 200;
         TestBox.sizeOffset_Y = 30;
+        TestBox.text = "test text";
         Container.AddChild(TestBox);
         InfoBox = Glazier.Get().CreateBox();
         InfoBox.positionOffset_Y = -50;
@@ -108,7 +110,6 @@ public class DevkitEditorHUD : MonoBehaviour
         UserManager.OnUserConnected -= OnUserConnected;
         UserManager.OnUserDisconnected -= OnUserDisconnected;
         UserInput.OnUserPositionUpdated -= OnUserPositionUpdated;
-        ViewportPlane.RemoveAllChildren();
         Container.RemoveAllChildren();
         Nametags.Clear();
         EditorUI.window.RemoveChild(Container);
@@ -139,11 +140,10 @@ public class DevkitEditorHUD : MonoBehaviour
         label.sizeScale_Y = 1f;
         label.shadowStyle = ETextContrastContext.ColorfulBackdrop;
         UpdateNametag(label, user);
-        ViewportPlane.AddChild(label);
+        Container.AddChild(label);
         Nametags.Add(new KeyValuePair<ISleekLabel, ulong>(label, user.SteamId.m_SteamID));
     }
-
-    // PlayerUI.updateGroupLabels
+    
     private void UpdateNametag(ISleekLabel nametag, EditorUser user)
     {
         if (!IsActive && nametag.isVisible)
@@ -159,10 +159,10 @@ public class DevkitEditorHUD : MonoBehaviour
         }
         else
         {
-            Vector2 adjScreenPos = ViewportPlane.ViewportToNormalizedPosition(screenPos);
+            Vector2 adjScreenPos = Container.ViewportToNormalizedPosition(screenPos);
             nametag.positionScale_X = adjScreenPos.x;
             nametag.positionScale_Y = adjScreenPos.y;
-            if (!nametag.isVisible && string.IsNullOrEmpty(nametag.text) && user.Player != null)
+            if ((!nametag.isVisible || string.IsNullOrEmpty(nametag.text)) && user.Player != null)
             {
                 nametag.text = user.Player.playerID.playerName;
                 nametag.isVisible = true;
@@ -172,19 +172,26 @@ public class DevkitEditorHUD : MonoBehaviour
 
     private void OnUserConnected(EditorUser user)
     {
-        OnUserPositionUpdated(user);
-        for (int i = 0; i < PlayerLabels.Count; ++i)
+        try
         {
-            if (PlayerLabels[i].Value == user.SteamId.m_SteamID)
+            OnUserPositionUpdated(user);
+            for (int i = 0; i < PlayerLabels.Count; ++i)
             {
-                PlayerLabels[i].Key.text = user.DisplayName;
-                return;
+                if (PlayerLabels[i].Value == user.SteamId.m_SteamID)
+                {
+                    PlayerLabels[i].Key.text = user.DisplayName;
+                    return;
+                }
             }
-        }
 
-        ISleekLabel label = CreateListLabelForPlayer(user, PlayerLabels.Count);
-        PlayerLabels.Add(new KeyValuePair<ISleekLabel, ulong>(label, user.SteamId.m_SteamID));
-        InfoBox.AddChild(label);
+            ISleekLabel label = CreateListLabelForPlayer(user, PlayerLabels.Count);
+            PlayerLabels.Add(new KeyValuePair<ISleekLabel, ulong>(label, user.SteamId.m_SteamID));
+            InfoBox.AddChild(label);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex);
+        }
     }
 
     private void OnUserDisconnected(EditorUser user)
@@ -197,7 +204,7 @@ public class DevkitEditorHUD : MonoBehaviour
                 Nametags.RemoveAt(i);
                 if (lbl.isVisible)
                     lbl.isVisible = false;
-                ViewportPlane.RemoveChild(lbl);
+                Container.RemoveChild(lbl);
                 return;
             }
         }

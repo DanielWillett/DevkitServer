@@ -106,7 +106,7 @@ public class TileSync : MonoBehaviour
         Logger.LogDebug($"[TILE SYNC] Receiving packet #{packetId} for tile {coords} ({DevkitServerUtility.FormatBytes(len)} @ {DevkitServerUtility.FormatBytes(_index)})");
         if (_index + len > _bufferLen)
             len = _bufferLen - _index;
-        Logger.LogDebug($"[TILE SYNC] srcLen: {data.Length}, srcInd: {offset + PacketOffset}, dstLen: {_buffer.Length} ({_bufferLen}), dstInd: {_index}, count: {len}.");
+        // Logger.LogDebug($"[TILE SYNC] srcLen: {data.Length}, srcInd: {offset + PacketOffset}, dstLen: {_buffer.Length} ({_bufferLen}), dstInd: {_index}, count: {len}.");
         Buffer.BlockCopy(data, offset + PacketOffset, _buffer, _index, len);
         _index += len;
         if (len + _index >= _bufferLen)

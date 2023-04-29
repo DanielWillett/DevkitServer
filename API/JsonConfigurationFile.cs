@@ -5,7 +5,19 @@ using System.Text.Json;
 namespace DevkitServer.API;
 public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvider<TConfig> where TConfig : class, new()
 {
-    public TConfig Configuration => _config;
+    public virtual TConfig? Default => null;
+    public TConfig Configuration
+    {
+        get => _config;
+        set
+        {
+            lock (_sync)
+            {
+                _config = value;
+            }
+        }
+    }
+
     private TConfig _config = null!;
     private readonly object _sync = new object();
     private string _file = null!;
@@ -31,7 +43,7 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
     {
         lock (_sync)
         {
-            _config = ReadFromFile(File, this);
+            _config = ReadFromFile(File, this, Default);
             WriteToFile(File, _config);
         }
     }
@@ -67,8 +79,9 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
 
         return null;
     }
-    public static TConfig ReadFromFile(string path, IJsonSettingProvider? options = null)
+    public static TConfig ReadFromFile(string path, IJsonSettingProvider? options = null, TConfig? @default = null)
     {
+        TConfig config;
         try
         {
             if (System.IO.File.Exists(path))
@@ -84,43 +97,54 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
                     Buffer.BlockCopy(bytes2, 0, bytes, 0, Math.Min(l, len));
                     Array.Resize(ref bytes, l);
                 }
+
                 if (len > 0)
                 {
                     Utf8JsonReader reader = new Utf8JsonReader(bytes, DevkitServerConfig.ReaderOptions);
-                    return JsonSerializer.Deserialize<TConfig>(ref reader, options == null ? DevkitServerConfig.SerializerSettings : options.SerializerOptions)
+                    config = JsonSerializer.Deserialize<TConfig>(ref reader,
+                               options == null
+                                   ? DevkitServerConfig.SerializerSettings
+                                   : options.SerializerOptions)
                            ?? throw new JsonException("Failed to read SystemConfig: returned null.");
+                    if (config is IDirtyable dirty2)
+                        dirty2.isDirty = false;
                 }
             }
+
+            if (@default != null)
+                return @default;
         }
         catch (Exception ex)
         {
             Logger.LogError("[" + typeof(TConfig).Format() + "] Error reading config file: \"" + path + "\".");
             Logger.LogError(ex);
 
+            string oldpath = path;
             try
             {
                 int c = 0;
-                string oldpath = path;
                 do
                 {
                     ++c;
                     path = Path.Combine(Path.GetDirectoryName(path)!, Path.GetFileNameWithoutExtension(path) + "_backup_" + c + Path.GetExtension(path));
                 }
                 while (System.IO.File.Exists(path));
-                System.IO.File.Copy(oldpath, path);
+                System.IO.File.Move(oldpath, path);
             }
             catch (Exception ex2)
             {
-                Logger.LogError("[" + typeof(TConfig).Format() + "] Error backing up config file from: \"" + path + "\".");
+                Logger.LogError("[" + typeof(TConfig).Format() + "] Error backing up invalid config file from: \"" + oldpath + "\" to \"" + path + "\".");
                 Logger.LogError(ex2);
             }
 #if SERVER
             Logger.LogWarning("[" + typeof(TConfig).Format() + "] Server startup halted. " +
-                              "fix the config errors in \"" + path + "\" or retart the server to use a clean config.");
+                              "fix the config errors in \"" + path + "\" and rename it to \"" + oldpath + "\" or retart the server to use the default config.");
             DevkitServerModule.Fault();
 #endif
+            if (@default != null)
+                return @default;
         }
-        TConfig config = new TConfig();
+        config = new TConfig();
         if (config is IDefaultable def)
             def.SetDefaults();
         if (config is IDirtyable dirty)

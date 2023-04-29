@@ -10,16 +10,17 @@ using DevkitServer.Players.UI;
 #endif
 using HarmonyLib;
 using SDG.Framework.Devkit;
+using SDG.Framework.Foliage;
 
 namespace DevkitServer.Multiplayer;
 
 public partial class EditorTerrain
 {
-    private static readonly Pool<BrushSettingsCollection> BrushCollectionPool = new Pool<BrushSettingsCollection>();
-    private static readonly Pool<SplatmapSettingsCollection> SplatmapCollectionPool = new Pool<SplatmapSettingsCollection>();
     private readonly BrushSettingsCollection?[] ReadBrushSettingsMask = new BrushSettingsCollection?[BrushFlagLength];
     private readonly SplatmapSettingsCollection?[] ReadSplatmapSettingsMask = new SplatmapSettingsCollection?[SplatmapFlagLength];
 #if CLIENT
+    private static readonly Pool<BrushSettingsCollection> BrushCollectionPool = new Pool<BrushSettingsCollection>();
+    private static readonly Pool<SplatmapSettingsCollection> SplatmapCollectionPool = new Pool<SplatmapSettingsCollection>();
     private static readonly Func<Array?>? GetUILayers = UIAccessTools.CreateUIFieldGetterReturn<Array>(UI.EditorTerrainTiles, "layers", false);
     private static readonly Func<int>? GetSelectedLayer = UIAccessTools.CreateUIFieldGetterReturn<int>(UI.EditorTerrainTiles, "selectedLayerIndex", false);
     private static readonly Action<int>? SetSelectedLayerIndex = UIAccessTools.GenerateUICaller<Action<int>>(UI.EditorTerrainTiles, "SetSelectedLayerIndex", throwOnFailure: false);
@@ -33,10 +34,12 @@ public partial class EditorTerrain
     static EditorTerrain()
     {
         ListPool<BrushSettingsCollection>.warmup((uint)(Provider.isServer ? 16 : 2));
+#if CLIENT
         BrushCollectionPool.warmup((uint)(Provider.isServer ? 32 : 5));
         SplatmapCollectionPool.warmup((uint)(Provider.isServer ? 32 : 5));
+#endif
     }
-    private BrushSettingsCollection? GetBrushSettings(BrushValueFlags value)
+    public BrushSettingsCollection? GetBrushSettings(BrushValueFlags value)
     {
         for (int i = 0; i < BrushFlagLength; ++i)
             if ((value & (BrushValueFlags)(1 << i)) != 0)
@@ -51,6 +54,7 @@ public partial class EditorTerrain
             if ((collection.Flags & (BrushValueFlags)(1 << i)) != 0)
             {
                 ref BrushSettingsCollection? col = ref ReadBrushSettingsMask[i];
+#if CLIENT
                 if (col != null)
                 {
                     bool stillUsed = false;
@@ -65,6 +69,7 @@ public partial class EditorTerrain
                     if (!stillUsed)
                         BrushCollectionPool.release(col);
                 }
+#endif
                 col = collection;
             }
         }
@@ -76,6 +81,7 @@ public partial class EditorTerrain
                 if ((sc.Flags & (SplatmapValueFlags)(1 << i)) != 0)
                 {
                     ref SplatmapSettingsCollection? col = ref ReadSplatmapSettingsMask[i];
+#if CLIENT
                     if (col != null)
                     {
                         bool stillUsed = false;
@@ -90,42 +96,19 @@ public partial class EditorTerrain
                         if (!stillUsed)
                             SplatmapCollectionPool.release(col);
                     }
+#endif
                     col = sc;
                 }
             }
         }
     }
-    private void SetBrushSettings(BrushValueFlags value, BrushSettingsCollection? settings)
-    {
-        for (int i = 0; i < BrushFlagLength; ++i)
-        {
-            if ((value & (BrushValueFlags)(1 << i)) != 0)
-            {
-                if (i is not (< 0 or >= BrushFlagLength))
-                    ReadBrushSettingsMask[i] = settings;
-                break;
-            }
-        }
-    }
-    private SplatmapSettingsCollection? GetSplatmapSettings(SplatmapValueFlags value)
+    public SplatmapSettingsCollection? GetSplatmapSettings(SplatmapValueFlags value)
     {
         for (int i = 0; i < SplatmapFlagLength; ++i)
             if ((value & (SplatmapValueFlags)(1 << i)) != 0)
                 return i is < 0 or >= SplatmapFlagLength ? null : ReadSplatmapSettingsMask[i];
 
         return null;
-    }
-    private void SetSplatmapSettings(SplatmapValueFlags value, SplatmapSettingsCollection? settings)
-    {
-        for (int i = 0; i < SplatmapFlagLength; ++i)
-        {
-            if ((value & (SplatmapValueFlags)(1 << i)) != 0)
-            {
-                if (i is not (< 0 or >= SplatmapFlagLength))
-                    ReadSplatmapSettingsMask[i] = settings;
-                break;
-            }
-        }
     }
     public enum TerrainTransactionType : byte
     {
@@ -139,7 +122,11 @@ public partial class EditorTerrain
         HolesCut,
         AddTile,
         DeleteTile,
-        UpdateSplatmapLayers
+        UpdateSplatmapLayers,
+        AddFoliageToSurface,
+        RemoveFoliageInstances,
+        RemoveResourceSpawnpoint,
+        RemoveLevelObject
     }
     private const int BrushFlagLength = 5;
     [Flags]
@@ -151,6 +138,8 @@ public partial class EditorTerrain
         Strength = 1 << 2,
         Sensitivity = 1 << 3,
         Target = 1 << 4,
+        FoliageAsset = 1 << 5,
+        TileCoordinates = 1 << 6,
         SplatmapPaintInfo = 1 << 7
     }
     private const int SplatmapFlagLength = 8;
@@ -185,7 +174,8 @@ public partial class EditorTerrain
         Splatmap,
         Holes,
         Tiles,
-        Resources
+        Resources,
+        Foliage
     }
     public interface IBounds : ITerrainAction
     {
@@ -231,6 +221,15 @@ public partial class EditorTerrain
     public interface ISplatmapMaterial : ITerrainAction
     {
         AssetReference<LandscapeMaterialAsset> SplatmapMaterial { get; set; }
+    }
+    public interface IFoliageAsset : ITerrainAction
+    {
+        AssetReference<FoliageInfoAsset> FoliageAsset { get; set; }
+    }
+    public interface ICoordinates : ITerrainAction
+    {
+        int CoordinateX { get; set; }
+        int CoordinateY { get; set; }
     }
 
     public sealed class HeightmapRampAction : IBrushRadius, IBrushFalloff, IBounds
@@ -614,7 +613,7 @@ public partial class EditorTerrain
             else if (IsAuto)
                 return;
             else
-                targetWeight = UseWeightTarget ? BrushTarget : (IsRemoving ? 0f : 1f);
+                targetWeight = !UseWeightTarget ? BrushTarget : (IsRemoving ? 0f : 1f);
 
             float speed = DeltaTime * BrushStrength * GetBrushAlpha(distance) * BrushSensitivity;
             
@@ -789,7 +788,7 @@ public partial class EditorTerrain
             return IsFilling;
         }
     }
-    public sealed class TileModifyAction : ITerrainAction
+    public sealed class TileModifyAction : ICoordinates
     {
         public TerrainTransactionType Type => IsDelete ? TerrainTransactionType.DeleteTile : TerrainTransactionType.AddTile;
         public TerrainEditorType EditorType => TerrainEditorType.Tiles;
@@ -797,6 +796,16 @@ public partial class EditorTerrain
         public float DeltaTime { get; set; }
         public bool IsDelete { get; set; }
         public LandscapeCoord Coordinates { get; set; }
+        int ICoordinates.CoordinateX
+        {
+            get => Coordinates.x;
+            set => Coordinates = Coordinates with { x = value };
+        }
+        int ICoordinates.CoordinateY
+        {
+            get => Coordinates.y;
+            set => Coordinates = Coordinates with { y = value };
+        }
         public void Apply()
         {
             if (IsDelete)
@@ -834,13 +843,23 @@ public partial class EditorTerrain
             Coordinates = new LandscapeCoord(reader.ReadInt32(), reader.ReadInt32());
         }
     }
-    public sealed class TileSplatmapLayersUpdateAction : ITerrainAction
+    public sealed class TileSplatmapLayersUpdateAction : ICoordinates
     {
         public TerrainTransactionType Type => TerrainTransactionType.UpdateSplatmapLayers;
         public TerrainEditorType EditorType => TerrainEditorType.Tiles;
         public CSteamID Instigator { get; set; }
         public float DeltaTime { get; set; }
         public LandscapeCoord Coordinates { get; set; }
+        int ICoordinates.CoordinateX
+        {
+            get => Coordinates.x;
+            set => Coordinates = Coordinates with { x = value };
+        }
+        int ICoordinates.CoordinateY
+        {
+            get => Coordinates.y;
+            set => Coordinates = Coordinates with { y = value };
+        }
         public AssetReference<LandscapeMaterialAsset>[]? Layers { get; set; }
         public void Apply()
         {
@@ -912,8 +931,229 @@ public partial class EditorTerrain
                 Layers[i] = new AssetReference<LandscapeMaterialAsset>(reader.ReadGuid());
         }
     }
+    [EarlyTypeInit]
+    public sealed class AddFoliageToSurfaceAction : IFoliageAsset
+    {
+        private static readonly Action<FoliageInfoAsset, Vector3, Quaternion, Vector3, bool>? ExecuteAddFoliage
+            = Accessor.GenerateInstanceCaller<FoliageInfoAsset, Action<FoliageInfoAsset, Vector3, Quaternion, Vector3, bool>>("addFoliage", throwOnError: false);
+        public TerrainTransactionType Type => TerrainTransactionType.AddFoliageToSurface;
+        public TerrainEditorType EditorType => TerrainEditorType.Foliage;
+        public CSteamID Instigator { get; set; }
+        public float DeltaTime { get; set; }
+        public AssetReference<FoliageInfoAsset> FoliageAsset { get; set; }
+        public Vector3 Position { get; set; }
+        public Quaternion Rotation { get; set; }
+        public Vector3 Scale { get; set; }
+        public bool ClearWhenBaked { get; set; }
+        public void Apply()
+        {
+            if (ExecuteAddFoliage == null)
+            {
+                Logger.LogWarning("Unable to add foliage asset: " + FoliageAsset.Format() + ", reflection failure on load.");
+                return;
+            }
+            if (FoliageAsset.Find() is { } asset)
+            {
+                ExecuteAddFoliage(asset, Position, Rotation, Scale, ClearWhenBaked);
+            }
+            else
+            {
+                Logger.LogWarning("Unknown foliage asset: " + FoliageAsset.Format() + ".");
+            }
+        }
+        public void Write(ByteWriter writer)
+        {
+            writer.Write(DeltaTime);
+            bool nonUniformScale = Scale == Vector3.one;
+            byte flag = (byte)((nonUniformScale ? 2 : 0) | (ClearWhenBaked ? 1 : 0));
+            writer.Write(flag);
+            writer.Write(Position);
+            writer.Write(Rotation);
+            if (nonUniformScale)
+                writer.Write(Scale);
+        }
+        public void Read(ByteReader reader)
+        {
+            DeltaTime = reader.ReadFloat();
+            byte flag = reader.ReadUInt8();
+            ClearWhenBaked = (flag & 1) != 0;
+            bool nonUniformScale = (flag & 2) != 0;
+            Position = reader.ReadVector3();
+            Rotation = reader.ReadQuaternion();
+            Scale = nonUniformScale ? reader.ReadVector3() : Vector3.one;
+        }
+    }
+    public sealed class RemoveFoliageInstancesAction : ICoordinates, IBrushRadius, IBrushFalloff, IFoliageAsset
+    {
+        public TerrainTransactionType Type => TerrainTransactionType.RemoveFoliageInstances;
+        public TerrainEditorType EditorType => TerrainEditorType.Foliage;
+        public CSteamID Instigator { get; set; }
+        public Vector3 BrushPosition { get; set; }
+        public AssetReference<FoliageInstancedMeshInfoAsset> FoliageAsset { get; set; }
+        AssetReference<FoliageInfoAsset> IFoliageAsset.FoliageAsset
+        {
+            get => new AssetReference<FoliageInfoAsset>(FoliageAsset.GUID);
+            set => FoliageAsset = new AssetReference<FoliageInstancedMeshInfoAsset>(value.GUID);
+        }
+        public float DeltaTime { get; set; }
+        public float BrushRadius { get; set; }
+        public float BrushFalloff { get; set; }
+        public FoliageCoord Coordinates { get; set; }
+        public int SampleCount { get; set; }
+        public bool AllowRemoveBaked { get; set; }
+        int ICoordinates.CoordinateX
+        {
+            get => Coordinates.x;
+            set => Coordinates = Coordinates with { x = value };
+        }
+        int ICoordinates.CoordinateY
+        {
+            get => Coordinates.y;
+            set => Coordinates = Coordinates with { y = value };
+        }
+        public void Apply()
+        {
+            FoliageTile tile = FoliageSystem.getTile(Coordinates);
 
-    private sealed class BrushSettingsCollection
+            if (tile == null)
+            {
+                Logger.LogWarning("Unknown foliage tile: " + Coordinates + ".");
+                return;
+            }
+            if (!tile.instances.TryGetValue(FoliageAsset, out FoliageInstanceList list))
+            {
+                Logger.LogWarning("Tile missing foliage " + (FoliageAsset.Find()?.FriendlyName ?? "NULL") + ": " + Coordinates.Format() + ".");
+                return;
+            }
+            bool flag1 = false;
+            float sqrBrushRadius = BrushRadius * BrushRadius;
+            float sqrBrushFalloffRadius = sqrBrushRadius * BrushFalloff * BrushFalloff;
+            int sampleCount = SampleCount;
+
+            // FoliageEditor.removeInstances
+            for (int index1 = list.matrices.Count - 1; index1 >= 0; --index1)
+            {
+                List<Matrix4x4> matrix = list.matrices[index1];
+                List<bool> boolList = list.clearWhenBaked[index1];
+                for (int index2 = matrix.Count - 1; index2 >= 0; --index2)
+                {
+                    if (!boolList[index2] || AllowRemoveBaked)
+                    {
+                        Vector3 position = matrix[index2].GetPosition();
+                        float sqrMagnitude = (position - BrushPosition).sqrMagnitude;
+                        if (sqrMagnitude < sqrBrushRadius)
+                        {
+                            bool outOfFalloff = sqrMagnitude < sqrBrushFalloffRadius;
+                            if (outOfFalloff && sampleCount > 0)
+                            {
+                                tile.removeInstance(list, index1, index2);
+                                --sampleCount;
+                                flag1 = true;
+                            }
+                        }
+                    }
+                }
+            }
+            if (!flag1)
+                return;
+            LevelHierarchy.MarkDirty();
+        }
+        public void Write(ByteWriter writer)
+        {
+            writer.Write(DeltaTime);
+        }
+        public void Read(ByteReader reader)
+        {
+            DeltaTime = reader.ReadFloat();
+        }
+    }
+    public sealed class RemoveResourceSpawnpointAction : IFoliageAsset
+    {
+        public TerrainTransactionType Type => TerrainTransactionType.RemoveResourceSpawnpoint;
+        public TerrainEditorType EditorType => TerrainEditorType.Foliage;
+        public CSteamID Instigator { get; set; }
+        public float DeltaTime { get; set; }
+        public Vector3 ResourcePosition { get; set; }
+        public AssetReference<ResourceAsset> FoliageAsset { get; set; }
+        AssetReference<FoliageInfoAsset> IFoliageAsset.FoliageAsset
+        {
+            get => new AssetReference<FoliageInfoAsset>(FoliageAsset.GUID);
+            set => FoliageAsset = new AssetReference<ResourceAsset>(value.GUID);
+        }
+        public void Apply()
+        {
+            Vector3 pos = ResourcePosition;
+            if (Regions.tryGetCoordinate(pos, out byte x, out byte y))
+            {
+                List<ResourceSpawnpoint> region = LevelGround.trees[x, y];
+                for (int i = 0; i < region.Count; ++i)
+                {
+                    ResourceSpawnpoint sp = region[i];
+                    if (sp.point.IsNearlyEqual(pos) && sp.asset.GUID == FoliageAsset.GUID)
+                    {
+                        sp.destroy();
+                        region.RemoveAt(i);
+                        return;
+                    }
+                }
+
+                Logger.LogWarning("Resource not found: " + (FoliageAsset.Find()?.FriendlyName ?? "NULL").Format() + " at " + ResourcePosition.Format() + ".");
+            }
+            else
+            {
+                Logger.LogWarning("Resource out of bounds: " + (FoliageAsset.Find()?.FriendlyName ?? "NULL").Format() + " at " + ResourcePosition.Format() + ".");
+            }
+        }
+
+        public void Write(ByteWriter writer)
+        {
+            writer.Write(DeltaTime);
+            writer.Write(ResourcePosition);
+        }
+        public void Read(ByteReader reader)
+        {
+            DeltaTime = reader.ReadFloat();
+            ResourcePosition = reader.ReadVector3();
+        }
+    }
+    public sealed class RemoveLevelObjectAction : ICoordinates
+    {
+        public TerrainTransactionType Type => TerrainTransactionType.RemoveLevelObject;
+        public TerrainEditorType EditorType => TerrainEditorType.Foliage;
+        public CSteamID Instigator { get; set; }
+        public float DeltaTime { get; set; }
+        public uint InstanceId { get; set; }
+        public int CoordinateX { get; set; }
+        public int CoordinateY { get; set; }
+        public void Apply()
+        {
+            List<LevelObject> region = LevelObjects.objects[CoordinateX, CoordinateY];
+            for (int i = 0; i < region.Count; ++i)
+            {
+                LevelObject obj = region[i];
+                if (obj.instanceID == InstanceId)
+                {
+                    LevelObjects.removeObject(obj.transform);
+                    return;
+                }
+            }
+
+            Logger.LogWarning("Object not found: #" + InstanceId.Format() + " (" + CoordinateX.Format() + ", " + CoordinateY.Format() + ").");
+        }
+
+        public void Write(ByteWriter writer)
+        {
+            writer.Write(DeltaTime);
+            writer.Write(InstanceId);
+        }
+        public void Read(ByteReader reader)
+        {
+            DeltaTime = reader.ReadFloat();
+            InstanceId = reader.ReadUInt32();
+        }
+    }
+
+    public sealed class BrushSettingsCollection
     {
         public BrushValueFlags Flags { get; set; }
         public byte StartIndex { get; set; }
@@ -922,6 +1162,9 @@ public partial class EditorTerrain
         public float Strength { get; set; }
         public float Sensitivity { get; set; }
         public float Target { get; set; }
+        public int CoordinateX { get; set; }
+        public int CoordinateY { get; set; }
+        public AssetReference<FoliageInfoAsset> FoliageAsset { get; set; }
         public SplatmapSettingsCollection? Splatmap { get; set; }
         public BrushSettingsCollection Reset()
         {
@@ -953,17 +1196,28 @@ public partial class EditorTerrain
             Flags |= BrushValueFlags.Target;
             Target = target;
         }
-        public BrushSettingsCollection WithSplatmapInfo(SplatmapSettingsCollection? collection)
+        public void WithFoliageAsset(AssetReference<FoliageInfoAsset> material)
+        {
+            Flags |= BrushValueFlags.FoliageAsset;
+            FoliageAsset = material.isValid ? material : default;
+        }
+        public void WithCoordinates(int x, int y)
+        {
+            Flags |= BrushValueFlags.TileCoordinates;
+            CoordinateX = x;
+            CoordinateY = y;
+        }
+        public void WithSplatmapInfo(SplatmapSettingsCollection? collection)
         {
             if (collection == null)
                 Flags &= ~BrushValueFlags.SplatmapPaintInfo;
             else
                 Flags |= BrushValueFlags.SplatmapPaintInfo;
-
+#if CLIENT
             if (collection != Splatmap && Splatmap != null)
                 SplatmapCollectionPool.release(Splatmap);
+#endif
             Splatmap = collection;
-            return this;
         }
         public void Read(ByteReader reader)
         {
@@ -989,9 +1243,23 @@ public partial class EditorTerrain
                 Target = reader.ReadFloat();
             else
                 Target = 0;
+            if ((Flags & BrushValueFlags.FoliageAsset) != 0)
+                FoliageAsset = new AssetReference<FoliageInfoAsset>(reader.ReadGuid());
+            else
+                FoliageAsset = default;
+            if ((Flags & BrushValueFlags.TileCoordinates) != 0)
+            {
+                CoordinateX = reader.ReadInt32();
+                CoordinateY = reader.ReadInt32();
+            }
+            else CoordinateX = CoordinateY = 0;
             if ((Flags & BrushValueFlags.SplatmapPaintInfo) != 0)
             {
+#if CLIENT
                 Splatmap ??= SplatmapCollectionPool.claim().Reset();
+#else
+                Splatmap ??= new SplatmapSettingsCollection();
+#endif
                 Splatmap.Read(reader);
             }
         }
@@ -1009,6 +1277,13 @@ public partial class EditorTerrain
                 writer.Write(Sensitivity);
             if ((Flags & BrushValueFlags.Target) != 0)
                 writer.Write(Target);
+            if ((Flags & BrushValueFlags.FoliageAsset) != 0)
+                writer.Write(FoliageAsset.GUID);
+            if ((Flags & BrushValueFlags.TileCoordinates) != 0)
+            {
+                writer.Write(CoordinateX);
+                writer.Write(CoordinateY);
+            }
             if ((Flags & BrushValueFlags.SplatmapPaintInfo) != 0)
             {
                 if (Splatmap == null)
@@ -1036,7 +1311,7 @@ public partial class EditorTerrain
             return bld.ToString();
         }
     }
-    private sealed class SplatmapSettingsCollection
+    public sealed class SplatmapSettingsCollection
     {
         public SplatmapValueFlags Flags { get; set; }
         public float AutoFoundationRayLength { get; set; }
@@ -1096,23 +1371,9 @@ public partial class EditorTerrain
         }
         public SplatmapSettingsCollection WithSplatmapMaterial(AssetReference<LandscapeMaterialAsset> material)
         {
-            if (material.isValid)
-            {
-                Flags |= SplatmapValueFlags.SplatmapMaterial;
-                SplatmapMaterial = material;
-            }
-            else
-            {
-                SplatmapMaterial = default;
-                Flags &= ~SplatmapValueFlags.SplatmapMaterial;
-            }
+            Flags |= SplatmapValueFlags.SplatmapMaterial;
+            SplatmapMaterial = material.isValid ? material : default;
             return this;
-        }
-        public static SplatmapSettingsCollection ReadToPool(ByteReader reader)
-        {
-            SplatmapSettingsCollection collection = SplatmapCollectionPool.claim();
-            collection.Read(reader);
-            return collection;
         }
         public void Read(ByteReader reader)
         {

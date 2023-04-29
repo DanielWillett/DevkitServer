@@ -2,6 +2,7 @@
 using HarmonyLib;
 using JetBrains.Annotations;
 using System.Reflection;
+using DevkitServer.Players;
 using SDG.Framework.Landscapes;
 #if CLIENT
 using System.Reflection.Emit;
@@ -57,6 +58,14 @@ internal static class PatchesMain
         }
     }
 
+    private static bool IsEditorMode(PlayerCaller caller)
+    {
+        if (!DevkitServerModule.IsEditing)
+            return false;
+
+        EditorUser? user = UserManager.FromId(caller.player.channel.owner.playerID.steamID.m_SteamID);
+        return !(user != null && user.Input.Controller == CameraController.Player);
+    }
 #if CLIENT
     private static readonly InstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>> GetServerPendingIDs =
         Accessor.GenerateInstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>>("serverPendingIDs", BindingFlags.NonPublic, true)!;
@@ -121,13 +130,6 @@ internal static class PatchesMain
             DevkitServerModule.IsEditing = false;
             Launch();
         }
-    }
-    private static bool IsEditorMode(PlayerCaller caller)
-    {
-        if (!DevkitServerModule.IsEditing)
-            return false;
-
-        return !(EditorUser.User != null && (!caller.player.channel.isOwner || EditorUser.User.Input.Controller == CameraController.Player));
     }
 
     private static readonly MethodInfo IsPlayerControlledOrNotEditingMethod =
@@ -316,6 +318,22 @@ internal static class PatchesMain
     [HarmonyPatch(typeof(ObjectManager), "Update")]
     [HarmonyPrefix]
     private static bool ObjectManagerUpdate() => !DevkitServerModule.IsEditing;
+
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(PlayerStance), "Update")]
+    [HarmonyPrefix]
+    private static bool PlayerStanceUpdate(PlayerStance __instance) => !IsEditorMode(__instance);
+
+    [UsedImplicitly]
+    [HarmonyPatch(typeof(PlayerStance), "GetStealthDetectionRadius")]
+    [HarmonyPrefix]
+    private static bool GetStealthDetectionRadius(ref float __result)
+    {
+        if (!DevkitServerModule.IsEditing)
+            return true;
+        __result = 0f;
+        return false;
+    }
 
     [UsedImplicitly]
     [HarmonyPatch(typeof(Editor), "save")]

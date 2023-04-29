@@ -16,10 +16,10 @@ namespace DevkitServer.Patches;
 
 public delegate void PaintHoleAction(Bounds bounds, Vector3 position, float radius, bool put);
 public delegate void LandscapeTileAction(LandscapeTile bounds);
-public delegate void AddFoliageAction(Vector3 position, Quaternion rotation, Vector3 scale, bool clearWhenBaked);
-public delegate void RemoveFoliageAction(FoliageTile foliageTile, FoliageInstanceList list, float sqrBrushRadius, float sqrBrushFalloffRadius, bool allowRemoveBaked, int sampleCount);
+public delegate void AddFoliageAction(FoliageInfoAsset asset, Vector3 position, Quaternion rotation, Vector3 scale, bool clearWhenBaked);
+public delegate void RemoveFoliageAction(Vector3 brushPosition, FoliageTile foliageTile, FoliageInstanceList list, float sqrBrushRadius, float sqrBrushFalloffRadius, bool allowRemoveBaked, int sampleCount);
 public delegate void ResourceSpawnpointRemovedAction(ResourceSpawnpoint spawnpoint);
-public delegate void LevelObjectRemovedAction(Transform objectTransform);
+public delegate void LevelObjectRemovedAction(Vector3 pos, LevelObject obj);
 public delegate void RampAction(Bounds bounds, Vector3 start, Vector3 end, float radius, float falloff);
 public delegate void AdjustAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, bool subtracting, float dt);
 public delegate void FlattenAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, float target, EDevkitLandscapeToolHeightmapFlattenMethod method, float dt);
@@ -47,6 +47,7 @@ public static class ClientEvents
     public static event ResourceSpawnpointRemovedAction? OnResourceSpawnpointRemoved;
     public static event LevelObjectRemovedAction? OnLevelObjectRemoved;
     public static event SplatmapLayerMaterialsUpdateAction? OnSplatmapLayerMaterialsUpdate;
+    public static readonly Type FoliageEditor = typeof(Provider).Assembly.GetType("SDG.Unturned.FoliageEditor");
 
     #region TerrainEditor.update
     [HarmonyPatch(typeof(TerrainEditor), nameof(TerrainEditor.update))]
@@ -295,7 +296,7 @@ public static class ClientEvents
     internal static readonly InstanceGetter<TerrainEditor, Vector3>? GetRampEnd =
         Accessor.GenerateInstanceGetter<TerrainEditor, Vector3>("heightmapRampEndPosition");
 
-    internal static readonly InstanceGetter<TerrainEditor, Vector3>? GetBrushWorldPosition =
+    internal static readonly InstanceGetter<TerrainEditor, Vector3>? GetTerrainBrushWorldPosition =
         Accessor.GenerateInstanceGetter<TerrainEditor, Vector3>("brushWorldPosition");
 
     internal static readonly InstanceGetter<TerrainEditor, int>? GetSampleCount =
@@ -318,9 +319,9 @@ public static class ClientEvents
     [UsedImplicitly]
     private static void OnAdjustConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null) return;
+        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
         
-        OnAdjusted?.Invoke(bounds, GetBrushWorldPosition(editor),
+        OnAdjusted?.Invoke(bounds, GetTerrainBrushWorldPosition(editor),
             editor.heightmapBrushRadius, editor.heightmapBrushFalloff,
             editor.heightmapBrushStrength, editor.heightmapAdjustSensitivity,
             InputEx.GetKey(KeyCode.LeftShift), Time.deltaTime);
@@ -328,9 +329,9 @@ public static class ClientEvents
     [UsedImplicitly]
     private static void OnFlattenConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null) return;
+        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
         
-        OnFlattened?.Invoke(bounds, GetBrushWorldPosition(editor),
+        OnFlattened?.Invoke(bounds, GetTerrainBrushWorldPosition(editor),
             editor.heightmapBrushRadius, editor.heightmapBrushFalloff,
             editor.heightmapBrushStrength, editor.heightmapAdjustSensitivity,
             editor.heightmapFlattenTarget,
@@ -339,10 +340,10 @@ public static class ClientEvents
     [UsedImplicitly]
     private static void OnSmoothConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null || GetHeightmapSmoothTarget == null) return;
+        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null || GetHeightmapSmoothTarget == null) return;
 
         EDevkitLandscapeToolHeightmapSmoothMethod method = DevkitLandscapeToolHeightmapOptions.instance.smoothMethod;
-        OnSmoothed?.Invoke(bounds, GetBrushWorldPosition(editor),
+        OnSmoothed?.Invoke(bounds, GetTerrainBrushWorldPosition(editor),
             editor.heightmapBrushRadius, editor.heightmapBrushFalloff,
             editor.heightmapBrushStrength, GetHeightmapSmoothTarget(editor),
             method, Time.deltaTime);
@@ -350,10 +351,10 @@ public static class ClientEvents
     [UsedImplicitly]
     private static void OnPaintConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null) return;
+        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
 
         DevkitLandscapeToolSplatmapOptions settings = DevkitLandscapeToolSplatmapOptions.instance;
-        OnPainted?.Invoke(bounds, GetBrushWorldPosition(editor), editor.splatmapBrushRadius,
+        OnPainted?.Invoke(bounds, GetTerrainBrushWorldPosition(editor), editor.splatmapBrushRadius,
             editor.splatmapBrushFalloff, editor.splatmapBrushStrength, editor.splatmapWeightTarget,
             editor.splatmapPaintSensitivity,
             InputEx.GetKey(KeyCode.LeftControl) || editor.splatmapUseWeightTarget,
@@ -367,10 +368,10 @@ public static class ClientEvents
     [UsedImplicitly]
     private static void OnAutoPaintConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null) return;
+        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
 
         DevkitLandscapeToolSplatmapOptions settings = DevkitLandscapeToolSplatmapOptions.instance;
-        OnAutoPainted?.Invoke(bounds, GetBrushWorldPosition(editor), editor.splatmapBrushRadius,
+        OnAutoPainted?.Invoke(bounds, GetTerrainBrushWorldPosition(editor), editor.splatmapBrushRadius,
             editor.splatmapBrushFalloff, editor.splatmapBrushStrength, editor.splatmapWeightTarget,
             editor.splatmapPaintSensitivity,
             InputEx.GetKey(KeyCode.LeftControl) || editor.splatmapUseWeightTarget,
@@ -384,7 +385,7 @@ public static class ClientEvents
     [UsedImplicitly]
     private static void OnPaintSmoothConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null || GetSampleAverage == null || GetSampleCount == null) return;
+        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null || GetSampleAverage == null || GetSampleCount == null) return;
 
         EDevkitLandscapeToolSplatmapSmoothMethod method = DevkitLandscapeToolSplatmapOptions.instance.smoothMethod;
         if (OnPaintSmoothed != null)
@@ -397,7 +398,7 @@ public static class ClientEvents
                     averagesList.Add(new KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>(kvp.Key, kvp.Value));
             }
 
-            OnPaintSmoothed.Invoke(bounds, GetBrushWorldPosition(editor), editor.splatmapBrushRadius,
+            OnPaintSmoothed.Invoke(bounds, GetTerrainBrushWorldPosition(editor), editor.splatmapBrushRadius,
             editor.splatmapBrushFalloff, editor.splatmapBrushStrength, method, averagesList, GetSampleCount(editor),
             TerrainEditor.splatmapMaterialTarget, Time.deltaTime);
         }
@@ -405,9 +406,9 @@ public static class ClientEvents
     [UsedImplicitly]
     private static void OnHoleConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetBrushWorldPosition == null) return;
+        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
         
-        OnHolePainted?.Invoke(bounds, GetBrushWorldPosition(editor), editor.splatmapBrushRadius, InputEx.GetKey(KeyCode.LeftShift));
+        OnHolePainted?.Invoke(bounds, GetTerrainBrushWorldPosition(editor), editor.splatmapBrushRadius, InputEx.GetKey(KeyCode.LeftShift));
     }
     [UsedImplicitly]
     private static void OnAddTile(LandscapeTile tile)
@@ -434,14 +435,14 @@ public static class ClientEvents
     [UsedImplicitly]
     [HarmonyPatch("FoliageEditor", "update")]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> FoliageEditorUpdateTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
+    private static IEnumerable<CodeInstruction> FoliageEditorUpdateTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
     {
-        Type? foliageEditor = typeof(Provider).Assembly.GetType("SDG.Unturned.FoliageEditor");
-        if (foliageEditor == null)
+        if (FoliageEditor == null)
         {
             Logger.LogWarning("Unable to find type: FoliageEditor.");
             foreach (CodeInstruction instruction in instructions)
                 yield return instruction;
+            DevkitServerModule.Fault();
             yield break;
         }
         Type ce = typeof(ClientEvents);
@@ -449,8 +450,9 @@ public static class ClientEvents
         MethodInfo removeInstancesInvoker = ce.GetMethod(nameof(OnRemoveInstances), BindingFlags.Static | BindingFlags.NonPublic)!;
         MethodInfo resourceSpawnpointDestroyedInvoker = ce.GetMethod(nameof(OnResourceSpawnpointDestroyed), BindingFlags.Static | BindingFlags.NonPublic)!;
         MethodInfo levelObjectRemovedInvoker = ce.GetMethod(nameof(OnLevelObjectRemovedInvoker), BindingFlags.Static | BindingFlags.NonPublic)!;
+        MethodInfo findLevelObjectUtil = typeof(DevkitServerUtility).GetMethod(nameof(DevkitServerUtility.FindLevelObject), BindingFlags.Static | BindingFlags.Public)!;
 
-        MethodInfo? removeInstances = foliageEditor.GetMethod("removeInstances",
+        MethodInfo? removeInstances = FoliageEditor.GetMethod("removeInstances",
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (removeInstances == null)
             Logger.LogWarning("Unable to find method: FoliageEditor.removeInstances.");
@@ -466,8 +468,19 @@ public static class ClientEvents
             BindingFlags.Public | BindingFlags.Static);
         if (removeInstances == null)
             Logger.LogWarning("Unable to find method: LevelObjects.removeObject.");
+
+        MethodInfo? lvlObjTransformGetter = typeof(LevelObject).GetProperty(nameof(LevelObject.transform), BindingFlags.Public | BindingFlags.Instance)?.GetMethod;
+        if (lvlObjTransformGetter == null)
+            Logger.LogWarning("Unable to find property getter: LevelObject.transform.");
+
+        MethodInfo? transformPosGetter = typeof(Transform).GetProperty(nameof(Transform.position), BindingFlags.Public | BindingFlags.Instance)?.GetMethod;
+        if (transformPosGetter == null)
+            Logger.LogWarning("Unable to find property getter: Transform.position.");
         LocalBuilder sampleCount = generator.DeclareLocal(typeof(int));
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        LocalBuilder lvlObject = generator.DeclareLocal(typeof(LevelObject));
+        LocalBuilder lvlObjectPos = generator.DeclareLocal(typeof(Vector3));
+        int ri = 0, rspd = 0, lod = 0;
         for (int i = 0; i < ins.Count; ++i)
         {
             CodeInstruction c = ins[i];
@@ -496,7 +509,8 @@ public static class ClientEvents
                             yield return ins[j];
                     }
                     yield return new CodeInstruction(OpCodes.Call, removeInstancesInvoker);
-                    Logger.LogDebug("Patched RemoveInstances.");
+                    Logger.LogDebug("Patched invoker for " + removeInstances.Format() + ".");
+                    ++ri;
                 }
             }
             else if (rspDestroy != null && c.Calls(rspDestroy) && i > 0 && rspDestroy.GetParameters() is { Length: 0 } && !rspDestroy.IsStatic)
@@ -504,46 +518,77 @@ public static class ClientEvents
                 yield return new CodeInstruction(OpCodes.Dup);
                 yield return c;
                 yield return new CodeInstruction(OpCodes.Call, resourceSpawnpointDestroyedInvoker);
-                Logger.LogDebug("Patched ResourceSpawnpointDestroyed.");
+                Logger.LogDebug("Patched invoker for " + rspDestroy.Format() + ".");
+                ++rspd;
             }
-            else if (lvlObjRemove != null && c.Calls(lvlObjRemove) && i > 0 &&
+            else if (lvlObjRemove != null && c.Calls(lvlObjRemove) && lvlObjTransformGetter != null && transformPosGetter != null && i > 0 &&
                      lvlObjRemove.GetParameters() is { Length: 1 } pl && pl[0].ParameterType == typeof(Transform))
             {
+                Label lbl = generator.DefineLabel();
                 yield return new CodeInstruction(OpCodes.Dup);
+                yield return new CodeInstruction(OpCodes.Call, findLevelObjectUtil);
+                yield return new CodeInstruction(OpCodes.Brfalse, lbl);
+                yield return new CodeInstruction(OpCodes.Dup);
+                yield return DevkitServerUtility.GetLocalCodeInstruction(lvlObject, lvlObject.LocalIndex, true);
+                yield return new CodeInstruction(OpCodes.Call, lvlObjTransformGetter);
+                yield return new CodeInstruction(OpCodes.Call, transformPosGetter);
+                yield return DevkitServerUtility.GetLocalCodeInstruction(lvlObjectPos, lvlObjectPos.LocalIndex, true);
+                c.labels.Add(lbl);
                 yield return c;
+                yield return DevkitServerUtility.GetLocalCodeInstruction(lvlObjectPos, lvlObjectPos.LocalIndex, false);
+                yield return DevkitServerUtility.GetLocalCodeInstruction(lvlObject, lvlObject.LocalIndex, false);
                 yield return new CodeInstruction(OpCodes.Call, levelObjectRemovedInvoker);
-                Logger.LogDebug("Patched LevelObjectRemoved.");
+                Logger.LogDebug("Patched invoker for " + lvlObjRemove.Format() + ".");
+                ++lod;
             }
             else yield return c;
         }
-    }
 
+        if (lod < 1)
+        {
+            Logger.LogError("Failed to patch " + ((lvlObjRemove ?? (object)"LevelObjects.removeObject").Format()) + " into " + method.Format() + ".");
+            DevkitServerModule.Fault();
+        }
+        if (rspd < 1)
+        {
+            Logger.LogError("Failed to patch " + ((rspDestroy ?? (object)"ResourceSpawnpoint.destroy").Format()) + " into " + method.Format() + ".");
+            DevkitServerModule.Fault();
+        }
+        if (ri < 3)
+        {
+            Logger.LogError("Failed to patch " + ((removeInstances ?? (object)"FoliageEditor.removeInstances").Format()) + " into " + method.Format() + " 3 times.");
+            DevkitServerModule.Fault();
+        }
+    }
+    
     [UsedImplicitly]
     [HarmonyPatch(typeof(FoliageInfoAsset), "addFoliageToSurface")]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> AddFoliageToSurfaceTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
+    private static IEnumerable<CodeInstruction> AddFoliageToSurfaceTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
     {
         MethodInfo addFoliageInvoker = typeof(ClientEvents).GetMethod(nameof(OnAddFoliage), BindingFlags.NonPublic | BindingFlags.Static)!;
 
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        bool patched = false;
         for (int i = 0; i < ins.Count; ++i)
         {
             CodeInstruction c = ins[i];
-            if (c.opcode == OpCodes.Callvirt && c.operand is MethodInfo method && method.Name.Equals("addFoliage", StringComparison.Ordinal))
+            if (c.opcode == OpCodes.Callvirt && c.operand is MethodInfo method2 && method2.Name.Equals("addFoliage", StringComparison.Ordinal))
             {
-                CheckCopiedMethodPatchOutOfDate(ref method, addFoliageInvoker);
-                if (method != null)
+                CheckCopiedMethodPatchOutOfDate(ref method2, addFoliageInvoker);
+                if (method2 != null)
                 {
-                    ParameterInfo[] ps = method.GetParameters();
+                    ParameterInfo[] ps = method2.GetParameters();
                     if (i > ps.Length)
                     {
                         yield return c;
-                        for (int j = i - ps.Length; j < i; ++j)
+                        for (int j = i - ps.Length - 1; j < i; ++j)
                         {
                             yield return ins[j].CopyWithoutSpecial();
                         }
                         yield return new CodeInstruction(OpCodes.Call, addFoliageInvoker);
-                        Logger.LogDebug("Patched OnAddFoliage.");
+                        Logger.LogDebug("Patched " + method2.Format() + " call in " + method.Format() + ".");
+                        patched = true;
                         continue;
                     }
                 }
@@ -551,11 +596,19 @@ public static class ClientEvents
 
             yield return c;
         }
+
+        if (!patched)
+        {
+            Logger.LogError("Failed to patch " + method.Format() + ".");
+            DevkitServerModule.Fault();
+        }
     }
 
 
+    internal static readonly InstanceGetter<object, Vector3>? GetFoliageBrushWorldPosition = Accessor.GenerateInstanceGetter<Vector3>(FoliageEditor, "brushWorldPosition");
+
     [UsedImplicitly]
-    private static void OnAddFoliage(Vector3 position, Quaternion rotation, Vector3 scale, bool clearWhenBaked)
+    private static void OnAddFoliage(FoliageInfoAsset asset, Vector3 position, Quaternion rotation, Vector3 scale, bool clearWhenBaked)
     {
         if (!DevkitServerModule.IsEditing) return;
 
@@ -564,13 +617,14 @@ public static class ClientEvents
                         " rot: " + rotation.eulerAngles.ToString("F2", CultureInfo.InvariantCulture) +
                         " scale: " + scale.ToString("F2", CultureInfo.InvariantCulture) +
                         " clear when baked: " + clearWhenBaked + "." );
-        OnFoliageAdded?.Invoke(position, rotation, scale, clearWhenBaked);
+        OnFoliageAdded?.Invoke(asset, position, rotation, scale, clearWhenBaked);
     }
 
     [UsedImplicitly]
     private static void OnRemoveInstances(FoliageTile foliageTile, FoliageInstanceList list, float sqrBrushRadius, float sqrBrushFalloffRadius, bool allowRemoveBaked, int sampleCount)
     {
-        if (!DevkitServerModule.IsEditing || !InputEx.GetKey(KeyCode.Mouse0)) return;
+        if (!DevkitServerModule.IsEditing || !InputEx.GetKey(KeyCode.Mouse0) ||
+            GetFoliageBrushWorldPosition == null || UserInput.ActiveTool is not { } tool) return;
 
         Logger.LogDebug(sampleCount + " foliage removed from " +
                         foliageTile.coord.ToString() +
@@ -578,7 +632,7 @@ public static class ClientEvents
                         " in radius^2: " + sqrBrushRadius.ToString("F2", CultureInfo.InvariantCulture) +
                         " with falloff^2: " + sqrBrushFalloffRadius.ToString("F2", CultureInfo.InvariantCulture) +
                         " remove baked: " + allowRemoveBaked + ".");
-        OnFoliageRemoved?.Invoke(foliageTile, list, sqrBrushRadius, sqrBrushFalloffRadius, allowRemoveBaked, sampleCount);
+        OnFoliageRemoved?.Invoke(GetFoliageBrushWorldPosition(tool), foliageTile, list, sqrBrushRadius, sqrBrushFalloffRadius, allowRemoveBaked, sampleCount);
     }
 
     [UsedImplicitly]
@@ -592,13 +646,19 @@ public static class ClientEvents
     }
 
     [UsedImplicitly]
-    private static void OnLevelObjectRemovedInvoker(Transform obj)
+    private static void OnLevelObjectRemovedInvoker(Vector3 position, LevelObject? obj)
     {
         if (!DevkitServerModule.IsEditing) return;
 
-        Logger.LogDebug("Level object for " + obj.name + " at " +
-                        obj.position.ToString("F2", CultureInfo.InvariantCulture) + " removed.");
-        OnLevelObjectRemoved?.Invoke(obj);
+        if (obj == null)
+        {
+            Logger.LogWarning("Removed unknown level object.");
+            return;
+        }
+
+        Logger.LogDebug("Level object removed: " + obj.asset.objectName.Format() + " #" +
+                        obj.instanceID.Format() + " at " + position.Format() + ".");
+        OnLevelObjectRemoved?.Invoke(position, obj);
     }
 
     #endregion
@@ -620,24 +680,36 @@ public static class ClientEvents
     {
         ParameterInfo[] p = original.GetParameters();
         ParameterInfo[] p2 = invoker.GetParameters();
+        bool instanceMatches = !original.IsStatic && original.DeclaringType != null && p2.Length > 0 &&
+                               (p2[0].ParameterType.IsAssignableFrom(original.DeclaringType) ||
+                                p2[0].ParameterType.IsByRef && p2[0].ParameterType.GetElementType()!
+                                    .IsAssignableFrom(original.DeclaringType));
         if (p.Length != p2.Length)
         {
-            Logger.LogWarning("Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".");
-            original = null!;
-        }
-        else
-        {
-            for (int i = 0; i < p.Length; ++i)
+            if (!instanceMatches || p.Length != p2.Length - 1)
             {
-                if (!p2[i].ParameterType.IsAssignableFrom(p[i].ParameterType))
-                {
-                    if (p[i].ParameterType.IsByRef &&
-                        p2[i].ParameterType.IsAssignableFrom(p[i].ParameterType.GetElementType()))
-                        continue;
-                    Logger.LogWarning("Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".");
-                    original = null!;
-                    return;
-                }
+                Logger.LogWarning("Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".");
+
+                original = null!;
+                return;
+            }
+        }
+
+        int invOffset = instanceMatches ? 1 : 0;
+
+        for (int i = 0; i < p.Length; ++i)
+        {
+            if (!p2[i + invOffset].ParameterType.IsAssignableFrom(p[i].ParameterType))
+            {
+                if (p[i].ParameterType.IsByRef &&
+                    p2[i + invOffset].ParameterType.IsAssignableFrom(p[i].ParameterType.GetElementType()))
+                    continue;
+                if (p2[i + invOffset].ParameterType.IsByRef &&
+                    p2[i + invOffset].ParameterType.GetElementType()!.IsAssignableFrom(p[i].ParameterType))
+                    continue;
+                Logger.LogWarning("Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".");
+                original = null!;
+                return;
             }
         }
     }

@@ -28,7 +28,8 @@ public class DevkitServerGamemode : GameMode
     {
         return new ClientInfo
         {
-            Permissions = UserPermissions.PlayerHandler.GetPermissions(user.SteamId.m_SteamID, true).ToArray()
+            Permissions = UserPermissions.UserHandler.GetPermissions(user.SteamId.m_SteamID, true)?.ToArray() ?? Array.Empty<Permission>(),
+            PermissionGroups = UserPermissions.UserHandler.GetPermissionGroups(user.SteamId.m_SteamID, true)?.ToArray() ?? Array.Empty<PermissionGroup>(),
         };
     }
 #endif
@@ -36,52 +37,16 @@ public class DevkitServerGamemode : GameMode
     {
         if (!DevkitServerModule.IsEditing)
             return base.getPlayerGameObject(playerID);
-        bool owner = playerID.steamID.m_SteamID == Provider.client.m_SteamID;
         GameObject obj = base.getPlayerGameObject(playerID);
-        //MainCamera? c = obj.GetComponentInChildren<MainCamera>();
-        //Transform? cam = obj.transform.FindChildRecursive("Camera");
-        //if (c != null)
-        //{
-        //    Object.Destroy(c);
-        //    Logger.LogDebug("Removed main camera from character object.");
-        //}
-        //if (cam != null)
-        //{
-        //    cam.gameObject.SetActive(false);
-        //    Logger.LogDebug("Disabled camera object on character object.");
-        //    if (owner)
-        //    {
-        //        c = Editor.editor.transform.GetComponentInChildren<MainCamera>();
-        //        GameObject parent = c.gameObject;
-        //        if (c != null)
-        //            Object.Destroy(c);
-        //        parent.AddComponent<MainCamera>();
-        //        Logger.LogDebug("Replaced camera object on editor object.");
-        //    }
-        //}
-        //if (!owner)
-        //{
-        //    if (obj.TryGetComponent(out Rigidbody body))
-        //    {
-        //        body.useGravity = true;
-        //        body.detectCollisions = true;
-        //    }
-        //}
-        
         EditorUser user = obj.AddComponent<EditorUser>();
+        user.PreInit(playerID.steamID, playerID.playerName);
 #if CLIENT
-        if (owner)
+        if (playerID.steamID.m_SteamID == Provider.client.m_SteamID)
         {
             user.Connection = NetFactory.GetPlayerTransportConnection();
             EditorUser.User = user;
         }
 #endif
-        user.Init(playerID.steamID, playerID.playerName);
-        /*
-#if DEBUG
-        Logger.LogInfo("Editor Object Dump (" + playerID.steamID.m_SteamID + "):", ConsoleColor.Cyan);
-        Logger.DumpGameObject(obj);
-#endif*/
         return obj;
     }
 }

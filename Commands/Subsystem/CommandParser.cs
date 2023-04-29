@@ -8,7 +8,7 @@ public class CommandParser
 {
     private static readonly char[] Prefixes = { '/', '@', '\\' };
     private static readonly char[] ContinueArgChars = { '\'', '"', '`', '“', '”', '‘', '’' };
-    private const int MaxArgCount = 16;
+    private const int MaxArgCount = 24;
     private static readonly ArgumentInfo[] ArgBuffer = new ArgumentInfo[MaxArgCount];
     private readonly ICommandHandler _handler;
     public CommandParser(ICommandHandler handler)
@@ -22,13 +22,16 @@ public class CommandParser
     }
     internal virtual unsafe bool TryRunCommand(
 #if SERVER
-        EditorUser? user,
+        EditorUser? user, 
+#endif
+#if CLIENT
+        bool console, 
 #endif
         string message, ref bool shouldList, bool requirePrefix)
     {
         ThreadUtil.assertIsGameThread();
         
-        if (message == null || message.Length < 2) goto notCommand;
+        if (message == null || message.Length < (requirePrefix ? 2 : 1)) goto notCommand;
         int cmdStart = -1;
         int cmdEnd = -1;
         int argCt = -1;
@@ -67,16 +70,14 @@ public class CommandParser
                         }
                     }
                     cmdStart = i;
-                    c:
-                    continue;
+                    c:;
                 }
 
                 if (cmdEnd == -1)
                 {
                     if (i != len - 1)
                     {
-                        if (c != ' ') continue;
-                        else
+                        if (c == ' ')
                         {
                             char next = message[i + 1];
                             if (next != ' ')
@@ -86,16 +87,32 @@ public class CommandParser
                                     if (next == ContinueArgChars[j])
                                         goto c;
                                 }
+
                                 ref ArgumentInfo info = ref ArgBuffer[++argCt];
                                 info.End = -1;
                                 info.Start = i + 1;
                             }
+
                             c:
                             cmdEnd = i - 1;
+                            goto getCommand;
                         }
+                        for (int j = 0; j < ContinueArgChars.Length; ++j)
+                        {
+                            if (c == ContinueArgChars[j])
+                            {
+                                ref ArgumentInfo info = ref ArgBuffer[++argCt];
+                                info.End = -1;
+                                info.Start = i + 1;
+                                cmdEnd = i - 1;
+                                goto getCommand;
+                            }
+                        }
+
+                        continue;
                     }
-                    else
-                        cmdEnd = i;
+
+                    cmdEnd = c == ' ' ? i - 1 : i;
                     goto getCommand;
                 }
 
@@ -185,24 +202,15 @@ public class CommandParser
                 continue;
                 getCommand:
                 shouldList = false;
+                string command = new string(ptr, cmdStart, cmdEnd - cmdStart + 1);
+                Logger.LogDebug("Command: \"" + command + "\"");
                 for (int k = 0; k < _handler.Commands.Count; ++k)
                 {
                     string c2 = _handler.Commands[k].CommandName;
-                    fixed (char* ptr2 = c2)
+                    if (command.Equals(c2, StringComparison.InvariantCultureIgnoreCase))
                     {
-                        if (cmdEnd - cmdStart + 1 != c2.Length)
-                            continue;
-                        for (int i2 = cmdStart; i2 <= cmdEnd; ++i2)
-                        {
-                            char c1 = *(ptr + i2);
-                            char c3 = *(ptr2 + i2 - cmdStart);
-                            if (!(c1 == c3 ||
-                                (c1 < 91 && c1 > 64 && c1 + 32 == c3) ||
-                                (c3 < 91 && c3 > 64 && c3 + 32 == c1))) goto nxt;
-                        }
                         cmdInd = k;
                         break;
-                    nxt:;
                     }
                 }
 
@@ -216,21 +224,10 @@ public class CommandParser
                             for (int a = 0; a < cmd.Aliases.Count; ++a)
                             {
                                 string c2 = cmd.Aliases[a];
-                                fixed (char* ptr2 = c2)
+                                if (command.Equals(c2, StringComparison.InvariantCultureIgnoreCase))
                                 {
-                                    if (cmdEnd - cmdStart + 1 != c2.Length)
-                                        continue;
-                                    for (int i2 = cmdStart; i2 <= cmdEnd; ++i2)
-                                    {
-                                        char c1 = *(ptr + i2);
-                                        char c3 = *(ptr2 + i2 - cmdStart);
-                                        if (!(c1 == c3 ||
-                                              (c1 < 91 && c1 > 64 && c1 + 32 == c3) ||
-                                              (c3 < 91 && c3 > 64 && c3 + 32 == c1))) goto nxt;
-                                    }
                                     cmdInd = k;
                                     goto brk;
-                                nxt:;
                                 }
                             }
                         }
@@ -296,11 +293,28 @@ public class CommandParser
                 if (ai.End < 1) continue;
                 args[++i3] = new string(ptr, ai.Start, ai.End - ai.Start + 1);
             }
+
+            string originalMessage = message;
+            if (!requirePrefix && Prefixes.Length > 0)
+            {
+                char prefix = originalMessage[0];
+                for (int i = 0; i < Prefixes.Length; ++i)
+                {
+                    if (Prefixes[i] == prefix)
+                        goto brk2;
+                }
+
+                originalMessage = Prefixes[0] + originalMessage;
+            }
+            brk2:
             _handler.ExecuteCommand(_handler.Commands[cmdInd],
 #if SERVER
                 user, 
 #endif
-                args, message);
+#if CLIENT
+                console,
+#endif
+                args, originalMessage);
         }
 
         shouldList = false;

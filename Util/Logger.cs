@@ -137,7 +137,7 @@ internal static class Logger
 #endif
     internal static void TryRemoveDateFromLine(ref string message)
     {
-        int ind = message.Length > 21 ? message.IndexOf(']', 0, 21) : -1;
+        int ind = message.Length > 22 ? message.IndexOf(']', 0, 22) : -1;
         if (ind != -1)
             message = message.Substring(ind + (message.Length > ind + 2 && message[ind + 1] == ' ' ? 2 : (message.Length > ind + 1 ? 1 : 0)));
     }
@@ -188,6 +188,34 @@ internal static class Logger
                 break;
         }
     }
+    internal static void CoreLog(string message, string core, string? type = null, ConsoleColor? color = null, Severity severity = Severity.Info)
+    {
+        color ??= severity switch
+        {
+            Severity.Debug => ConsoleColor.DarkGray,
+            Severity.Info => ConsoleColor.DarkCyan,
+            Severity.Warning => ConsoleColor.Yellow,
+            Severity.Error or Severity.Fatal => ConsoleColor.Red,
+            _ => ConsoleColor.Gray
+        };
+        if (string.IsNullOrEmpty(type))
+        {
+            type = severity switch
+            {
+                Severity.Debug => "DEBUG",
+                Severity.Warning => "WARN",
+                Severity.Error => "ERROR",
+                Severity.Fatal => "FATAL",
+                _ => "INFO"
+            };
+        }
+        ChangeResets(ref message, color.Value);
+        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] " +
+                       "[" + core.ToUpperInvariant() + "]"
+                       + new string(' ', Math.Max(1, 14 - core.Length)) 
+                       + "[" + type!.ToUpperInvariant() + "]" + new string(' ', Math.Max(1, 6 - type.Length)) + message,
+            color.Value, true, severity);
+    }
     public static void ChangeResets(ref string message, ConsoleColor color)
     {
         if (message.IndexOf('\u001b') != -1)
@@ -224,7 +252,7 @@ internal static class Logger
         {
             try
             {
-                Terminal.Write(JsonSerializer.Serialize(obj, obj!.GetType(), condensed ? DevkitServerConfig.CondensedSerializerSettings : DevkitServerConfig.SerializerSettings),
+                Terminal.Write(JsonSerializer.Serialize(obj, obj.GetType(), condensed ? DevkitServerConfig.CondensedSerializerSettings : DevkitServerConfig.SerializerSettings),
                     color, true, Severity.Debug);
             }
             catch (Exception ex)
@@ -398,7 +426,7 @@ internal static class Logger
     }/// <summary>
     /// Convert to <see cref="Color"/> to ARGB data.
     /// </summary>
-    public static int ToArgb(Color color)
+    private static int ToArgb(Color color)
     {
         return 0xFF << 24 |
                (byte)Math.Min(255, Mathf.RoundToInt(color.r * 255)) << 16 |
@@ -416,7 +444,7 @@ internal static class Logger
             bits |= 1;
         return (ConsoleColor)bits;
     }
-    public static unsafe string RemoveANSIFormatting(string orig)
+    internal static unsafe string RemoveANSIFormatting(string orig)
     {
         if (orig.Length < 5)
             return orig;

@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.Remoting.Messaging;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -249,7 +251,7 @@ public static class DevkitServerUtility
              <= ushort.MaxValue => OpCodes.Ldarg_S,
              _ => OpCodes.Ldarg
         };
-        if (index > 4)
+        if (index > 3)
             generator.Emit(code, index);
         else
             generator.Emit(code);
@@ -523,6 +525,238 @@ public static class DevkitServerUtility
         steamId = CSteamID.Nil;
         return false;
     }
+    public static unsafe bool TryParseHexColor32(string hex, out Color32 color)
+    {
+        if (string.IsNullOrWhiteSpace(hex))
+        {
+            color = default;
+            return false;
+        }
+
+        bool res = true;
+        fixed (char* ptr2 = hex)
+        {
+            int offset = *ptr2 == '#' ? 1 : 0;
+            char* ptr = ptr2 + offset;
+            switch (hex.Length - offset)
+            {
+                case 1: // w
+                    byte r = CharToHex(ptr, false);
+                    color = new Color32(r, r, r, byte.MaxValue);
+                    return res;
+                case 2: // wa
+                    r = CharToHex(ptr, false);
+                    byte a = CharToHex(ptr + 1, false);
+                    color = new Color32(r, r, r, a);
+                    return res;
+                case 3: // rgb
+                    r = CharToHex(ptr, false);
+                    byte g = CharToHex(ptr + 1, false);
+                    byte b = CharToHex(ptr + 2, false);
+                    color = new Color32(r, g, b, byte.MaxValue);
+                    return res;
+                case 4: // rgba
+                    r = CharToHex(ptr, false);
+                    g = CharToHex(ptr + 1, false);
+                    b = CharToHex(ptr + 2, false);
+                    a = CharToHex(ptr + 3, false);
+                    color = new Color32(r, g, b, a);
+                    return res;
+                case 6: // rrggbb
+                    r = CharToHex(ptr, true);
+                    g = CharToHex(ptr + 2, true);
+                    b = CharToHex(ptr + 4, true);
+                    color = new Color32(r, g, b, byte.MaxValue);
+                    return res;
+                case 8: // rrggbbaa
+                    r = CharToHex(ptr, true);
+                    g = CharToHex(ptr + 2, true);
+                    b = CharToHex(ptr + 4, true);
+                    a = CharToHex(ptr + 6, true);
+                    color = new Color32(r, g, b, a);
+                    return res;
+            }
+        }
+
+        color = default;
+        return false;
+
+        byte CharToHex(char* c, bool dual)
+        {
+            if (dual)
+            {
+                int c2 = *c;
+                byte b1;
+                if (c2 is > 96 and < 103)
+                    b1 = (byte)((c2 - 87) * 0x10);
+                else if (c2 is > 64 and < 71)
+                    b1 = (byte)((c2 - 55) * 0x10);
+                else if (c2 is > 47 and < 58)
+                    b1 = (byte)((c2 - 48) * 0x10);
+                else
+                {
+                    res = false;
+                    return 0;
+                }
+
+                c2 = *(c + 1);
+                if (c2 is > 96 and < 103)
+                    return (byte)(b1 + (c2 - 87));
+                if (c2 is > 64 and < 71)
+                    return (byte)(b1 + (c2 - 55));
+                if (c2 is > 47 and < 58)
+                    return (byte)(b1 + (c2 - 48));
+                res = false;
+            }
+            else
+            {
+                int c2 = *c;
+                if (c2 is > 96 and < 103)
+                    return (byte)((c2 - 87) * 0x10);
+                if (c2 is > 64 and < 71)
+                    return (byte)((c2 - 55) * 0x10);
+                if (c2 is > 47 and < 58)
+                    return (byte)((c2 - 48) * 0x10);
+                res = false;
+            }
+
+            return 0;
+        }
+    }
+    private static readonly char[] SplitChars = { ',' };
+    private static KeyValuePair<string, Color>[]? _presets;
+    private static void CheckPresets()
+    {
+        if (_presets != null)
+            return;
+        PropertyInfo[] props = typeof(Color).GetProperties(BindingFlags.Static | BindingFlags.Public)
+            .Where(x => x.PropertyType == typeof(Color)).Where(x => x.GetMethod != null).ToArray();
+        _presets = new KeyValuePair<string, Color>[props.Length];
+        for (int i = 0; i < props.Length; ++i)
+            _presets[i] = new KeyValuePair<string, Color>(props[i].Name.ToLowerInvariant(), (Color)props[i].GetMethod.Invoke(null, Array.Empty<object>()));
+    }
+    public static bool TryParseColor(string str, out Color color)
+    {
+        Color32 color32;
+        if (str.Length > 0 && str[0] == '#')
+        {
+            if (TryParseHexColor32(str, out color32))
+            {
+                color = color32;
+                return true;
+            }
+
+            color = default;
+            return false;
+        }
+        string[] strs = str.Split(SplitChars, StringSplitOptions.RemoveEmptyEntries);
+        if (strs.Length is 3 or 4)
+        {
+            bool hsv = strs[0].StartsWith("hsv");
+            float a = 1f;
+            int ind = strs[0].IndexOf('(');
+            if (ind != -1 && strs[0].Length > ind + 1) strs[0] = strs[0].Substring(ind + 1);
+            if (!float.TryParse(strs[0], NumberStyles.Number, CultureInfo.InvariantCulture, out float r))
+                goto fail;
+            if (!float.TryParse(strs[1], NumberStyles.Number, CultureInfo.InvariantCulture, out float g))
+                goto fail;
+            if (!float.TryParse(strs[2].Replace(')', ' '), NumberStyles.Number, CultureInfo.InvariantCulture, out float b))
+                goto fail;
+            if (strs.Length > 3 && !float.TryParse(strs[3].Replace(')', ' '), NumberStyles.Number, CultureInfo.InvariantCulture, out a))
+                goto fail;
+
+            if (hsv)
+            {
+                color = Color.HSVToRGB(r, g, b, false) with { a = a };
+                return true;
+            }
+            
+            r = Mathf.Clamp01(r);
+            g = Mathf.Clamp01(g);
+            b = Mathf.Clamp01(b);
+            color = new Color(r, g, b, a);
+            return true;
+            fail:
+            color = default;
+            return false;
+        }
+        
+        if (TryParseHexColor32(str, out color32))
+        {
+            color = color32;
+            return true;
+        }
+
+        CheckPresets();
+        for (int i = 0; i < _presets!.Length; ++i)
+        {
+            if (string.Compare(_presets[i].Key, str, CultureInfo.InvariantCulture,
+                CompareOptions.IgnoreCase | CompareOptions.IgnoreKanaType | CompareOptions.IgnoreWidth | CompareOptions.IgnoreNonSpace) == 0)
+            {
+                color = _presets[i].Value;
+                return true;
+            }
+        }
+
+        color = default;
+        return false;
+    }
+    public static bool TryParseColor32(string str, out Color32 color)
+    {
+        if (str.Length > 0 && str[0] == '#')
+        {
+            if (TryParseHexColor32(str, out color))
+                return true;
+
+            color = default;
+            return false;
+        }
+        string[] strs = str.Split(SplitChars, StringSplitOptions.RemoveEmptyEntries);
+        if (strs.Length is 3 or 4)
+        {
+            bool hsv = strs[0].StartsWith("hsv");
+            byte a = 1;
+            int ind = strs[0].IndexOf('(');
+            if (ind != -1 && strs[0].Length > ind + 1) strs[0] = strs[0].Substring(ind + 1);
+            if (!byte.TryParse(strs[0], NumberStyles.Number, CultureInfo.InvariantCulture, out byte r))
+                goto fail;
+            if (!byte.TryParse(strs[1], NumberStyles.Number, CultureInfo.InvariantCulture, out byte g))
+                goto fail;
+            if (!byte.TryParse(strs[2].Replace(')', ' '), NumberStyles.Number, CultureInfo.InvariantCulture, out byte b))
+                goto fail;
+            if (strs.Length > 3 && !byte.TryParse(strs[3].Replace(')', ' '), NumberStyles.Number, CultureInfo.InvariantCulture, out a))
+                goto fail;
+
+            if (hsv)
+            {
+                color = Color.HSVToRGB(r, g, b, false) with { a = a };
+                return true;
+            }
+
+            color = new Color32(r, g, b, a);
+            return true;
+            fail:
+            color = default;
+            return false;
+        }
+        
+        if (TryParseHexColor32(str, out color))
+            return true;
+
+        CheckPresets();
+        for (int i = 0; i < _presets!.Length; ++i)
+        {
+            if (string.Compare(_presets[i].Key, str, CultureInfo.InvariantCulture,
+                    CompareOptions.IgnoreCase | CompareOptions.IgnoreKanaType | CompareOptions.IgnoreWidth | CompareOptions.IgnoreNonSpace) == 0)
+            {
+                color = _presets[i].Value;
+                return true;
+            }
+        }
+
+        color = default;
+        return false;
+    }
     public static bool QueueOnMainThread(Action action, bool skipFrame = false, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
@@ -682,6 +916,34 @@ public static class DevkitServerUtility
         return RemoveTMProRichTextRegex.Replace(text, string.Empty);
     }
     public static Color GetColor(this IDevkitServerPlugin? plugin) => plugin == null ? DevkitServerModule.PluginColor : (plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor);
+    public static LevelObject? FindLevelObject(Transform t)
+    {
+        if (t == null || !Regions.tryGetCoordinate(t.position, out byte x, out byte y))
+            return null;
+        for (int i = 0; i < LevelObjects.objects[x, y].Count; ++i)
+        {
+            if (LevelObjects.objects[x, y][i].transform == t)
+            {
+                return LevelObjects.objects[x, y][i];
+            }
+        }
+
+        int ws = Regions.WORLD_SIZE;
+        for (int x2 = 0; x2 < ws; ++x2)
+        {
+            for (int y2 = 0; y2 < ws; ++y2)
+            {
+                if (x2 == x && y2 == y) continue;
+                for (int i = 0; i < LevelObjects.objects[x, y].Count; ++i)
+                {
+                    if (LevelObjects.objects[x, y][i].transform == t)
+                        return LevelObjects.objects[x, y][i];
+                }
+            }
+        }
+
+        return null;
+    }
 }
 
 public static class AssetTypeHelper<TAsset>

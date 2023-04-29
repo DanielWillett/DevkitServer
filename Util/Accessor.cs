@@ -9,6 +9,8 @@ internal static class Accessor
 {
     internal static Type[]? FuncTypes;
     internal static Type[]? ActionTypes;
+    private static bool _castExCtorCalc;
+    private static ConstructorInfo? _castExCtor;
     public static InstanceSetter<TInstance, TValue>? GenerateInstanceSetter<TInstance, TValue>(string fieldName, BindingFlags flags = BindingFlags.NonPublic, bool throwOnError = false)
     {
         try
@@ -30,7 +32,7 @@ internal static class Accessor
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error generating instance setter for " + typeof(TInstance).Name + "." + fieldName + ".");
+            Logger.LogError("Error generating instance setter for " + typeof(TInstance).Format() + "." + fieldName.Colorize(Color.red) + ".");
             Logger.LogError(ex);
             if (throwOnError)
                 throw;
@@ -56,7 +58,7 @@ internal static class Accessor
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error generating instance getter for " + typeof(TInstance).Name + "." + fieldName + ".");
+            Logger.LogError("Error generating instance getter for " + typeof(TInstance).Format() + "." + fieldName.Colorize(Color.red) + ".");
             Logger.LogError(ex);
             if (throwOnError)
                 throw;
@@ -64,16 +66,113 @@ internal static class Accessor
         }
     }
     public static StaticSetter<TValue>? GenerateStaticSetter<TInstance, TValue>(string fieldName, BindingFlags flags = BindingFlags.NonPublic, bool throwOnError = false)
+        => GenerateStaticSetter<TValue>(typeof(TInstance), fieldName, flags, throwOnError);
+    public static StaticGetter<TValue>? GenerateStaticGetter<TInstance, TValue>(string fieldName, BindingFlags flags = BindingFlags.NonPublic, bool throwOnError = false)
+        => GenerateStaticGetter<TValue>(typeof(TInstance), fieldName, flags, throwOnError);
+    public static InstanceSetter<object, TValue>? GenerateInstanceSetter<TValue>(Type instance, string fieldName, BindingFlags flags = BindingFlags.NonPublic, bool throwOnError = false)
+    {
+        try
+        {
+            flags |= BindingFlags.Instance;
+            flags &= ~BindingFlags.Static;
+            FieldInfo? field = instance.GetField(fieldName, flags);
+            if (field is null || field.IsStatic || !field.FieldType.IsAssignableFrom(typeof(TValue)))
+                throw new FieldAccessException("Field not found or invalid.");
+            const MethodAttributes attr = MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig;
+            DynamicMethod method = new DynamicMethod("set_" + fieldName, attr, CallingConventions.HasThis, typeof(void), new Type[] { typeof(object), field.FieldType }, instance, true);
+            method.DefineParameter(1, ParameterAttributes.None, "value");
+            ILGenerator il = method.GetILGenerator();
+            Label lbl = il.DefineLabel();
+            il.Emit(OpCodes.Ldarg_0);
+            if (_castExCtorCalc)
+            {
+                _castExCtorCalc = true;
+                _castExCtor = typeof(InvalidCastException).GetConstructor(BindingFlags.Public | BindingFlags.Instance, null, new Type[] { typeof(string) }, null)!;
+            }
+            if (_castExCtor != null)
+            {
+                il.Emit(OpCodes.Isinst, instance);
+                il.Emit(OpCodes.Dup);
+                il.Emit(OpCodes.Brtrue, field);
+                il.Emit(OpCodes.Pop);
+                il.Emit(OpCodes.Ldstr, "Invalid instance type passed to setter for " + fieldName + ". Expected " + instance.FullName + ".");
+                il.Emit(OpCodes.Newobj, _castExCtor);
+                il.Emit(OpCodes.Throw);
+            }
+            il.MarkLabel(lbl);
+            if (instance.IsValueType)
+                il.Emit(OpCodes.Unbox, instance);
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Stfld, field);
+            il.Emit(OpCodes.Ret);
+            return (InstanceSetter<object, TValue>)method.CreateDelegate(typeof(InstanceSetter<object, TValue>));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error generating instance setter for " + instance.Format() + "." + fieldName.Colorize(Color.red) + ".");
+            Logger.LogError(ex);
+            if (throwOnError)
+                throw;
+            return null;
+        }
+    }
+    public static InstanceGetter<object, TValue>? GenerateInstanceGetter<TValue>(Type instance, string fieldName, BindingFlags flags = BindingFlags.NonPublic, bool throwOnError = false)
+    {
+        try
+        {
+            flags |= BindingFlags.Instance;
+            flags &= ~BindingFlags.Static;
+            FieldInfo? field = instance.GetField(fieldName, flags);
+            if (field is null || field.IsStatic || !field.FieldType.IsAssignableFrom(typeof(TValue)))
+                throw new FieldAccessException("Field not found or invalid.");
+            const MethodAttributes attr = MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig;
+            DynamicMethod method = new DynamicMethod("get_" + fieldName, attr, CallingConventions.HasThis, typeof(TValue), new Type[] { typeof(object) }, instance, true);
+            ILGenerator il = method.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0);
+            Label lbl = il.DefineLabel();
+            if (_castExCtorCalc)
+            {
+                _castExCtorCalc = true;
+                _castExCtor = typeof(InvalidCastException).GetConstructor(BindingFlags.Public | BindingFlags.Instance, null, new Type[] { typeof(string) }, null)!;
+            }
+            
+            if (_castExCtor != null)
+            {
+                il.Emit(OpCodes.Isinst, instance);
+                il.Emit(OpCodes.Dup);
+                il.Emit(OpCodes.Brtrue, lbl);
+                il.Emit(OpCodes.Pop);
+                il.Emit(OpCodes.Ldstr, "Invalid instance type passed to getter for " + fieldName + ". Expected " + instance.FullName + ".");
+                il.Emit(OpCodes.Newobj, _castExCtor);
+                il.Emit(OpCodes.Throw);
+            }
+            il.MarkLabel(lbl);
+            if (instance.IsValueType)
+                il.Emit(OpCodes.Unbox, instance);
+            il.Emit(OpCodes.Ldfld, field);
+            il.Emit(OpCodes.Ret);
+            return (InstanceGetter<object, TValue>)method.CreateDelegate(typeof(InstanceGetter<object, TValue>));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error generating instance getter for " + instance.Format() + "." + fieldName.Colorize(Color.red) + ".");
+            Logger.LogError(ex);
+            if (throwOnError)
+                throw;
+            return null;
+        }
+    }
+    public static StaticSetter<TValue>? GenerateStaticSetter<TValue>(Type instance, string fieldName, BindingFlags flags = BindingFlags.NonPublic, bool throwOnError = false)
     {
         try
         {
             flags |= BindingFlags.Static;
             flags &= ~BindingFlags.Instance;
-            FieldInfo? field = typeof(TInstance).GetField(fieldName, flags);
+            FieldInfo? field = instance.GetField(fieldName, flags);
             if (field is null || !field.IsStatic || !field.FieldType.IsAssignableFrom(typeof(TValue)))
                 throw new FieldAccessException("Field not found or invalid.");
             const MethodAttributes attr = MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig;
-            DynamicMethod method = new DynamicMethod("set_" + fieldName, attr, CallingConventions.Standard, typeof(void), new Type[] { field.FieldType }, typeof(TInstance), true);
+            DynamicMethod method = new DynamicMethod("set_" + fieldName, attr, CallingConventions.Standard, typeof(void), new Type[] { field.FieldType }, instance, true);
             method.DefineParameter(1, ParameterAttributes.None, "value");
             ILGenerator il = method.GetILGenerator();
             il.Emit(OpCodes.Ldarg_0);
@@ -83,24 +182,24 @@ internal static class Accessor
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error generating static setter for " + typeof(TInstance).Name + "." + fieldName + ".");
+            Logger.LogError("Error generating static setter for " + instance.Format() + "." + fieldName.Colorize(Color.red) + ".");
             Logger.LogError(ex);
             if (throwOnError)
                 throw;
             return null;
         }
     }
-    public static StaticGetter<TValue>? GenerateStaticGetter<TInstance, TValue>(string fieldName, BindingFlags flags = BindingFlags.NonPublic, bool throwOnError = false)
+    public static StaticGetter<TValue>? GenerateStaticGetter<TValue>(Type instance, string fieldName, BindingFlags flags = BindingFlags.NonPublic, bool throwOnError = false)
     {
         try
         {
             flags |= BindingFlags.Static;
             flags &= ~BindingFlags.Instance;
-            FieldInfo? field = typeof(TInstance).GetField(fieldName, flags);
+            FieldInfo? field = instance.GetField(fieldName, flags);
             if (field is null || !field.IsStatic || !field.FieldType.IsAssignableFrom(typeof(TValue)))
                 throw new FieldAccessException("Field not found or invalid.");
             const MethodAttributes attr = MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig;
-            DynamicMethod method = new DynamicMethod("get_" + fieldName, attr, CallingConventions.Standard, typeof(TValue), Array.Empty<Type>(), typeof(TInstance), true);
+            DynamicMethod method = new DynamicMethod("get_" + fieldName, attr, CallingConventions.Standard, typeof(TValue), Array.Empty<Type>(), instance, true);
             ILGenerator il = method.GetILGenerator();
             il.Emit(OpCodes.Ldsfld, field);
             il.Emit(OpCodes.Ret);
@@ -108,7 +207,7 @@ internal static class Accessor
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error generating static getter for " + typeof(TInstance).Name + "." + fieldName + ".");
+            Logger.LogError("Error generating static getter for " + instance.Format() + "." + fieldName.Colorize(Color.red) + ".");
             Logger.LogError(ex);
             if (throwOnError)
                 throw;

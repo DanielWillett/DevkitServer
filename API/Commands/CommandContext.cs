@@ -52,6 +52,19 @@ public class CommandContext : Exception
     public int ArgumentOffset { get; set; }
 
     /// <summary>
+    /// Steam 64 id of the caller.
+    /// </summary>
+    /// <remarks><see cref="CSteamID.Nil"/> when called by console.</remarks>
+    public CSteamID CallerId { get; set; }
+
+#if CLIENT
+    /// <summary>
+    /// Clientside flag that will be <see langword="true"/> when the command was invoked using the console.
+    /// </summary>
+    public bool InvokedFromConsole { get; set; }
+#endif
+
+    /// <summary>
     /// Number of arguments provided, taking <see cref="ArgumentOffset"/> into account.
     /// </summary>
     public int ArgumentCount => Arguments.Length - ArgumentOffset;
@@ -59,6 +72,9 @@ public class CommandContext : Exception
     public CommandContext(IExecutableCommand command, string[] arguments, string originalMessage
 #if SERVER
         , EditorUser? caller
+#endif
+#if CLIENT
+        , bool console
 #endif
         )
     {
@@ -68,9 +84,12 @@ public class CommandContext : Exception
 #if SERVER
         Caller = caller!;
         IsConsole = Caller == null;
+        CallerId = caller == null ? CSteamID.Nil : caller.SteamId;
 #else
         IsConsole = false;
         Caller = EditorUser.User!;
+        CallerId = Provider.client;
+        InvokedFromConsole = console;
 #endif
     }
 
@@ -86,6 +105,19 @@ public class CommandContext : Exception
             return Plugin?.Translations ?? DevkitServerModule.CommandLocalization;
         }
     }
+
+#if CLIENT
+    /// <summary>
+    /// Translate a formatting key using the default translation file (<see cref="Translations"/>).
+    /// </summary>
+    /// <remarks>If <see cref="IsConsole"/> is true, rich text is removed from the result.</remarks>
+    /// <exception cref="CommandContext"/>
+    public void BreakAndRunOnServer()
+    {
+        CommandHandler.Handler.TransitionCommandExecutionToServer(this);
+        throw this;
+    }
+#endif
 
     /// <summary>
     /// Translate a formatting key using the default translation file (<see cref="Translations"/>).
@@ -279,13 +311,14 @@ public class CommandContext : Exception
     public Exception ReplyString(string rawText)
     {
         if (IsConsole)
-            Command.LogInfo(rawText);
+            Command.LogInfo(DevkitServerUtility.RemoveRichText(rawText));
         else
         {
-            if (DevkitServerModule.IsMainThread)
-                ChatManager.say(Caller.SteamId, rawText, Palette.AMBIENT, EChatMode.SAY, true);
-            else
-                DevkitServerUtility.QueueOnMainThread(() => ChatManager.say(Caller.SteamId, rawText, Palette.AMBIENT, EChatMode.SAY, true));
+#if SERVER
+            CommandHandler.SendMessage(rawText, Caller, Command, Severity.Info);
+#else
+            CommandHandler.SendMessage(rawText, InvokedFromConsole, Command, Severity.Info);
+#endif
         }
 
         return this;
@@ -474,6 +507,38 @@ public class CommandContext : Exception
             return false;
         }
         return Enum.TryParse(GetParamForParse(parameter), true, out value);
+    }
+
+    /// <summary>
+    /// Gets a <paramref name="parameter"/> at a given index, parses it as an <see cref="Color"/>, or returns <see langword="false"/> if out of range or unable to parse.
+    /// </summary>
+    /// <remarks>Zero based indexing.</remarks>
+    public bool TryGet(int parameter, out Color value)
+    {
+        parameter += ArgumentOffset;
+        if (parameter < 0 || parameter >= Arguments.Length)
+        {
+            value = Color.white;
+            return false;
+        }
+
+        return DevkitServerUtility.TryParseColor(GetParamForParse(parameter), out value);
+    }
+
+    /// <summary>
+    /// Gets a <paramref name="parameter"/> at a given index, parses it as an <see cref="Color32"/>, or returns <see langword="false"/> if out of range or unable to parse.
+    /// </summary>
+    /// <remarks>Zero based indexing.</remarks>
+    public bool TryGet(int parameter, out Color32 value)
+    {
+        parameter += ArgumentOffset;
+        if (parameter < 0 || parameter >= Arguments.Length)
+        {
+            value = Color.white;
+            return false;
+        }
+
+        return DevkitServerUtility.TryParseColor32(GetParamForParse(parameter), out value);
     }
 
     /// <summary>
@@ -1244,12 +1309,12 @@ public class CommandContext : Exception
     /// Check if <see cref="Caller"/> has <paramref name="permission"/>. Always returns <see langword="true"/> when ran with console.
     /// </summary>
     public bool HasPermission(Permission permission)
-    {
+    { 
         if (IsConsole) return true;
 #if SERVER
-        return UserPermissions.PlayerHandler.HasPermission(Caller.SteamId.m_SteamID, permission);
+        return UserPermissions.UserHandler.HasPermission(Caller.SteamId.m_SteamID, permission);
 #else
-        return UserPermissions.PlayerHandler.HasPermission(permission);
+        return UserPermissions.UserHandler.HasPermission(permission);
 #endif
     }
 
@@ -1261,6 +1326,74 @@ public class CommandContext : Exception
     {
         if (!HasPermission(permission))
             throw SendNoPermission();
+    }
+
+    /// <summary>
+    /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have at least one of the provided permissions.
+    /// </summary>
+    /// <exception cref="CommandContext"/>
+    public void AssertPermissionsOr(Permission permission1, Permission permission2)
+    {
+        if (!HasPermission(permission1) && !HasPermission(permission2))
+            throw SendNoPermission();
+    }
+
+    /// <summary>
+    /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have at least one of the provided permissions.
+    /// </summary>
+    /// <exception cref="CommandContext"/>
+    public void AssertPermissionsOr(Permission permission1, Permission permission2, Permission permission3)
+    {
+        if (!HasPermission(permission1) && !HasPermission(permission2) && !HasPermission(permission3))
+            throw SendNoPermission();
+    }
+
+    /// <summary>
+    /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have at least one of the provided <paramref name="permissions"/>.
+    /// </summary>
+    /// <exception cref="CommandContext"/>
+    public void AssertPermissionsOr(params Permission[] permissions)
+    {
+        for (int i = 0; i < permissions.Length; i++)
+        {
+            if (HasPermission(permissions[i]))
+                return;
+        }
+
+        throw SendNoPermission();
+    }
+
+    /// <summary>
+    /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have all of the provided permissions.
+    /// </summary>
+    /// <exception cref="CommandContext"/>
+    public void AssertPermissionsAnd(Permission permission1, Permission permission2)
+    {
+        if (!HasPermission(permission1) || !HasPermission(permission2))
+            throw SendNoPermission();
+    }
+
+    /// <summary>
+    /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have all of the provided permissions.
+    /// </summary>
+    /// <exception cref="CommandContext"/>
+    public void AssertPermissionsAnd(Permission permission1, Permission permission2, Permission permission3)
+    {
+        if (!HasPermission(permission1) || !HasPermission(permission2) || !HasPermission(permission3))
+            throw SendNoPermission();
+    }
+
+    /// <summary>
+    /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have all of the provided <paramref name="permissions"/>.
+    /// </summary>
+    /// <exception cref="CommandContext"/>
+    public void AssertPermissionsAnd(params Permission[] permissions)
+    {
+        for (int i = 0; i < permissions.Length; i++)
+        {
+            if (!HasPermission(permissions[i]))
+                throw SendNoPermission();
+        }
     }
 
     /// <summary>
@@ -1309,7 +1442,7 @@ public class CommandContext : Exception
     /// <exception cref="CommandContext"/>
     public void AssertHelpCheckString(int parameter, string helpMessage)
     {
-        if (MatchParameter(parameter, "help"))
+        if (MatchParameter(parameter, DevkitServerModule.HelpCache))
             throw ReplyString(helpMessage);
     }
 
@@ -1319,7 +1452,7 @@ public class CommandContext : Exception
     /// <exception cref="CommandContext"/>
     public void AssertHelpCheckFormat(int parameter, string format)
     {
-        if (MatchParameter(parameter, "help"))
+        if (MatchParameter(parameter, DevkitServerModule.HelpCache))
             throw Reply(format);
     }
 
@@ -1330,7 +1463,7 @@ public class CommandContext : Exception
     /// <exception cref="CommandContext"/>
     public void AssertHelpCheckFormat(int parameter, string format, params object?[] args)
     {
-        if (MatchParameter(parameter, "help"))
+        if (MatchParameter(parameter, DevkitServerModule.HelpCache))
             throw Reply(format, args);
     }
 
@@ -1340,7 +1473,7 @@ public class CommandContext : Exception
     /// <exception cref="CommandContext"/>
     public void AssertHelpCheck(int parameter, string usage)
     {
-        if (MatchParameter(parameter, "help"))
+        if (MatchParameter(parameter, DevkitServerModule.HelpCache))
             throw SendCorrectUsage(usage);
     }
 

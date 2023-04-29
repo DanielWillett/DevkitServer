@@ -1,28 +1,35 @@
-﻿using System.Collections.Concurrent;
-using System.Globalization;
-using System.Reflection;
-using System.Reflection.Emit;
-using DevkitServer.Multiplayer;
-using DevkitServer.Patches;
-using DevkitServer.Players;
-using SDG.Framework.Modules;
-using System.Runtime.CompilerServices;
-using System.Text;
+﻿#if SERVER
+// #define USERINPUT_DEBUG
+#endif
 using DevkitServer.API;
-using DevkitServer.API.Permissions;
 using DevkitServer.Configuration;
+using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Patches;
 using DevkitServer.Plugins;
 using JetBrains.Annotations;
+using SDG.Framework.Modules;
+using System.Collections.Concurrent;
+using System.Globalization;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using Module = SDG.Framework.Modules.Module;
+#if CLIENT
+using DevkitServer.Players;
+#endif
 
 namespace DevkitServer;
 
 public sealed class DevkitServerModule : IModuleNexus
 {
+    private static readonly StaticGetter<Assets>? GetAssetsInstance = Accessor.GenerateStaticGetter<Assets, Assets>("instance");
+    public const string ModuleName = "DevkitServer";
     public static readonly string ServerRule = "DevkitServer";
     private static CancellationTokenSource? _tknSrc;
+    private static string? _helpCache;
     internal static readonly Color PluginColor = new Color32(0, 255, 153, 255);
     internal static readonly Color UnturnedColor = new Color32(99, 123, 99, 255);
+    internal static string HelpCache => _helpCache ??= CommandLocalization.format("Help");
     public static GameObject GameObjectHost { get; private set; } = null!;
     public static DevkitServerModuleComponent ComponentHost { get; private set; } = null!;
     public static DevkitServerModule Instance { get; private set; } = null!;
@@ -36,6 +43,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static Local MainLocalization { get; private set; } = null!;
     public static Local CommandLocalization { get; private set; } = null!;
     public static CultureInfo CommandParseLocale { get; set; } = CultureInfo.InvariantCulture;
+    
     public static void EarlyInitialize()
     {
         LoadFaulted = false;
@@ -110,7 +118,9 @@ public sealed class DevkitServerModule : IModuleNexus
             Provider.onServerDisconnected += UserManager.RemovePlayer;
             Level.onLevelLoaded += OnLevelLoaded;
             Assets.onAssetsRefreshed += OnAssetsRefreshed;
-            // UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
+#if USERINPUT_DEBUG
+            Players.UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
+#endif
 #else
             Provider.onClientConnected += EditorUser.OnClientConnected;
             Provider.onEnemyConnected += EditorUser.OnEnemyConnected;
@@ -127,6 +137,22 @@ public sealed class DevkitServerModule : IModuleNexus
             Logger.LogError(ex);
             Fault();
         }
+
+        if (LoadFaulted)
+        {
+            try
+            {
+                Module module = ModuleHook.getModuleByName(ModuleName);
+                if (module != null)
+                    module.isEnabled = false;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error unloading...");
+                Logger.LogError(ex);
+            }
+
+        }
     }
 
 #if SERVER
@@ -135,20 +161,22 @@ public sealed class DevkitServerModule : IModuleNexus
         TryLoadBundle();
     }
 #else
-    private void OnChatMessageReceived()
+    private static void OnChatMessageReceived()
     {
         if (ChatManager.receivedChatHistory.Count > 0)
         {
             ReceivedChatMessage msg = ChatManager.receivedChatHistory[0];
-            Logger.LogInfo("[" + msg.mode + " CHAT] [" + (msg.speaker.playerID?.characterName ?? "SERVER") + "] " + msg.contents + ".");
+            Logger.CoreLog("[" + (msg.speaker?.playerID?.characterName ?? "SERVER") + " | " + msg.mode.ToString().ToUpperInvariant() + "] "
+                           + DevkitServerUtility.RemoveRichText(msg.contents),
+                "UNTURNED", "CHAT", color: ConsoleColor.White, Severity.Info);
         }
     }
 #endif
 
     private void OnPostLevelLoaded(int level)
     {
-        if (level == Level.BUILD_INDEX_GAME)
-            GameObjectHost.AddComponent<TileSync>();
+        //if (level == Level.BUILD_INDEX_GAME)
+        //    GameObjectHost.AddComponent<TileSync>();
     }
     internal void UnloadBundle()
     {
@@ -203,14 +231,22 @@ public sealed class DevkitServerModule : IModuleNexus
         Bundle = new MasterBundle(bundle, string.Empty, "DevkitServer Base");
         Logger.LogInfo("Loaded bundle: " + bundle.assetBundleNameWithoutExtension.Format() + " from " + path.Format() + ".");
         HasLoadedBundle = true;
-#if FALSE
+#if false
         Logger.LogDebug("Assets:");
         foreach (string asset in Bundle.cfg.assetBundle.GetAllAssetNames())
             Logger.LogDebug("Asset: " + asset.Format() + ".");
 #endif
-
     }
-    internal static void Fault() => LoadFaulted = true;
+    internal static void Fault()
+    {
+        if (!LoadFaulted)
+        {
+            LoadFaulted = true;
+            Logger.LogWarning("DevkitServer terminated.");
+            GetAssetsInstance?.Invoke()?.StopAllCoroutines();
+            Provider.shutdown(10, "DevkitServer failed to load.");
+        }
+    }
 
     private static void OnEditorCreated()
     {
@@ -265,7 +301,9 @@ public sealed class DevkitServerModule : IModuleNexus
         Provider.onServerConnected -= UserManager.AddPlayer;
         Provider.onServerDisconnected -= UserManager.RemovePlayer;
         Level.onLevelLoaded -= OnLevelLoaded;
-        // UserInput.OnUserPositionUpdated -= OnUserPositionUpdated;
+#if USERINPUT_DEBUG
+        Players.UserInput.OnUserPositionUpdated -= OnUserPositionUpdated;
+#endif
         HighSpeedServer.Deinit();
 #else
         Provider.onClientConnected -= EditorUser.OnClientConnected;
@@ -282,10 +320,9 @@ public sealed class DevkitServerModule : IModuleNexus
         Logger.CloseLogger();
     }
 
-#if SERVER
-/*
+#if USERINPUT_DEBUG
     private static EffectAsset? _debugEffectAsset;
-    private static void OnUserPositionUpdated(EditorUser obj)
+    private static void OnUserPositionUpdated(Players.EditorUser obj)
     {
         _debugEffectAsset ??= Assets.find<EffectAsset>(new Guid("5e2a0073025849d39322932d88609777"));
         if (_debugEffectAsset != null && obj.Input != null)
@@ -299,7 +336,6 @@ public sealed class DevkitServerModule : IModuleNexus
             EffectManager.triggerEffect(p);
         }
     }
-    */
 #endif
 
     [ModuleInitializer]
@@ -331,6 +367,7 @@ public sealed class DevkitServerModule : IModuleNexus
     private static readonly LocalDatDictionary DefaultMainLocalization = new LocalDatDictionary
     {
         { "Name", "Devkit Server" },
+        { "Help", "help" }
     };
     private static readonly LocalDatDictionary DefaultCommandLocalization = new LocalDatDictionary
     {

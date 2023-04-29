@@ -2,6 +2,7 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DevkitServer.API.Permissions;
 using Mono.Cecil;
 
 namespace DevkitServer.Configuration;
@@ -519,18 +520,7 @@ public sealed class ColorJsonConverter : JsonConverter<Color>
     }
     public override void Write(Utf8JsonWriter writer, Color value, JsonSerializerOptions options)
     {
-        JsonWriterOptions opt2 = writer.Options;
-        if (opt2.Indented && DevkitServerConfig.SetWriterOptions != null)
-            DevkitServerConfig.SetWriterOptions(writer, opt2 with { Indented = false });
-        writer.WriteStartArray();
-        writer.WriteNumberValue(value.r);
-        writer.WriteNumberValue(value.g);
-        writer.WriteNumberValue(value.b);
-        if (value.a < 1f)
-            writer.WriteNumberValue(value.a);
-        writer.WriteEndArray();
-        if (opt2.Indented && DevkitServerConfig.SetWriterOptions != null)
-            DevkitServerConfig.SetWriterOptions(writer, opt2);
+        writer.WriteStringValue("#" + (value.a < 1f ? ColorUtility.ToHtmlStringRGBA(value) : ColorUtility.ToHtmlStringRGB(value)).ToLowerInvariant());
     }
 }
 public sealed class Color32JsonConverter : JsonConverter<Color32>
@@ -705,18 +695,11 @@ public sealed class Color32JsonConverter : JsonConverter<Color32>
     }
     public override void Write(Utf8JsonWriter writer, Color32 value, JsonSerializerOptions options)
     {
-        JsonWriterOptions opt2 = writer.Options;
-        if (opt2.Indented && DevkitServerConfig.SetWriterOptions != null)
-            DevkitServerConfig.SetWriterOptions(writer, opt2 with { Indented = false });
-        writer.WriteStartArray();
-        writer.WriteNumberValue(value.r);
-        writer.WriteNumberValue(value.g);
-        writer.WriteNumberValue(value.b);
-        if (value.a < 1f)
-            writer.WriteNumberValue(value.a);
-        writer.WriteEndArray();
-        if (opt2.Indented && DevkitServerConfig.SetWriterOptions != null)
-            DevkitServerConfig.SetWriterOptions(writer, opt2);
+        string str = "#" + value.r.ToString("X2", CultureInfo.InvariantCulture) + value.g.ToString("X2", CultureInfo.InvariantCulture) + value.b.ToString("X2", CultureInfo.InvariantCulture);
+        if (value.a != byte.MaxValue)
+            str += value.a.ToString("X2", CultureInfo.InvariantCulture);
+        
+        writer.WriteStringValue(str.ToLowerInvariant());
     }
 }
 public sealed class AssetReferenceJsonConverterFactory : JsonConverterFactory

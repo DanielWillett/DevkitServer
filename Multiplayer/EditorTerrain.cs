@@ -10,6 +10,7 @@ using HarmonyLib;
 #if CLIENT
 using DevkitServer.Patches;
 using SDG.Framework.Devkit.Tools;
+using SDG.Framework.Foliage;
 #endif
 
 namespace DevkitServer.Multiplayer;
@@ -179,7 +180,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
         ThreadUtil.assertIsGameThread();
 
         writer.Write(DataVersion);
-        byte ct = (byte)Math.Min(_editBuffer.Count, byte.MaxValue);
+        byte ct = (byte)Math.Min(_editBuffer.Count, 96);
         writer.Write(ct);
         List<BrushSettingsCollection> c = ListPool<BrushSettingsCollection>.claim();
         for (int i = 0; i < ct; ++i)
@@ -197,6 +198,10 @@ public sealed partial class EditorTerrain : MonoBehaviour
                 (toAdd ??= BrushCollectionPool.claim().Reset()).WithSensitivity(s2.BrushSensitivity);
             if (action is IBrushTarget t && (GetBrushSettings(BrushValueFlags.Target) is not { } v5 || !MathfEx.IsNearlyEqual(v5.Target, t.BrushTarget, tol)))
                 (toAdd ??= BrushCollectionPool.claim().Reset()).WithTarget(t.BrushTarget);
+            if (action is IFoliageAsset fAsset && (GetBrushSettings(BrushValueFlags.FoliageAsset) is not { } v11 || v11.FoliageAsset.GUID != fAsset.FoliageAsset.GUID))
+                (toAdd ??= BrushCollectionPool.claim().Reset()).WithFoliageAsset(fAsset.FoliageAsset);
+            if (action is ICoordinates coord && (GetBrushSettings(BrushValueFlags.TileCoordinates) is not { } v12 || v12.CoordinateX != coord.CoordinateX || v12.CoordinateY != coord.CoordinateY))
+                (toAdd ??= BrushCollectionPool.claim().Reset()).WithCoordinates(coord.CoordinateX, coord.CoordinateY);
             if (action is IAutoSlope slope)
             {
                 if (GetSplatmapSettings(SplatmapValueFlags.AutoSlopeMinAngleBegin) is not { } v6 || !MathfEx.IsNearlyEqual(v6.AutoSlopeMinAngleBegin, slope.AutoSlopeMinAngleBegin, tol))
@@ -236,13 +241,28 @@ public sealed partial class EditorTerrain : MonoBehaviour
         {
             BrushSettingsCollection collection = c[i];
             collection.Write(writer);
-            if (collection.Splatmap != null)
+            bool stillUsed = false;
+            for (int j = 0; j < ReadBrushSettingsMask.Length; ++j)
             {
-                SplatmapCollectionPool.release(collection.Splatmap);
-                collection.Splatmap = null;
+                if (ReadBrushSettingsMask[j] == collection)
+                    stillUsed = true;
             }
-
-            BrushCollectionPool.release(collection);
+            SplatmapSettingsCollection? sp = collection.Splatmap;
+            if (!stillUsed)
+                BrushCollectionPool.release(collection);
+            if (sp != null)
+            {
+                for (int j = 0; j < ReadSplatmapSettingsMask.Length; ++j)
+                {
+                    if (ReadSplatmapSettingsMask[j] == sp)
+                        stillUsed = true;
+                }
+                if (!stillUsed)
+                {
+                    SplatmapCollectionPool.release(sp);
+                    collection.Splatmap = null;
+                }
+            }
         }
 
         ListPool<BrushSettingsCollection>.release(c);
@@ -299,6 +319,10 @@ public sealed partial class EditorTerrain : MonoBehaviour
                 TerrainTransactionType.AddTile => new TileModifyAction(),
                 TerrainTransactionType.DeleteTile => new TileModifyAction { IsDelete = true },
                 TerrainTransactionType.UpdateSplatmapLayers => new TileSplatmapLayersUpdateAction(),
+                TerrainTransactionType.AddFoliageToSurface => new AddFoliageToSurfaceAction(),
+                TerrainTransactionType.RemoveFoliageInstances => new RemoveFoliageInstancesAction(),
+                TerrainTransactionType.RemoveResourceSpawnpoint => new RemoveResourceSpawnpointAction(),
+                TerrainTransactionType.RemoveLevelObject => new RemoveLevelObjectAction(),
                 _ => null
             };
             if (action != null)
@@ -315,6 +339,13 @@ public sealed partial class EditorTerrain : MonoBehaviour
                     s2.BrushSensitivity = st4.Sensitivity;
                 if (action is IBrushTarget t && GetBrushSettings(BrushValueFlags.Target) is { } st5)
                     t.BrushTarget = st5.Target;
+                if (action is IFoliageAsset fAsset && GetBrushSettings(BrushValueFlags.FoliageAsset) is { } st11)
+                    fAsset.FoliageAsset = st11.FoliageAsset;
+                if (action is ICoordinates coord && GetBrushSettings(BrushValueFlags.FoliageAsset) is { } st12)
+                {
+                    coord.CoordinateX = st12.CoordinateX;
+                    coord.CoordinateY = st12.CoordinateY;
+                }
                 if (action is IAutoSlope slope)
                 {
                     if (GetSplatmapSettings(SplatmapValueFlags.AutoSlopeMinAngleBegin) is { } st6)
@@ -449,10 +480,10 @@ public sealed partial class EditorTerrain : MonoBehaviour
             ClientEvents.OnTileAdded += OnTileAdded;
             ClientEvents.OnTileDeleted += OnTileDeleted;
             ClientEvents.OnSplatmapLayerMaterialsUpdate += OnSplatmapLayerMaterialsUpdate;
-            //ClientEvents.OnFoliageAdded += OnFoliageAdded;
-            //ClientEvents.OnFoliageRemoved += OnFoliageRemoved;
-            //ClientEvents.OnResourceSpawnpointRemoved += OnResourceSpawnpointRemoved;
-            //ClientEvents.OnLevelObjectRemoved += OnLevelObjectRemoved;
+            ClientEvents.OnFoliageAdded += OnFoliageAdded;
+            ClientEvents.OnFoliageRemoved += OnFoliageRemoved;
+            ClientEvents.OnResourceSpawnpointRemoved += OnResourceSpawnpointRemoved;
+            ClientEvents.OnLevelObjectRemoved += OnLevelObjectRemoved;
         }
 #endif
     }
@@ -473,10 +504,10 @@ public sealed partial class EditorTerrain : MonoBehaviour
             ClientEvents.OnTileAdded -= OnTileAdded;
             ClientEvents.OnTileDeleted -= OnTileDeleted;
             ClientEvents.OnSplatmapLayerMaterialsUpdate -= OnSplatmapLayerMaterialsUpdate;
-            //ClientEvents.OnFoliageAdded -= OnFoliageAdded;
-            //ClientEvents.OnFoliageRemoved -= OnFoliageRemoved;
-            //ClientEvents.OnResourceSpawnpointRemoved -= OnResourceSpawnpointRemoved;
-            //ClientEvents.OnLevelObjectRemoved -= OnLevelObjectRemoved;
+            ClientEvents.OnFoliageAdded -= OnFoliageAdded;
+            ClientEvents.OnFoliageRemoved -= OnFoliageRemoved;
+            ClientEvents.OnResourceSpawnpointRemoved -= OnResourceSpawnpointRemoved;
+            ClientEvents.OnLevelObjectRemoved -= OnLevelObjectRemoved;
         }
 #endif
     }
@@ -649,15 +680,60 @@ public sealed partial class EditorTerrain : MonoBehaviour
             DeltaTime = Time.deltaTime
         });
     }
-    //private void OnFoliageAdded(LandscapeTile tile)
-    //{
-    //    QueueAction(new FoliageAddAction
-    //    {
-    //        IsDelete = false,
-    //        Coordinates = tile.coord,
-    //        DeltaTime = Time.deltaTime
-    //    });
-    //}
+    private void OnFoliageAdded(FoliageInfoAsset asset, Vector3 position, Quaternion rotation, Vector3 scale, bool clearWhenBaked)
+    {
+        QueueAction(new AddFoliageToSurfaceAction
+        {
+            Position = position,
+            Rotation = rotation,
+            Scale = scale,
+            ClearWhenBaked = clearWhenBaked,
+            FoliageAsset = new AssetReference<FoliageInfoAsset>(asset.GUID),
+            DeltaTime = Time.deltaTime
+        });
+    }
+    private void OnFoliageRemoved(Vector3 brushPosition, FoliageTile foliageTile, FoliageInstanceList list, float sqrBrushRadius, float sqrBrushFalloffRadius, bool allowRemoveBaked, int sampleCount)
+    {
+        if (sampleCount == 0)
+            return;
+        QueueAction(new RemoveFoliageInstancesAction
+        {
+            Coordinates = foliageTile.coord,
+            FoliageAsset = list.assetReference,
+            BrushPosition = brushPosition,
+            BrushRadius = DevkitFoliageToolOptions.instance.brushRadius,
+            BrushFalloff = DevkitFoliageToolOptions.instance.brushFalloff,
+            AllowRemoveBaked = allowRemoveBaked,
+            SampleCount = sampleCount,
+            DeltaTime = Time.deltaTime
+        });
+    }
+    private void OnResourceSpawnpointRemoved(ResourceSpawnpoint spawnpoint)
+    {
+        QueueAction(new RemoveResourceSpawnpointAction
+        {
+            ResourcePosition = spawnpoint.point,
+            FoliageAsset = spawnpoint.asset.getReferenceTo<ResourceAsset>(),
+            DeltaTime = Time.deltaTime
+        });
+    }
+    private void OnLevelObjectRemoved(Vector3 position, LevelObject obj)
+    {
+        if (Regions.tryGetCoordinate(position, out byte x, out byte y))
+        {
+            QueueAction(new RemoveLevelObjectAction
+            {
+                CoordinateX = x,
+                CoordinateY = y,
+                InstanceId = obj.instanceID,
+                DeltaTime = Time.deltaTime
+            });
+        }
+        else
+        {
+            Logger.LogWarning("Unknown region for object " + obj.asset?.FriendlyName.Format() + " #" + obj.instanceID + ".");
+        }
+    }
 #endif
 
     public delegate void AppliedAction(ITerrainAction action);

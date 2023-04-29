@@ -20,7 +20,9 @@ public class DevkitServerConfig
         new CSteamIDJsonConverter(),
         new AssetReferenceJsonConverterFactory(),
         new TypeJsonConverter(),
-        new PermissionConverter()
+        new PermissionConverter(),
+        new PermissionGroupConverter(),
+        new GroupPermissionConverter()
     };
 
     internal static readonly InstanceSetter<Utf8JsonWriter, JsonWriterOptions>? SetWriterOptions = Accessor.GenerateInstanceSetter<Utf8JsonWriter, JsonWriterOptions>("_options");
@@ -61,6 +63,7 @@ public class DevkitServerConfig
 #else
     public static readonly string FilePath = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer", Provider.serverID);
     public static readonly string ConfigFilePath = Path.Combine(FilePath, "server_config.json");
+    public static readonly string PermissionGroupsPath = Path.Combine(FilePath, "permission_groups.json");
 #endif
 
     public static readonly string LocalizationFilePath = Path.Combine(FilePath, "Localization");

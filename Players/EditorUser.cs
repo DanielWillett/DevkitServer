@@ -6,20 +6,21 @@ using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players.UI;
 #endif
 using JetBrains.Annotations;
-using SDG.Framework.Debug;
-using UnityEngine.PlayerLoop;
 
 namespace DevkitServer.Players;
 public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 {
+    public ClientInfo ClientInfo { get; private set; } = null!;
 #if CLIENT
     public static EditorUser? User { get; internal set; }
 #endif
     public CSteamID SteamId { get; private set; }
 #if SERVER
     private List<Permission> _perms = null!;
-    public ITransportConnection Connection { get; internal set; } = null!;
+    private List<PermissionGroup> _permGrps = null!;
     public IReadOnlyList<Permission> Permissions { get; private set; } = null!;
+    public IReadOnlyList<PermissionGroup> PermissionGroups { get; private set; } = null!;
+    public ITransportConnection Connection { get; internal set; } = null!;
 #else
     public IClientTransport? Connection { get; internal set; }
 #endif
@@ -32,14 +33,15 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     public bool IsOwner { get; private set; }
     public GameObject EditorObject { get; private set; } = null!;
 
-
-    internal void Init(CSteamID player, string displayName)
+    
+    internal void PreInit(CSteamID player, string displayName)
     {
         SteamId = player;
         DisplayName = displayName;
-#if SERVER
-        Connection = Provider.findTransportConnection(player);
-#endif
+        Logger.LogDebug("Editor User created: " + SteamId.m_SteamID.Format() + " (" + displayName.Format() + ").");
+    }
+    internal void Init()
+    {
 #if CLIENT
         IsOwner = this == User;
 #endif
@@ -48,14 +50,15 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         Input = EditorObject.GetComponent<UserInput>();
         Terrain = EditorObject.GetComponent<EditorTerrain>();
 #if SERVER
-        ClientInfo info = DevkitServerGamemode.GetClientInfo(this);
-        ClientInfo.SendClientInfo.Invoke(Connection, info);
-        _perms = info.Permissions.ToList();
+        ClientInfo = DevkitServerGamemode.GetClientInfo(this);
+        _perms = ClientInfo.Permissions.ToList();
+        _permGrps = ClientInfo.PermissionGroups.ToList();
         Permissions = _perms.AsReadOnly();
+        PermissionGroups = _permGrps.AsReadOnly();
+        ClientInfo.SendClientInfo.Invoke(Connection, ClientInfo);
 #endif
-        Logger.LogDebug("Editor User initialized: " + SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture) + " (" + displayName + ").");
+        Logger.LogDebug("Editor User initialized: " + SteamId.m_SteamID.Format() + " (" + DisplayName.Format() + ").");
     }
-
 #if SERVER
     internal void AddPermission(Permission permission)
     {
@@ -67,7 +70,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
                 return;
         }
 
-        API.Permissions.UserPermissions.SendPermissionState.Invoke(Connection, permission, true);
+        UserPermissions.SendPermissionState.Invoke(Connection, permission, true);
         _perms.Add(permission);
     }
 
@@ -79,19 +82,64 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         {
             if (_perms[i].Equals(permission))
             {
-                API.Permissions.UserPermissions.SendPermissionState.Invoke(Connection, permission, false);
+                UserPermissions.SendPermissionState.Invoke(Connection, permission, false);
                 _perms.RemoveAt(i);
                 break;
             }
         }
     }
+    internal void AddPermissionGroup(PermissionGroup group)
+    {
+        ThreadUtil.assertIsGameThread();
 
+        for (int i = 0; i < _permGrps.Count; ++i)
+        {
+            if (_permGrps[i].Equals(group))
+                return;
+        }
+
+        UserPermissions.SendPermissionGroupState.Invoke(Connection, group, true);
+        bool added = false;
+        for (int i = 0; i < _permGrps.Count; ++i)
+        {
+            if (_permGrps[i].Priority <= group.Priority)
+                continue;
+            _permGrps.Insert(i, group);
+            added = true;
+            break;
+        }
+        if (!added)
+            _permGrps.Add(group);
+    }
+
+    internal void RemovePermissionGroup(PermissionGroup group)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        for (int i = _permGrps.Count - 1; i >= 0; --i)
+        {
+            if (_permGrps[i].Equals(group))
+            {
+                UserPermissions.SendPermissionGroupState.Invoke(Connection, group, false);
+                _permGrps.RemoveAt(i);
+                break;
+            }
+        }
+    }
+
+    internal void ClearPermissionGroups()
+    {
+        ThreadUtil.assertIsGameThread();
+
+        _permGrps.Clear();
+        UserPermissions.SendClearPermissionGroups.Invoke(Connection);
+    }
     internal void ClearPermissions()
     {
         ThreadUtil.assertIsGameThread();
 
         _perms.Clear();
-        API.Permissions.UserPermissions.SendClearPermissions.Invoke(Connection);
+        UserPermissions.SendClearPermissions.Invoke(Connection);
     }
 #endif
 
@@ -99,13 +147,25 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendPermissionState)]
     private static void ReceivePermissionState(MessageContext ctx, Permission perm, bool state)
     {
-        UserPermissions.PlayerHandler.ReceivePermissionState(perm, state);
+        UserPermissions.UserHandler.ReceivePermissionState(perm, state);
         ctx.Acknowledge();
     }
     [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendClearPermissions)]
-    private static void ReceiveClearPermission(MessageContext ctx)
+    private static void ReceiveClearPermissions(MessageContext ctx)
     {
-        UserPermissions.PlayerHandler.ReceiveClearPermissions();
+        UserPermissions.UserHandler.ReceiveClearPermissions();
+        ctx.Acknowledge();
+    }
+    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendPermissionGroupState)]
+    private static void ReceivePermissionGroupState(MessageContext ctx, PermissionGroup group, bool state)
+    {
+        UserPermissions.UserHandler.ReceivePermissionGroupState(group, state);
+        ctx.Acknowledge();
+    }
+    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendClearPermissionGroups)]
+    private static void ReceiveClearPermissionGroups(MessageContext ctx)
+    {
+        UserPermissions.UserHandler.ReceiveClearPermissions();
         ctx.Acknowledge();
     }
 #endif
@@ -123,6 +183,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     {
         if (!DevkitServerModule.IsEditing)
             return;
+        Commander.init();
         if (!SDG.Unturned.Player.player.TryGetComponent(out EditorUser user))
         {
             Logger.LogWarning("Unable to find Editor user in client-side player.");
@@ -147,13 +208,13 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
             Logger.LogWarning("Unable to close high-speed server!");
             Logger.LogError(ex);
         }
+        UserManager.Disconnect();
 
-        if (User != null || User is not null)
+        if (User != null)
         {
             if (User.isActiveAndEnabled)
                 Destroy(User);
 
-            DevkitEditorHUD.Close(true);
             User = null;
             Logger.LogDebug("Deregistered client-side editor user.");
             return;
@@ -163,6 +224,9 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
             Logger.LogWarning("Unable to find Editor user in client-side player.");
             DevkitServerModule.RegisterDisconnectFromEditingServer();
         }
+
+        DevkitEditorHUD.Close(true);
+        ClientInfo.OnDisconnect();
     }
     internal static void OnEnemyDisconnected(SteamPlayer player)
     {

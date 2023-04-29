@@ -5,17 +5,26 @@ using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.API.Permissions;
 
+[JsonConverter(typeof(PermissionConverter))]
 public sealed class Permission
 {
+    public static readonly Permission SuperuserPermission = new Permission(true);
     public const string CoreModuleCode = "unturned";
     public const string DevkitServerModuleCode = "devkitserver";
     public string Id { get; }
     public IDevkitServerPlugin? Plugin { get; internal set; }
     public bool Core { get; }
     public bool DevkitServer { get; }
+    public bool Superuser { get; }
+    public bool Valid => (Core || DevkitServer || Superuser || Plugin != null) && !string.IsNullOrWhiteSpace(Id);
     public Permission(string permissionId)
     {
         Id = permissionId;
+    }
+    private Permission(bool superuser)
+    {
+        Id = "*";
+        Superuser = superuser;
     }
     internal Permission(string permissionId, IDevkitServerPlugin? plugin) : this(permissionId)
     {
@@ -38,13 +47,15 @@ public sealed class Permission
 
     public override string ToString()
     {
+        if (Superuser)
+            return "*";
         if (Core)
             return CoreModuleCode + "." + Id;
         if (DevkitServer)
             return DevkitServerModuleCode + "." + Id;
 
         if (Plugin == null)
-            return Id;
+            return "INVALID." + Id;
         return Plugin.PermissionPrefix + "." + Id;
     }
 
@@ -54,6 +65,12 @@ public sealed class Permission
         {
             permission = null!;
             return false;
+        }
+
+        if (str.Equals("*", StringComparison.InvariantCultureIgnoreCase))
+        {
+            permission = SuperuserPermission;
+            return true;
         }
         int index = str.IndexOf('.');
         if (index == -1 || index == str.Length - 1)
@@ -85,13 +102,14 @@ public sealed class Permission
             }
         }
 
-        permission = null!;
+        Logger.LogInfo("Unable to find pluign for permission " + str.Format() + ", this may not be an issue if the plugin is server-side only.");
+        permission = new Permission(id, null, core: false, devkitServer: false);
         return false;
     }
 
     public override bool Equals(object? obj)
     {
-        return obj is Permission perm && (ReferenceEquals(perm, obj) || perm.Core == Core && perm.DevkitServer == DevkitServer && perm.Plugin == Plugin && perm.Id.Equals(Id, StringComparison.InvariantCultureIgnoreCase));
+        return obj is Permission perm && (ReferenceEquals(perm, obj) || perm.Superuser && Superuser || perm.Core == Core && perm.DevkitServer == DevkitServer && perm.Plugin == Plugin && perm.Id.Equals(Id, StringComparison.InvariantCultureIgnoreCase));
     }
     public static bool operator ==(Permission? left, object? right) => left is null ? right is null : left.Equals(right);
     public static bool operator !=(Permission? left, object? right) => left is null ? right is not null : !left.Equals(right);

@@ -406,7 +406,7 @@ public static class EditorLevel
         {
             Logger.LogInfo("[RECEIVE LEVEL] Received acknowledgement to level request.", ConsoleColor.DarkCyan);
             LoadingUI.updateKey("Downloading Level | Server Compressing Level");
-            LoadingUI.updateProgress(0f);
+            LoadingUI.updateProgress(0.05f);
         }
     }
     
@@ -474,13 +474,13 @@ public static class EditorLevel
             }
             else t += " | Calculating Speed...";
             LoadingUI.updateKey(t);
-            LoadingUI.updateProgress((float)_lastPart / _lastWhole);
+            LoadingUI.updateProgress(_lastWhole == 0 || _lastPart == 0 ? 0.05f : (float)_lastPart / _lastWhole);
             return;
         }
         if (_missingPackets > 0)
         {
             LoadingUI.updateKey("Downloading Level / Recovering Missing Packets [ " + (_startingMissingPackets - _missingPackets) + " / " + _startingMissingPackets + " ]");
-            LoadingUI.updateProgress((float)(_startingMissingPackets - _missingPackets) / _startingMissingPackets);
+            LoadingUI.updateProgress(_startingMissingPackets == 0 || _startingMissingPackets == _missingPackets ? 0.05f : (float)(_startingMissingPackets - _missingPackets) / _startingMissingPackets);
         }
         else if (_pendingLevelIndex >= _pendingLevelLength || _startingMissingPackets > 0)
         {
@@ -500,7 +500,7 @@ public static class EditorLevel
             }
             else t += " | Calculating Speed...";
             LoadingUI.updateKey(t);
-            LoadingUI.updateProgress((float)_pendingLevelIndex / _pendingLevelLength);
+            LoadingUI.updateProgress(_pendingLevelIndex == 0 || _pendingLevelLength == 0 ? 0.05f : (float)_pendingLevelIndex / _pendingLevelLength);
         }
     }
     [NetCall(NetCallSource.FromServer, (ushort)NetCalls.Ping)]

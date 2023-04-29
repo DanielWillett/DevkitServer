@@ -56,33 +56,33 @@ public static class UserManager
                 if (pl.player.gameObject.TryGetComponent(out EditorUser user))
                 {
                     user.IsOnline = true;
-                    if (!_users.Contains(user))
+                    bool added = false;
+                    for (int j = 0; j < _users.Count; ++j)
                     {
-                        bool added = false;
-                        for (int j = 0; j < _users.Count; ++j)
+                        EditorUser u = _users[j];
+                        if (u.SteamId.m_SteamID > player.m_SteamID)
                         {
-                            EditorUser u = _users[j];
-                            if (u.SteamId.m_SteamID > player.m_SteamID)
-                            {
-                                _users.Insert(j, user);
-                                added = true;
-                                break;
-                            }
-                            if (u == user)
-                            {
-                                added = true;
-                                break;
-                            }
+                            _users.Insert(j, user);
+                            added = true;
+                            break;
                         }
-                        if (!added) _users.Add(user);
+                        if (u.SteamId.m_SteamID == user.SteamId.m_SteamID)
+                        {
+                            Logger.LogWarning("User {" + user.SteamId.m_SteamID.Format() + "} was already online.");
+                            RemovePlayer(u.SteamId);
+                            _users[j] = user;
+                            added = true;
+                            break;
+                        }
                     }
+                    if (!added) _users.Add(user);
 
                     user.Player = pl;
                     user.IsOnline = true;
 #if SERVER
-                    user.Connection = Provider.findTransportConnection(player);
+                    user.Connection = pl.transportConnection;
 #endif
-                    _users.Add(user);
+                    user.Init();
                     OnUserConnected?.Invoke(user);
 #if SERVER
                     Logger.LogInfo("Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + user.Connection.Format() + ".");
@@ -91,22 +91,51 @@ public static class UserManager
 #endif
                     return;
                 }
+
+                break;
             }
         }
 
         Provider.kick(player, "Player not properly set up.");
     }
+#if CLIENT
+    internal static void Disconnect()
+    {
+        if (EditorUser.User != null)
+        {
+            RemovePlayer(EditorUser.User);
+            EditorUser.User = null;
+        }
+        for (int i = Users.Count - 1; i >= 0; --i)
+        {
+            RemovePlayer(Users[i]);
+        }
+
+        if (Users.Count > 0)
+        {
+            Logger.LogWarning("Unable to properly remove all users.");
+            _users.Clear();
+        }
+    }
+#endif
     internal static void RemovePlayer(CSteamID player)
     {
         EditorUser? user = FromId(player);
         if (user == null)
             return;
+        RemovePlayer(user);
+    }
+    private static void RemovePlayer(EditorUser user)
+    {
 #if CLIENT
-        if (player.m_SteamID == Provider.client.m_SteamID)
+        if (user.SteamId.m_SteamID == Provider.client.m_SteamID)
             HighSpeedConnection.Instance?.Dispose();
 #endif
         _users.Remove(user);
         OnUserDisconnected?.Invoke(user);
+#if SERVER
+        user.Input.Save();
+#endif
         user.IsOnline = false;
         user.Player = null;
         Logger.LogInfo("Player removed: " + user.DisplayName + " {" + user.SteamId.m_SteamID + "}.");
@@ -132,7 +161,7 @@ public static class UserManager
         }
         return player;
     }
-    /// <summary>Slow, use rarely.</summary>
+
     public static EditorUser? FromName(string name, NameSearchType type)
     {
         if (type == NameSearchType.CharacterName)

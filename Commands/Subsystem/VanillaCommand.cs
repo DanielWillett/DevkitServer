@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using DevkitServer.API;
+﻿using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
 using DevkitServer.Players;
@@ -24,7 +19,8 @@ internal sealed class VanillaCommand : IExecutableCommand
     public VanillaCommand(Command command)
     {
         Command = command;
-        Permissions = new List<Permission>(1) { new Permission(Command.command.ToLowerInvariant(), null, true, false) };
+        Permissions = new List<Permission>(1) { new Permission(Command.command.ToLowerInvariant(), true, false) };
+        UserPermissions.Handler.Register(Permissions[0]);
     }
     void IExecutableCommand.Execute(CommandContext ctx)
     {
