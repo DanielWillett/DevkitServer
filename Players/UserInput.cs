@@ -16,11 +16,15 @@ namespace DevkitServer.Players;
 [EarlyTypeInit(-1)]
 public class UserInput : MonoBehaviour
 {
-    private const ushort DataVersion = 2;
-    internal static readonly NetCall<ulong, Vector3, float, float> SendInitialPosition = new NetCall<ulong, Vector3, float, float>((ushort)NetCalls.SendInitialPosition);
+    private const ushort DataVersion = 3;
+    internal static readonly NetCall<ulong, Vector3> SendInitialPosition = new NetCall<ulong, Vector3>((ushort)NetCalls.SendInitialPosition);
     internal static readonly NetCall<ulong, CameraController> SendUpdateController = new NetCall<ulong, CameraController>((ushort)NetCalls.SendUpdateController);
     private CameraController _controller;
     private static Delegate[] _onUpdatedActions = Array.Empty<Delegate>();
+#if CLIENT
+    private static StaticSetter<float>? SetLookPitch = Accessor.GenerateStaticSetter<EditorLook, float>("_pitch");
+    private static StaticSetter<float>? SetLookYaw = Accessor.GenerateStaticSetter<EditorLook, float>("_yaw");
+#endif
     private static event Action<EditorUser>? _onUpdated;
     public static event Action<EditorUser>? OnUserPositionUpdated
     {
@@ -50,6 +54,7 @@ public class UserInput : MonoBehaviour
     private float _lastPitch;
     private float _nextPacketApplyTime;
     public EditorUser User { get; internal set; } = null!;
+    // ReSharper disable once UnusedAutoPropertyAccessor.Local
     public bool IsOwner { get; private set; }
     public GameObject? ControllerObject { get; private set; }
 
@@ -140,23 +145,17 @@ public class UserInput : MonoBehaviour
 #if CLIENT
     [UsedImplicitly]
     [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendInitialPosition)]
-    private static void ReceiveInitialPosition(MessageContext ctx, ulong player, Vector3 pos, float pitch, float yaw)
+    private static void ReceiveInitialPosition(MessageContext ctx, ulong player, Vector3 pos)
     {
         EditorUser? user = UserManager.FromId(player);
         if (user != null && user.Input != null)
         {
             UserInput input = user.Input;
-            if (!input.IsOwner)
-                input.transform.SetPositionAndRotation(pos, Quaternion.Euler(pitch, yaw, 0f));
-            else
-            {
-                input._nextPacketSendRotation = true;
-                input.transform.position = pos;
-                MainCamera.instance.transform.localRotation = Quaternion.Euler(EditorLook.pitch, 0.0f, 0.0f);
-                Level.editing.transform.rotation = Quaternion.Euler(0.0f, yaw, 0.0f);
-            }
+            input.transform.position = pos;
             input._networkedInitialPosition = true;
-            Logger.LogInfo("Received initial transform " + user + ": " + pos + ", (" + EditorLook.pitch + ", " + EditorLook.yaw + ").");
+            if (input.IsOwner)
+                input._nextPacketSendRotation = true;
+            Logger.LogInfo("Received initial transform " + user + ": " + pos + ".");
             ctx.Acknowledge(StandardErrorCode.Success);
             TryInvokeOnUserPositionUpdated(user);
         }
@@ -220,11 +219,11 @@ public class UserInput : MonoBehaviour
         {
             UserInput inp = UserManager.Users[i].Input;
             if (inp != null && inp != this)
-                SendInitialPosition.Invoke(User.Connection, inp.User.SteamId.m_SteamID, inp._lastPos, inp._lastPitch, inp._lastYaw);
+                SendInitialPosition.Invoke(User.Connection, inp.User.SteamId.m_SteamID, inp._lastPos);
         }
 #endif
 
-        Logger.LogDebug("User input module created for " + User.SteamId.m_SteamID + " ( owner: " + IsOwner + " ).");
+        Logger.LogDebug("User input module created for " + User.SteamId.m_SteamID.Format() + " ( owner: " + IsOwner.Format() + " ).");
     }
     private void HandleControllerUpdated()
     {
@@ -263,7 +262,7 @@ public class UserInput : MonoBehaviour
                 _editorUiObject = ui.transform;
             else
                 _playerUiObject = ui.transform;
-            Logger.LogInfo("Cleaned up " + (editor ? "EditorUI." : "PlayerUI."));
+            Logger.LogInfo("Cleaned up " + (!editor ? "EditorUI." : "PlayerUI."));
         }
         else
         {
@@ -608,37 +607,37 @@ public class UserInput : MonoBehaviour
                 pitch = rot.x;
                 yaw = rot.y;
             }
-            else
+            else if (v < 3)
             {
-                pitch = block.readSingle();
-                yaw = block.readSingle();
+                block.readSingle();
+                block.readSingle();
             }
-            this.transform.SetPositionAndRotation(pos, Quaternion.Euler(pitch, yaw, 0f));
+            this.transform.position = pos;
             _lastPacket = new UserInputPacket
             {
                 Position = pos,
-                Pitch = pitch,
-                Yaw = yaw,
+                Pitch = 0,
+                Yaw = 0,
                 Flags = Flags.StopMsg,
                 DeltaTime = Time.deltaTime,
                 Input = Vector3.zero,
                 Speed = 0f
             };
             _lastPos = pos;
-            _lastPitch = pitch;
-            _lastYaw = yaw;
+            _lastPitch = 0;
+            _lastYaw = 0;
             if (v > 0)
                 Controller = (CameraController)block.readByte();
             
-            Logger.LogDebug(" Loaded position: " + pos.Format() + ", (" + pitch.Format() + ", " + yaw.Format() + ").");
-            SendInitialPosition.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, pos, pitch, yaw);
+            Logger.LogDebug(" Loaded position: " + pos.Format());
+            SendInitialPosition.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, pos);
         }
         else
         {
             PlayerSpawnpoint spawn = LevelPlayers.getSpawn(false);
             Vector3 pos = spawn.point + new Vector3(0.0f, 2f, 0.0f);
             Logger.LogDebug(" Loaded random position: " + pos.Format() + ", " + spawn.angle.Format() + "°.");
-            SendInitialPosition.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, pos, 0f, spawn.angle);
+            SendInitialPosition.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, pos);
         }
 
         _networkedInitialPosition = true;
@@ -650,8 +649,6 @@ public class UserInput : MonoBehaviour
         Block block = new Block();
         block.writeUInt16(DataVersion);
         block.writeSingleVector3(_lastPos);
-        block.writeSingle(_lastPitch);
-        block.writeSingle(_lastYaw);
         block.writeByte((byte)Controller);
         Logger.LogDebug(" Saved position: " + _lastPos.Format() + ", (" + _lastPitch.Format() + ", " + _lastYaw.Format() + ").");
         PlayerSavedata.writeBlock(User.Player.playerID, "/DevkitServer/Input.dat", block);

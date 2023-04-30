@@ -1,9 +1,11 @@
 ﻿#if CLIENT
 using System.Reflection;
 using System.Reflection.Emit;
+using HarmonyLib;
 
 namespace DevkitServer.Players.UI;
 [EarlyTypeInit]
+[HarmonyPatch]
 public static class UIAccessTools
 {
     private static readonly StaticGetter<EditorUI?> GetEditorUIInstance
@@ -38,6 +40,9 @@ public static class UIAccessTools
 
     public static EditorUI? EditorUI => GetEditorUIInstance();
     public static PlayerUI? PlayerUI => GetPlayerUIInstance();
+
+    public static event System.Action? EditorUIReady;
+    public static event System.Action? PlayerUIReady;
     public static EditorDashboardUI? EditorDashboardUI
     {
         get
@@ -621,6 +626,21 @@ public static class UIAccessTools
             Logger.LogError(ex);
             DevkitServerModule.Fault();
         }
+    }
+    
+    [HarmonyPatch(typeof(EditorUI), "Start")]
+    [HarmonyPostfix]
+    private static void EditorUIStartPostfix()
+    {
+        EditorUIReady?.Invoke();
+        Logger.LogInfo("Editor UI ready.");
+    }
+    [HarmonyPatch(typeof(PlayerUI), "InitializePlayer")]
+    [HarmonyPostfix]
+    private static void PlayerUIStartPostfix()
+    {
+        PlayerUIReady?.Invoke();
+        Logger.LogInfo("Player UI ready.");
     }
 }
 public enum UI

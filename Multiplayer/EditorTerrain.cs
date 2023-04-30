@@ -32,6 +32,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
     internal static FieldInfo SaveTransactionsField = typeof(EditorTerrain).GetField(nameof(SaveTransactions), BindingFlags.Static | BindingFlags.NonPublic)!;
 #if CLIENT
     private float _lastFlush;
+    private bool _queuedThisFrame;
 #endif
     private float _nextApply;
     // edit buffer is reversed for everyone but the owner.
@@ -67,6 +68,10 @@ public sealed partial class EditorTerrain : MonoBehaviour
     private void QueueAction(ITerrainAction action)
     {
         action.Instigator = Provider.client;
+        if (_queuedThisFrame)
+            action.DeltaTime = 0f;
+        else
+            _queuedThisFrame = true;
         _editBuffer.Add(action);
     }
 #endif
@@ -146,6 +151,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
 #if CLIENT
         if (IsOwner)
         {
+            _queuedThisFrame = false;
             if (t - _lastFlush >= 1f)
             {
                 _lastFlush = t;
@@ -158,13 +164,13 @@ public sealed partial class EditorTerrain : MonoBehaviour
         while (_editBuffer.Count > 0 && t >= _nextApply)
         {
             ITerrainAction action = _editBuffer[_editBuffer.Count - 1];
+            _nextApply += action.DeltaTime;
             if (OnApplyingAction != null)
             {
                 bool allow = true;
                 OnApplyingAction.Invoke(action, ref allow);
                 if (!allow) continue;
             }
-            _nextApply += action.DeltaTime;
             ActiveAction = action;
             action.Apply();
             ActiveAction = null;
@@ -277,7 +283,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
                 disposable.Dispose();
         }
         
-        _editBuffer.Clear();
+        _editBuffer.RemoveRange(0, ct);
     }
 #endif
 
@@ -341,7 +347,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
                     t.BrushTarget = st5.Target;
                 if (action is IFoliageAsset fAsset && GetBrushSettings(BrushValueFlags.FoliageAsset) is { } st11)
                     fAsset.FoliageAsset = st11.FoliageAsset;
-                if (action is ICoordinates coord && GetBrushSettings(BrushValueFlags.FoliageAsset) is { } st12)
+                if (action is ICoordinates coord && GetBrushSettings(BrushValueFlags.TileCoordinates) is { } st12)
                 {
                     coord.CoordinateX = st12.CoordinateX;
                     coord.CoordinateY = st12.CoordinateY;
@@ -463,6 +469,7 @@ public sealed partial class EditorTerrain : MonoBehaviour
     public static void Patch()
     {
         SplatmapPaintAction.Patch();
+        HeightmapSmoothAction.Patch();
     }
     public void Init()
     {

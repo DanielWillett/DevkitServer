@@ -776,12 +776,12 @@ internal static class Logger
 
             return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + s64.ToString("D17") + ANSIReset;
         }
-        if (obj is CSteamID s642 && s642.UserSteam64())
+        if (obj is CSteamID cs64 && cs64.UserSteam64())
         {
             if (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
-                return s642.m_SteamID.ToString("D17");
+                return cs64.m_SteamID.ToString("D17");
 
-            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + s642.m_SteamID.ToString("D17") + ANSIReset;
+            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + cs64.m_SteamID.ToString("D17") + ANSIReset;
         }
         if (obj is ITransportConnection connection)
         {

@@ -53,50 +53,57 @@ public static class UserManager
             SteamPlayer pl = Provider.clients[i];
             if (pl.playerID.steamID.m_SteamID == player.m_SteamID)
             {
-                if (pl.player.gameObject.TryGetComponent(out EditorUser user))
-                {
-                    user.IsOnline = true;
-                    bool added = false;
-                    for (int j = 0; j < _users.Count; ++j)
-                    {
-                        EditorUser u = _users[j];
-                        if (u.SteamId.m_SteamID > player.m_SteamID)
-                        {
-                            _users.Insert(j, user);
-                            added = true;
-                            break;
-                        }
-                        if (u.SteamId.m_SteamID == user.SteamId.m_SteamID)
-                        {
-                            Logger.LogWarning("User {" + user.SteamId.m_SteamID.Format() + "} was already online.");
-                            RemovePlayer(u.SteamId);
-                            _users[j] = user;
-                            added = true;
-                            break;
-                        }
-                    }
-                    if (!added) _users.Add(user);
-
-                    user.Player = pl;
-                    user.IsOnline = true;
-#if SERVER
-                    user.Connection = pl.transportConnection;
-#endif
-                    user.Init();
-                    OnUserConnected?.Invoke(user);
-#if SERVER
-                    Logger.LogInfo("Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + user.Connection.Format() + ".");
-#else
-                    Logger.LogInfo("Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + (user.Connection != null ? "Current Session" : "Remote Session") + ".");
-#endif
+                if (AddPlayer(pl))
                     return;
-                }
-
                 break;
             }
         }
 
         Provider.kick(player, "Player not properly set up.");
+    }
+    internal static bool AddPlayer(SteamPlayer pl)
+    {
+        if (pl.player.gameObject.TryGetComponent(out EditorUser user))
+        {
+            user.IsOnline = true;
+            bool added = false;
+            ulong s64 = pl.playerID.steamID.m_SteamID;
+            for (int j = 0; j < _users.Count; ++j)
+            {
+                EditorUser u = _users[j];
+                if (u.SteamId.m_SteamID > s64)
+                {
+                    _users.Insert(j, user);
+                    added = true;
+                    break;
+                }
+                if (u.SteamId.m_SteamID == user.SteamId.m_SteamID)
+                {
+                    Logger.LogWarning("User {" + user.SteamId.m_SteamID.Format() + "} was already online.");
+                    RemovePlayer(u.SteamId);
+                    _users[j] = user;
+                    added = true;
+                    break;
+                }
+            }
+            if (!added) _users.Add(user);
+
+            user.Player = pl;
+            user.IsOnline = true;
+#if SERVER
+                    user.Connection = pl.transportConnection;
+#endif
+            user.Init();
+            OnUserConnected?.Invoke(user);
+#if SERVER
+            Logger.LogInfo("Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + user.Connection.Format() + ".");
+#else
+            Logger.LogInfo("Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + (user.Connection != null ? "Current Session" : "Remote Session") + ".");
+#endif
+            return true;
+        }
+
+        return false;
     }
 #if CLIENT
     internal static void Disconnect()

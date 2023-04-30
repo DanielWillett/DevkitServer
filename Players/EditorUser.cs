@@ -1,8 +1,8 @@
 ﻿using System.Globalization;
 using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer;
-#if CLIENT
 using DevkitServer.Multiplayer.Networking;
+#if CLIENT
 using DevkitServer.Players.UI;
 #endif
 using JetBrains.Annotations;
@@ -25,7 +25,9 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     public IClientTransport? Connection { get; internal set; }
 #endif
     public UserInput Input { get; private set; } = null!;
+    public UserTransactions Transactions { get; private set; } = null!;
     public EditorTerrain Terrain { get; private set; } = null!;
+    public TileSync TileSync { get; private set; } = null!;
     public string DisplayName { get; private set; } = null!;
     public SteamPlayer? Player { get; internal set; }
 
@@ -48,7 +50,9 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         EditorObject = IsOwner ? Editor.editor.gameObject : new GameObject("Editor {" + SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture) + "}");
         DevkitServerGamemode.SetupEditorObject(EditorObject, this);
         Input = EditorObject.GetComponent<UserInput>();
+        Transactions = EditorObject.GetComponent<UserTransactions>();
         Terrain = EditorObject.GetComponent<EditorTerrain>();
+        TileSync = EditorObject.GetComponent<TileSync>();
 #if SERVER
         ClientInfo = DevkitServerGamemode.GetClientInfo(this);
         _perms = ClientInfo.Permissions.ToList();
@@ -194,7 +198,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     }
     internal static void OnEnemyConnected(SteamPlayer player)
     {
-        UserManager.AddPlayer(player.playerID.steamID);
+        UserManager.AddPlayer(player);
     }
     internal static void OnClientDisconnected()
     {
@@ -235,7 +239,54 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 #endif
     public int CompareTo(EditorUser other) => SteamId.m_SteamID.CompareTo(other.SteamId.m_SteamID);
 
-    public override string ToString() => $"{{{SteamId.m_SteamID}}} ({Player?.playerID.playerName}/{Player?.playerID.characterName}/{Player?.playerID.nickName})";
+    public override string ToString()
+    {
+        string? pn = Player?.playerID.playerName;
+        string? cn = Player?.playerID.characterName;
+        string? nn = Player?.playerID.nickName;
+        string s64 = SteamId.m_SteamID.ToString("D17");
+        bool pws = string.IsNullOrWhiteSpace(pn);
+        bool cws = string.IsNullOrWhiteSpace(cn);
+        bool nws = string.IsNullOrWhiteSpace(nn);
+        if (pws && cws && nws)
+            return s64 + " (" + DisplayName + ")";
+        if (pws)
+        {
+            if (cws)
+                return s64 + " (" + nn + ")";
+            if (nws || nn!.Equals(cn, StringComparison.Ordinal))
+                return s64 + " (" + cn + ")";
+            return s64 + " (" + cn + "|" + nn + ")";
+        }
+        if (cws)
+        {
+            if (pws)
+                return s64 + " (" + nn + ")";
+            if (nws || nn!.Equals(pn, StringComparison.Ordinal))
+                return s64 + " (" + pn + ")";
+            return s64 + " (" + pn + "|" + nn + ")";
+        }
+        if (nws)
+        {
+            if (pws)
+                return s64 + " (" + cn + ")";
+            if (cws || cn!.Equals(pn, StringComparison.Ordinal))
+                return s64 + " (" + pn + ")";
+            return s64 + " (" + pn + "|" + cn + ")";
+        }
+
+        bool nep = nn!.Equals(pn, StringComparison.Ordinal);
+        bool nec = nn!.Equals(cn, StringComparison.Ordinal);
+        bool pec = nec && nep || pn!.Equals(cn, StringComparison.Ordinal);
+        if (nep && nec)
+            return s64 + " (" + nn + ")";
+        if (pec || nec)
+            return s64 + " (" + pn + "|" + nn + ")";
+        if (nep)
+            return s64 + " (" + pn + "|" + cn + ")";
+        
+        return s64 + " (" + pn + "|" + cn + "|" + nn + ")";
+    }
 
     public static implicit operator ulong(EditorUser user) => user.SteamId.m_SteamID;
     public static implicit operator CSteamID(EditorUser user) => user.SteamId;

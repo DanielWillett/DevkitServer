@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using System.Reflection.Emit;
 using DevkitServer.Util.Encoding;
 using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Landscapes;
@@ -128,7 +129,7 @@ public partial class EditorTerrain
         RemoveResourceSpawnpoint,
         RemoveLevelObject
     }
-    private const int BrushFlagLength = 5;
+    private const int BrushFlagLength = 7;
     [Flags]
     public enum BrushValueFlags : byte
     {
@@ -385,6 +386,9 @@ public partial class EditorTerrain
     }
     public sealed class HeightmapSmoothAction : IBrushRadius, IBrushFalloff, IBrushStrength, IBrushPosition, IBounds
     {
+        private static readonly Dictionary<LandscapeCoord, float[,]> PixelSmoothBuffer = new Dictionary<LandscapeCoord, float[,]>(4);
+        private static int _pixelSmoothSampleCount;
+        private static float _pixelSmoothSampleTotal;
         public TerrainTransactionType Type => TerrainTransactionType.HeightmapSmooth;
         public TerrainEditorType EditorType => TerrainEditorType.Heightmap;
         public EDevkitLandscapeToolHeightmapSmoothMethod SmoothMethod { get; set; }
@@ -397,9 +401,44 @@ public partial class EditorTerrain
         public float DeltaTime { get; set; }
         public float SmoothTarget { get; set; }
 
+        internal static void Patch()
+        {
+            try
+            {
+                PatchesMain.Patcher.CreateReversePatcher(
+                        typeof(TerrainEditor).GetMethod("SampleHeightPixelSmooth", BindingFlags.Instance | BindingFlags.NonPublic),
+                        new HarmonyMethod(typeof(HeightmapSmoothAction).GetMethod(nameof(SampleHeightPixelSmooth), BindingFlags.Static | BindingFlags.NonPublic)))
+                    .Patch(HarmonyReversePatchType.Original);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error reverse patching TerrainEditor.blendSplatmapWeights.");
+                Logger.LogError(ex);
+                DevkitServerModule.Fault();
+            }
+
+            try
+            {
+                int a = 0;
+                float b = 0;
+                SampleHeightPixelSmooth(null, new Vector3(float.NaN, float.NaN, float.NaN), ref a, ref b);
+            }
+            catch (NotImplementedException)
+            {
+                Logger.LogError("Failed to reverse patch " + Accessor.GetMethodInfo(SampleHeightPixelSmooth)?.Format() + ".");
+                DevkitServerModule.Fault();
+                return;
+            }
+
+            Logger.LogInfo("Reverse patched " + Accessor.GetMethodInfo(SampleHeightPixelSmooth)?.Format() + ".");
+        }
         public void Apply()
         {
+            if (SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE)
+                Landscape.readHeightmap(Bounds, IntlHandleHeightmapReadSmoothPixelAverage);
             WriteHeightmapNoTransactions(Bounds, IntlHandleHeightmapWriteSmooth);
+            if (SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE)
+                ReleasePixelSmoothBuffer();
         }
         public void Read(ByteReader reader)
         {
@@ -407,14 +446,70 @@ public partial class EditorTerrain
             SmoothMethod = pixel ? EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE : EDevkitLandscapeToolHeightmapSmoothMethod.BRUSH_AVERAGE;
             BrushPosition = reader.ReadVector2();
             DeltaTime = reader.ReadFloat();
-            SmoothTarget = reader.ReadFloat();
+            if (SmoothMethod != EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE)
+                SmoothTarget = reader.ReadFloat();
         }
         public void Write(ByteWriter writer)
         {
             writer.WriteHeightmapBounds(Bounds, SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE);
             writer.Write(BrushPosition);
             writer.Write(DeltaTime);
-            writer.Write(SmoothTarget);
+            if (SmoothMethod != EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE)
+                writer.Write(SmoothTarget);
+        }
+        private static void IntlHandleHeightmapReadSmoothPixelAverage(LandscapeCoord tileCoord, HeightmapCoord heightmapCoord, Vector3 worldPosition, float currentHeight)
+        {
+            if (!PixelSmoothBuffer.TryGetValue(tileCoord, out float[,] hm))
+            {
+                hm = LandscapeHeightmapCopyPool.claim();
+                PixelSmoothBuffer.Add(tileCoord, hm);
+            }
+            hm[heightmapCoord.x, heightmapCoord.y] = currentHeight;
+        }
+        private static void ReleasePixelSmoothBuffer()
+        {
+            foreach (KeyValuePair<LandscapeCoord, float[,]> hmVal in PixelSmoothBuffer)
+                LandscapeHeightmapCopyPool.release(hmVal.Value);
+            PixelSmoothBuffer.Clear();
+        }
+
+        private static void SampleHeightPixelSmooth(object? instance, Vector3 worldPosition, ref int sampleCount, ref float sampleAverage)
+        {
+            IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
+            {
+                FieldInfo? field = typeof(TerrainEditor).GetField("pixelSmoothBuffer", BindingFlags.Instance | BindingFlags.NonPublic);
+                if (field == null)
+                    Logger.LogWarning("Unable to find field: TerrainEditor.pixelSmoothBuffer.");
+                
+                FieldInfo buffer = typeof(HeightmapSmoothAction).GetField(nameof(PixelSmoothBuffer), BindingFlags.Static | BindingFlags.NonPublic)!;
+                
+                List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+                bool one = false;
+                for (int i = 0; i < ins.Count; ++i)
+                {
+                    CodeInstruction c = ins[i];
+                    if (c.opcode == OpCodes.Ldarg_0 && i != ins.Count - 1 && (field == null && ins[i + 1].opcode == OpCodes.Ldfld || ins[i + 1].LoadsField(field)))
+                    {
+                        CodeInstruction c2 = new CodeInstruction(OpCodes.Ldsfld, buffer);
+                        c2.labels.AddRange(c.labels);
+                        c2.blocks.AddRange(c.blocks);
+                        yield return c2;
+                        one = true;
+                        ++i;
+                        Logger.LogDebug("Replaced " + ins[i + 1].Format() + " with " + c2.Format() + ".");
+                        continue;
+                    }
+                    yield return c;
+                }
+                if (!one)
+                {
+                    Logger.LogWarning("Unable to replace load of " + field?.Format() + " with " + buffer.Format() + ".");
+                }
+            }
+
+            // make compiler happy
+            _ = Transpiler(null!, null!);
+            throw new NotImplementedException();
         }
         private float IntlHandleHeightmapWriteSmooth(LandscapeCoord tileCoord, HeightmapCoord heightmapCoord, Vector3 worldPosition, float currentHeight)
         {
@@ -423,7 +518,18 @@ public partial class EditorTerrain
                 return currentHeight;
             distance = Mathf.Sqrt(distance) / BrushRadius;
             float brushAlpha = GetBrushAlpha(distance);
-            currentHeight = Mathf.Lerp(currentHeight, SmoothTarget, DeltaTime * BrushStrength * brushAlpha);
+            float target = SmoothTarget;
+            if (SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE)
+            {
+                _pixelSmoothSampleCount = 0;
+                _pixelSmoothSampleTotal = 0.0f;
+                SampleHeightPixelSmooth(null, worldPosition + new Vector3(Landscape.HEIGHTMAP_WORLD_UNIT, 0.0f, 0.0f), ref _pixelSmoothSampleCount, ref _pixelSmoothSampleTotal);
+                SampleHeightPixelSmooth(null, worldPosition + new Vector3(-Landscape.HEIGHTMAP_WORLD_UNIT, 0.0f, 0.0f), ref _pixelSmoothSampleCount, ref _pixelSmoothSampleTotal);
+                SampleHeightPixelSmooth(null, worldPosition + new Vector3(0.0f, 0.0f, Landscape.HEIGHTMAP_WORLD_UNIT), ref _pixelSmoothSampleCount, ref _pixelSmoothSampleTotal);
+                SampleHeightPixelSmooth(null, worldPosition + new Vector3(0.0f, 0.0f, -Landscape.HEIGHTMAP_WORLD_UNIT), ref _pixelSmoothSampleCount, ref _pixelSmoothSampleTotal);
+                target = _pixelSmoothSampleCount <= 0 ? currentHeight : _pixelSmoothSampleTotal / _pixelSmoothSampleCount;
+            }
+            currentHeight = Mathf.Lerp(currentHeight, target, DeltaTime * BrushStrength * brushAlpha);
             return currentHeight;
         }
     }
@@ -1305,6 +1411,10 @@ public partial class EditorTerrain
                 bld.Append(" Sensitivity: ").Append(Sensitivity);
             if ((Flags & BrushValueFlags.Target) != 0)
                 bld.Append(" Target: ").Append(Target);
+            if ((Flags & BrushValueFlags.FoliageAsset) != 0)
+                bld.Append(" Foliage Asset: ").Append(FoliageAsset.GUID.ToString("N"));
+            if ((Flags & BrushValueFlags.TileCoordinates) != 0)
+                bld.Append(" Tile Coordinates: (").Append(CoordinateX).Append(", ").Append(CoordinateY).Append(')');
             if ((Flags & BrushValueFlags.SplatmapPaintInfo) != 0 && Splatmap != null)
                 bld.Append(" Splatmap: ").Append(Splatmap);
 

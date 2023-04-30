@@ -16,6 +16,7 @@ using System.Runtime.CompilerServices;
 using Module = SDG.Framework.Modules.Module;
 #if CLIENT
 using DevkitServer.Players;
+using DevkitServer.Players.UI;
 #endif
 
 namespace DevkitServer;
@@ -111,8 +112,8 @@ public sealed class DevkitServerModule : IModuleNexus
             if (LoadFaulted)
                 return;
 
-            Editor.onEditorCreated += OnEditorCreated;
             Level.onPostLevelLoaded += OnPostLevelLoaded;
+            Editor.onEditorCreated += OnEditorCreated;
 #if SERVER
             Provider.onServerConnected += UserManager.AddPlayer;
             Provider.onServerDisconnected += UserManager.RemovePlayer;
@@ -128,6 +129,7 @@ public sealed class DevkitServerModule : IModuleNexus
             Provider.onEnemyDisconnected += EditorUser.OnEnemyDisconnected;
             ChatManager.onChatMessageReceived += OnChatMessageReceived;
             UserTPVControl.Init();
+            UIAccessTools.EditorUIReady += EditorUIReady;
 #endif
             PluginLoader.Load();
         }
@@ -154,6 +156,12 @@ public sealed class DevkitServerModule : IModuleNexus
 
         }
     }
+#if CLIENT
+    private void EditorUIReady()
+    {
+        DevkitEditorHUD.Open();
+    }
+#endif
 
 #if SERVER
     private void OnAssetsRefreshed()
@@ -175,8 +183,10 @@ public sealed class DevkitServerModule : IModuleNexus
 
     private void OnPostLevelLoaded(int level)
     {
-        //if (level == Level.BUILD_INDEX_GAME)
-        //    GameObjectHost.AddComponent<TileSync>();
+        if (IsEditing && level == Level.BUILD_INDEX_GAME)
+            GameObjectHost.AddComponent<TileSync>();
+        else if (GameObjectHost.TryGetComponent(out TileSync sync))
+            Object.Destroy(sync);
     }
     internal void UnloadBundle()
     {
@@ -291,6 +301,7 @@ public sealed class DevkitServerModule : IModuleNexus
         PluginLoader.Unload();
         _tknSrc?.Cancel();
         _tknSrc = null;
+        Object.Destroy(TileSync.ServersideAuthorityTileSync);
         Object.Destroy(GameObjectHost);
         Logger.LogInfo("Shutting down...");
         PatchesMain.Unpatch();

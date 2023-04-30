@@ -11,26 +11,24 @@ public class DevkitEditorHUD : MonoBehaviour
     public ISleekBox InfoBox;
     public ISleekLabel MapLabel;
     public ISleekLabel UsersLabel;
-    public ISleekLabel TestBox;
 #nullable restore
     public List<KeyValuePair<ISleekLabel, ulong>> PlayerLabels = new List<KeyValuePair<ISleekLabel, ulong>>(16);
     public bool IsActive { get; private set; }
     public static DevkitEditorHUD? Instance { get; private set; }
     private void UpdateInfoHeight()
     {
-        InfoBox.sizeOffset_X = 60 + (UserManager.Users.Count - 1) * 20;
+        InfoBox.sizeOffset_Y = 70 + PlayerLabels.Count * 25;
+        InfoBox.positionOffset_Y = -InfoBox.sizeOffset_Y;
     }
     private static ISleekLabel CreateListLabelForPlayer(EditorUser user, int index)
     {
         ISleekLabel label = Glazier.Get().CreateLabel();
-
+        
         label.positionOffset_X = 10;
-        label.positionOffset_Y = 35 + 30 * index;
-        label.sizeOffset_X = 20;
+        label.positionOffset_Y = 65 + 25 * index;
         label.sizeOffset_Y = 20;
         label.sizeScale_X = 1f;
-        label.sizeScale_Y = 1f;
-        label.text = user.DisplayName;
+        label.text = "• " + user.DisplayName;
 
         return label;
     }
@@ -45,61 +43,40 @@ public class DevkitEditorHUD : MonoBehaviour
         Instance = this;
         Container = new SleekFullscreenBox
         {
-            positionOffset_X = 10,
-            positionOffset_Y = 10,
             positionScale_X = 1f,
-            positionScale_Y = 1f,
-            sizeOffset_X = -20,
-            sizeOffset_Y = -20,
             sizeScale_X = 1f,
-            sizeScale_Y = 1f,
-            isVisible = true
+            sizeScale_Y = 1f
         };
         EditorUI.window.AddChild(Container);
-        TestBox = Glazier.Get().CreateLabel();
-        TestBox.positionOffset_X = -100;
-        TestBox.positionOffset_Y = 5;
-        TestBox.positionScale_X = 0.5f;
-        TestBox.positionScale_Y = 0.5f;
-        TestBox.sizeOffset_X = 200;
-        TestBox.sizeOffset_Y = 30;
-        TestBox.text = "test text";
-        Container.AddChild(TestBox);
         InfoBox = Glazier.Get().CreateBox();
-        InfoBox.positionOffset_Y = -50;
         InfoBox.positionScale_X = 0.8f;
         InfoBox.positionScale_Y = 1f;
-        UpdateInfoHeight();
+        InfoBox.positionOffset_Y = -75;
+        InfoBox.sizeOffset_Y = 75;
         InfoBox.sizeScale_X = 0.2f;
-        InfoBox.sizeScale_Y = 1f;
         MapLabel = Glazier.Get().CreateLabel();
         MapLabel.positionOffset_X = 5;
         MapLabel.positionOffset_Y = 5;
-        MapLabel.sizeOffset_X = 20;
         MapLabel.sizeOffset_Y = 20;
         MapLabel.sizeScale_X = 1f;
-        MapLabel.sizeScale_Y = 1f;
         MapLabel.text = Level.info.getLocalizedName();
         UsersLabel = Glazier.Get().CreateLabel();
         UsersLabel.positionOffset_X = 5;
         UsersLabel.positionOffset_Y = 35;
-        UsersLabel.sizeOffset_X = 20;
         UsersLabel.sizeOffset_Y = 20;
         UsersLabel.sizeScale_X = 1f;
-        UsersLabel.sizeScale_Y = 1f;
-        UsersLabel.text = "Users:";
+        UsersLabel.text = "<b>Users</b>";
+        UsersLabel.enableRichText = true;
         InfoBox.AddChild(MapLabel);
         InfoBox.AddChild(UsersLabel);
         for (int i = 0; i < UserManager.Users.Count; ++i)
         {
             EditorUser user = UserManager.Users[i];
-            if (user != EditorUser.User)
-            {
-                ISleekLabel label = CreateListLabelForPlayer(user, i);
-                PlayerLabels.Add(new KeyValuePair<ISleekLabel, ulong>(label, user.SteamId.m_SteamID));
-                InfoBox.AddChild(label);
-            }
+            ISleekLabel label = CreateListLabelForPlayer(user, i);
+            PlayerLabels.Add(new KeyValuePair<ISleekLabel, ulong>(label, user.SteamId.m_SteamID));
+            InfoBox.AddChild(label);
         }
+        UpdateInfoHeight();
         Container.AddChild(InfoBox);
         Logger.LogDebug("Inited hud");
     }
@@ -120,7 +97,10 @@ public class DevkitEditorHUD : MonoBehaviour
     internal void OnUserPositionUpdated(EditorUser user)
     {
         if (user == EditorUser.User)
+        {
+            UpdateAllNametags();
             return;
+        }
         for (int i = 0; i < Nametags.Count; ++i)
         {
             if (Nametags[i].Value == user.SteamId.m_SteamID)
@@ -130,14 +110,16 @@ public class DevkitEditorHUD : MonoBehaviour
             }
         }
 
+        CreateNametag(user);
+    }
+    private void CreateNametag(EditorUser user)
+    {
         // PlayerGroupUI.addGroup
         ISleekLabel label = Glazier.Get().CreateLabel();
         label.positionOffset_X = -100;
         label.positionOffset_Y = -15;
         label.sizeOffset_X = 200;
         label.sizeOffset_Y = 30;
-        label.sizeScale_X = 1f;
-        label.sizeScale_Y = 1f;
         label.shadowStyle = ETextContrastContext.ColorfulBackdrop;
         UpdateNametag(label, user);
         Container.AddChild(label);
@@ -146,12 +128,12 @@ public class DevkitEditorHUD : MonoBehaviour
     
     private void UpdateNametag(ISleekLabel nametag, EditorUser user)
     {
-        if (!IsActive && nametag.isVisible)
-        {
-            nametag.isVisible = false;
+        if (!IsActive)
             return;
-        }
-        Vector3 screenPos = MainCamera.instance.WorldToViewportPoint(user.transform.position);
+        GameObject? ctrl = user.Input.ControllerObject;
+        if (ctrl == null)
+            return;
+        Vector3 screenPos = MainCamera.instance.WorldToViewportPoint(ctrl.transform.position);
         if (screenPos.z <= 0.0)
         {
             if (nametag.isVisible)
@@ -187,6 +169,7 @@ public class DevkitEditorHUD : MonoBehaviour
             ISleekLabel label = CreateListLabelForPlayer(user, PlayerLabels.Count);
             PlayerLabels.Add(new KeyValuePair<ISleekLabel, ulong>(label, user.SteamId.m_SteamID));
             InfoBox.AddChild(label);
+            UpdateInfoHeight();
         }
         catch (Exception ex)
         {
@@ -202,10 +185,8 @@ public class DevkitEditorHUD : MonoBehaviour
             {
                 ISleekLabel lbl = Nametags[i].Key;
                 Nametags.RemoveAt(i);
-                if (lbl.isVisible)
-                    lbl.isVisible = false;
                 Container.RemoveChild(lbl);
-                return;
+                break;
             }
         }
         for (int i = 0; i < PlayerLabels.Count; ++i)
@@ -214,19 +195,30 @@ public class DevkitEditorHUD : MonoBehaviour
             {
                 ISleekLabel lbl = PlayerLabels[i].Key;
                 PlayerLabels.RemoveAt(i);
-                if (lbl.isVisible)
-                    lbl.isVisible = false;
                 InfoBox.RemoveChild(lbl);
-                return;
+                UpdateInfoHeight();
+                break;
             }
         }
     }
     internal void UpdateAllNametags()
     {
-        for (int i = 0; i < Nametags.Count; ++i)
+        for (int p = 0; p < UserManager.Users.Count; ++p)
         {
-            if (UserManager.FromId(Nametags[i].Value) is { } pl)
-                UpdateNametag(Nametags[i].Key, pl);
+            bool found = false;
+            EditorUser u = UserManager.Users[p];
+            for (int i = 0; i < Nametags.Count; ++i)
+            {
+                if (Nametags[i].Value == u.SteamId.m_SteamID)
+                {
+                    UpdateNametag(Nametags[i].Key, u);
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+                CreateNametag(u);
         }
     }
 
@@ -236,9 +228,15 @@ public class DevkitEditorHUD : MonoBehaviour
 
         if (Instance == null)
         {
-            Instance = DevkitServerModule.GameObjectHost.AddComponent<DevkitEditorHUD>();
+            DevkitServerModule.GameObjectHost.AddComponent<DevkitEditorHUD>();
         }
-        if (Instance.IsActive)
+        else if (EditorUI.window == null || EditorUI.window.FindIndexOfChild(Instance.Container) == -1)
+        {
+            Logger.LogDebug("Expired container parent for editor HUD.");
+            Close(true);
+            DevkitServerModule.GameObjectHost.AddComponent<DevkitEditorHUD>();
+        }
+        if (Instance!.IsActive)
             return;
         Instance.IsActive = true;
         Instance.Container.AnimateIntoView();
@@ -257,7 +255,7 @@ public class DevkitEditorHUD : MonoBehaviour
         }
         else
         {
-            Instance.Container.AnimateOutOfView(0f, 1f);
+            Instance.Container.AnimateOutOfView(1f, 0f);
         }
         Logger.LogDebug(" Closed HUD");
         Instance.IsActive = false;

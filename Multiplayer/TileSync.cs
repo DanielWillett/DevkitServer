@@ -1,30 +1,61 @@
-﻿using JetBrains.Annotations;
-using SDG.Framework.Landscapes;
-using DevkitServer.Multiplayer.Networking;
-#if CLIENT
-using SDG.Framework.Devkit;
-using SDG.NetPak;
-#endif
-#if SERVER
-using HarmonyLib;
+﻿using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
-#endif
+using HarmonyLib;
+using JetBrains.Annotations;
+using SDG.Framework.Devkit;
+using SDG.Framework.Landscapes;
+using SDG.NetPak;
 
 namespace DevkitServer.Multiplayer;
-#if SERVER
 [HarmonyPatch]
-#endif
 public class TileSync : MonoBehaviour
 {
+    private static readonly NetCall<ulong> SendTileSyncAuthority = new NetCall<ulong>((ushort)NetCalls.TileSyncAuthority);
     private const int MaxPacketSize = (int)(NetFactory.MaxPacketSize * 0.75f); // leave some space for other packets
-    private const int PacketOffset = sizeof(ushort) + 1 + 7 * sizeof(int);
+    private const int PacketOffset = sizeof(ushort) + 1 + 7 * sizeof(int) + sizeof(ulong);
     public static int HeightmapPacketCount { get; }
     public static int SplatmapPacketCount { get; }
     public static int HolePacketCount { get; }
     public static int TotalHeightmapLength { get; }
     public static int TotalSplatmapLength { get; }
     public static int TotalHoleLength { get; }
-     
+    public static TileSync ServersideAuthorityTileSync { get; private set; } = null!;
+
+    /// <remarks><see langword="null"/> for the server-side authority instance.</remarks>
+    public EditorUser? User { get; internal set; }
+    public bool IsOwner { get; private set; }
+
+    public bool HasAuthority
+    {
+        get => _hasAuthority;
+        private set
+        {
+            if (_hasAuthority == value)
+                return;
+            if (value)
+            {
+#if SERVER
+                SendTileSyncAuthority?.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID);
+#endif
+                if (ServersideAuthorityTileSync != null)
+                    ServersideAuthorityTileSync.HasAuthority = false;
+
+                for (int i = 0; i < UserManager.Users.Count; ++i)
+                {
+                    EditorUser u = UserManager.Users[i];
+                    if (u.TileSync != null)
+                        u.TileSync.HasAuthority = false;
+                }
+            }
+            _hasAuthority = value;
+            if (User == null)
+                Logger.LogDebug($"Server-side authority TileSync {(value ? "gained" : "lost")} authority.");
+            else
+                Logger.LogDebug($"{User.Format()} TileSync {(value ? "gained" : "lost")} authority.");
+        }
+    }
+
     private DataType _dataType;
     public enum DataType
     {
@@ -33,12 +64,8 @@ public class TileSync : MonoBehaviour
         Splatmap,
         Holes
     }
-#if CLIENT
-    private int _index;
-#else
+    private bool _hasAuthority;
     private int _index = -1;
-#endif
-#if SERVER
     private static readonly byte[] _packetBuffer = new byte[PacketOffset + MaxPacketSize];
     private int _packetId;
     private DataType _lastDataType;
@@ -46,10 +73,8 @@ public class TileSync : MonoBehaviour
     private int _hmIndex;
     private int _smIndex;
     private int _holeIndex;
-#endif
     private static readonly byte[] _buffer;
     private static int _bufferLen;
-    public static TileSync? Instance { get; private set; }
     static TileSync()
     {
         TotalHeightmapLength = Landscape.HEIGHTMAP_RESOLUTION * Landscape.HEIGHTMAP_RESOLUTION * sizeof(float);
@@ -60,16 +85,33 @@ public class TileSync : MonoBehaviour
         HolePacketCount = Mathf.CeilToInt((float)TotalHoleLength / MaxPacketSize);
         _buffer = new byte[Math.Max(TotalHeightmapLength, Math.Max(TotalSplatmapLength, TotalHoleLength))];
     }
-
-    [UsedImplicitly]
-    private void Awake()
+    private void Start()
     {
-        if (Instance != null)
-            Destroy(Instance);
-        
-        Instance = this;
-    }
+        if (User == null)
+        {
 #if SERVER
+            IsOwner = true;
+#endif
+#if CLIENT
+            IsOwner = false;
+#endif
+            Logger.LogDebug("Server-side authority TileSync initialized.");
+            if (ServersideAuthorityTileSync != null)
+                Destroy(ServersideAuthorityTileSync);
+            ServersideAuthorityTileSync = this;
+        }
+        else
+        {
+            Logger.LogDebug($"Client {User.Format()} TileSync initialized.");
+#if CLIENT
+            IsOwner = User == EditorUser.User;
+#endif
+#if SERVER
+            IsOwner = false;
+#endif
+        }
+    }
+    
     private readonly List<MapInvalidation<HeightmapBounds>> _hmInvalidated = new List<MapInvalidation<HeightmapBounds>>(32);
     private readonly List<MapInvalidation<SplatmapBounds>> _smInvalidated = new List<MapInvalidation<SplatmapBounds>>(32);
     private readonly List<MapInvalidation<SplatmapBounds>> _holeInvalidated = new List<MapInvalidation<SplatmapBounds>>(32);
@@ -85,10 +127,31 @@ public class TileSync : MonoBehaviour
             Time = time;
         }
     }
-#endif
 #if CLIENT
+    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.TileSyncAuthority)]
+    [UsedImplicitly]
+    private static void ReceiveTileSyncAuthority(MessageContext ctx, ulong s64)
+    {
+        if (s64 == 0)
+        {
+            if (ServersideAuthorityTileSync != null)
+                ServersideAuthorityTileSync.HasAuthority = true;
+            return;
+        }
+        EditorUser? user = UserManager.FromId(s64);
+        if (user != null && user.TileSync != null)
+        {
+            user.TileSync.HasAuthority = true;
+        }
+    }
+#endif
     private void ReceiveTileData(byte[] data, int offset)
     {
+        if (!HasAuthority)
+        {
+            Logger.LogWarning("Received tile data while authority.");
+            return;
+        }
         _dataType = (DataType)data[offset];
         int packetId = BitConverter.ToUInt16(data, offset + 1);
         LandscapeCoord coords = new LandscapeCoord(BitConverter.ToInt32(data, offset + 1 + sizeof(ushort)), BitConverter.ToInt32(data, offset + sizeof(ushort) + 1 + sizeof(int)));
@@ -106,7 +169,7 @@ public class TileSync : MonoBehaviour
         Logger.LogDebug($"[TILE SYNC] Receiving packet #{packetId} for tile {coords} ({DevkitServerUtility.FormatBytes(len)} @ {DevkitServerUtility.FormatBytes(_index)})");
         if (_index + len > _bufferLen)
             len = _bufferLen - _index;
-        // Logger.LogDebug($"[TILE SYNC] srcLen: {data.Length}, srcInd: {offset + PacketOffset}, dstLen: {_buffer.Length} ({_bufferLen}), dstInd: {_index}, count: {len}.");
+        Logger.LogDebug($"[TILE SYNC] srcLen: {data.Length}, srcInd: {offset + PacketOffset}, dstLen: {_buffer.Length} ({_bufferLen}), dstInd: {_index}, count: {len}.");
         Buffer.BlockCopy(data, offset + PacketOffset, _buffer, _index, len);
         _index += len;
         if (len + _index >= _bufferLen)
@@ -195,8 +258,6 @@ public class TileSync : MonoBehaviour
     [UsedImplicitly]
     internal static void ReceiveTileData(NetPakReader reader)
     {
-        if (Instance == null)
-            return;
         if (!reader.ReadUInt16(out ushort len))
         {
             Logger.LogError("[TILE SYNC] Failed to read incoming tile data packet length.");
@@ -209,10 +270,34 @@ public class TileSync : MonoBehaviour
             return;
         }
 
-        Instance?.ReceiveTileData(buffer, offset);
+        ulong fromPlayer = BitConverter.ToUInt64(buffer, offset);
+
+        TileSync sync;
+        if (fromPlayer != 0)
+        {
+            EditorUser? user = UserManager.FromId(fromPlayer);
+            if (user == null || user.TileSync == null)
+            {
+                Logger.LogWarning($"Unable to find a player to receive tile data on: {fromPlayer.Format()}.");
+                return;
+            }
+            sync = user.TileSync;
+        }
+        else
+        {
+            sync = ServersideAuthorityTileSync;
+        }
+        if (sync == null)
+        {
+            Logger.LogWarning("Unable to find TileSync for tile data.");
+            return;
+        }
+
+        if (sync.HasAuthority)
+            sync.ReceiveTileData(buffer, offset + sizeof(ulong));
+        else
+            Logger.LogWarning($"Received tile data from non-authoritive TileSync: {(sync.User == null ? "server-side authority" : sync.User.Format())}.");
     }
-#endif
-#if SERVER
     private static bool AddHeightmapBounds(List<MapInvalidation<HeightmapBounds>> list, LandscapeCoord coord, HeightmapBounds bounds, float time)
     {
         for (int i = list.Count - 1; i >= 0; --i)
@@ -392,7 +477,11 @@ public class TileSync : MonoBehaviour
     [UsedImplicitly]
     private void Update()
     {
+#if SERVER
         if (Provider.clients.Count == 0)
+            return;
+#endif
+        if (!HasAuthority)
             return;
         float time = Time.realtimeSinceStartup;
         if (_dataType == DataType.None && time - _lastSent > 5f)
@@ -503,18 +592,29 @@ public class TileSync : MonoBehaviour
                 _lastSent = time;
                 ushort len = (ushort)Math.Min(_bufferLen - _index, MaxPacketSize);
                 Buffer.BlockCopy(_buffer, _index, _packetBuffer, PacketOffset, len);
-                _packetBuffer[0] = (byte)_dataType;
-                UnsafeBitConverter.GetBytes(_packetBuffer, (ushort)_packetId, 1);
+                UnsafeBitConverter.GetBytes(_packetBuffer,
+#if SERVER
+                    0ul
+#else
+                    Provider.client.m_SteamID
+#endif
+                    , 0);
+                _packetBuffer[sizeof(ulong)] = (byte)_dataType;
+                UnsafeBitConverter.GetBytes(_packetBuffer, (ushort)_packetId, 1 + sizeof(ulong));
                 ++_packetId;
-                UnsafeBitConverter.GetBytes(_packetBuffer, tile.coord.x, sizeof(ushort) + 1);
-                UnsafeBitConverter.GetBytes(_packetBuffer, tile.coord.y, sizeof(ushort) + 1 + sizeof(int));
-                UnsafeBitConverter.GetBytes(_packetBuffer, sx, sizeof(ushort) + 1 + 2 * sizeof(int));
-                UnsafeBitConverter.GetBytes(_packetBuffer, sy, sizeof(ushort) + 1 + 3 * sizeof(int));
-                UnsafeBitConverter.GetBytes(_packetBuffer, ox, sizeof(ushort) + 1 + 4 * sizeof(int));
-                UnsafeBitConverter.GetBytes(_packetBuffer, oy, sizeof(ushort) + 1 + 5 * sizeof(int));
-                UnsafeBitConverter.GetBytes(_packetBuffer, len, sizeof(ushort) + 1 + 6 * sizeof(int));
+                UnsafeBitConverter.GetBytes(_packetBuffer, tile.coord.x, sizeof(ushort) + 1 + sizeof(ulong));
+                UnsafeBitConverter.GetBytes(_packetBuffer, tile.coord.y, sizeof(ushort) + 1 + sizeof(int) + sizeof(ulong));
+                UnsafeBitConverter.GetBytes(_packetBuffer, sx, sizeof(ushort) + 1 + 2 * sizeof(int) + sizeof(ulong));
+                UnsafeBitConverter.GetBytes(_packetBuffer, sy, sizeof(ushort) + 1 + 3 * sizeof(int) + sizeof(ulong));
+                UnsafeBitConverter.GetBytes(_packetBuffer, ox, sizeof(ushort) + 1 + 4 * sizeof(int) + sizeof(ulong));
+                UnsafeBitConverter.GetBytes(_packetBuffer, oy, sizeof(ushort) + 1 + 5 * sizeof(int) + sizeof(ulong));
+                UnsafeBitConverter.GetBytes(_packetBuffer, len, sizeof(ushort) + 1 + 6 * sizeof(int) + sizeof(ulong));
                 _index += len;
-                NetFactory.SendGeneric(NetFactory.DevkitMessage.SendTileData, _packetBuffer, null, length: PacketOffset + len, reliable: true);
+                NetFactory.SendGeneric(NetFactory.DevkitMessage.SendTileData, _packetBuffer, 
+#if SERVER
+                    null,
+#endif
+                    length: PacketOffset + len, reliable: true);
             }
 
             // flush buffer
@@ -540,7 +640,13 @@ public class TileSync : MonoBehaviour
     [UsedImplicitly]
     private static void OnWriteHeightmap(Bounds worldBounds, Landscape.LandscapeWriteHeightmapHandler callback)
     {
-        Instance?.InvalidateBounds(worldBounds, DataType.Heightmap, Time.realtimeSinceStartup);
+#if SERVER
+        if (ServersideAuthorityTileSync.HasAuthority)
+            ServersideAuthorityTileSync.InvalidateBounds(worldBounds, DataType.Heightmap, Time.realtimeSinceStartup);
+#else
+        if (EditorUser.User != null && EditorUser.User.TileSync != null && EditorUser.User.TileSync.HasAuthority)
+            EditorUser.User.TileSync.InvalidateBounds(worldBounds, DataType.Heightmap, Time.realtimeSinceStartup);
+#endif
     }
 
     [HarmonyPatch(typeof(Landscape), nameof(Landscape.writeSplatmap))]
@@ -548,7 +654,13 @@ public class TileSync : MonoBehaviour
     [UsedImplicitly]
     private static void OnWriteSplatmap(Bounds worldBounds, Landscape.LandscapeWriteSplatmapHandler callback)
     {
-        Instance?.InvalidateBounds(worldBounds, DataType.Splatmap, Time.realtimeSinceStartup);
+#if SERVER
+        if (ServersideAuthorityTileSync.HasAuthority)
+            ServersideAuthorityTileSync.InvalidateBounds(worldBounds, DataType.Splatmap, Time.realtimeSinceStartup);
+#else
+        if (EditorUser.User != null && EditorUser.User.TileSync != null && EditorUser.User.TileSync.HasAuthority)
+            EditorUser.User.TileSync.InvalidateBounds(worldBounds, DataType.Splatmap, Time.realtimeSinceStartup);
+#endif
     }
 
     [HarmonyPatch(typeof(Landscape), nameof(Landscape.writeHoles))]
@@ -556,7 +668,12 @@ public class TileSync : MonoBehaviour
     [UsedImplicitly]
     private static void OnWriteHoles(Bounds worldBounds, Landscape.LandscapeWriteHolesHandler callback)
     {
-        Instance?.InvalidateBounds(worldBounds, DataType.Holes, Time.realtimeSinceStartup);
-    }
+#if SERVER
+        if (ServersideAuthorityTileSync.HasAuthority)
+            ServersideAuthorityTileSync.InvalidateBounds(worldBounds, DataType.Holes, Time.realtimeSinceStartup);
+#else
+        if (EditorUser.User != null && EditorUser.User.TileSync != null && EditorUser.User.TileSync.HasAuthority)
+            EditorUser.User.TileSync.InvalidateBounds(worldBounds, DataType.Holes, Time.realtimeSinceStartup);
 #endif
+    }
 }

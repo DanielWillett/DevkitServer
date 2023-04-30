@@ -24,5 +24,7 @@ internal enum NetCalls : ushort
     SendPermissionGroupLateRegistered = 21,
     SendPermissionDeregistered = 22,
     SendPermissionGroupDeregistered = 23,
-    SendPermissionGroupUpdate = 24
+    SendPermissionGroupUpdate = 24,
+    ReunRequest = 25,
+    TileSyncAuthority = 26
 }

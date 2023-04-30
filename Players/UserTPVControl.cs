@@ -11,7 +11,7 @@ public class UserTPVControl : MonoBehaviour
 {
     private static GameObject? _objectPrefab;
     private static bool _init;
-    private EditorClothes _editorClothes;
+    private EditorClothes _editorClothes = null!;
     public EditorUser User { get; internal set; } = null!;
     public GameObject Model { get; private set; } = null!;
 
@@ -84,7 +84,7 @@ public class UserTPVControl : MonoBehaviour
     {
         if (UserManager.FromPlayer(__instance.player) is { IsOnline: true } editor && editor.EditorObject != null && editor.EditorObject.TryGetComponent(out UserTPVControl ctrl))
         {
-            ctrl._editorClothes.Face = ctrl.User.Player!.face;
+            ctrl._editorClothes.Face = index;
             ctrl._editorClothes.Apply();
         }
     }
@@ -288,7 +288,7 @@ internal sealed class EditorClothes : MonoBehaviour
                 Destroy(_hatModel.gameObject);
             if (hat != null && hat.hat != null && hat.shouldBeVisible(false))
             {
-                _hatModel = Instantiate(hat.hat, Vector3.zero, Quaternion.identity, transform).transform;
+                _hatModel = Instantiate(hat.hat, Vector3.zero, Quaternion.Euler(-90f, 0f, 0f), transform).transform;
                 _hatModel.name = "Hat" + hat.GUID.ToString("N");
                 _hatModel.transform.localScale = new Vector3(1f, !this._isLeftHanded || !(GetShouldMirrorLeftHandedModel != null && GetShouldMirrorLeftHandedModel(hat)) ? 1f : -1f, 1f);
                 if (hat.shouldDestroyClothingColliders)
@@ -313,7 +313,7 @@ internal sealed class EditorClothes : MonoBehaviour
                 GameObject hairModel = Resources.Load<GameObject>("Hairs/" + _hair.ToString(CultureInfo.InvariantCulture) + "/Hair");
                 if (hairModel != null)
                 {
-                    _hairModel = Instantiate(hairModel, Vector3.zero, Quaternion.identity, transform).transform;
+                    _hairModel = Instantiate(hairModel, Vector3.zero, Quaternion.Euler(-90f, 0f, 0f), transform).transform;
                     _hairModel.name = "Hair" + _hair.ToString(CultureInfo.InvariantCulture);
                     Transform m0 = _hairModel.Find("Model_0");
                     if (m0 != null)
@@ -332,7 +332,7 @@ internal sealed class EditorClothes : MonoBehaviour
                 GameObject beardModel = Resources.Load<GameObject>("Beards/" + _beard.ToString(CultureInfo.InvariantCulture) + "/Beard");
                 if (beardModel != null)
                 {
-                    _beardModel = Instantiate(beardModel, Vector3.zero, Quaternion.identity, transform).transform;
+                    _beardModel = Instantiate(beardModel, Vector3.zero, Quaternion.Euler(-90f, 0f, 0f), transform).transform;
                     _beardModel.name = "Beard" + _beard.ToString(CultureInfo.InvariantCulture);
                     Transform m0 = _beardModel.Find("Model_0");
                     if (m0 != null)

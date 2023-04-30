@@ -10,6 +10,7 @@ using SDG.Framework.Landscapes;
 using SDG.Framework.Devkit;
 using SDG.Framework.Foliage;
 using DevkitServer.Players;
+using SDG.Framework.Devkit.Transactions;
 using SDG.Framework.Utilities;
 
 namespace DevkitServer.Patches;
@@ -456,8 +457,8 @@ public static class ClientEvents
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (removeInstances == null)
             Logger.LogWarning("Unable to find method: FoliageEditor.removeInstances.");
-        else
-            CheckCopiedMethodPatchOutOfDate(ref removeInstances, removeInstancesInvoker);
+        // else
+        //     CheckCopiedMethodPatchOutOfDate(ref removeInstances, removeInstancesInvoker);
 
         MethodInfo? rspDestroy = typeof(ResourceSpawnpoint).GetMethod(nameof(ResourceSpawnpoint.destroy),
             BindingFlags.Public | BindingFlags.Instance);
@@ -502,6 +503,11 @@ public static class ClientEvents
                         CodeInstruction l = ins[j];
                         if (l.opcode == OpCodes.Ldloca_S || l.opcode == OpCodes.Ldloca)
                         {
+                            if (l.operand is LocalBuilder lbl)
+                                yield return DevkitServerUtility.GetLocalCodeInstruction(lbl, lbl.LocalIndex, false,
+                                    false);
+                            else
+                                yield return new CodeInstruction(l.opcode == OpCodes.Ldloca_S ? OpCodes.Ldarg_S : OpCodes.Ldarg, l.operand);
                             yield return DevkitServerUtility.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, false);
                             Logger.LogDebug("Inserted get sample count local instruction.");
                         }
@@ -612,27 +618,29 @@ public static class ClientEvents
     {
         if (!DevkitServerModule.IsEditing) return;
 
-        Logger.LogDebug("Foliage added at " +
-                        position.ToString("F2", CultureInfo.InvariantCulture) +
-                        " rot: " + rotation.eulerAngles.ToString("F2", CultureInfo.InvariantCulture) +
-                        " scale: " + scale.ToString("F2", CultureInfo.InvariantCulture) +
-                        " clear when baked: " + clearWhenBaked + "." );
+        Logger.LogDebug("Foliage " + asset.FriendlyName + " added at " +
+                                          position.ToString("F2", CultureInfo.InvariantCulture) +
+                                          " rot: " + rotation.eulerAngles.ToString("F2", CultureInfo.InvariantCulture) +
+                                          " scale: " + scale.ToString("F2", CultureInfo.InvariantCulture) +
+                                          " clear when baked: " + clearWhenBaked + "." );
         OnFoliageAdded?.Invoke(asset, position, rotation, scale, clearWhenBaked);
     }
 
     [UsedImplicitly]
-    private static void OnRemoveInstances(FoliageTile foliageTile, FoliageInstanceList list, float sqrBrushRadius, float sqrBrushFalloffRadius, bool allowRemoveBaked, int sampleCount)
+    private static void OnRemoveInstances(FoliageTile foliageTile, FoliageInstanceList list, float sqrBrushRadius, float sqrBrushFalloffRadius, bool allowRemoveBaked, int sampleCount, int oldSampleCount)
     {
+        if (sampleCount == oldSampleCount)
+            return;
         if (!DevkitServerModule.IsEditing || !InputEx.GetKey(KeyCode.Mouse0) ||
             GetFoliageBrushWorldPosition == null || UserInput.ActiveTool is not { } tool) return;
 
-        Logger.LogDebug(sampleCount + " foliage removed from " +
-                        foliageTile.coord.ToString() +
-                        " on list " + list.assetReference.Find()?.FriendlyName +
-                        " in radius^2: " + sqrBrushRadius.ToString("F2", CultureInfo.InvariantCulture) +
-                        " with falloff^2: " + sqrBrushFalloffRadius.ToString("F2", CultureInfo.InvariantCulture) +
-                        " remove baked: " + allowRemoveBaked + ".");
-        OnFoliageRemoved?.Invoke(GetFoliageBrushWorldPosition(tool), foliageTile, list, sqrBrushRadius, sqrBrushFalloffRadius, allowRemoveBaked, sampleCount);
+        Logger.LogDebug((oldSampleCount - sampleCount) + " foliage removed from " +
+                         foliageTile.coord.ToString() +
+                         " on list " + list.assetReference.Find()?.FriendlyName +
+                         " in radius^2: " + sqrBrushRadius.ToString("F2", CultureInfo.InvariantCulture) +
+                         " with falloff^2: " + sqrBrushFalloffRadius.ToString("F2", CultureInfo.InvariantCulture) +
+                         " remove baked: " + allowRemoveBaked + ".");
+        OnFoliageRemoved?.Invoke(GetFoliageBrushWorldPosition(tool), foliageTile, list, sqrBrushRadius, sqrBrushFalloffRadius, allowRemoveBaked, (oldSampleCount - sampleCount));
     }
 
     [UsedImplicitly]
@@ -676,6 +684,80 @@ public static class ClientEvents
     }
     #endregion
 
+    #region EditorInteract.Update
+    [HarmonyPatch("EditorInteract", "Update")]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    private static IEnumerable<CodeInstruction> EditorInteractUpdateTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
+    {
+        Type tm = typeof(DevkitTransactionManager);
+        Type ce = typeof(ClientEvents);
+        MethodInfo? redoMethod = tm.GetMethod(nameof(DevkitTransactionManager.redo), BindingFlags.Public | BindingFlags.Static);
+        if (redoMethod == null)
+        {
+            Logger.LogWarning("Unable to find method: DevkitTransactionManager.redo.");
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo? undoMethod = tm.GetMethod(nameof(DevkitTransactionManager.undo), BindingFlags.Public | BindingFlags.Static);
+        if (undoMethod == null)
+        {
+            Logger.LogWarning("Unable to find method: DevkitTransactionManager.undo.");
+            DevkitServerModule.Fault();
+        }
+        MethodInfo undoInvoker = ce.GetMethod(nameof(OnUndoRequested), BindingFlags.Static | BindingFlags.NonPublic)!;
+        MethodInfo redoInvoker = ce.GetMethod(nameof(OnRedoRequested), BindingFlags.Static | BindingFlags.NonPublic)!;
+
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        bool undo = false, redo = false;
+        for (int i = 0; i < ins.Count; ++i)
+        {
+            CodeInstruction c = ins[i];
+            if (!redo && redoMethod != null && c.Calls(redoMethod) && redoInvoker != null)
+            {
+                CodeInstruction c2 = new CodeInstruction(OpCodes.Call, redoInvoker);
+                c2.labels.AddRange(c.labels);
+                c2.blocks.AddRange(c.blocks);
+                yield return c2;
+                redo = true;
+                if (redoMethod.ReturnType != typeof(void))
+                    i++; // remove pop
+                continue;
+            }
+            
+            if (!undo && undoMethod != null && c.Calls(undoMethod) && undoInvoker != null)
+            {
+                CodeInstruction c2 = new CodeInstruction(OpCodes.Call, undoInvoker);
+                c2.labels.AddRange(c.labels);
+                c2.blocks.AddRange(c.blocks);
+                yield return c2;
+                undo = true;
+                if (undoMethod.ReturnType != typeof(void))
+                    i++; // remove pop
+                continue;
+            }
+
+            yield return c;
+        }
+        if (!undo || !redo)
+        {
+            Logger.LogWarning("Patching error for " + method.Format() + $" Redo: {redo.Format()}, Undo: {undo.Format()}.");
+            DevkitServerModule.Fault();
+        }
+    }
+    private static void OnUndoRequested()
+    {
+        if (EditorUser.User != null && EditorUser.User.Transactions != null)
+            EditorUser.User.Transactions.RequestUndo();
+    }
+    private static void OnRedoRequested()
+    {
+        if (EditorUser.User != null && EditorUser.User.Transactions != null)
+            EditorUser.User.Transactions.RequestRedo();
+    }
+
+    #endregion
+    
     private static void CheckCopiedMethodPatchOutOfDate(ref MethodInfo original, MethodInfo invoker)
     {
         ParameterInfo[] p = original.GetParameters();
