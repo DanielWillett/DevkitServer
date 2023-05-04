@@ -192,20 +192,28 @@ public sealed class PermissionGroup : IReadOnlyList<GroupPermission>
         Color clr = reader.ReadColor();
         int priority = reader.ReadInt32();
         int len = reader.ReadInt32();
-        List<GroupPermission> permissions = new List<GroupPermission>(len);
+        PermissionGroup group = new PermissionGroup
+        {
+            Id = id,
+            DisplayName = name,
+            Color = clr,
+            Priority = priority
+        };
+        if (group._permissions.Capacity < len)
+            group._permissions.Capacity = len;
         for (int j = 0; j < len; ++j)
         {
             bool rem = reader.ReadBool();
             string str = reader.ReadString();
             if (Permission.TryParse(str, out Permission perm))
             {
-                permissions.Add(new GroupPermission(perm, rem));
+                group._permissions.Add(new GroupPermission(perm, rem));
             }
             else
-                Logger.LogWarning("Unable to parse permission: " + str.Format() + ".");
+                Logger.LogInfo("Unable to find permission: " + str.Format() + ", usually not a problem.");
         }
 
-        return new PermissionGroup(id, name, clr, priority, permissions);
+        return group;
     }
     internal bool AddPermission(GroupPermission permission)
     {
@@ -257,7 +265,7 @@ public sealed class PermissionGroup : IReadOnlyList<GroupPermission>
 
     // ReSharper restore NonReadonlyMemberInGetHashCode
     public static bool operator ==(PermissionGroup? left, object? right) => left is null ? right is null : left.Equals(right);
-    public static bool operator !=(PermissionGroup? left, object? right) => left is null ? right is not null : !left.Equals(right);
+    public static bool operator !=(PermissionGroup? left, object? right) => !(left == right);
 }
 
 [JsonConverter(typeof(GroupPermissionConverter))]

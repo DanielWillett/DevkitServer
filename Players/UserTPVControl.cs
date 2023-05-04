@@ -44,6 +44,7 @@ public class UserTPVControl : MonoBehaviour
         }
 
         Model = Instantiate(_objectPrefab, transform, false);
+        Model.transform.localScale = new Vector3(2.5f, 2.5f, 2.5f);
         Model.transform.rotation = Quaternion.Euler(90, 0, 0);
         Model.name = "TPV_Editor_" + User.SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture);
         _editorClothes = Model.AddComponent<EditorClothes>();
@@ -288,7 +289,7 @@ internal sealed class EditorClothes : MonoBehaviour
                 Destroy(_hatModel.gameObject);
             if (hat != null && hat.hat != null && hat.shouldBeVisible(false))
             {
-                _hatModel = Instantiate(hat.hat, Vector3.zero, Quaternion.Euler(-90f, 0f, 0f), transform).transform;
+                _hatModel = Instantiate(hat.hat, Vector3.zero, Quaternion.Euler(-180f, 0f, 0f), transform).transform;
                 _hatModel.name = "Hat" + hat.GUID.ToString("N");
                 _hatModel.transform.localScale = new Vector3(1f, !this._isLeftHanded || !(GetShouldMirrorLeftHandedModel != null && GetShouldMirrorLeftHandedModel(hat)) ? 1f : -1f, 1f);
                 if (hat.shouldDestroyClothingColliders)
@@ -313,7 +314,7 @@ internal sealed class EditorClothes : MonoBehaviour
                 GameObject hairModel = Resources.Load<GameObject>("Hairs/" + _hair.ToString(CultureInfo.InvariantCulture) + "/Hair");
                 if (hairModel != null)
                 {
-                    _hairModel = Instantiate(hairModel, Vector3.zero, Quaternion.Euler(-90f, 0f, 0f), transform).transform;
+                    _hairModel = Instantiate(hairModel, Vector3.zero, Quaternion.Euler(-180f, 0f, 0f), transform).transform;
                     _hairModel.name = "Hair" + _hair.ToString(CultureInfo.InvariantCulture);
                     Transform m0 = _hairModel.Find("Model_0");
                     if (m0 != null)
@@ -332,7 +333,7 @@ internal sealed class EditorClothes : MonoBehaviour
                 GameObject beardModel = Resources.Load<GameObject>("Beards/" + _beard.ToString(CultureInfo.InvariantCulture) + "/Beard");
                 if (beardModel != null)
                 {
-                    _beardModel = Instantiate(beardModel, Vector3.zero, Quaternion.Euler(-90f, 0f, 0f), transform).transform;
+                    _beardModel = Instantiate(beardModel, Vector3.zero, Quaternion.Euler(-180f, 0f, 0f), transform).transform;
                     _beardModel.name = "Beard" + _beard.ToString(CultureInfo.InvariantCulture);
                     Transform m0 = _beardModel.Find("Model_0");
                     if (m0 != null)

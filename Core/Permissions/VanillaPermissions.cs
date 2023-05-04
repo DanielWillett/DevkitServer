@@ -4,6 +4,8 @@ namespace DevkitServer.Core.Permissions;
 public static class VanillaPermissions
 {
     [Permission]
+    public static readonly Permission EditTerrain = new Permission("terrain.*", core: true);
+    [Permission]
     public static readonly Permission EditHeightmap = new Permission("terrain.heightmap.edit", core: true);
     [Permission]
     public static readonly Permission EditSplatmap = new Permission("terrain.splatmap.edit", core: true);

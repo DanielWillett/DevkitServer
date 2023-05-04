@@ -1,11 +1,21 @@
 ﻿using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
+#if CLIENT
 using JetBrains.Annotations;
+#endif
+#if SERVER
+using DevkitServer.Players;
+#endif
 
 namespace DevkitServer.Multiplayer;
 public sealed class ClientInfo
 {
+#if CLIENT
+    public static event Action<ClientInfo>? OnClientInfoReady;
+#else
+    public static event Action<EditorUser, ClientInfo>? OnClientInfoReady;
+#endif
     internal static readonly NetCallRaw<ClientInfo> SendClientInfo = new NetCallRaw<ClientInfo>((ushort)NetCalls.SendClientInfo, ReadInfo, WriteInfo);
     public const ushort DataVersion = 0;
 #if CLIENT
@@ -18,7 +28,21 @@ public sealed class ClientInfo
         Info = info;
         UserPermissions.UserHandler.ReceivePermissions(info.Permissions, info.PermissionGroups);
         Logger.LogDebug("Received client info.");
+        Logger.DumpJson(info);
         ctx.Acknowledge();
+        if (OnClientInfoReady == null) return;
+        foreach (Action<ClientInfo> inv in OnClientInfoReady.GetInvocationList().Cast<Action<ClientInfo>>())
+        {
+            try
+            {
+                inv(info);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Plugin threw an error in " + typeof(ClientInfo).Format() + "." + nameof(OnClientInfoReady) + ".");
+                Logger.LogError(ex);
+            }
+        }
     }
     internal static void OnDisconnect()
     {
@@ -60,13 +84,13 @@ public sealed class ClientInfo
             if (Permission.TryParse(str, out Permission p))
                 perms.Add(p);
             else
-                Logger.LogWarning("Unable to parse permission: " + str.Format() + ".");
+                Logger.LogInfo("Unable to find permission: " + str.Format() + ", usually not a problem.");
         }
 
         Permissions = perms.ToArray();
 
         PermissionGroups = new PermissionGroup[reader.ReadInt32()];
-        for (int i = 0; i < perms.Count; ++i)
+        for (int i = 0; i < PermissionGroups.Length; ++i)
             PermissionGroups[i] = PermissionGroup.ReadPermissionGroup(reader);
     }
     public void Write(ByteWriter writer)
@@ -81,7 +105,26 @@ public sealed class ClientInfo
         }
 
         writer.Write(PermissionGroups == null ? 0 : PermissionGroups.Length);
-        for (int i = 0; i < PermissionGroups!.Length; i++)
+        for (int i = 0; i < PermissionGroups!.Length; ++i)
             PermissionGroup.WritePermissionGroup(writer, PermissionGroups[i]);
     }
+
+#if SERVER
+    internal static void TryInvokeOnClientInfoReady(EditorUser user, ClientInfo info)
+    {
+        if (OnClientInfoReady == null) return;
+        foreach (Action<EditorUser, ClientInfo> inv in OnClientInfoReady.GetInvocationList().Cast<Action<EditorUser, ClientInfo>>())
+        {
+            try
+            {
+                inv(user, info);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Plugin threw an error in " + typeof(ClientInfo).Format() + "." + nameof(OnClientInfoReady) + " for " + user.Format() + ".");
+                Logger.LogError(ex);
+            }
+        }
+    }
+#endif
 }

@@ -2,12 +2,16 @@
 using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
+using JetBrains.Annotations;
 
 namespace DevkitServer.Players.UI;
 [EarlyTypeInit]
 [HarmonyPatch]
 public static class UIAccessTools
 {
+    public static int MessageBlockOffset { get; private set; }
+    public static int MessageBlockSize { get; private set; }
+
     private static readonly StaticGetter<EditorUI?> GetEditorUIInstance
         = Accessor.GenerateStaticGetter<EditorUI, EditorUI?>("instance", throwOnError: true)!;
 
@@ -630,13 +634,16 @@ public static class UIAccessTools
     
     [HarmonyPatch(typeof(EditorUI), "Start")]
     [HarmonyPostfix]
+    [UsedImplicitly]
     private static void EditorUIStartPostfix()
     {
         EditorUIReady?.Invoke();
         Logger.LogInfo("Editor UI ready.");
     }
+
     [HarmonyPatch(typeof(PlayerUI), "InitializePlayer")]
     [HarmonyPostfix]
+    [UsedImplicitly]
     private static void PlayerUIStartPostfix()
     {
         PlayerUIReady?.Invoke();

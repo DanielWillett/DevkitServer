@@ -599,13 +599,10 @@ public class UserInput : MonoBehaviour
         {
             Block block = PlayerSavedata.readBlock(User.Player.playerID, "/DevkitServer/Input.dat", 0);
             ushort v = block.readUInt16();
-            float pitch, yaw;
             Vector3 pos = block.readSingleVector3();
             if (v < 2)
             {
-                Vector3 rot = block.readSingleQuaternion().eulerAngles;
-                pitch = rot.x;
-                yaw = rot.y;
+                block.readSingleQuaternion();
             }
             else if (v < 3)
             {

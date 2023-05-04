@@ -43,6 +43,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static CancellationToken UnloadToken => _tknSrc == null ? CancellationToken.None : _tknSrc.Token;
     public static Local MainLocalization { get; private set; } = null!;
     public static Local CommandLocalization { get; private set; } = null!;
+    public static Local MessageLocalization { get; private set; } = null!;
     public static CultureInfo CommandParseLocale { get; set; } = CultureInfo.InvariantCulture;
     
     public static void EarlyInitialize()
@@ -68,9 +69,15 @@ public sealed class DevkitServerModule : IModuleNexus
             Instance = this;
             ReloadMainLocalization();
             ReloadCommandsLocalization();
+            ReloadMessagesLocalization();
             PluginAdvertising.Get().AddPlugin(MainLocalization.format("Name"));
             _tknSrc = new CancellationTokenSource();
             Logger.LogInfo("DevkitServer loading...");
+            if (!BitConverter.IsLittleEndian)
+            {
+                Logger.LogWarning("Your machine is big-endian, you may face issues with improper data transmission, " +
+                                  "please report it as I am unable to test with these conditioins.");
+            }
             DevkitServerConfig.Reload();
 
             if (LoadFaulted)
@@ -184,7 +191,9 @@ public sealed class DevkitServerModule : IModuleNexus
     private void OnPostLevelLoaded(int level)
     {
         if (IsEditing && level == Level.BUILD_INDEX_GAME)
-            GameObjectHost.AddComponent<TileSync>();
+        {
+            //GameObjectHost.AddComponent<TileSync>();
+        }
         else if (GameObjectHost.TryGetComponent(out TileSync sync))
             Object.Destroy(sync);
     }
@@ -375,6 +384,13 @@ public sealed class DevkitServerModule : IModuleNexus
         DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultCommandLocalization, path);
         CommandLocalization = lcl;
     }
+    public static void ReloadMessagesLocalization()
+    {
+        string path = Path.Combine(DevkitServerConfig.LocalizationFilePath, "Messages");
+        Local lcl = Localization.tryRead(path, false);
+        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultMessageLocalization, path);
+        MessageLocalization = lcl;
+    }
     private static readonly LocalDatDictionary DefaultMainLocalization = new LocalDatDictionary
     {
         { "Name", "Devkit Server" },
@@ -388,6 +404,10 @@ public sealed class DevkitServerModule : IModuleNexus
         { "PlayersOnly", "<#ff8c69>This command can not be called from console." },
         { "Exception", "<#ff8c69>Error executing command: <#4ec9b0>{0}</color>." },
         { "NoPermissions", "<#ff8c69>You do not have permission to use this command." }
+    };
+    private static readonly LocalDatDictionary DefaultMessageLocalization = new LocalDatDictionary
+    {
+        { "NoPermissions", "No Permission" }
     };
 }
 

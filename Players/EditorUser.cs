@@ -60,6 +60,8 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         Permissions = _perms.AsReadOnly();
         PermissionGroups = _permGrps.AsReadOnly();
         ClientInfo.SendClientInfo.Invoke(Connection, ClientInfo);
+        ClientInfo.TryInvokeOnClientInfoReady(this, ClientInfo);
+        Logger.DumpJson(ClientInfo);
 #endif
         Logger.LogDebug("Editor User initialized: " + SteamId.m_SteamID.Format() + " (" + DisplayName.Format() + ").");
     }

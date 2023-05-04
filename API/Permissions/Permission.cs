@@ -109,7 +109,13 @@ public sealed class Permission
 
     public override bool Equals(object? obj)
     {
-        return obj is Permission perm && (ReferenceEquals(perm, obj) || perm.Superuser && Superuser || perm.Core == Core && perm.DevkitServer == DevkitServer && perm.Plugin == Plugin && perm.Id.Equals(Id, StringComparison.InvariantCultureIgnoreCase));
+        return obj is Permission perm && (
+            ReferenceEquals(perm, this) ||
+            perm.Superuser && Superuser ||
+            perm.Core == Core && perm.DevkitServer == DevkitServer &&
+                (Plugin == null && perm.Plugin == null ||
+                 Plugin != null && Plugin.Equals(perm.Plugin))
+              && perm.Id.Equals(Id, StringComparison.InvariantCultureIgnoreCase));
     }
     public static bool operator ==(Permission? left, object? right) => left is null ? right is null : left.Equals(right);
     public static bool operator !=(Permission? left, object? right) => left is null ? right is not null : !left.Equals(right);

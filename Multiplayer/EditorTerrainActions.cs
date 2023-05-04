@@ -400,7 +400,6 @@ public partial class EditorTerrain
         public float BrushStrength { get; set; }
         public float DeltaTime { get; set; }
         public float SmoothTarget { get; set; }
-
         internal static void Patch()
         {
             try
@@ -435,7 +434,11 @@ public partial class EditorTerrain
         public void Apply()
         {
             if (SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE)
+            {
+                Bounds readBounds = Bounds;
+                readBounds.Expand(Landscape.HEIGHTMAP_WORLD_UNIT * 2f);
                 Landscape.readHeightmap(Bounds, IntlHandleHeightmapReadSmoothPixelAverage);
+            }
             WriteHeightmapNoTransactions(Bounds, IntlHandleHeightmapWriteSmooth);
             if (SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE)
                 ReleasePixelSmoothBuffer();
@@ -472,7 +475,6 @@ public partial class EditorTerrain
                 LandscapeHeightmapCopyPool.release(hmVal.Value);
             PixelSmoothBuffer.Clear();
         }
-
         private static void SampleHeightPixelSmooth(object? instance, Vector3 worldPosition, ref int sampleCount, ref float sampleAverage)
         {
             IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
@@ -496,7 +498,7 @@ public partial class EditorTerrain
                         yield return c2;
                         one = true;
                         ++i;
-                        Logger.LogDebug("Replaced " + ins[i + 1].Format() + " with " + c2.Format() + ".");
+                        Logger.LogDebug("Replaced " + ins[i].Format() + " with " + c2.Format() + ".");
                         continue;
                     }
                     yield return c;
@@ -506,8 +508,7 @@ public partial class EditorTerrain
                     Logger.LogWarning("Unable to replace load of " + field?.Format() + " with " + buffer.Format() + ".");
                 }
             }
-
-            // make compiler happy
+            
             _ = Transpiler(null!, null!);
             throw new NotImplementedException();
         }

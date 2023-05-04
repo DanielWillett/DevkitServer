@@ -4,18 +4,21 @@ using JetBrains.Annotations;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
+using DevkitServer.API.Permissions;
+using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer;
 using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Landscapes;
 using SDG.Framework.Devkit;
 using SDG.Framework.Foliage;
 using DevkitServer.Players;
+using DevkitServer.Players.UI;
 using SDG.Framework.Devkit.Transactions;
 using SDG.Framework.Utilities;
 
 namespace DevkitServer.Patches;
 
-public delegate void PaintHoleAction(Bounds bounds, Vector3 position, float radius, bool put);
+public delegate void PaintHoleAction(Bounds bounds, Vector3 position, float radius, bool isFilling);
 public delegate void LandscapeTileAction(LandscapeTile bounds);
 public delegate void AddFoliageAction(FoliageInfoAsset asset, Vector3 position, Quaternion rotation, Vector3 scale, bool clearWhenBaked);
 public delegate void RemoveFoliageAction(Vector3 brushPosition, FoliageTile foliageTile, FoliageInstanceList list, float sqrBrushRadius, float sqrBrushFalloffRadius, bool allowRemoveBaked, int sampleCount);
@@ -28,6 +31,9 @@ public delegate void SmoothAction(Bounds bounds, Vector3 position, float radius,
 public delegate void PaintAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, float target, bool useWeightTarget, bool autoSlope, bool autoFoundation, float autoMinAngleBegin, float autoMinAngleEnd, float autoMaxAngleBegin, float autoMaxAngleEnd, float autoRayLength, float autoRayRadius, ERayMask autoRayMask, bool isRemove, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt);
 public delegate void PaintSmoothAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, EDevkitLandscapeToolSplatmapSmoothMethod method, List<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>> averages, int sampleCount, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt);
 public delegate void SplatmapLayerMaterialsUpdateAction(LandscapeTile tile);
+public delegate void EditHeightmapRequest(TerrainEditor.EDevkitLandscapeToolHeightmapMode mode, ref bool allow);
+public delegate void EditSplatmapRequest(TerrainEditor.EDevkitLandscapeToolSplatmapMode mode, ref bool allow);
+public delegate void EditHolesRequest(bool isFilling, ref bool allow);
 
 [HarmonyPatch]
 [EarlyTypeInit]
@@ -48,6 +54,12 @@ public static class ClientEvents
     public static event ResourceSpawnpointRemovedAction? OnResourceSpawnpointRemoved;
     public static event LevelObjectRemovedAction? OnLevelObjectRemoved;
     public static event SplatmapLayerMaterialsUpdateAction? OnSplatmapLayerMaterialsUpdate;
+    public static event EditHeightmapRequest? OnEditHeightmapPermissionDenied;
+    public static event EditSplatmapRequest? OnEditSplatmapPermissionDenied;
+    public static event EditHolesRequest? OnEditHolesPermissionDenied;
+    public static event EditHeightmapRequest? OnEditHeightmapRequested;
+    public static event EditSplatmapRequest? OnEditSplatmapRequested;
+    public static event EditHolesRequest? OnEditHolesRequested;
     public static readonly Type FoliageEditor = typeof(Provider).Assembly.GetType("SDG.Unturned.FoliageEditor");
 
     #region TerrainEditor.update
@@ -58,6 +70,7 @@ public static class ClientEvents
     {
         Type te = typeof(TerrainEditor);
         Type ce = typeof(ClientEvents);
+        Type vp = typeof(VanillaPermissions);
         MethodInfo? rampHandler = te.GetMethod("handleHeightmapWriteRamp",
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (rampHandler == null)
@@ -189,6 +202,33 @@ public static class ClientEvents
             Logger.LogWarning("Unable to find one or more of the TerrainEditor patch trigger methods.");
             DevkitServerModule.Fault();
         }
+        FieldInfo? permissionWriteHeightmap = vp.GetField(nameof(VanillaPermissions.EditHeightmap));
+        FieldInfo? permissionWriteSplatmap = vp.GetField(nameof(VanillaPermissions.EditSplatmap));
+        FieldInfo? permissionWriteHoles = vp.GetField(nameof(VanillaPermissions.EditHoles));
+        FieldInfo? permissionAll = vp.GetField(nameof(VanillaPermissions.EditTerrain));
+        if (permissionWriteHeightmap == null || permissionWriteSplatmap == null || permissionWriteHoles == null)
+        {
+            Logger.LogWarning("Unable to find one or more of the VanillaPermissions fields.");
+            DevkitServerModule.Fault();
+        }
+        if (permissionAll == null)
+        {
+            Logger.LogWarning("Unable to find field: VanillaPermissions.EditTerrain.");
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo? hasPermission = typeof(PermissionsEx).GetMethod(nameof(PermissionsEx.Has),
+            BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(Permission), typeof(bool) }, null);
+        if (hasPermission == null)
+        {
+            Logger.LogWarning("Unable to find method: PermissionsEx.Has.");
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo? onNoPermissionInvoker = ce.GetMethod(nameof(OnNoPermissionsInvoker), BindingFlags.Static | BindingFlags.NonPublic);
+        MethodInfo? onPermissionInvoker = ce.GetMethod(nameof(OnPermissionsInvoker), BindingFlags.Static | BindingFlags.NonPublic);
+        if (hasPermission == null)
+            Logger.LogWarning("Unable to find method: ClientEvents.OnNoPermissionsInvoker.");
         LocalBuilder localBounds = generator.DeclareLocal(typeof(Bounds));
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
         int addTileCt = 0;
@@ -205,7 +245,58 @@ public static class ClientEvents
             {
                 if (ins.Count > i + 3 && ins[i + 2].opcode == OpCodes.Newobj && writeHeightmap != null && (ins[i + 3].Calls(writeHeightmap) || ins[i + 3].Calls(writeSplatmap) || ins[i + 3].Calls(writeHoles)))
                 {
-                    yield return new CodeInstruction(OpCodes.Dup);
+                    FieldInfo? permission;
+                    if (ins[i + 3].Calls(writeHeightmap))
+                        permission = permissionWriteHeightmap;
+                    else if (ins[i + 3].Calls(writeSplatmap))
+                        permission = permissionWriteHoles;
+                    else
+                        permission = permissionWriteHoles;
+
+                    Label? lbl = null;
+                    if ((permission != null || permissionAll != null) && hasPermission != null)
+                    {
+                        lbl = generator.DefineLabel();
+                        if (permission != null)
+                        {
+                            yield return new CodeInstruction(OpCodes.Ldsfld, permission);
+                            yield return new CodeInstruction(OpCodes.Ldc_I4_1);
+                            yield return new CodeInstruction(OpCodes.Call, hasPermission);
+                            yield return new CodeInstruction(OpCodes.Brtrue, lbl.Value);
+                        }
+                        if (permissionAll != null)
+                        {
+                            yield return new CodeInstruction(OpCodes.Ldsfld, permissionAll);
+                            yield return new CodeInstruction(permission != null ? OpCodes.Ldc_I4_0 : OpCodes.Ldc_I4_1);
+                            yield return new CodeInstruction(OpCodes.Call, hasPermission);
+                            yield return new CodeInstruction(OpCodes.Brtrue, lbl.Value);
+                        }
+                        if (onNoPermissionInvoker != null)
+                        {
+                            yield return new CodeInstruction(OpCodes.Call, onNoPermissionInvoker);
+                            yield return new CodeInstruction(OpCodes.Brtrue, lbl.Value);
+                        }
+
+                        yield return new CodeInstruction(OpCodes.Pop);
+                        yield return new CodeInstruction(OpCodes.Ret);
+                    }
+                    CodeInstruction c2 = new CodeInstruction(OpCodes.Dup);
+                    if (onPermissionInvoker != null)
+                    {
+                        CodeInstruction c3 = new CodeInstruction(OpCodes.Call, onPermissionInvoker);
+                        if (lbl.HasValue)
+                            c3.labels.Add(lbl.Value);
+                        lbl = generator.DefineLabel();
+                        yield return c3;
+                        yield return new CodeInstruction(OpCodes.Brtrue, lbl.Value);
+
+                        yield return new CodeInstruction(OpCodes.Pop);
+                        yield return new CodeInstruction(OpCodes.Ret);
+                    }
+                    
+                    if (lbl.HasValue)
+                        c2.labels.Add(lbl.Value);
+                    yield return c2;
                     yield return DevkitServerUtility.GetLocalCodeInstruction(localBounds, localBounds.LocalIndex, true);
                     yield return c;
                     yield return n;
@@ -308,6 +399,159 @@ public static class ClientEvents
 
     internal static readonly InstanceGetter<TerrainEditor, float>? GetHeightmapSmoothTarget =
         Accessor.GenerateInstanceGetter<TerrainEditor, float>("heightmapSmoothTarget");
+    [UsedImplicitly]
+    private static bool OnNoPermissionsInvoker()
+    {
+        bool allow = false;
+        if (TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.HEIGHTMAP)
+        {
+            Logger.LogDebug("Edit heightmap denied.");
+            if (OnEditHeightmapPermissionDenied == null)
+                goto rtn;
+            foreach (EditHeightmapRequest denied in OnEditHeightmapPermissionDenied.GetInvocationList().Cast<EditHeightmapRequest>())
+            {
+                try
+                {
+                    denied(TerrainEditor.heightmapMode, ref allow);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditHeightmapPermissionDenied) + ".");
+                    Logger.LogError(ex);
+                    allow = false;
+                }
+
+                if (allow)
+                    goto rtn;
+            }
+        }
+        else if (TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.SPLATMAP)
+        {
+            if (TerrainEditor.splatmapMode != TerrainEditor.EDevkitLandscapeToolSplatmapMode.CUT)
+            {
+                Logger.LogDebug("Edit splatmap denied.");
+                if (OnEditSplatmapPermissionDenied == null)
+                    goto rtn;
+                foreach (EditSplatmapRequest denied in OnEditSplatmapPermissionDenied.GetInvocationList().Cast<EditSplatmapRequest>())
+                {
+                    try
+                    {
+                        denied(TerrainEditor.splatmapMode, ref allow);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditSplatmapPermissionDenied) + ".");
+                        Logger.LogError(ex);
+                        allow = false;
+                    }
+
+                    if (allow)
+                        goto rtn;
+                }
+            }
+            else
+            {
+                Logger.LogDebug("Edit holes denied.");
+                if (OnEditHolesPermissionDenied == null)
+                    goto rtn;
+                bool isFilling = InputEx.GetKey(KeyCode.LeftShift);
+                foreach (EditHolesRequest denied in OnEditHolesPermissionDenied.GetInvocationList().Cast<EditHolesRequest>())
+                {
+                    try
+                    {
+                        denied(isFilling, ref allow);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditHolesPermissionDenied) + ".");
+                        Logger.LogError(ex);
+                        allow = false;
+                    }
+
+                    if (allow)
+                        goto rtn;
+                }
+            }
+        }
+        rtn:
+        if (!allow)
+            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("NoPermissions"));
+        return allow;
+    }
+    [UsedImplicitly]
+    private static bool OnPermissionsInvoker()
+    {
+        bool allow = true;
+        if (TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.HEIGHTMAP)
+        {
+            Logger.LogDebug("Edit heightmap requested.");
+            if (OnEditHeightmapRequested == null) return true;
+            foreach (EditHeightmapRequest requested in OnEditHeightmapRequested.GetInvocationList().Cast<EditHeightmapRequest>())
+            {
+                try
+                {
+                    requested(TerrainEditor.heightmapMode, ref allow);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditHeightmapRequested) + ".");
+                    Logger.LogError(ex);
+                    allow = false;
+                }
+
+                if (allow)
+                    return allow;
+            }
+        }
+        else if (TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.SPLATMAP)
+        {
+            if (TerrainEditor.splatmapMode != TerrainEditor.EDevkitLandscapeToolSplatmapMode.CUT)
+            {
+                Logger.LogDebug("Edit splatmap requested.");
+                if (OnEditSplatmapRequested == null) return true;
+                foreach (EditSplatmapRequest requested in OnEditSplatmapRequested.GetInvocationList().Cast<EditSplatmapRequest>())
+                {
+                    try
+                    {
+                        requested(TerrainEditor.splatmapMode, ref allow);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditSplatmapRequested) + ".");
+                        Logger.LogError(ex);
+                        allow = false;
+                    }
+
+                    if (allow)
+                        return allow;
+                }
+            }
+            else
+            {
+                Logger.LogDebug("Edit holes requested.");
+                if (OnEditHolesRequested == null) return true;
+                bool isFilling = InputEx.GetKey(KeyCode.LeftShift);
+                foreach (EditHolesRequest requested in OnEditHolesRequested.GetInvocationList().Cast<EditHolesRequest>())
+                {
+                    try
+                    {
+                        requested(isFilling, ref allow);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditHolesRequested) + ".");
+                        Logger.LogError(ex);
+                        allow = false;
+                    }
+
+                    if (allow)
+                        return allow;
+                }
+            }
+        }
+
+        return allow;
+    }
 
     [UsedImplicitly]
     private static void OnRampConfirm(Bounds bounds)

@@ -349,8 +349,8 @@ internal sealed class PermissionsCommand : SynchronousCommand, ICommandLocalizat
         { "UserRevokedPermissionGroup", "<#72e4dc>Removed the permission group <{1}>{0}</color> from <#ffe4f8>{2}</color>." },
         { "UserAddedPermissionGroup", "<#72e4dc>Added the permission group <{1}>{0}</color> to <#ffe4f8>{2}</color>." },
         { "UserClearedPermissionGroups", "<#72e4dc>Cleared all permission groups from <#ffe4f8>{0}</color>." },
-        { "UserRevokedPermission", "<#72e4dc>Removed the permission <#b08598>{0}</color> from <#ffe4f8>{2}</color>." },
-        { "UserAddedPermission", "<#72e4dc>Added the permission <#b08598>{0}</color> to <#ffe4f8>{2}</color>." },
+        { "UserRevokedPermission", "<#72e4dc>Removed the permission <#b08598>{0}</color> from <#ffe4f8>{1}</color>." },
+        { "UserAddedPermission", "<#72e4dc>Added the permission <#b08598>{0}</color> to <#ffe4f8>{1}</color>." },
         { "UserClearedPermissions", "<#72e4dc>Cleared all permissions from <#ffe4f8>{0}</color>." },
     };
 }

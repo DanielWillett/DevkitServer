@@ -255,7 +255,7 @@ public static class PermissionsEx
                 bool su = superuser && perm.Permission.Equals(Permission.SuperuserPermission);
                 if (!removedSuperuser && perm.IsRemoved && su)
                     removedSuperuser = true;
-                if ((!suEx && perm.Permission.Equals(permission)) || su && !removedSuperuser)
+                if (!suEx && perm.Permission.Equals(permission) || su && !removedSuperuser)
                     return !perm.IsRemoved;
             }
         }

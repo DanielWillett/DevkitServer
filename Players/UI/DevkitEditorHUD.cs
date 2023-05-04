@@ -77,6 +77,7 @@ public class DevkitEditorHUD : MonoBehaviour
             InfoBox.AddChild(label);
         }
         UpdateInfoHeight();
+        UpdateAllNametags();
         Container.AddChild(InfoBox);
         Logger.LogDebug("Inited hud");
     }
@@ -144,11 +145,10 @@ public class DevkitEditorHUD : MonoBehaviour
             Vector2 adjScreenPos = Container.ViewportToNormalizedPosition(screenPos);
             nametag.positionScale_X = adjScreenPos.x;
             nametag.positionScale_Y = adjScreenPos.y;
-            if ((!nametag.isVisible || string.IsNullOrEmpty(nametag.text)) && user.Player != null)
-            {
-                nametag.text = user.Player.playerID.playerName;
+            if (string.IsNullOrEmpty(nametag.text))
+                nametag.text = user.DisplayName;
+            if (!nametag.isVisible)
                 nametag.isVisible = true;
-            }
         }
     }
 
@@ -207,6 +207,7 @@ public class DevkitEditorHUD : MonoBehaviour
         {
             bool found = false;
             EditorUser u = UserManager.Users[p];
+            if (u.IsOwner) continue;
             for (int i = 0; i < Nametags.Count; ++i)
             {
                 if (Nametags[i].Value == u.SteamId.m_SteamID)
