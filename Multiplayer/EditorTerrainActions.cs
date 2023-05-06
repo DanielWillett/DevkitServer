@@ -437,7 +437,7 @@ public partial class EditorTerrain
             {
                 Bounds readBounds = Bounds;
                 readBounds.Expand(Landscape.HEIGHTMAP_WORLD_UNIT * 2f);
-                Landscape.readHeightmap(Bounds, IntlHandleHeightmapReadSmoothPixelAverage);
+                Landscape.readHeightmap(readBounds, IntlHandleHeightmapReadSmoothPixelAverage);
             }
             WriteHeightmapNoTransactions(Bounds, IntlHandleHeightmapWriteSmooth);
             if (SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE)

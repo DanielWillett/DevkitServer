@@ -426,7 +426,8 @@ public static class PermissionsEx
     /// <remarks>You shouldn't ever need to call this unless you're creating your own implementation of <see cref="IPermissionHandler"/>.</remarks>
     public static void ReplicateLatePermissionRegistration(Permission permission)
     {
-        SendPermissionLateRegistered.Invoke(Provider.GatherRemoteClientConnections(), permission.ToString());
+        if (Provider.clients.Count > 0)
+            SendPermissionLateRegistered.Invoke(Provider.GatherRemoteClientConnections(), permission.ToString());
     }
     /// <summary>
     /// Tell all clients about a registered <see cref="PermissionGroup"/>.
@@ -434,7 +435,8 @@ public static class PermissionsEx
     /// <remarks>You shouldn't ever need to call this unless you're creating your own implementation of <see cref="IPermissionHandler"/>.</remarks>
     public static void ReplicateLatePermissionGroupRegistration(PermissionGroup group)
     {
-        SendPermissionGroupLateRegistered.Invoke(Provider.GatherRemoteClientConnections(), group);
+        if (Provider.clients.Count > 0)
+            SendPermissionGroupLateRegistered.Invoke(Provider.GatherRemoteClientConnections(), group);
     }
     /// <summary>
     /// Tell all clients about a deregistered <see cref="Permission"/>.
@@ -442,7 +444,8 @@ public static class PermissionsEx
     /// <remarks>You shouldn't ever need to call this unless you're creating your own implementation of <see cref="IPermissionHandler"/>.</remarks>
     public static void ReplicatePermissionDeregistration(Permission permission)
     {
-        SendPermissionDeregistered.Invoke(Provider.GatherRemoteClientConnections(), permission.ToString());
+        if (Provider.clients.Count > 0)
+            SendPermissionDeregistered.Invoke(Provider.GatherRemoteClientConnections(), permission.ToString());
     }
     /// <summary>
     /// Tell all clients about a deregistered <see cref="PermissionGroup"/>.
@@ -450,7 +453,8 @@ public static class PermissionsEx
     /// <remarks>You shouldn't ever need to call this unless you're creating your own implementation of <see cref="IPermissionHandler"/>.</remarks>
     public static void ReplicatePermissionGroupDeregistration(PermissionGroup permissionGroup)
     {
-        SendPermissionGroupDeregistered.Invoke(Provider.GatherRemoteClientConnections(), permissionGroup.Id);
+        if (Provider.clients.Count > 0)
+            SendPermissionGroupDeregistered.Invoke(Provider.GatherRemoteClientConnections(), permissionGroup.Id);
     }
     /// <summary>
     /// Tell all clients about an updated <see cref="PermissionGroup"/>.
@@ -458,7 +462,8 @@ public static class PermissionsEx
     /// <remarks>You shouldn't ever need to call this unless you're creating your own implementation of <see cref="IPermissionHandler"/>.</remarks>
     public static void ReplicatePermissionGroupUpdate(PermissionGroup permissionGroup)
     {
-        SendPermissionGroupUpdate.Invoke(Provider.GatherRemoteClientConnections(), permissionGroup);
+        if (Provider.clients.Count > 0)
+            SendPermissionGroupUpdate.Invoke(Provider.GatherRemoteClientConnections(), permissionGroup);
     }
 #endif
 

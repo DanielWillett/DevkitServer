@@ -1,6 +1,9 @@
 ﻿#if SERVER
 // #define USERINPUT_DEBUG
 #endif
+
+#define TILE_SYNC
+
 using DevkitServer.API;
 using DevkitServer.Configuration;
 using DevkitServer.Multiplayer;
@@ -192,7 +195,9 @@ public sealed class DevkitServerModule : IModuleNexus
     {
         if (IsEditing && level == Level.BUILD_INDEX_GAME)
         {
-            //GameObjectHost.AddComponent<TileSync>();
+#if TILE_SYNC
+            GameObjectHost.AddComponent<TileSync>();
+#endif
         }
         else if (GameObjectHost.TryGetComponent(out TileSync sync))
             Object.Destroy(sync);

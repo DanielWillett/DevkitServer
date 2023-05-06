@@ -120,33 +120,98 @@ public static class DevkitServerUtility
         return true;
     }
     public static unsafe int GetLabelId(this Label label) => *(int*)&label;
-    public static void PrintBytesHex(byte[] bytes, int columnCount = 16, int len = -1)
+    public static void PrintBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
     {
-        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, columnCount, len));
+        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, columnCount, offset, len));
     }
-    public static void PrintBytesDec(byte[] bytes, int columnCount = 16, int len = -1)
+    public static void PrintBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
     {
-        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, columnCount, len));
+        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, columnCount, offset, len));
     }
-    public static string GetBytesHex(byte[] bytes, int columnCount = 16, int len = -1)
+    public static string GetBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
     {
-        return BytesToString(bytes, columnCount, len, "X2");
+        return BytesToString(bytes, columnCount, offset, len, "X2");
     }
-    public static string GetBytesDec(byte[] bytes, int columnCount = 16, int len = -1)
+    public static string GetBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
     {
-        return BytesToString(bytes, columnCount, len, "000");
+        return BytesToString(bytes, columnCount, offset, len, "000");
     }
-    public static string BytesToString(byte[] bytes, int columnCount, int len, string fmt)
+    public static unsafe void PrintBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0)
     {
-        StringBuilder sb = new StringBuilder(bytes.Length * 4);
-        len = len < 0 || len > bytes.Length ? bytes.Length : len;
+        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, len, columnCount, offset));
+    }
+    public static unsafe void PrintBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0)
+    {
+        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, len, columnCount, offset));
+    }
+    public static unsafe string GetBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0)
+    {
+        return BytesToString(bytes, columnCount, offset, len, "X2");
+    }
+    public static unsafe string GetBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0)
+    {
+        return BytesToString(bytes, columnCount, offset, len, "000");
+    }
+    public static unsafe void PrintBytesHex<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
+    {
+        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, len, columnCount, offset));
+    }
+    public static unsafe void PrintBytesDec<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
+    {
+        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, len, columnCount, offset));
+    }
+    public static unsafe string GetBytesHex<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
+    {
+        return BytesToString(bytes, columnCount, offset, len);
+    }
+    public static unsafe string GetBytesDec<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
+    {
+        return BytesToString(bytes, columnCount, offset, len);
+    }
+    public static string BytesToString(byte[] bytes, int columnCount, int offset, int len, string fmt)
+    {
+        if (offset >= bytes.Length)
+            offset = bytes.Length - 1;
+        if (len < 0 || len + offset < 0 || len + offset > bytes.Length)
+            len = bytes.Length - offset;
+        StringBuilder sb = new StringBuilder(len * 4);
         for (int i = 0; i < len; ++i)
         {
             if (i != 0 && i % columnCount == 0)
                 sb.Append(Environment.NewLine);
             else if (i != 0)
                 sb.Append(' ');
-            sb.Append(bytes[i].ToString(fmt));
+            sb.Append(bytes[i + offset].ToString(fmt));
+        }
+        return sb.ToString();
+    }
+    public static unsafe string BytesToString(byte* bytes, int columnCount, int offset, int len, string fmt)
+    {
+        if (offset >= len)
+            offset = len - 1;
+        StringBuilder sb = new StringBuilder(len * 4);
+        for (int i = 0; i < len; ++i)
+        {
+            if (i != 0 && i % columnCount == 0)
+                sb.Append(Environment.NewLine);
+            else if (i != 0)
+                sb.Append(' ');
+            sb.Append(bytes[i + offset].ToString(fmt));
+        }
+        return sb.ToString();
+    }
+    public static unsafe string BytesToString<T>(T* bytes, int columnCount, int offset, int len) where T : unmanaged
+    {
+        if (offset >= len)
+            offset = len - 1;
+        StringBuilder sb = new StringBuilder(len * 4);
+        for (int i = 0; i < len; ++i)
+        {
+            if (i != 0 && i % columnCount == 0)
+                sb.Append(Environment.NewLine);
+            else if (i != 0)
+                sb.Append(' ');
+            sb.Append(bytes[i + offset].ToString());
         }
         return sb.ToString();
     }
@@ -334,51 +399,6 @@ public static class DevkitServerUtility
         ptr[index + 3] = b;
     }
     public static uint ReverseUInt32(uint val) => ((val >> 24) & 0xFF) | (((val >> 16) & 0xFF) << 8) | (((val >> 8) & 0xFF) << 16) | (val << 24);
-    public static bool Encapsulates(this in LandscapeBounds outer, in LandscapeBounds inner) =>
-        outer.min.x < inner.min.x && outer.min.y < inner.min.y && outer.max.x > inner.max.x && outer.max.y > inner.max.y;
-    public static bool Encapsulates(this in HeightmapBounds outer, in HeightmapBounds inner) =>
-        outer.min.x < inner.min.x && outer.min.y < inner.min.y && outer.max.x > inner.max.x && outer.max.y > inner.max.y;
-    public static bool Encapsulates(this in SplatmapBounds outer, in SplatmapBounds inner) =>
-        outer.min.x < inner.min.x && outer.min.y < inner.min.y && outer.max.x > inner.max.x && outer.max.y > inner.max.y;
-    public static bool Overlaps(this in LandscapeBounds left, in LandscapeBounds right) =>
-        !(left.max.x < right.min.x || left.max.y < right.min.y || left.min.x > right.max.x || left.min.y > right.max.y);
-    public static bool Overlaps(this in HeightmapBounds left, in HeightmapBounds right) =>
-        !(left.max.x < right.min.x || left.max.y < right.min.y || left.min.x > right.max.x || left.min.y > right.max.y);
-    public static bool Overlaps(this in SplatmapBounds left, in SplatmapBounds right) =>
-        !(left.max.x < right.min.x || left.max.y < right.min.y || left.min.x > right.max.x || left.min.y > right.max.y);
-    public static void Encapsulate(this ref LandscapeBounds left, in LandscapeBounds right)
-    {
-        if (left.min.x > right.min.x)
-            left.min.x = right.min.x;
-        if (left.min.y > right.min.y)
-            left.min.y = right.min.y;
-        if (left.max.x < right.max.x)
-            left.max.x = right.max.x;
-        if (left.max.y < right.max.y)
-            left.max.y = right.max.y;
-    }
-    public static void Encapsulate(this ref HeightmapBounds left, in HeightmapBounds right)
-    {
-        if (left.min.x > right.min.x)
-            left.min.x = right.min.x;
-        if (left.min.y > right.min.y)
-            left.min.y = right.min.y;
-        if (left.max.x < right.max.x)
-            left.max.x = right.max.x;
-        if (left.max.y < right.max.y)
-            left.max.y = right.max.y;
-    }
-    public static void Encapsulate(this ref SplatmapBounds left, in SplatmapBounds right)
-    {
-        if (left.min.x > right.min.x)
-            left.min.x = right.min.x;
-        if (left.min.y > right.min.y)
-            left.min.y = right.min.y;
-        if (left.max.x < right.max.x)
-            left.max.x = right.max.x;
-        if (left.max.y < right.max.y)
-            left.max.y = right.max.y;
-    }
     public static Vector2 ToVector2(this in Vector3 v3) => new Vector2(v3.x, v3.z);
     public static Vector3 ToVector3(this in Vector2 v2) => new Vector3(v2.x, 0f, v2.y);
     public static Vector3 ToVector3(this in Vector2 v2, float y) => new Vector3(v2.x, y, v2.y);

@@ -578,7 +578,7 @@ public static class ClientEvents
         
         OnFlattened?.Invoke(bounds, GetTerrainBrushWorldPosition(editor),
             editor.heightmapBrushRadius, editor.heightmapBrushFalloff,
-            editor.heightmapBrushStrength, editor.heightmapAdjustSensitivity,
+            editor.heightmapBrushStrength, editor.heightmapFlattenSensitivity,
             editor.heightmapFlattenTarget,
             DevkitLandscapeToolHeightmapOptions.instance.flattenMethod, Time.deltaTime);
     }
