@@ -4,7 +4,10 @@ using DevkitServer.Util.Encoding;
 using HarmonyLib;
 using JetBrains.Annotations;
 using SDG.Framework.Landscapes;
+using SDG.Framework.Rendering;
+using SDG.Framework.Utilities;
 using SDG.NetPak;
+using TMPro;
 
 namespace DevkitServer.Multiplayer;
 [HarmonyPatch]
@@ -16,11 +19,11 @@ public class TileSync : MonoBehaviour
     // Header structure
     // [1B: type] [1B: header size] [4B: total size] [4B: total packets] [16B: bounds (4B x 4)] [8B: tile (4B x 2)]
 
-    private const byte HeaderSize = checked( 2 + sizeof(int) * 8 );
+    private const byte HeaderSize = checked( 2 + sizeof(int) * 8 /* align to 64 bit */ + 6);
 
     // Packet Header structure
     // [1B: packet header size] [4B: packet id] [2B: packet length] 
-    private const byte PacketHeaderSize = checked( 1 + sizeof(int) + sizeof(ushort) );
+    private const byte PacketHeaderSize = checked( 1 + sizeof(int) + sizeof(ushort) /* align to 64 bit */ + 1);
     public static int HeightmapPacketCount { get; }
     public static int SplatmapPacketCount { get; }
     public static int HolePacketCount { get; }
@@ -35,11 +38,10 @@ public class TileSync : MonoBehaviour
     public bool HasAuthority
     {
         get => _hasAuthority;
-#if SERVER
-        set
-#else
-        private set
+#if CLIENT
+        private
 #endif
+        set
         {
             if (_hasAuthority == value)
                 return;
@@ -57,6 +59,11 @@ public class TileSync : MonoBehaviour
                     if (u.TileSync != null)
                         u.TileSync.HasAuthority = false;
                 }
+            }
+            else
+            {
+                _invalidations.Clear();
+                _invalidateIndex = 0;
             }
             _hasAuthority = value;
             if (User == null)
@@ -84,7 +91,11 @@ public class TileSync : MonoBehaviour
     private int _bufferLen;
     private int _ttlPackets;
     private MapInvalidation _receiving;
-    private BitArray _packetMask;
+#if CLIENT && DEBUG
+    private MapInvalidation _gl;
+    private bool _renderGl;
+#endif
+    private BitArray? _packetMask;
     static TileSync()
     {
         TotalHeightmapLength = Landscape.HEIGHTMAP_RESOLUTION * Landscape.HEIGHTMAP_RESOLUTION * sizeof(float);
@@ -101,6 +112,9 @@ public class TileSync : MonoBehaviour
     [UsedImplicitly]
     private void Start()
     {
+#if CLIENT&& DEBUG
+        GLRenderer.render += HandleGLRender;
+#endif
         if (User == null)
         {
 #if SERVER
@@ -126,7 +140,95 @@ public class TileSync : MonoBehaviour
 #endif
         }
     }
-    
+#if CLIENT && DEBUG
+    private unsafe void HandleGLRender()
+    {
+        if (HasAuthority)
+        {
+            if (_invalidateIndex > -1 && _invalidations.Count > _invalidateIndex)
+            {
+                MapInvalidation inv = _invalidations[_invalidateIndex];
+                DevkitServerGLUtility.DrawTerrainBounds(inv.Tile, inv.XMin, inv.XMax, inv.YMin, inv.YMax, inv.Type != DataType.Heightmap, Color.magenta);
+            }
+            float time = Time.realtimeSinceStartup;
+            Color pink = new Color(1f, 0.7f, 0.7f);
+            Color red = Color.red;
+            for (int i = 0; i < _invalidations.Count; ++i)
+            {
+                MapInvalidation inv = _invalidations[i];
+                DevkitServerGLUtility.DrawTerrainBounds(inv.Tile, inv.XMin, inv.XMax, inv.YMin, inv.YMax, inv.Type != DataType.Heightmap,
+                    i == _invalidateIndex ? Color.magenta : Color.Lerp(pink, red, (time - inv.Time) / 10f));
+            }
+        }
+
+        if (!_renderGl)
+            return;
+        DevkitServerGLUtility.DrawTerrainBounds(_gl.Tile, _gl.XMin, _gl.XMax, _gl.YMin, _gl.YMax, _gl.Type != DataType.Heightmap);
+#if true
+        LandscapeCoord tile = _gl.Tile;
+        GL.Begin(GL.TRIANGLES);
+        fixed (byte* ptr = _buffer)
+        {
+            float num = 0.5f;//Mathf.Lerp(0.1f, 1f, Mathf.Min(_gl.YMax - _gl.YMin, _gl.XMax - _gl.XMin) / 256f);
+            Vector3 size = new Vector3(num, num, num);
+            int offsetX = _gl.XMin;
+            int offsetY = _gl.YMin;
+            int sizeX = _gl.XMax - offsetX + 1;
+            int sizeY = _gl.YMax - offsetY + 1;
+
+            switch (_dataType)
+            {
+                case DataType.Heightmap:
+                    float* buffer = (float*)ptr;
+                    for (int x = offsetX; x < offsetX + sizeX; ++x)
+                    {
+                        for (int y = offsetY; y < offsetY + sizeY; ++y)
+                        {
+                            GL.Color(Color.Lerp(Color.red, Color.green, *buffer));
+                            GLUtility.boxSolid(Landscape.getWorldPosition(tile, new HeightmapCoord(x, y), *buffer), size);
+                            ++buffer;
+                        }
+                    }
+                    break;
+                case DataType.Splatmap:
+                    buffer = (float*)ptr;
+                    AssetReference<LandscapeMaterialAsset> mat = TerrainEditor.splatmapMaterialTarget;
+                    LandscapeTile? tile2 = Landscape.getTile(tile);
+                    int index = tile2 == null || !mat.isValid ? -1 : tile2.materials.FindIndex(x => x.GUID == mat.GUID);
+                    if (index >= 0)
+                    {
+                        for (int x = offsetX; x < offsetX + sizeX; ++x)
+                        {
+                            for (int y = offsetY; y < offsetY + sizeY; ++y)
+                            {
+                                GL.Color(Color.Lerp(Color.red, Color.green, buffer[index]));
+                                GLUtility.boxSolid(Landscape.getWorldPosition(tile, new SplatmapCoord(x, y)), size);
+                                buffer += Landscape.SPLATMAP_LAYERS;
+                            }
+                        }
+                    }
+                    break;
+                case DataType.Holes:
+                    int c = 0;
+                    for (int x = offsetX; x < offsetX + sizeX; ++x)
+                    {
+                        for (int y = offsetY; y < offsetY + sizeY; ++y)
+                        {
+                            bool val = (ptr[c / 8] & (1 << (c % 8))) > 0;
+                            GL.Color(val ? Color.green : Color.red);
+                            GLUtility.boxSolid(Landscape.getWorldPosition(tile, new SplatmapCoord(x, y)), size);
+                            ++c;
+                        }
+                    }
+                    break;
+            }
+        }
+
+        GL.End();
+#endif
+    }
+#endif
+
     private readonly List<MapInvalidation> _invalidations = new List<MapInvalidation>(32);
     private struct MapInvalidation
     {
@@ -220,7 +322,7 @@ public class TileSync : MonoBehaviour
         offset += sizeof(int);
         int len = BitConverter.ToUInt16(data, offset);
         offset += sizeof(ushort);
-        Logger.LogDebug($"Packet received: #{packetId}, len: {len}.");
+        Logger.LogDebug($"Packet received: #{packetId.Format()}, len: {len.Format()}.");
         if (packetId == 0)
         {
             _index = 0;
@@ -233,16 +335,17 @@ public class TileSync : MonoBehaviour
                 Logger.LogWarning($"[TILE SYNC] Out of date header: {hdrSize.Format()}B.");
                 return;
             }
-            _bufferLen = BitConverter.ToInt32(data, offset);
+            _bufferLen = BitConverter.ToInt32(data, offset) - hdrSize;
             offset += sizeof(int);
             _ttlPackets = BitConverter.ToInt32(data, offset);
+            offset += sizeof(int);
+
             if (_packetMask == null || _packetMask.Length < _ttlPackets)
                 _packetMask = new BitArray(Mathf.CeilToInt(_ttlPackets / 32f) * 32);
             else
                 _packetMask.SetAll(false);
 
             _packetMask[0] = true;
-            offset += sizeof(int);
 
             int xmin = BitConverter.ToInt32(data, offset);
             offset += sizeof(int);
@@ -258,14 +361,19 @@ public class TileSync : MonoBehaviour
             int ytile = BitConverter.ToInt32(data, offset);
             offset += sizeof(int);
 
-            _receiving = new MapInvalidation(new LandscapeCoord(xtile, ytile), xmin, ymin, xmax, ymax, _dataType, 0f);
+            _receiving = new MapInvalidation(new LandscapeCoord(xtile, ytile), xmin, ymin, xmax, ymax, _dataType, Time.realtimeSinceStartup);
+            Logger.LogDebug($"Received starting packet: Len: {_bufferLen}. Packets: {_ttlPackets}. Tile: {_receiving.Tile.Format()}, Bounds: ({xmin.Format()}-{xmax.Format()}, {ymin.Format()}-{ymax.Format()}), Type: {_dataType}.");
+#if CLIENT && DEBUG
+            _gl = _receiving;
+            _renderGl = true;
+#endif
         }
         else if (packetId >= _ttlPackets)
         {
-            Logger.LogWarning($"[TILE SYNC] Received out of bounds packet: {packetId.Format()}/{_packetMask.Length}.");
+            Logger.LogWarning($"[TILE SYNC] Received out of bounds packet: {(packetId + 1).Format()}/{_ttlPackets}.");
         }
-        else _packetMask[packetId] = true;
-        
+        else _packetMask![packetId] = true;
+        Logger.LogDebug($"[TILE SYNC] Offset: {offset.Format()}, copying {len} B to {_index}.");
         Buffer.BlockCopy(data, offset, _buffer, _index, len);
         Logger.LogDebug($"[TILE SYNC] Receiving packet #{packetId} for tile {_receiving.Tile.Format()} ({DevkitServerUtility.FormatBytes(len)} @ {DevkitServerUtility.FormatBytes(_index)})");
         
@@ -273,7 +381,7 @@ public class TileSync : MonoBehaviour
         int missingCt = 0;
         for (int i = 0; i < _ttlPackets; ++i)
         {
-            if (!_packetMask[i])
+            if (!_packetMask![i])
                 ++missingCt;
         }
         if (missingCt < 1 || packetId == _ttlPackets - 1)
@@ -331,14 +439,17 @@ public class TileSync : MonoBehaviour
         if (sync.HasAuthority)
         {
 #if SERVER
-            PooledTransportConnectionList list = NetFactory.GetPooledTransportConnectionList(!sync.IsOwner ? Provider.clients.Count - 1 : Provider.clients.Count);
-            for (int i = 0; i < Provider.clients.Count; ++i)
+            if (Provider.clients.Count > 1)
             {
-                SteamPlayer sp = Provider.clients[i];
-                if (sync.IsOwner || sp.playerID.steamID.m_SteamID == sync.User!.SteamId.m_SteamID)
-                    list.Add(sp.transportConnection);
+                PooledTransportConnectionList list = NetFactory.GetPooledTransportConnectionList(!sync.IsOwner ? Provider.clients.Count - 1 : Provider.clients.Count);
+                for (int i = 0; i < Provider.clients.Count; ++i)
+                {
+                    SteamPlayer sp = Provider.clients[i];
+                    if (sync.IsOwner || sp.playerID.steamID.m_SteamID == sync.User!.SteamId.m_SteamID)
+                        list.Add(sp.transportConnection);
+                }
+                NetFactory.SendGeneric(NetFactory.DevkitMessage.SendTileData, buffer, list, length: len, reliable: true, offset: offset);
             }
-            NetFactory.SendGeneric(NetFactory.DevkitMessage.SendTileData, buffer, list, length: len, reliable: true, offset: offset);
 #endif
             sync.ReceiveTileData(buffer, offset + sizeof(ulong), len);
         }
@@ -465,27 +576,12 @@ public class TileSync : MonoBehaviour
             UnsafeBitConverter.GetBytes(ptr, tile.coord.x, offset);
             offset += sizeof(int);
             UnsafeBitConverter.GetBytes(ptr, tile.coord.y, offset);
-            offset += sizeof(int);
-#if DEBUG
-            if (offset != HeaderSize)
-                Logger.LogWarning($"[TILE SYNC] HeaderSize {HeaderSize.Format()} does not match generated offset: {offset.Format()}.");
-#endif
         }
-
-        //if (!BitConverter.IsLittleEndian && _dataType is DataType.Heightmap or DataType.Splatmap)
-        //{
-        //    fixed (byte* ptr2 = _buffer)
-        //    {
-        //        for (int i = HeaderSize; i < _bufferLen; i += sizeof(float))
-        //            DevkitServerUtility.ReverseFloat(ptr2, i);
-        //    }
-        //}
 
         Logger.LogDebug("[TILE SYNC]  Buffered " + DevkitServerUtility.FormatBytes(_bufferLen - HeaderSize) + " (" + _dataType.ToString().ToUpperInvariant() + ").");
     }
     private unsafe void ApplyBuffer()
     {
-        _index = 0;
         LandscapeTile? tile = Landscape.getTile(_receiving.Tile);
         if (tile == null)
         {
@@ -520,7 +616,7 @@ public class TileSync : MonoBehaviour
         _receiving = default;
         _index = 0;
         _packetId = 0;
-        Array.Clear(_buffer, 0, _buffer.Length);
+        // Array.Clear(_buffer, 0, _bufferLen);
     }
     [UsedImplicitly]
     private unsafe void Update()
@@ -571,17 +667,12 @@ public class TileSync : MonoBehaviour
 
             fixed (byte* ptr = PacketBuffer)
             {
-                UnsafeBitConverter.GetBytes(ptr, User == null ? 0 : User.SteamId.m_SteamID);
+                UnsafeBitConverter.GetBytes(ptr, User == null ? 0ul : User.SteamId.m_SteamID);
                 ptr[sizeof(ulong)] = PacketHeaderSize;
                 int offset = 1 + sizeof(ulong);
                 UnsafeBitConverter.GetBytes(ptr, _packetId, offset);
                 offset += sizeof(int);
-                UnsafeBitConverter.GetBytes(ptr, (ushort)len, offset);
-                offset += sizeof(ushort);
-#if DEBUG
-                if (offset != PacketHeaderSize + sizeof(ulong))
-                    Logger.LogWarning($"[TILE SYNC] PacketHeaderSize {PacketHeaderSize.Format()} does not match generated offset: {offset.Format()}.");
-#endif
+                UnsafeBitConverter.GetBytes(ptr, (ushort)(_packetId == 0 ? len - HeaderSize : len), offset);
             }
             
             Buffer.BlockCopy(_buffer, _index, PacketBuffer, PacketHeaderSize + sizeof(ulong), len);
@@ -590,11 +681,11 @@ public class TileSync : MonoBehaviour
 #if SERVER
                 null,
 #endif
-                length: len, reliable: true);
-            Logger.LogDebug($"#{_packetId.Format()} Tile: {tile.coord.Format()}.");
+                length: PacketHeaderSize + sizeof(ulong) + len, reliable: true);
+            Logger.LogDebug($"#{_packetId.Format()} Tile: {tile.coord.Format()} Length: {len.Format()}.");
             
-            ++_packetId;
             _index += len;
+            ++_packetId;
             flush:
             // flush buffer
             if (_index >= _bufferLen || tile == null)
@@ -649,4 +740,11 @@ public class TileSync : MonoBehaviour
             EditorUser.User.TileSync.InvalidateBounds(worldBounds, DataType.Holes, Time.realtimeSinceStartup);
 #endif
     }
+#if CLIENT&& DEBUG
+    [UsedImplicitly]
+    private void OnDestroy()
+    {
+        GLRenderer.render -= HandleGLRender;
+    }
+#endif
 }

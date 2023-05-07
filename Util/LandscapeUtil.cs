@@ -1,5 +1,7 @@
-﻿using SDG.Framework.Devkit;
+﻿using System.Net.Sockets;
+using SDG.Framework.Devkit;
 using SDG.Framework.Landscapes;
+using SDG.Framework.Rendering;
 
 namespace DevkitServer.Util;
 public static class LandscapeUtil
@@ -16,6 +18,12 @@ public static class LandscapeUtil
         !(left.max.x < right.min.x || left.max.y < right.min.y || left.min.x > right.max.x || left.min.y > right.max.y);
     public static bool Overlaps(this in SplatmapBounds left, in SplatmapBounds right) =>
         !(left.max.x < right.min.x || left.max.y < right.min.y || left.min.x > right.max.x || left.min.y > right.max.y);
+    public static Vector3 GetWorldPosition(this in HeightmapCoord coord, in LandscapeCoord tile)
+    {
+        Vector3 pos = Landscape.getWorldPosition(tile, coord, 0f);
+        return new Vector3(pos.x, LevelGround.getHeight(pos), pos.z);
+    }
+    public static Vector3 GetWorldPosition(this in SplatmapCoord coord, in LandscapeCoord tile) => Landscape.getWorldPosition(tile, coord);
     public static void Encapsulate(this ref LandscapeBounds left, in LandscapeBounds right)
     {
         if (left.min.x > right.min.x)
@@ -94,7 +102,6 @@ public static class LandscapeUtil
             for (int x = offsetX; x < offsetX + sizeX; ++x)
             {
                 Buffer.MemoryCopy(tileData + x * tileSize + offsetY, buffer, blockSize, blockSize);
-                Logger.LogDebug($"{x}: {Environment.NewLine}{DevkitServerUtility.GetBytesHex(tileData, sizeX, 3, x * tileSize + offsetY)}");
                 buffer += sizeY;
             }
         }
@@ -115,7 +122,6 @@ public static class LandscapeUtil
             for (int x = offsetX; x < offsetX + sizeX; ++x)
             {
                 Buffer.MemoryCopy(buffer, tileData + x * tileSize + offsetY, blockSize, blockSize);
-                Logger.LogDebug($"{x}: {Environment.NewLine}{DevkitServerUtility.GetBytesHex(tileData, sizeX, 3, x * tileSize + offsetY)}");
                 buffer += sizeY;
             }
         }
@@ -138,7 +144,6 @@ public static class LandscapeUtil
         int layers = Landscape.SPLATMAP_LAYERS;
         int tileSize = Landscape.SPLATMAP_RESOLUTION * layers;
         int blockSize = sizeY * layers * sizeof(float);
-
         fixed (float* tileData = tile.splatmap)
         {
             Logger.LogDebug($"[TERRAIN COPY] Reading splatmap: Offset: ({offsetX.Format()}, {offsetY.Format()}). Size: ({sizeX.Format()}, {sizeY.Format()}). Tile Size: {tileSize.Format()}. Block Size: {blockSize.Format()}.");
@@ -169,7 +174,7 @@ public static class LandscapeUtil
                 buffer += sizeY * layers;
             }
         }
-
+        
         if (apply)
         {
             Logger.LogDebug("Applying splatmap to " + tile.coord.Format() + ".");
@@ -192,8 +197,9 @@ public static class LandscapeUtil
             {
                 for (int y = offsetY; y < offsetY + sizeY; ++y)
                 {
-                    // ReSharper disable once RedundantCast (literally just incorrect)
-                    input[bitCt / 8] |= tileData[x * tileSize + y] ? (byte)(1 << (bitCt % 8)) : (byte)0;
+                    if (tileData[x * tileSize + y])
+                        input[bitCt / 8] |= (byte)(1 << (bitCt % 8));
+                    
                     ++bitCt;
                 }
             }
