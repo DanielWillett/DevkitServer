@@ -29,7 +29,6 @@ internal static class PatchesMain
         {
             Patcher = new Harmony(HarmonyId);
             Patcher.PatchAll();
-            EditorTerrain.Patch();
 
             // Accessor.AddFunctionBreakpoints(AccessTools.Method(typeof(ObjectManager), "ReceiveObjects"));
             // ConstructorInfo? info = typeof(MenuConfigurationOptionsUI).GetConstructors(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
@@ -550,7 +549,7 @@ internal static class PatchesMain
                 {
                     if (ins[j].Branches(out Label? lbl) && lbl.HasValue)
                     {
-                        yield return new CodeInstruction(OpCodes.Ldsfld, EditorTerrain.SaveTransactionsField);
+                        yield return new CodeInstruction(OpCodes.Ldsfld, LandscapeUtil.SaveTransactionsField);
                         yield return new CodeInstruction(OpCodes.Brfalse_S, lbl);
                         Logger.LogDebug("Inserted save transactions check in " + method.Format() + ".");
                         break;

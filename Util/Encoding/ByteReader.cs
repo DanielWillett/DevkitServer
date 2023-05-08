@@ -1173,6 +1173,113 @@ public class ByteReader
             return null;
         }
     }
+    public static MethodInfo? GetReadMethod(Type type, bool isNullable = false)
+    {
+    redo:
+        if (type.IsPrimitive)
+        {
+            if (type == typeof(ulong))
+                return isNullable ? ReadNullableUInt64Method : ReadUInt64Method;
+            if (type == typeof(float))
+                return isNullable ? ReadNullableFloatMethod : ReadFloatMethod;
+            if (type == typeof(long))
+                return isNullable ? ReadNullableInt64Method : ReadInt64Method;
+            if (type == typeof(ushort))
+                return isNullable ? ReadNullableUInt16Method : ReadUInt16Method;
+            if (type == typeof(short))
+                return isNullable ? ReadNullableInt16Method : ReadInt16Method;
+            if (type == typeof(byte))
+                return isNullable ? ReadNullableUInt8Method : ReadUInt8Method;
+            if (type == typeof(int))
+                return isNullable ? ReadNullableInt32Method : ReadInt32Method;
+            if (type == typeof(uint))
+                return isNullable ? ReadNullableUInt32Method : ReadUInt32Method;
+            if (type == typeof(bool))
+                return isNullable ? ReadNullableBoolMethod : ReadBoolMethod;
+            if (type == typeof(char))
+                return isNullable ? ReadNullableCharMethod : ReadCharMethod;
+            if (type == typeof(sbyte))
+                return isNullable ? ReadNullableInt8Method : ReadInt8Method;
+            if (type == typeof(double))
+                return isNullable ? ReadNullableDoubleMethod : ReadDoubleMethod;
+        }
+
+        if (type == typeof(string))
+            return isNullable ? ReadNullableStringMethod : ReadStringMethod;
+        if (type.IsEnum)
+            return isNullable ? ReadNullableEnumMethod.MakeGenericMethod(type) : ReadEnumMethod.MakeGenericMethod(type);
+        
+        if (!isNullable && type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
+        {
+            type = type.GenericTypeArguments[0];
+            isNullable = true;
+            goto redo;
+        }
+        if (type == typeof(decimal))
+            return isNullable ? ReadNullableDecimalMethod : ReadDecimalMethod;
+        if (type == typeof(DateTime))
+            return isNullable ? ReadNullableDateTimeMethod : ReadDateTimeMethod;
+        if (type == typeof(DateTimeOffset))
+            return isNullable ? ReadNullableDateTimeOffsetMethod : ReadDateTimeOffsetMethod;
+        if (type == typeof(TimeSpan))
+            return isNullable ? ReadNullableTimeSpanMethod : ReadTimeSpanMethod;
+        if (type == typeof(Guid))
+            return isNullable ? ReadNullableGuidMethod : ReadGuidMethod;
+        if (type == typeof(Vector2))
+            return isNullable ? ReadNullableVector2Method : ReadVector2Method;
+        if (type == typeof(Vector3))
+            return isNullable ? ReadNullableVector3Method : ReadVector3Method;
+        if (type == typeof(Vector4))
+            return isNullable ? ReadNullableVector4Method : ReadVector4Method;
+        if (type == typeof(Bounds))
+            return isNullable ? ReadNullableBoundsMethod : ReadBoundsMethod;
+        if (type == typeof(Quaternion))
+            return isNullable ? ReadNullableQuaternionMethod : ReadQuaternionMethod;
+        if (type == typeof(Color))
+            return isNullable ? ReadNullableColorMethod : ReadColorMethod;
+        if (type == typeof(Color32))
+            return isNullable ? ReadNullableColor32Method : ReadColor32Method;
+        if (type.IsArray)
+        {
+            Type elemType = type.GetElementType();
+            if (elemType == typeof(ulong))
+                return isNullable ? ReadNullableUInt64ArrayMethod : ReadUInt64ArrayMethod;
+            if (elemType == typeof(float))
+                return isNullable ? ReadNullableFloatArrayMethod : ReadFloatArrayMethod;
+            if (elemType == typeof(long))
+                return isNullable ? ReadNullableInt64ArrayMethod : ReadInt64ArrayMethod;
+            if (elemType == typeof(ushort))
+                return isNullable ? ReadNullableUInt16ArrayMethod : ReadUInt16ArrayMethod;
+            if (elemType == typeof(short))
+                return isNullable ? ReadNullableInt16ArrayMethod : ReadInt16ArrayMethod;
+            if (elemType == typeof(byte))
+                return isNullable ? ReadNullableByteArrayMethod : ReadByteArrayMethod;
+            if (elemType == typeof(int))
+                return isNullable ? ReadNullableInt32ArrayMethod : ReadInt32ArrayMethod;
+            if (elemType == typeof(uint))
+                return isNullable ? ReadNullableUInt32ArrayMethod : ReadUInt32ArrayMethod;
+            if (elemType == typeof(bool))
+                return isNullable ? ReadNullableBoolArrayMethod : ReadBoolArrayMethod;
+            if (elemType == typeof(sbyte))
+                return isNullable ? ReadNullableInt8ArrayMethod : ReadInt8ArrayMethod;
+            if (elemType == typeof(decimal))
+                return isNullable ? ReadNullableDecimalArrayMethod : ReadDecimalArrayMethod;
+            if (elemType == typeof(char))
+                return isNullable ? ReadNullableCharArrayMethod : ReadCharArrayMethod;
+            if (elemType == typeof(double))
+                return isNullable ? ReadNullableDoubleArrayMethod : ReadDoubleArrayMethod;
+            if (elemType == typeof(string))
+                return isNullable ? ReadNullableStringArrayMethod : ReadStringArrayMethod;
+            if (elemType == typeof(Guid))
+                return isNullable ? ReadNullableGuidArrayMethod : ReadGuidArrayMethod;
+            if (elemType == typeof(DateTime))
+                return isNullable ? ReadNullableDateTimeArrayMethod : ReadDateTimeArrayMethod;
+            if (elemType == typeof(DateTimeOffset))
+                return isNullable ? ReadNullableDateTimeOffsetArrayMethod : ReadDateTimeOffsetArrayMethod;
+        }
+
+        return null;
+    }
     public static class ReaderHelper<T>
     {
         public static readonly Reader<T>? Reader;

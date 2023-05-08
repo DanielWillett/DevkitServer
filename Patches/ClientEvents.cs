@@ -482,6 +482,24 @@ public static class ClientEvents
     private static bool OnPermissionsInvoker()
     {
         bool allow = true;
+        if (UserInput.ActiveTool is TerrainEditor editor && GetTerrainBrushWorldPosition != null)
+        {
+            TileSync? sync = TileSync.GetAuthority();
+            if (sync != null && sync.Pending.HasValue)
+            {
+                float rad = TerrainEditor.toolMode switch
+                {
+                    TerrainEditor.EDevkitLandscapeToolMode.HEIGHTMAP => editor.heightmapBrushRadius,
+                    TerrainEditor.EDevkitLandscapeToolMode.SPLATMAP => editor.splatmapBrushRadius,
+                    _ => 0
+                };
+                if (sync.Pending.Value.CollidesWith2DCircle(GetTerrainBrushWorldPosition(editor), rad))
+                {
+                    UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("BeingSynced"));
+                    return false;
+                }
+            }
+        }
         if (TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.HEIGHTMAP)
         {
             Logger.LogDebug("Edit heightmap requested.");
@@ -922,7 +940,7 @@ public static class ClientEvents
     private static void OnPrototypesUpdated(LandscapeTile __instance)
     {
         // was ran in the read method or during an apply call, no need to update.
-        if (!EditorTerrain.SaveTransactions || Landscape.getTile(__instance.coord) == null) return;
+        if (!LandscapeUtil.SaveTransactions || Landscape.getTile(__instance.coord) == null) return;
 
         OnSplatmapLayerMaterialsUpdate?.Invoke(__instance);
     }

@@ -7,6 +7,7 @@ using SDG.NetPak;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using DevkitServer.Multiplayer.Actions;
 
 namespace DevkitServer.Multiplayer.Networking;
 
@@ -18,7 +19,7 @@ public static class NetFactory
         InvokeMethod,
         MovementRelay,
         SendTileData,
-        TerrainEditRelay
+        ActionRelay
     }
     public const int MaxPacketSize = 61440;
     private static readonly List<Listener> localListeners = new List<Listener>(16);
@@ -82,7 +83,7 @@ public static class NetFactory
 #if CLIENT
         methods[(int)DevkitMessage.SendTileData] = typeof(TileSync).GetMethod(nameof(TileSync.ReceiveTileData), BindingFlags.NonPublic | BindingFlags.Static)!;
 #endif
-        methods[(int)DevkitMessage.TerrainEditRelay] = typeof(EditorTerrain).GetMethod(nameof(EditorTerrain.ReceiveTerrainRelay), BindingFlags.NonPublic | BindingFlags.Static)!;
+        methods[(int)DevkitMessage.ActionRelay] = typeof(EditorActions).GetMethod(nameof(EditorActions.ReceiveActionRelay), BindingFlags.NonPublic | BindingFlags.Static)!;
 
         Listeners = new Delegate[methods.Length];
 

@@ -595,11 +595,13 @@ public class UserInput : MonoBehaviour
     private void Load()
     {
         if (User?.Player == null) return;
+        _networkedInitialPosition = true;
+        Vector3 pos;
         if (PlayerSavedata.fileExists(User.Player.playerID, "/DevkitServer/Input.dat"))
         {
             Block block = PlayerSavedata.readBlock(User.Player.playerID, "/DevkitServer/Input.dat", 0);
             ushort v = block.readUInt16();
-            Vector3 pos = block.readSingleVector3();
+            pos = block.readSingleVector3();
             if (v < 2)
             {
                 block.readSingleQuaternion();
@@ -609,35 +611,36 @@ public class UserInput : MonoBehaviour
                 block.readSingle();
                 block.readSingle();
             }
-            this.transform.position = pos;
-            _lastPacket = new UserInputPacket
+            if (pos.IsFinite() && Mathf.Abs(pos.x) <= ushort.MaxValue && Mathf.Abs(pos.y) <= ushort.MaxValue)
             {
-                Position = pos,
-                Pitch = 0,
-                Yaw = 0,
-                Flags = Flags.StopMsg,
-                DeltaTime = Time.deltaTime,
-                Input = Vector3.zero,
-                Speed = 0f
-            };
-            _lastPos = pos;
-            _lastPitch = 0;
-            _lastYaw = 0;
-            if (v > 0)
-                Controller = (CameraController)block.readByte();
-            
-            Logger.LogDebug(" Loaded position: " + pos.Format());
-            SendInitialPosition.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, pos);
-        }
-        else
-        {
-            PlayerSpawnpoint spawn = LevelPlayers.getSpawn(false);
-            Vector3 pos = spawn.point + new Vector3(0.0f, 2f, 0.0f);
-            Logger.LogDebug(" Loaded random position: " + pos.Format() + ", " + spawn.angle.Format() + "°.");
-            SendInitialPosition.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, pos);
+                this.transform.position = pos;
+                _lastPacket = new UserInputPacket
+                {
+                    Position = pos,
+                    Pitch = 0,
+                    Yaw = 0,
+                    Flags = Flags.StopMsg,
+                    DeltaTime = Time.deltaTime,
+                    Input = Vector3.zero,
+                    Speed = 0f
+                };
+                _lastPos = pos;
+                _lastPitch = 0;
+                _lastYaw = 0;
+                if (v > 0)
+                    Controller = (CameraController)block.readByte();
+
+                Logger.LogDebug(" Loaded position: " + pos.Format());
+                SendInitialPosition.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, pos);
+                return;
+            }
         }
 
-        _networkedInitialPosition = true;
+        PlayerSpawnpoint spawn = LevelPlayers.getSpawn(false);
+        pos = spawn.point + new Vector3(0.0f, 2f, 0.0f);
+        Logger.LogDebug(" Loaded random position: " + pos.Format() + ", " + spawn.angle.Format() + "°.");
+        SendInitialPosition.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, pos);
+
     }
     public void Save()
     {

@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using DevkitServer.Patches;
 using HarmonyLib;
@@ -229,7 +230,7 @@ internal static class Accessor
     internal static readonly MethodInfo IsServerGetter = typeof(Provider).GetProperty(nameof(Provider.isServer), BindingFlags.Static | BindingFlags.Public)?.GetGetMethod()!;
     internal static readonly MethodInfo IsEditorGetter = typeof(Level).GetProperty(nameof(Level.isEditor), BindingFlags.Static | BindingFlags.Public)?.GetGetMethod()!;
     internal static readonly MethodInfo IsDevkitServerGetter = typeof(DevkitServerModule).GetProperty(nameof(DevkitServerModule.IsEditing), BindingFlags.Static | BindingFlags.Public)?.GetGetMethod()!;
-    private static readonly MethodInfo LogDebug = typeof(Logger).GetMethod(nameof(Logger.LogDebug), BindingFlags.Public | BindingFlags.Static)!;
+    internal static readonly MethodInfo LogDebug = typeof(Logger).GetMethod(nameof(Logger.LogDebug), BindingFlags.Public | BindingFlags.Static)!;
     public static IEnumerable<CodeInstruction> AddIsEditorCall(IEnumerable<CodeInstruction> instructions, MethodBase __method)
     {
         if (IsServerGetter == null || IsEditorGetter == null)
@@ -692,6 +693,23 @@ internal static class Accessor
                 return ActionTypes![p.Length].MakeGenericType(p2);
             }
         }
+    }
+    /// <param name="assembly"><see langword="null"/> to use DevkitServer assembly.</param>
+    /// <returns>Every type defined in the assembly.</returns>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static Type[] GetTypesSafe()
+    {
+        Type[] allTypes;
+        try
+        {
+            allTypes = Assembly.GetCallingAssembly().GetTypes();
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            allTypes = ex.Types;
+        }
+
+        return allTypes;
     }
 }
 

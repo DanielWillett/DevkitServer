@@ -678,7 +678,7 @@ internal static class Logger
 
                 break;
             case OperandType.InlineType:
-                if (instruction.operand is MethodBase type)
+                if (instruction.operand is Type type)
                     return op + " " + type.Format();
                 break;
             case OperandType.ShortInlineVar:
@@ -725,8 +725,9 @@ internal static class Logger
 
         return instruction.Name;
     }
-    public static string Format(this string str, bool quotes)
+    public static string Format(this string? str, bool quotes)
     {
+        if (str == null) return ((object?)null).Format();
         if (StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string clr = (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor

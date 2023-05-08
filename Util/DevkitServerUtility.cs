@@ -15,6 +15,7 @@ using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Patches;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
+using JetBrains.Annotations;
 using SDG.Framework.Debug;
 using SDG.Framework.Landscapes;
 using Action = System.Action;
@@ -41,6 +42,7 @@ public static class DevkitServerUtility
         new Regex(@"(?<!(?:\<noparse\>(?!\<\/noparse\>)).*)\<\/{0,1}(?:(?:color=\""{0,1}[#a-z]{0,9}\""{0,1})|(?:color)|(?:size=\""{0,1}\d+\""{0,1})|(?:size)|(?:alpha)|(?:alpha=#[0-f]{1,2})|(?:#.{3,8})|(?:[isub])|(?:su[pb])|(?:lowercase)|(?:uppercase)|(?:smallcaps))\>", RegexOptions.IgnoreCase);
     public static Regex RemoveTMProRichTextRegex { get; } =
         new Regex(@"(?<!(?:\<noparse\>(?!\<\/noparse\>)).*)\<\/{0,1}(?:(?:noparse)|(?:alpha)|(?:alpha=#[0-f]{1,2})|(?:[su])|(?:su[pb])|(?:lowercase)|(?:uppercase)|(?:smallcaps))\>", RegexOptions.IgnoreCase);
+    [Pure]
     public static string FormatBytes(long length)
     {
         _sizeCodes ??= new string[]
@@ -82,6 +84,7 @@ public static class DevkitServerUtility
 
         return len.ToString("N1") + " " + _sizeCodes[inc];
     }
+    [Pure]
     public static Bounds InflateBounds(in Bounds bounds)
     {
         Vector3 c = bounds.center;
@@ -90,6 +93,7 @@ public static class DevkitServerUtility
     }
     /// <summary>Convert an HTMLColor string to a actual color.</summary>
     /// <param name="htmlColorCode">A hexadecimal/HTML color key.</param>
+    [Pure]
     public static Color Hex(this string htmlColorCode)
     {
         if (htmlColorCode.Length == 0)
@@ -119,6 +123,7 @@ public static class DevkitServerUtility
 
         return true;
     }
+    [Pure]
     public static unsafe int GetLabelId(this Label label) => *(int*)&label;
     public static void PrintBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
     {
@@ -128,10 +133,12 @@ public static class DevkitServerUtility
     {
         Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, columnCount, offset, len));
     }
+    [Pure]
     public static string GetBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
     {
         return BytesToString(bytes, columnCount, offset, len, "X2");
     }
+    [Pure]
     public static string GetBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
     {
         return BytesToString(bytes, columnCount, offset, len, "000");
@@ -144,10 +151,12 @@ public static class DevkitServerUtility
     {
         Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, len, columnCount, offset));
     }
+    [Pure]
     public static unsafe string GetBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0)
     {
         return BytesToString(bytes, columnCount, offset, len, "X2");
     }
+    [Pure]
     public static unsafe string GetBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0)
     {
         return BytesToString(bytes, columnCount, offset, len, "000");
@@ -160,14 +169,17 @@ public static class DevkitServerUtility
     {
         Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, len, columnCount, offset));
     }
+    [Pure]
     public static unsafe string GetBytesHex<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
     {
         return BytesToString(bytes, columnCount, offset, len);
     }
+    [Pure]
     public static unsafe string GetBytesDec<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
     {
         return BytesToString(bytes, columnCount, offset, len);
     }
+    [Pure]
     public static string BytesToString(byte[] bytes, int columnCount, int offset, int len, string fmt)
     {
         if (offset >= bytes.Length)
@@ -185,6 +197,7 @@ public static class DevkitServerUtility
         }
         return sb.ToString();
     }
+    [Pure]
     public static unsafe string BytesToString(byte* bytes, int columnCount, int offset, int len, string fmt)
     {
         if (offset >= len)
@@ -200,6 +213,7 @@ public static class DevkitServerUtility
         }
         return sb.ToString();
     }
+    [Pure]
     public static unsafe string BytesToString<T>(T* bytes, int columnCount, int offset, int len) where T : unmanaged
     {
         if (offset >= len)
@@ -215,10 +229,12 @@ public static class DevkitServerUtility
         }
         return sb.ToString();
     }
+    [Pure]
     public static CodeInstruction GetLocalCodeInstruction(LocalBuilder? builder, int index, bool set, bool byref = false)
     {
         return new CodeInstruction(GetLocalCode(builder != null ? builder.LocalIndex : index, set, byref), builder);
     }
+    [Pure]
     public static OpCode GetLocalCode(int index, bool set, bool byref = false)
     {
         if (index > ushort.MaxValue)
@@ -236,6 +252,7 @@ public static class DevkitServerUtility
             _ => set ? (index > byte.MaxValue ? OpCodes.Stloc : OpCodes.Stloc_S) : (index > byte.MaxValue ? OpCodes.Ldloc : OpCodes.Ldloc_S)
         };
     }
+    [Pure]
     public static int GetLocalIndex(CodeInstruction code, bool set)
     {
         if (code.opcode.OperandType == OperandType.ShortInlineVar &&
@@ -271,6 +288,7 @@ public static class DevkitServerUtility
 
         return -1;
     }
+    [Pure]
     public static CodeInstruction LoadConstantI4(int number)
     {
         return number switch
@@ -288,6 +306,49 @@ public static class DevkitServerUtility
              _ => new CodeInstruction(OpCodes.Ldc_I4, number),
         };
     }
+    public static void LoadConstantI4(ILGenerator generator, int number)
+    {
+        OpCode code = number switch
+        {
+            -1 => OpCodes.Ldc_I4_M1,
+             0 => OpCodes.Ldc_I4_0,
+             1 => OpCodes.Ldc_I4_1,
+             2 => OpCodes.Ldc_I4_2,
+             3 => OpCodes.Ldc_I4_3,
+             4 => OpCodes.Ldc_I4_4,
+             5 => OpCodes.Ldc_I4_5,
+             6 => OpCodes.Ldc_I4_6,
+             7 => OpCodes.Ldc_I4_7,
+             8 => OpCodes.Ldc_I4_8,
+             _ => OpCodes.Ldc_I4
+        };
+        if (number is < -1 or > 8)
+            generator.Emit(code, number);
+        else
+            generator.Emit(code);
+    }
+    public static void LoadConstantI4(DebuggableEmitter generator, int number)
+    {
+        OpCode code = number switch
+        {
+            -1 => OpCodes.Ldc_I4_M1,
+             0 => OpCodes.Ldc_I4_0,
+             1 => OpCodes.Ldc_I4_1,
+             2 => OpCodes.Ldc_I4_2,
+             3 => OpCodes.Ldc_I4_3,
+             4 => OpCodes.Ldc_I4_4,
+             5 => OpCodes.Ldc_I4_5,
+             6 => OpCodes.Ldc_I4_6,
+             7 => OpCodes.Ldc_I4_7,
+             8 => OpCodes.Ldc_I4_8,
+             _ => OpCodes.Ldc_I4
+        };
+        if (number is < -1 or > 8)
+            generator.Emit(code, number);
+        else
+            generator.Emit(code);
+    }
+    [Pure]
     public static CodeInstruction LoadParameter(int index)
     {
         return index switch
@@ -321,6 +382,7 @@ public static class DevkitServerUtility
         else
             generator.Emit(code);
     }
+    [Pure]
     public static LocalBuilder? GetLocal(CodeInstruction code, out int index, bool set)
     {
         if (code.opcode.OperandType == OperandType.ShortInlineVar &&
@@ -398,10 +460,15 @@ public static class DevkitServerUtility
         ptr[index] = ptr[index + 3];
         ptr[index + 3] = b;
     }
+    [Pure]
     public static uint ReverseUInt32(uint val) => ((val >> 24) & 0xFF) | (((val >> 16) & 0xFF) << 8) | (((val >> 8) & 0xFF) << 16) | (val << 24);
+    [Pure]
     public static Vector2 ToVector2(this in Vector3 v3) => new Vector2(v3.x, v3.z);
+    [Pure]
     public static Vector3 ToVector3(this in Vector2 v2) => new Vector3(v2.x, 0f, v2.y);
+    [Pure]
     public static Vector3 ToVector3(this in Vector2 v2, float y) => new Vector3(v2.x, y, v2.y);
+    [Pure]
     public static CodeInstruction CopyWithoutSpecial(this CodeInstruction instruction) => new CodeInstruction(instruction.opcode, instruction.operand);
     public static bool TryParseSteamId(string str, out CSteamID steamId)
     {
@@ -655,6 +722,7 @@ public static class DevkitServerUtility
         for (int i = 0; i < props.Length; ++i)
             _presets[i] = new KeyValuePair<string, Color>(props[i].Name.ToLowerInvariant(), (Color)props[i].GetMethod.Invoke(null, Array.Empty<object>()));
     }
+    [Pure]
     public static bool TryParseColor(string str, out Color color)
     {
         Color32 color32;
@@ -721,6 +789,7 @@ public static class DevkitServerUtility
         color = default;
         return false;
     }
+    [Pure]
     public static bool TryParseColor32(string str, out Color32 color)
     {
         if (str.Length > 0 && str[0] == '#')
@@ -777,6 +846,7 @@ public static class DevkitServerUtility
         color = default;
         return false;
     }
+    [Pure]
     public static bool QueueOnMainThread(Action action, bool skipFrame = false, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
@@ -884,8 +954,11 @@ public static class DevkitServerUtility
                 break;
         }
     }
+    [Pure]
     public static unsafe bool UserSteam64(this ulong s64) => ((CSteamID*)&s64)->GetEAccountType() == EAccountType.k_EAccountTypeIndividual;
+    [Pure]
     public static bool UserSteam64(this CSteamID s64) => s64.GetEAccountType() == EAccountType.k_EAccountTypeIndividual;
+    [Pure]
     public static string GetPlayerSavedataLocation(ulong s64, string path, int characterId = 0) => PlayerSavedata.hasSync
         ? (Path.Combine(ReadWrite.PATH, "Sync", s64 + "_" + characterId, Level.info.name, path))
         : (Path.Combine(ReadWrite.PATH, ServerSavedata.directory, Provider.serverID, "Players", s64 + "_" + characterId, Level.info.name, path));
@@ -915,10 +988,15 @@ public static class DevkitServerUtility
         WriteData(path, @new);
     }
     private const string NullValue = "null";
+    [Pure]
     public static string Translate(this Local local, string format) => local.format(format);
+    [Pure]
     public static string Translate(this Local local, string format, object? arg0) => local.format(format, arg0 ?? NullValue);
+    [Pure]
     public static string Translate(this Local local, string format, object? arg0, object? arg1) => local.format(format, arg0 ?? NullValue, arg1 ?? NullValue);
+    [Pure]
     public static string Translate(this Local local, string format, object? arg0, object? arg1, object? arg2) => local.format(format, arg0 ?? NullValue, arg1 ?? NullValue, arg2 ?? NullValue);
+    [Pure]
     public static string Translate(this Local local, string format, params object?[] args)
     {
         for (int i = 0; i < args.Length; ++i)
@@ -926,16 +1004,20 @@ public static class DevkitServerUtility
         
         return local.format(format, args);
     }
+    [Pure]
     public static string RemoveRichText(string text)
     {
         return RemoveRichTextRegex.Replace(text, string.Empty);
     }
     /// <remarks>Does not include &lt;#ffffff&gt; colors.</remarks>
+    [Pure]
     public static string RemoveTMProRichText(string text)
     {
         return RemoveTMProRichTextRegex.Replace(text, string.Empty);
     }
+    [Pure]
     public static Color GetColor(this IDevkitServerPlugin? plugin) => plugin == null ? DevkitServerModule.PluginColor : (plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor);
+    [Pure]
     public static LevelObject? FindLevelObject(Transform t)
     {
         if (t == null || !Regions.tryGetCoordinate(t.position, out byte x, out byte y))

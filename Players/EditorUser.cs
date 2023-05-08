@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer;
+using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Networking;
 #if CLIENT
 using DevkitServer.Players.UI;
@@ -26,7 +27,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 #endif
     public UserInput Input { get; private set; } = null!;
     public UserTransactions Transactions { get; private set; } = null!;
-    public EditorTerrain Terrain { get; private set; } = null!;
+    public EditorActions Actions { get; private set; } = null!;
     public TileSync TileSync { get; private set; } = null!;
     public string DisplayName { get; private set; } = null!;
     public SteamPlayer? Player { get; internal set; }
@@ -51,7 +52,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         DevkitServerGamemode.SetupEditorObject(EditorObject, this);
         Input = EditorObject.GetComponent<UserInput>();
         Transactions = EditorObject.GetComponent<UserTransactions>();
-        Terrain = EditorObject.GetComponent<EditorTerrain>();
+        Actions = EditorObject.GetComponent<EditorActions>();
         TileSync = EditorObject.GetComponent<TileSync>();
 #if SERVER
         ClientInfo = DevkitServerGamemode.GetClientInfo(this);

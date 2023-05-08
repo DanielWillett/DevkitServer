@@ -1,11 +1,14 @@
-﻿using System.Net.Sockets;
+﻿using System.Reflection;
+using DevkitServer.Multiplayer;
 using SDG.Framework.Devkit;
 using SDG.Framework.Landscapes;
-using SDG.Framework.Rendering;
 
 namespace DevkitServer.Util;
 public static class LandscapeUtil
 {
+    internal static bool SaveTransactions = true;
+    internal static FieldInfo SaveTransactionsField = typeof(LandscapeUtil).GetField(nameof(SaveTransactions), BindingFlags.Static | BindingFlags.NonPublic)!;
+
     public static bool Encapsulates(this in LandscapeBounds outer, in LandscapeBounds inner) =>
         outer.min.x < inner.min.x && outer.min.y < inner.min.y && outer.max.x > inner.max.x && outer.max.y > inner.max.y;
     public static bool Encapsulates(this in HeightmapBounds outer, in HeightmapBounds inner) =>
@@ -24,6 +27,17 @@ public static class LandscapeUtil
         return new Vector3(pos.x, LevelGround.getHeight(pos), pos.z);
     }
     public static Vector3 GetWorldPosition(this in SplatmapCoord coord, in LandscapeCoord tile) => Landscape.getWorldPosition(tile, coord);
+    public static Vector3 GetWorldPositionNoHeight(this in HeightmapCoord coord, in LandscapeCoord tile, float height = 0) => Landscape.getWorldPosition(tile, coord, height);
+
+    // SDG.Framework.Landscapes.Landscape.getWorldPosition
+    public static Vector3 GetWorldPositionNoHeight(this in SplatmapCoord coord, in LandscapeCoord tile, float height = 0)
+    {
+        return new Vector3(
+            Mathf.RoundToInt(tile.x * Landscape.TILE_SIZE + coord.y / (float)Landscape.SPLATMAP_RESOLUTION * Landscape.TILE_SIZE) + Landscape.HALF_SPLATMAP_WORLD_UNIT,
+            height,
+            Mathf.RoundToInt(tile.y * Landscape.TILE_SIZE + coord.x / (float)Landscape.SPLATMAP_RESOLUTION * Landscape.TILE_SIZE) + Landscape.HALF_SPLATMAP_WORLD_UNIT);
+    }
+
     public static void Encapsulate(this ref LandscapeBounds left, in LandscapeBounds right)
     {
         if (left.min.x > right.min.x)
@@ -184,24 +198,31 @@ public static class LandscapeUtil
     }
     public static unsafe void ReadHoles(byte* input, LandscapeTile tile, in SplatmapBounds bounds)
     {
+        if (!tile.hasAnyHolesData)
+        {
+            int c = GetHolesSize(in bounds);
+            for (int i = 0; i < c; ++i)
+                input[i] = 0xFF;
+            return;
+        }
         int offsetX = bounds.min.x;
         int offsetY = bounds.min.y;
         int sizeX = bounds.max.x - offsetX + 1;
         int sizeY = bounds.max.y - offsetY + 1;
         const int tileSize = Landscape.HOLES_RESOLUTION;
-        fixed (bool* tileData = tile.holes)
+        Logger.LogDebug($"[TERRAIN COPY] Reading holes: Offset: ({offsetX.Format()}, {offsetY.Format()}). Size: ({sizeX.Format()}, {sizeY.Format()}). Tile Size: {tileSize.Format()}.");
+        int bitCt = 0;
+        for (int x = offsetX; x < offsetX + sizeX; ++x)
         {
-            Logger.LogDebug($"[TERRAIN COPY] Reading holes: Offset: ({offsetX.Format()}, {offsetY.Format()}). Size: ({sizeX.Format()}, {sizeY.Format()}). Tile Size: {tileSize.Format()}.");
-            int bitCt = 0;
-            for (int x = offsetX; x < offsetX + sizeX; ++x)
+            for (int y = offsetY; y < offsetY + sizeY; ++y)
             {
-                for (int y = offsetY; y < offsetY + sizeY; ++y)
-                {
-                    if (tileData[x * tileSize + y])
-                        input[bitCt / 8] |= (byte)(1 << (bitCt % 8));
-                    
-                    ++bitCt;
-                }
+                if (bitCt % 8 == 0)
+                    input[bitCt / 8] = 0;
+
+                if (tile.holes[x, y])
+                    input[bitCt / 8] |= (byte)(1 << (bitCt % 8));
+
+                ++bitCt;
             }
         }
     }
@@ -212,17 +233,14 @@ public static class LandscapeUtil
         int sizeX = bounds.max.x - offsetX + 1;
         int sizeY = bounds.max.y - offsetY + 1;
         const int tileSize = Landscape.HOLES_RESOLUTION;
-        fixed (bool* tileData = tile.holes)
+        Logger.LogDebug($"[TERRAIN COPY] Writing holes: Offset: ({offsetX.Format()}, {offsetY.Format()}). Size: ({sizeX.Format()}, {sizeY.Format()}). Tile Size: {tileSize.Format()}.");
+        int bitCt = 0;
+        for (int x = offsetX; x < offsetX + sizeX; ++x)
         {
-            Logger.LogDebug($"[TERRAIN COPY] Writing holes: Offset: ({offsetX.Format()}, {offsetY.Format()}). Size: ({sizeX.Format()}, {sizeY.Format()}). Tile Size: {tileSize.Format()}.");
-            int bitCt = 0;
-            for (int x = offsetX; x < offsetX + sizeX; ++x)
+            for (int y = offsetY; y < offsetY + sizeY; ++y)
             {
-                for (int y = offsetY; y < offsetY + sizeY; ++y)
-                {
-                    tileData[x * tileSize + y] = (input[bitCt / 8] & (1 << (bitCt % 8))) > 0;
-                    ++bitCt;
-                }
+                tile.holes[x, y] = (input[bitCt / 8] & (1 << (bitCt % 8))) > 0;
+                ++bitCt;
             }
         }
 
@@ -233,5 +251,66 @@ public static class LandscapeUtil
             tile.hasAnyHolesData = true;
             LevelHierarchy.MarkDirty();
         }
+    }
+    public static void WriteHeightmapNoTransactions(Bounds worldBounds, Landscape.LandscapeWriteHeightmapHandler callback)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        SaveTransactions = false;
+        try
+        {
+            Landscape.writeHeightmap(worldBounds, callback);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error writing to heightmap.");
+            Logger.LogError(ex);
+        }
+        finally
+        {
+            SaveTransactions = true;
+        }
+    }
+    public static void WriteSplatmapNoTransactions(Bounds worldBounds, Landscape.LandscapeWriteSplatmapHandler callback)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        SaveTransactions = false;
+        try
+        {
+            Landscape.writeSplatmap(worldBounds, callback);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error writing to splatmap.");
+            Logger.LogError(ex);
+        }
+        finally
+        {
+            SaveTransactions = true;
+        }
+    }
+    public static void WriteHolesNoTransactions(Bounds worldBounds, Landscape.LandscapeWriteHolesHandler callback)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        SaveTransactions = false;
+        try
+        {
+            Landscape.writeHoles(worldBounds, callback);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error writing to holes.");
+            Logger.LogError(ex);
+        }
+        finally
+        {
+            SaveTransactions = true;
+        }
+    }
+    public static float GetBrushAlpha(this Multiplayer.Actions.IBrushFalloff action, float sqrDistance)
+    {
+        return sqrDistance < action.BrushFalloff ? 1f : (1f - sqrDistance) / (1f - action.BrushFalloff);
     }
 }

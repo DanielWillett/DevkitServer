@@ -412,7 +412,8 @@ public sealed class DevkitServerModule : IModuleNexus
     };
     private static readonly LocalDatDictionary DefaultMessageLocalization = new LocalDatDictionary
     {
-        { "NoPermissions", "No Permission" }
+        { "NoPermissions", "No Permission" },
+        { "BeingSynced", "Syncing" },
     };
 }
 

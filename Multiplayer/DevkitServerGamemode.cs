@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using DevkitServer.API.Permissions;
+using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
 
@@ -13,7 +14,7 @@ public class DevkitServerGamemode : GameMode
 {
     public static void SetupEditorObject(GameObject editor, EditorUser user)
     {
-        editor.AddComponent<EditorTerrain>().User = user;
+        editor.AddComponent<EditorActions>().User = user;
         editor.AddComponent<UserInput>().User = user;
         editor.AddComponent<UserTransactions>().User = user;
         editor.AddComponent<TileSync>().User = user;

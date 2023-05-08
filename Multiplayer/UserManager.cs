@@ -130,6 +130,17 @@ public static class UserManager
         EditorUser? user = FromId(player);
         if (user == null)
             return;
+#if SERVER
+        if (user.TileSync != null)
+        {
+            if (user.TileSync.HasAuthority)
+            {
+                user.TileSync.HasAuthority = false;
+                if (TileSync.ServersideAuthorityTileSync != null)
+                    TileSync.ServersideAuthorityTileSync.HasAuthority = true;
+            }
+        }
+#endif
         RemovePlayer(user);
     }
     private static void RemovePlayer(EditorUser user)

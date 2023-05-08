@@ -1513,6 +1513,113 @@ public class ByteWriter
             return null;
         }
     }
+    public static MethodInfo? GetWriteMethod(Type type, bool isNullable = false)
+    {
+    redo:
+        if (type.IsPrimitive)
+        {
+            if (type == typeof(ulong))
+                return isNullable ? WriteNullableUInt64Method : WriteUInt64Method;
+            if (type == typeof(float))
+                return isNullable ? WriteNullableFloatMethod : WriteFloatMethod;
+            if (type == typeof(long))
+                return isNullable ? WriteNullableInt64Method : WriteInt64Method;
+            if (type == typeof(ushort))
+                return isNullable ? WriteNullableUInt16Method : WriteUInt16Method;
+            if (type == typeof(short))
+                return isNullable ? WriteNullableInt16Method : WriteInt16Method;
+            if (type == typeof(byte))
+                return isNullable ? WriteNullableUInt8Method : WriteUInt8Method;
+            if (type == typeof(int))
+                return isNullable ? WriteNullableInt32Method : WriteInt32Method;
+            if (type == typeof(uint))
+                return isNullable ? WriteNullableUInt32Method : WriteUInt32Method;
+            if (type == typeof(bool))
+                return isNullable ? WriteNullableBooleanMethod : WriteBooleanMethod;
+            if (type == typeof(char))
+                return isNullable ? WriteNullableCharMethod : WriteCharMethod;
+            if (type == typeof(sbyte))
+                return isNullable ? WriteNullableInt8Method : WriteInt8Method;
+            if (type == typeof(double))
+                return isNullable ? WriteNullableDoubleMethod : WriteDoubleMethod;
+        }
+
+        if (type == typeof(string))
+            return isNullable ? WriteNullableStringMethod : WriteStringMethod;
+        if (type.IsEnum)
+            return isNullable ? WriteNullableEnumMethod.MakeGenericMethod(type) : WriteEnumMethod.MakeGenericMethod(type);
+        if (!isNullable && type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
+        {
+            type = type.GenericTypeArguments[0];
+            isNullable = true;
+            goto redo;
+        }
+        if (type == typeof(decimal))
+            return isNullable ? WriteNullableDecimalMethod : WriteDecimalMethod;
+        if (type == typeof(DateTime))
+            return isNullable ? WriteNullableDateTimeMethod : WriteDateTimeMethod;
+        if (type == typeof(DateTimeOffset))
+            return isNullable ? WriteNullableDateTimeOffsetMethod : WriteDateTimeOffsetMethod;
+        if (type == typeof(TimeSpan))
+            return isNullable ? WriteNullableTimeSpanMethod : WriteTimeSpanMethod;
+        if (type == typeof(Guid))
+            return isNullable ? WriteNullableGUIDMethod : WriteGUIDMethod;
+        if (type == typeof(Vector2))
+            return isNullable ? WriteNullableVector2Method : WriteVector2Method;
+        if (type == typeof(Vector3))
+            return isNullable ? WriteNullableVector3Method : WriteVector3Method;
+        if (type == typeof(Vector4))
+            return isNullable ? WriteNullableVector4Method : WriteVector4Method;
+        if (type == typeof(Bounds))
+            return isNullable ? WriteNullableBoundsMethod : WriteBoundsMethod;
+        if (type == typeof(Quaternion))
+            return isNullable ? WriteNullableQuaternionMethod : WriteQuaternionMethod;
+        if (type == typeof(Color))
+            return isNullable ? WriteNullableColorMethod : WriteColorMethod;
+        if (type == typeof(Color32)) 
+                return isNullable ? WriteNullableColor32Method : WriteColor32Method;
+        if (type.IsArray)
+        {
+            Type elemType = type.GetElementType();
+            if (elemType == typeof(ulong))
+                return isNullable ? WriteNullableUInt64ArrayMethod : WriteUInt64ArrayMethod;
+            if (elemType == typeof(float))
+                return isNullable ? WriteNullableFloatArrayMethod : WriteFloatArrayMethod;
+            if (elemType == typeof(long))
+                return isNullable ? WriteNullableInt64ArrayMethod : WriteInt64ArrayMethod;
+            if (elemType == typeof(ushort))
+                return isNullable ? WriteNullableUInt16ArrayMethod : WriteUInt16ArrayMethod;
+            if (elemType == typeof(short))
+                return isNullable ? WriteNullableInt16ArrayMethod : WriteInt16ArrayMethod;
+            if (elemType == typeof(byte))
+                return isNullable ? WriteNullableUInt8ArrayMethod : WriteByteArrayMethod;
+            if (elemType == typeof(int))
+                return isNullable ? WriteNullableInt32ArrayMethod : WriteInt32ArrayMethod;
+            if (elemType == typeof(uint))
+                return isNullable ? WriteNullableUInt32ArrayMethod : WriteUInt32ArrayMethod;
+            if (elemType == typeof(bool))
+                return isNullable ? WriteNullableBooleanArrayMethod : WriteBooleanArrayMethod;
+            if (elemType == typeof(sbyte))
+                return isNullable ? WriteNullableInt8ArrayMethod : WriteInt8ArrayMethod;
+            if (elemType == typeof(decimal))
+                return isNullable ? WriteNullableDecimalArrayMethod : WriteDecimalArrayMethod;
+            if (elemType == typeof(char))
+                return isNullable ? WriteNullableCharArrayMethod : WriteCharArrayMethod;
+            if (elemType == typeof(double))
+                return isNullable ? WriteNullableDoubleArrayMethod : WriteDoubleArrayMethod;
+            if (elemType == typeof(string))
+                return isNullable ? WriteNullableStringArrayMethod : WriteStringArrayMethod;
+            if (elemType == typeof(Guid))
+                return isNullable ? WriteNullableGuidArrayMethod : WriteGuidArrayMethod;
+            if (elemType == typeof(DateTime))
+                return isNullable ? WriteNullableDateTimeArrayMethod : WriteDateTimeArrayMethod;
+            if (elemType == typeof(DateTimeOffset))
+                return isNullable ? WriteNullableDateTimeOffsetArrayMethod : WriteDateTimeOffsetArrayMethod;
+        }
+
+        return null;
+
+    }
     public static Writer<T1> GetWriter<T1>(bool isNullable = false) => (Writer<T1>)GetWriter(typeof(T1), isNullable)!;
     public static int GetMinimumSize(Type type)
     {
