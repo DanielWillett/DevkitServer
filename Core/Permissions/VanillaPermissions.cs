@@ -6,6 +6,16 @@ public static class VanillaPermissions
     [Permission]
     public static readonly Permission EditTerrain = new Permission("terrain.*", core: true);
     [Permission]
+    public static readonly Permission EditTiles = new Permission("tiles.*", core: true);
+    [Permission]
+    public static readonly Permission AddTile = new Permission("tiles.add", core: true);
+    [Permission]
+    public static readonly Permission DeleteTile = new Permission("tiles.delete", core: true);
+    [Permission]
+    public static readonly Permission ResetTile = new Permission("tiles.reset", core: true);
+    [Permission]
+    public static readonly Permission ReplicateTileSplatmap = new Permission("tiles.replicate_splatmap", core: true);
+    [Permission]
     public static readonly Permission EditHeightmap = new Permission("terrain.heightmap.edit", core: true);
     [Permission]
     public static readonly Permission EditSplatmap = new Permission("terrain.splatmap.edit", core: true);
@@ -25,6 +35,8 @@ public static class VanillaPermissions
     public static readonly Permission EditLighting = new Permission("lighting.edit", core: true);
     [Permission]
     public static readonly Permission BakeMapImages = new Permission("terrain.images.bake", core: true);
+    [Permission]
+    public static readonly Permission EditObjects = new Permission("hierarchy.objects.*", core: true);
     [Permission]
     public static readonly Permission PlaceObjects = new Permission("hierarchy.objects.place", core: true);
     [Permission]

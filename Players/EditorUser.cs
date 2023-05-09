@@ -3,6 +3,7 @@ using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Util.Comparers;
 #if CLIENT
 using DevkitServer.Players.UI;
 #endif
@@ -17,6 +18,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 #endif
     public CSteamID SteamId { get; private set; }
 #if SERVER
+    private HashSet<LevelObject> _lo = null!;
     private List<Permission> _perms = null!;
     private List<PermissionGroup> _permGrps = null!;
     public IReadOnlyList<Permission> Permissions { get; private set; } = null!;
@@ -36,12 +38,11 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     public bool IsOwner { get; private set; }
     public GameObject EditorObject { get; private set; } = null!;
 
-    
     internal void PreInit(CSteamID player, string displayName)
     {
         SteamId = player;
         DisplayName = displayName;
-        Logger.LogDebug("Editor User created: " + SteamId.m_SteamID.Format() + " (" + displayName.Format() + ").");
+        Logger.LogDebug("[USERS] Editor User created: " + SteamId.m_SteamID.Format() + " (" + displayName.Format() + ").");
     }
     internal void Init()
     {
@@ -56,6 +57,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         TileSync = EditorObject.GetComponent<TileSync>();
 #if SERVER
         ClientInfo = DevkitServerGamemode.GetClientInfo(this);
+        _lo = new HashSet<LevelObject>(32, LevelObjectComparer.Instance);
         _perms = ClientInfo.Permissions.ToList();
         _permGrps = ClientInfo.PermissionGroups.ToList();
         Permissions = _perms.AsReadOnly();
@@ -64,9 +66,18 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         ClientInfo.TryInvokeOnClientInfoReady(this, ClientInfo);
         Logger.DumpJson(ClientInfo);
 #endif
-        Logger.LogDebug("Editor User initialized: " + SteamId.m_SteamID.Format() + " (" + DisplayName.Format() + ").");
+        Logger.LogDebug("[USERS] Editor User initialized: " + SteamId.m_SteamID.Format() + " (" + DisplayName.Format() + ").");
     }
 #if SERVER
+    internal void AddPlacedLevelObject(LevelObject obj)
+    {
+        if (!_lo.Contains(obj))
+            _lo.Add(obj);
+    }
+    public bool PlacedLevelObjectRecently(LevelObject obj)
+    {
+        return _lo.Contains(obj);
+    }
     internal void AddPermission(Permission permission)
     {
         ThreadUtil.assertIsGameThread();
@@ -182,8 +193,12 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     {
         Player = null;
         IsOnline = false;
+#if SERVER
+        _lo.Clear();
+        _lo = null!;
+#endif
         if (!IsOwner && EditorObject != null) Destroy(EditorObject);
-        Logger.LogDebug("Editor User destroyed: " + SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture) + ".");
+        Logger.LogDebug("[USERS] Editor User destroyed: " + SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture) + ".");
     }
 #if CLIENT
     internal static void OnClientConnected()

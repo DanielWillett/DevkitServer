@@ -3,7 +3,7 @@
 namespace DevkitServer.Multiplayer.Actions;
 
 [EarlyTypeInit]
-public class ActionSettings
+public class ActionSettings : IDisposable
 {
     private static readonly int SettingsFlagLength;
     public EditorActions EditorActions { get; }
@@ -69,6 +69,23 @@ public class ActionSettings
                         CollectionPool.release(col);
                 }
                 col = collection;
+            }
+        }
+    }
+
+    void IDisposable.Dispose()
+    {
+        for (int i = 0; i < SettingsFlagLength; ++i)
+        {
+            if (_activeSettings[i] is { } collection)
+            {
+                _activeSettings[i] = null;
+                for (int j = i + 1; j < SettingsFlagLength; ++j)
+                {
+                    if (_activeSettings[j] == collection)
+                        _activeSettings[j] = null;
+                }
+                CollectionPool.release(collection);
             }
         }
     }

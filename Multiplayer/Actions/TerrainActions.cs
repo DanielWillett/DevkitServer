@@ -1,5 +1,4 @@
 ﻿using DevkitServer.Patches;
-using DevkitServer.Players.UI;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
 using JetBrains.Annotations;
@@ -9,6 +8,13 @@ using SDG.Framework.Landscapes;
 using SDG.Framework.Utilities;
 using System.Reflection;
 using System.Reflection.Emit;
+#if SERVER
+using DevkitServer.API.Permissions;
+using DevkitServer.Core.Permissions;
+#endif
+#if CLIENT
+using DevkitServer.Players.UI;
+#endif
 
 namespace DevkitServer.Multiplayer.Actions;
 public sealed class TerrainActions
@@ -285,6 +291,13 @@ public sealed class HeightmapRampAction : ITerrainAction, IBrushRadius, IBrushFa
     {
         LandscapeUtil.WriteHeightmapNoTransactions(Bounds, IntlHandleHeightmapWriteRamp);
     }
+#if SERVER
+    public bool CheckCanApply()
+    {
+        return VanillaPermissions.EditHeightmap.Has(Instigator.m_SteamID) ||
+               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+    }
+#endif
     public void Read(ByteReader reader)
     {
         Bounds = reader.ReadInflatedBounds();
@@ -344,6 +357,13 @@ public sealed class HeightmapAdjustAction : ITerrainAction, IBrushRadius, IBrush
     {
         LandscapeUtil.WriteHeightmapNoTransactions(Bounds, IntlHandleHeightmapWriteAdjust);
     }
+#if SERVER
+    public bool CheckCanApply()
+    {
+        return VanillaPermissions.EditHeightmap.Has(Instigator.m_SteamID) ||
+               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+    }
+#endif
     public void Read(ByteReader reader)
     {
         Bounds = reader.ReadInflatedBounds(out bool sub);
@@ -394,6 +414,13 @@ public sealed class HeightmapFlattenAction : ITerrainAction, IBrushRadius, IBrus
     {
         LandscapeUtil.WriteHeightmapNoTransactions(Bounds, IntlHandleHeightmapWriteFlatten);
     }
+#if SERVER
+    public bool CheckCanApply()
+    {
+        return VanillaPermissions.EditHeightmap.Has(Instigator.m_SteamID) ||
+               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+    }
+#endif
     public void Read(ByteReader reader)
     {
         Bounds = reader.ReadInflatedBounds();
@@ -489,6 +516,13 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrush
         if (SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE)
             ReleasePixelSmoothBuffer();
     }
+#if SERVER
+    public bool CheckCanApply()
+    {
+        return VanillaPermissions.EditHeightmap.Has(Instigator.m_SteamID) ||
+               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+    }
+#endif
     public void Read(ByteReader reader)
     {
         Bounds = reader.ReadInflatedBounds(out bool pixel);
@@ -695,6 +729,13 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
     {
         LandscapeUtil.WriteSplatmapNoTransactions(Bounds, IntlHandleSplatmapWritePaint);
     }
+#if SERVER
+    public bool CheckCanApply()
+    {
+        return VanillaPermissions.EditSplatmap.Has(Instigator.m_SteamID) ||
+               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+    }
+#endif
     public void Read(ByteReader reader)
     {
         Bounds = reader.ReadInflatedBounds();
@@ -772,7 +813,7 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
         else if (IsAuto)
             return;
         else
-            targetWeight = !UseWeightTarget ? BrushTarget : (IsRemoving ? 0f : 1f);
+            targetWeight = UseWeightTarget ? BrushTarget : (IsRemoving ? 0f : 1f);
 
         float speed = DeltaTime * BrushStrength * this.GetBrushAlpha(distance) * BrushSensitivity;
 
@@ -817,6 +858,13 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushF
     {
         LandscapeUtil.WriteSplatmapNoTransactions(Bounds, IntlHandleSplatmapWriteSmooth);
     }
+#if SERVER
+    public bool CheckCanApply()
+    {
+        return VanillaPermissions.EditSplatmap.Has(Instigator.m_SteamID) ||
+               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+    }
+#endif
     public void Read(ByteReader reader)
     {
         Bounds = reader.ReadInflatedBounds(out bool pixel);
@@ -958,6 +1006,13 @@ public sealed class HolemapPaintAction : ITerrainAction, IBrushRadius
         Logger.DumpJson(this);
         LandscapeUtil.WriteHolesNoTransactions(Bounds, IntlHandleHolesWriteCut);
     }
+#if SERVER
+    public bool CheckCanApply()
+    {
+        return VanillaPermissions.EditHoles.Has(Instigator.m_SteamID) ||
+               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+    }
+#endif
     private bool IntlHandleHolesWriteCut(Vector3 worldPosition, bool currentlyVisible)
     {
         if (currentlyVisible == IsFilling || new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude > BrushRadius * BrushRadius)
@@ -1009,6 +1064,13 @@ public sealed class TileModifyAction : ITerrainAction, ICoordinates
             Logger.LogInfo("Tile added: " + Coordinates + ".", ConsoleColor.Green);
         }
     }
+#if SERVER
+    public bool CheckCanApply()
+    {
+        return (IsDelete ? VanillaPermissions.DeleteTile : VanillaPermissions.AddTile).Has(Instigator.m_SteamID) ||
+               VanillaPermissions.EditTiles.Has(Instigator.m_SteamID);
+    }
+#endif
     public void Write(ByteWriter writer)
     {
         writer.Write(IsDelete);
@@ -1105,6 +1167,13 @@ public sealed class TileSplatmapLayersUpdateAction : ITerrainAction, ICoordinate
             LevelHierarchy.MarkDirty();
         }
     }
+#if SERVER
+    public bool CheckCanApply()
+    {
+        return VanillaPermissions.EditSplatmap.Has(Instigator.m_SteamID) ||
+               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+    }
+#endif
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);

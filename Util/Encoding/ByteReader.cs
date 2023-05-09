@@ -45,6 +45,7 @@ public class ByteReader
     
     public void LoadNew(Stream stream)
     {
+        failure = false;
         _stream = stream ?? throw new ArgumentNullException(nameof(stream));
         if (!_stream.CanSeek)
         {

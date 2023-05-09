@@ -1,20 +1,20 @@
 ﻿#if CLIENT
-using HarmonyLib;
-using JetBrains.Annotations;
-using System.Globalization;
-using System.Reflection;
-using System.Reflection.Emit;
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer;
-using SDG.Framework.Devkit.Tools;
-using SDG.Framework.Landscapes;
-using SDG.Framework.Devkit;
-using SDG.Framework.Foliage;
 using DevkitServer.Players;
 using DevkitServer.Players.UI;
+using HarmonyLib;
+using JetBrains.Annotations;
+using SDG.Framework.Devkit;
+using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Devkit.Transactions;
+using SDG.Framework.Foliage;
+using SDG.Framework.Landscapes;
 using SDG.Framework.Utilities;
+using System.Globalization;
+using System.Reflection;
+using System.Reflection.Emit;
 
 namespace DevkitServer.Patches;
 
@@ -681,19 +681,19 @@ public static class ClientEvents
     [UsedImplicitly]
     private static void OnAddTile(LandscapeTile tile)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor) return;
+        if (!DevkitServerModule.IsEditing) return;
 
-        Logger.LogDebug("Tile added: " + tile.coord.ToString() + ".");
+        Logger.LogDebug("Tile added: " + tile.coord.Format() + ".");
         OnTileAdded?.Invoke(tile);
     }
     [UsedImplicitly]
     private static void OnRemoveTile()
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor) return;
+        if (!DevkitServerModule.IsEditing) return;
 
         LandscapeTile? tile = TerrainEditor.selectedTile;
         if (tile == null) return;
-        Logger.LogDebug("Tile deleted: " + tile.coord.ToString() + ".");
+        Logger.LogDebug("Tile deleted: " + tile.coord.Format() + ".");
         OnTileDeleted?.Invoke(tile);
     }
     #endregion

@@ -361,7 +361,7 @@ public class TileSync : MonoBehaviour
             return sqrDst <= radius;
         }
 
-        public override string ToString() => $"{{ Tile: {Tile.Format()}, Bounds: ({XMin.Format()} - {XMax.Format()}, {YMin.Format()} - {YMax.Format()}) ({Type.Format()}).";
+        public override string ToString() => $"{{ Tile: {Tile}, Bounds: ({XMin} - {XMax}, {YMin} - {YMax}) ({Type}) }}";
     }
 #if CLIENT && GL_SAMPLES
     private struct PreviewSample

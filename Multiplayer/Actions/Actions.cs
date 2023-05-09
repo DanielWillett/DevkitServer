@@ -40,6 +40,7 @@ public enum ActionType : byte
     AddFoliageToSurface,
     RemoveFoliageInstances,
     RemoveResourceSpawnpoint,
+    RemoveFoliageLevelObject,
     RemoveLevelObject,
 
     // for future use
@@ -52,8 +53,11 @@ public interface IAction
     float DeltaTime { get; set; }
     CSteamID Instigator { get; set; }
     void Apply();
-    void Write(ByteWriter writer);
+#if SERVER
+    bool CheckCanApply();
+#endif
     void Read(ByteReader reader);
+    void Write(ByteWriter writer);
 }
 
 public interface IAsset

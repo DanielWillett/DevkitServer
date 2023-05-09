@@ -10,7 +10,7 @@ namespace DevkitServer.Multiplayer.Actions;
 [EarlyTypeInit]
 public sealed class EditorActions : MonoBehaviour
 {
-    public const ushort DataVersion = 0;
+    public const ushort DataVersion = 1;
 
     private static readonly ByteReader Reader = new ByteReader { ThrowOnError = true };
     private static readonly ByteWriter Writer = new ByteWriter(false, 8192);
@@ -24,7 +24,7 @@ public sealed class EditorActions : MonoBehaviour
     /// <summary>Ran after an action is applied.</summary>
     public static event AppliedAction? OnAppliedAction;
 
-    internal static ushort ReadDataVersion = DataVersion;
+    internal static ushort ReadDataVersion = 0;
 
 #if CLIENT
     private float _lastFlush;
@@ -52,7 +52,7 @@ public sealed class EditorActions : MonoBehaviour
         if (User == null)
         {
             Destroy(this);
-            Logger.LogError("Invalid EditorActions setup; EditorUser not found!");
+            Logger.LogError("Invalid EditorActions setup; EditorUser not found!", method: "EDITOR ACTIONS");
             return;
         }
 
@@ -60,12 +60,13 @@ public sealed class EditorActions : MonoBehaviour
         IsOwner = User == EditorUser.User;
 #endif
         Subscribe();
-        Logger.LogDebug("Editor actions module created for " + User.SteamId.m_SteamID + " ( owner: " + IsOwner + " ).");
+        Logger.LogDebug("[EDITOR ACTIONS] Editor actions module created for " + User.SteamId.m_SteamID + " ( owner: " + IsOwner + " ).");
     }
 
     [UsedImplicitly]
     private void OnDestroy()
     {
+        ((IDisposable)Settings).Dispose();
         Unsubscribe();
         User = null!;
         IsOwner = false;
@@ -90,7 +91,7 @@ public sealed class EditorActions : MonoBehaviour
     {
         if (!reader.ReadUInt16(out ushort len))
         {
-            Logger.LogError("Failed to read incoming terrain packet length.");
+            Logger.LogError("Failed to read incoming terrain packet length.", method: "EDITOR ACTIONS");
             return;
         }
 
@@ -98,13 +99,13 @@ public sealed class EditorActions : MonoBehaviour
         EditorUser? user = UserManager.FromConnection(transportConnection);
         if (user == null)
         {
-            Logger.LogError("Failed to find user for terrain packet from transport connection: " + transportConnection.Format() + ".");
+            Logger.LogError("Failed to find user for terrain packet from transport connection: " + transportConnection.Format() + ".", method: "EDITOR ACTIONS");
             return;
         }
 #endif
         if (!reader.ReadBytesPtr(len, out byte[] buffer, out int offset))
         {
-            Logger.LogError("Failed to read terrain packet.");
+            Logger.LogError("Failed to read terrain packet.", method: "EDITOR ACTIONS");
             return;
         }
         Reader.LoadNew(buffer);
@@ -114,37 +115,19 @@ public sealed class EditorActions : MonoBehaviour
         EditorUser? user = UserManager.FromId(s64);
         if (user == null)
         {
-            Logger.LogError("Failed to find user for terrain packet from a steam id: " + s64.Format() + ".");
+            Logger.LogError("Failed to find user for terrain packet from a steam id: " + s64.Format() + ".", method: "EDITOR ACTIONS");
             return;
         }
 #endif
-        user.Actions.HandleReadPackets(Reader);
-
-#if SERVER
-        if (Provider.clients.Count > 1)
-        {
-            byte[] sendBytes = new byte[sizeof(ulong) + len];
-            Buffer.BlockCopy(buffer, offset, sendBytes, sizeof(ulong), len);
-            UnsafeBitConverter.GetBytes(sendBytes, user.SteamId.m_SteamID);
-            IList<ITransportConnection> list = NetFactory.GetPooledTransportConnectionList(Provider.clients.Count - 1);
-            for (int i = 0; i < Provider.clients.Count; ++i)
-            {
-                SteamPlayer pl = Provider.clients[i];
-                if (pl.playerID.steamID.m_SteamID != user.SteamId.m_SteamID)
-                    list.Add(pl.transportConnection);
-            }
-
-            NetFactory.SendGeneric(NetFactory.DevkitMessage.ActionRelay, sendBytes, list, reliable: false);
-        }
-#endif
+        user.Actions.HandleReadPackets(Reader, len);
     }
 #if CLIENT
     internal void FlushEdits()
     {
         if (_pendingActions.Count > 0)
         {
-            Logger.LogDebug("Flushing " + _pendingActions.Count.Format() + " action(s).");
-            WriteEditBuffer(Writer);
+            Logger.LogDebug("[EDITOR ACTIONS] Flushing " + _pendingActions.Count.Format() + " action(s).");
+            WriteEditBuffer(Writer, 0, _pendingActions.Count);
             int len = Writer.Count;
             NetFactory.SendGeneric(NetFactory.DevkitMessage.ActionRelay, Writer.FinishWrite(), 0, len, true);
         }
@@ -193,18 +176,20 @@ public sealed class EditorActions : MonoBehaviour
             }
         }
     }
-#if CLIENT
-    private void WriteEditBuffer(ByteWriter writer)
+    private void WriteEditBuffer(ByteWriter writer, int index, int length)
     {
         if (!EditorActionsCodeGeneration.Init)
             return;
         ThreadUtil.assertIsGameThread();
-
+#if SERVER
+        writer.Write(User.SteamId.m_SteamID);
+#endif
         writer.Write(DataVersion);
-        byte ct = (byte)Math.Min(_pendingActions.Count, 96);
+        byte ct = (byte)Math.Min(length, 96);
         writer.Write(ct);
         List<ActionSettingsCollection> c = ListPool<ActionSettingsCollection>.claim();
-        for (int i = 0; i < ct; ++i)
+        int count2 = ct + index;
+        for (int i = index; i < count2; ++i)
         {
             IAction action = _pendingActions[i];
             ActionSettingsCollection? toAdd = null;
@@ -214,15 +199,15 @@ public sealed class EditorActions : MonoBehaviour
             if (toAdd != null)
             {
                 Settings.SetSettings(toAdd);
-                toAdd.StartIndex = (byte)i;
+                toAdd.StartIndex = (byte)(i - index);
                 c.Add(toAdd);
-                Logger.LogDebug("Queued data: " + toAdd.Flags + " at index " + toAdd.StartIndex + ": " + toAdd + ".");
+                Logger.LogDebug("[EDITOR ACTIONS] Queued data: " + toAdd.Flags + " at index " + toAdd.StartIndex + ": " + toAdd + ".");
             }
         }
 
         byte ct2 = (byte)c.Count;
         writer.Write(ct2);
-        Logger.LogDebug("Writing " + ct2 + " collections.");
+        Logger.LogDebug("[EDITOR ACTIONS] Writing " + ct2 + " collections.");
         for (int i = 0; i < ct2; ++i)
         {
             ActionSettingsCollection collection = c[i];
@@ -231,7 +216,7 @@ public sealed class EditorActions : MonoBehaviour
 
         ListPool<ActionSettingsCollection>.release(c);
 
-        Logger.LogDebug("Writing " + ct + " actions.");
+        Logger.LogDebug("[EDITOR ACTIONS] Writing " + ct + " actions.");
         for (int i = 0; i < ct; ++i)
         {
             IAction action = _pendingActions[i];
@@ -243,14 +228,16 @@ public sealed class EditorActions : MonoBehaviour
 
         _pendingActions.RemoveRange(0, ct);
     }
-#endif
 
-    private void HandleReadPackets(ByteReader reader)
+    private void HandleReadPackets(ByteReader reader, int bufferLength)
     {
         if (!EditorActionsCodeGeneration.Init)
             return;
         ThreadUtil.assertIsGameThread();
-
+#if SERVER
+        int offset = reader.Position;
+        byte[] buffer = reader.InternalBuffer!;
+#endif
         ReadDataVersion = reader.ReadUInt16();
         int ct = reader.ReadUInt8();
         int ct2 = reader.ReadUInt8();
@@ -266,6 +253,9 @@ public sealed class EditorActions : MonoBehaviour
         int stInd = _pendingActions.Count;
         if (stInd == 0)
             _nextApply = Time.realtimeSinceStartup;
+#if SERVER
+        bool anyInvalid = false;
+#endif
         for (int i = 0; i < ct; ++i)
         {
             if (c.Count > collIndex + 1 && c[collIndex + 1].StartIndex >= i)
@@ -277,9 +267,52 @@ public sealed class EditorActions : MonoBehaviour
                 action.Instigator = User.SteamId;
                 EditorActionsCodeGeneration.OnReadingAction!(this, action);
                 action.Read(reader);
+#if SERVER
+                if (action.CheckCanApply())
+                    _pendingActions.Add(action);
+                else
+                {
+                    anyInvalid = true;
+                    Logger.LogDebug($"[EDITOR ACTIONS] Invalid action request filtered from {action.Instigator.Format()}: {action}.");
+                }
+#else
                 _pendingActions.Add(action);
+#endif
             }
         }
+#if SERVER
+        if (Provider.clients.Count > 1)
+        {
+            Logger.LogDebug("[EDITOR ACTIONS] Relaying " + (_pendingActions.Count - stInd).Format() + " action(s).");
+            if (anyInvalid)
+            {
+                WriteEditBuffer(Writer, stInd, _pendingActions.Count - stInd);
+                int len = Writer.Count;
+                NetFactory.SendGeneric(NetFactory.DevkitMessage.ActionRelay, Writer.FinishWrite(), null, 0, len, true);
+            }
+
+            // faster to just copy the array so do that when possible
+            else
+            {
+                byte[] sendBytes = new byte[sizeof(ulong) + bufferLength];
+                Buffer.BlockCopy(buffer, offset, sendBytes, sizeof(ulong), bufferLength);
+                UnsafeBitConverter.GetBytes(sendBytes, User.SteamId.m_SteamID);
+                int capacity = Provider.clients.Count - 1;
+                IList<ITransportConnection> list = NetFactory.GetPooledTransportConnectionList(capacity);
+                if (list is List<ITransportConnection> l && l.Capacity < capacity)
+                    l.Capacity = capacity;
+                for (int i = 0; i < Provider.clients.Count; ++i)
+                {
+                    SteamPlayer pl = Provider.clients[i];
+                    if (pl.playerID.steamID.m_SteamID != User.SteamId.m_SteamID)
+                        list.Add(pl.transportConnection);
+                }
+
+                NetFactory.SendGeneric(NetFactory.DevkitMessage.ActionRelay, sendBytes, list, reliable: false);
+            }
+        }
+#endif
+        ReadDataVersion = 0;
         if (stInd != _pendingActions.Count)
         {
             // reverse, queue at beginning
@@ -288,7 +321,7 @@ public sealed class EditorActions : MonoBehaviour
             _pendingActions.RemoveRange(stInd, tempBuffer.Length);
             Array.Reverse(tempBuffer);
             _pendingActions.InsertRange(0, tempBuffer);
-            Logger.LogDebug("Received actions: " + tempBuffer.Length + ".");
+            Logger.LogDebug("[EDITOR ACTIONS] Received actions: " + tempBuffer.Length + ".");
         }
 
         ListPool<ActionSettingsCollection>.release(c);
@@ -298,8 +331,8 @@ public sealed class EditorActions : MonoBehaviour
             if (c.Count <= index)
                 return;
             collIndex = index;
-            ActionSettingsCollection collection = c[collIndex];
-            Settings.SetSettings(collection);
+            Settings.SetSettings(c[collIndex]);
+            Logger.LogDebug("[EDITOR ACTIONS] Loading option collection: " + c[collIndex].Format() + ".");
         }
     }
 

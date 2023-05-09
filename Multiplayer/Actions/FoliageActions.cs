@@ -1,5 +1,8 @@
-﻿using DevkitServer.Patches;
+﻿using DevkitServer.API.Permissions;
+using DevkitServer.Core.Permissions;
+using DevkitServer.Patches;
 using DevkitServer.Util.Encoding;
+using JetBrains.Annotations;
 using SDG.Framework.Devkit;
 using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Foliage;
@@ -56,7 +59,8 @@ public sealed class FoliageActions
             return;
         EditorActions.QueueAction(new RemoveFoliageInstancesAction
         {
-            Coordinates = foliageTile.coord,
+            CoordinateX = foliageTile.coord.x,
+            CoordinateY = foliageTile.coord.y,
             FoliageAsset = list.assetReference,
             BrushPosition = brushPosition,
             BrushRadius = DevkitFoliageToolOptions.instance.brushRadius,
@@ -84,6 +88,7 @@ public sealed class FoliageActions
                 CoordinateX = x,
                 CoordinateY = y,
                 InstanceId = obj.instanceID,
+                IsFoliage = true,
                 DeltaTime = Time.deltaTime
             });
         }
@@ -131,6 +136,13 @@ public sealed class AddFoliageToSurfaceAction : IAction, IAsset
             Logger.LogWarning("Unknown foliage asset: " + FoliageAsset.Format() + ".");
         }
     }
+#if SERVER
+    public bool CheckCanApply()
+    {
+        return VanillaPermissions.EditFoliage.Has(Instigator.m_SteamID) ||
+               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+    }
+#endif
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
@@ -170,31 +182,22 @@ public sealed class RemoveFoliageInstancesAction : IAction, ICoordinates, IBrush
     public float DeltaTime { get; set; }
     public float BrushRadius { get; set; }
     public float BrushFalloff { get; set; }
-    public FoliageCoord Coordinates { get; set; }
+    public int CoordinateX { get; set; }
+    public int CoordinateY { get; set; }
     public int SampleCount { get; set; }
     public bool AllowRemoveBaked { get; set; }
-    int ICoordinates.CoordinateX
-    {
-        get => Coordinates.x;
-        set => Coordinates = Coordinates with { x = value };
-    }
-    int ICoordinates.CoordinateY
-    {
-        get => Coordinates.y;
-        set => Coordinates = Coordinates with { y = value };
-    }
     public void Apply()
     {
-        FoliageTile tile = FoliageSystem.getTile(Coordinates);
+        FoliageTile tile = FoliageSystem.getTile(new FoliageCoord(CoordinateX, CoordinateY));
 
         if (tile == null)
         {
-            Logger.LogWarning("Unknown foliage tile: " + Coordinates + ".");
+            Logger.LogWarning("Unknown foliage tile: (" + CoordinateX.Format() + ", " + CoordinateY.Format() + ").");
             return;
         }
         if (!tile.instances.TryGetValue(FoliageAsset, out FoliageInstanceList list))
         {
-            Logger.LogWarning("Tile missing foliage " + (FoliageAsset.Find()?.FriendlyName ?? "NULL") + ": " + Coordinates.Format() + ".");
+            Logger.LogWarning("Tile missing foliage " + (FoliageAsset.Find()?.FriendlyName ?? "NULL") + ": (" + CoordinateX.Format() + ", " + CoordinateY.Format() + ").");
             return;
         }
         bool flag1 = false;
@@ -230,6 +233,13 @@ public sealed class RemoveFoliageInstancesAction : IAction, ICoordinates, IBrush
             return;
         LevelHierarchy.MarkDirty();
     }
+#if SERVER
+    public bool CheckCanApply()
+    {
+        return VanillaPermissions.EditFoliage.Has(Instigator.m_SteamID) ||
+               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+    }
+#endif
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
@@ -271,14 +281,20 @@ public sealed class RemoveResourceSpawnpointAction : IAction, IAsset
                 }
             }
 
-            Logger.LogWarning("Resource not found: " + (FoliageAsset.Find()?.FriendlyName ?? "NULL").Format() + " at " + ResourcePosition.Format() + ".");
+            Logger.LogWarning("Resource not found: " + (FoliageAsset.Find()?.FriendlyName ?? FoliageAsset.ToString()).Format() + " at " + ResourcePosition.Format() + ".");
         }
         else
         {
-            Logger.LogWarning("Resource out of bounds: " + (FoliageAsset.Find()?.FriendlyName ?? "NULL").Format() + " at " + ResourcePosition.Format() + ".");
+            Logger.LogWarning("Resource out of bounds: " + (FoliageAsset.Find()?.FriendlyName ?? FoliageAsset.ToString()).Format() + " at " + ResourcePosition.Format() + ".");
         }
     }
-
+#if SERVER
+    public bool CheckCanApply()
+    {
+        return VanillaPermissions.EditFoliage.Has(Instigator.m_SteamID) ||
+               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+    }
+#endif
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
@@ -291,31 +307,68 @@ public sealed class RemoveResourceSpawnpointAction : IAction, IAsset
     }
 }
 
+[Action(ActionType.RemoveFoliageLevelObject, CreateMethod = nameof(CreateRemoveFoliageLevelObject))]
 [Action(ActionType.RemoveLevelObject)]
 [EarlyTypeInit]
 public sealed class RemoveLevelObjectAction : IAction, ICoordinates
 {
-    public ActionType Type => ActionType.RemoveLevelObject;
+    private LevelObject? _targetObject;
+    public ActionType Type => IsFoliage ? ActionType.RemoveFoliageLevelObject : ActionType.RemoveLevelObject;
     public CSteamID Instigator { get; set; }
     public float DeltaTime { get; set; }
     public uint InstanceId { get; set; }
     public int CoordinateX { get; set; }
     public int CoordinateY { get; set; }
+    public bool IsFoliage { get; set; }
     public void Apply()
     {
+        if (_targetObject == null)
+        {
+            List<LevelObject> region = LevelObjects.objects[CoordinateX, CoordinateY];
+            for (int i = 0; i < region.Count; ++i)
+            {
+                LevelObject obj = region[i];
+                if (obj.instanceID == InstanceId)
+                {
+                    _targetObject = obj;
+                    break;
+                }
+            }
+
+            if (_targetObject == null)
+            {
+                Logger.LogWarning("Object not found: #" + InstanceId.Format() + " (" + CoordinateX.Format() + ", " + CoordinateY.Format() + ").");
+                return;
+            }
+        }
+        LevelObjects.removeObject(_targetObject.transform);
+    }
+#if SERVER
+    public bool CheckCanApply()
+    {
+        if (IsFoliage)
+            return VanillaPermissions.EditFoliage.Has(Instigator.m_SteamID) ||
+                   VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+
+        if (VanillaPermissions.EditObjects.Has(Instigator.m_SteamID) ||
+            VanillaPermissions.RemoveSavedObjects.Has(Instigator.m_SteamID))
+            return true;
+            
+        // check if the user is the one that placed the object (recently).
         List<LevelObject> region = LevelObjects.objects[CoordinateX, CoordinateY];
         for (int i = 0; i < region.Count; ++i)
         {
             LevelObject obj = region[i];
             if (obj.instanceID == InstanceId)
             {
-                LevelObjects.removeObject(obj.transform);
-                return;
+                _targetObject = obj;
+                return UserManager.FromId(Instigator.m_SteamID) is { } user && user.PlacedLevelObjectRecently(obj);
             }
         }
 
-        Logger.LogWarning("Object not found: #" + InstanceId.Format() + " (" + CoordinateX.Format() + ", " + CoordinateY.Format() + ").");
+        return false;
     }
+#endif
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
@@ -326,4 +379,7 @@ public sealed class RemoveLevelObjectAction : IAction, ICoordinates
         DeltaTime = reader.ReadFloat();
         InstanceId = reader.ReadUInt32();
     }
+
+    [UsedImplicitly]
+    private static RemoveLevelObjectAction CreateRemoveFoliageLevelObject() => new RemoveLevelObjectAction { IsFoliage = true };
 }

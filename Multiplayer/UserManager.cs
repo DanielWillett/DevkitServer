@@ -1,4 +1,6 @@
-﻿using DevkitServer.Multiplayer.Networking;
+﻿#if CLIENT
+using DevkitServer.Multiplayer.Networking;
+#endif
 using DevkitServer.Players;
 
 namespace DevkitServer.Multiplayer;
@@ -79,7 +81,7 @@ public static class UserManager
                 }
                 if (u.SteamId.m_SteamID == user.SteamId.m_SteamID)
                 {
-                    Logger.LogWarning("User {" + user.SteamId.m_SteamID.Format() + "} was already online.");
+                    Logger.LogWarning("User {" + user.SteamId.m_SteamID.Format() + "} was already online.", method: "USERS");
                     RemovePlayer(u.SteamId);
                     _users[j] = user;
                     added = true;
@@ -96,9 +98,9 @@ public static class UserManager
             user.Init();
             OnUserConnected?.Invoke(user);
 #if SERVER
-            Logger.LogInfo("Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + user.Connection.Format() + ".");
+            Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + user.Connection.Format() + ".");
 #else
-            Logger.LogInfo("Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + (user.Connection != null ? "Current Session" : "Remote Session") + ".");
+            Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + (user.Connection != null ? "Current Session" : "Remote Session") + ".");
 #endif
             return true;
         }
@@ -120,7 +122,7 @@ public static class UserManager
 
         if (Users.Count > 0)
         {
-            Logger.LogWarning("Unable to properly remove all users.");
+            Logger.LogWarning("Unable to properly remove all users.", method: "USERS");
             _users.Clear();
         }
     }
@@ -156,7 +158,7 @@ public static class UserManager
 #endif
         user.IsOnline = false;
         user.Player = null;
-        Logger.LogInfo("Player removed: " + user.DisplayName + " {" + user.SteamId.m_SteamID + "}.");
+        Logger.LogInfo("[USERS] Player removed: " + user.DisplayName + " {" + user.SteamId.m_SteamID + "}.");
         Object.Destroy(user);
     }
 

@@ -542,22 +542,34 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
             if (File.Exists(path))
             {
                 using FileStream str = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                ByteReader reader = new ByteReader();
-                reader.LoadNew(str);
-                _ = reader.ReadUInt16();
-                int ct = reader.ReadInt32();
+                Reader.LoadNew(str);
+                _ = Reader.ReadUInt16();
+                int ct = Reader.ReadInt32();
                 List<Permission> list = new List<Permission>(ct);
                 for (int i = 0; i < ct; ++i)
                 {
-                    if (Permission.TryParse(reader.ReadString(), out Permission perm))
+                    if (Permission.TryParse(Reader.ReadString(), out Permission perm))
                         list.Add(Handler.TryFindEqualPermission(perm));
-                    if (reader.HasFailed)
+                    if (Reader.HasFailed)
                         break;
                 }
                 return list.AsReadOnly();
             }
+            else
+            {
+                string[] def = DevkitServerConfig.Config.DefaultUserPermissions ?? Array.Empty<string>();
+                List<Permission> list = new List<Permission>(def.Length);
+                for (int i = 0; i < def.Length; ++i)
+                {
+                    if (Permission.TryParse(def[i], out Permission permission))
+                        list.Add(Handler.TryFindEqualPermission(permission));
+                    else
+                        Logger.LogWarning("Unknown default permission: " + def[i].Format() + ".");
+                }
 
-            return new List<Permission>(0).AsReadOnly();
+                SavePermissions(user, list);
+                return list.AsReadOnly();
+            }
         }
     }
     public virtual void AddPermissionGroup(ulong user, PermissionGroup group)
@@ -654,15 +666,14 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
             if (File.Exists(path))
             {
                 using FileStream str = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                ByteReader reader = new ByteReader();
-                reader.LoadNew(str);
-                _ = reader.ReadUInt16();
-                int ct = reader.ReadInt32();
+                Reader.LoadNew(str);
+                _ = Reader.ReadUInt16();
+                int ct = Reader.ReadInt32();
                 List<PermissionGroup> list = new List<PermissionGroup>(ct);
                 for (int i = 0; i < ct; ++i)
                 {
-                    bool temp = reader.ReadBool();
-                    string id = reader.ReadString();
+                    bool temp = Reader.ReadBool();
+                    string id = Reader.ReadString();
                     if (Handler.TryFindPermissionGroup(id, out PermissionGroup group))
                         list.Add(group);
                     else
@@ -671,13 +682,26 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
                             Logger.LogWarning("Unknown permission group in " + user + "'s permission group save, ignoring.");
                         list.Add(new PermissionGroup(id, id, Color.white, int.MinValue, Array.Empty<GroupPermission>()));
                     }
-                    if (reader.HasFailed)
+                    if (Reader.HasFailed)
                         break;
                 }
                 return list.AsReadOnly();
             }
+            else
+            {
+                string[] def = DevkitServerConfig.Config.DefaultUserPermissionGroups ?? Array.Empty<string>();
+                List<PermissionGroup> list = new List<PermissionGroup>(def.Length);
+                for (int i = 0; i < def.Length; ++i)
+                {
+                    if (Handler.TryFindPermissionGroup(def[i], out PermissionGroup group))
+                        list.Add(group);
+                    else
+                        Logger.LogWarning("Unknown default permission group: " + def[i].Format() + ".");
+                }
 
-            return new List<PermissionGroup>(0).AsReadOnly();
+                SavePermissionGroups(user, list);
+                return list.AsReadOnly();
+            }
         }
     }
     public void SavePermissionGroup(PermissionGroup group)
@@ -686,11 +710,11 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         PermissionsEx.ReplicatePermissionGroupUpdate(group);
         TryInvokePermissionGroupUpdated(group);
     }
-    private static void SavePermissions(ulong player, IReadOnlyCollection<Permission> permissions)
+    private static void SavePermissions(ulong user, IReadOnlyCollection<Permission> permissions)
     {
-        lock (Reader)
+        lock (Writer)
         {
-            string path = DevkitServerUtility.GetPlayerSavedataLocation(player, Path.Combine("DevkitServer", "Permissions.dat"));
+            string path = DevkitServerUtility.GetPlayerSavedataLocation(user, Path.Combine("DevkitServer", "Permissions.dat"));
             string? dir = Path.GetDirectoryName(path);
             if (dir != null)
                 Directory.CreateDirectory(dir);
@@ -705,11 +729,11 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
             Writer.Stream = null;
         }
     }
-    private static void SavePermissionGroups(ulong player, IReadOnlyCollection<PermissionGroup> groups)
+    private static void SavePermissionGroups(ulong user, IReadOnlyCollection<PermissionGroup> groups)
     {
-        lock (Reader)
+        lock (Writer)
         {
-            string path = DevkitServerUtility.GetPlayerSavedataLocation(player, Path.Combine("DevkitServer", "PermissionGroups.dat"));
+            string path = DevkitServerUtility.GetPlayerSavedataLocation(user, Path.Combine("DevkitServer", "PermissionGroups.dat"));
             string? dir = Path.GetDirectoryName(path);
             if (dir != null)
                 Directory.CreateDirectory(dir);

@@ -2,6 +2,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DevkitServer.API.Permissions;
+using DevkitServer.Core.Permissions;
 
 namespace DevkitServer.Configuration;
 public class DevkitServerConfig
@@ -183,6 +184,7 @@ public class DevkitServerConfig
 }
 public class SystemConfig
 {
+#nullable disable
     [JsonPropertyName("extended_visual_ansi_support")]
     public bool ConsoleExtendedVisualANSISupport { get; set; }
 
@@ -193,9 +195,14 @@ public class SystemConfig
     [JsonPropertyName("disable_map_download")]
     public bool DisableMapDownload { get; set; }
 
-    [JsonPropertyName("high_speed")]
-    public TcpServerInfo? TcpSettings;
+    [JsonPropertyName("default_permissions")]
+    public string[] DefaultUserPermissions { get; set; }
 
+    [JsonPropertyName("default_permission_groups")]
+    public string[] DefaultUserPermissionGroups { get; set; }
+
+    [JsonPropertyName("high_speed")]
+    public TcpServerInfo TcpSettings;
     public class TcpServerInfo
     {
         [JsonPropertyName("enable_high_speed_support")]
@@ -205,6 +212,7 @@ public class SystemConfig
         public ushort HighSpeedPort { get; set; }
     }
 #endif
+#nullable restore
 
     public void SetDefaults()
     {
@@ -213,6 +221,11 @@ public class SystemConfig
 #if SERVER
         DisableMapDownload = false;
         TcpSettings = new TcpServerInfo { EnableHighSpeedSupport = false, HighSpeedPort = (ushort)(Provider.port + 2) };
+        DefaultUserPermissions = Array.Empty<string>();
+        DefaultUserPermissionGroups = new string[]
+        {
+            "viewer"
+        };
 #endif
     }
 }

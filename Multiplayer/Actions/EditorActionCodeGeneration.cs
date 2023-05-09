@@ -190,6 +190,7 @@ internal static class EditorActionsCodeGeneration
         readGenerator.Emit(OpCodes.Call, getActionSettings);
         readGenerator.Emit(OpCodes.Stloc, readActionSettings);
 
+        LocalBuilder anyChanged = writeGenerator.DeclareLocal(typeof(bool));
         const float tol = 0.0001f;
         foreach ((Type type, List<(PropertyInfo property, ActionSettingAttribute attr)> list) in properties)
         {
@@ -203,6 +204,10 @@ internal static class EditorActionsCodeGeneration
                 readGenerator.MarkLabel(readNext.Value);
             readNext = readGenerator.DefineLabel();
 
+            // anyChanged = false;
+            writeGenerator.Emit(OpCodes.Ldc_I4_0);
+            writeGenerator.Emit(OpCodes.Stloc, anyChanged);
+
             // if (action is not <type>) continue;
             writeGenerator.Emit(OpCodes.Ldarg_2);
             writeGenerator.Emit(OpCodes.Isinst, type);
@@ -212,8 +217,10 @@ internal static class EditorActionsCodeGeneration
             readGenerator.Emit(OpCodes.Brfalse, readNext.Value);
 
             Label? readNextProp = null;
-            Label? writeNextProp = null;
+            Label? writeCheckNextProp = null;
             List<LocalBuilder> lcls = new List<LocalBuilder>();
+            Label updateValuePop = writeGenerator.DefineLabel();
+            Label updateValueNoPop = writeGenerator.DefineLabel();
             foreach ((PropertyInfo property, ActionSettingAttribute attr) in list)
             {
                 writeGenerator.Comment($"Property: {property.Format()}, {attr.ActionSetting.Format()}.");
@@ -229,14 +236,13 @@ internal static class EditorActionsCodeGeneration
                     continue;
                 }
 
-                if (writeNextProp.HasValue)
-                    writeGenerator.MarkLabel(writeNextProp.Value);
-                writeNextProp = writeGenerator.DefineLabel();
+                if (writeCheckNextProp.HasValue)
+                    writeGenerator.MarkLabel(writeCheckNextProp.Value);
+                writeCheckNextProp = writeGenerator.DefineLabel();
                 if (readNextProp.HasValue)
                     readGenerator.MarkLabel(readNextProp.Value);
                 readNextProp = readGenerator.DefineLabel();
 
-                Label updateValue = writeGenerator.DefineLabel();
                 // ActionSettingsCollection? settings = settings.GetSetting(<type>);
                 writeGenerator.Emit(OpCodes.Ldloc, writeActionSettings);
                 DevkitServerUtility.LoadConstantI4(writeGenerator, (int)attr.ActionSetting);
@@ -245,9 +251,9 @@ internal static class EditorActionsCodeGeneration
                 DevkitServerUtility.LoadConstantI4(readGenerator, (int)attr.ActionSetting);
                 readGenerator.Emit(OpCodes.Call, getSettings);
 
-                // if (settings == null) goto updateValue;
+                // if (settings == null) goto updateValuePop;
                 writeGenerator.Emit(OpCodes.Dup);
-                writeGenerator.Emit(OpCodes.Brfalse, updateValue);
+                writeGenerator.Emit(OpCodes.Brfalse, updateValuePop);
 
                 // if (settings.GetSettings(<value>) == null) continue;
                 readGenerator.Emit(OpCodes.Dup);
@@ -272,13 +278,13 @@ internal static class EditorActionsCodeGeneration
                     writeGenerator.Emit(OpCodes.Callvirt, property.GetMethod);
                     writeGenerator.Emit(OpCodes.Ldc_R4, tol);
                     writeGenerator.Emit(OpCodes.Call, nearlyEqual);
-                    writeGenerator.Emit(OpCodes.Brtrue, writeNextProp.Value);
+                    writeGenerator.Emit(OpCodes.Brtrue, writeCheckNextProp.Value);
                 }
                 else if (property.PropertyType.IsPrimitive || property.PropertyType.IsEnum)
                 {
                     writeGenerator.Emit(OpCodes.Ldarg_2);
                     writeGenerator.Emit(OpCodes.Callvirt, property.GetMethod);
-                    writeGenerator.Emit(OpCodes.Beq, writeNextProp.Value);
+                    writeGenerator.Emit(OpCodes.Beq, writeCheckNextProp.Value);
                 }
                 else
                 {
@@ -311,47 +317,11 @@ internal static class EditorActionsCodeGeneration
                         writeGenerator.Emit(OpCodes.Callvirt, property.GetMethod);
                     }
                     writeGenerator.Emit(OpCodes.Callvirt, objEquals);
-                    writeGenerator.Emit(OpCodes.Brtrue, writeNextProp.Value);
+                    writeGenerator.Emit(OpCodes.Brtrue, writeCheckNextProp.Value);
+
+                    writeGenerator.Emit(OpCodes.Ldc_I4_1);
+                    writeGenerator.Emit(OpCodes.Stloc, anyChanged);
                 }
-
-                // else
-                Label updateValue2 = writeGenerator.DefineLabel();
-                writeGenerator.Emit(OpCodes.Br, updateValue2);
-                writeGenerator.MarkLabel(updateValue);
-                writeGenerator.Emit(OpCodes.Pop);
-                writeGenerator.MarkLabel(updateValue2);
-                writeGenerator.Emit(OpCodes.Ldarg_1);
-                writeGenerator.Emit(OpCodes.Ldind_Ref);
-                writeGenerator.Emit(OpCodes.Stloc, writeSettings);
-                writeGenerator.Emit(OpCodes.Ldloc, writeSettings);
-                Label setProperty = writeGenerator.DefineLabel();
-                // if (collection == null)
-                //    collection = ActionSettings.CollectionPool.claim().Reset();
-                writeGenerator.Emit(OpCodes.Brtrue, setProperty);
-                writeGenerator.Emit(OpCodes.Ldarg_1);
-
-                writeGenerator.Emit(OpCodes.Ldsfld, poolField);
-                writeGenerator.Emit(OpCodes.Call, claimFromPool);
-                writeGenerator.Emit(OpCodes.Stloc, writeSettings);
-                writeGenerator.Emit(OpCodes.Ldloc, writeSettings);
-                writeGenerator.Emit(OpCodes.Dup);
-                writeGenerator.Emit(OpCodes.Call, reset);
-                writeGenerator.Emit(OpCodes.Stind_Ref);
-
-                writeGenerator.MarkLabel(setProperty);
-                // collection.<Property> = action.<Property>
-                writeGenerator.Emit(OpCodes.Ldloc, writeSettings);
-                writeGenerator.Emit(OpCodes.Dup);
-                writeGenerator.Emit(OpCodes.Dup);
-                writeGenerator.Emit(OpCodes.Ldarg_2);
-                writeGenerator.Emit(OpCodes.Callvirt, property.GetMethod);
-                writeGenerator.Emit(OpCodes.Callvirt, settingsProperty.SetMethod);
-
-                // collection.Flags |= <Type>
-                writeGenerator.Emit(OpCodes.Call, flagsProperty.GetMethod);
-                DevkitServerUtility.LoadConstantI4(writeGenerator, (int)attr.ActionSetting);
-                writeGenerator.Emit(OpCodes.Or);
-                writeGenerator.Emit(OpCodes.Call, flagsProperty.GetSetMethod(true));
 
                 // action.<Property> = collection.<Property>
                 readGenerator.Emit(OpCodes.Ldarg_1);
@@ -359,11 +329,73 @@ internal static class EditorActionsCodeGeneration
                 readGenerator.Emit(OpCodes.Callvirt, settingsProperty.GetMethod);
                 readGenerator.Emit(OpCodes.Callvirt, property.SetMethod);
             }
-            if (writeNextProp.HasValue)
-                writeGenerator.MarkLabel(writeNextProp.Value);
+
+            // if (!anyChanged) continue;
+            writeGenerator.Emit(OpCodes.Ldloc, anyChanged);
+            writeGenerator.Emit(OpCodes.Brfalse, writeNext.Value);
+
+            writeGenerator.Emit(OpCodes.Br, updateValueNoPop);
+            writeGenerator.MarkLabel(updateValuePop);
+            writeGenerator.Emit(OpCodes.Pop);
+            writeGenerator.MarkLabel(updateValueNoPop);
+            
+            writeGenerator.Emit(OpCodes.Ldarg_1);
+            writeGenerator.Emit(OpCodes.Ldind_Ref);
+            writeGenerator.Emit(OpCodes.Stloc, writeSettings);
+
+            writeGenerator.Emit(OpCodes.Ldloc, writeSettings);
+            Label writeSetProperties = writeGenerator.DefineLabel();
+            // if (collection == null)
+            //    collection = ActionSettings.CollectionPool.claim().Reset();
+            writeGenerator.Emit(OpCodes.Brtrue, writeSetProperties);
+            writeGenerator.Emit(OpCodes.Ldarg_1);
+
+            writeGenerator.Emit(OpCodes.Ldsfld, poolField);
+            writeGenerator.Emit(OpCodes.Call, claimFromPool);
+            writeGenerator.Emit(OpCodes.Stloc, writeSettings);
+            writeGenerator.Emit(OpCodes.Ldloc, writeSettings);
+            writeGenerator.Emit(OpCodes.Dup);
+            writeGenerator.Emit(OpCodes.Call, reset);
+            writeGenerator.Emit(OpCodes.Stind_Ref);
+
+            writeGenerator.MarkLabel(writeSetProperties);
+
+            List<ActionSetting> used = new List<ActionSetting>(1);
+
+            foreach ((PropertyInfo property, ActionSettingAttribute attr) in list)
+            {
+                PropertyInfo? settingsProperty = null;
+                if (type.IsAssignableFrom(typeof(ActionSettingsCollection)))
+                    settingsProperty = property;
+
+                if (settingsProperty == null || settingsProperty.GetMethod == null || settingsProperty.SetMethod == null)
+                    continue;
+
+                // collection.<Property> = action.<Property>
+                writeGenerator.Emit(OpCodes.Ldloc, writeSettings);
+                writeGenerator.Emit(OpCodes.Ldarg_2);
+                writeGenerator.Emit(OpCodes.Callvirt, property.GetMethod);
+                writeGenerator.Emit(OpCodes.Callvirt, settingsProperty.SetMethod);
+
+                if (!used.Contains(attr.ActionSetting))
+                {
+                    writeGenerator.Emit(OpCodes.Ldloc, writeSettings);
+                    writeGenerator.Emit(OpCodes.Dup);
+                    // collection.Flags |= <Type>
+                    writeGenerator.Emit(OpCodes.Call, flagsProperty.GetMethod);
+                    DevkitServerUtility.LoadConstantI4(writeGenerator, (int)attr.ActionSetting);
+                    writeGenerator.Emit(OpCodes.Or);
+                    writeGenerator.Emit(OpCodes.Call, flagsProperty.GetSetMethod(true));
+                    used.Add(attr.ActionSetting);
+                }
+            }
+
+            if (writeCheckNextProp.HasValue)
+                writeGenerator.MarkLabel(writeCheckNextProp.Value);
             if (readNextProp.HasValue)
                 readGenerator.MarkLabel(readNextProp.Value);
         }
+
         if (writeNext.HasValue)
             writeGenerator.MarkLabel(writeNext.Value);
         
@@ -464,7 +496,7 @@ internal static class EditorActionsCodeGeneration
             .Where(x => interfaces.Contains(x.type))
             .SelectMany(x => x.info)
             .Select(x => (x.attr.ActionSetting, x.property))
-            .OrderBy(x => x.ActionSetting);
+            .OrderBy(x => x.ActionSetting).ThenBy(x => x.property.Name);
 
         foreach ((ActionSetting setting, PropertyInfo property) in settingsProperties)
         {
@@ -519,7 +551,7 @@ internal static class EditorActionsCodeGeneration
             byteReadGenerator.Emit(OpCodes.Call, property.GetSetMethod(true));
 
             toStringGenerator.Emit(OpCodes.Ldarg_1);
-            toStringGenerator.Emit(OpCodes.Ldstr, " " + setting + ": ");
+            toStringGenerator.Emit(OpCodes.Ldstr, " " + property.Name + ": ");
             toStringGenerator.Emit(OpCodes.Call, append);
             toStringGenerator.Emit(OpCodes.Ldarg_0);
             toStringGenerator.Emit(OpCodes.Call, property.GetMethod);
