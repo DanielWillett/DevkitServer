@@ -1,18 +1,36 @@
 ﻿using SDG.Framework.Utilities;
 
 namespace DevkitServer.Multiplayer.Actions;
+
+[EarlyTypeInit]
 public class ActionSettings
 {
-    private const int SettingsFlagLength = 32;
+    private static readonly int SettingsFlagLength;
     public EditorActions EditorActions { get; }
 
-    private readonly ActionSettingsCollection?[] _activeSettings = new ActionSettingsCollection?[SettingsFlagLength];
     internal static readonly Pool<ActionSettingsCollection> CollectionPool = new Pool<ActionSettingsCollection>();
+    private readonly ActionSettingsCollection?[] _activeSettings = new ActionSettingsCollection?[SettingsFlagLength];
     static ActionSettings()
     {
+        int max = -1;
+        ActionSetting[] actions = (ActionSetting[])Enum.GetValues(typeof(ActionSetting));
+        const int size = sizeof(ActionSetting) * 8;
+        for (int i = 0; i < actions.Length; ++i)
+        {
+            ActionSetting c = actions[i];
+            if (c is ActionSetting.Extended or ActionSetting.None) continue;
+            for (int b = max + 1; b < size; ++b)
+            {
+                if ((c & (ActionSetting)(1 << b)) != 0)
+                    max = b;
+            }
+        }
+
+        SettingsFlagLength = max + 1;
+        Logger.LogDebug($"[EDITOR ACTIONS] ActionSetting flag length: {SettingsFlagLength.Format()}/{size.Format()} bits.");
         ListPool<ActionSettingsCollection>.warmup((uint)(Provider.isServer ? 16 : 2));
 #if CLIENT
-        CollectionPool.warmup(SettingsFlagLength * 4);
+        CollectionPool.warmup((uint)(SettingsFlagLength * 4));
 #endif
     }
     internal ActionSettings(EditorActions actions)
@@ -22,8 +40,10 @@ public class ActionSettings
     public ActionSettingsCollection? GetSettings(ActionSetting value)
     {
         for (int i = 0; i < SettingsFlagLength; ++i)
+        {
             if ((value & (ActionSetting)(1 << i)) != 0)
-                return i is < 0 or >= SettingsFlagLength ? null : _activeSettings[i];
+                return i < 0 || i >= SettingsFlagLength ? null : _activeSettings[i];
+        }
 
         return null;
     }

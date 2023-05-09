@@ -280,7 +280,6 @@ public static class ClientEvents
                         yield return new CodeInstruction(OpCodes.Pop);
                         yield return new CodeInstruction(OpCodes.Ret);
                     }
-                    CodeInstruction c2 = new CodeInstruction(OpCodes.Dup);
                     if (onPermissionInvoker != null)
                     {
                         CodeInstruction c3 = new CodeInstruction(OpCodes.Call, onPermissionInvoker);
@@ -293,7 +292,8 @@ public static class ClientEvents
                         yield return new CodeInstruction(OpCodes.Pop);
                         yield return new CodeInstruction(OpCodes.Ret);
                     }
-                    
+
+                    CodeInstruction c2 = new CodeInstruction(OpCodes.Dup);
                     if (lbl.HasValue)
                         c2.labels.Add(lbl.Value);
                     yield return c2;
@@ -493,10 +493,15 @@ public static class ClientEvents
                     TerrainEditor.EDevkitLandscapeToolMode.SPLATMAP => editor.splatmapBrushRadius,
                     _ => 0
                 };
-                if (sync.Pending.Value.CollidesWith2DCircle(GetTerrainBrushWorldPosition(editor), rad))
+                if (sync.Pending.Value.Type == TileSync.DataType.Heightmap && TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.HEIGHTMAP ||
+                    sync.Pending.Value.Type == TileSync.DataType.Splatmap && TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.SPLATMAP && TerrainEditor.splatmapMode != TerrainEditor.EDevkitLandscapeToolSplatmapMode.CUT ||
+                    sync.Pending.Value.Type == TileSync.DataType.Holes && TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.SPLATMAP && TerrainEditor.splatmapMode == TerrainEditor.EDevkitLandscapeToolSplatmapMode.CUT)
                 {
-                    UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("BeingSynced"));
-                    return false;
+                    if (sync.Pending.Value.CollidesWith2DCircle(GetTerrainBrushWorldPosition(editor), rad))
+                    {
+                        UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("BeingSynced"));
+                        return false;
+                    }
                 }
             }
         }

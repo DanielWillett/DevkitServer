@@ -144,7 +144,7 @@ internal static class EditorActionsCodeGeneration
         DynamicMethod writeMethod = new DynamicMethod("SettingsWriteHandler", attributes, CallingConventions.Standard,
             typeof(void), new Type[] { typeof(EditorActions), typeof(ActionSettingsCollection).MakeByRefType(), typeof(IAction) },
             typeof(EditorActionsCodeGeneration), true);
-        DebuggableEmitter writeGenerator = new DebuggableEmitter(writeMethod) { DebugLog = true, Breakpointing = true };
+        DebuggableEmitter writeGenerator = new DebuggableEmitter(writeMethod) { DebugLog = false };
 
         DynamicMethod readMethod = new DynamicMethod("SettingsReadHandler", attributes, CallingConventions.Standard,
             typeof(void), new Type[] { typeof(EditorActions), typeof(IAction) },
@@ -265,9 +265,9 @@ internal static class EditorActionsCodeGeneration
                 readGenerator.Emit(OpCodes.Stloc, readSettings);
 
                 // if (settings.<Property> equals action.<Property>) continue;
+                writeGenerator.Emit(OpCodes.Callvirt, settingsProperty.GetMethod);
                 if (property.PropertyType == typeof(float))
                 {
-                    writeGenerator.Emit(OpCodes.Callvirt, settingsProperty.GetMethod);
                     writeGenerator.Emit(OpCodes.Ldarg_2);
                     writeGenerator.Emit(OpCodes.Callvirt, property.GetMethod);
                     writeGenerator.Emit(OpCodes.Ldc_R4, tol);
@@ -276,15 +276,12 @@ internal static class EditorActionsCodeGeneration
                 }
                 else if (property.PropertyType.IsPrimitive || property.PropertyType.IsEnum)
                 {
-                    writeGenerator.Emit(OpCodes.Callvirt, settingsProperty.GetMethod);
                     writeGenerator.Emit(OpCodes.Ldarg_2);
                     writeGenerator.Emit(OpCodes.Callvirt, property.GetMethod);
                     writeGenerator.Emit(OpCodes.Beq, writeNextProp.Value);
                 }
                 else
                 {
-                    writeGenerator.Emit(OpCodes.Ldarg_2);
-                    writeGenerator.Emit(OpCodes.Callvirt, property.GetMethod);
                     if (property.PropertyType.IsValueType)
                     {
                         LocalBuilder? lcl = null;
@@ -303,14 +300,15 @@ internal static class EditorActionsCodeGeneration
                         }
                         writeGenerator.Emit(OpCodes.Stloc, lcl);
                         writeGenerator.Emit(OpCodes.Ldloca, lcl);
-                    }
-                    // todo NRE
-                    writeGenerator.Emit(OpCodes.Callvirt, settingsProperty.GetMethod);
-                    // error
-                    if (property.PropertyType.IsValueType)
-                    {
+                        writeGenerator.Emit(OpCodes.Ldarg_2);
+                        writeGenerator.Emit(OpCodes.Callvirt, property.GetMethod);
                         writeGenerator.Emit(OpCodes.Box, property.PropertyType);
                         writeGenerator.Emit(OpCodes.Constrained, property.PropertyType);
+                    }
+                    else
+                    {
+                        writeGenerator.Emit(OpCodes.Ldarg_2);
+                        writeGenerator.Emit(OpCodes.Callvirt, property.GetMethod);
                     }
                     writeGenerator.Emit(OpCodes.Callvirt, objEquals);
                     writeGenerator.Emit(OpCodes.Brtrue, writeNextProp.Value);

@@ -1,14 +1,14 @@
-﻿using System.Diagnostics;
+﻿// #define GL_SAMPLES
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
 using JetBrains.Annotations;
 using SDG.Framework.Landscapes;
-using SDG.Framework.Rendering;
-using SDG.Framework.Utilities;
 using SDG.NetPak;
-using TMPro;
+#if CLIENT
+using SDG.Framework.Rendering;
+#endif
 
 namespace DevkitServer.Multiplayer;
 [HarmonyPatch]
@@ -63,7 +63,7 @@ public class TileSync : MonoBehaviour
                 if (_authority == this)
                     _authority = null;
                 _invalidations.Clear();
-#if CLIENT && DEBUG
+#if CLIENT && GL_SAMPLES
                 _samples = null;
 #endif
                 _invalidateIndex = 0;
@@ -94,11 +94,12 @@ public class TileSync : MonoBehaviour
     private int _bufferLen;
     private int _ttlPackets;
     private MapInvalidation _receiving;
-#if CLIENT && DEBUG
-    private MapInvalidation _gl;
+#if CLIENT
     private bool _renderGl;
+#if GL_SAMPLES
     private PreviewSample[]? _samples;
     private bool _invalSamples;
+#endif
 #endif
     private BitArray? _packetMask;
     static TileSync()
@@ -136,7 +137,7 @@ public class TileSync : MonoBehaviour
     [UsedImplicitly]
     private void Start()
     {
-#if CLIENT&& DEBUG
+#if CLIENT && DEBUG
         GLRenderer.render += HandleGLRender;
 #endif
         if (User == null)
@@ -164,8 +165,8 @@ public class TileSync : MonoBehaviour
 #endif
         }
     }
-#if CLIENT && DEBUG
-    private unsafe void HandleGLRender()
+#if CLIENT
+    private void HandleGLRender()
     {
         if (!HasAuthority)
             return;
@@ -189,84 +190,87 @@ public class TileSync : MonoBehaviour
 
         if (!_renderGl)
             return;
-        DevkitServerGLUtility.DrawTerrainBounds(_gl.Tile, _gl.XMin, _gl.XMax, _gl.YMin, _gl.YMax, _gl.Type != DataType.Heightmap);
-#if true
-        int offsetX = _gl.XMin;
-        int offsetY = _gl.YMin;
-        int sizeX = _gl.XMax - offsetX + 1;
-        int sizeY = _gl.YMax - offsetY + 1;
-        int sampleCt = sizeX * sizeY;
-        if (_invalSamples)
+        DevkitServerGLUtility.DrawTerrainBounds(_receiving.Tile, _receiving.XMin, _receiving.XMax, _receiving.YMin, _receiving.YMax, _receiving.Type != DataType.Heightmap);
+#if GL_SAMPLES
+        unsafe
         {
-            LandscapeCoord tile = _gl.Tile;
-            fixed (byte* ptr = _buffer)
+            int offsetX = _receiving.XMin;
+            int offsetY = _receiving.YMin;
+            int sizeX = _receiving.XMax - offsetX + 1;
+            int sizeY = _receiving.YMax - offsetY + 1;
+            int sampleCt = sizeX * sizeY;
+            if (_invalSamples)
             {
-                if (_samples == null || _samples.Length < sampleCt)
-                    _samples = new PreviewSample[sampleCt];
-                int sampleIndex = -1;
-                switch (_dataType)
+                LandscapeCoord tile = _receiving.Tile;
+                fixed (byte* ptr = _buffer)
                 {
-                    case DataType.Heightmap:
-                        float* buffer = (float*)ptr;
-                        for (int x = offsetX; x < offsetX + sizeX; ++x)
-                        {
-                            for (int y = offsetY; y < offsetY + sizeY; ++y)
-                            {
-                                _samples[++sampleIndex] = (new PreviewSample(Landscape.getWorldPosition(tile, new HeightmapCoord(x, y), *buffer), Color.Lerp(Color.red, Color.green, *buffer)));
-                                ++buffer;
-                            }
-                        }
-                        break;
-                    case DataType.Splatmap:
-                        buffer = (float*)ptr;
-                        AssetReference<LandscapeMaterialAsset> mat = TerrainEditor.splatmapMaterialTarget;
-                        LandscapeTile? tile2 = Landscape.getTile(tile);
-                        int index = tile2 == null || !mat.isValid ? -1 : tile2.materials.FindIndex(x => x.GUID == mat.GUID);
-                        if (index >= 0)
-                        {
+                    if (_samples == null || _samples.Length < sampleCt)
+                        _samples = new PreviewSample[sampleCt];
+                    int sampleIndex = -1;
+                    switch (_dataType)
+                    {
+                        case DataType.Heightmap:
+                            float* buffer = (float*)ptr;
                             for (int x = offsetX; x < offsetX + sizeX; ++x)
                             {
                                 for (int y = offsetY; y < offsetY + sizeY; ++y)
                                 {
-                                    _samples[++sampleIndex] = (new PreviewSample(Landscape.getWorldPosition(tile, new SplatmapCoord(x, y)), Color.Lerp(Color.red, Color.green, buffer[index])));
-                                    buffer += Landscape.SPLATMAP_LAYERS;
+                                    _samples[++sampleIndex] = (new PreviewSample(Landscape.getWorldPosition(tile, new HeightmapCoord(x, y), *buffer), Color.Lerp(Color.red, Color.green, *buffer)));
+                                    ++buffer;
                                 }
                             }
-                        }
-                        break;
-                    case DataType.Holes:
-                        int c = 0;
-                        for (int x = offsetX; x < offsetX + sizeX; ++x)
-                        {
-                            for (int y = offsetY; y < offsetY + sizeY; ++y)
+                            break;
+                        case DataType.Splatmap:
+                            buffer = (float*)ptr;
+                            AssetReference<LandscapeMaterialAsset> mat = TerrainEditor.splatmapMaterialTarget;
+                            LandscapeTile? tile2 = Landscape.getTile(tile);
+                            int index = tile2 == null || !mat.isValid ? -1 : tile2.materials.FindIndex(x => x.GUID == mat.GUID);
+                            if (index >= 0)
                             {
-                                bool val = (ptr[c / 8] & (1 << (c % 8))) > 0;
-                                _samples[++sampleIndex] = (new PreviewSample(Landscape.getWorldPosition(tile, new SplatmapCoord(x, y)), val ? Color.green : Color.red));
-                                ++c;
+                                for (int x = offsetX; x < offsetX + sizeX; ++x)
+                                {
+                                    for (int y = offsetY; y < offsetY + sizeY; ++y)
+                                    {
+                                        _samples[++sampleIndex] = (new PreviewSample(Landscape.getWorldPosition(tile, new SplatmapCoord(x, y)), Color.Lerp(Color.red, Color.green, buffer[index])));
+                                        buffer += Landscape.SPLATMAP_LAYERS;
+                                    }
+                                }
                             }
-                        }
-                        break;
+                            break;
+                        case DataType.Holes:
+                            int c = 0;
+                            for (int x = offsetX; x < offsetX + sizeX; ++x)
+                            {
+                                for (int y = offsetY; y < offsetY + sizeY; ++y)
+                                {
+                                    bool val = (ptr[c / 8] & (1 << (c % 8))) > 0;
+                                    _samples[++sampleIndex] = (new PreviewSample(Landscape.getWorldPosition(tile, new SplatmapCoord(x, y)), val ? Color.green : Color.red));
+                                    ++c;
+                                }
+                            }
+                            break;
+                    }
                 }
             }
-        }
-        if (_samples != null)
-        {
-            GL.Begin(GL.TRIANGLES);
-            const float length = 0.5f;
-            Vector3 size = new Vector3(length, length, length);
-            int c2 = Math.Min(sampleCt, _samples.Length);
-            int skip = c2 > 1024 ? (c2 > 8192 ? 8 : 4) : 1;
-            for (int i = 0; i < c2; ++i)
+            if (_samples != null)
             {
-                if (i % skip == 0)
+                GL.Begin(GL.TRIANGLES);
+                const float length = 0.5f;
+                Vector3 size = new Vector3(length, length, length);
+                int c2 = Math.Min(sampleCt, _samples.Length);
+                int skip = c2 > 1024 ? (c2 > 8192 ? 8 : 4) : 1;
+                for (int i = 0; i < c2; ++i)
                 {
-                    ref PreviewSample sample = ref _samples[i];
-                    GL.Color(sample.Color);
-                    GLUtility.boxSolid(sample.Position, size);
+                    if (i % skip == 0)
+                    {
+                        ref PreviewSample sample = ref _samples[i];
+                        GL.Color(sample.Color);
+                        GLUtility.boxSolid(sample.Position, size);
+                    }
                 }
-            }
 
-            GL.End();
+                GL.End();
+            }
         }
 #endif
     }
@@ -346,18 +350,20 @@ public class TileSync : MonoBehaviour
             else if (cx > maxPos.x)
                 closestEdgeX = maxPos.x;
 
-            if (cy < minPos.y)
-                closestEdgeY = minPos.y;
-            else if (cy > maxPos.y)
-                closestEdgeY = maxPos.y;
+            if (cy < minPos.z)
+                closestEdgeY = minPos.z;
+            else if (cy > maxPos.z)
+                closestEdgeY = maxPos.z;
 
             float distX = cx - closestEdgeX;
             float distY = cy - closestEdgeY;
             float sqrDst = distX * distX + distY * distY;
             return sqrDst <= radius;
         }
+
+        public override string ToString() => $"{{ Tile: {Tile.Format()}, Bounds: ({XMin.Format()} - {XMax.Format()}, {YMin.Format()} - {YMax.Format()}) ({Type.Format()}).";
     }
-#if CLIENT && DEBUG
+#if CLIENT && GL_SAMPLES
     private struct PreviewSample
     {
         public readonly Vector3 Position;
@@ -387,9 +393,8 @@ public class TileSync : MonoBehaviour
         }
     }
 #endif
-    private void ReceiveTileData(byte[] data, int offset, int length)
+    private void ReceiveTileData(byte[] data, int offset)
     {
-        DevkitServerUtility.PrintBytesHex(data, offset: offset, len: length);
         if (!HasAuthority || IsOwner)
         {
             Logger.LogWarning("[TILE SYNC] Received tile data from non-authority tile sync.");
@@ -438,10 +443,12 @@ public class TileSync : MonoBehaviour
             len -= HeaderSize;
 
             _receiving = new MapInvalidation(new LandscapeCoord(xtile, ytile), xmin, ymin, xmax, ymax, _dataType, Time.realtimeSinceStartup);
-            Logger.LogDebug($"Received starting packet: Len: {_bufferLen}. Packets: {_ttlPackets}. Tile: {_receiving.Tile.Format()}, Bounds: ({xmin.Format()}-{xmax.Format()}, {ymin.Format()}-{ymax.Format()}), Type: {_dataType}.");
-#if CLIENT && DEBUG
-            _gl = _receiving;
+#if CLIENT
             _renderGl = true;
+#endif
+            Logger.LogDebug($"Received starting packet: Len: {_bufferLen}. Packets: {_ttlPackets}. {_receiving.Format()}.");
+#if CLIENT && GL_SAMPLES
+            _gl = _receiving;
 #endif
         }
         else if (packetId >= _ttlPackets)
@@ -456,7 +463,7 @@ public class TileSync : MonoBehaviour
         _index += len;
         int missingCt = 0;
 
-#if CLIENT && DEBUG
+#if CLIENT && GL_SAMPLES
         _invalSamples = true;
 #endif
 
@@ -532,7 +539,7 @@ public class TileSync : MonoBehaviour
                 NetFactory.SendGeneric(NetFactory.DevkitMessage.SendTileData, buffer, list, length: len, reliable: true, offset: offset);
             }
 #endif
-            sync.ReceiveTileData(buffer, offset + sizeof(ulong), len);
+            sync.ReceiveTileData(buffer, offset + sizeof(ulong));
         }
         else
             Logger.LogWarning($"Received tile data from non-authoritive TileSync: {(sync.User == null ? "server-side authority" : sync.User.Format())}.");
@@ -824,7 +831,7 @@ public class TileSync : MonoBehaviour
             EditorUser.User.TileSync.InvalidateBounds(worldBounds, DataType.Holes, Time.realtimeSinceStartup);
 #endif
     }
-#if CLIENT&& DEBUG
+#if CLIENT
     [UsedImplicitly]
     private void OnDestroy()
     {

@@ -16,7 +16,9 @@ namespace DevkitServer.Players.UI;
 [EarlyTypeInit]
 public static class UIMessage
 {
+#if CLIENT
     private static string? _customText;
+#endif
     /// <summary>
     /// <see cref="EEditorMessage"/> value used for a custom message.
     /// </summary>
