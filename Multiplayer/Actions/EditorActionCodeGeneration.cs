@@ -63,10 +63,10 @@ internal static class EditorActionsCodeGeneration
         Logger.LogDebug($"[EDITOR ACTIONS] Found {actions.Count.Format()} action types.");
         Logger.LogDebug($"[EDITOR ACTIONS] Found {properties.Count.Format()} setting interfaces with {c.Format()} total properties.");
         
-        MethodInfo? getActionSettings = typeof(EditorActions).GetProperty(nameof(EditorActions.Settings), BindingFlags.Instance | BindingFlags.Public)?.GetMethod;
+        MethodInfo? getActionSettings = typeof(IActionListener).GetProperty(nameof(IActionListener.Settings), BindingFlags.Instance | BindingFlags.Public)?.GetMethod;
         if (getActionSettings == null)
         {
-            Logger.LogWarning($"Failed to find {typeof(EditorActions).Format()}.Settings getter.", method: "EDITOR ACTIONS");
+            Logger.LogWarning($"Failed to find {typeof(IActionListener).Format()}.Settings getter.", method: "EDITOR ACTIONS");
             DevkitServerModule.Fault();
             return;
         }
@@ -142,12 +142,12 @@ internal static class EditorActionsCodeGeneration
         }
 
         DynamicMethod writeMethod = new DynamicMethod("SettingsWriteHandler", attributes, CallingConventions.Standard,
-            typeof(void), new Type[] { typeof(EditorActions), typeof(ActionSettingsCollection).MakeByRefType(), typeof(IAction) },
+            typeof(void), new Type[] { typeof(IActionListener), typeof(ActionSettingsCollection).MakeByRefType(), typeof(IAction) },
             typeof(EditorActionsCodeGeneration), true);
-        DebuggableEmitter writeGenerator = new DebuggableEmitter(writeMethod) { DebugLog = false };
+        DebuggableEmitter writeGenerator = new DebuggableEmitter(writeMethod) { DebugLog = true };
 
         DynamicMethod readMethod = new DynamicMethod("SettingsReadHandler", attributes, CallingConventions.Standard,
-            typeof(void), new Type[] { typeof(EditorActions), typeof(IAction) },
+            typeof(void), new Type[] { typeof(IActionListener), typeof(IAction) },
             typeof(EditorActionsCodeGeneration), true);
         DebuggableEmitter readGenerator = new DebuggableEmitter(readMethod) { DebugLog = false };
 
@@ -318,10 +318,10 @@ internal static class EditorActionsCodeGeneration
                     }
                     writeGenerator.Emit(OpCodes.Callvirt, objEquals);
                     writeGenerator.Emit(OpCodes.Brtrue, writeCheckNextProp.Value);
-
-                    writeGenerator.Emit(OpCodes.Ldc_I4_1);
-                    writeGenerator.Emit(OpCodes.Stloc, anyChanged);
                 }
+
+                writeGenerator.Emit(OpCodes.Ldc_I4_1);
+                writeGenerator.Emit(OpCodes.Stloc, anyChanged);
 
                 // action.<Property> = collection.<Property>
                 readGenerator.Emit(OpCodes.Ldarg_1);
@@ -579,8 +579,8 @@ internal static class EditorActionsCodeGeneration
     }
 }
 
-internal delegate void HandleWriteSettings(EditorActions actions, ref ActionSettingsCollection? collection, IAction action);
-internal delegate void HandleReadSettings(EditorActions actions, IAction action);
+internal delegate void HandleWriteSettings(IActionListener actions, ref ActionSettingsCollection? collection, IAction action);
+internal delegate void HandleReadSettings(IActionListener actions, IAction action);
 internal delegate IAction? HandleCreateNewAction(ActionType type);
 internal delegate void HandleByteWriteSettings(ActionSettingsCollection collection, ByteWriter writer);
 internal delegate void HandleByteReadSettings(ActionSettingsCollection collection, ByteReader reader);

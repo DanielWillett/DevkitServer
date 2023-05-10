@@ -15,6 +15,7 @@ using SDG.Framework.Utilities;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
+using DevkitServer.Multiplayer.Actions;
 
 namespace DevkitServer.Patches;
 
@@ -405,7 +406,6 @@ public static class ClientEvents
         bool allow = false;
         if (TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.HEIGHTMAP)
         {
-            Logger.LogDebug("Edit heightmap denied.");
             if (OnEditHeightmapPermissionDenied == null)
                 goto rtn;
             foreach (EditHeightmapRequest denied in OnEditHeightmapPermissionDenied.GetInvocationList().Cast<EditHeightmapRequest>())
@@ -429,7 +429,6 @@ public static class ClientEvents
         {
             if (TerrainEditor.splatmapMode != TerrainEditor.EDevkitLandscapeToolSplatmapMode.CUT)
             {
-                Logger.LogDebug("Edit splatmap denied.");
                 if (OnEditSplatmapPermissionDenied == null)
                     goto rtn;
                 foreach (EditSplatmapRequest denied in OnEditSplatmapPermissionDenied.GetInvocationList().Cast<EditSplatmapRequest>())
@@ -451,7 +450,6 @@ public static class ClientEvents
             }
             else
             {
-                Logger.LogDebug("Edit holes denied.");
                 if (OnEditHolesPermissionDenied == null)
                     goto rtn;
                 bool isFilling = InputEx.GetKey(KeyCode.LeftShift);
@@ -482,6 +480,11 @@ public static class ClientEvents
     private static bool OnPermissionsInvoker()
     {
         bool allow = true;
+        if (EditorActions.IsPlayingCatchUp)
+        {
+            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("BeingSynced"));
+            return false;
+        }
         if (UserInput.ActiveTool is TerrainEditor editor && GetTerrainBrushWorldPosition != null)
         {
             TileSync? sync = TileSync.GetAuthority();
@@ -507,7 +510,6 @@ public static class ClientEvents
         }
         if (TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.HEIGHTMAP)
         {
-            Logger.LogDebug("Edit heightmap requested.");
             if (OnEditHeightmapRequested == null) return true;
             foreach (EditHeightmapRequest requested in OnEditHeightmapRequested.GetInvocationList().Cast<EditHeightmapRequest>())
             {
@@ -530,7 +532,6 @@ public static class ClientEvents
         {
             if (TerrainEditor.splatmapMode != TerrainEditor.EDevkitLandscapeToolSplatmapMode.CUT)
             {
-                Logger.LogDebug("Edit splatmap requested.");
                 if (OnEditSplatmapRequested == null) return true;
                 foreach (EditSplatmapRequest requested in OnEditSplatmapRequested.GetInvocationList().Cast<EditSplatmapRequest>())
                 {
@@ -551,7 +552,6 @@ public static class ClientEvents
             }
             else
             {
-                Logger.LogDebug("Edit holes requested.");
                 if (OnEditHolesRequested == null) return true;
                 bool isFilling = InputEx.GetKey(KeyCode.LeftShift);
                 foreach (EditHolesRequest requested in OnEditHolesRequested.GetInvocationList().Cast<EditHolesRequest>())
@@ -650,6 +650,8 @@ public static class ClientEvents
             settings.autoRayMask, InputEx.GetKey(KeyCode.LeftShift),
             TerrainEditor.splatmapMaterialTarget, Time.deltaTime);
     }
+
+    internal static int TakeReleaseAveragesList = 0;
     [UsedImplicitly]
     private static void OnPaintSmoothConfirm(Bounds bounds)
     {
@@ -669,6 +671,8 @@ public static class ClientEvents
             OnPaintSmoothed.Invoke(bounds, GetTerrainBrushWorldPosition(editor), editor.splatmapBrushRadius,
             editor.splatmapBrushFalloff, editor.splatmapBrushStrength, method, averagesList, GetSampleCount(editor),
             TerrainEditor.splatmapMaterialTarget, Time.deltaTime);
+            if (TakeReleaseAveragesList == 0)
+                ListPool<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>>.release(averagesList);
         }
     }
     [UsedImplicitly]

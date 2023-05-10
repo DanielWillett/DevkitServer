@@ -6,7 +6,7 @@ namespace DevkitServer.Multiplayer.Actions;
 public class ActionSettings : IDisposable
 {
     private static readonly int SettingsFlagLength;
-    public EditorActions EditorActions { get; }
+    public IActionListener EditorActions { get; }
 
     internal static readonly Pool<ActionSettingsCollection> CollectionPool = new Pool<ActionSettingsCollection>();
     private readonly ActionSettingsCollection?[] _activeSettings = new ActionSettingsCollection?[SettingsFlagLength];
@@ -33,7 +33,7 @@ public class ActionSettings : IDisposable
         CollectionPool.warmup((uint)(SettingsFlagLength * 4));
 #endif
     }
-    internal ActionSettings(EditorActions actions)
+    internal ActionSettings(IActionListener actions)
     {
         EditorActions = actions;
     }

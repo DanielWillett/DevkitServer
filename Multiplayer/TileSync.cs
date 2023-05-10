@@ -1,4 +1,6 @@
-﻿// #define GL_SAMPLES
+﻿#if CLIENT
+// #define GL_SAMPLES
+#endif
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
@@ -63,7 +65,7 @@ public class TileSync : MonoBehaviour
                 if (_authority == this)
                     _authority = null;
                 _invalidations.Clear();
-#if CLIENT && GL_SAMPLES
+#if GL_SAMPLES
                 _samples = null;
 #endif
                 _invalidateIndex = 0;
@@ -137,7 +139,7 @@ public class TileSync : MonoBehaviour
     [UsedImplicitly]
     private void Start()
     {
-#if CLIENT && DEBUG
+#if CLIENT
         GLRenderer.render += HandleGLRender;
 #endif
         if (User == null)
@@ -363,7 +365,7 @@ public class TileSync : MonoBehaviour
 
         public override string ToString() => $"{{ Tile: {Tile}, Bounds: ({XMin} - {XMax}, {YMin} - {YMax}) ({Type}) }}";
     }
-#if CLIENT && GL_SAMPLES
+#if GL_SAMPLES
     private struct PreviewSample
     {
         public readonly Vector3 Position;
@@ -447,7 +449,7 @@ public class TileSync : MonoBehaviour
             _renderGl = true;
 #endif
             Logger.LogDebug($"Received starting packet: Len: {_bufferLen}. Packets: {_ttlPackets}. {_receiving.Format()}.");
-#if CLIENT && GL_SAMPLES
+#if GL_SAMPLES
             _gl = _receiving;
 #endif
         }
@@ -463,7 +465,7 @@ public class TileSync : MonoBehaviour
         _index += len;
         int missingCt = 0;
 
-#if CLIENT && GL_SAMPLES
+#if GL_SAMPLES
         _invalSamples = true;
 #endif
 
@@ -718,7 +720,7 @@ public class TileSync : MonoBehaviour
         if (!HasAuthority || !IsOwner)
             return;
         float time = Time.realtimeSinceStartup;
-        if (_dataType == DataType.None && time - _lastSent > 5f)
+        if (_dataType == DataType.None && time - _lastSent > 1.5f)
         {
             if (_invalidations.Count == 0)
             {
@@ -726,7 +728,7 @@ public class TileSync : MonoBehaviour
                 _dataType = DataType.None;
                 return;
             }
-            while (_invalidateIndex < _invalidations.Count && time - _invalidations[_invalidateIndex].Time < 2f)
+            while (_invalidateIndex < _invalidations.Count && time - _invalidations[_invalidateIndex].Time < 3f)
                 ++_invalidateIndex;
             if (_invalidateIndex >= _invalidations.Count)
             {

@@ -1,6 +1,7 @@
 ﻿using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 using System.IO.Compression;
+using DevkitServer.Multiplayer.Actions;
 #if CLIENT
 using DevkitServer.Patches;
 using SDG.Framework.Utilities;
@@ -28,6 +29,7 @@ public static class EditorLevel
         ) { HighSpeed = true };
     private static readonly NetCall SendPending = new NetCall((ushort)NetCalls.SendPending);
     internal static readonly NetCall Ping = new NetCall((ushort)NetCalls.Ping);
+    internal static List<ITransportConnection> PendingToReceiveActions = new List<ITransportConnection>(4);
     public static string TempLevelPath => Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer",
 #if SERVER
         Provider.serverID,
@@ -37,7 +39,7 @@ public static class EditorLevel
         "{0}", "Level");
 
 #if SERVER
-    private static readonly ByteWriter LevelWriter = new ByteWriter(false, 134217728); // 128 MB
+    private static readonly ByteWriter LevelWriter = new ByteWriter(false, 134217728); // 128 MiB
 
     [NetCall(NetCallSource.FromClient, (ushort)NetCalls.RequestLevel)]
     private static StandardErrorCode ReceiveLevelRequest(MessageContext ctx)
@@ -131,6 +133,7 @@ public static class EditorLevel
             float startTime = Time.realtimeSinceStartup;
             string lvlName = Level.info.name;
             LevelData levelDataAtTimeOfRequest = LevelData.GatherLevelData();
+            PendingToReceiveActions.Add(connection);
             Coroutine compress = DevkitServerModule.ComponentHost.StartCoroutine(CompressLevel(levelDataAtTimeOfRequest));
 
             NetTask task2 = EndSendLevel.Listen();
@@ -360,6 +363,7 @@ public static class EditorLevel
         finally
         {
             hsConn?.CloseConnection();
+            PendingToReceiveActions.Remove(connection);
         }
     }
 #endif
@@ -392,6 +396,8 @@ public static class EditorLevel
         {
             yield return new WaitForSeconds(0.1f);
             task = SendRequestLevel.RequestAck(3000);
+            if (TemporaryEditorActions.Instance == null)
+                _ = new TemporaryEditorActions();
             Logger.LogInfo("[RECEIVE LEVEL] Sent level request.", ConsoleColor.DarkCyan);
             yield return task;
         }

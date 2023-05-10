@@ -35,6 +35,7 @@ public sealed class TerrainActions
             ClientEvents.OnSmoothed += OnHeightmapSmooth;
             ClientEvents.OnPainted += OnPaint;
             ClientEvents.OnAutoPainted += OnAutoPaint;
+            ++ClientEvents.TakeReleaseAveragesList;
             ClientEvents.OnPaintSmoothed += OnPaintSmooth;
             ClientEvents.OnHolePainted += OnPaintHole;
             ClientEvents.OnTileAdded += OnTileAdded;
@@ -56,6 +57,7 @@ public sealed class TerrainActions
             ClientEvents.OnPainted -= OnPaint;
             ClientEvents.OnAutoPainted -= OnAutoPaint;
             ClientEvents.OnPaintSmoothed -= OnPaintSmooth;
+            --ClientEvents.TakeReleaseAveragesList;
             ClientEvents.OnHolePainted -= OnPaintHole;
             ClientEvents.OnTileAdded -= OnTileAdded;
             ClientEvents.OnTileDeleted -= OnTileDeleted;
@@ -696,6 +698,10 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
             Logger.LogInfo("Reverse patched " + Accessor.GetMethodInfo(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
         }
     }
+
+    private LandscapeMaterialAsset? _asset;
+    private bool _assetFound;
+
     public ActionType Type => IsAuto ? ActionType.SplatmapAutoPaint : ActionType.SplatmapPaint;
     public TerrainEditorType EditorType => TerrainEditorType.Splatmap;
     public CSteamID Instigator { get; set; }
@@ -741,9 +747,12 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
         Bounds = reader.ReadInflatedBounds();
         byte flags = reader.ReadUInt8();
         IsAuto = (flags & 1) != 0;
-        UseWeightTarget = (flags & (1 << 1)) != 0;
-        UseAutoSlope = (flags & (1 << 2)) != 0;
-        UseAutoFoundation = (flags & (1 << 3)) != 0;
+        if (!IsAuto)
+        {
+            UseWeightTarget = (flags & (1 << 1)) != 0;
+            UseAutoSlope = (flags & (1 << 2)) != 0;
+            UseAutoFoundation = (flags & (1 << 3)) != 0;
+        }
         IsRemoving = (flags & (1 << 4)) != 0;
         BrushPosition = reader.ReadVector2();
         DeltaTime = reader.ReadFloat();
@@ -751,13 +760,27 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
     public void Write(ByteWriter writer)
     {
         writer.WriteHeightmapBounds(Bounds);
-        byte flags = (byte)((IsAuto ? 1 : 0) | (UseWeightTarget ? 1 << 1 : 0) | (UseAutoSlope ? 1 << 2 : 0) | (UseAutoFoundation ? 1 << 3 : 0) | (IsRemoving ? 1 << 4 : 0));
+        byte flags = (byte)((IsAuto ? 1 : 0) | (IsRemoving ? 1 << 4 : 0));
+        if (!IsAuto)
+            flags |= (byte)((UseWeightTarget ? 1 << 1 : 0) | (UseAutoSlope ? 1 << 2 : 0) | (UseAutoFoundation ? 1 << 3 : 0));
         writer.Write(flags);
         writer.Write(BrushPosition);
         writer.Write(DeltaTime);
     }
     private void IntlHandleSplatmapWritePaint(LandscapeCoord tileCoord, SplatmapCoord splatmapCoord, Vector3 worldPosition, float[] currentWeights)
     {
+        if (IsAuto && _assetFound && _asset == null)
+            return;
+        if (IsAuto && !_assetFound)
+        {
+            _assetFound = true;
+            _asset = SplatmapMaterial.Find();
+            if (_asset == null)
+            {
+                Logger.LogWarning($"[TERRAIN ACTIONS] Failed to find splatmap asset: {SplatmapMaterial.Format()} (from: {Instigator.Format()}).");
+                return;
+            }
+        }
         float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
         if (distance > BrushRadius * BrushRadius)
             return;
@@ -770,38 +793,69 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
             return;
 
         distance = Mathf.Sqrt(distance) / BrushRadius;
-        float targetWeight = 0.5f;
-        if (UseAutoFoundation || UseAutoSlope)
+        float targetWeight = IsAuto ? 1f : 0.5f;
+        bool useAutoFoundation = IsAuto ? _asset!.useAutoFoundation : UseAutoFoundation;
+        bool useAutoSlope = IsAuto ? _asset!.useAutoSlope : UseAutoSlope;
+        if (useAutoFoundation || useAutoSlope)
         {
             bool consumedAuto = false;
-            if (UseAutoFoundation)
+            if (useAutoFoundation)
             {
+                float radius, length;
+                int mask;
+                if (IsAuto)
+                {
+                    mask = (int)_asset!.autoRayMask;
+                    radius = _asset.autoRayRadius;
+                    length = _asset!.autoRayLength;
+                }
+                else
+                {
+                    mask = (int)AutoFoundationRayMask;
+                    radius = AutoFoundationRayRadius;
+                    length = AutoFoundationRayLength;
+                }
                 int ct = Physics.SphereCastNonAlloc(
-                    worldPosition + new Vector3(0.0f, AutoFoundationRayLength, 0.0f),
-                    AutoFoundationRayRadius, Vector3.down, FoundationHits,
-                    AutoFoundationRayLength, (int)AutoFoundationRayMask, QueryTriggerInteraction.Ignore);
+                    worldPosition + new Vector3(0.0f, length, 0.0f),
+                    radius, Vector3.down, FoundationHits,
+                    length, mask, QueryTriggerInteraction.Ignore);
                 for (int i = 0; i < ct; ++i)
                 {
                     ObjectAsset? asset = LevelObjects.getAsset(FoundationHits[i].transform);
                     if (asset is not { isSnowshoe: true })
                     {
                         consumedAuto = true;
-                        targetWeight = UseWeightTarget ? BrushTarget : 1f;
+                        targetWeight = !IsAuto && UseWeightTarget ? BrushTarget : 1f;
                         break;
                     }
                 }
             }
 
-            if (!consumedAuto && UseAutoSlope && Landscape.getNormal(worldPosition, out Vector3 normal))
+            if (!consumedAuto && useAutoSlope && Landscape.getNormal(worldPosition, out Vector3 normal))
             {
                 float angle = Vector3.Angle(Vector3.up, normal);
-                if (angle >= AutoSlopeMinAngleBegin && angle <= AutoSlopeMaxAngleEnd)
+                float minBegin, minEnd, maxBegin, maxEnd;
+                if (IsAuto)
                 {
-                    targetWeight = angle >= AutoSlopeMinAngleEnd
-                        ? (angle <= AutoSlopeMaxAngleBegin
+                    minBegin = _asset!.autoMinAngleBegin;
+                    minEnd = _asset!.autoMinAngleEnd;
+                    maxBegin = _asset!.autoMaxAngleBegin;
+                    maxEnd = _asset!.autoMaxAngleEnd;
+                }
+                else
+                {
+                    minBegin = AutoSlopeMinAngleBegin;
+                    minEnd = AutoSlopeMinAngleEnd;
+                    maxBegin = AutoSlopeMaxAngleBegin;
+                    maxEnd = AutoSlopeMaxAngleEnd;
+                }
+                if (angle >= minBegin && angle <= maxEnd)
+                {
+                    targetWeight = angle >= minEnd
+                        ? (angle <= maxBegin
                             ? 1f
-                            : (1f - Mathf.InverseLerp(AutoSlopeMaxAngleBegin, AutoSlopeMaxAngleEnd, angle)))
-                        : (Mathf.InverseLerp(AutoSlopeMinAngleBegin, AutoSlopeMinAngleEnd, angle));
+                            : (1f - Mathf.InverseLerp(maxBegin, maxEnd, angle)))
+                        : (Mathf.InverseLerp(minBegin, minEnd, angle));
                     consumedAuto = true;
                 }
 
@@ -994,16 +1048,12 @@ public sealed class HolemapPaintAction : ITerrainAction, IBrushRadius
     }
     public void Write(ByteWriter writer)
     {
-        Logger.LogInfo("Writing: ");
-        Logger.DumpJson(this);
         writer.WriteHeightmapBounds(Bounds, IsFilling);
         writer.Write(BrushPosition);
         writer.Write(DeltaTime);
     }
     public void Apply()
     {
-        Logger.LogInfo("Filling: ");
-        Logger.DumpJson(this);
         LandscapeUtil.WriteHolesNoTransactions(Bounds, IntlHandleHolesWriteCut);
     }
 #if SERVER
