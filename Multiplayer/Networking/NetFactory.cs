@@ -21,6 +21,12 @@ public static class NetFactory
         SendTileData,
         ActionRelay
     }
+#nullable disable
+    private static long[] _inByteCt;
+    private static long[] _outByteCt;
+#nullable restore
+    private static float _inByteCtStTime;
+    private static float _outByteCtStTime;
     public const int MaxPacketSize = 61440;
     private static readonly List<Listener> localListeners = new List<Listener>(16);
     private static readonly List<Listener> localAckRequests = new List<Listener>(16);
@@ -86,11 +92,14 @@ public static class NetFactory
         methods[(int)DevkitMessage.ActionRelay] = typeof(EditorActions).GetMethod(nameof(EditorActions.ReceiveActionRelay), BindingFlags.NonPublic | BindingFlags.Static)!;
 
         Listeners = new Delegate[methods.Length];
+        _inByteCt = new long[BlockSize];
+        _outByteCt = new long[BlockSize];
+        _inByteCtStTime = _outByteCtStTime = Time.realtimeSinceStartup;
 
         // patch reading enum method.
 
 #if SERVER
-        Type readEnum  = typeof(EServerMessage_NetEnum);
+        Type readEnum = typeof(EServerMessage_NetEnum);
         Type writeEnum = typeof(EClientMessage_NetEnum);
 #else
         Type readEnum = typeof(EClientMessage_NetEnum);
@@ -245,6 +254,53 @@ public static class NetFactory
         }
         return false;
     }
+    public static void ResetByteTracking(bool? send = null)
+    {
+        if (send.HasValue)
+        {
+            Array.Clear(send.Value ? _outByteCt : _inByteCt, 0, BlockSize);
+            if (send.Value)
+                _outByteCtStTime = Time.realtimeSinceStartup;
+            else
+                _inByteCtStTime = Time.realtimeSinceStartup;
+        }
+        else
+        {
+            Array.Clear(_outByteCt, 0, BlockSize);
+            Array.Clear(_inByteCt, 0, BlockSize);
+            _inByteCtStTime = _outByteCtStTime = Time.realtimeSinceStartup;
+        }
+    }
+    public static float GetBytesPerSecondAvg(DevkitMessage message, bool send) => GetBytesTotal(message, send, out float timespan) / timespan;
+    public static float GetBytesPerSecondAvg(bool send) => GetBytesTotal(send, out float timespan) / timespan;
+    public static long GetBytesTotal(DevkitMessage message, bool send, out float timespan)
+    {
+        timespan = Time.realtimeSinceStartup - (send ? _outByteCtStTime : _inByteCtStTime);
+        if ((int)message < BlockSize)
+            return (send ? _outByteCt : _inByteCt)[(int)message];
+
+        return 0;
+    }
+    public static long GetBytesTotal(bool send, out float timespan)
+    {
+        long ttl = 0;
+        timespan = Time.realtimeSinceStartup - (send ? _outByteCtStTime : _inByteCtStTime);
+        for (int i = 0; i < BlockSize; ++i)
+            ttl += (send ? _outByteCt : _inByteCt)[i];
+
+        return ttl;
+    }
+    internal static void IncrementByteCount(bool send, DevkitMessage msg, long length)
+    {
+        if ((int)msg < BlockSize)
+        {
+            if (send)
+                length += Mathf.CeilToInt(NewWriteBitCount / 8f) + sizeof(ushort);
+            else
+                length += Mathf.CeilToInt(NewReceiveBitCount / 8f) + sizeof(ushort);
+            (send ? _outByteCt : _inByteCt)[(int)msg] += length;
+        }
+    }
 #if DEBUG
     private static void PatchServerGetWriterWithStaticHeader(ClientMethodHandle __instance)
     {
@@ -355,6 +411,8 @@ public static class NetFactory
         byte[] bytes = new byte[len];
         if (!reader.ReadBytes(bytes, len))
             return;
+        IncrementByteCount(false, DevkitMessage.InvokeMethod, len + sizeof(ushort));
+
         MessageOverhead ovh = new MessageOverhead(bytes);
 #if SERVER
         OnReceived(bytes, transportConnection, ovh, false);
@@ -851,6 +909,7 @@ public static class NetFactory
         Writer.WriteUInt16((ushort)length);
         Writer.WriteBytes(bytes, offset, length);
         Writer.Flush();
+        IncrementByteCount(true, message, length);
 #if CLIENT
         GetPlayerTransportConnection().Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
 #else
@@ -876,6 +935,7 @@ public static class NetFactory
         Writer.WriteBytes(bytes, offset, length);
         Writer.Flush();
         ENetReliability reliability = reliable ? ENetReliability.Reliable : ENetReliability.Unreliable;
+        IncrementByteCount(true, message, length * connections.Count);
         for (int i = 0; i < connections.Count; ++i)
             connections[i].Send(Writer.buffer, Writer.writeByteIndex, reliability);
     }
@@ -912,6 +972,7 @@ public static class NetFactory
         int len = Math.Min(ushort.MaxValue, bytes.Length);
         Writer.WriteUInt16((ushort)len);
         Writer.WriteBytes(bytes, offset < 0 ? 0 : offset, count < 0 ? bytes.Length : count);
+        IncrementByteCount(true, DevkitMessage.InvokeMethod, len);
         Writer.Flush();
 #if DEBUG
         Logger.LogDebug("Sending " + bytes.Length + " bytes to " +
@@ -933,6 +994,7 @@ public static class NetFactory
         Writer.WriteBytes(bytes);
         Writer.Flush();
         Logger.LogDebug("Sending " + bytes.Length + " bytes to " + connections.Count + " user(s).");
+        IncrementByteCount(true, DevkitMessage.InvokeMethod, bytes.Length * connections.Count);
         for (int i = 0; i < connections.Count; ++i)
             connections[i].Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
     }

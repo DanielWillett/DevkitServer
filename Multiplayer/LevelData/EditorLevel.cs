@@ -1,8 +1,9 @@
 ﻿using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 using System.IO.Compression;
-using DevkitServer.Multiplayer.Actions;
+using JetBrains.Annotations;
 #if CLIENT
+using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Patches;
 using SDG.Framework.Utilities;
 #endif
@@ -16,18 +17,27 @@ namespace DevkitServer.Multiplayer.LevelData;
 public static class EditorLevel
 {
     public const int DataBufferPacketSize = NetFactory.MaxPacketSize; // 60 KiB (must be slightly under ushort.MaxValue, 60 KB is a good middle ground to allow for future overhead expansion, etc).
+    [UsedImplicitly]
     private static readonly NetCall SendRequestLevel = new NetCall((ushort)NetCalls.RequestLevel);
+    [UsedImplicitly]
     private static readonly NetCall<int, string, long, int, bool, long> StartSendLevel = new NetCall<int, string, long, int, bool, long>((ushort)NetCalls.StartSendLevel);
+    [UsedImplicitly]
     private static readonly NetCallCustom SendLevelPacket = new NetCallCustom((ushort)NetCalls.SendLevel);
+    [UsedImplicitly]
     private static readonly NetCall<bool, bool> EndSendLevel = new NetCall<bool, bool>((ushort)NetCalls.EndSendLevel);
+    [UsedImplicitly]
     private static readonly NetCall<int[]> RequestPackets = new NetCall<int[]>((ushort)NetCalls.RequestLevelPackets);
+    [UsedImplicitly]
     private static readonly NetCall<int, int> SendCheckup = new NetCall<int, int>((ushort)NetCalls.RequestLevelCheckup);
+    [UsedImplicitly]
     private static readonly NetCallRaw<byte[], bool> SendWholeLevel = new NetCallRaw<byte[], bool>((ushort)HighSpeedNetCall.SendWholeLevel, reader => reader.ReadLongBytes(), null, (writer, b) => writer.WriteLong(b), null
 #if SERVER
         , capacity: 80000000
 #endif
         ) { HighSpeed = true };
+    [UsedImplicitly]
     private static readonly NetCall SendPending = new NetCall((ushort)NetCalls.SendPending);
+    [UsedImplicitly]
     internal static readonly NetCall Ping = new NetCall((ushort)NetCalls.Ping);
     internal static List<ITransportConnection> PendingToReceiveActions = new List<ITransportConnection>(4);
     public static string TempLevelPath => Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer",
@@ -39,6 +49,8 @@ public static class EditorLevel
         "{0}", "Level");
 
 #if SERVER
+    private static bool _isCompressingLevel;
+    private static LevelData? _lvl;
     private static readonly ByteWriter LevelWriter = new ByteWriter(false, 134217728); // 128 MiB
 
     [NetCall(NetCallSource.FromClient, (ushort)NetCalls.RequestLevel)]
@@ -52,34 +64,50 @@ public static class EditorLevel
     {
         EndSendLevel.Invoke(connection, true, false);
     }
-    private static IEnumerator CompressLevel(LevelData levelData)
+    private static IEnumerator GatherAndCompressLevel(ITransportConnection connection)
     {
-        Folder folder = levelData.LevelFolderContent;
-        Folder.Write(LevelWriter, in folder);
-        byte[] data = LevelWriter.ToArray();
-        LevelWriter.FinishWrite();
-        int size1 = data.Length;
-        levelData.Compressed = false;
-
-        using (MemoryStream mem = new MemoryStream(data.Length))
-        using (DeflateStream stream = new DeflateStream(mem, CompressionLevel.Optimal))
+        if (_isCompressingLevel)
         {
-            IAsyncResult writeTask = stream.BeginWrite(data, 0, data.Length, null, null);
-            while (!writeTask.IsCompleted)
+            while (_isCompressingLevel)
                 yield return null;
-
-            stream.EndWrite(writeTask);
-            stream.Close(); // flush just doesn't work here for some reason
-            byte[] data2 = mem.ToArray();
-            if (data2.Length < data.Length)
-            {
-                levelData.Compressed = true;
-                Logger.LogInfo("[SEND LEVEL] Compresssed level from " + DevkitServerUtility.FormatBytes(size1) + " to " + DevkitServerUtility.FormatBytes(data2.Length) + ".");
-                data = data2;
-            }
+            yield break;
         }
+        _isCompressingLevel = true;
+        try
+        {
+            _lvl = LevelData.GatherLevelData();
+            PendingToReceiveActions.Add(connection);
+            Folder folder = _lvl.LevelFolderContent;
+            Folder.Write(LevelWriter, in folder);
+            byte[] data = LevelWriter.ToArray();
+            LevelWriter.FinishWrite();
+            int size1 = data.Length;
+            _lvl.Compressed = false;
 
-        levelData.Data = data;
+            using (MemoryStream mem = new MemoryStream(data.Length))
+            using (DeflateStream stream = new DeflateStream(mem, CompressionLevel.Optimal))
+            {
+                IAsyncResult writeTask = stream.BeginWrite(data, 0, data.Length, null, null);
+                while (!writeTask.IsCompleted)
+                    yield return null;
+
+                stream.EndWrite(writeTask);
+                stream.Close(); // flush just doesn't work here for some reason
+                byte[] data2 = mem.ToArray();
+                if (data2.Length < data.Length)
+                {
+                    _lvl.Compressed = true;
+                    Logger.LogInfo("[SEND LEVEL] Compresssed level from " + DevkitServerUtility.FormatBytes(size1) + " to " + DevkitServerUtility.FormatBytes(data2.Length) + ".");
+                    data = data2;
+                }
+            }
+
+            _lvl.Data = data;
+        }
+        finally
+        {
+            _isCompressingLevel = false;
+        }
     }
     private static IEnumerator SendLevelCoroutine(ITransportConnection connection)
     {
@@ -132,10 +160,7 @@ public static class EditorLevel
             const int firstCheckupPosition = 25 - 1;
             float startTime = Time.realtimeSinceStartup;
             string lvlName = Level.info.name;
-            LevelData levelDataAtTimeOfRequest = LevelData.GatherLevelData();
-            PendingToReceiveActions.Add(connection);
-            Coroutine compress = DevkitServerModule.ComponentHost.StartCoroutine(CompressLevel(levelDataAtTimeOfRequest));
-
+            Coroutine compress = DevkitServerModule.ComponentHost.StartCoroutine(GatherAndCompressLevel(connection));
             NetTask task2 = EndSendLevel.Listen();
 
             float avgPing = 0;
@@ -168,12 +193,21 @@ public static class EditorLevel
                 Logger.LogDebug($"[SEND LEVEL] Average ping: {avgPing * 1000:F2} ms (n = {pingCt}, t = {pingSpacing * 1000:0.##} ms).");
             }
 
-            while (levelDataAtTimeOfRequest.Data == null)
+            while (_isCompressingLevel)
                 yield return null;
+            LevelData? levelDataAtTimeOfRequest = _lvl;
+            if (levelDataAtTimeOfRequest == null)
+            {
+                Logger.LogInfo("[SEND LEVEL] Failed to compress level.", ConsoleColor.DarkCyan);
+                DevkitServerModule.ComponentHost.StopCoroutine(compress);
+                yield break;
+            }
 
             byte[] data = levelDataAtTimeOfRequest.Data;
             bool compressed = levelDataAtTimeOfRequest.Compressed;
-
+            yield return new WaitForSecondsRealtime(0.25f);
+            if (!_isCompressingLevel)
+                _lvl = null;
             Logger.LogInfo($"[SEND LEVEL] Gathered level data ({DevkitServerUtility.FormatBytes(data.Length)}) for ({connection.Format()}) after {Time.realtimeSinceStartup - startTime:F2} seconds.", ConsoleColor.DarkCyan);
 
             if (!lowSpeedDownload)

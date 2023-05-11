@@ -62,6 +62,8 @@ public sealed class ClientInfo
     /// This is not kept updated after initial connection. To access an updated list use <see cref="Permissions.PlayerHandler"/>.
     /// </remarks>
     public PermissionGroup[] PermissionGroups { get; internal set; }
+
+    public bool EnablePixelAverageSplatmapSmoothing { get; internal set; }
 #nullable restore
     internal ClientInfo() { }
 
@@ -92,6 +94,8 @@ public sealed class ClientInfo
         PermissionGroups = new PermissionGroup[reader.ReadInt32()];
         for (int i = 0; i < PermissionGroups.Length; ++i)
             PermissionGroups[i] = PermissionGroup.ReadPermissionGroup(reader);
+
+        EnablePixelAverageSplatmapSmoothing = reader.ReadBool();
     }
     public void Write(ByteWriter writer)
     {
@@ -107,6 +111,8 @@ public sealed class ClientInfo
         writer.Write(PermissionGroups == null ? 0 : PermissionGroups.Length);
         for (int i = 0; i < PermissionGroups!.Length; ++i)
             PermissionGroup.WritePermissionGroup(writer, PermissionGroups[i]);
+
+        writer.Write(EnablePixelAverageSplatmapSmoothing);
     }
 
 #if SERVER

@@ -143,6 +143,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             Logger.LogError("Failed to read incoming action packet length.", method: "EDITOR ACTIONS");
             return;
         }
+        NetFactory.IncrementByteCount(false, NetFactory.DevkitMessage.ActionRelay, len + sizeof(ushort));
 
 #if SERVER
         EditorUser? user = UserManager.FromConnection(transportConnection);
@@ -330,8 +331,9 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             c.Add(collection);
         }
         int collIndex = -1, stInd = _pendingActions.Count;
+        float t = Time.realtimeSinceStartup;
         if (stInd == 0)
-            _nextApply = Time.realtimeSinceStartup;
+            _nextApply = t;
 #if SERVER
         bool anyInvalid = false;
 #endif
@@ -353,6 +355,15 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 {
                     anyInvalid = true;
                     Logger.LogDebug($"[EDITOR ACTIONS] Invalid action request filtered from {action.Instigator.Format()}: {action}.");
+                    if (action is ITerrainAction tAction && TileSync.ServersideAuthorityTileSync != null && TileSync.ServersideAuthorityTileSync.HasAuthority)
+                    {
+                        TileSync.ServersideAuthorityTileSync.InvalidateBounds(tAction.Bounds, tAction.EditorType switch
+                        {
+                            TerrainEditorType.Heightmap => TileSync.DataType.Heightmap,
+                            TerrainEditorType.Splatmap => TileSync.DataType.Splatmap,
+                            _ => TileSync.DataType.Holes
+                        }, t);
+                    }
                 }
 #else
                 _pendingActions.Add(action);

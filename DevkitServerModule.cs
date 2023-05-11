@@ -414,6 +414,9 @@ public sealed class DevkitServerModule : IModuleNexus
     {
         { "NoPermissions", "No Permission" },
         { "BeingSynced", "Syncing" },
+        { "FeatureDisabled", "Disabled" },
+        { "UndoNotSupported", "Undo Not Supported" },
+        { "RedoNotSupported", "Redo Not Supported" },
     };
 }
 

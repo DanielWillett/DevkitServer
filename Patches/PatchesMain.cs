@@ -185,6 +185,17 @@ internal static class PatchesMain
     [HarmonyPrefix]
     private static bool EditorUIUpdate() => IsEditorControlledOrNotEditing();
     [UsedImplicitly]
+    [HarmonyPatch(typeof(EditorPauseUI), "onClickedExitButton")]
+    [HarmonyPrefix]
+    private static bool EditorPauseUIExit()
+    {
+        if (!DevkitServerModule.IsEditing)
+            return true;
+
+        Provider.RequestDisconnect("clicked exit button from editor pause menu.");
+        return false;
+    }
+    [UsedImplicitly]
     [HarmonyPatch(typeof(MenuConfigurationOptionsUI), MethodType.Constructor)]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> MenuConfigurationOptionsUITranspiler(ILGenerator generator, IEnumerable<CodeInstruction> instructions)

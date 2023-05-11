@@ -5,6 +5,7 @@ using JetBrains.Annotations;
 using SDG.Framework.Devkit;
 using System.Reflection;
 using System.Reflection.Emit;
+using SDG.Framework.Landscapes;
 #if CLIENT
 using DevkitServer.Players.UI;
 #endif
@@ -102,12 +103,12 @@ public class UserInput : MonoBehaviour
 #if CLIENT
     private EditorMovement? _movement;
     private static readonly ByteWriter Writer = new ByteWriter(false, 245);
+    private Transform? _playerUiObject;
+    private Transform? _editorUiObject;
+    private UserInputPacket _lastPacket;
 #endif
     private static readonly ByteReader Reader = new ByteReader { ThrowOnError = true };
     private readonly Queue<UserInputPacket> _packets = new Queue<UserInputPacket>();
-    private UserInputPacket _lastPacket;
-    private Transform? _playerUiObject;
-    private Transform? _editorUiObject;
 
     public static IDevkitTool? ActiveTool => GetDevkitTool?.Invoke();
 
@@ -190,29 +191,30 @@ public class UserInput : MonoBehaviour
 
 #if CLIENT
         IsOwner = User == EditorUser.User;
-        if (IsOwner && !User.EditorObject.TryGetComponent(out _movement))
-        {
-            Destroy(this);
-            Logger.LogError("Invalid UserInput setup; EditorMovement not found!");
-            return;
-        }
-#endif
-
-        _nextPacketApplyTime = Time.realtimeSinceStartup;
-        TryInvokeOnUserPositionUpdated(User);
-
         if (IsOwner)
         {
+            if (!User.EditorObject.TryGetComponent(out _movement))
+            {
+                Destroy(this);
+                Logger.LogError("Invalid UserInput setup; EditorMovement not found!");
+                return;
+            }
             PlayerUI? plUi = User.gameObject.GetComponentInChildren<PlayerUI>();
             if (plUi != null)
                 _playerUiObject = plUi.transform;
             EditorUI? edUi = User.EditorObject.GetComponentInChildren<EditorUI>();
             if (edUi != null)
                 _editorUiObject = edUi.transform;
-            Controller = CameraController.Editor;
         }
+        Controller = CameraController.Editor;
+#endif
 
+        _nextPacketApplyTime = Time.realtimeSinceStartup;
+        TryInvokeOnUserPositionUpdated(User);
+        
 #if SERVER
+        _controller = CameraController.Editor;
+        ControllerObject = User.EditorObject;
         Load();
         SaveManager.onPostSave += Save;
         for (int i = 0; i < UserManager.Users.Count; ++i)
@@ -227,6 +229,8 @@ public class UserInput : MonoBehaviour
     }
     private void HandleControllerUpdated()
     {
+        User.Player!.player.gameObject.SetActive(true);
+        User.EditorObject.SetActive(true);
         if (IsOwner)
         {
             GameObject? ctrl = ControllerObject;
@@ -238,7 +242,7 @@ public class UserInput : MonoBehaviour
 #if CLIENT
                 ChangeUI(true);
 #endif
-}
+            }
             else if (ctrl == User.Player!.player.gameObject)
             {
                 Logger.LogInfo("Camera controller set to {Player}.", ConsoleColor.DarkCyan);
@@ -248,6 +252,33 @@ public class UserInput : MonoBehaviour
             }
             else
                 Logger.LogInfo("Camera controller set to \"" + ctrl.name + "\".", ConsoleColor.DarkCyan);
+        }
+        if (Controller == CameraController.Editor)
+        {
+#if SERVER
+            Vector3 position = User.Player!.player.transform.position;
+            SetEditorPosition(position);
+#endif
+            User.Player!.player.gameObject.SetActive(false);
+        }
+        else if (Controller == CameraController.Player)
+        {
+#if SERVER
+            Vector3 position = User.EditorObject.transform.position;
+            float yaw = User.EditorObject.transform.rotation.eulerAngles.y;
+            if (Physics.Raycast(new Ray(position with { y = Level.HEIGHT }, Vector3.down), out RaycastHit info, Level.HEIGHT, RayMasks.BLOCK_COLLISION, QueryTriggerInteraction.Ignore))
+            {
+                position.y = info.point.y + 1f;
+            }
+            else
+            {
+                PlayerSpawnpoint spawn = LevelPlayers.getSpawn(false);
+                position = spawn.point + new Vector3(0.0f, 1f, 0.0f);
+                yaw = spawn.angle;
+            }
+            User.Player!.player.teleportToLocationUnsafe(position, yaw);
+#endif
+            User.EditorObject.SetActive(false);
         }
         OnUserControllerUpdated?.Invoke(User);
     }
@@ -362,6 +393,7 @@ public class UserInput : MonoBehaviour
             Logger.LogError("Failed to read incoming movement packet length.");
             return;
         }
+        NetFactory.IncrementByteCount(false, NetFactory.DevkitMessage.MovementRelay, len + sizeof(ushort));
 
 #if SERVER
         EditorUser? user = UserManager.FromConnection(transportConnection);
@@ -535,24 +567,29 @@ public class UserInput : MonoBehaviour
         while (_packets is { Count: > 0 } && t >= _nextPacketApplyTime)
         {
             UserInputPacket packet = _packets.Dequeue();
-            _nextPacketApplyTime += packet.DeltaTime;
-            if ((packet.Flags & Flags.StopMsg) == 0)
+            if (_networkedInitialPosition)
             {
-                if (_hasStopped)
+                _nextPacketApplyTime += packet.DeltaTime;
+                if ((packet.Flags & Flags.StopMsg) == 0)
+                {
+                    if (_hasStopped)
+                        _nextPacketApplyTime = t + packet.DeltaTime;
+                    _hasStopped = false;
+                    ApplyPacket(in packet);
+                }
+                else
+                {
                     _nextPacketApplyTime = t + packet.DeltaTime;
-                _hasStopped = false;
-                ApplyPacket(in packet);
-            }
-            else
-            {
-                _nextPacketApplyTime = t + packet.DeltaTime;
-                _hasStopped = true;
-                this.transform.SetPositionAndRotation(packet.Position, Quaternion.Euler(packet.Pitch, packet.Yaw, 0f));
-                _lastPos = packet.Position;
-                _lastPitch = packet.Pitch;
-                _lastYaw = packet.Yaw;
-                _lastPacket = packet;
-                TryInvokeOnUserPositionUpdated(User);
+                    _hasStopped = true;
+                    this.transform.SetPositionAndRotation(packet.Position, Quaternion.Euler(packet.Pitch, packet.Yaw, 0f));
+                    _lastPos = packet.Position;
+                    _lastPitch = packet.Pitch;
+                    _lastYaw = packet.Yaw;
+#if CLIENT
+                    _lastPacket = packet;
+#endif
+                    TryInvokeOnUserPositionUpdated(User);
+                }
             }
         }
     }
@@ -578,7 +615,9 @@ public class UserInput : MonoBehaviour
             transform.position = pos;
         _lastPos = pos;
         TryInvokeOnUserPositionUpdated(User);
+#if CLIENT
         _lastPacket = packet;
+#endif
     }
 #if CLIENT
     [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendUpdateController)]
@@ -613,25 +652,13 @@ public class UserInput : MonoBehaviour
             }
             if (pos.IsFinite() && Mathf.Abs(pos.x) <= ushort.MaxValue && Mathf.Abs(pos.y) <= ushort.MaxValue)
             {
-                this.transform.position = pos;
-                _lastPacket = new UserInputPacket
-                {
-                    Position = pos,
-                    Pitch = 0,
-                    Yaw = 0,
-                    Flags = Flags.StopMsg,
-                    DeltaTime = Time.deltaTime,
-                    Input = Vector3.zero,
-                    Speed = 0f
-                };
-                _lastPos = pos;
                 _lastPitch = 0;
                 _lastYaw = 0;
                 if (v > 0)
                     Controller = (CameraController)block.readByte();
 
                 Logger.LogDebug(" Loaded position: " + pos.Format());
-                SendInitialPosition.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, pos);
+                SetEditorPosition(pos);
                 return;
             }
         }
@@ -639,8 +666,28 @@ public class UserInput : MonoBehaviour
         PlayerSpawnpoint spawn = LevelPlayers.getSpawn(false);
         pos = spawn.point + new Vector3(0.0f, 2f, 0.0f);
         Logger.LogDebug(" Loaded random position: " + pos.Format() + ", " + spawn.angle.Format() + "°.");
-        SendInitialPosition.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, pos);
+        SetEditorPosition(pos);
 
+    }
+    public void SetEditorPosition(Vector3 pos)
+    {
+        this.transform.position = pos;
+#if CLIENT
+        _lastPacket = new UserInputPacket
+        {
+            Position = pos,
+            Pitch = 0,
+            Yaw = 0,
+            Flags = Flags.StopMsg,
+            DeltaTime = Time.deltaTime,
+            Input = Vector3.zero,
+            Speed = 0f
+        };
+#endif
+        _lastPos = pos;
+#if SERVER
+        SendInitialPosition.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, pos);
+#endif
     }
     public void Save()
     {

@@ -496,6 +496,7 @@ public class TileSync : MonoBehaviour
             Logger.LogError("[TILE SYNC] Failed to read incoming tile data packet length.");
             return;
         }
+        NetFactory.IncrementByteCount(false, NetFactory.DevkitMessage.MovementRelay, len + sizeof(ushort));
 
         if (!reader.ReadBytesPtr(len, out byte[] buffer, out int offset))
         {

@@ -846,7 +846,7 @@ public static class DevkitServerUtility
         color = default;
         return false;
     }
-    [Pure]
+
     public static bool QueueOnMainThread(Action action, bool skipFrame = false, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();

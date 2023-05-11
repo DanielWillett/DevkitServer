@@ -3,6 +3,7 @@ using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
 using DevkitServer.Commands.Subsystem;
 using System.Reflection;
+using DevkitServer.Players;
 #if CLIENT
 using DevkitServer.Players.UI;
 #endif
@@ -110,6 +111,19 @@ internal static class CommandTests
             ctx.ReplyString("<#7bbc5f>Closed DevkitEditorHUD.");
         }
         else ctx.SendCorrectUsage("/test ui <open|close>");
+    }
+    private static void tpvrot(CommandContext ctx)
+    {
+        ctx.TryGet(0, out float x);
+        ctx.TryGet(0, out float y);
+        ctx.TryGet(0, out float z);
+        
+        ctx.AssertHelpCheck(0, "/test [x] [y] [z] - Set euler rotations.");
+        UserTPVControl.XRot = x;
+        UserTPVControl.YRot = y;
+        UserTPVControl.ZRot = z;
+        UserTPVControl.ApplyRotation();
+        ctx.ReplyString($"Set rotation to: ({x}, {y}, {z}).");
     }
 #endif
 

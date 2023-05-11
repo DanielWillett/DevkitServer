@@ -14,7 +14,17 @@ public class UserTPVControl : MonoBehaviour
     private EditorClothes _editorClothes = null!;
     public EditorUser User { get; internal set; } = null!;
     public GameObject Model { get; private set; } = null!;
-
+    public static float XRot = -90;
+    public static float YRot;
+    public static float ZRot;
+    public static void ApplyRotation()
+    {
+        foreach (EditorUser user in UserManager.Users)
+        {
+            if (!user.IsOwner && user.EditorObject != null && user.EditorObject.TryGetComponent(out UserTPVControl ctrl))
+                ctrl._editorClothes.transform.rotation = Quaternion.Euler(XRot, YRot, ZRot);
+        }
+    }
     [UsedImplicitly]
     private void Start()
     {
@@ -45,10 +55,11 @@ public class UserTPVControl : MonoBehaviour
 
         Model = Instantiate(_objectPrefab, transform, false);
         Model.transform.localScale = new Vector3(2.5f, 2.5f, 2.5f);
-        Model.transform.rotation = Quaternion.Euler(90, 0, 0);
+        Model.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
         Model.name = "TPV_Editor_" + User.SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture);
         _editorClothes = Model.AddComponent<EditorClothes>();
         _editorClothes.Face = User.Player.face;
+        _editorClothes.transform.rotation = Quaternion.Euler(XRot, YRot, ZRot);
         _editorClothes.Beard = User.Player.beard;
         _editorClothes.SkinColor = User.Player.skin;
         _editorClothes.Hair = User.Player.hair;

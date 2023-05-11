@@ -5,11 +5,11 @@ using JetBrains.Annotations;
 using SDG.Framework.Devkit;
 using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Landscapes;
-using SDG.Framework.Utilities;
 using System.Reflection;
 using System.Reflection.Emit;
 #if SERVER
 using DevkitServer.API.Permissions;
+using DevkitServer.Configuration;
 using DevkitServer.Core.Permissions;
 #endif
 #if CLIENT
@@ -35,7 +35,6 @@ public sealed class TerrainActions
             ClientEvents.OnSmoothed += OnHeightmapSmooth;
             ClientEvents.OnPainted += OnPaint;
             ClientEvents.OnAutoPainted += OnAutoPaint;
-            ++ClientEvents.TakeReleaseAveragesList;
             ClientEvents.OnPaintSmoothed += OnPaintSmooth;
             ClientEvents.OnHolePainted += OnPaintHole;
             ClientEvents.OnTileAdded += OnTileAdded;
@@ -57,7 +56,6 @@ public sealed class TerrainActions
             ClientEvents.OnPainted -= OnPaint;
             ClientEvents.OnAutoPainted -= OnAutoPaint;
             ClientEvents.OnPaintSmoothed -= OnPaintSmooth;
-            --ClientEvents.TakeReleaseAveragesList;
             ClientEvents.OnHolePainted -= OnPaintHole;
             ClientEvents.OnTileAdded -= OnTileAdded;
             ClientEvents.OnTileDeleted -= OnTileDeleted;
@@ -180,7 +178,7 @@ public sealed class TerrainActions
             DeltaTime = dt
         });
     }
-    private void OnPaintSmooth(Bounds bounds, Vector3 position, float radius, float falloff, float strength, EDevkitLandscapeToolSplatmapSmoothMethod method, List<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>> averages, int sampleCount, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt)
+    private void OnPaintSmooth(Bounds bounds, Vector3 position, float radius, float falloff, float strength, EDevkitLandscapeToolSplatmapSmoothMethod method, float dt)
     {
         EditorActions.QueueAction(new SplatmapSmoothAction
         {
@@ -190,9 +188,6 @@ public sealed class TerrainActions
             BrushFalloff = falloff,
             BrushStrength = strength,
             SmoothMethod = method,
-            Averages = averages,
-            SampleCount = sampleCount,
-            SplatmapMaterial = selectedMaterial,
             DeltaTime = dt
         });
     }
@@ -241,38 +236,33 @@ public enum TerrainEditorType
 {
     Heightmap,
     Splatmap,
-    Holes,
-    Tiles
+    Holes
 }
 
 public interface ITerrainAction : IAction
 {
     TerrainEditorType EditorType { get; }
+    Bounds Bounds { get; }
 }
 
+[ActionSetting(ActionSetting.AutoSlopeData)]
 public interface IAutoSlope
 {
-    [ActionSetting(ActionSetting.AutoSlopeMinAngleBegin)]
     float AutoSlopeMinAngleBegin { get; set; }
-
-    [ActionSetting(ActionSetting.AutoSlopeMinAngleEnd)]
+    
     float AutoSlopeMinAngleEnd { get; set; }
-
-    [ActionSetting(ActionSetting.AutoSlopeMaxAngleBegin)]
+    
     float AutoSlopeMaxAngleBegin { get; set; }
-
-    [ActionSetting(ActionSetting.AutoSlopeMaxAngleEnd)]
+    
     float AutoSlopeMaxAngleEnd { get; set; }
 }
+[ActionSetting(ActionSetting.AutoFoundationData)]
 public interface IAutoFoundation
 {
-    [ActionSetting(ActionSetting.AutoFoundationRayLength)]
     float AutoFoundationRayLength { get; set; }
-
-    [ActionSetting(ActionSetting.AutoFoundationRayRadius)]
+    
     float AutoFoundationRayRadius { get; set; }
-
-    [ActionSetting(ActionSetting.AutoFoundationRayMask)]
+    
     ERayMask AutoFoundationRayMask { get; set; }
 }
 
@@ -744,43 +734,48 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
 #endif
     public void Read(ByteReader reader)
     {
-        Bounds = reader.ReadInflatedBounds();
-        byte flags = reader.ReadUInt8();
-        IsAuto = (flags & 1) != 0;
-        if (!IsAuto)
+        Bounds = reader.ReadInflatedBounds(out bool isAuto);
+        IsAuto = isAuto;
+        if (!isAuto)
         {
-            UseWeightTarget = (flags & (1 << 1)) != 0;
-            UseAutoSlope = (flags & (1 << 2)) != 0;
-            UseAutoFoundation = (flags & (1 << 3)) != 0;
+            byte flags = reader.ReadUInt8();
+            UseWeightTarget = (flags & (1 << 0)) != 0;
+            UseAutoSlope = (flags & (1 << 1)) != 0;
+            UseAutoFoundation = (flags & (1 << 2)) != 0;
+            IsRemoving = (flags & (1 << 3)) != 0;
         }
-        IsRemoving = (flags & (1 << 4)) != 0;
         BrushPosition = reader.ReadVector2();
         DeltaTime = reader.ReadFloat();
     }
     public void Write(ByteWriter writer)
     {
-        writer.WriteHeightmapBounds(Bounds);
-        byte flags = (byte)((IsAuto ? 1 : 0) | (IsRemoving ? 1 << 4 : 0));
+        writer.WriteHeightmapBounds(Bounds, IsAuto);
         if (!IsAuto)
-            flags |= (byte)((UseWeightTarget ? 1 << 1 : 0) | (UseAutoSlope ? 1 << 2 : 0) | (UseAutoFoundation ? 1 << 3 : 0));
-        writer.Write(flags);
+        {
+            byte flags = (byte)((UseWeightTarget ? 1 << 0 : 0) | (UseAutoSlope ? 1 << 1 : 0) | (UseAutoFoundation ? 1 << 2 : 0) | (IsRemoving ? 1 << 3 : 0));
+            writer.Write(flags);
+        }
         writer.Write(BrushPosition);
         writer.Write(DeltaTime);
     }
     private void IntlHandleSplatmapWritePaint(LandscapeCoord tileCoord, SplatmapCoord splatmapCoord, Vector3 worldPosition, float[] currentWeights)
     {
-        if (IsAuto && _assetFound && _asset == null)
-            return;
-        if (IsAuto && !_assetFound)
+        if (_assetFound && _asset == null)
+            return; // already errored
+        if (!_assetFound)
         {
             _assetFound = true;
             _asset = SplatmapMaterial.Find();
-            if (_asset == null)
-            {
-                Logger.LogWarning($"[TERRAIN ACTIONS] Failed to find splatmap asset: {SplatmapMaterial.Format()} (from: {Instigator.Format()}).");
-                return;
-            }
         }
+        if (_asset == null)
+        {
+            if (SplatmapMaterial.isValid)
+                Logger.LogWarning($"[TERRAIN ACTIONS] Failed to find splatmap asset: {SplatmapMaterial.Format()} (from: {Instigator.Format()}).");
+            return;
+        }
+
+        if (IsAuto && !_asset!.useAutoFoundation && !_asset.useAutoSlope)
+            return;
         float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
         if (distance > BrushRadius * BrushRadius)
             return;
@@ -798,7 +793,7 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
         bool useAutoSlope = IsAuto ? _asset!.useAutoSlope : UseAutoSlope;
         if (useAutoFoundation || useAutoSlope)
         {
-            bool consumedAuto = false;
+            bool needsApplying = false;
             if (useAutoFoundation)
             {
                 float radius, length;
@@ -816,7 +811,7 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
                     length = AutoFoundationRayLength;
                 }
                 int ct = Physics.SphereCastNonAlloc(
-                    worldPosition + new Vector3(0.0f, length, 0.0f),
+                    worldPosition + new Vector3(0.0f, _asset!.autoRayLength, 0.0f),
                     radius, Vector3.down, FoundationHits,
                     length, mask, QueryTriggerInteraction.Ignore);
                 for (int i = 0; i < ct; ++i)
@@ -824,14 +819,14 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
                     ObjectAsset? asset = LevelObjects.getAsset(FoundationHits[i].transform);
                     if (asset is not { isSnowshoe: true })
                     {
-                        consumedAuto = true;
+                        needsApplying = true;
                         targetWeight = !IsAuto && UseWeightTarget ? BrushTarget : 1f;
                         break;
                     }
                 }
             }
 
-            if (!consumedAuto && useAutoSlope && Landscape.getNormal(worldPosition, out Vector3 normal))
+            if (!needsApplying && useAutoSlope && Landscape.getNormal(worldPosition, out Vector3 normal))
             {
                 float angle = Vector3.Angle(Vector3.up, normal);
                 float minBegin, minEnd, maxBegin, maxEnd;
@@ -856,13 +851,11 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
                             ? 1f
                             : (1f - Mathf.InverseLerp(maxBegin, maxEnd, angle)))
                         : (Mathf.InverseLerp(minBegin, minEnd, angle));
-                    consumedAuto = true;
+                    needsApplying = true;
                 }
-
-                if (!consumedAuto)
-                    return;
-
             }
+            if (!needsApplying)
+                return;
         }
         else if (IsAuto)
             return;
@@ -888,98 +881,107 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
 
 [Action(ActionType.SplatmapSmooth)]
 [EarlyTypeInit]
-public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength, IDisposable, IAsset
+public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength
 {
+    private class SampleBufferEntry
+    {
+        public Guid Material;
+        public float Weight;
+    }
+
+    private static readonly List<SampleBufferEntry> SmoothSampleAverageBuffer = new List<SampleBufferEntry>(Landscape.SPLATMAP_LAYERS * 2);
+    private static int SmoothSampleAverageCount;
+    private static int SmoothSampleCount;
     public ActionType Type => ActionType.SplatmapSmooth;
     public TerrainEditorType EditorType => TerrainEditorType.Splatmap;
     public CSteamID Instigator { get; set; }
     public Bounds Bounds { get; set; }
     public Vector2 BrushPosition { get; set; }
-    public AssetReference<LandscapeMaterialAsset> SplatmapMaterial { get; set; }
-    Guid IAsset.Asset
-    {
-        get => SplatmapMaterial.GUID;
-        set => SplatmapMaterial = new AssetReference<LandscapeMaterialAsset>(value);
-    }
     public EDevkitLandscapeToolSplatmapSmoothMethod SmoothMethod { get; set; }
     public float BrushRadius { get; set; }
     public float BrushFalloff { get; set; }
     public float BrushStrength { get; set; }
     public float DeltaTime { get; set; }
-    public List<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>>? Averages { get; set; }
-    public int SampleCount { get; set; }
     public void Apply()
     {
+        if (SmoothMethod == EDevkitLandscapeToolSplatmapSmoothMethod.BRUSH_AVERAGE)
+        {
+            SmoothSampleAverageCount = 0;
+            SmoothSampleCount = 0;
+            Landscape.readSplatmap(Bounds, IntlHandleSplatmapReadBrushAverage);
+        }
         LandscapeUtil.WriteSplatmapNoTransactions(Bounds, IntlHandleSplatmapWriteSmooth);
     }
 #if SERVER
     public bool CheckCanApply()
     {
+        if (!DevkitServerConfig.Config.EnablePixelAverageSplatmapSmoothing && SmoothMethod == EDevkitLandscapeToolSplatmapSmoothMethod.PIXEL_AVERAGE)
+            return false;
         return VanillaPermissions.EditSplatmap.Has(Instigator.m_SteamID) ||
                VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
     }
 #endif
+    private static void AddOrIncrementSample(AssetReference<LandscapeMaterialAsset> material, float weight)
+    {
+        ++SmoothSampleCount;
+        if (weight == 0)
+            return;
+        bool found = false;
+        for (int j = 0; j < SmoothSampleAverageCount; ++j)
+        {
+            if (SmoothSampleAverageBuffer[j].Material == material.GUID)
+            {
+                SmoothSampleAverageBuffer[j].Weight += weight;
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+        {
+            if (SmoothSampleAverageBuffer.Count > SmoothSampleAverageCount)
+            {
+                SampleBufferEntry e = SmoothSampleAverageBuffer[SmoothSampleAverageCount];
+                e.Material = material.GUID;
+                e.Weight = weight;
+            }
+            else
+            {
+                SmoothSampleAverageBuffer.Add(new SampleBufferEntry { Material = material.GUID, Weight = weight });
+            }
+            ++SmoothSampleAverageCount;
+        }
+    }
     public void Read(ByteReader reader)
     {
         Bounds = reader.ReadInflatedBounds(out bool pixel);
         SmoothMethod = pixel ? EDevkitLandscapeToolSplatmapSmoothMethod.PIXEL_AVERAGE : EDevkitLandscapeToolSplatmapSmoothMethod.BRUSH_AVERAGE;
         BrushPosition = reader.ReadVector2();
         DeltaTime = reader.ReadFloat();
-        Averages ??= ListPool<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>>.claim();
-        List<KeyValuePair<byte, float>> proxies = ListPool<KeyValuePair<byte, float>>.claim();
-        int len = reader.ReadUInt8();
-        if (Averages.Capacity < len)
-            Averages.Capacity = len;
-        if (proxies.Capacity < len)
-            proxies.Capacity = len;
-        for (int i = 0; i < len; ++i)
-            proxies.Add(new KeyValuePair<byte, float>(reader.ReadUInt8(), reader.ReadFloat()));
-
-        List<Guid> index = ListPool<Guid>.claim();
-        len = reader.ReadUInt8();
-        if (index.Capacity < len)
-            index.Capacity = len;
-        for (int i = 0; i < len; ++i)
-            index.Add(reader.ReadGuid());
-
-        for (int i = 0; i < proxies.Count; ++i)
-        {
-            KeyValuePair<byte, float> proxy = proxies[i];
-            Averages.Add(new KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>(new AssetReference<LandscapeMaterialAsset>(index[proxy.Key]), proxy.Value));
-        }
-
-        ListPool<Guid>.release(index);
-        ListPool<KeyValuePair<byte, float>>.release(proxies);
     }
     public void Write(ByteWriter writer)
     {
         writer.WriteHeightmapBounds(Bounds, SmoothMethod == EDevkitLandscapeToolSplatmapSmoothMethod.PIXEL_AVERAGE);
         writer.Write(BrushPosition);
         writer.Write(DeltaTime);
-        int len = Math.Min(byte.MaxValue, Averages == null ? 0 : Averages.Count);
-        writer.Write((byte)len);
-        List<Guid> index = ListPool<Guid>.claim();
-        for (int i = 0; i < len; ++i)
+    }
+    private void IntlHandleSplatmapReadBrushAverage(LandscapeCoord tileCoord, SplatmapCoord splatmapCoord, Vector3 worldPosition, float[] currentWeights)
+    {
+        float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
+        if (distance > BrushRadius * BrushRadius)
+            return;
+        LandscapeTile? tile = Landscape.getTile(tileCoord);
+        if (tile?.materials == null)
+            return;
+        for (int i = 0; i < Landscape.SPLATMAP_LAYERS; ++i)
         {
-            KeyValuePair<AssetReference<LandscapeMaterialAsset>, float> v = Averages![i];
-            int ind = index.IndexOf(v.Key.GUID);
-            if (ind == -1)
-            {
-                ind = index.Count;
-                index.Add(v.Key.GUID);
-            }
-            writer.Write((byte)ind);
-            writer.Write(v.Value);
+            AssetReference<LandscapeMaterialAsset> mat = tile.materials[i];
+            if (mat.isValid)
+                AddOrIncrementSample(mat, currentWeights[i]);
         }
-        len = Math.Min(byte.MaxValue, index.Count);
-        writer.Write((byte)len);
-        for (int i = 0; i < len; ++i)
-            writer.Write(index[i]);
-        ListPool<Guid>.release(index);
     }
     private void IntlHandleSplatmapWriteSmooth(LandscapeCoord tileCoord, SplatmapCoord splatmapCoord, Vector3 worldPosition, float[] currentWeights)
     {
-        if (SampleCount < 1 || Averages == null)
+        if (SmoothMethod == EDevkitLandscapeToolSplatmapSmoothMethod.BRUSH_AVERAGE && SmoothSampleCount < 1)
             return;
         LandscapeTile? tile = Landscape.getTile(tileCoord);
         if (tile?.materials == null)
@@ -988,42 +990,66 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushF
         if (distance > BrushRadius * BrushRadius)
             return;
         distance = Mathf.Sqrt(distance) / BrushRadius;
+
+        if (SmoothMethod == EDevkitLandscapeToolSplatmapSmoothMethod.PIXEL_AVERAGE)
+        {
+            SmoothSampleAverageCount = 0;
+            SmoothSampleCount = 0;
+            ScanTile(0, -1);
+            ScanTile(1, 0);
+            ScanTile(0, 1);
+            ScanTile(-1, 0);
+
+            void ScanTile(int dx, int dy)
+            {
+                SplatmapCoord splatmapCoord2 = new SplatmapCoord(splatmapCoord.x + dx, splatmapCoord.y + dy);
+                LandscapeCoord tileCoord2 = tileCoord;
+                LandscapeUtility.cleanSplatmapCoord(ref tileCoord2, ref splatmapCoord2);
+                LandscapeTile? tile2 = Landscape.getTile(tileCoord2);
+                if (tile2?.materials != null)
+                {
+                    for (int i = 0; i < Landscape.SPLATMAP_LAYERS; ++i)
+                    {
+                        AssetReference<LandscapeMaterialAsset> mat = tile2.materials[i];
+                        if (mat.isValid)
+                            AddOrIncrementSample(mat, tile2.splatmap[splatmapCoord2.x, splatmapCoord2.y, i]);
+                    }
+                }
+            }
+
+            if (SmoothSampleCount < 1)
+                return;
+        }
+
         float speed = DeltaTime * BrushStrength * this.GetBrushAlpha(distance);
         float total = 0f;
         for (int i = 0; i < Landscape.SPLATMAP_LAYERS; ++i)
         {
-            AssetReference<LandscapeMaterialAsset> r = tile.materials[i];
-            for (int j = 0; j < Averages.Count; ++j)
+            Guid r = tile.materials[i].GUID;
+            for (int j = 0; j < SmoothSampleAverageCount; ++j)
             {
-                if (Averages[j].Key == r)
+                if (SmoothSampleAverageBuffer[j].Material == r)
                 {
-                    total += Averages[j].Value;
+                    total += SmoothSampleAverageBuffer[j].Weight / SmoothSampleCount;
                     break;
                 }
             }
         }
-
-        total = 1f / total;
+        
         for (int i = 0; i < Landscape.SPLATMAP_LAYERS; ++i)
         {
-            AssetReference<LandscapeMaterialAsset> r = tile.materials[i];
+            Guid r = tile.materials[i].GUID;
             float weight = 0;
-            for (int j = 0; j < Averages.Count; ++j)
+            for (int j = 0; j < SmoothSampleAverageCount; ++j)
             {
-                if (Averages[j].Key == r)
+                if (SmoothSampleAverageBuffer[j].Material == r)
                 {
-                    weight = Averages[j].Value / SampleCount * total;
+                    weight = SmoothSampleAverageBuffer[j].Weight / SmoothSampleCount / total;
                     break;
                 }
             }
             currentWeights[i] += (weight - currentWeights[i]) * speed;
         }
-    }
-
-    public void Dispose()
-    {
-        if (Averages != null)
-            ListPool<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>>.release(Averages);
     }
 }
 
@@ -1074,10 +1100,9 @@ public sealed class HolemapPaintAction : ITerrainAction, IBrushRadius
 [Action(ActionType.AddTile)]
 [Action(ActionType.DeleteTile, CreateMethod = nameof(CreateDeleteTile))]
 [EarlyTypeInit]
-public sealed class TileModifyAction : ITerrainAction, ICoordinates
+public sealed class TileModifyAction : IAction, ICoordinates
 {
     public ActionType Type => IsDelete ? ActionType.DeleteTile : ActionType.AddTile;
-    public TerrainEditorType EditorType => TerrainEditorType.Tiles;
     public CSteamID Instigator { get; set; }
     public float DeltaTime { get; set; }
     public bool IsDelete { get; set; }
@@ -1141,7 +1166,7 @@ public sealed class TileModifyAction : ITerrainAction, ICoordinates
 
 [Action(ActionType.UpdateSplatmapLayers)]
 [EarlyTypeInit]
-public sealed class TileSplatmapLayersUpdateAction : ITerrainAction, ICoordinates
+public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinates
 {
 #if CLIENT
     private static readonly Func<Array?>? GetUILayers = UIAccessTools.CreateUIFieldGetterReturn<Array>(UI.EditorTerrainTiles, "layers", false);
@@ -1155,7 +1180,6 @@ public sealed class TileSplatmapLayersUpdateAction : ITerrainAction, ICoordinate
             , false, useFptrReconstruction: true);
 #endif
     public ActionType Type => ActionType.UpdateSplatmapLayers;
-    public TerrainEditorType EditorType => TerrainEditorType.Tiles;
     public CSteamID Instigator { get; set; }
     public float DeltaTime { get; set; }
     public LandscapeCoord Coordinates { get; set; }

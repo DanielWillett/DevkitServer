@@ -122,6 +122,7 @@ public class DevkitEditorHUD : MonoBehaviour
         label.sizeOffset_X = 200;
         label.sizeOffset_Y = 30;
         label.shadowStyle = ETextContrastContext.ColorfulBackdrop;
+        label.text = user.DisplayName;
         UpdateNametag(label, user);
         Container.AddChild(label);
         Nametags.Add(new KeyValuePair<ISleekLabel, ulong>(label, user.SteamId.m_SteamID));
@@ -134,7 +135,7 @@ public class DevkitEditorHUD : MonoBehaviour
         GameObject? ctrl = user.Input.ControllerObject;
         if (ctrl == null)
             return;
-        Vector3 screenPos = MainCamera.instance.WorldToViewportPoint(ctrl.transform.position);
+        Vector3 screenPos = MainCamera.instance.WorldToViewportPoint(ctrl.transform.position + Vector3.up);
         if (screenPos.z <= 0.0)
         {
             if (nametag.isVisible)
@@ -145,8 +146,6 @@ public class DevkitEditorHUD : MonoBehaviour
             Vector2 adjScreenPos = Container.ViewportToNormalizedPosition(screenPos);
             nametag.positionScale_X = adjScreenPos.x;
             nametag.positionScale_Y = adjScreenPos.y;
-            if (string.IsNullOrEmpty(nametag.text))
-                nametag.text = user.DisplayName;
             if (!nametag.isVisible)
                 nametag.isVisible = true;
         }

@@ -19,7 +19,7 @@ internal static class EditorActionsCodeGeneration
     {
         Type[] types = Accessor.GetTypesSafe();
         int c = 0;
-        List<(Type type, List<(PropertyInfo property, ActionSettingAttribute attr)> info)> properties = new List<(Type, List<(PropertyInfo, ActionSettingAttribute)>)>(48);
+        List<(Type type, ActionSettingAttribute attr, List<PropertyInfo> info)> properties = new List<(Type, ActionSettingAttribute, List<PropertyInfo>)>(48);
         List<(Type type, ActionAttribute attr)> actions = new List<(Type, ActionAttribute)>(32);
         for (int i = 0; i < types.Length; ++i)
         {
@@ -37,25 +37,10 @@ internal static class EditorActionsCodeGeneration
                 }
                 continue;
             }
-            PropertyInfo[] props = t.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            for (int p = 0; p < props.Length; ++p)
+            if (Attribute.GetCustomAttribute(t, typeof(ActionSettingAttribute), false) is ActionSettingAttribute settingAttr)
             {
-                PropertyInfo prop = props[p];
-                if (Attribute.GetCustomAttribute(prop, typeof(ActionSettingAttribute), false) is ActionSettingAttribute settingAttr)
-                {
-                    bool found = false;
-                    for (int j = 0; j < properties.Count; ++j)
-                    {
-                        if (properties[j].type == t)
-                        {
-                            properties[j].info.Add((prop, settingAttr));
-                            found = true;
-                        }
-                    }
-                    if (!found)
-                        properties.Add((t, new List<(PropertyInfo, ActionSettingAttribute)>(1) { (prop, settingAttr) }));
-                    ++c;
-                }
+                PropertyInfo[] props = t.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                properties.Add((t, settingAttr, new List<PropertyInfo>(props)));
             }
         }
 
@@ -144,7 +129,7 @@ internal static class EditorActionsCodeGeneration
         DynamicMethod writeMethod = new DynamicMethod("SettingsWriteHandler", attributes, CallingConventions.Standard,
             typeof(void), new Type[] { typeof(IActionListener), typeof(ActionSettingsCollection).MakeByRefType(), typeof(IAction) },
             typeof(EditorActionsCodeGeneration), true);
-        DebuggableEmitter writeGenerator = new DebuggableEmitter(writeMethod) { DebugLog = true };
+        DebuggableEmitter writeGenerator = new DebuggableEmitter(writeMethod) { DebugLog = false };
 
         DynamicMethod readMethod = new DynamicMethod("SettingsReadHandler", attributes, CallingConventions.Standard,
             typeof(void), new Type[] { typeof(IActionListener), typeof(IAction) },
@@ -192,7 +177,7 @@ internal static class EditorActionsCodeGeneration
 
         LocalBuilder anyChanged = writeGenerator.DeclareLocal(typeof(bool));
         const float tol = 0.0001f;
-        foreach ((Type type, List<(PropertyInfo property, ActionSettingAttribute attr)> list) in properties)
+        foreach ((Type type, ActionSettingAttribute attr, List<PropertyInfo> list) in properties)
         {
             writeGenerator.Comment($"Type: {type.Format()}...");
             readGenerator.Comment($"Type: {type.Format()}...");
@@ -221,7 +206,7 @@ internal static class EditorActionsCodeGeneration
             List<LocalBuilder> lcls = new List<LocalBuilder>();
             Label updateValuePop = writeGenerator.DefineLabel();
             Label updateValueNoPop = writeGenerator.DefineLabel();
-            foreach ((PropertyInfo property, ActionSettingAttribute attr) in list)
+            foreach (PropertyInfo property in list)
             {
                 writeGenerator.Comment($"Property: {property.Format()}, {attr.ActionSetting.Format()}.");
                 readGenerator.Comment($"Property: {property.Format()}, {attr.ActionSetting.Format()}.");
@@ -330,6 +315,11 @@ internal static class EditorActionsCodeGeneration
                 readGenerator.Emit(OpCodes.Callvirt, property.SetMethod);
             }
 
+            if (writeCheckNextProp.HasValue)
+                writeGenerator.MarkLabel(writeCheckNextProp.Value);
+            if (readNextProp.HasValue)
+                readGenerator.MarkLabel(readNextProp.Value);
+
             // if (!anyChanged) continue;
             writeGenerator.Emit(OpCodes.Ldloc, anyChanged);
             writeGenerator.Emit(OpCodes.Brfalse, writeNext.Value);
@@ -362,7 +352,7 @@ internal static class EditorActionsCodeGeneration
 
             List<ActionSetting> used = new List<ActionSetting>(1);
 
-            foreach ((PropertyInfo property, ActionSettingAttribute attr) in list)
+            foreach (PropertyInfo property in list)
             {
                 PropertyInfo? settingsProperty = null;
                 if (type.IsAssignableFrom(typeof(ActionSettingsCollection)))
@@ -389,11 +379,6 @@ internal static class EditorActionsCodeGeneration
                     used.Add(attr.ActionSetting);
                 }
             }
-
-            if (writeCheckNextProp.HasValue)
-                writeGenerator.MarkLabel(writeCheckNextProp.Value);
-            if (readNextProp.HasValue)
-                readGenerator.MarkLabel(readNextProp.Value);
         }
 
         if (writeNext.HasValue)
@@ -489,14 +474,19 @@ internal static class EditorActionsCodeGeneration
             createGenerator.Emit(OpCodes.Ldnull);
             createGenerator.Emit(OpCodes.Ret);
         }
+        
+        Type[] interfaces = typeof(ActionSettingsCollection).GetInterfaces();
+        IEnumerable<(ActionSetting, PropertyInfo)> settingsProperties = new List<(ActionSetting, PropertyInfo)>(16);
+        foreach ((Type type, ActionSettingAttribute attr, List<PropertyInfo> list) in properties)
+        {
+            if (interfaces.Contains(type))
+            {
+                foreach (PropertyInfo prop in list)
+                    ((List<(ActionSetting, PropertyInfo)>)settingsProperties).Add((attr.ActionSetting, prop));
+            }
+        }
 
-        Type settingsType = typeof(ActionSettingsCollection);
-        Type[] interfaces = settingsType.GetInterfaces();
-        IEnumerable<(ActionSetting setting, PropertyInfo property)> settingsProperties = properties
-            .Where(x => interfaces.Contains(x.type))
-            .SelectMany(x => x.info)
-            .Select(x => (x.attr.ActionSetting, x.property))
-            .OrderBy(x => x.ActionSetting).ThenBy(x => x.property.Name);
+        settingsProperties = settingsProperties.OrderBy(prop => prop.Item1).ThenBy(prop => prop.Item2.Name);
 
         foreach ((ActionSetting setting, PropertyInfo property) in settingsProperties)
         {
@@ -586,7 +576,7 @@ internal delegate void HandleByteWriteSettings(ActionSettingsCollection collecti
 internal delegate void HandleByteReadSettings(ActionSettingsCollection collection, ByteReader reader);
 internal delegate void HandleAppendSettingsCollection(ActionSettingsCollection collection, StringBuilder builder);
 
-[AttributeUsage(AttributeTargets.Property)]
+[AttributeUsage(AttributeTargets.Interface)]
 internal sealed class ActionSettingAttribute : Attribute
 {
     public ActionSetting ActionSetting { get; }

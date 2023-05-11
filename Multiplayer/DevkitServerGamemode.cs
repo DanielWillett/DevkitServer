@@ -1,13 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using DevkitServer.API.Permissions;
-using DevkitServer.Multiplayer.Actions;
-using DevkitServer.Multiplayer.Networking;
+﻿using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Players;
+#if SERVER
+using DevkitServer.API.Permissions;
+using DevkitServer.Configuration;
+#endif
+#if CLIENT
+using DevkitServer.Multiplayer.Networking;
+#endif
 
 namespace DevkitServer.Multiplayer;
 public class DevkitServerGamemode : GameMode
@@ -31,6 +30,7 @@ public class DevkitServerGamemode : GameMode
         {
             Permissions = UserPermissions.UserHandler.GetPermissions(user.SteamId.m_SteamID, true)?.ToArray() ?? Array.Empty<Permission>(),
             PermissionGroups = UserPermissions.UserHandler.GetPermissionGroups(user.SteamId.m_SteamID, true)?.ToArray() ?? Array.Empty<PermissionGroup>(),
+            EnablePixelAverageSplatmapSmoothing = DevkitServerConfig.Config.EnablePixelAverageSplatmapSmoothing
         };
     }
 #endif

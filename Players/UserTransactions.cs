@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Players.UI;
 using JetBrains.Annotations;
 using SDG.Framework.Devkit.Transactions;
 
@@ -34,6 +35,10 @@ public class UserTransactions : MonoBehaviour
 #if SERVER
     private void ReceiveReunRequest(bool isRedo)
     {
+        if (isRedo)
+            UIMessage.SendEditorMessage(User, DevkitServerModule.MessageLocalization.Translate("RedoNotSupported"));
+        else
+            UIMessage.SendEditorMessage(User, DevkitServerModule.MessageLocalization.Translate("UndoNotSupported"));
         Logger.LogDebug($"{User.Format()} Requested a{(isRedo ? " redo." : "n undo.")}");
     }
     [NetCall(NetCallSource.FromClient, (ushort)NetCalls.ReunRequest)]

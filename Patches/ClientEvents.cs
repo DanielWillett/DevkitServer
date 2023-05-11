@@ -30,7 +30,7 @@ public delegate void AdjustAction(Bounds bounds, Vector3 position, float radius,
 public delegate void FlattenAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, float target, EDevkitLandscapeToolHeightmapFlattenMethod method, float dt);
 public delegate void SmoothAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float target, EDevkitLandscapeToolHeightmapSmoothMethod method, float dt);
 public delegate void PaintAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, float target, bool useWeightTarget, bool autoSlope, bool autoFoundation, float autoMinAngleBegin, float autoMinAngleEnd, float autoMaxAngleBegin, float autoMaxAngleEnd, float autoRayLength, float autoRayRadius, ERayMask autoRayMask, bool isRemove, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt);
-public delegate void PaintSmoothAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, EDevkitLandscapeToolSplatmapSmoothMethod method, List<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>> averages, int sampleCount, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt);
+public delegate void PaintSmoothAction(Bounds bounds, Vector3 position, float radius, float falloff, float strength, EDevkitLandscapeToolSplatmapSmoothMethod method, float dt);
 public delegate void SplatmapLayerMaterialsUpdateAction(LandscapeTile tile);
 public delegate void EditHeightmapRequest(TerrainEditor.EDevkitLandscapeToolHeightmapMode mode, ref bool allow);
 public delegate void EditSplatmapRequest(TerrainEditor.EDevkitLandscapeToolSplatmapMode mode, ref bool allow);
@@ -532,6 +532,11 @@ public static class ClientEvents
         {
             if (TerrainEditor.splatmapMode != TerrainEditor.EDevkitLandscapeToolSplatmapMode.CUT)
             {
+                if (TerrainEditor.splatmapMode == TerrainEditor.EDevkitLandscapeToolSplatmapMode.SMOOTH && DevkitLandscapeToolSplatmapOptions.instance.smoothMethod == EDevkitLandscapeToolSplatmapSmoothMethod.PIXEL_AVERAGE && ClientInfo.Info is not { EnablePixelAverageSplatmapSmoothing: true })
+                {
+                    UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("FeatureDisabled"));
+                    return false;
+                }
                 if (OnEditSplatmapRequested == null) return true;
                 foreach (EditSplatmapRequest requested in OnEditSplatmapRequested.GetInvocationList().Cast<EditSplatmapRequest>())
                 {
@@ -623,8 +628,8 @@ public static class ClientEvents
 
         DevkitLandscapeToolSplatmapOptions settings = DevkitLandscapeToolSplatmapOptions.instance;
         OnPainted?.Invoke(bounds, GetTerrainBrushWorldPosition(editor), editor.splatmapBrushRadius,
-            editor.splatmapBrushFalloff, editor.splatmapBrushStrength, editor.splatmapWeightTarget,
-            editor.splatmapPaintSensitivity,
+            editor.splatmapBrushFalloff, editor.splatmapBrushStrength, editor.splatmapPaintSensitivity,
+            editor.splatmapWeightTarget,
             InputEx.GetKey(KeyCode.LeftControl) || editor.splatmapUseWeightTarget,
             settings.useAutoSlope, settings.useAutoFoundation,
             settings.autoMinAngleBegin, settings.autoMinAngleEnd,
@@ -640,8 +645,8 @@ public static class ClientEvents
 
         DevkitLandscapeToolSplatmapOptions settings = DevkitLandscapeToolSplatmapOptions.instance;
         OnAutoPainted?.Invoke(bounds, GetTerrainBrushWorldPosition(editor), editor.splatmapBrushRadius,
-            editor.splatmapBrushFalloff, editor.splatmapBrushStrength, editor.splatmapWeightTarget,
-            editor.splatmapPaintSensitivity,
+            editor.splatmapBrushFalloff, editor.splatmapBrushStrength, editor.splatmapPaintSensitivity,
+            editor.splatmapWeightTarget,
             InputEx.GetKey(KeyCode.LeftControl) || editor.splatmapUseWeightTarget,
             settings.useAutoSlope, settings.useAutoFoundation,
             settings.autoMinAngleBegin, settings.autoMinAngleEnd,
@@ -650,30 +655,14 @@ public static class ClientEvents
             settings.autoRayMask, InputEx.GetKey(KeyCode.LeftShift),
             TerrainEditor.splatmapMaterialTarget, Time.deltaTime);
     }
-
-    internal static int TakeReleaseAveragesList = 0;
+    
     [UsedImplicitly]
     private static void OnPaintSmoothConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null || GetSampleAverage == null || GetSampleCount == null) return;
-
-        EDevkitLandscapeToolSplatmapSmoothMethod method = DevkitLandscapeToolSplatmapOptions.instance.smoothMethod;
-        if (OnPaintSmoothed != null)
-        {
-            Dictionary<AssetReference<LandscapeMaterialAsset>, float> averages = GetSampleAverage(editor);
-            List<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>> averagesList = ListPool<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>>.claim();
-            foreach (KeyValuePair<AssetReference<LandscapeMaterialAsset>, float> kvp in averages)
-            {
-                if (kvp.Value > 0f)
-                    averagesList.Add(new KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>(kvp.Key, kvp.Value));
-            }
-
-            OnPaintSmoothed.Invoke(bounds, GetTerrainBrushWorldPosition(editor), editor.splatmapBrushRadius,
-            editor.splatmapBrushFalloff, editor.splatmapBrushStrength, method, averagesList, GetSampleCount(editor),
-            TerrainEditor.splatmapMaterialTarget, Time.deltaTime);
-            if (TakeReleaseAveragesList == 0)
-                ListPool<KeyValuePair<AssetReference<LandscapeMaterialAsset>, float>>.release(averagesList);
-        }
+        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
+        
+        OnPaintSmoothed?.Invoke(bounds, GetTerrainBrushWorldPosition(editor), editor.splatmapBrushRadius,
+            editor.splatmapBrushFalloff, editor.splatmapBrushStrength, DevkitLandscapeToolSplatmapOptions.instance.smoothMethod, Time.deltaTime);
     }
     [UsedImplicitly]
     private static void OnHoleConfirm(Bounds bounds)

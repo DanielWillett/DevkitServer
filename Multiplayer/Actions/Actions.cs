@@ -13,13 +13,8 @@ public enum ActionSetting
     Target = 1 << 4,
     Asset = 1 << 5,
     TileCoordinates = 1 << 6,
-    AutoSlopeMinAngleBegin = 1 << 7,
-    AutoSlopeMinAngleEnd = 1 << 8,
-    AutoSlopeMaxAngleBegin = 1 << 9,
-    AutoSlopeMaxAngleEnd = 1 << 10,
-    AutoFoundationRayLength = 1 << 11,
-    AutoFoundationRayRadius = 1 << 12,
-    AutoFoundationRayMask = 1 << 13,
+    AutoSlopeData = 1 << 7,
+    AutoFoundationData = 1 << 8,
 
     Extended = 1 << 31
 }
@@ -60,40 +55,39 @@ public interface IAction
     void Write(ByteWriter writer);
 }
 
+[ActionSetting(ActionSetting.Asset)]
 public interface IAsset
 {
-    [ActionSetting(ActionSetting.Asset)]
     Guid Asset { get; set; }
 }
+[ActionSetting(ActionSetting.TileCoordinates)]
 public interface ICoordinates
 {
-    [ActionSetting(ActionSetting.TileCoordinates)]
     int CoordinateX { get; set; }
-    [ActionSetting(ActionSetting.TileCoordinates)]
     int CoordinateY { get; set; }
 }
+[ActionSetting(ActionSetting.Radius)]
 public interface IBrushRadius
 {
-    [ActionSetting(ActionSetting.Radius)]
     float BrushRadius { get; set; }
 }
+[ActionSetting(ActionSetting.Falloff)]
 public interface IBrushFalloff
 {
-    [ActionSetting(ActionSetting.Falloff)]
     float BrushFalloff { get; set; }
 }
+[ActionSetting(ActionSetting.Strength)]
 public interface IBrushStrength
 {
-    [ActionSetting(ActionSetting.Strength)]
     float BrushStrength { get; set; }
 }
+[ActionSetting(ActionSetting.Sensitivity)]
 public interface IBrushSensitivity
 {
-    [ActionSetting(ActionSetting.Sensitivity)]
     float BrushSensitivity { get; set; }
 }
+[ActionSetting(ActionSetting.Target)]
 public interface IBrushTarget
 {
-    [ActionSetting(ActionSetting.Target)]
     float BrushTarget { get; set; }
 }

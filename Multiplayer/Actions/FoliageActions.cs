@@ -267,17 +267,25 @@ public sealed class RemoveResourceSpawnpointAction : IAction, IAsset
     public void Apply()
     {
         Vector3 pos = ResourcePosition;
+        Logger.DumpJson(this);
         if (Regions.tryGetCoordinate(pos, out byte x, out byte y))
         {
             List<ResourceSpawnpoint> region = LevelGround.trees[x, y];
             for (int i = 0; i < region.Count; ++i)
             {
                 ResourceSpawnpoint sp = region[i];
-                if (sp.point.IsNearlyEqual(pos) && sp.asset.GUID == FoliageAsset.GUID)
+                if (sp.point.IsNearlyEqual(pos))
                 {
-                    sp.destroy();
-                    region.RemoveAt(i);
-                    return;
+                    if (sp.asset.GUID == FoliageAsset.GUID)
+                    {
+                        sp.destroy();
+                        region.RemoveAt(i);
+                        return;
+                    }
+                    else
+                    {
+                        Logger.LogWarning("Found matching position but different GUID: " + (FoliageAsset.Find()?.FriendlyName ?? FoliageAsset.ToString()).Format() + " vs " + sp.asset.FriendlyName.Format() + ".");
+                    }
                 }
             }
 
