@@ -1017,7 +1017,123 @@ public static class ClientEvents
     }
 
     #endregion
-    
+
+    #region SelectionTool.update
+    [HarmonyPatch(typeof(SelectionTool), nameof(SelectionTool.update))]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    private static IEnumerable<CodeInstruction> SelectionToolUpdateTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
+    {
+        Type st = typeof(SelectionTool);
+        Type th = typeof(TransformHandles);
+        Type dtu = typeof(DevkitTransactionUtility);
+        Type ce = typeof(ClientEvents);
+        Type vp = typeof(VanillaPermissions);
+
+        MethodInfo moveHandleInvoker = new Action<Vector3, Quaternion, Vector3, bool, bool>(OnMoveHandle).Method;
+        MethodInfo requestInstantiationInvoker = new Action<Vector3>(OnRequestInstantiaion).Method;
+        MethodInfo recordDestructionInvoker = new Action<GameObject>(OnDestruction).Method;
+        
+        MethodInfo? moveHandle = st.GetMethod("moveHandle", BindingFlags.Instance | BindingFlags.NonPublic, null, new Type[] { typeof(Vector3), typeof(Quaternion), typeof(Vector3), typeof(bool), typeof(bool) }, null);
+        if (moveHandle == null)
+        {
+            Logger.LogWarning("Unable to find method: SelectionTool.moveHandle.");
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo? requestInstantiation = st.GetMethod("RequestInstantiation", BindingFlags.Instance | BindingFlags.NonPublic, null, new Type[] { typeof(Vector3) }, null);
+        if (requestInstantiation == null)
+        {
+            Logger.LogWarning("Unable to find method: SelectionTool.RequestInstantiation.");
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo? handlesMouseUp = th.GetMethod(nameof(TransformHandles.MouseUp), BindingFlags.Instance | BindingFlags.Public, null, Array.Empty<Type>(), null);
+        if (handlesMouseUp == null)
+        {
+            Logger.LogWarning("Unable to find method: TransformHandles.MouseUp.");
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo? recordDestruction = dtu.GetMethod(nameof(DevkitTransactionUtility.recordDestruction), BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(GameObject) }, null);
+        if (recordDestruction == null)
+        {
+            Logger.LogWarning("Unable to find method: DevkitTransactionUtility.recordDestruction.");
+            DevkitServerModule.Fault();
+        }
+
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        StackTracker tracker = new StackTracker(ins);
+        for (int i = 0; i < ins.Count; ++i)
+        {
+            CodeInstruction c = ins[i];
+            MethodInfo? invoker = null;
+            if (moveHandle != null && c.Calls(moveHandle))
+                invoker = moveHandleInvoker;
+            else if (requestInstantiation != null && c.Calls(requestInstantiation))
+                invoker = requestInstantiationInvoker;
+
+            if (invoker != null)
+            {
+                int lastLdArg0 = tracker.GetLastUnconsumedIndex(i, OpCodes.Ldarg_0, method);
+                if (lastLdArg0 != -1)
+                {
+                    ins.Insert(i + 1, new CodeInstruction(OpCodes.Call, invoker));
+
+                    for (int j = i - 1; j > lastLdArg0; --j)
+                    {
+                        ins.Insert(i + 1, ins[j].CopyWithoutSpecial());
+                    }
+                    
+                    i += i - lastLdArg0;
+                    Logger.LogDebug($"Patched in {invoker} to {method}.");
+                }
+            }
+            else if (recordDestruction != null && c.Calls(recordDestruction))
+            {
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Call, recordDestructionInvoker));
+                List<CodeInstruction> ins2 = new List<CodeInstruction>(4);
+                for (int j = i - 1; j >= 0; --j)
+                {
+                    ins2.Add(ins[j].CopyWithoutSpecial());
+                    if (ins[j].operand is LocalBuilder bld && typeof(IEnumerator<DevkitSelection>).IsAssignableFrom(bld.LocalType))
+                        break;
+                }
+                for (int j = 0; j < ins2.Count; ++j)
+                    ins.Insert(i + 1, ins2[j]);
+                Logger.LogDebug($"Patched in {recordDestructionInvoker} to {method}.");
+            }
+        }
+
+        return ins;
+    }
+    [UsedImplicitly]
+    private static void OnMoveHandle(Vector3 position, Quaternion rotation, Vector3 scale, bool doRotation, bool hasScale)
+    {
+        if (!DevkitServerModule.IsEditing) return;
+
+        Logger.LogDebug("Handle moved: " + position.Format() + " Rot: " + doRotation.Format() + ", Scale: " + hasScale.Format() + ".");
+    }
+
+    [UsedImplicitly]
+    private static void OnRequestInstantiaion(Vector3 position)
+    {
+        if (!DevkitServerModule.IsEditing) return;
+
+        Logger.LogDebug("Instantiation requested at: " + position.Format() + ".");
+    }
+
+    [UsedImplicitly]
+    private static void OnDestruction(GameObject obj)
+    {
+        if (!DevkitServerModule.IsEditing) return;
+
+        Logger.LogDebug("Destruction requested at: " + obj.name.Format() + ".");
+    }
+
+    #endregion
+
+
     private static void CheckCopiedMethodPatchOutOfDate(ref MethodInfo original, MethodInfo invoker)
     {
         ParameterInfo[] p = original.GetParameters();

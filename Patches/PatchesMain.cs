@@ -2,6 +2,7 @@
 using HarmonyLib;
 using JetBrains.Annotations;
 using System.Reflection;
+using DevkitServer.Configuration;
 using DevkitServer.Players;
 using SDG.Framework.Landscapes;
 #if CLIENT
@@ -27,6 +28,20 @@ internal static class PatchesMain
     {
         try
         {
+#if DEBUG
+            string path = Path.Combine(DevkitServerConfig.FilePath, "harmony.log");
+            Environment.SetEnvironmentVariable("HARMONY_LOG_FILE", path);
+            try
+            {
+                File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Unable to delete previous harmony log.");
+                Logger.LogError(ex);
+            }
+            Harmony.DEBUG = true;
+#endif
             Patcher = new Harmony(HarmonyId);
             Patcher.PatchAll();
 

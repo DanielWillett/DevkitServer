@@ -598,61 +598,65 @@ internal static class Logger
             case OperandType.ShortInlineBrTarget:
             case OperandType.InlineBrTarget:
                 if (instruction.operand is Label lbl)
-                    return op + " " + lbl.Format();
+                    op += " " + lbl.Format();
                 break;
             case OperandType.InlineField:
                 if (instruction.operand is FieldInfo field)
-                    return op + " " + field.Format();
+                    op += " " + field.Format();
                 break;
             case OperandType.ShortInlineI:
             case OperandType.InlineI:
                 try
                 {
                     int num = Convert.ToInt32(instruction.operand);
-                    return op + " " + GetColor(StackCleaner.Configuration.Colors!.ExtraDataColor) + num + GetReset();
+                    op += " " + GetColor(StackCleaner.Configuration.Colors!.ExtraDataColor) + num + GetReset();
                 }
                 catch
                 {
-                    break;
+                    // ignored
                 }
+                break;
             case OperandType.InlineI8:
                 try
                 {
                     long lng = Convert.ToInt64(instruction.operand);
-                    return op + " " + GetColor(StackCleaner.Configuration.Colors!.ExtraDataColor) + lng + GetReset();
+                    op += " " + GetColor(StackCleaner.Configuration.Colors!.ExtraDataColor) + lng + GetReset();
                 }
                 catch
                 {
-                    break;
+                    // ignored
                 }
+                break;
             case OperandType.InlineMethod:
                 if (instruction.operand is MethodBase method)
-                    return op + " " + method.Format();
+                    op += " " + method.Format();
                 break;
             case OperandType.ShortInlineR:
             case OperandType.InlineR:
                 try
                 {
                     double dbl = Convert.ToDouble(instruction.operand);
-                    return op + " " + GetColor(StackCleaner.Configuration.Colors!.ExtraDataColor) + dbl + GetReset();
+                    op += " " + GetColor(StackCleaner.Configuration.Colors!.ExtraDataColor) + dbl + GetReset();
                 }
                 catch
                 {
-                    break;
+                    // ignored
                 }
+                break;
             case OperandType.InlineSig:
                 try
                 {
                     int num = Convert.ToInt32(instruction.operand);
-                    return op + " " + GetColor(StackCleaner.Configuration.Colors!.ExtraDataColor) + num + GetReset();
+                    op += " " + GetColor(StackCleaner.Configuration.Colors!.ExtraDataColor) + num + GetReset();
                 }
                 catch
                 {
-                    break;
+                    // ignored
                 }
+                break;
             case OperandType.InlineString:
                 if (instruction.operand is string str)
-                    return op + " " + GetColor(ToArgb(new Color32(214, 157, 133, 255))) + "\"" + str + "\"" + GetReset();
+                    op += " " + GetColor(ToArgb(new Color32(214, 157, 133, 255))) + "\"" + str + "\"" + GetReset();
                 break;
             case OperandType.InlineSwitch:
                 if (instruction.operand is Label[] jumps)
@@ -662,32 +666,38 @@ internal static class Logger
                         op += Environment.NewLine + "  " + GetColor(StackCleaner.Configuration.Colors!.ExtraDataColor) + i + GetReset() + " => " + GetColor(StackCleaner.Configuration.Colors!.StructColor) + " Label #" + jumps[i].GetLabelId() + GetReset();
 
                     op += Environment.NewLine + "}";
-                    return op;
                 }
                 break;
             case OperandType.InlineTok:
                 switch (instruction.operand)
                 {
                     case Type typeToken:
-                        return op + " " + typeToken.Format();
+                        op += " " + typeToken.Format();
+                        break;
                     case MethodBase methodToken:
-                        return op + " " + methodToken.Format();
+                        op += " " + methodToken.Format();
+                        break;
                     case FieldInfo fieldToken:
-                        return op + " " + fieldToken.Format();
+                        op += " " + fieldToken.Format();
+                        break;
                 }
-
                 break;
             case OperandType.InlineType:
                 if (instruction.operand is Type type)
-                    return op + " " + type.Format();
+                    op += " " + type.Format();
                 break;
             case OperandType.ShortInlineVar:
             case OperandType.InlineVar:
                 if (instruction.operand is LocalBuilder lb)
-                    return op + " " + GetColor(StackCleaner.Configuration.Colors!.ExtraDataColor) + lb.LocalIndex + GetReset() + " : " + lb.LocalType!.Format();
+                    op += " " + GetColor(StackCleaner.Configuration.Colors!.ExtraDataColor) + lb.LocalIndex + GetReset() + " : " + lb.LocalType!.Format();
                 break;
-
         }
+
+        foreach (Label lbl in instruction.labels)
+        {
+            op += " .lbl #".Colorize(ConsoleColor.DarkRed) + lbl.GetLabelId().Format();
+        }
+
         string GetColor(int argb)
         {
             return (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
