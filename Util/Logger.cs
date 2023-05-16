@@ -519,40 +519,106 @@ internal static class Logger
     }
 
     // this is not a mess, scroll away
-    public static string Format(this FieldInfo field) => (field.DeclaringType != null ? StackCleaner.GetString(field.DeclaringType) : ((StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
-                                                             ? string.Empty
-                                                             : (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                                                                 ? GetExtANSIForegroundString(StackCleaner.Configuration.Colors!.KeywordColor)
-                                                                 : GetANSIForegroundString(ToConsoleColor(StackCleaner.Configuration.Colors!.KeywordColor)))) + "global" + (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
-                                                                 ? string.Empty
-                                                                 : (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                                                                     ? GetExtANSIForegroundString(StackCleaner.Configuration.Colors!.PunctuationColor)
-                                                                     : GetANSIForegroundString(ToConsoleColor(StackCleaner.Configuration.Colors!.PunctuationColor)))) + "::" +
-                                                             (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIReset))) + " " + (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
-                                                                        ? string.Empty
-                                                                        : (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                                                                            ? GetExtANSIForegroundString(StackCleaner.Configuration.Colors!.PropertyColor)
-                                                                            : GetANSIForegroundString(ToConsoleColor(StackCleaner.Configuration.Colors!.PropertyColor)))) + field.Name +
-                                                                                                                         (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIReset);
-    public static string Format(this PropertyInfo property) => (property.DeclaringType != null ? StackCleaner.GetString(property.DeclaringType) : ((StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
-                                                             ? string.Empty
-                                                             : (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                                                                 ? GetExtANSIForegroundString(StackCleaner.Configuration.Colors!.KeywordColor)
-                                                                 : GetANSIForegroundString(ToConsoleColor(StackCleaner.Configuration.Colors!.KeywordColor)))) + "global" + (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
-                                                                 ? string.Empty
-                                                                 : (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                                                                     ? GetExtANSIForegroundString(StackCleaner.Configuration.Colors!.PunctuationColor)
-                                                                     : GetANSIForegroundString(ToConsoleColor(StackCleaner.Configuration.Colors!.PunctuationColor)))) + "::" +
-                                                             (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIReset))) + " " + (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
-                                                                        ? string.Empty
-                                                                        : (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                                                                            ? GetExtANSIForegroundString(StackCleaner.Configuration.Colors!.PropertyColor)
-                                                                            : GetANSIForegroundString(ToConsoleColor(StackCleaner.Configuration.Colors!.PropertyColor)))) + property.Name +
-                                                                                                                         (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIReset);
-    public static string Format(this MethodBase method) => StackCleaner.GetString(method);
-    public static string Format(this Type typedef) => StackCleaner.GetString(typedef);
-    public static string Format(this ExceptionBlock block)
+    public static string Format(this FieldInfo? field) => field == null ? ((object)null!).Format() : ((field.DeclaringType != null
+                                                              ? StackCleaner.GetString(field.DeclaringType)
+                                                              : ((StackCleaner.Configuration.ColorFormatting ==
+                                                                  StackColorFormatType.None
+                                                                     ? string.Empty
+                                                                     : (StackCleaner.Configuration.ColorFormatting ==
+                                                                        StackColorFormatType.ExtendedANSIColor
+                                                                         ? GetExtANSIForegroundString(
+                                                                             StackCleaner.Configuration.Colors!
+                                                                                 .KeywordColor)
+                                                                         : GetANSIForegroundString(
+                                                                             ToConsoleColor(
+                                                                                 StackCleaner.Configuration.Colors!
+                                                                                     .KeywordColor)))) + "global" +
+                                                                 (StackCleaner.Configuration.ColorFormatting ==
+                                                                  StackColorFormatType.None
+                                                                     ? string.Empty
+                                                                     : (StackCleaner.Configuration.ColorFormatting ==
+                                                                        StackColorFormatType.ExtendedANSIColor
+                                                                         ? GetExtANSIForegroundString(
+                                                                             StackCleaner.Configuration.Colors!
+                                                                                 .PunctuationColor)
+                                                                         : GetANSIForegroundString(
+                                                                             ToConsoleColor(
+                                                                                 StackCleaner.Configuration.Colors!
+                                                                                     .PunctuationColor)))) + "::" +
+                                                                 (StackCleaner.Configuration.ColorFormatting ==
+                                                                  StackColorFormatType.None
+                                                                     ? string.Empty
+                                                                     : ANSIReset))) + " " +
+                                                          (StackCleaner.Configuration.ColorFormatting ==
+                                                           StackColorFormatType.None
+                                                              ? string.Empty
+                                                              : (StackCleaner.Configuration.ColorFormatting ==
+                                                                 StackColorFormatType.ExtendedANSIColor
+                                                                  ? GetExtANSIForegroundString(
+                                                                      StackCleaner.Configuration.Colors!.PropertyColor)
+                                                                  : GetANSIForegroundString(
+                                                                      ToConsoleColor(StackCleaner.Configuration.Colors!
+                                                                          .PropertyColor)))) + field.Name +
+                                                          (StackCleaner.Configuration.ColorFormatting ==
+                                                           StackColorFormatType.None
+                                                              ? string.Empty
+                                                              : ANSIReset));
+    public static string Format(this PropertyInfo? property) => property == null ? ((object)null!).Format() : ((property.DeclaringType != null
+                                                                     ? StackCleaner.GetString(property.DeclaringType)
+                                                                     : ((StackCleaner.Configuration.ColorFormatting ==
+                                                                         StackColorFormatType.None
+                                                                            ? string.Empty
+                                                                            : (StackCleaner.Configuration
+                                                                                   .ColorFormatting ==
+                                                                               StackColorFormatType.ExtendedANSIColor
+                                                                                ? GetExtANSIForegroundString(
+                                                                                    StackCleaner.Configuration.Colors!
+                                                                                        .KeywordColor)
+                                                                                : GetANSIForegroundString(
+                                                                                    ToConsoleColor(
+                                                                                        StackCleaner.Configuration
+                                                                                            .Colors!.KeywordColor)))) +
+                                                                        "global" + (StackCleaner.Configuration
+                                                                            .ColorFormatting == StackColorFormatType.None
+                                                                            ? string.Empty
+                                                                            : (StackCleaner.Configuration
+                                                                                   .ColorFormatting ==
+                                                                               StackColorFormatType.ExtendedANSIColor
+                                                                                ? GetExtANSIForegroundString(
+                                                                                    StackCleaner.Configuration.Colors!
+                                                                                        .PunctuationColor)
+                                                                                : GetANSIForegroundString(
+                                                                                    ToConsoleColor(
+                                                                                        StackCleaner.Configuration
+                                                                                            .Colors!
+                                                                                            .PunctuationColor)))) +
+                                                                        "::" +
+                                                                        (StackCleaner.Configuration.ColorFormatting ==
+                                                                         StackColorFormatType.None
+                                                                            ? string.Empty
+                                                                            : ANSIReset))) + " " +
+                                                                 (StackCleaner.Configuration.ColorFormatting ==
+                                                                  StackColorFormatType.None
+                                                                     ? string.Empty
+                                                                     : (StackCleaner.Configuration.ColorFormatting ==
+                                                                        StackColorFormatType.ExtendedANSIColor
+                                                                         ? GetExtANSIForegroundString(
+                                                                             StackCleaner.Configuration.Colors!
+                                                                                 .PropertyColor)
+                                                                         : GetANSIForegroundString(
+                                                                             ToConsoleColor(
+                                                                                 StackCleaner.Configuration.Colors!
+                                                                                     .PropertyColor)))) + property.Name +
+                                                                 (StackCleaner.Configuration.ColorFormatting ==
+                                                                  StackColorFormatType.None
+                                                                     ? string.Empty
+                                                                     : ANSIReset));
+    public static string Format(this MethodBase? method) => method == null ? ((object)null!).Format() : StackCleaner.GetString(method);
+    public static string Format(this Type? typedef) => typedef == null ? ((object)null!).Format() : StackCleaner.GetString(typedef);
+    public static string Format(this ExceptionBlock? block)
     {
+        if (block == null)
+            return ((object)null!).Format();
         switch (block.blockType)
         {
             case ExceptionBlockType.BeginExceptionBlock:
@@ -590,8 +656,10 @@ internal static class Logger
             ? GetExtANSIForegroundString(StackCleaner.Configuration.Colors!.StructColor)
             : GetANSIForegroundString(ToConsoleColor(StackCleaner.Configuration.Colors!.StructColor)))) + "Label #" + label.GetLabelId() +
                                                      (StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIReset);
-    public static string Format(this CodeInstruction instruction)
+    public static string Format(this CodeInstruction? instruction)
     {
+        if (instruction == null)
+            return ((object)null!).Format();
         string op = instruction.opcode.Format();
         switch (instruction.opcode.OperandType)
         {

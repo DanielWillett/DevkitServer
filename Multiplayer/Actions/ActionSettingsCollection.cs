@@ -4,6 +4,7 @@ using System.Text;
 namespace DevkitServer.Multiplayer.Actions;
 public class ActionSettingsCollection : IBrushRadius, IBrushFalloff, IBrushStrength, IBrushSensitivity, IBrushTarget, ICoordinates, IAsset, IAutoFoundation, IAutoSlope
 {
+    public const int BaseSize = sizeof(int) + sizeof(ActionSetting);
     public int StartIndex { get; internal set; }
     public ActionSetting Flags { get; private set; }
     public float BrushRadius { get; set; }

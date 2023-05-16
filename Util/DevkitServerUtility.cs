@@ -1022,11 +1022,26 @@ public static class DevkitServerUtility
     {
         if (t == null || !Regions.tryGetCoordinate(t.position, out byte x, out byte y))
             return null;
-        for (int i = 0; i < LevelObjects.objects[x, y].Count; ++i)
+        List<LevelObject> region = LevelObjects.objects[x, y];
+        for (int i = 0; i < region.Count; ++i)
         {
-            if (LevelObjects.objects[x, y][i].transform == t)
+            if (region[i].transform == t)
             {
-                return LevelObjects.objects[x, y][i];
+                return region[i];
+            }
+        }
+        for (int i = 0; i < region.Count; ++i)
+        {
+            if (region[i].placeholderTransform == t)
+            {
+                return region[i];
+            }
+        }
+        for (int i = 0; i < region.Count; ++i)
+        {
+            if (region[i].skybox == t)
+            {
+                return region[i];
             }
         }
 
@@ -1036,13 +1051,57 @@ public static class DevkitServerUtility
             for (int y2 = 0; y2 < ws; ++y2)
             {
                 if (x2 == x && y2 == y) continue;
-                for (int i = 0; i < LevelObjects.objects[x, y].Count; ++i)
+                region = LevelObjects.objects[x, y];
+                for (int i = 0; i < region.Count; ++i)
                 {
-                    if (LevelObjects.objects[x, y][i].transform == t)
-                        return LevelObjects.objects[x, y][i];
+                    if (region[i].transform == t)
+                        return region[i];
                 }
             }
         }
+        
+        for (int x2 = 0; x2 < ws; ++x2)
+        {
+            for (int y2 = 0; y2 < ws; ++y2)
+            {
+                if (x2 == x && y2 == y) continue;
+                region = LevelObjects.objects[x, y];
+                for (int i = 0; i < region.Count; ++i)
+                {
+                    if (region[i].placeholderTransform == t)
+                        return region[i];
+                }
+            }
+        }
+        
+        for (int x2 = 0; x2 < ws; ++x2)
+        {
+            for (int y2 = 0; y2 < ws; ++y2)
+            {
+                if (x2 == x && y2 == y) continue;
+                region = LevelObjects.objects[x, y];
+                for (int i = 0; i < region.Count; ++i)
+                {
+                    if (region[i].skybox == t)
+                        return region[i];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    [Pure]
+    public static Transform? GetTransform(this LevelObject obj)
+    {
+        if (obj.transform != null)
+            return obj.transform;
+        
+        if (obj.skybox != null)
+            return obj.skybox;
+
+        if (obj.placeholderTransform != null)
+            return obj.placeholderTransform;
 
         return null;
     }

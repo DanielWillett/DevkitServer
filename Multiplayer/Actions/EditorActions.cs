@@ -14,6 +14,8 @@ namespace DevkitServer.Multiplayer.Actions;
 public sealed class EditorActions : MonoBehaviour, IActionListener
 {
     public const ushort DataVersion = 1;
+    public const ushort ActionBaseSize = 1;
+    public const int MaxPacketSize = 16384;
 
     private static readonly ByteReader Reader = new ByteReader { ThrowOnError = true };
     private static readonly ByteWriter Writer = new ByteWriter(false, 8192);
@@ -51,12 +53,14 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     public ActionSettings Settings { get; }
     public TerrainActions TerrainActions { get; }
     public FoliageActions FoliageActions { get; }
+    public HierarchyActions HierarchyActions { get; }
 
     private EditorActions()
     {
         Settings = new ActionSettings(this);
         TerrainActions = new TerrainActions(this);
         FoliageActions = new FoliageActions(this);
+        HierarchyActions = new HierarchyActions(this);
     }
 
     [UsedImplicitly]
@@ -192,7 +196,11 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         }
     }
 #endif
-
+    public static (int Data, int Settings) GetMaxSizes(IAction action) =>
+        EditorActionsCodeGeneration.Attributes.TryGetValue(action.Type, out ActionAttribute attr)
+            ? (attr.Capacity + ActionBaseSize, attr.OptionCapacity + ActionSettingsCollection.BaseSize)
+            : (sizeof(float) + ActionBaseSize, ActionSettingsCollection.BaseSize);
+            // DeltaTime
     [UsedImplicitly]
     private void Update()
     {
@@ -202,9 +210,9 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 #endif
         float t = Time.realtimeSinceStartup;
 #if CLIENT
+        _queuedThisFrame = false;
         if (IsOwner)
         {
-            _queuedThisFrame = false;
             if (t - _lastFlush >= 1f)
             {
                 _lastFlush = t;
@@ -263,13 +271,32 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         writer.Write(User.SteamId.m_SteamID);
 #endif
         writer.Write(DataVersion);
-        byte ct = (byte)Math.Min(length, 96);
-        writer.Write(ct);
+        if (index + length > _pendingActions.Count)
+            length = _pendingActions.Count - index;
+        int ct = 0;
+        int size = 0;
+        for (int i = index; i < length; ++i)
+        {
+            if (ct >= byte.MaxValue)
+                break;
+            (int val, int settings) = GetMaxSizes(_pendingActions[i]);
+            val += settings;
+            if (size + settings > MaxPacketSize)
+            {
+                if (ct == 0)
+                    ++ct;
+                break;
+            }
+            size += val + settings;
+            ++ct;
+        }
+        writer.Write((byte)ct);
         List<ActionSettingsCollection> c = ListPool<ActionSettingsCollection>.claim();
         int count2 = ct + index;
         for (int i = index; i < count2; ++i)
         {
             IAction action = _pendingActions[i];
+            Logger.LogDebug("[EDITOR ACTIONS] Queued action at index " + (i - index).Format() + ": " + action.Format() + ".");
             ActionSettingsCollection? toAdd = null;
 
             EditorActionsCodeGeneration.OnWritingAction!(this, ref toAdd, action);
@@ -295,7 +322,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         ListPool<ActionSettingsCollection>.release(c);
 
         Logger.LogDebug("[EDITOR ACTIONS] Writing " + ct + " actions.");
-        for (int i = 0; i < ct; ++i)
+        for (int i = index; i < count2; ++i)
         {
             IAction action = _pendingActions[i];
             writer.Write(action.Type);
@@ -339,10 +366,16 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 #endif
         for (int i = 0; i < ct; ++i)
         {
-            while (c.Count > collIndex + 1 && c[collIndex + 1].StartIndex >= i)
-                LoadCollection(collIndex + 1);
+            while (c.Count > collIndex + 1 && c[collIndex + 1].StartIndex <= i)
+            {
+                ++collIndex;
+                ActionSettingsCollection collection = c[collIndex];
+                Settings.SetSettings(collection);
+                Logger.LogDebug($"[EDITOR ACTIONS] Loading option collection at index {collection.StartIndex}: {collection.Format()}.");
+            }
             ActionType type = reader.ReadEnum<ActionType>();
             IAction? action = EditorActionsCodeGeneration.CreateAction!(type);
+            Logger.LogDebug($"[EDITOR ACTIONS] Loading action #{i.Format()} {action}, collection index: {collIndex}.");
             if (action != null)
             {
                 action.Instigator = User.SteamId;
@@ -417,28 +450,20 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         }
 
         ListPool<ActionSettingsCollection>.release(c);
-
-        void LoadCollection(int index)
-        {
-            if (c.Count <= index)
-                return;
-            collIndex = index;
-            ActionSettingsCollection collection = c[collIndex];
-            Settings.SetSettings(collection);
-            Logger.LogDebug($"[EDITOR ACTIONS] Loading option collection at index {collection.StartIndex}: {collection.Format()}.");
-        }
     }
 
     public void Subscribe()
     {
         TerrainActions.Subscribe();
         FoliageActions.Subscribe();
+        HierarchyActions.Subscribe();
     }
 
     public void Unsubscribe()
     {
         TerrainActions.Unsubscribe();
         FoliageActions.Unsubscribe();
+        HierarchyActions.Unsubscribe();
     }
 }
 public interface IActionListener

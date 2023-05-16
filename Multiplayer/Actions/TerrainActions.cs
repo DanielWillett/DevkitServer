@@ -266,7 +266,7 @@ public interface IAutoFoundation
     ERayMask AutoFoundationRayMask { get; set; }
 }
 
-[Action(ActionType.HeightmapRamp)]
+[Action(ActionType.HeightmapRamp, EncodingEx.MaxHeightmapBoundsSize + 28, 8)]
 [EarlyTypeInit]
 public sealed class HeightmapRampAction : ITerrainAction, IBrushRadius, IBrushFalloff
 {
@@ -329,7 +329,7 @@ public sealed class HeightmapRampAction : ITerrainAction, IBrushRadius, IBrushFa
     }
 }
 
-[Action(ActionType.HeightmapAdjust)]
+[Action(ActionType.HeightmapAdjust, EncodingEx.MaxHeightmapBoundsSize + 12, 16)]
 [EarlyTypeInit]
 public sealed class HeightmapAdjustAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength, IBrushSensitivity
 {
@@ -385,7 +385,7 @@ public sealed class HeightmapAdjustAction : ITerrainAction, IBrushRadius, IBrush
     }
 }
 
-[Action(ActionType.HeightmapFlatten)]
+[Action(ActionType.HeightmapFlatten, EncodingEx.MaxHeightmapBoundsSize + 13, 20)]
 [EarlyTypeInit]
 public sealed class HeightmapFlattenAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength, IBrushSensitivity, IBrushTarget
 {
@@ -447,7 +447,7 @@ public sealed class HeightmapFlattenAction : ITerrainAction, IBrushRadius, IBrus
     }
 }
 
-[Action(ActionType.HeightmapSmooth)]
+[Action(ActionType.HeightmapSmooth, EncodingEx.MaxHeightmapBoundsSize + 16, 12)]
 [EarlyTypeInit]
 public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength
 {
@@ -607,8 +607,8 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrush
     }
 }
 
-[Action(ActionType.SplatmapPaint)]
-[Action(ActionType.SplatmapAutoPaint, CreateMethod = nameof(CreateAutoPaint))]
+[Action(ActionType.SplatmapPaint, EncodingEx.MaxHeightmapBoundsSize + 13, 64)]
+[Action(ActionType.SplatmapAutoPaint, EncodingEx.MaxHeightmapBoundsSize + 12, 64, CreateMethod = nameof(CreateAutoPaint))]
 [EarlyTypeInit]
 public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength, IBrushTarget, IBrushSensitivity, IAutoSlope, IAutoFoundation, IAsset
 {
@@ -879,7 +879,7 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
     private static SplatmapPaintAction CreateAutoPaint() => new SplatmapPaintAction { IsAuto = true };
 }
 
-[Action(ActionType.SplatmapSmooth)]
+[Action(ActionType.SplatmapSmooth, EncodingEx.MaxHeightmapBoundsSize + 8, 12)]
 [EarlyTypeInit]
 public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength
 {
@@ -1053,7 +1053,7 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushF
     }
 }
 
-[Action(ActionType.HolesCut)]
+[Action(ActionType.HolesCut, EncodingEx.MaxHeightmapBoundsSize + 8, 4)]
 [EarlyTypeInit]
 public sealed class HolemapPaintAction : ITerrainAction, IBrushRadius
 {
@@ -1097,8 +1097,8 @@ public sealed class HolemapPaintAction : ITerrainAction, IBrushRadius
     }
 }
 
-[Action(ActionType.AddTile)]
-[Action(ActionType.DeleteTile, CreateMethod = nameof(CreateDeleteTile))]
+[Action(ActionType.AddTile, 5, 8)]
+[Action(ActionType.DeleteTile, 5, 8, CreateMethod = nameof(CreateDeleteTile))]
 [EarlyTypeInit]
 public sealed class TileModifyAction : IAction, ICoordinates
 {
@@ -1150,21 +1150,18 @@ public sealed class TileModifyAction : IAction, ICoordinates
     {
         writer.Write(IsDelete);
         writer.Write(DeltaTime);
-        writer.Write(Coordinates.x);
-        writer.Write(Coordinates.y);
     }
     public void Read(ByteReader reader)
     {
         IsDelete = reader.ReadBool();
         DeltaTime = reader.ReadFloat();
-        Coordinates = new LandscapeCoord(reader.ReadInt32(), reader.ReadInt32());
     }
 
     [UsedImplicitly]
     private static TileModifyAction CreateDeleteTile() => new TileModifyAction { IsDelete = true };
 }
 
-[Action(ActionType.UpdateSplatmapLayers)]
+[Action(ActionType.UpdateSplatmapLayers, 132, 8)]
 [EarlyTypeInit]
 public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinates
 {
@@ -1251,8 +1248,6 @@ public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinates
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
-        writer.Write(Coordinates.x);
-        writer.Write(Coordinates.y);
         int amt = Math.Min(byte.MaxValue, Layers == null ? 0 : Layers.Length);
         writer.Write((byte)amt);
         for (int i = 0; i < amt; ++i)
@@ -1261,7 +1256,6 @@ public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinates
     public void Read(ByteReader reader)
     {
         DeltaTime = reader.ReadFloat();
-        Coordinates = new LandscapeCoord(reader.ReadInt32(), reader.ReadInt32());
         int amt = reader.ReadInt32();
         if (Layers == null || Layers.Length != amt)
             Layers = new AssetReference<LandscapeMaterialAsset>[amt];

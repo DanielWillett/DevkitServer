@@ -249,7 +249,7 @@ public static class PluginLoader
             foreach (Type type in types
                          .Where(x => typeof(IDevkitServerPlugin).IsAssignableFrom(x))
                          .OrderByDescending(x =>
-                             Attribute.GetCustomAttribute(x, typeof(PluginLoadPriorityAttribute)) is PluginLoadPriorityAttribute attr
+                             Attribute.GetCustomAttribute(x, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr
                                  ? attr.Priority
                                  : 0
                          ))
@@ -313,8 +313,8 @@ public static class PluginLoader
         UserPermissions.InitHandlers();
 
         pluginsTemp = pluginsTemp.OrderByDescending(x =>
-            Attribute.GetCustomAttribute(x.GetType(), typeof(PluginLoadPriorityAttribute)) is
-                PluginLoadPriorityAttribute attr
+            Attribute.GetCustomAttribute(x.GetType(), typeof(LoadPriorityAttribute)) is
+                LoadPriorityAttribute attr
                 ? attr.Priority
                 : 0
         ).ToList();

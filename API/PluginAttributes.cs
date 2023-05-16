@@ -7,11 +7,11 @@ using System.Threading.Tasks;
 namespace DevkitServer.API;
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public sealed class PluginLoadPriorityAttribute : Attribute
+public sealed class LoadPriorityAttribute : Attribute
 {
     public int Priority { get; }
 
-    public PluginLoadPriorityAttribute(int priority)
+    public LoadPriorityAttribute(int priority)
     {
         Priority = priority;
     }

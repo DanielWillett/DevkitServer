@@ -2,7 +2,7 @@
 
 namespace TestPlugin;
 
-[PluginLoadPriority(1)]
+[LoadPriority(1)]
 internal class TestPluginSubmodule : Plugin
 {
     public override string Name => "TestPlugin.Module";

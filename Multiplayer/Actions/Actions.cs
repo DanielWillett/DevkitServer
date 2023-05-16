@@ -1,4 +1,5 @@
-﻿using DevkitServer.Util.Encoding;
+﻿using System.Text.Json.Serialization;
+using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.Multiplayer.Actions;
 
@@ -44,6 +45,7 @@ public enum ActionType : byte
 
 public interface IAction
 {
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     ActionType Type { get; }
     float DeltaTime { get; set; }
     CSteamID Instigator { get; set; }

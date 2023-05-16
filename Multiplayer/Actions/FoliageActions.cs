@@ -101,7 +101,7 @@ public sealed class FoliageActions
 
 }
 
-[Action(ActionType.AddFoliageToSurface)]
+[Action(ActionType.AddFoliageToSurface, 45, 16)]
 [EarlyTypeInit]
 public sealed class AddFoliageToSurfaceAction : IAction, IAsset
 {
@@ -166,7 +166,7 @@ public sealed class AddFoliageToSurfaceAction : IAction, IAsset
     }
 }
 
-[Action(ActionType.RemoveFoliageInstances)]
+[Action(ActionType.RemoveFoliageInstances, 16, 36)]
 [EarlyTypeInit]
 public sealed class RemoveFoliageInstancesAction : IAction, ICoordinates, IBrushRadius, IBrushFalloff, IAsset
 {
@@ -243,14 +243,16 @@ public sealed class RemoveFoliageInstancesAction : IAction, ICoordinates, IBrush
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
+        writer.Write(BrushPosition);
     }
     public void Read(ByteReader reader)
     {
         DeltaTime = reader.ReadFloat();
+        BrushPosition = reader.ReadVector3();
     }
 }
 
-[Action(ActionType.RemoveResourceSpawnpoint)]
+[Action(ActionType.RemoveResourceSpawnpoint, 16, 16)]
 [EarlyTypeInit]
 public sealed class RemoveResourceSpawnpointAction : IAction, IAsset
 {
@@ -315,8 +317,8 @@ public sealed class RemoveResourceSpawnpointAction : IAction, IAsset
     }
 }
 
-[Action(ActionType.RemoveFoliageLevelObject, CreateMethod = nameof(CreateRemoveFoliageLevelObject))]
-[Action(ActionType.RemoveLevelObject)]
+[Action(ActionType.RemoveFoliageLevelObject, 8, 8, CreateMethod = nameof(CreateRemoveFoliageLevelObject))]
+[Action(ActionType.RemoveLevelObject, 8, 8)]
 [EarlyTypeInit]
 public sealed class RemoveLevelObjectAction : IAction, ICoordinates
 {

@@ -1,14 +1,15 @@
-﻿using SDG.Framework.Utilities;
+﻿using DevkitServer.Util.Encoding;
+using SDG.Framework.Utilities;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
-using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.Multiplayer.Actions;
 [EarlyTypeInit]
 internal static class EditorActionsCodeGeneration
 {
     internal static bool Init;
+    internal static Dictionary<ActionType, ActionAttribute> Attributes = new Dictionary<ActionType, ActionAttribute>(32);
     internal static HandleWriteSettings? OnWritingAction;
     internal static HandleReadSettings? OnReadingAction;
     internal static HandleCreateNewAction? CreateAction;
@@ -17,11 +18,11 @@ internal static class EditorActionsCodeGeneration
     internal static HandleAppendSettingsCollection? AppendSettingsCollection;
     static EditorActionsCodeGeneration()
     {
-        Type[] types = Accessor.GetTypesSafe();
+        List<Type> types = Accessor.GetTypesSafe(removeIgnored: true);
         int c = 0;
         List<(Type type, ActionSettingAttribute attr, List<PropertyInfo> info)> properties = new List<(Type, ActionSettingAttribute, List<PropertyInfo>)>(48);
         List<(Type type, ActionAttribute attr)> actions = new List<(Type, ActionAttribute)>(32);
-        for (int i = 0; i < types.Length; ++i)
+        for (int i = 0; i < types.Count; ++i)
         {
             Type t = types[i];
             if (!t.IsInterface)
@@ -32,7 +33,18 @@ internal static class EditorActionsCodeGeneration
                     if (attrs.Length > 0)
                     {
                         foreach (ActionAttribute actionAttr in attrs.OfType<ActionAttribute>())
-                            actions.Add((t, actionAttr));
+                        {
+                            actionAttr.Type = t;
+                            if (Attributes.TryGetValue(actionAttr.ActionType, out ActionAttribute attribute))
+                            {
+                                Logger.LogWarning($"[EDITOR ACTIONS] Duplicate action attribute for type ignored: {actionAttr.ActionType.Format()}, {t.Format()} already overridden by {attribute.Type.Format()}.");
+                            }
+                            else
+                            {
+                                Attributes[actionAttr.ActionType] = actionAttr;
+                                actions.Add((t, actionAttr));
+                            }
+                        }
                     }
                 }
                 continue;
@@ -590,9 +602,30 @@ internal sealed class ActionSettingAttribute : Attribute
 internal sealed class ActionAttribute : Attribute
 {
     public ActionType ActionType { get; }
+
+    /// <summary>
+    /// Name of a static method in this class to use to create the action (instead of default constructor).
+    /// </summary>
     public string? CreateMethod { get; set; }
-    public ActionAttribute(ActionType type)
+
+    /// <summary>
+    /// Max size in bytes.
+    /// </summary>
+    public int Capacity { get; }
+
+    /// <summary>
+    /// Max size in bytes of a full option change.
+    /// </summary>
+    public int OptionCapacity { get; }
+
+    /// <summary>
+    /// Set at runtime.
+    /// </summary>
+    public Type? Type { get; internal set; }
+    public ActionAttribute(ActionType type, int capacity, int optionCapacity)
     {
         ActionType = type;
+        Capacity = capacity;
+        OptionCapacity = optionCapacity;
     }
 }

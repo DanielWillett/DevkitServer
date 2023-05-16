@@ -16,6 +16,8 @@ using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Util.Encoding;
+using Action = System.Action;
 
 namespace DevkitServer.Patches;
 
@@ -76,7 +78,7 @@ public static class ClientEvents
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (rampHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleHeightmapWriteRamp.");
+            Logger.LogWarning("Unable to find method: TerrainEditor.handleHeightmapWriteRamp.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
         
@@ -84,7 +86,7 @@ public static class ClientEvents
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (adjustHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleHeightmapWriteAdjust.");
+            Logger.LogWarning("Unable to find method: TerrainEditor.handleHeightmapWriteAdjust.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
         
@@ -92,7 +94,7 @@ public static class ClientEvents
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (flattenHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleHeightmapWriteFlatten.");
+            Logger.LogWarning("Unable to find method: TerrainEditor.handleHeightmapWriteFlatten.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
         
@@ -100,7 +102,7 @@ public static class ClientEvents
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (smoothHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleHeightmapWriteSmooth.");
+            Logger.LogWarning("Unable to find method: TerrainEditor.handleHeightmapWriteSmooth.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
@@ -108,7 +110,7 @@ public static class ClientEvents
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (paintHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleSplatmapWritePaint.");
+            Logger.LogWarning("Unable to find method: TerrainEditor.handleSplatmapWritePaint.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
@@ -116,7 +118,7 @@ public static class ClientEvents
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (autoPaintHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleSplatmapWriteAuto.");
+            Logger.LogWarning("Unable to find method: TerrainEditor.handleSplatmapWriteAuto.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
@@ -124,7 +126,7 @@ public static class ClientEvents
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (paintSmoothHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleSplatmapWriteSmooth.");
+            Logger.LogWarning("Unable to find method: TerrainEditor.handleSplatmapWriteSmooth.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
@@ -132,7 +134,7 @@ public static class ClientEvents
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (holesHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleSplatmapWriteCut.");
+            Logger.LogWarning("Unable to find method: TerrainEditor.handleSplatmapWriteCut.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
@@ -140,7 +142,7 @@ public static class ClientEvents
             BindingFlags.Public | BindingFlags.Static);
         if (addTile == null)
         {
-            Logger.LogWarning("Unable to find method: Landscape.addTile.");
+            Logger.LogWarning("Unable to find method: Landscape.addTile.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
@@ -148,7 +150,7 @@ public static class ClientEvents
             BindingFlags.Public | BindingFlags.Static);
         if (removeTile == null)
         {
-            Logger.LogWarning("Unable to find method: Landscape.removeTile.");
+            Logger.LogWarning("Unable to find method: Landscape.removeTile.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
@@ -156,7 +158,7 @@ public static class ClientEvents
             BindingFlags.Public | BindingFlags.Static);
         if (lHMarkDirty == null)
         {
-            Logger.LogWarning("Unable to find method: LevelHierarchy.MarkDirty.");
+            Logger.LogWarning("Unable to find method: LevelHierarchy.MarkDirty.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
@@ -164,7 +166,7 @@ public static class ClientEvents
             BindingFlags.Public | BindingFlags.Static);
         if (writeHeightmap == null)
         {
-            Logger.LogWarning("Unable to find method: Landscape.writeHeightmap.");
+            Logger.LogWarning("Unable to find method: Landscape.writeHeightmap.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
@@ -172,7 +174,7 @@ public static class ClientEvents
             BindingFlags.Public | BindingFlags.Static);
         if (writeSplatmap == null)
         {
-            Logger.LogWarning("Unable to find method: Landscape.writeSplatmap.");
+            Logger.LogWarning("Unable to find method: Landscape.writeSplatmap.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
@@ -180,7 +182,7 @@ public static class ClientEvents
             BindingFlags.Public | BindingFlags.Static);
         if (writeHoles == null)
         {
-            Logger.LogWarning("Unable to find method: Landscape.writeHoles.");
+            Logger.LogWarning("Unable to find method: Landscape.writeHoles.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
         
@@ -209,12 +211,12 @@ public static class ClientEvents
         FieldInfo? permissionAll = vp.GetField(nameof(VanillaPermissions.EditTerrain));
         if (permissionWriteHeightmap == null || permissionWriteSplatmap == null || permissionWriteHoles == null)
         {
-            Logger.LogWarning("Unable to find one or more of the VanillaPermissions fields.");
+            Logger.LogWarning("Unable to find one or more of the VanillaPermissions fields.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
         if (permissionAll == null)
         {
-            Logger.LogWarning("Unable to find field: VanillaPermissions.EditTerrain.");
+            Logger.LogWarning("Unable to find field: VanillaPermissions.EditTerrain.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
@@ -222,14 +224,14 @@ public static class ClientEvents
             BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(Permission), typeof(bool) }, null);
         if (hasPermission == null)
         {
-            Logger.LogWarning("Unable to find method: PermissionsEx.Has.");
+            Logger.LogWarning("Unable to find method: PermissionsEx.Has.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? onNoPermissionInvoker = ce.GetMethod(nameof(OnNoPermissionsInvoker), BindingFlags.Static | BindingFlags.NonPublic);
         MethodInfo? onPermissionInvoker = ce.GetMethod(nameof(OnPermissionsInvoker), BindingFlags.Static | BindingFlags.NonPublic);
         if (hasPermission == null)
-            Logger.LogWarning("Unable to find method: ClientEvents.OnNoPermissionsInvoker.");
+            Logger.LogWarning("Unable to find method: ClientEvents.OnNoPermissionsInvoker.", method: "CLIENT EVENTS");
         LocalBuilder localBounds = generator.DeclareLocal(typeof(Bounds));
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
         int addTileCt = 0;
@@ -328,13 +330,13 @@ public static class ClientEvents
                     if (invoker != null)
                     {
                         yield return new CodeInstruction(OpCodes.Call, invoker);
-                        Logger.LogDebug("Patched in " + invoker.Format() + " call.");
+                        Logger.LogDebug("[CLIENT EVENTS] Patched in " + invoker.Format() + " call.");
                         ++pCt;
                     }
                     else
                     {
                         yield return new CodeInstruction(OpCodes.Pop);
-                        Logger.LogWarning("Unknown function pointer-based method call: " + method.Format() + ".");
+                        Logger.LogWarning("Unknown function pointer-based method call: " + method.Format() + ".", method: "CLIENT EVENTS");
                     }
 
                     i += 3;
@@ -359,7 +361,7 @@ public static class ClientEvents
                 yield return c;
                 yield return DevkitServerUtility.GetLocalCodeInstruction(addTileLcl2, addTileLcl, false);
                 yield return new CodeInstruction(OpCodes.Call, addTileInvoker);
-                Logger.LogDebug("Patched in OnAddTile call.");
+                Logger.LogDebug("[CLIENT EVENTS] Patched in OnAddTile call.");
                 addTileCt = 2;
                 pAddTile = true;
                 continue;
@@ -369,7 +371,7 @@ public static class ClientEvents
             {
                 yield return c;
                 yield return new CodeInstruction(OpCodes.Call, removeTileInvoker);
-                Logger.LogDebug("Patched in OnRemoveTile call.");
+                Logger.LogDebug("[CLIENT EVENTS] Patched in OnRemoveTile call.");
                 pRemoveTile = true;
                 continue;
             }
@@ -378,7 +380,7 @@ public static class ClientEvents
         }
         if (!pRemoveTile || !pAddTile || pCt != 8)
         {
-            Logger.LogWarning($"Patching error for TerrainEditor.update. Invalid transpiler operation: Remove Tile: {pRemoveTile}, Add Tile: {pAddTile}, invoker counts: {pCt} / 8.");
+            Logger.LogWarning($"Patching error for TerrainEditor.update. Invalid transpiler operation: Remove Tile: {pRemoveTile}, Add Tile: {pAddTile}, invoker counts: {pCt} / 8.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
     }
@@ -416,8 +418,8 @@ public static class ClientEvents
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditHeightmapPermissionDenied) + ".");
-                    Logger.LogError(ex);
+                    Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditHeightmapPermissionDenied) + ".", method: "CLIENT EVENTS");
+                    Logger.LogError(ex, method: "CLIENT EVENTS");
                     allow = false;
                 }
 
@@ -439,8 +441,8 @@ public static class ClientEvents
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditSplatmapPermissionDenied) + ".");
-                        Logger.LogError(ex);
+                        Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditSplatmapPermissionDenied) + ".", method: "CLIENT EVENTS");
+                        Logger.LogError(ex, method: "CLIENT EVENTS");
                         allow = false;
                     }
 
@@ -461,8 +463,8 @@ public static class ClientEvents
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditHolesPermissionDenied) + ".");
-                        Logger.LogError(ex);
+                        Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditHolesPermissionDenied) + ".", method: "CLIENT EVENTS");
+                        Logger.LogError(ex, method: "CLIENT EVENTS");
                         allow = false;
                     }
 
@@ -519,8 +521,8 @@ public static class ClientEvents
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditHeightmapRequested) + ".");
-                    Logger.LogError(ex);
+                    Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditHeightmapRequested) + ".", method: "CLIENT EVENTS");
+                    Logger.LogError(ex, method: "CLIENT EVENTS");
                     allow = false;
                 }
 
@@ -546,8 +548,8 @@ public static class ClientEvents
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditSplatmapRequested) + ".");
-                        Logger.LogError(ex);
+                        Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditSplatmapRequested) + ".", method: "CLIENT EVENTS");
+                        Logger.LogError(ex, method: "CLIENT EVENTS");
                         allow = false;
                     }
 
@@ -567,8 +569,8 @@ public static class ClientEvents
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditHolesRequested) + ".");
-                        Logger.LogError(ex);
+                        Logger.LogError("Plugin threw an error in " + typeof(ClientEvents).Format() + "." + nameof(OnEditHolesRequested) + ".", method: "CLIENT EVENTS");
+                        Logger.LogError(ex, method: "CLIENT EVENTS");
                         allow = false;
                     }
 
@@ -676,7 +678,7 @@ public static class ClientEvents
     {
         if (!DevkitServerModule.IsEditing) return;
 
-        Logger.LogDebug("Tile added: " + tile.coord.Format() + ".");
+        Logger.LogDebug("[CLIENT EVENTS] Tile added: " + tile.coord.Format() + ".");
         OnTileAdded?.Invoke(tile);
     }
     [UsedImplicitly]
@@ -686,7 +688,7 @@ public static class ClientEvents
 
         LandscapeTile? tile = TerrainEditor.selectedTile;
         if (tile == null) return;
-        Logger.LogDebug("Tile deleted: " + tile.coord.Format() + ".");
+        Logger.LogDebug("[CLIENT EVENTS] Tile deleted: " + tile.coord.Format() + ".");
         OnTileDeleted?.Invoke(tile);
     }
     #endregion
@@ -700,7 +702,7 @@ public static class ClientEvents
     {
         if (FoliageEditor == null)
         {
-            Logger.LogWarning("Unable to find type: FoliageEditor.");
+            Logger.LogWarning("Unable to find type: FoliageEditor.", method: "CLIENT EVENTS");
             foreach (CodeInstruction instruction in instructions)
                 yield return instruction;
             DevkitServerModule.Fault();
@@ -716,27 +718,27 @@ public static class ClientEvents
         MethodInfo? removeInstances = FoliageEditor.GetMethod("removeInstances",
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (removeInstances == null)
-            Logger.LogWarning("Unable to find method: FoliageEditor.removeInstances.");
+            Logger.LogWarning("Unable to find method: FoliageEditor.removeInstances.", method: "CLIENT EVENTS");
         // else
         //     CheckCopiedMethodPatchOutOfDate(ref removeInstances, removeInstancesInvoker);
 
         MethodInfo? rspDestroy = typeof(ResourceSpawnpoint).GetMethod(nameof(ResourceSpawnpoint.destroy),
             BindingFlags.Public | BindingFlags.Instance);
         if (removeInstances == null)
-            Logger.LogWarning("Unable to find method: ResourceSpawnpoint.destroy.");
+            Logger.LogWarning("Unable to find method: ResourceSpawnpoint.destroy.", method: "CLIENT EVENTS");
 
         MethodInfo? lvlObjRemove = typeof(LevelObjects).GetMethod(nameof(LevelObjects.removeObject),
             BindingFlags.Public | BindingFlags.Static);
         if (removeInstances == null)
-            Logger.LogWarning("Unable to find method: LevelObjects.removeObject.");
+            Logger.LogWarning("Unable to find method: LevelObjects.removeObject.", method: "CLIENT EVENTS");
 
         MethodInfo? lvlObjTransformGetter = typeof(LevelObject).GetProperty(nameof(LevelObject.transform), BindingFlags.Public | BindingFlags.Instance)?.GetMethod;
         if (lvlObjTransformGetter == null)
-            Logger.LogWarning("Unable to find property getter: LevelObject.transform.");
+            Logger.LogWarning("Unable to find property getter: LevelObject.transform.", method: "CLIENT EVENTS");
 
         MethodInfo? transformPosGetter = typeof(Transform).GetProperty(nameof(Transform.position), BindingFlags.Public | BindingFlags.Instance)?.GetMethod;
         if (transformPosGetter == null)
-            Logger.LogWarning("Unable to find property getter: Transform.position.");
+            Logger.LogWarning("Unable to find property getter: Transform.position.", method: "CLIENT EVENTS");
         LocalBuilder sampleCount = generator.DeclareLocal(typeof(int));
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
         LocalBuilder lvlObject = generator.DeclareLocal(typeof(LevelObject));
@@ -755,7 +757,7 @@ public static class ClientEvents
                         LocalBuilder? bld = DevkitServerUtility.GetLocal(ins[i - 1], out int index, false);
                         yield return DevkitServerUtility.GetLocalCodeInstruction(bld!, index, false);
                         yield return DevkitServerUtility.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, true);
-                        Logger.LogDebug("Inserted set sample count local instruction.");
+                        Logger.LogDebug("[CLIENT EVENTS] Inserted set sample count local instruction.");
                     }
                     yield return c;
                     for (int j = i - ps.Length; j < i; ++j)
@@ -769,13 +771,13 @@ public static class ClientEvents
                             else
                                 yield return new CodeInstruction(l.opcode == OpCodes.Ldloca_S ? OpCodes.Ldarg_S : OpCodes.Ldarg, l.operand);
                             yield return DevkitServerUtility.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, false);
-                            Logger.LogDebug("Inserted get sample count local instruction.");
+                            Logger.LogDebug("[CLIENT EVENTS] Inserted get sample count local instruction.");
                         }
                         else
                             yield return ins[j];
                     }
                     yield return new CodeInstruction(OpCodes.Call, removeInstancesInvoker);
-                    Logger.LogDebug("Patched invoker for " + removeInstances.Format() + ".");
+                    Logger.LogDebug("[CLIENT EVENTS] Patched invoker for " + removeInstances.Format() + ".");
                     ++ri;
                 }
             }
@@ -784,7 +786,7 @@ public static class ClientEvents
                 yield return new CodeInstruction(OpCodes.Dup);
                 yield return c;
                 yield return new CodeInstruction(OpCodes.Call, resourceSpawnpointDestroyedInvoker);
-                Logger.LogDebug("Patched invoker for " + rspDestroy.Format() + ".");
+                Logger.LogDebug("[CLIENT EVENTS] Patched invoker for " + rspDestroy.Format() + ".");
                 ++rspd;
             }
             else if (lvlObjRemove != null && c.Calls(lvlObjRemove) && lvlObjTransformGetter != null && transformPosGetter != null && i > 0 &&
@@ -804,7 +806,7 @@ public static class ClientEvents
                 yield return DevkitServerUtility.GetLocalCodeInstruction(lvlObjectPos, lvlObjectPos.LocalIndex, false);
                 yield return DevkitServerUtility.GetLocalCodeInstruction(lvlObject, lvlObject.LocalIndex, false);
                 yield return new CodeInstruction(OpCodes.Call, levelObjectRemovedInvoker);
-                Logger.LogDebug("Patched invoker for " + lvlObjRemove.Format() + ".");
+                Logger.LogDebug("[CLIENT EVENTS] Patched invoker for " + lvlObjRemove.Format() + ".");
                 ++lod;
             }
             else yield return c;
@@ -812,17 +814,17 @@ public static class ClientEvents
 
         if (lod < 1)
         {
-            Logger.LogError("Failed to patch " + ((lvlObjRemove ?? (object)"LevelObjects.removeObject").Format()) + " into " + method.Format() + ".");
+            Logger.LogError("Failed to patch " + ((lvlObjRemove ?? (object)"LevelObjects.removeObject").Format()) + " into " + method.Format() + ".", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
         if (rspd < 1)
         {
-            Logger.LogError("Failed to patch " + ((rspDestroy ?? (object)"ResourceSpawnpoint.destroy").Format()) + " into " + method.Format() + ".");
+            Logger.LogError("Failed to patch " + ((rspDestroy ?? (object)"ResourceSpawnpoint.destroy").Format()) + " into " + method.Format() + ".", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
         if (ri < 3)
         {
-            Logger.LogError("Failed to patch " + ((removeInstances ?? (object)"FoliageEditor.removeInstances").Format()) + " into " + method.Format() + " 3 times.");
+            Logger.LogError("Failed to patch " + ((removeInstances ?? (object)"FoliageEditor.removeInstances").Format()) + " into " + method.Format() + " 3 times.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
     }
@@ -853,7 +855,7 @@ public static class ClientEvents
                             yield return ins[j].CopyWithoutSpecial();
                         }
                         yield return new CodeInstruction(OpCodes.Call, addFoliageInvoker);
-                        Logger.LogDebug("Patched " + method2.Format() + " call in " + method.Format() + ".");
+                        Logger.LogDebug("[CLIENT EVENTS] Patched " + method2.Format() + " call in " + method.Format() + ".");
                         patched = true;
                         continue;
                     }
@@ -865,7 +867,7 @@ public static class ClientEvents
 
         if (!patched)
         {
-            Logger.LogError("Failed to patch " + method.Format() + ".");
+            Logger.LogError("Failed to patch " + method.Format() + ".", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
     }
@@ -894,7 +896,7 @@ public static class ClientEvents
         if (!DevkitServerModule.IsEditing || !InputEx.GetKey(KeyCode.Mouse0) ||
             GetFoliageBrushWorldPosition == null || UserInput.ActiveTool is not { } tool) return;
 
-        Logger.LogDebug((oldSampleCount - sampleCount) + " foliage removed from " +
+        Logger.LogDebug("[CLIENT EVENTS] " + (oldSampleCount - sampleCount) + " foliage removed from " +
                          foliageTile.coord.ToString() +
                          " on list " + list.assetReference.Find()?.FriendlyName +
                          " in radius^2: " + sqrBrushRadius.ToString("F2", CultureInfo.InvariantCulture) +
@@ -908,7 +910,7 @@ public static class ClientEvents
     {
         if (!DevkitServerModule.IsEditing) return;
 
-        Logger.LogDebug("Resource spawnpoint for " + sp.asset.FriendlyName + " at " +
+        Logger.LogDebug("[CLIENT EVENTS] Resource spawnpoint for " + sp.asset.FriendlyName + " at " +
                         sp.point.ToString("F2", CultureInfo.InvariantCulture) + " removed.");
         OnResourceSpawnpointRemoved?.Invoke(sp);
     }
@@ -920,11 +922,11 @@ public static class ClientEvents
 
         if (obj == null)
         {
-            Logger.LogWarning("Removed unknown level object.");
+            Logger.LogWarning("Removed unknown level object.", method: "CLIENT EVENTS");
             return;
         }
 
-        Logger.LogDebug("Level object removed: " + obj.asset.objectName.Format() + " #" +
+        Logger.LogDebug("[CLIENT EVENTS] Level object removed: " + obj.asset.objectName.Format() + " #" +
                         obj.instanceID.Format() + " at " + position.Format() + ".");
         OnLevelObjectRemoved?.Invoke(position, obj);
     }
@@ -941,6 +943,7 @@ public static class ClientEvents
         if (!LandscapeUtil.SaveTransactions || Landscape.getTile(__instance.coord) == null) return;
 
         OnSplatmapLayerMaterialsUpdate?.Invoke(__instance);
+        Logger.LogDebug("[CLIENT EVENTS] Tile prototypes updated: " + __instance.coord.Format() + ".");
     }
     #endregion
 
@@ -955,14 +958,14 @@ public static class ClientEvents
         MethodInfo? redoMethod = tm.GetMethod(nameof(DevkitTransactionManager.redo), BindingFlags.Public | BindingFlags.Static);
         if (redoMethod == null)
         {
-            Logger.LogWarning("Unable to find method: DevkitTransactionManager.redo.");
+            Logger.LogWarning("Unable to find method: DevkitTransactionManager.redo.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? undoMethod = tm.GetMethod(nameof(DevkitTransactionManager.undo), BindingFlags.Public | BindingFlags.Static);
         if (undoMethod == null)
         {
-            Logger.LogWarning("Unable to find method: DevkitTransactionManager.undo.");
+            Logger.LogWarning("Unable to find method: DevkitTransactionManager.undo.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
         MethodInfo undoInvoker = ce.GetMethod(nameof(OnUndoRequested), BindingFlags.Static | BindingFlags.NonPublic)!;
@@ -1001,7 +1004,7 @@ public static class ClientEvents
         }
         if (!undo || !redo)
         {
-            Logger.LogWarning("Patching error for " + method.Format() + $" Redo: {redo.Format()}, Undo: {undo.Format()}.");
+            Logger.LogWarning("Patching error for " + method.Format() + $" Redo: {redo.Format()}, Undo: {undo.Format()}.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
     }
@@ -1019,6 +1022,9 @@ public static class ClientEvents
     #endregion
 
     #region SelectionTool.update
+
+    public static InstanceGetter<SelectionTool, TransformHandles>? GetSelectionHandles = Accessor.GenerateInstanceGetter<SelectionTool, TransformHandles>("handles");
+
     [HarmonyPatch(typeof(SelectionTool), nameof(SelectionTool.update))]
     [HarmonyTranspiler]
     [UsedImplicitly]
@@ -1033,32 +1039,33 @@ public static class ClientEvents
         MethodInfo moveHandleInvoker = new Action<Vector3, Quaternion, Vector3, bool, bool>(OnMoveHandle).Method;
         MethodInfo requestInstantiationInvoker = new Action<Vector3>(OnRequestInstantiaion).Method;
         MethodInfo recordDestructionInvoker = new Action<GameObject>(OnDestruction).Method;
+        MethodInfo transformSelectionInvoker = new Action(OnFinishTransform).Method;
         
         MethodInfo? moveHandle = st.GetMethod("moveHandle", BindingFlags.Instance | BindingFlags.NonPublic, null, new Type[] { typeof(Vector3), typeof(Quaternion), typeof(Vector3), typeof(bool), typeof(bool) }, null);
         if (moveHandle == null)
         {
-            Logger.LogWarning("Unable to find method: SelectionTool.moveHandle.");
+            Logger.LogWarning("Unable to find method: SelectionTool.moveHandle.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? requestInstantiation = st.GetMethod("RequestInstantiation", BindingFlags.Instance | BindingFlags.NonPublic, null, new Type[] { typeof(Vector3) }, null);
         if (requestInstantiation == null)
         {
-            Logger.LogWarning("Unable to find method: SelectionTool.RequestInstantiation.");
+            Logger.LogWarning("Unable to find method: SelectionTool.RequestInstantiation.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
-        MethodInfo? handlesMouseUp = th.GetMethod(nameof(TransformHandles.MouseUp), BindingFlags.Instance | BindingFlags.Public, null, Array.Empty<Type>(), null);
-        if (handlesMouseUp == null)
+        MethodInfo? transformSelection = st.GetMethod("transformSelection", BindingFlags.Instance | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+        if (transformSelection == null)
         {
-            Logger.LogWarning("Unable to find method: TransformHandles.MouseUp.");
+            Logger.LogWarning("Unable to find method: SelectionTool.transformSelection.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? recordDestruction = dtu.GetMethod(nameof(DevkitTransactionUtility.recordDestruction), BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(GameObject) }, null);
         if (recordDestruction == null)
         {
-            Logger.LogWarning("Unable to find method: DevkitTransactionUtility.recordDestruction.");
+            Logger.LogWarning("Unable to find method: DevkitTransactionUtility.recordDestruction.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
@@ -1072,6 +1079,8 @@ public static class ClientEvents
                 invoker = moveHandleInvoker;
             else if (requestInstantiation != null && c.Calls(requestInstantiation))
                 invoker = requestInstantiationInvoker;
+            else if (transformSelection != null && c.Calls(transformSelection))
+                invoker = transformSelectionInvoker;
 
             if (invoker != null)
             {
@@ -1086,7 +1095,7 @@ public static class ClientEvents
                     }
                     
                     i += i - lastLdArg0;
-                    Logger.LogDebug($"Patched in {invoker} to {method}.");
+                    Logger.LogDebug($"[CLIENT EVENTS] Patched in {invoker.Format()} to {method.Format()}.");
                 }
             }
             else if (recordDestruction != null && c.Calls(recordDestruction))
@@ -1101,7 +1110,7 @@ public static class ClientEvents
                 }
                 for (int j = 0; j < ins2.Count; ++j)
                     ins.Insert(i + 1, ins2[j]);
-                Logger.LogDebug($"Patched in {recordDestructionInvoker} to {method}.");
+                Logger.LogDebug($"[CLIENT EVENTS] Patched in {recordDestructionInvoker.Format()} to {method.Format()}.");
             }
         }
 
@@ -1112,7 +1121,7 @@ public static class ClientEvents
     {
         if (!DevkitServerModule.IsEditing) return;
 
-        Logger.LogDebug("Handle moved: " + position.Format() + " Rot: " + doRotation.Format() + ", Scale: " + hasScale.Format() + ".");
+        Logger.LogDebug("[CLIENT EVENTS] Handle moved: " + position.Format() + " Rot: " + doRotation.Format() + ", Scale: " + hasScale.Format() + ".");
     }
 
     [UsedImplicitly]
@@ -1120,7 +1129,7 @@ public static class ClientEvents
     {
         if (!DevkitServerModule.IsEditing) return;
 
-        Logger.LogDebug("Instantiation requested at: " + position.Format() + ".");
+        Logger.LogDebug("[CLIENT EVENTS] Instantiation requested at: " + position.Format() + ".");
     }
 
     [UsedImplicitly]
@@ -1128,7 +1137,45 @@ public static class ClientEvents
     {
         if (!DevkitServerModule.IsEditing) return;
 
-        Logger.LogDebug("Destruction requested at: " + obj.name.Format() + ".");
+        Logger.LogDebug("[CLIENT EVENTS] Destruction requested at: " + obj.name.Format() + ".");
+    }
+
+    private static readonly List<IDevkitHierarchyItem> WorkingHierarchyItems = new List<IDevkitHierarchyItem>(2);
+    [UsedImplicitly]
+    private static void OnFinishTransform()
+    {
+        if (!DevkitServerModule.IsEditing) return;
+        HierarchyObjectTransformation[] translations = new HierarchyObjectTransformation[DevkitSelectionManager.selection.Count];
+        int index = -1;
+        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+        {
+            selection.gameObject.GetComponents(WorkingHierarchyItems);
+            try
+            {
+                for (int i = 0; i < WorkingHierarchyItems.Count; ++i)
+                {
+                    IDevkitHierarchyItem item = WorkingHierarchyItems[i];
+                    if (item.instanceID == 0u)
+                        Logger.LogWarning($"Skipped item: {item.Format()} because it was missing an instance ID.", method: "CLIENT EVENTS");
+                    else
+                    {
+                        translations[++index] = new HierarchyObjectTransformation(item.instanceID, HierarchyObjectTransformation.TransformFlags.All,
+                            selection.gameObject.transform.position, selection.gameObject.transform.rotation,
+                            selection.gameObject.transform.localScale);
+                    }
+                }
+            }
+            finally
+            {
+                WorkingHierarchyItems.Clear();
+            }
+        }
+
+        ++index;
+        if (index != translations.Length)
+            Array.Resize(ref translations, index);
+
+        Logger.LogDebug("[CLIENT EVENTS] Move completed for: " + string.Join(", ", translations) + ".");
     }
 
     #endregion
@@ -1146,7 +1193,7 @@ public static class ClientEvents
         {
             if (!instanceMatches || p.Length != p2.Length - 1)
             {
-                Logger.LogWarning("Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".");
+                Logger.LogWarning("Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".", method: "CLIENT EVENTS");
 
                 original = null!;
                 return;
@@ -1165,7 +1212,7 @@ public static class ClientEvents
                 if (p2[i + invOffset].ParameterType.IsByRef &&
                     p2[i + invOffset].ParameterType.GetElementType()!.IsAssignableFrom(p[i].ParameterType))
                     continue;
-                Logger.LogWarning("Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".");
+                Logger.LogWarning("Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".", method: "CLIENT EVENTS");
                 original = null!;
                 return;
             }
@@ -1173,4 +1220,68 @@ public static class ClientEvents
     }
 
 }
+
+public readonly struct HierarchyObjectTransformation
+{
+    public TransformFlags Flags { get; }
+    public uint InstanceId { get; }
+    public Vector3 Position { get; }
+    public Quaternion Rotation { get; }
+    public Vector3 Scale { get; }
+
+    public HierarchyObjectTransformation(ByteReader reader)
+    {
+        InstanceId = reader.ReadUInt32();
+        TransformFlags flags = reader.ReadEnum<TransformFlags>();
+        Flags = flags & ~(TransformFlags)8;
+        if ((flags & TransformFlags.Position) != 0)
+            Position = reader.ReadVector3();
+        else
+            Position = Vector3.zero;
+        if ((flags & TransformFlags.Rotation) != 0)
+            Rotation = reader.ReadQuaternion();
+        else
+            Rotation = Quaternion.identity;
+        if ((flags & (TransformFlags)8) != 0)
+            Scale = Vector3.one;
+        else if ((flags & TransformFlags.Scale) != 0)
+            Scale = reader.ReadVector3();
+        else
+            Scale = Vector3.zero;
+    }
+    public HierarchyObjectTransformation(uint instanceId, TransformFlags flags, Vector3 position, Quaternion rotation, Vector3 scale)
+    {
+        InstanceId = instanceId;
+        Flags = flags;
+        Position = position;
+        Rotation = rotation;
+        Scale = scale;
+    }
+
+    [Flags]
+    public enum TransformFlags : byte
+    {
+        Position = 1,
+        Rotation = 2,
+        Scale = 4,
+        All = Position | Rotation | Scale
+    }
+    public void Write(ByteWriter writer)
+    {
+        writer.Write(InstanceId);
+        TransformFlags flags = Flags;
+        if ((flags & TransformFlags.Scale) != 0 && Scale.GetRoundedIfNearlyEqualToOne() == Vector3.one)
+            flags |= (TransformFlags)8;
+        writer.Write(flags);
+        if ((Flags & TransformFlags.Position) != 0)
+            writer.Write(Position);
+        if ((Flags & TransformFlags.Rotation) != 0)
+            writer.Write(Rotation);
+        if ((flags & TransformFlags.Scale) != 0 && (flags & (TransformFlags)8) == 0)
+            writer.Write(Scale);
+    }
+
+    public override string ToString() => $"Instance ID: {InstanceId.Format()} moved: {Flags.Format()} (pos: {Position.Format()}, rot: {Rotation.Format()}, scale: {Scale.Format()}).";
+}
+
 #endif

@@ -2,6 +2,7 @@
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
+using DevkitServer.API;
 using DevkitServer.Patches;
 using HarmonyLib;
 
@@ -329,7 +330,14 @@ internal static class Accessor
             typeof(Action<,,,,,,,,,,,,,,,>)
         };
     }
-
+    public static int SortTypesByPriorityHandler(Type a, Type b)
+    {
+        return (Attribute.GetCustomAttribute(b, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute pB
+            ? pB.Priority
+            : 0).CompareTo(Attribute.GetCustomAttribute(a, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute pA
+            ? pA.Priority
+            : 0);
+    }
     public static Delegate? GenerateInstanceCaller<TInstance>(string methodName, Type[]? parameters = null, bool throwOnError = false, bool useFptrReconstruction = false)
     {
         MethodInfo? method = null;
@@ -694,22 +702,51 @@ internal static class Accessor
             }
         }
     }
-    /// <param name="assembly"><see langword="null"/> to use DevkitServer assembly.</param>
-    /// <returns>Every type defined in the assembly.</returns>
+
+    /// <returns>Every type defined in the calling assembly.</returns>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static Type[] GetTypesSafe()
+    public static List<Type> GetTypesSafe(bool removeIgnored = false) => GetTypesSafe(Assembly.GetCallingAssembly(), removeIgnored);
+
+    /// <returns>Every type defined in <paramref name="assmebly"/>.</returns>
+    public static List<Type> GetTypesSafe(Assembly assmebly, bool removeIgnored = false)
     {
-        Type[] allTypes;
+        List<Type> types;
         try
         {
-            allTypes = Assembly.GetCallingAssembly().GetTypes();
+            types = new List<Type>(assmebly.GetTypes());
         }
         catch (ReflectionTypeLoadException ex)
         {
-            allTypes = ex.Types;
+            types = new List<Type>(ex.Types);
         }
 
-        return allTypes;
+        if (removeIgnored)
+            types.RemoveAll(x => Attribute.IsDefined(x, typeof(IgnoreAttribute)));
+        
+        types.Sort(SortTypesByPriorityHandler);
+        return types;
+    }
+    /// <returns>Every type defined in the provided <paramref name="assmeblies"/>.</returns>
+    public static List<Type> GetTypesSafe(IEnumerable<Assembly> assmeblies, bool removeIgnored = false)
+    {
+        List<Type> types = new List<Type>();
+        foreach (Assembly assembly in assmeblies)
+        {
+            try
+            {
+                types.AddRange(assembly.GetTypes());
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                types.AddRange(ex.Types);
+            }
+        }
+
+        if (removeIgnored)
+            types.RemoveAll(x => Attribute.IsDefined(x, typeof(IgnoreAttribute)));
+        
+        types.Sort(SortTypesByPriorityHandler);
+        return types;
     }
 }
 

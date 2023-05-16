@@ -34,7 +34,6 @@ public static class EncodingEx
         }
         return ValidTypes.Contains(type);
     }
-
     public static Bounds ReadInflatedBounds(this ByteReader reader) => ReadInflatedBounds(reader, out _);
     public static Bounds ReadInflatedBounds(this ByteReader reader, out bool extraFlag)
     {
@@ -78,7 +77,13 @@ public static class EncodingEx
 
         return new Bounds(center, size);
     }
+
+    public const int MaxHeightmapBoundsSize = MaxInflatedBoundsSizeNoYComponents;
     public static void WriteHeightmapBounds(this ByteWriter writer, Bounds bounds, bool extraFlag = false) => writer.WriteInflatedBounds(bounds, true, true, false, extraFlag);
+
+    public const int MaxInflatedBoundsSize = 25;
+    public const int MaxInflatedBoundsSizeMinusOneYComponent = 21;
+    public const int MaxInflatedBoundsSizeNoYComponents = 17;
     public static void WriteInflatedBounds(this ByteWriter writer, Bounds bounds, bool ignoreCenterY = false, bool ignoreSizeY = false, bool preserveSizeSigns = false, bool extraFlag = false)
     {
         // 1 = sz full, 2 = sz ushort, 4 = pos full, 8 = pos ushort, 16 = ignore center y, 32 = ignore size y, 64 = preserve size signs, 128 = extra flag
