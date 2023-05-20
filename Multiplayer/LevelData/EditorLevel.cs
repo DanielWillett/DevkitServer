@@ -119,41 +119,12 @@ public static class EditorLevel
         {
             if (!overrideSlow)
             {
-                NetTask hsTask = HighSpeedNetFactory.TryCreate(connection, out lowSpeedDownload);
-                if (!lowSpeedDownload)
-                {
-                    yield return hsTask;
-                    if (!hsTask.Parameters.Responded || hsTask.Parameters.ErrorCode is not (int)StandardErrorCode.Success)
-                    {
-                        lowSpeedDownload = true;
-                        Logger.LogWarning("[SEND LEVEL] High-speed connection did not create in time.");
-                    }
-                }
-
-                float stTime = Time.realtimeSinceStartup;
-                if (!lowSpeedDownload)
-                {
-                    hsConn = HighSpeedServer.Instance.VerifiedConnections.FirstOrDefault(x => x.SteamConnection != null && x.SteamConnection.Equals(connection)) ??
-                             HighSpeedServer.Instance.PendingConnections.FirstOrDefault(x => x.SteamConnection != null && x.SteamConnection.Equals(connection));
-                    if (hsConn == null)
-                    {
-                        lowSpeedDownload = true;
-                        Logger.LogWarning("[SEND LEVEL] Unable to find created high-speed connection.");
-                    }
-                }
-                if (!lowSpeedDownload)
-                {
-                    while (!hsConn!.Verified)
-                    {
-                        yield return null;
-                        if (Time.realtimeSinceStartup - stTime > 8f)
-                        {
-                            lowSpeedDownload = true;
-                            Logger.LogWarning("[SEND LEVEL] High-speed connection did not verify in time.");
-                            break;
-                        }
-                    }
-                }
+                TaskYieldInstruction hsTask = HighSpeedNetFactory.TryGetOrCreateAndVerifyYield(connection, true);
+                yield return hsTask;
+                if (hsTask.TryGetResult(out hsConn) && hsConn is { Verified: true, Client.Connected: true })
+                    lowSpeedDownload = false;
+                else
+                    lowSpeedDownload = true;
             }
 
             Logger.LogDebug(lowSpeedDownload ? "[SEND LEVEL] Using low-speed (Steamworks) download option." : "[SEND LEVEL] Using high-speed (TCP) download option.");
@@ -396,7 +367,8 @@ public static class EditorLevel
         }
         finally
         {
-            hsConn?.CloseConnection();
+            if (hsConn != null)
+                HighSpeedNetFactory.ReleaseConnection(hsConn);
             PendingToReceiveActions.Remove(connection);
         }
     }
@@ -419,7 +391,6 @@ public static class EditorLevel
     private static volatile int _lastPart;
     private static volatile int _lastWhole;
     private static volatile bool _lastDirty;
-    private static float _lastUpdated;
     private static float _lastKeepalive;
 
     private static IEnumerator TryReceiveLevelCoroutine()
@@ -437,31 +408,25 @@ public static class EditorLevel
         }
         if (!task.Parameters.Responded)
         {
-            LoadingUI.updateKey("Downloading Level | Request Failed");
             Logger.LogWarning("[RECEIVE LEVEL] Did not receive acknowledgement to level request; request timed out.");
-            yield return new WaitForSeconds(2f);
-            Provider.disconnect();
+            DevkitServerUtility.CustomDisconnect("Did not receive acknowledgement to level request; request timed out.");
+            Reset();
         }
         else
         {
             Logger.LogInfo("[RECEIVE LEVEL] Received acknowledgement to level request.", ConsoleColor.DarkCyan);
-            LoadingUI.updateKey("Downloading Level | Server Compressing Level");
-            LoadingUI.updateProgress(0.05f);
+            LoadingUI.SetDownloadFileName("Level | Server Compressing Level");
+            LoadingUI.NotifyDownloadProgress(1f);
         }
     }
     
     internal static void RequestLevel()
     {
-        LoadingUI.updateKey("Downloading Level | Requesting Level Info");
-        _pendingLevel = null;
-        _pendingLevelName = null;
-        _pendingLevelIndex = 0;
-        _pendingLevelLength = 0;
-        _pendingCancelKey = 0;
+        LoadingUI.SetLoadingText("Downloading Level from Server");
+        LoadingUI.NotifyLevelLoadingProgress(0.01f);
+        Reset(true);
         _lastPart = 0;
         _lastWhole = 0;
-        _missingPackets = 0;
-        _startingMissingPackets = 0;
         _lastDirty = true;
         DevkitServerModule.ComponentHost.StartCoroutine(TryReceiveLevelCoroutine());
     }
@@ -470,30 +435,15 @@ public static class EditorLevel
         float t = Time.realtimeSinceStartup;
         if (_lastDirty)
         {
-            if (t - _lastUpdated > 0.0875f)
+            _lastDirty = false;
+            UpdateLoadingUI();
+            if (t - _lastKeepalive > 7.5f && _pendingKeepAliveKey != 0)
             {
-                try
-                {
-                    _lastUpdated = t;
-                    _lastDirty = false;
-                    Logger.LogDebug("Updating loading UI (" + _lastPart + "/" + _lastWhole + ") MT: " + DevkitServerModule.IsMainThread + ".");
-                    UpdateLoadingUI();
-                    if (t - _lastKeepalive > 7.5f && _pendingKeepAliveKey != 0)
-                    {
-                        _lastKeepalive = t;
-                        MessageOverhead ovh = new MessageOverhead(MessageFlags.RequestResponse, Ping.ID, 0, _pendingKeepAliveKey);
-                        Ping.Invoke(ref ovh);
-                        Logger.LogDebug("Sending keepalive: " + ovh.Format() + ".");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError("Error updating progress UI.");
-                    Logger.LogError(ex);
-                }
+                _lastKeepalive = t;
+                MessageOverhead ovh = new MessageOverhead(MessageFlags.RequestResponse, Ping.ID, 0, _pendingKeepAliveKey);
+                Ping.Invoke(ref ovh);
+                Logger.LogDebug("[RECEIVING LEVEL] Sending KeepAlive: " + ovh.Format() + ".");
             }
-            else
-                Logger.LogDebug($"Invalidated progress: {_lastPart}/{_lastWhole} ({(float)_lastPart / _lastWhole:P1})");
         }
     }
 
@@ -504,7 +454,7 @@ public static class EditorLevel
         if (_hs)
         {
             float time = Time.realtimeSinceStartup;
-            string t = "Downloading Level | " + _pendingLevelName + " [ " + DevkitServerUtility.FormatBytes(_lastPart) +
+            string t = _pendingLevelName + " [ " + DevkitServerUtility.FormatBytes(_lastPart) +
                        " / " + DevkitServerUtility.FormatBytes(_lastWhole) + " ]";
             if (_lastPart > 0 && _lastWhole > 0)
             {
@@ -513,24 +463,25 @@ public static class EditorLevel
                      " Remaining: " + Mathf.FloorToInt(remaining / 60).ToString("00") + ":" + Mathf.FloorToInt(remaining % 60).ToString("00");
             }
             else t += " | Calculating Speed...";
-            LoadingUI.updateKey(t);
-            LoadingUI.updateProgress(_lastWhole == 0 || _lastPart == 0 ? 0.05f : (float)_lastPart / _lastWhole);
+            LoadingUI.SetDownloadFileName(t);
+            LoadingUI.NotifyDownloadProgress(_lastWhole == 0 || _lastPart == 0 ? 0.05f : ((float)_lastPart / _lastWhole * 0.90f + 0.05f));
             return;
         }
         if (_missingPackets > 0)
         {
-            LoadingUI.updateKey("Downloading Level / Recovering Missing Packets [ " + (_startingMissingPackets - _missingPackets) + " / " + _startingMissingPackets + " ]");
-            LoadingUI.updateProgress(_startingMissingPackets == 0 || _startingMissingPackets == _missingPackets ? 0.05f : (float)(_startingMissingPackets - _missingPackets) / _startingMissingPackets);
+            LoadingUI.SetDownloadFileName("Level | Recovering Missing Packets [ " + (_startingMissingPackets - _missingPackets) + " / " + _startingMissingPackets + " ]");
+            LoadingUI.NotifyDownloadProgress(_startingMissingPackets == 0 || _startingMissingPackets == _missingPackets ? 0.05f :
+                ((float)(_startingMissingPackets - _missingPackets) / _startingMissingPackets * 0.90f + 0.05f));
         }
         else if (_pendingLevelIndex >= _pendingLevelLength || _startingMissingPackets > 0)
         {
-            LoadingUI.updateKey("Downloading Level / Installing Level " + _pendingLevelName + ".");
-            LoadingUI.updateProgress(1f);
+            LoadingUI.SetDownloadFileName("Level | Installing " + _pendingLevelName + ".");
+            LoadingUI.NotifyDownloadProgress(0.95f);
         }
         else
         {
             float time = Time.realtimeSinceStartup;
-            string t = "Downloading Level | " + _pendingLevelName + " [ " + DevkitServerUtility.FormatBytes(_pendingLevelIndex) +
+            string t = _pendingLevelName + " [ " + DevkitServerUtility.FormatBytes(_pendingLevelIndex) +
                        " / " + DevkitServerUtility.FormatBytes(_pendingLevelLength) + " ]";
             if (_pendingLevelIndex > 0)
             {
@@ -539,8 +490,8 @@ public static class EditorLevel
                     " Remaining: " + Mathf.FloorToInt(remaining / 60).ToString("00") + ":" + Mathf.FloorToInt(remaining % 60).ToString("00");
             }
             else t += " | Calculating Speed...";
-            LoadingUI.updateKey(t);
-            LoadingUI.updateProgress(_pendingLevelIndex == 0 || _pendingLevelLength == 0 ? 0.05f : (float)_pendingLevelIndex / _pendingLevelLength);
+            LoadingUI.SetDownloadFileName(t);
+            LoadingUI.NotifyDownloadProgress(_pendingLevelIndex == 0 || _pendingLevelLength == 0 ? 0.05f : ((float)_pendingLevelIndex / _pendingLevelLength * 0.90f + 0.05f));
         }
     }
     [NetCall(NetCallSource.FromServer, (ushort)NetCalls.Ping)]
@@ -600,6 +551,7 @@ public static class EditorLevel
         _pendingLevelName = lvlName;
         _pendingCancelKey = reqId;
         _pendingLevelStartTime = Time.realtimeSinceStartup;
+        LoadingUI.SetDownloadFileName(_pendingLevelName);
         Logger.LogInfo($"[RECEIVE LEVEL] Started receiving level data ({DevkitServerUtility.FormatBytes(length)}) for level {lvlName}.", ConsoleColor.DarkCyan);
         UpdateLoadingUI();
     }
@@ -651,13 +603,21 @@ public static class EditorLevel
         UpdateLoadingUI();
         ctx.Acknowledge();
     }
+
+    private static bool _isCancelling;
     public static void RequestCancelLevelDownload()
     {
-        if (_pendingLevel != null)
+        if (!_isCancelling && _pendingLevel != null)
         {
             MessageOverhead ovh = new MessageOverhead(MessageFlags.RequestResponse, EndSendLevel.ID, 0, 0, _pendingCancelKey);
             EndSendLevel.Invoke(ref ovh, true, false);
-            Provider.disconnect();
+            _isCancelling = true;
+            string lvl = _pendingLevelName ?? string.Empty;
+            TimeUtility.InvokeAfterDelay(() =>
+            {
+                DevkitServerUtility.CustomDisconnect("Cancelled level download: " + lvl + ".");
+                Reset();
+            }, 0.5f);
         }
     }
 
@@ -670,35 +630,57 @@ public static class EditorLevel
         HighSpeedConnection? inst = HighSpeedConnection.Instance;
         if (inst != null)
             inst.BufferProgressUpdated -= OnBufferUpdated;
-        
+
         _lastPart = 0;
         _lastWhole = 0;
         _lastDirty = false;
         _pendingLevelLength = _pendingLevelIndex = payload.Length;
-        LoadingUI.updateKey("Downloading Level | Installing " + _pendingLevelName);
-        LoadingUI.updateProgress(0.75f);
+        DevkitServerModule.ComponentHost.StartCoroutine(ReceiveLevelCoroutine(ctx, payload, compressed));
+    }
+    private static IEnumerator ReceiveLevelCoroutine(MessageContext ctx, byte[] payload, bool compressed)
+    {
+        int bytesDecompressed = 0;
+        LoadingUI.SetDownloadFileName("Level | " + (compressed ? "Decompressing " : "Installing ") + _pendingLevelName + ".");
+        LoadingUI.NotifyDownloadProgress(0.9f);
+        yield return null;
         if (compressed)
         {
-            try
+            Logger.LogDebug("[RECEIVE LEVEL] Extracting level.");
+            using MemoryStream output = new MemoryStream((int)(payload.Length * 1.5));
+            using (MemoryStream input = new MemoryStream(payload))
+            using (DeflateStream stream = new DeflateStream(input, CompressionMode.Decompress))
             {
-                Logger.LogDebug("[RECEIVE LEVEL] Extracting level.");
-                using MemoryStream output = new MemoryStream((int)(payload.Length * 1.5));
-                using (MemoryStream input = new MemoryStream(payload))
-                using (DeflateStream stream = new DeflateStream(input, CompressionMode.Decompress))
+                const int bufferSize = 4194304;
+                byte[] buffer = new byte[bufferSize];
+                
+                while (true)
                 {
-                    stream.CopyTo(output);
+                    try
+                    {
+                        int count = stream.Read(buffer, 0, buffer.Length);
+                        if (count == 0)
+                        {
+                            LoadingUI.NotifyDownloadProgress(0.96f);
+                            break;
+                        }
+                        output.Write(buffer, 0, count);
+                        bytesDecompressed += count;
+                        LoadingUI.NotifyDownloadProgress(bytesDecompressed / (float)payload.Length * 0.06f + 0.9f);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError("[RECEIVE LEVEL] Error decompressing level.");
+                        Logger.LogError(ex);
+                        DevkitServerUtility.CustomDisconnect("Error decompressing level: " + _pendingLevelName + ".");
+                        Reset();
+                        yield break;
+                    }
+                    yield return null;
                 }
+            }
 
-                payload = output.ToArray();
-                Logger.LogDebug($"[RECEIVE LEVEL] Decompressed from {DevkitServerUtility.FormatBytes(_pendingLevelLength)} -> {DevkitServerUtility.FormatBytes(payload.Length)}.");
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Error decompressing payload.");
-                Logger.LogError(ex);
-                ctx.Acknowledge(StandardErrorCode.InvalidData);
-                return;
-            }
+            payload = output.ToArray();
+            Logger.LogDebug($"[RECEIVE LEVEL] Decompressed from {DevkitServerUtility.FormatBytes(_pendingLevelLength)} -> {DevkitServerUtility.FormatBytes(payload.Length)}.");
         }
         string dir = TempLevelPath;
         dir = DevkitServerUtility.QuickFormat(dir, _pendingLevelName);
@@ -707,15 +689,19 @@ public static class EditorLevel
         Directory.CreateDirectory(dir);
 #if DEBUG
         File.WriteAllBytes(Path.Combine(dir, "Raw Data.dat"), payload);
+        yield return null;
 #endif
         Logger.LogDebug("[RECEIVE LEVEL] Reading level folder.");
         LevelReader.LoadNew(payload);
         Folder folder = Folder.Read(LevelReader);
         Logger.LogDebug("[RECEIVE LEVEL] Writing level folder.");
         folder.WriteContentsToDisk(dir);
+        LoadingUI.NotifyDownloadProgress(1f);
         Logger.LogInfo($"[RECEIVE LEVEL] Finished receiving level data ({DevkitServerUtility.FormatBytes(_pendingLevelLength)}) for level {_pendingLevelName}.", ConsoleColor.DarkCyan);
+        yield return null;
         OnLevelReady(Path.Combine(dir, folder.FolderName));
 
+        Reset();
         ctx.Acknowledge(StandardErrorCode.Success);
     }
 
@@ -740,13 +726,6 @@ public static class EditorLevel
             }
             if (missing == null)
             {
-                LoadingUI.updateKey("Downloading Level | Installing " + _pendingLevelName);
-                LoadingUI.updateProgress(0.75f);
-                string dir = TempLevelPath;
-                dir = DevkitServerUtility.QuickFormat(dir, _pendingLevelName);
-                if (Directory.Exists(dir))
-                    Directory.Delete(dir, true);
-                Directory.CreateDirectory(dir);
                 ctx.Reply(RequestPackets, Array.Empty<int>());
                 Logger.LogDebug($"[RECEIVE LEVEL] Allocating {_pendingLevelLength} bytes to level data array.");
                 byte[] lvl = new byte[_pendingLevelLength];
@@ -757,29 +736,8 @@ public static class EditorLevel
                     Buffer.BlockCopy(b, 0, lvl, index, b.Length);
                     index += b.Length;
                 }
-                if (wasCompressed)
-                {
-                    Logger.LogDebug("[RECEIVE LEVEL] Extracting level.");
-                    using MemoryStream output = new MemoryStream((int)(lvl.Length * 1.5));
-                    using (MemoryStream input = new MemoryStream(lvl))
-                    using (DeflateStream stream = new DeflateStream(input, CompressionMode.Decompress))
-                    {
-                        stream.CopyTo(output);
-                    }
 
-                    lvl = output.ToArray();
-                    Logger.LogDebug($"[RECEIVE LEVEL] Decompressed from {DevkitServerUtility.FormatBytes(_pendingLevelLength)} -> {DevkitServerUtility.FormatBytes(lvl.Length)}.");
-                }
-#if DEBUG
-                File.WriteAllBytes(Path.Combine(dir, "Raw Data.dat"), lvl);
-#endif
-                Logger.LogDebug("[RECEIVE LEVEL] Reading level folder.");
-                LevelReader.LoadNew(lvl);
-                Folder folder = Folder.Read(LevelReader);
-                Logger.LogDebug("[RECEIVE LEVEL] Writing level folder.");
-                folder.WriteContentsToDisk(dir);
-                Logger.LogInfo($"[RECEIVE LEVEL] Finished receiving level data ({DevkitServerUtility.FormatBytes(_pendingLevelLength)}) for level {_pendingLevelName}.", ConsoleColor.DarkCyan);
-                OnLevelReady(Path.Combine(dir, folder.FolderName));
+                DevkitServerModule.ComponentHost.StartCoroutine(ReceiveLevelCoroutine(ctx, lvl, wasCompressed));
             }
             else
             {
@@ -787,7 +745,6 @@ public static class EditorLevel
                 ctx.Reply(RequestPackets, missing.ToArray());
                 Logger.LogWarning($"[RECEIVE LEVEL] Missing {missing.Count} / {_pendingLevel.Length} ({(float)missing.Count / _pendingLevel.Length:P1}).");
                 UpdateLoadingUI();
-                return;
             }
 
         }
@@ -795,10 +752,13 @@ public static class EditorLevel
         {
             ctx.Reply(RequestPackets, Array.Empty<int>());
             Logger.LogInfo("[RECEIVE LEVEL] Cancelled level load.");
-            LoadingUI.updateKey("Downloading Level / Level Load Cancelled");
+            LoadingUI.SetDownloadFileName("Level | Level Load Cancelled");
             Provider.disconnect();
+            Reset();
         }
-
+    }
+    private static void Reset(bool isDownloading = false)
+    {
         _pendingLevel = null;
         _pendingLevelIndex = 0;
         _pendingLevelLength = 0;
@@ -807,17 +767,21 @@ public static class EditorLevel
         _pendingLevelName = null;
         _startingMissingPackets = 0;
         _missingPackets = 0;
+        LoadingUI.SetIsDownloading(isDownloading);
     }
-
     private static void OnLevelReady(string dir)
     {
-        DevkitServerModule.Instance.TryLoadBundle();
+        DevkitServerModule.ComponentHost.StartCoroutine(DevkitServerModule.Instance.TryLoadBundle(() => LoadLevel(dir)));
+    }
+    private static void LoadLevel(string dir)
+    {
         GC.Collect();
+        Resources.UnloadUnusedAssets();
         LevelInfo? info = LoadLevelInfo(dir, false, 0ul);
         if (info == null)
         {
             Logger.LogInfo("[RECEIVE LEVEL] Failed to read received level at: \"" + dir + "\".", ConsoleColor.DarkCyan);
-            Provider.disconnect();
+            DevkitServerUtility.CustomDisconnect("Failed to read received level.");
             return;
         }
 

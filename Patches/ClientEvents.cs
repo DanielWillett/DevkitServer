@@ -300,12 +300,12 @@ public static class ClientEvents
                     if (lbl.HasValue)
                         c2.labels.Add(lbl.Value);
                     yield return c2;
-                    yield return DevkitServerUtility.GetLocalCodeInstruction(localBounds, localBounds.LocalIndex, true);
+                    yield return PatchUtil.GetLocalCodeInstruction(localBounds, localBounds.LocalIndex, true);
                     yield return c;
                     yield return n;
                     yield return ins[i + 2];
                     yield return ins[i + 3];
-                    yield return DevkitServerUtility.GetLocalCodeInstruction(localBounds, localBounds.LocalIndex, false);
+                    yield return PatchUtil.GetLocalCodeInstruction(localBounds, localBounds.LocalIndex, false);
                     MethodInfo? invoker = null;
                     // heightmap
                     if (method == rampHandler)
@@ -347,7 +347,7 @@ public static class ClientEvents
             else if (addTileCt == 0 && addTile != null && c.Calls(addTile) && n != null)
             {
                 addTileCt = lHMarkDirty == null ? 2 : 1;
-                addTileLcl2 = DevkitServerUtility.GetLocal(n, out addTileLcl, true);
+                addTileLcl2 = PatchUtil.GetLocal(n, out addTileLcl, true);
                 if (addTileLcl2 == null)
                     addTileCt = 2;
                 if (addTileCt == 2)
@@ -359,7 +359,7 @@ public static class ClientEvents
             else if (addTileCt == 1 && c.Calls(lHMarkDirty!))
             {
                 yield return c;
-                yield return DevkitServerUtility.GetLocalCodeInstruction(addTileLcl2, addTileLcl, false);
+                yield return PatchUtil.GetLocalCodeInstruction(addTileLcl2, addTileLcl, false);
                 yield return new CodeInstruction(OpCodes.Call, addTileInvoker);
                 Logger.LogDebug("[CLIENT EVENTS] Patched in OnAddTile call.");
                 addTileCt = 2;
@@ -754,9 +754,9 @@ public static class ClientEvents
                 {
                     if (ps[ps.Length - 1].ParameterType is { IsByRef: true } p && p.GetElementType() == typeof(int))
                     {
-                        LocalBuilder? bld = DevkitServerUtility.GetLocal(ins[i - 1], out int index, false);
-                        yield return DevkitServerUtility.GetLocalCodeInstruction(bld!, index, false);
-                        yield return DevkitServerUtility.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, true);
+                        LocalBuilder? bld = PatchUtil.GetLocal(ins[i - 1], out int index, false);
+                        yield return PatchUtil.GetLocalCodeInstruction(bld!, index, false);
+                        yield return PatchUtil.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, true);
                         Logger.LogDebug("[CLIENT EVENTS] Inserted set sample count local instruction.");
                     }
                     yield return c;
@@ -766,11 +766,11 @@ public static class ClientEvents
                         if (l.opcode == OpCodes.Ldloca_S || l.opcode == OpCodes.Ldloca)
                         {
                             if (l.operand is LocalBuilder lbl)
-                                yield return DevkitServerUtility.GetLocalCodeInstruction(lbl, lbl.LocalIndex, false,
+                                yield return PatchUtil.GetLocalCodeInstruction(lbl, lbl.LocalIndex, false,
                                     false);
                             else
                                 yield return new CodeInstruction(l.opcode == OpCodes.Ldloca_S ? OpCodes.Ldarg_S : OpCodes.Ldarg, l.operand);
-                            yield return DevkitServerUtility.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, false);
+                            yield return PatchUtil.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, false);
                             Logger.LogDebug("[CLIENT EVENTS] Inserted get sample count local instruction.");
                         }
                         else
@@ -797,14 +797,14 @@ public static class ClientEvents
                 yield return new CodeInstruction(OpCodes.Call, findLevelObjectUtil);
                 yield return new CodeInstruction(OpCodes.Brfalse, lbl);
                 yield return new CodeInstruction(OpCodes.Dup);
-                yield return DevkitServerUtility.GetLocalCodeInstruction(lvlObject, lvlObject.LocalIndex, true);
+                yield return PatchUtil.GetLocalCodeInstruction(lvlObject, lvlObject.LocalIndex, true);
                 yield return new CodeInstruction(OpCodes.Call, lvlObjTransformGetter);
                 yield return new CodeInstruction(OpCodes.Call, transformPosGetter);
-                yield return DevkitServerUtility.GetLocalCodeInstruction(lvlObjectPos, lvlObjectPos.LocalIndex, true);
+                yield return PatchUtil.GetLocalCodeInstruction(lvlObjectPos, lvlObjectPos.LocalIndex, true);
                 c.labels.Add(lbl);
                 yield return c;
-                yield return DevkitServerUtility.GetLocalCodeInstruction(lvlObjectPos, lvlObjectPos.LocalIndex, false);
-                yield return DevkitServerUtility.GetLocalCodeInstruction(lvlObject, lvlObject.LocalIndex, false);
+                yield return PatchUtil.GetLocalCodeInstruction(lvlObjectPos, lvlObjectPos.LocalIndex, false);
+                yield return PatchUtil.GetLocalCodeInstruction(lvlObject, lvlObject.LocalIndex, false);
                 yield return new CodeInstruction(OpCodes.Call, levelObjectRemovedInvoker);
                 Logger.LogDebug("[CLIENT EVENTS] Patched invoker for " + lvlObjRemove.Format() + ".");
                 ++lod;
@@ -1025,15 +1025,75 @@ public static class ClientEvents
 
     public static InstanceGetter<SelectionTool, TransformHandles>? GetSelectionHandles = Accessor.GenerateInstanceGetter<SelectionTool, TransformHandles>("handles");
 
+    [HarmonyPatch(typeof(SelectionTool), "OnHandleTranslatedAndRotated")]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    private static IEnumerable<CodeInstruction> SelectionToolOnHandleTranslatedAndRotated(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
+    {
+        Type st = typeof(SelectionTool);
+        MethodInfo tempMoveHandleInvoker = new Action<DevkitSelection, Vector3, Quaternion, Vector3, bool>(OnTempMoveRotateHandle).Method;
+
+        MethodInfo? getComponent = typeof(GameObject).GetMethods(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault(x =>
+            x.Name.Equals("GetComponent") && x.GetParameters().Length == 0 && x.GetGenericArguments().Length == 1)?.MakeGenericMethod(typeof(ITransformedHandler));
+        if (getComponent == null)
+        {
+            Logger.LogWarning("Unable to find method: GameObject.GetComponent<ITransformedHandler>.", method: "CLIENT EVENTS");
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo? moveNext;
+        using (IEnumerator<DevkitSelection> e = DevkitSelectionManager.selection.GetEnumerator())
+            moveNext = e.GetType().GetMethod("MoveNext", BindingFlags.Public | BindingFlags.Instance);
+        if (moveNext == null)
+        {
+            Logger.LogWarning("Unable to find method: IEnumerator<DevkitSelection>.MoveNext.", method: "CLIENT EVENTS");
+            DevkitServerModule.Fault();
+        }
+
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        StackTracker tracker = new StackTracker(ins);
+        CodeInstruction? ldLocCodeInst = null;
+        Label initLabel = generator.DefineLabel();
+        for (int i = 0; i < ins.Count; ++i)
+        {
+            CodeInstruction c = ins[i];
+            if (ldLocCodeInst == null && getComponent != null && c.Calls(getComponent) && i < ins.Count - 1 && ins[i + 1].opcode.IsStLoc())
+            {
+                int lastInd = tracker.GetLastUnconsumedIndex(i, c => c.IsLdLoc(), method);
+                if (lastInd != -1)
+                {
+                    ldLocCodeInst = ins[lastInd].CopyWithoutSpecial();
+                }
+            }
+            if (i > 0 && ldLocCodeInst != null && moveNext != null && ins[i].Calls(moveNext) && ins[i - 1].opcode.IsLdLoc(either: true))
+            {
+                ldLocCodeInst.labels.AddRange(ins[i - 1].labels);
+                ins[i - 1].labels.Clear();
+                ins[i - 1].labels.Add(initLabel);
+                ins.Insert(i - 1, ldLocCodeInst);
+                ins.Insert(i, new CodeInstruction(OpCodes.Brfalse, initLabel));
+                ins.Insert(i + 1, ldLocCodeInst.CopyWithoutSpecial());
+                ins.Insert(i + 2, new CodeInstruction(OpCodes.Ldarg_1));
+                ins.Insert(i + 3, new CodeInstruction(OpCodes.Ldarg_2));
+                ins.Insert(i + 4, new CodeInstruction(OpCodes.Ldarg_3));
+                ins.Insert(i + 5, new CodeInstruction(OpCodes.Ldarg_S, 4));
+                ins.Insert(i + 6, new CodeInstruction(OpCodes.Call, tempMoveHandleInvoker));
+                i += 6;
+                ldLocCodeInst = null;
+                Logger.LogDebug($"[CLIENT EVENTS] Patched in {tempMoveHandleInvoker.Format()} to {method.Format()}.");
+            }
+        }
+
+        return ins;
+    }
+
     [HarmonyPatch(typeof(SelectionTool), nameof(SelectionTool.update))]
     [HarmonyTranspiler]
     [UsedImplicitly]
     private static IEnumerable<CodeInstruction> SelectionToolUpdateTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
     {
         Type st = typeof(SelectionTool);
-        Type th = typeof(TransformHandles);
         Type dtu = typeof(DevkitTransactionUtility);
-        Type ce = typeof(ClientEvents);
         Type vp = typeof(VanillaPermissions);
 
         MethodInfo moveHandleInvoker = new Action<Vector3, Quaternion, Vector3, bool, bool>(OnMoveHandle).Method;
@@ -1138,6 +1198,15 @@ public static class ClientEvents
         if (!DevkitServerModule.IsEditing) return;
 
         Logger.LogDebug("[CLIENT EVENTS] Destruction requested at: " + obj.name.Format() + ".");
+    }
+
+    [UsedImplicitly]
+    private static void OnTempMoveRotateHandle(DevkitSelection selection, Vector3 deltaPos, Quaternion deltaRot, Vector3 pivotPos, bool modifyRotation)
+    {
+        if (selection == null || selection.gameObject == null)
+            return;
+
+        Logger.LogDebug($"[CLIENT EVENTS] Temp move requested at: {selection.gameObject.name.Format()}: deltaPos: {deltaPos.Format()}, deltaRot: {deltaRot.eulerAngles.Format()}, pivotPos: {pivotPos.Format()}, modifyRotation: {modifyRotation}.");
     }
 
     private static readonly List<IDevkitHierarchyItem> WorkingHierarchyItems = new List<IDevkitHierarchyItem>(2);

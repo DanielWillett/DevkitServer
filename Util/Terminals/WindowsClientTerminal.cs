@@ -93,7 +93,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                             {
                                 string message = msg.Message;
                                 Logger.TryRemoveDateFromLine(ref message);
-                                Logs.printLine(Logger.RemoveANSIFormatting(message));
+                                Logs.printLine(FormattingUtil.RemoveANSIFormatting(message));
                             }
                         }
                         Console.SetCursorPosition(x, y);
@@ -111,7 +111,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                             {
                                 string message = msg.Message;
                                 Logger.TryRemoveDateFromLine(ref message);
-                                Logs.printLine(Logger.RemoveANSIFormatting(message));
+                                Logs.printLine(FormattingUtil.RemoveANSIFormatting(message));
                             }
                         }
                     }
@@ -321,7 +321,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
         public readonly bool Save;
         public LogMessage(string message, ConsoleColor color, bool save)
         {
-            Message = Logger.GetANSIForegroundString(color) + message + Logger.ANSIReset;
+            Message = FormattingUtil.GetANSIForegroundString(color) + message + FormattingUtil.ANSIReset;
             Save = save;
         }
         public void Write()

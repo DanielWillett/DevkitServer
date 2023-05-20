@@ -86,7 +86,7 @@ public static class CommandEx
                     IDevkitServerPlugin? plugin = PluginLoader.FindPluginForMember(type);
                     if (plugin == null && local != asm)
                     {
-                        command.LogError("Unable to link " + type.Format() + " to a plugin. Use the " + typeof(PluginIdentifierAttribute) +
+                        command.LogError("Unable to link " + type.Format() + " to a plugin. Use the " + typeof(PluginIdentifierAttribute).Format() +
                                          " to link a command to a plugin when multiple plugins are loaded from an assembly.");
                         continue;
                     }

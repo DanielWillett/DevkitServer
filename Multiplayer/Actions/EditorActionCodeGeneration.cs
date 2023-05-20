@@ -242,10 +242,10 @@ internal static class EditorActionsCodeGeneration
 
                 // ActionSettingsCollection? settings = settings.GetSetting(<type>);
                 writeGenerator.Emit(OpCodes.Ldloc, writeActionSettings);
-                DevkitServerUtility.LoadConstantI4(writeGenerator, (int)attr.ActionSetting);
+                PatchUtil.LoadConstantI4(writeGenerator, (int)attr.ActionSetting);
                 writeGenerator.Emit(OpCodes.Call, getSettings);
                 readGenerator.Emit(OpCodes.Ldloc, readActionSettings);
-                DevkitServerUtility.LoadConstantI4(readGenerator, (int)attr.ActionSetting);
+                PatchUtil.LoadConstantI4(readGenerator, (int)attr.ActionSetting);
                 readGenerator.Emit(OpCodes.Call, getSettings);
 
                 // if (settings == null) goto updateValuePop;
@@ -385,7 +385,7 @@ internal static class EditorActionsCodeGeneration
                     writeGenerator.Emit(OpCodes.Dup);
                     // collection.Flags |= <Type>
                     writeGenerator.Emit(OpCodes.Call, flagsProperty.GetMethod);
-                    DevkitServerUtility.LoadConstantI4(writeGenerator, (int)attr.ActionSetting);
+                    PatchUtil.LoadConstantI4(writeGenerator, (int)attr.ActionSetting);
                     writeGenerator.Emit(OpCodes.Or);
                     writeGenerator.Emit(OpCodes.Call, flagsProperty.GetSetMethod(true));
                     used.Add(attr.ActionSetting);
@@ -458,7 +458,7 @@ internal static class EditorActionsCodeGeneration
                 if (gap)
                 {
                     createGenerator.Emit(OpCodes.Ldarg_0);
-                    DevkitServerUtility.LoadConstantI4(createGenerator, (int)actionType);
+                    PatchUtil.LoadConstantI4(createGenerator, (int)actionType);
                     if (i < lbls.Count - 1)
                         createGenerator.Emit(OpCodes.Bne_Un, lbls[i + 1].lbl);
                     else
@@ -525,9 +525,9 @@ internal static class EditorActionsCodeGeneration
             byteWriteGenerator.Emit(OpCodes.Call, flagsProperty.GetMethod);
             byteReadGenerator.Emit(OpCodes.Call, flagsProperty.GetMethod);
             toStringGenerator.Emit(OpCodes.Call, flagsProperty.GetMethod);
-            DevkitServerUtility.LoadConstantI4(byteWriteGenerator, (int)setting);
-            DevkitServerUtility.LoadConstantI4(byteReadGenerator, (int)setting);
-            DevkitServerUtility.LoadConstantI4(toStringGenerator, (int)setting);
+            PatchUtil.LoadConstantI4(byteWriteGenerator, (int)setting);
+            PatchUtil.LoadConstantI4(byteReadGenerator, (int)setting);
+            PatchUtil.LoadConstantI4(toStringGenerator, (int)setting);
             byteWriteGenerator.Emit(OpCodes.And);
             byteReadGenerator.Emit(OpCodes.And);
             toStringGenerator.Emit(OpCodes.And);

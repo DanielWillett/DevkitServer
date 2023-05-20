@@ -3,13 +3,14 @@ using DevkitServer.API.Permissions;
 using DevkitServer.Commands.Subsystem;
 using DevkitServer.Configuration;
 using System.Reflection;
+using DevkitServer.Multiplayer.Networking;
 using Action = System.Action;
 
 namespace DevkitServer.Plugins;
 public static class PluginLoader
 {
-    public static readonly string PluginDirectory = Path.Combine(DevkitServerConfig.FilePath, "Plugins");
-    public static readonly string LibraryDirectory = Path.Combine(DevkitServerConfig.FilePath, "Libraries");
+    public static readonly string PluginDirectory = Path.Combine(DevkitServerConfig.Directory, "Plugins");
+    public static readonly string LibraryDirectory = Path.Combine(DevkitServerConfig.Directory, "Libraries");
 
     private static readonly List<IDevkitServerPlugin> _plugins = new List<IDevkitServerPlugin>();
     private static readonly List<PluginLibrary> _libs = new List<PluginLibrary>();
@@ -318,12 +319,27 @@ public static class PluginLoader
                 ? attr.Priority
                 : 0
         ).ToList();
+        List<Assembly> reflected = new List<Assembly>(pluginsTemp.Count + 1) { Assembly.GetExecutingAssembly() };
         for (int i = 0; i < pluginsTemp.Count; ++i)
         {
             IDevkitServerPlugin plugin = pluginsTemp[i];
             try
             {
                 plugin.Load();
+                if (!reflected.Contains(plugin.Assembly))
+                {
+                    reflected.Add(plugin.Assembly);
+
+                    CreateDirectoryAttribute.CreateInAssembly(plugin.Assembly);
+
+                    NetFactory.Reflect(plugin.Assembly,
+#if SERVER
+                        NetCallSource.FromClient
+#else
+                        NetCallSource.FromServer
+#endif
+                    );
+                }
                 AssertPluginValid(plugin);
                 TryInvokeOnPluginLoaded(plugin);
                 Logger.LogInfo("[LOAD " + plugin.Name.ToUpperInvariant() + "] Loaded " + plugin.Name.Colorize(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor));

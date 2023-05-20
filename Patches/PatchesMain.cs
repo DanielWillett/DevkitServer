@@ -2,13 +2,13 @@
 using HarmonyLib;
 using JetBrains.Annotations;
 using System.Reflection;
+using System.Text;
 using DevkitServer.Configuration;
 using DevkitServer.Players;
 using SDG.Framework.Landscapes;
 #if CLIENT
 using System.Reflection.Emit;
 using DevkitServer.Multiplayer.LevelData;
-using DevkitServer.Players;
 using SDG.Provider;
 #endif
 #if SERVER
@@ -29,15 +29,18 @@ internal static class PatchesMain
         try
         {
 #if DEBUG
-            string path = Path.Combine(DevkitServerConfig.FilePath, "harmony.log");
+            string path = Path.Combine(DevkitServerConfig.Directory, "harmony.log");
             Environment.SetEnvironmentVariable("HARMONY_LOG_FILE", path);
             try
             {
-                File.Delete(path);
+                using FileStream str = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+                byte[] bytes = Encoding.UTF8.GetBytes(DateTimeOffset.UtcNow.ToString("R") + Environment.NewLine);
+                str.Write(bytes, 0, bytes.Length);
+                str.Flush();
             }
             catch (Exception ex)
             {
-                Logger.LogError("Unable to delete previous harmony log.");
+                Logger.LogError("Unable to clear previous harmony log.");
                 Logger.LogError(ex);
             }
             Harmony.DEBUG = true;
@@ -213,25 +216,25 @@ internal static class PatchesMain
     [UsedImplicitly]
     [HarmonyPatch(typeof(MenuConfigurationOptionsUI), MethodType.Constructor)]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> MenuConfigurationOptionsUITranspiler(ILGenerator generator, IEnumerable<CodeInstruction> instructions)
-        => MenuConfigurationUITranspiler(generator, instructions);
+    private static IEnumerable<CodeInstruction> MenuConfigurationOptionsUITranspiler(IEnumerable<CodeInstruction> instructions)
+        => MenuConfigurationUITranspiler(instructions);
     [UsedImplicitly]
     [HarmonyPatch(typeof(MenuConfigurationGraphicsUI), MethodType.Constructor)]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> MenuConfigurationGraphicsUITranspiler(ILGenerator generator, IEnumerable<CodeInstruction> instructions)
-        => MenuConfigurationUITranspiler(generator, instructions);
+    private static IEnumerable<CodeInstruction> MenuConfigurationGraphicsUITranspiler(IEnumerable<CodeInstruction> instructions)
+        => MenuConfigurationUITranspiler(instructions);
     [UsedImplicitly]
     [HarmonyPatch(typeof(MenuConfigurationDisplayUI), MethodType.Constructor)]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> MenuConfigurationDisplayUITranspiler(ILGenerator generator, IEnumerable<CodeInstruction> instructions)
-        => MenuConfigurationUITranspiler(generator, instructions);
+    private static IEnumerable<CodeInstruction> MenuConfigurationDisplayUITranspiler(IEnumerable<CodeInstruction> instructions)
+        => MenuConfigurationUITranspiler(instructions);
     [UsedImplicitly]
     [HarmonyPatch(typeof(MenuConfigurationControlsUI), MethodType.Constructor)]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> MenuConfigurationControlsUITranspiler(ILGenerator generator, IEnumerable<CodeInstruction> instructions)
-        => MenuConfigurationUITranspiler(generator, instructions);
+    private static IEnumerable<CodeInstruction> MenuConfigurationControlsUITranspiler(IEnumerable<CodeInstruction> instructions)
+        => MenuConfigurationUITranspiler(instructions);
 
-    private static IEnumerable<CodeInstruction> MenuConfigurationUITranspiler(ILGenerator generator, IEnumerable<CodeInstruction> instructions)
+    private static IEnumerable<CodeInstruction> MenuConfigurationUITranspiler(IEnumerable<CodeInstruction> instructions)
     {
         MethodInfo? isConnected = typeof(Provider).GetProperty(nameof(Provider.isConnected), BindingFlags.Static | BindingFlags.Public)?.GetMethod;
         if (isConnected == null)
@@ -269,9 +272,46 @@ internal static class PatchesMain
         return true;
     }
 
+    [HarmonyPatch(typeof(MasterBundleConfig), "StartLoad")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    private static void PrefixStartLoad(MasterBundleConfig __instance, byte[] inputData, byte[] inputHash)
+    {
+        Logger.LogDebug($"{__instance.assetBundleName.Format()} load start.");
+    }
+    [HarmonyPatch(typeof(MasterBundleConfig), "FinishLoad")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    private static void PrefixFinishLoad(MasterBundleConfig __instance)
+    {
+        Logger.LogDebug($"{__instance.assetBundleName.Format()} load end.");
+    }
+
 
 #if SERVER
     internal static List<ITransportConnection> PendingConnections = new List<ITransportConnection>(8);
+
+    [HarmonyPatch(typeof(Provider), "host")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    private static bool PrefixHost()
+    {
+        if (DevkitServerModule.HasLoadedBundle)
+            return true;
+        DevkitServerModule.ComponentHost.StartCoroutine(DevkitServerModule.Instance.TryLoadBundle(DoHost));
+        return false;
+    }
+
+    private static void DoHost()
+    {
+        if (DevkitServerModule.HasLoadedBundle)
+            Provider.host();
+        else
+        {
+            Logger.LogError($"Unable to host without {Path.Combine(DevkitServerConfig.BundlesFolder, "devkitserver.masterbundle").Format(false)}. Try redownloading from {DevkitServerModule.RepositoryUrl}.", method: "TryLoadBundle");
+            DevkitServerModule.Fault();
+        }
+    }
     internal static void RemoveExpiredConnections()
     {
         for (int i = PendingConnections.Count - 1; i >= 0; --i)

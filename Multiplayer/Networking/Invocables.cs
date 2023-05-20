@@ -1,5 +1,6 @@
 ﻿using DevkitServer.Util.Encoding;
 using System.Reflection;
+using DevkitServer.API;
 
 namespace DevkitServer.Multiplayer.Networking;
 
@@ -9,23 +10,35 @@ public abstract class BaseNetCall
     internal const MessageFlags RequestFlags = DefaultFlags | MessageFlags.Request;
     internal const MessageFlags AcknowledgeRequestFlags = DefaultFlags | MessageFlags.AcknowledgeRequest;
     public readonly ushort ID;
+    public readonly Guid Guid;
+    public IDevkitServerPlugin? Plugin { get; internal set; }
     public string Name { get; internal set; } = null!;
     public bool HighSpeed { get; set; }
 
-    protected BaseNetCall(ushort method)
+    protected internal BaseNetCall(ushort method)
     {
+        if (method == 0)
+            throw new ArgumentException("Method ID must be greater than zero.", nameof(method));
         ID = method;
+    }
+    protected BaseNetCall(Guid method)
+    {
+        if (method == Guid.Empty)
+            throw new ArgumentException("Guid must not be empty.", nameof(method));
+        Guid = method;
     }
 
     protected BaseNetCall(Delegate method)
     {
         MethodInfo info = method.GetMethodInfo();
         if (Attribute.GetCustomAttribute(info, typeof(NetCallAttribute)) is NetCallAttribute attribute)
+        {
             ID = attribute.MethodID;
+            Guid = string.IsNullOrEmpty(attribute.GuidString) || !Guid.TryParse(attribute.GuidString, out Guid g) ? Guid.Empty : g;
+        }
 
-        if (ID == 0)
-            throw new ArgumentException($"Method provided for {info.Name} does not contain " +
-                                        $"a {nameof(NetCallAttribute)} attribute.", nameof(method));
+        if (ID == 0 && Guid == Guid.Empty)
+            throw new ArgumentException($"Method provided for {info.Format()} does not contain a {typeof(NetCallAttribute).Format()} attribute, or has invalid data.", nameof(method));
     }
     public abstract bool Read(byte[] message, out object[] parameters);
     public NetTask Listen(int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
@@ -41,6 +54,18 @@ public abstract class BaseNetCall
         return task;
     }
     internal virtual void SetThrowOnError(bool value) { }
+    public override bool Equals(object obj) => obj is BaseNetCall c2 && Equals(c2);
+    public bool Equals(BaseNetCall other) => (ID != default && ID == other.ID || Guid != Guid.Empty && Guid == other.Guid) && HighSpeed == other.HighSpeed;
+    public override int GetHashCode()
+    {
+        unchecked
+        {
+            int hashCode = ID.GetHashCode();
+            hashCode = (hashCode * 397) ^ Guid.GetHashCode();
+            hashCode = (hashCode * 397) ^ HighSpeed.GetHashCode();
+            return hashCode;
+        }
+    }
 }
 public class NetCallCustom : BaseNetCall
 {
@@ -49,7 +74,11 @@ public class NetCallCustom : BaseNetCall
     public delegate Task MethodAsync(MessageContext context, ByteReader reader);
     private readonly ByteWriter _writer;
     private bool throwOnError;
-    public NetCallCustom(ushort method, int capacity = 0) : base(method)
+    internal NetCallCustom(ushort method, int capacity = 0) : base(method)
+    {
+        _writer = new ByteWriter(true, capacity);
+    }
+    public NetCallCustom(Guid method, int capacity = 0) : base(method)
     {
         _writer = new ByteWriter(true, capacity);
     }
@@ -255,20 +284,23 @@ public class NetCallCustom : BaseNetCall
 /// <summary> For querying only </summary>
 public abstract class NetCallRaw : BaseNetCall
 {
-    protected NetCallRaw(ushort method) : base(method) { }
+    protected internal NetCallRaw(ushort method) : base(method) { }
+    protected NetCallRaw(Guid method) : base(method) { }
     protected NetCallRaw(Delegate method) : base(method) { }
 }
 /// <summary> For querying only </summary>
 public abstract class DynamicNetCall : BaseNetCall
 {
-    protected DynamicNetCall(ushort method) : base(method) { }
+    protected internal DynamicNetCall(ushort method) : base(method) { }
+    protected DynamicNetCall(Guid method) : base(method) { }
     protected DynamicNetCall(Delegate method) : base(method) { }
 }
 public sealed class NetCall : BaseNetCall
 {
     public delegate void Method(MessageContext context);
     public delegate Task MethodAsync(MessageContext context);
-    public NetCall(ushort method) : base(method) { }
+    internal NetCall(ushort method) : base(method) { }
+    public NetCall(Guid method) : base(method) { }
     public NetCall(Method method) : base(method) { }
     public NetCall(MethodAsync method) : base(method) { }
     private byte[]? _bytes;
@@ -396,7 +428,13 @@ public sealed class NetCallRaw<T> : NetCallRaw
     public delegate void Method(MessageContext context, T arg1);
     public delegate Task MethodAsync(MessageContext context, T arg1);
     /// <summary>Leave <paramref name="reader"/> or <paramref name="writer"/> null to auto-fill.</summary>
-    public NetCallRaw(ushort method, ByteReader.Reader<T>? reader, ByteWriter.Writer<T>? writer, int capacity = 0) : base(method)
+    internal NetCallRaw(ushort method, ByteReader.Reader<T>? reader, ByteWriter.Writer<T>? writer, int capacity = 0) : base(method)
+    {
+        _writer = new ByteWriterRaw<T>(writer, capacity: capacity);
+        _reader = new ByteReaderRaw<T>(reader);
+    }
+    /// <summary>Leave <paramref name="reader"/> or <paramref name="writer"/> null to auto-fill.</summary>
+    public NetCallRaw(Guid method, ByteReader.Reader<T>? reader, ByteWriter.Writer<T>? writer, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T>(writer, capacity: capacity);
         _reader = new ByteReaderRaw<T>(reader);
@@ -592,7 +630,13 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2);
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, int capacity = 0) : base(method)
+    internal NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, int capacity = 0) : base(method)
+    {
+        _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
+    }
+    /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
+    public NetCallRaw(Guid method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
@@ -791,7 +835,13 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3);
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, int capacity = 0) : base(method)
+    internal NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, int capacity = 0) : base(method)
+    {
+        _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
+    }
+    /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
+    public NetCallRaw(Guid method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
@@ -991,7 +1041,13 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4);
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, int capacity = 0) : base(method)
+    internal NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, int capacity = 0) : base(method)
+    {
+        _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
+    }
+    /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
+    public NetCallRaw(Guid method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
@@ -1190,7 +1246,12 @@ public sealed class NetCall<T> : DynamicNetCall
     private readonly DynamicByteWriter<T> _writer;
     public delegate void Method(MessageContext context, T arg1);
     public delegate Task MethodAsync(MessageContext context, T arg1);
-    public NetCall(ushort method, int capacity = 0) : base(method)
+    internal NetCall(ushort method, int capacity = 0) : base(method)
+    {
+        _reader = new DynamicByteReader<T>();
+        _writer = new DynamicByteWriter<T>(capacity: capacity);
+    }
+    public NetCall(Guid method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T>();
         _writer = new DynamicByteWriter<T>(capacity: capacity);
@@ -1383,7 +1444,12 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
     private readonly DynamicByteWriter<T1, T2> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2);
-    public NetCall(ushort method, int capacity = 0) : base(method)
+    internal NetCall(ushort method, int capacity = 0) : base(method)
+    {
+        _reader = new DynamicByteReader<T1, T2>();
+        _writer = new DynamicByteWriter<T1, T2>(capacity: capacity);
+    }
+    public NetCall(Guid method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2>();
         _writer = new DynamicByteWriter<T1, T2>(capacity: capacity);
@@ -1577,7 +1643,12 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
     private readonly DynamicByteWriter<T1, T2, T3> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3);
-    public NetCall(ushort method, int capacity = 0) : base(method)
+    internal NetCall(ushort method, int capacity = 0) : base(method)
+    {
+        _reader = new DynamicByteReader<T1, T2, T3>();
+        _writer = new DynamicByteWriter<T1, T2, T3>(capacity: capacity);
+    }
+    public NetCall(Guid method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3>();
         _writer = new DynamicByteWriter<T1, T2, T3>(capacity: capacity);
@@ -1772,7 +1843,12 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
     private readonly DynamicByteWriter<T1, T2, T3, T4> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4);
-    public NetCall(ushort method, int capacity = 0) : base(method)
+    internal NetCall(ushort method, int capacity = 0) : base(method)
+    {
+        _reader = new DynamicByteReader<T1, T2, T3, T4>();
+        _writer = new DynamicByteWriter<T1, T2, T3, T4>(capacity: capacity);
+    }
+    public NetCall(Guid method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4>(capacity: capacity);
@@ -1968,7 +2044,12 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
     private readonly DynamicByteWriter<T1, T2, T3, T4, T5> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5);
-    public NetCall(ushort method, int capacity = 0) : base(method)
+    internal NetCall(ushort method, int capacity = 0) : base(method)
+    {
+        _reader = new DynamicByteReader<T1, T2, T3, T4, T5>();
+        _writer = new DynamicByteWriter<T1, T2, T3, T4, T5>(capacity: capacity);
+    }
+    public NetCall(Guid method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5>(capacity: capacity);
@@ -2165,7 +2246,12 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
     private readonly DynamicByteWriter<T1, T2, T3, T4, T5, T6> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6);
-    public NetCall(ushort method, int capacity = 0) : base(method)
+    internal NetCall(ushort method, int capacity = 0) : base(method)
+    {
+        _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6>();
+        _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6>(capacity: capacity);
+    }
+    public NetCall(Guid method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6>(capacity: capacity);
@@ -2368,18 +2454,21 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6,
         T7 arg7);
 
-    public NetCall(ushort method, int capacity = 0) : base(method)
+    internal NetCall(ushort method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7>(capacity: capacity);
     }
-
+    public NetCall(Guid method, int capacity = 0) : base(method)
+    {
+        _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7>();
+        _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7>(capacity: capacity);
+    }
     public NetCall(Method method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7>(capacity: capacity);
     }
-
     public NetCall(MethodAsync method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7>();
@@ -2580,7 +2669,12 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
     private readonly DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8);
-    public NetCall(ushort method, int capacity = 0) : base(method)
+    internal NetCall(ushort method, int capacity = 0) : base(method)
+    {
+        _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8>();
+        _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8>(capacity: capacity);
+    }
+    public NetCall(Guid method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8>(capacity: capacity);
@@ -2779,7 +2873,12 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
     private readonly DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9);
-    public NetCall(ushort method, int capacity = 0) : base(method)
+    internal NetCall(ushort method, int capacity = 0) : base(method)
+    {
+        _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9>();
+        _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9>(capacity: capacity);
+    }
+    public NetCall(Guid method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9>(capacity: capacity);
@@ -2979,7 +3078,12 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
     private readonly DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10);
-    public NetCall(ushort method, int capacity = 0) : base(method)
+    internal NetCall(ushort method, int capacity = 0) : base(method)
+    {
+        _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>();
+        _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(capacity: capacity);
+    }
+    public NetCall(Guid method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(capacity: capacity);

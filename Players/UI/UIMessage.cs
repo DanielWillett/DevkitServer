@@ -55,7 +55,7 @@ public static class UIMessage
                 CodeInstruction c = new CodeInstruction(OpCodes.Ldarg_0);
                 c.labels.AddRange(instr.labels);
                 yield return c;
-                c = DevkitServerUtility.LoadConstantI4((int)CustomMessage);
+                c = PatchUtil.LoadConstantI4((int)CustomMessage);
                 yield return c;
                 Label lbl = generator.DefineLabel();
                 Label lbl2 = generator.DefineLabel();

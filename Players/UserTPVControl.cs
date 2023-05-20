@@ -194,7 +194,7 @@ internal sealed class EditorClothes : MonoBehaviour
             {
                 try
                 {
-                    _visualHatAsset = Assets.find(EAssetType.ITEM, Provider.provider.economyService.getInventoryItemID(_visualHat)) as ItemHatAsset;
+                    _visualHatAsset = Assets.find<ItemHatAsset>(Provider.provider.economyService.getInventoryItemGuid(_visualHat));
                 }
                 catch
                 {

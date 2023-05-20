@@ -494,7 +494,7 @@ internal static class Accessor
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Unable to create instance caller for " + (method.DeclaringType?.Name ?? "<unknown-type>") + "." + method.Name);
+            Logger.LogWarning("Unable to create instance caller for " + (method.DeclaringType?.Name ?? "<unknown-type>").Format(false) + "." + (method.Name ?? "<unknown-name>").Format(false) + ".");
             Logger.LogError(ex);
             if (throwOnError)
                 throw;

@@ -136,6 +136,44 @@ public class StackTracker
         }
         return last;
     }
+    public int GetLastUnconsumedIndex(int startIndex, Predicate<OpCode> codeFilter, MethodBase method, object? operand = null)
+    {
+        int stackSize = 0;
+        int lastStack = _lastStackSizeIs0;
+        if (_lastStackSizeIs0 >= startIndex)
+            lastStack = 0;
+
+        int last = -1;
+        for (int i = lastStack; i < _instructions.Count; ++i)
+        {
+            CodeInstruction current = _instructions[i];
+            if ((current.opcode == OpCodes.Br || current.opcode == OpCodes.Br_S) && stackSize != 0 && current.operand is Label lbl)
+            {
+                int index = _instructions.FindIndex(i, x => x.labels.Contains(lbl));
+                if (index != -1)
+                {
+                    i = index - 1;
+                    continue;
+                }
+            }
+            if (stackSize == 0)
+            {
+                lastStack = _lastStackSizeIs0;
+                _lastStackSizeIs0 = i;
+                if (codeFilter(current.opcode) && (operand == null || OperandsEqual(current.operand, operand)))
+                {
+                    if (i >= startIndex)
+                    {
+                        _lastStackSizeIs0 = lastStack;
+                        return last;
+                    }
+                    last = i;
+                }
+            }
+            stackSize += GetStackChange(current.opcode, current.operand, method);
+        }
+        return last;
+    }
 
     private static bool OperandsEqual(object? left, object? right)
     {

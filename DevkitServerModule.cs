@@ -13,6 +13,7 @@ using DevkitServer.Plugins;
 using JetBrains.Annotations;
 using SDG.Framework.Modules;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -26,13 +27,17 @@ namespace DevkitServer;
 
 public sealed class DevkitServerModule : IModuleNexus
 {
-    private static readonly StaticGetter<Assets>? GetAssetsInstance = Accessor.GenerateStaticGetter<Assets, Assets>("instance");
+    public static readonly string RepositoryUrl = "https://github.com/DanielWillett/DevkitServer"; // don't end with '/'
+    private static StaticGetter<Assets> GetAssetsInstance = null!;
+    private static Func<Assets, IEnumerator> GetLoadAssetsFromWorkerThreadCoroutine = null!;
+    private static InstanceSetter<AssetOrigin, bool>? SetOverrideIDs;
     public const string ModuleName = "DevkitServer";
     public static readonly string ServerRule = "DevkitServer";
     private static CancellationTokenSource? _tknSrc;
     private static string? _helpCache;
     internal static readonly Color PluginColor = new Color32(0, 255, 153, 255);
     internal static readonly Color UnturnedColor = new Color32(99, 123, 99, 255);
+    public Assembly Assembly { get; } = Assembly.GetExecutingAssembly();
     internal static string HelpCache => _helpCache ??= CommandLocalization.format("Help");
     public static GameObject GameObjectHost { get; private set; } = null!;
     public static DevkitServerModuleComponent ComponentHost { get; private set; } = null!;
@@ -48,25 +53,36 @@ public sealed class DevkitServerModule : IModuleNexus
     public static Local CommandLocalization { get; private set; } = null!;
     public static Local MessageLocalization { get; private set; } = null!;
     public static CultureInfo CommandParseLocale { get; set; } = CultureInfo.InvariantCulture;
-    
+    public static AssetOrigin BundleOrigin { get; }
+    static DevkitServerModule()
+    {
+        BundleOrigin = new AssetOrigin { name = ModuleName, workshopFileId = 0ul };
+        SetOverrideIDs?.Invoke(BundleOrigin, true);
+    }
     public static void EarlyInitialize()
     {
         LoadFaulted = false;
-        GameObjectHost = new GameObject("DevkitServer");
+        GameObjectHost = new GameObject(ModuleName);
         ComponentHost = GameObjectHost.AddComponent<DevkitServerModuleComponent>();
         Provider.gameMode = new DevkitServerGamemode();
         Object.DontDestroyOnLoad(GameObjectHost);
 
         Logger.InitLogger();
-        Logger.LogInfo("DevkitServer by BlazingFlame#0001 (https://github.com/DanielWillett) initialized.");
+        Logger.LogInfo($"{ModuleName.Colorize(PluginColor)} by {"BlazingFlame#0001".Colorize(new Color32(86, 98, 246, 255))} ({"https://github.com/DanielWillett".Format(false)}) initialized.");
+        Logger.LogInfo($"Please create an Issue for any bugs at {(RepositoryUrl + "/issues").Format(false)} (one bug per issue please).");
+        Logger.LogInfo($"Please give suggestions as a Discussion at {(RepositoryUrl + "/discussions/categories/ideas").Format(false)}.");
         PatchesMain.Init();
 #if CLIENT
         Logger.PostPatcherSetupInitLogger();
 #endif
+        GetLoadAssetsFromWorkerThreadCoroutine = Accessor.GenerateInstanceCaller<Assets, Func<Assets, IEnumerator>>("LoadAssetsFromWorkerThread", Array.Empty<Type>(), true)!;
+        GetAssetsInstance = Accessor.GenerateStaticGetter<Assets, Assets>("instance", throwOnError: true)!;
+        SetOverrideIDs = Accessor.GenerateInstanceSetter<AssetOrigin, bool>("shouldAssetsOverrideExistingIds");
     }
 
     public void initialize()
     {
+        Stopwatch watch = Stopwatch.StartNew();
         try
         {
             Instance = this;
@@ -81,6 +97,7 @@ public sealed class DevkitServerModule : IModuleNexus
                 Logger.LogWarning("Your machine is big-endian, you may face issues with improper data transmission, " +
                                   "please report it as I am unable to test with these conditioins.");
             }
+
             DevkitServerConfig.Reload();
 
             if (LoadFaulted)
@@ -92,7 +109,8 @@ public sealed class DevkitServerModule : IModuleNexus
             if (!NetFactory.Init())
             {
                 Fault();
-                Logger.LogError("Failed to load! Loading cancelled. Check for updates on https://github.com/DanielWillett/DevkitServer.");
+                Logger.LogError(
+                    "Failed to load! Loading cancelled. Check for updates on https://github.com/DanielWillett/DevkitServer.");
                 return;
             }
 
@@ -121,6 +139,7 @@ public sealed class DevkitServerModule : IModuleNexus
 
             if (LoadFaulted)
                 return;
+            CreateDirectoryAttribute.CreateInAssembly(Assembly, true);
 
             Level.onPostLevelLoaded += OnPostLevelLoaded;
             Editor.onEditorCreated += OnEditorCreated;
@@ -128,7 +147,6 @@ public sealed class DevkitServerModule : IModuleNexus
             Provider.onServerConnected += UserManager.AddPlayer;
             Provider.onServerDisconnected += UserManager.RemovePlayer;
             Level.onLevelLoaded += OnLevelLoaded;
-            Assets.onAssetsRefreshed += OnAssetsRefreshed;
 #if USERINPUT_DEBUG
             Players.UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
 #endif
@@ -149,6 +167,11 @@ public sealed class DevkitServerModule : IModuleNexus
             Logger.LogError(ex);
             Fault();
         }
+        finally
+        {
+            watch.Stop();
+            Logger.LogInfo($"{ModuleName} initializer took {watch.ElapsedMilliseconds} ms.");
+        }
 
         if (LoadFaulted)
         {
@@ -166,19 +189,13 @@ public sealed class DevkitServerModule : IModuleNexus
 
         }
     }
+
 #if CLIENT
     private void EditorUIReady()
     {
         DevkitEditorHUD.Open();
     }
-#endif
 
-#if SERVER
-    private void OnAssetsRefreshed()
-    {
-        TryLoadBundle();
-    }
-#else
     private static void OnChatMessageReceived()
     {
         if (ChatManager.receivedChatHistory.Count > 0)
@@ -223,34 +240,47 @@ public sealed class DevkitServerModule : IModuleNexus
         Bundle = null;
         HasLoadedBundle = false;
     }
-    internal void TryLoadBundle()
+    internal IEnumerator TryLoadBundle(System.Action? callback)
     {
-        if (HasLoadedBundle) return;
+        ThreadUtil.assertIsGameThread();
+        if (HasLoadedBundle)
+        {
+            callback?.Invoke();
+            yield break;
+        }
         string path = Path.Combine(ReadWrite.PATH, "Modules", "DevkitServer", "Bundles");
         if (!Directory.Exists(path))
         {
             Logger.LogError("Failed to find DevkitServer bundle folder: " + path.Format() + ".");
-            return;
-        }
-
-        try
-        {
-            Assets.load(path, new AssetOrigin { name = "DevkitServer", workshopFileId = 0ul }, true);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError("Error loading " + "devkitserver.masterbundle".Format() + " bundle.");
-            Logger.LogError(ex); 
-            return;
+            callback?.Invoke();
+            yield break;
         }
         MasterBundleConfig? bundle = Assets.findMasterBundleByPath(path);
         if (bundle == null)
         {
-            foreach (MasterBundleConfig config in (List<MasterBundleConfig>)typeof(Assets).GetField("allMasterBundles", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null))
-                Logger.LogDebug("Bundle: " + config.assetBundleName.Format() + " (" + config.directoryPath.Format() + ").");
-            
-            Logger.LogError("Failed to find DevkitServer bundle: " + Path.Combine(path, "devkitserver.masterbundle").Format() + ".");
-            return;
+            Logger.LogDebug($"Adding DevkitServer Bundle Search Location: {path.Format(false)}.");
+            Assets.RequestAddSearchLocation(path, BundleOrigin);
+            IEnumerator t = GetLoadAssetsFromWorkerThreadCoroutine(GetAssetsInstance());
+            Logger.LogDebug(t.Format());
+            while (t.MoveNext())
+            {
+                Logger.LogDebug(t.Current.Format());
+                yield return t.Current;
+            }
+
+            yield return new WaitForSeconds(5f);
+
+            bundle = Assets.findMasterBundleByPath(path);
+            if (bundle == null)
+            {
+#if DEBUG
+                foreach (MasterBundleConfig config in (IEnumerable<MasterBundleConfig>?)typeof(Assets).GetField("allMasterBundles", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null) ?? Array.Empty<MasterBundleConfig>())
+                    Logger.LogDebug("Bundle: " + config.assetBundleName.Format() + " (" + config.directoryPath.Format() + ").");
+#endif
+                Logger.LogError("Failed to find DevkitServer bundle: " + Path.Combine(path, "devkitserver.masterbundle").Format() + ".");
+                callback?.Invoke();
+                yield break;
+            }
         }
         Bundle = new MasterBundle(bundle, string.Empty, "DevkitServer Base");
         Logger.LogInfo("Loaded bundle: " + bundle.assetBundleNameWithoutExtension.Format() + " from " + path.Format() + ".");
@@ -260,6 +290,7 @@ public sealed class DevkitServerModule : IModuleNexus
         foreach (string asset in Bundle.cfg.assetBundle.GetAllAssetNames())
             Logger.LogDebug("Asset: " + asset.Format() + ".");
 #endif
+        callback?.Invoke();
     }
     internal static void Fault()
     {

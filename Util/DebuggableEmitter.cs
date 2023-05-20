@@ -259,7 +259,7 @@ public class DebuggableEmitter
         if (Breakpointing)
         {
             Generator.Emit(OpCodes.Ldstr, msg);
-            DevkitServerUtility.LoadConstantI4(Generator, (int)ConsoleColor.DarkRed);
+            PatchUtil.LoadConstantI4(Generator, (int)ConsoleColor.DarkRed);
             Generator.Emit(OpCodes.Call, Accessor.LogDebug);
         }
     }
@@ -274,7 +274,7 @@ public class DebuggableEmitter
         if (Breakpointing && !_lastWasPrefix)
         {
             Generator.Emit(OpCodes.Ldstr, msg);
-            DevkitServerUtility.LoadConstantI4(Generator, (int)ConsoleColor.DarkRed);
+            PatchUtil.LoadConstantI4(Generator, (int)ConsoleColor.DarkRed);
             Generator.Emit(OpCodes.Call, Accessor.LogDebug);
         }
         _lastWasPrefix = code.OpCodeType == OpCodeType.Prefix;

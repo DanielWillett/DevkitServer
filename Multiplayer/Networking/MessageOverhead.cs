@@ -24,6 +24,8 @@ public readonly struct MessageOverhead
     public readonly long ResponseKey = default;
     [FieldOffset(23)]
     public readonly int Length;
+    [FieldOffset(27)]
+    public readonly Guid MessageGuid;
 
     // All flags that use a request key
     private const MessageFlags RequestKeyMask = MessageFlags.Request |
@@ -33,28 +35,27 @@ public readonly struct MessageOverhead
                                                  MessageFlags.RequestResponseWithAcknowledgeRequest;
     // All flags that use a response key
     private const MessageFlags ResponseKeyMask = MessageFlags.RequestResponseWithAcknowledgeRequest;
-    public ulong Sender => (Flags & MessageFlags.Relay) == 0 ? 0 : (ulong)RequestKey;
     public static unsafe void SetSize(ref MessageOverhead overhead, int size) => *(int*)((byte*)Unsafe.AsPointer(ref overhead) + 3) = size;
 
     /// <exception cref="IndexOutOfRangeException">If the pointer doesn't point to enough valid memory for the read.</exception>
-    public unsafe MessageOverhead(byte[] bytes, ulong sender = 0)
+    public unsafe MessageOverhead(byte[] bytes)
     {
         fixed (byte* ptr = bytes)
         {
-            Read(ptr, sender, bytes.Length, out Flags, out MessageId, out Size, out RequestKey, out ResponseKey, out Length);
+            Read(ptr, bytes.Length, out Flags, out MessageId, out Size, out RequestKey, out ResponseKey, out Length, out MessageGuid);
         }
     }
     /// <exception cref="AccessViolationException">If the pointer doesn't point to enough valid memory for the read.</exception>
-    public unsafe MessageOverhead(byte* ptr, ulong sender = 0)
+    public unsafe MessageOverhead(byte* ptr)
     {
-        Read(ptr, sender, -1, out Flags, out MessageId, out Size, out RequestKey, out ResponseKey, out Length);
+        Read(ptr, -1, out Flags, out MessageId, out Size, out RequestKey, out ResponseKey, out Length, out MessageGuid);
     }
     /// <exception cref="IndexOutOfRangeException">If the pointer doesn't point to enough valid memory for the read.</exception>
-    public unsafe MessageOverhead(byte* ptr, int len, ulong sender = 0)
+    public unsafe MessageOverhead(byte* ptr, int len)
     {
-        Read(ptr, sender, len, out Flags, out MessageId, out Size, out RequestKey, out ResponseKey, out Length);
+        Read(ptr, len, out Flags, out MessageId, out Size, out RequestKey, out ResponseKey, out Length, out MessageGuid);
     }
-    private static unsafe void Read(byte* ptr, ulong sender, int len, out MessageFlags flags, out ushort messageId, out int size, out long requestKey, out long responseKey, out int length)
+    private static unsafe void Read(byte* ptr, int len, out MessageFlags flags, out ushort messageId, out int size, out long requestKey, out long responseKey, out int length, out Guid guid)
     {
         if (len != -1 && len < MinimumSize) throw new IndexOutOfRangeException();
         requestKey = default;
@@ -62,6 +63,7 @@ public readonly struct MessageOverhead
         length = 7;
         flags = (MessageFlags)(*ptr);
         int offset = 1;
+        guid = Guid.Empty;
         messageId = UnsafeBitConverter.GetUInt16(ptr, offset);
         offset += sizeof(ushort);
         size = UnsafeBitConverter.GetInt32(ptr, offset);
@@ -76,11 +78,6 @@ public readonly struct MessageOverhead
             responseKey = UnsafeBitConverter.GetInt64(ptr, offset);
             offset += sizeof(long);
         }
-        if (sender != 0)
-        {
-            flags |= MessageFlags.Relay;
-            requestKey = (long)sender;
-        }
 
         length = offset;
     }
@@ -92,6 +89,7 @@ public readonly struct MessageOverhead
         RequestKey = (flags & RequestKeyMask) > 0 ? requestKey : default;
         ResponseKey = (flags & ResponseKeyMask) > 0 ? responseKey : default;
         Length = MinimumSize;
+        MessageGuid = Guid.Empty;
         if (flags == MessageFlags.None) return;
         if ((flags & RequestKeyMask) > 0)
             Length += sizeof(long);
@@ -141,8 +139,6 @@ public readonly struct MessageOverhead
         msg += " " + DevkitServerUtility.FormatBytes(Size) + ";";
         if ((Flags & MessageFlags.Relay) == 0 && ResponseKey != 0)
             msg += " Snowflake: " + RequestKey.ToString(CultureInfo.InvariantCulture) + ";";
-        if ((Flags & MessageFlags.Relay) != 0 && Sender != 0)
-            msg += " Sender: " + Sender.ToString(CultureInfo.InvariantCulture) + ";";
         if (RequestKey != 0)
             msg += (ResponseKey == 0 ? " Snowflake: " : " Request Key: ") + RequestKey.ToString(CultureInfo.InvariantCulture) + ";";
         if (Flags is not MessageFlags.None)

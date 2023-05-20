@@ -20,6 +20,8 @@ public class HighSpeedConnection : ITransportConnection
     public Guid SteamToken { get; internal set; }
     public TcpClient Client { get; }
 #if SERVER
+    internal int IntlTakeCounter;
+    public int TakeCounter => IntlTakeCounter;
     public HighSpeedServer Server { get; }
     public ITransportConnection? SteamConnection { get; private set; }
     public List<ITransportConnection>? SteamConnectionCandidates { get; private set; }

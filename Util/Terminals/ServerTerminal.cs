@@ -24,7 +24,7 @@ internal class ServerTerminal : MonoBehaviour, ITerminal
     {
         CheckInit();
         OnOutput?.Invoke(ref input, ref color);
-        string str = Logger.GetANSIForegroundString(color) + input + Logger.ANSIReset;
+        string str = FormattingUtil.GetANSIForegroundString(color) + input + FormattingUtil.ANSIReset;
         _writing = true;
         switch (severity)
         {
@@ -61,7 +61,7 @@ internal class ServerTerminal : MonoBehaviour, ITerminal
         if (save)
         {
             Logger.TryRemoveDateFromLine(ref str);
-            str = Logger.RemoveANSIFormatting(str);
+            str = FormattingUtil.RemoveANSIFormatting(str);
             Logs.printLine(str);
         }
         _writing = false;

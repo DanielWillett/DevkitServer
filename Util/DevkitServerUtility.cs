@@ -1,24 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Net;
+﻿using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Runtime.Remoting.Messaging;
 using System.Text;
-using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using DevkitServer.API;
-using DevkitServer.Multiplayer.Networking;
-using DevkitServer.Patches;
 using DevkitServer.Util.Encoding;
-using HarmonyLib;
 using JetBrains.Annotations;
-using SDG.Framework.Debug;
-using SDG.Framework.Landscapes;
 using Action = System.Action;
+#if SERVER
+using DevkitServer.Patches;
+using DevkitServer.Players;
+using System.Net;
+#endif
 
 namespace DevkitServer.Util;
 public static class DevkitServerUtility
@@ -229,228 +222,6 @@ public static class DevkitServerUtility
         }
         return sb.ToString();
     }
-    [Pure]
-    public static CodeInstruction GetLocalCodeInstruction(LocalBuilder? builder, int index, bool set, bool byref = false)
-    {
-        return new CodeInstruction(GetLocalCode(builder != null ? builder.LocalIndex : index, set, byref), builder);
-    }
-    [Pure]
-    public static OpCode GetLocalCode(int index, bool set, bool byref = false)
-    {
-        if (index > ushort.MaxValue)
-            throw new ArgumentOutOfRangeException(nameof(index));
-        if (!set && byref)
-        {
-            return index > byte.MaxValue ? OpCodes.Ldloca : OpCodes.Ldloca_S;
-        }
-        return index switch
-        {
-            0 => set ? OpCodes.Stloc_0 : OpCodes.Ldloc_0,
-            1 => set ? OpCodes.Stloc_1 : OpCodes.Ldloc_1,
-            2 => set ? OpCodes.Stloc_2 : OpCodes.Ldloc_2,
-            3 => set ? OpCodes.Stloc_3 : OpCodes.Ldloc_3,
-            _ => set ? (index > byte.MaxValue ? OpCodes.Stloc : OpCodes.Stloc_S) : (index > byte.MaxValue ? OpCodes.Ldloc : OpCodes.Ldloc_S)
-        };
-    }
-    [Pure]
-    public static int GetLocalIndex(CodeInstruction code, bool set)
-    {
-        if (code.opcode.OperandType == OperandType.ShortInlineVar &&
-            (set && code.opcode == OpCodes.Stloc_S ||
-             !set && code.opcode == OpCodes.Ldloc_S || !set && code.opcode == OpCodes.Ldloca_S))
-            return ((LocalBuilder)code.operand).LocalIndex;
-        if (code.opcode.OperandType == OperandType.InlineVar &&
-            (set && code.opcode == OpCodes.Stloc ||
-             !set && code.opcode == OpCodes.Ldloc || !set && code.opcode == OpCodes.Ldloca))
-            return ((LocalBuilder)code.operand).LocalIndex;
-        if (set)
-        {
-            if (code.opcode == OpCodes.Stloc_0)
-                return 0;
-            if (code.opcode == OpCodes.Stloc_1)
-                return 1;
-            if (code.opcode == OpCodes.Stloc_2)
-                return 2;
-            if (code.opcode == OpCodes.Stloc_3)
-                return 3;
-        }
-        else
-        {
-            if (code.opcode == OpCodes.Ldloc_0)
-                return 0;
-            if (code.opcode == OpCodes.Ldloc_1)
-                return 1;
-            if (code.opcode == OpCodes.Ldloc_2)
-                return 2;
-            if (code.opcode == OpCodes.Ldloc_3)
-                return 3;
-        }
-
-        return -1;
-    }
-    [Pure]
-    public static CodeInstruction LoadConstantI4(int number)
-    {
-        return number switch
-        {
-            -1 => new CodeInstruction(OpCodes.Ldc_I4_M1),
-             0 => new CodeInstruction(OpCodes.Ldc_I4_0),
-             1 => new CodeInstruction(OpCodes.Ldc_I4_1),
-             2 => new CodeInstruction(OpCodes.Ldc_I4_2),
-             3 => new CodeInstruction(OpCodes.Ldc_I4_3),
-             4 => new CodeInstruction(OpCodes.Ldc_I4_4),
-             5 => new CodeInstruction(OpCodes.Ldc_I4_5),
-             6 => new CodeInstruction(OpCodes.Ldc_I4_6),
-             7 => new CodeInstruction(OpCodes.Ldc_I4_7),
-             8 => new CodeInstruction(OpCodes.Ldc_I4_8),
-             _ => new CodeInstruction(OpCodes.Ldc_I4, number),
-        };
-    }
-    public static void LoadConstantI4(ILGenerator generator, int number)
-    {
-        OpCode code = number switch
-        {
-            -1 => OpCodes.Ldc_I4_M1,
-             0 => OpCodes.Ldc_I4_0,
-             1 => OpCodes.Ldc_I4_1,
-             2 => OpCodes.Ldc_I4_2,
-             3 => OpCodes.Ldc_I4_3,
-             4 => OpCodes.Ldc_I4_4,
-             5 => OpCodes.Ldc_I4_5,
-             6 => OpCodes.Ldc_I4_6,
-             7 => OpCodes.Ldc_I4_7,
-             8 => OpCodes.Ldc_I4_8,
-             _ => OpCodes.Ldc_I4
-        };
-        if (number is < -1 or > 8)
-            generator.Emit(code, number);
-        else
-            generator.Emit(code);
-    }
-    public static void LoadConstantI4(DebuggableEmitter generator, int number)
-    {
-        OpCode code = number switch
-        {
-            -1 => OpCodes.Ldc_I4_M1,
-             0 => OpCodes.Ldc_I4_0,
-             1 => OpCodes.Ldc_I4_1,
-             2 => OpCodes.Ldc_I4_2,
-             3 => OpCodes.Ldc_I4_3,
-             4 => OpCodes.Ldc_I4_4,
-             5 => OpCodes.Ldc_I4_5,
-             6 => OpCodes.Ldc_I4_6,
-             7 => OpCodes.Ldc_I4_7,
-             8 => OpCodes.Ldc_I4_8,
-             _ => OpCodes.Ldc_I4
-        };
-        if (number is < -1 or > 8)
-            generator.Emit(code, number);
-        else
-            generator.Emit(code);
-    }
-    [Pure]
-    public static CodeInstruction LoadParameter(int index)
-    {
-        return index switch
-        {
-             0 => new CodeInstruction(OpCodes.Ldarg_0),
-             1 => new CodeInstruction(OpCodes.Ldarg_1),
-             2 => new CodeInstruction(OpCodes.Ldarg_2),
-             3 => new CodeInstruction(OpCodes.Ldarg_3),
-             < ushort.MaxValue => new CodeInstruction(OpCodes.Ldarg_S, index),
-             _ => new CodeInstruction(OpCodes.Ldarg, index)
-        };
-    }
-    public static void LoadParameter(this ILGenerator generator, int index, bool byref = false)
-    {
-        if (byref)
-        {
-            generator.Emit(index > ushort.MaxValue ? OpCodes.Ldarga : OpCodes.Ldarga_S, index);
-            return;
-        }
-        OpCode code = index switch
-        {
-             0 => OpCodes.Ldarg_0,
-             1 => OpCodes.Ldarg_1,
-             2 => OpCodes.Ldarg_2,
-             3 => OpCodes.Ldarg_3,
-             <= ushort.MaxValue => OpCodes.Ldarg_S,
-             _ => OpCodes.Ldarg
-        };
-        if (index > 3)
-            generator.Emit(code, index);
-        else
-            generator.Emit(code);
-    }
-    [Pure]
-    public static LocalBuilder? GetLocal(CodeInstruction code, out int index, bool set)
-    {
-        if (code.opcode.OperandType == OperandType.ShortInlineVar &&
-            (set && code.opcode == OpCodes.Stloc_S ||
-             !set && code.opcode == OpCodes.Ldloc_S || !set && code.opcode == OpCodes.Ldloca_S))
-        {
-            LocalBuilder bld = (LocalBuilder)code.operand;
-            index = bld.LocalIndex;
-            return bld;
-        }
-        if (code.opcode.OperandType == OperandType.InlineVar &&
-            (set && code.opcode == OpCodes.Stloc ||
-             !set && code.opcode == OpCodes.Ldloc || !set && code.opcode == OpCodes.Ldloca))
-        {
-            LocalBuilder bld = (LocalBuilder)code.operand;
-            index = bld.LocalIndex;
-            return bld;
-        }
-        if (set)
-        {
-            if (code.opcode == OpCodes.Stloc_0)
-            {
-                index = 0;
-                return null;
-            }
-            if (code.opcode == OpCodes.Stloc_1)
-            {
-                index = 1;
-                return null;
-            }
-            if (code.opcode == OpCodes.Stloc_2)
-            {
-                index = 2;
-                return null;
-            }
-            if (code.opcode == OpCodes.Stloc_3)
-            {
-                index = 3;
-                return null;
-            }
-        }
-        else
-        {
-            if (code.opcode == OpCodes.Ldloc_0)
-            {
-                index = 0;
-                return null;
-            }
-            if (code.opcode == OpCodes.Ldloc_1)
-            {
-                index = 1;
-                return null;
-            }
-            if (code.opcode == OpCodes.Ldloc_2)
-            {
-                index = 2;
-                return null;
-            }
-            if (code.opcode == OpCodes.Ldloc_3)
-            {
-                index = 3;
-                return null;
-            }
-        }
-        
-        index = -1;
-        return null;
-    }
     public static unsafe void ReverseFloat(byte* ptr, int index)
     {
         byte b = ptr[index + 1];
@@ -468,8 +239,6 @@ public static class DevkitServerUtility
     public static Vector3 ToVector3(this in Vector2 v2) => new Vector3(v2.x, 0f, v2.y);
     [Pure]
     public static Vector3 ToVector3(this in Vector2 v2, float y) => new Vector3(v2.x, y, v2.y);
-    [Pure]
-    public static CodeInstruction CopyWithoutSpecial(this CodeInstruction instruction) => new CodeInstruction(instruction.opcode, instruction.operand);
     public static bool TryParseSteamId(string str, out CSteamID steamId)
     {
         if (str.Equals("Nil", StringComparison.InvariantCultureIgnoreCase) ||
@@ -861,7 +630,7 @@ public static class DevkitServerUtility
         return true;
     }
     public static MainThreadTask ToUpdate(CancellationToken token = default) => DevkitServerModule.IsMainThread ? MainThreadTask.CompletedNoSkip : new MainThreadTask(false, token);
-    public static MainThreadTask SkipFrame(CancellationToken token = default) => DevkitServerModule.IsMainThread ? MainThreadTask.CompletedSkip : new MainThreadTask(true, token);
+    public static MainThreadTask SkipFrame(CancellationToken token = default) => new MainThreadTask(true, token);
 #if SERVER
     public static bool TryGetConnections(IPAddress ip, out List<ITransportConnection> results)
     {
@@ -1104,6 +873,158 @@ public static class DevkitServerUtility
             return obj.placeholderTransform;
 
         return null;
+    }
+
+    public static void CustomDisconnect(
+#if SERVER
+        EditorUser user,
+#endif
+        string message)
+    {
+#if CLIENT
+        Provider.connectionFailureInfo = ESteamConnectionFailureInfo.KICKED;
+        Provider.RequestDisconnect(Provider.connectionFailureReason = message);
+#else
+        if (Provider.pending.Any(x => x.playerID.steamID.m_SteamID == user.SteamId.m_SteamID))
+            Provider.reject(user.SteamId, ESteamRejection.PLUGIN, message);
+        else
+            Provider.kick(user.SteamId, message);
+#endif
+    }
+    /// <summary>
+    /// Tries to create a directory.
+    /// </summary>
+    /// <remarks>Will not throw an exception. Use <see cref="Directory.CreateDirectory"/> if you want an exception.</remarks>
+    /// <param name="relative">If the path is relative to <see cref="ReadWrite.PATH"/>.</param>
+    /// <param name="path">Relative or absolute path to a directory.</param>
+    /// <returns><see langword="true"/> if the directory is created or already existed, otherwise false.</returns>
+    public static bool CheckDirectory(bool relative, string path) => CheckDirectory(relative, false, path, null);
+    internal static bool CheckDirectory(bool relative, bool fault, string path, MemberInfo? member)
+    {
+        try
+        {
+            if (relative)
+                path = Path.Combine(ReadWrite.PATH, path);
+            if (Directory.Exists(path))
+            {
+                if (member == null)
+                    Logger.LogDebug($"[CHECK DIR] Directory checked: {path.Format(false)}.");
+                else
+                    Logger.LogDebug($"[CHECK DIR] Directory checked: {path.Format(false)} from {member.Format()}.");
+                return true;
+            }
+
+            Directory.CreateDirectory(path);
+            if (member == null)
+                Logger.LogInfo($"[CHECK DIR] Directory created: {path.Format(false)}.");
+            else
+                Logger.LogInfo($"[CHECK DIR] Directory created: {path.Format(false)} from {member.Format()}.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            if (member == null)
+                Logger.LogError($"[CHECK DIR] Unable to create directory: {path.Format(false)}.");
+            else
+                Logger.LogError($"[CHECK DIR] Unable to create directory: {path.Format(false)} from {member.Format()}.");
+            Logger.LogError(ex);
+            if (fault)
+                DevkitServerModule.Fault();
+            return false;
+        }
+    }
+}
+
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+public sealed class CreateDirectoryAttribute : Attribute
+{
+    public bool RelativeToGameDir { get; set; }
+    internal bool FaultOnFailure { get; set; } = true;
+    public static void CreateInAssembly(Assembly assembly) => CreateInAssembly(assembly, false);
+    internal static void CreateInAssembly(Assembly assembly, bool allowFault)
+    {
+        List<Type> types = Accessor.GetTypesSafe(assembly, false);
+        for (int index = 0; index < types.Count; index++)
+        {
+            Type type = types[index];
+            FieldInfo[] fields = type.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            for (int f = 0; f < fields.Length; ++f)
+            {
+                FieldInfo field = fields[f];
+                if (!field.IsStatic || IsDefined(field, typeof(IgnoreAttribute)) || GetCustomAttribute(field, typeof(CreateDirectoryAttribute)) is not CreateDirectoryAttribute cdir)
+                    continue;
+                if (typeof(string).IsAssignableFrom(field.FieldType))
+                {
+                    string? path = (string?)field.GetValue(null);
+                    if (path == null)
+                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
+                    else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, field);
+                }
+                else if (typeof(FileInfo).IsAssignableFrom(field.FieldType))
+                {
+                    FileInfo? fileInfo = (FileInfo?)field.GetValue(null);
+                    cdir.RelativeToGameDir = false;
+                    string? file = fileInfo?.DirectoryName;
+                    if (file == null)
+                    {
+                        if (fileInfo == null)
+                            Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
+                    }
+                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, field);
+                }
+                else if (typeof(DirectoryInfo).IsAssignableFrom(field.FieldType))
+                {
+                    string? dir = ((DirectoryInfo?)field.GetValue(null))?.FullName;
+                    cdir.RelativeToGameDir = false;
+                    if (dir == null)
+                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
+                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, field);
+                }
+                else
+                {
+                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, valid on types: " +
+                                      $"{typeof(string).Format()}, {typeof(FileInfo).Format()}, or {typeof(DirectoryInfo).Format()}.");
+                }
+            }
+            PropertyInfo[] properties = type.GetProperties(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            for (int p = 0; p < properties.Length; ++p)
+            {
+                PropertyInfo property = properties[p];
+                if (property.GetMethod == null || property.GetMethod.IsStatic || property.GetIndexParameters() is { Length: > 0 } ||
+                    IsDefined(property, typeof(IgnoreAttribute)) || GetCustomAttribute(property, typeof(CreateDirectoryAttribute)) is not CreateDirectoryAttribute cdir)
+                    continue;
+                if (typeof(string).IsAssignableFrom(property.PropertyType))
+                {
+                    string? path = (string?)property.GetMethod?.Invoke(null, Array.Empty<object>());
+                    if (path == null)
+                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
+                    else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, property);
+                }
+                else if (typeof(FileInfo).IsAssignableFrom(property.PropertyType))
+                {
+                    FileInfo? fileInfo = (FileInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>());
+                    string? file = fileInfo?.DirectoryName;
+                    if (file == null)
+                    {
+                        if (fileInfo == null)
+                            Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
+                    }
+                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, property);
+                }
+                else if (typeof(DirectoryInfo).IsAssignableFrom(property.PropertyType))
+                {
+                    string? dir = ((DirectoryInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>()))?.FullName;
+                    if (dir == null)
+                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
+                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, property);
+                }
+                else
+                {
+                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, valid on types: " +
+                                      $"{typeof(string).Format()}, {typeof(FileInfo).Format()}, or {typeof(DirectoryInfo).Format()}.");
+                }
+            }
+        }
     }
 }
 

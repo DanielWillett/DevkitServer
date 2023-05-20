@@ -59,15 +59,21 @@ public class DevkitServerConfig
     }
 
 #if CLIENT
-    public static readonly string FilePath = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer");
-    public static readonly string ConfigFilePath = Path.Combine(FilePath, "client_config.json");
+    [CreateDirectory]
+    public static readonly string Directory = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer");
+    public static readonly string ConfigFilePath = Path.Combine(Directory, "client_config.json");
 #else
-    public static readonly string FilePath = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer", Provider.serverID);
-    public static readonly string ConfigFilePath = Path.Combine(FilePath, "server_config.json");
-    public static readonly string PermissionGroupsPath = Path.Combine(FilePath, "permission_groups.json");
+    [CreateDirectory]
+    public static readonly string Directory = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer", Provider.serverID);
+    public static readonly string ConfigFilePath = Path.Combine(Directory, "server_config.json");
+    public static readonly string PermissionGroupsPath = Path.Combine(Directory, "permission_groups.json");
 #endif
 
-    public static readonly string LocalizationFilePath = Path.Combine(FilePath, "Localization");
+    [CreateDirectory]
+    public static readonly string BundlesFolder = Path.Combine(UnturnedPaths.RootDirectory.FullName, "Modules", DevkitServerModule.ModuleName, "Bundles");
+    [CreateDirectory]
+    public static readonly string LocalizationFilePath = Path.Combine(Directory, "Localization");
+    [CreateDirectory]
     public static readonly string CommandLocalizationFilePath = Path.Combine(LocalizationFilePath, "Commands");
 
     private static SystemConfig? _config;
@@ -100,7 +106,7 @@ public class DevkitServerConfig
             {
                 string path = ConfigFilePath;
                 if (Path.GetDirectoryName(path) is { } dir)
-                    Directory.CreateDirectory(dir);
+                    System.IO.Directory.CreateDirectory(dir);
                 using FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
                 SystemConfig? config = _config;
                 if (config == null)

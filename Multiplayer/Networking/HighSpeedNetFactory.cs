@@ -22,6 +22,101 @@ public static class HighSpeedNetFactory
         Logger.LogDebug("Verifying high speed connection: " + pending.GetAddress().Format() + ".");
         HighSpeedVerify.Invoke(pending, pending.SteamToken);
     }
+    /// <summary>Call <see cref="ReleaseConnection"/> when you're done.</summary>
+    /// <returns>Number of takes on the connection after taking one.</returns>
+    public static int TakeConnection(HighSpeedConnection connection)
+    {
+        return Interlocked.Increment(ref connection.IntlTakeCounter);
+    }
+    /// <summary>Call <see cref="TakeConnection"/> before this. Closes the connection if there are no remaining takes.</summary>
+    /// <returns>Number of takes on the connection after releasing one.</returns>
+    public static int ReleaseConnection(HighSpeedConnection connection)
+    {
+        int c = Interlocked.Decrement(ref connection.IntlTakeCounter);
+        if (c <= 0)
+            connection.CloseConnection();
+        return c;
+    }
+
+    /// <summary>Coroutine compatible. Find or create a connection for <paramref name="connection"/>. If it doesn't exist it will be created, verified.
+    /// Then if <paramref name="take"/> is <see langword="true"/>, <see cref="TakeConnection"/> will be ran on it.</summary>
+    /// <param name="connection"></param>
+    /// <param name="take"></param>
+    /// <exception cref="OperationCanceledException"/>
+    /// <remarks>If you <paramref name="take"/> the connection or call <see cref="TakeConnection"/> on it, make sure you call <see cref="ReleaseConnection"/> when you're done.</remarks>
+    public static TaskYieldInstruction TryGetOrCreateAndVerifyYield(ITransportConnection connection, bool take, CancellationToken token = default) =>
+        new TaskYieldInstruction(TryGetOrCreateAndVerify(connection, take, token), token);
+    /// <summary>Find or create a connection for <paramref name="connection"/>. If it doesn't exist it will be created, verified.
+    /// Then if <paramref name="take"/> is <see langword="true"/>, <see cref="TakeConnection"/> will be ran on it.</summary>
+    /// <param name="connection"></param>
+    /// <param name="take"></param>
+    /// <exception cref="OperationCanceledException"/>
+    /// <remarks>If you <paramref name="take"/> the connection or call <see cref="TakeConnection"/> on it, make sure you call <see cref="ReleaseConnection"/> when you're done.</remarks>
+    public static async Task<HighSpeedConnection?> TryGetOrCreateAndVerify(ITransportConnection connection, bool take, CancellationToken token = default)
+    {
+        HighSpeedConnection? hsConn = FindConnection(connection);
+        if (hsConn is not { Client.Connected: true })
+            hsConn = null;
+
+        if (hsConn == null)
+        {
+            NetTask hsTask = TryCreate(connection, out bool failure);
+            if (!failure)
+            {
+                RequestResponse response = await hsTask;
+                if (!response.Responded || response.ErrorCode is not (int)StandardErrorCode.Success)
+                {
+                    Logger.LogWarning("Failed to create high-speed connection.");
+                    return null;
+                }
+            }
+            else return null;
+
+
+            hsConn = connection.FindConnection();
+            if (hsConn == null)
+            {
+                Logger.LogWarning("Unable to find created high-speed connection.");
+                return null;
+            }
+        }
+        
+        if (!hsConn.Verified)
+        {
+            try
+            {
+                CancellationTokenSource tknSrc = CancellationTokenSource.CreateLinkedTokenSource(token, new CancellationTokenSource(5000).Token);
+                while (!hsConn.Verified)
+                {
+                    await DevkitServerUtility.SkipFrame(tknSrc.Token);
+                    tknSrc.Token.ThrowIfCancellationRequested();
+                }
+            }
+            catch (OperationCanceledException) when (!token.IsCancellationRequested) // only for timeout token.
+            {
+                Logger.LogWarning("Timed out trying to verify connection (5 seconds).");
+                return null;
+            }
+        }
+
+        if (take)
+            TakeConnection(hsConn);
+        return hsConn;
+    }
+    public static HighSpeedConnection? FindConnection(this ITransportConnection connection)
+    {
+        HighSpeedConnection? hs = connection as HighSpeedConnection;
+        bool Filter(HighSpeedConnection x) => x is { Client.Connected: true, SteamConnection: not null } && x.SteamConnection.Equals(connection);
+        hs ??= HighSpeedServer.Instance.VerifiedConnections.FirstOrDefault(Filter) ?? HighSpeedServer.Instance.PendingConnections.FirstOrDefault(Filter);
+        return hs;
+    }
+    public static HighSpeedConnection? FindConnection(ulong steam64)
+    {
+        if (!steam64.UserSteam64())
+            return null;
+        bool Filter(HighSpeedConnection x) => x is { Client.Connected: true } && x.Steam64 == steam64;
+        return HighSpeedServer.Instance.VerifiedConnections.FirstOrDefault(Filter) ?? HighSpeedServer.Instance.PendingConnections.FirstOrDefault(Filter);
+    }
 
     [NetCall(NetCallSource.FromClient, (ushort)NetCalls.SendSteamVerificationToken)]
     private static void ReceiveSteamToken(MessageContext ctx, Guid received, ulong steam64)

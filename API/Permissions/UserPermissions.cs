@@ -18,7 +18,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
     internal static readonly NetCall SendClearPermissions = new NetCall((ushort)NetCalls.SendClearPermissions);
     internal static readonly NetCall SendClearPermissionGroups = new NetCall((ushort)NetCalls.SendClearPermissionGroups);
 #if SERVER
-    public static readonly string DefaultFileLocation = Path.Combine(DevkitServerConfig.FilePath, "permissions.json");
+    public static readonly string DefaultFileLocation = Path.Combine(DevkitServerConfig.Directory, "permissions.json");
     public const ushort DataVersion = 0;
 #endif
     private static IPermissionHandler _handler = new UserPermissions();
