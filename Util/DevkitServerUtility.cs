@@ -680,48 +680,11 @@ public static class DevkitServerUtility
             Directory.CreateDirectory(dir);
         using FileStream str = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
         using StreamWriter writer = new StreamWriter(str, encoding);
-        WriteData(writer, data, false);
+        using (DatWriter datWriter = new DatWriter(writer))
+        {
+            datWriter.WriteNode(data);
+        }
         writer.Flush();
-    }
-    public static void WriteData(StreamWriter writer, IDatNode data, bool writeBrackets = false, int indent = 0)
-    {
-        if (data is DatValue value)
-        {
-            writer.WriteLine(writeBrackets ? (" " + value.value) : value.value);
-            return;
-        }
-        string ind = indent < 1 ? string.Empty : new string('\t', indent);
-        switch (data)
-        {
-            case DatDictionary dict:
-                if (writeBrackets)
-                {
-                    writer.WriteLine();
-                    writer.WriteLine(ind + "{");
-                }
-                foreach (KeyValuePair<string, IDatNode> node in dict)
-                {
-                    writer.Write((writeBrackets ? ind + "\t" : string.Empty) + (node.Key.IndexOf(' ') != -1 ? ("\"" + node.Key + "\"") : node.Key));
-                    WriteData(writer, node.Value, true, writeBrackets ? indent + 1 : indent);
-                }
-                if (writeBrackets)
-                    writer.WriteLine(ind + "}");
-                break;
-            case DatList list:
-                if (writeBrackets)
-                {
-                    writer.WriteLine();
-                    writer.WriteLine(ind + "[");
-                }
-                for (int i = 0; i < list.Count; ++i)
-                {
-                    IDatNode node = list[i];
-                    WriteData(writer, node, true, writeBrackets ? indent + 1 : indent);
-                }
-                if (writeBrackets)
-                    writer.WriteLine(ind + "]");
-                break;
-        }
     }
     [Pure]
     public static unsafe bool UserSteam64(this ulong s64) => ((CSteamID*)&s64)->GetEAccountType() == EAccountType.k_EAccountTypeIndividual;

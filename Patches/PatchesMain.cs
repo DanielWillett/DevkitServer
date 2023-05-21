@@ -272,11 +272,13 @@ internal static class PatchesMain
         return true;
     }
 
+    internal static MasterBundleConfig? LastLoadedMasterBundleConfig;
     [HarmonyPatch(typeof(MasterBundleConfig), "StartLoad")]
     [HarmonyPrefix]
     [UsedImplicitly]
     private static void PrefixStartLoad(MasterBundleConfig __instance, byte[] inputData, byte[] inputHash)
     {
+        LastLoadedMasterBundleConfig = __instance;
         Logger.LogDebug($"{__instance.assetBundleName.Format()} load start.");
     }
     [HarmonyPatch(typeof(MasterBundleConfig), "FinishLoad")]
@@ -284,7 +286,15 @@ internal static class PatchesMain
     [UsedImplicitly]
     private static void PrefixFinishLoad(MasterBundleConfig __instance)
     {
+        Interlocked.CompareExchange(ref LastLoadedMasterBundleConfig, null, __instance);
         Logger.LogDebug($"{__instance.assetBundleName.Format()} load end.");
+    }
+    [HarmonyPatch(typeof(Assets), "LoadNewAssetsFromUpdate")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    private static void PrefixLoadNewAssetsFromUpdate(Assets __instance)
+    {
+        Logger.LogDebug($"{__instance.Format()} loading from update.");
     }
 
 

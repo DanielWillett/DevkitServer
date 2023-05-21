@@ -209,9 +209,6 @@ public class SystemConfig
 
     [JsonPropertyName("high_speed")]
     public TcpServerInfo TcpSettings;
-
-    [JsonPropertyName("enable_pixel_avg_splatmap_smoothing")]
-    public bool EnablePixelAverageSplatmapSmoothing;
     public class TcpServerInfo
     {
         [JsonPropertyName("enable_high_speed_support")]

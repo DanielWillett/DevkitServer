@@ -28,8 +28,7 @@ namespace DevkitServer;
 public sealed class DevkitServerModule : IModuleNexus
 {
     public static readonly string RepositoryUrl = "https://github.com/DanielWillett/DevkitServer"; // don't end with '/'
-    private static StaticGetter<Assets> GetAssetsInstance = null!;
-    private static Func<Assets, IEnumerator> GetLoadAssetsFromWorkerThreadCoroutine = null!;
+    private static StaticGetter<Assets>? GetAssetsInstance;
     private static InstanceSetter<AssetOrigin, bool>? SetOverrideIDs;
     public const string ModuleName = "DevkitServer";
     public static readonly string ServerRule = "DevkitServer";
@@ -47,6 +46,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static LevelInfo? PendingLevelInfo { get; internal set; }
     public static bool HasLoadedBundle { get; private set; }
     public static MasterBundle? Bundle { get; private set; }
+    public static MasterBundleConfig? BundleConfig { get; private set; }
     public static bool IsMainThread => ThreadUtil.gameThread == Thread.CurrentThread;
     public static CancellationToken UnloadToken => _tknSrc == null ? CancellationToken.None : _tknSrc.Token;
     public static Local MainLocalization { get; private set; } = null!;
@@ -75,8 +75,7 @@ public sealed class DevkitServerModule : IModuleNexus
 #if CLIENT
         Logger.PostPatcherSetupInitLogger();
 #endif
-        GetLoadAssetsFromWorkerThreadCoroutine = Accessor.GenerateInstanceCaller<Assets, Func<Assets, IEnumerator>>("LoadAssetsFromWorkerThread", Array.Empty<Type>(), true)!;
-        GetAssetsInstance = Accessor.GenerateStaticGetter<Assets, Assets>("instance", throwOnError: true)!;
+        GetAssetsInstance = Accessor.GenerateStaticGetter<Assets, Assets>("instance");
         SetOverrideIDs = Accessor.GenerateInstanceSetter<AssetOrigin, bool>("shouldAssetsOverrideExistingIds");
     }
 
@@ -248,6 +247,10 @@ public sealed class DevkitServerModule : IModuleNexus
             callback?.Invoke();
             yield break;
         }
+
+        while (Assets.isLoading)
+            yield return null;
+        
         string path = Path.Combine(ReadWrite.PATH, "Modules", "DevkitServer", "Bundles");
         if (!Directory.Exists(path))
         {
@@ -255,20 +258,17 @@ public sealed class DevkitServerModule : IModuleNexus
             callback?.Invoke();
             yield break;
         }
-        MasterBundleConfig? bundle = Assets.findMasterBundleByPath(path);
-        if (bundle == null)
+        MasterBundleConfig? bundle = BundleConfig ?? Assets.findMasterBundleByPath(path);
+        if (bundle == null || bundle.assetBundle == null)
         {
             Logger.LogDebug($"Adding DevkitServer Bundle Search Location: {path.Format(false)}.");
             Assets.RequestAddSearchLocation(path, BundleOrigin);
-            IEnumerator t = GetLoadAssetsFromWorkerThreadCoroutine(GetAssetsInstance());
-            Logger.LogDebug(t.Format());
-            while (t.MoveNext())
+            yield return null;
+            yield return new WaitForEndOfFrame();
+            while (Assets.isLoading)
             {
-                Logger.LogDebug(t.Current.Format());
-                yield return t.Current;
+                yield return null;
             }
-
-            yield return new WaitForSeconds(5f);
 
             bundle = Assets.findMasterBundleByPath(path);
             if (bundle == null)
@@ -282,7 +282,14 @@ public sealed class DevkitServerModule : IModuleNexus
                 yield break;
             }
         }
+
+        if (Bundle != null)
+        {
+            Bundle.unload();
+            Bundle = null;
+        }
         Bundle = new MasterBundle(bundle, string.Empty, "DevkitServer Base");
+        BundleConfig = bundle;
         Logger.LogInfo("Loaded bundle: " + bundle.assetBundleNameWithoutExtension.Format() + " from " + path.Format() + ".");
         HasLoadedBundle = true;
 #if false
@@ -292,13 +299,16 @@ public sealed class DevkitServerModule : IModuleNexus
 #endif
         callback?.Invoke();
     }
+
     internal static void Fault()
     {
         if (!LoadFaulted)
         {
             LoadFaulted = true;
             Logger.LogWarning("DevkitServer terminated.");
-            GetAssetsInstance?.Invoke()?.StopAllCoroutines();
+            Assets? instance = GetAssetsInstance?.Invoke();
+            if (instance != null)
+                instance.StopAllCoroutines();
             Provider.shutdown(10, "DevkitServer failed to load.");
         }
     }

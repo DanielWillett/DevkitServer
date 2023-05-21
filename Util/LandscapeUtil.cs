@@ -100,6 +100,133 @@ public static class LandscapeUtil
 
         return hm;
     }
+
+    public static void ReleaseHeightmapBuffer(Dictionary<LandscapeCoord, float[,]> dict)
+    {
+        foreach (float[,] hm in dict.Values)
+            LandscapeHeightmapCopyPool.release(hm);
+
+        dict.Clear();
+    }
+    public static void ReleaseSplatmapBuffer(Dictionary<LandscapeCoord, float[,,]> dict)
+    {
+        foreach (float[,,] sm in dict.Values)
+            LandscapeSplatmapCopyPool.release(sm);
+
+        dict.Clear();
+    }
+    public static void ReleaseHoleBuffer(Dictionary<LandscapeCoord, bool[,]> dict)
+    {
+        foreach (bool[,] hm in dict.Values)
+            LandscapeHoleCopyPool.release(hm);
+
+        dict.Clear();
+    }
+
+    /// <returns>Number of tiles copied.</returns>
+    public static int CopyHeightmapTo(LandscapeBounds bounds, Dictionary<LandscapeCoord, float[,]> dict)
+    {
+        int tiles = 0;
+        for (int x = bounds.min.x; x <= bounds.max.x; ++x)
+        {
+            for (int y = bounds.min.y; y <= bounds.max.y; ++y)
+            {
+                LandscapeCoord coord = new LandscapeCoord(x, y);
+                LandscapeTile? tile = Landscape.getTile(coord);
+                float[,] hm;
+                if (tile == null)
+                {
+                    if (dict.TryGetValue(coord, out hm))
+                    {
+                        LandscapeHeightmapCopyPool.release(hm);
+                        dict.Remove(coord);
+                    }
+                    continue;
+                }
+                if (!dict.TryGetValue(coord, out hm))
+                    dict.Add(coord, CloneHeightmapFromPool(tile));
+                else
+                {
+                    LandscapeHeightmapCopyPool.release(hm);
+                    dict[coord] = CloneHeightmapFromPool(tile);
+                }
+
+                ++tiles;
+            }
+        }
+
+        return tiles;
+    }
+
+    /// <returns>Number of tiles copied.</returns>
+    public static int CopySplatmapTo(LandscapeBounds bounds, Dictionary<LandscapeCoord, float[,,]> dict)
+    {
+        int tiles = 0;
+        for (int x = bounds.min.x; x <= bounds.max.x; ++x)
+        {
+            for (int y = bounds.min.y; y <= bounds.max.y; ++y)
+            {
+                LandscapeCoord coord = new LandscapeCoord(x, y);
+                LandscapeTile? tile = Landscape.getTile(coord);
+                float[,,] sm;
+                if (tile == null)
+                {
+                    if (dict.TryGetValue(coord, out sm))
+                    {
+                        LandscapeSplatmapCopyPool.release(sm);
+                        dict.Remove(coord);
+                    }
+                    continue;
+                }
+                if (!dict.TryGetValue(coord, out sm))
+                    dict.Add(coord, CloneSplatmapFromPool(tile));
+                else
+                {
+                    LandscapeSplatmapCopyPool.release(sm);
+                    dict[coord] = CloneSplatmapFromPool(tile);
+                }
+
+                ++tiles;
+            }
+        }
+
+        return tiles;
+    }
+
+    /// <returns>Number of tiles copied.</returns>
+    public static int CopyHolesTo(LandscapeBounds bounds, Dictionary<LandscapeCoord, bool[,]> dict)
+    {
+        int tiles = 0;
+        for (int x = bounds.min.x; x <= bounds.max.x; ++x)
+        {
+            for (int y = bounds.min.y; y <= bounds.max.y; ++y)
+            {
+                LandscapeCoord coord = new LandscapeCoord(x, y);
+                LandscapeTile? tile = Landscape.getTile(coord);
+                bool[,] hm;
+                if (tile == null)
+                {
+                    if (dict.TryGetValue(coord, out hm))
+                    {
+                        LandscapeHoleCopyPool.release(hm);
+                        dict.Remove(coord);
+                    }
+                    continue;
+                }
+                if (!dict.TryGetValue(coord, out hm))
+                    dict.Add(coord, CloneHolesFromPool(tile));
+                else
+                {
+                    LandscapeHoleCopyPool.release(hm);
+                    dict[coord] = CloneHolesFromPool(tile);
+                }
+
+                ++tiles;
+            }
+        }
+
+        return tiles;
+    }
     public static unsafe void ReadHeightmap(byte* output, LandscapeTile tile, in HeightmapBounds bounds)
     {
         float* buffer = (float*)output;

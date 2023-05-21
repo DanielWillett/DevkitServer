@@ -29,8 +29,7 @@ public class DevkitServerGamemode : GameMode
         return new ClientInfo
         {
             Permissions = UserPermissions.UserHandler.GetPermissions(user.SteamId.m_SteamID, true)?.ToArray() ?? Array.Empty<Permission>(),
-            PermissionGroups = UserPermissions.UserHandler.GetPermissionGroups(user.SteamId.m_SteamID, true)?.ToArray() ?? Array.Empty<PermissionGroup>(),
-            EnablePixelAverageSplatmapSmoothing = DevkitServerConfig.Config.EnablePixelAverageSplatmapSmoothing
+            PermissionGroups = UserPermissions.UserHandler.GetPermissionGroups(user.SteamId.m_SteamID, true)?.ToArray() ?? Array.Empty<PermissionGroup>()
         };
     }
 #endif

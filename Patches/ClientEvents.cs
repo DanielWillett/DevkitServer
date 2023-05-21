@@ -534,11 +534,6 @@ public static class ClientEvents
         {
             if (TerrainEditor.splatmapMode != TerrainEditor.EDevkitLandscapeToolSplatmapMode.CUT)
             {
-                if (TerrainEditor.splatmapMode == TerrainEditor.EDevkitLandscapeToolSplatmapMode.SMOOTH && DevkitLandscapeToolSplatmapOptions.instance.smoothMethod == EDevkitLandscapeToolSplatmapSmoothMethod.PIXEL_AVERAGE && ClientInfo.Info is not { EnablePixelAverageSplatmapSmoothing: true })
-                {
-                    UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("FeatureDisabled"));
-                    return false;
-                }
                 if (OnEditSplatmapRequested == null) return true;
                 foreach (EditSplatmapRequest requested in OnEditSplatmapRequested.GetInvocationList().Cast<EditSplatmapRequest>())
                 {
@@ -1030,7 +1025,6 @@ public static class ClientEvents
     [UsedImplicitly]
     private static IEnumerable<CodeInstruction> SelectionToolOnHandleTranslatedAndRotated(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
     {
-        Type st = typeof(SelectionTool);
         MethodInfo tempMoveHandleInvoker = new Action<DevkitSelection, Vector3, Quaternion, Vector3, bool>(OnTempMoveRotateHandle).Method;
 
         MethodInfo? getComponent = typeof(GameObject).GetMethods(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault(x =>
@@ -1094,7 +1088,7 @@ public static class ClientEvents
     {
         Type st = typeof(SelectionTool);
         Type dtu = typeof(DevkitTransactionUtility);
-        Type vp = typeof(VanillaPermissions);
+        // Type vp = typeof(VanillaPermissions);
 
         MethodInfo moveHandleInvoker = new Action<Vector3, Quaternion, Vector3, bool, bool>(OnMoveHandle).Method;
         MethodInfo requestInstantiationInvoker = new Action<Vector3>(OnRequestInstantiaion).Method;

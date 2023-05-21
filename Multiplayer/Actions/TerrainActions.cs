@@ -502,11 +502,12 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrush
         {
             Bounds readBounds = Bounds;
             readBounds.Expand(Landscape.HEIGHTMAP_WORLD_UNIT * 2f);
-            Landscape.readHeightmap(readBounds, IntlHandleHeightmapReadSmoothPixelAverage);
+            LandscapeBounds landscapeBounds = new LandscapeBounds(readBounds);
+            LandscapeUtil.CopyHeightmapTo(landscapeBounds, PixelSmoothBuffer);
         }
         LandscapeUtil.WriteHeightmapNoTransactions(Bounds, IntlHandleHeightmapWriteSmooth);
         if (SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE)
-            ReleasePixelSmoothBuffer();
+            LandscapeUtil.ReleaseHeightmapBuffer(PixelSmoothBuffer);
     }
 #if SERVER
     public bool CheckCanApply()
@@ -532,28 +533,13 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrush
         if (SmoothMethod != EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE)
             writer.Write(SmoothTarget);
     }
-    private static void IntlHandleHeightmapReadSmoothPixelAverage(LandscapeCoord tileCoord, HeightmapCoord heightmapCoord, Vector3 worldPosition, float currentHeight)
-    {
-        if (!PixelSmoothBuffer.TryGetValue(tileCoord, out float[,] hm))
-        {
-            hm = LandscapeHeightmapCopyPool.claim();
-            PixelSmoothBuffer.Add(tileCoord, hm);
-        }
-        hm[heightmapCoord.x, heightmapCoord.y] = currentHeight;
-    }
-    private static void ReleasePixelSmoothBuffer()
-    {
-        foreach (KeyValuePair<LandscapeCoord, float[,]> hmVal in PixelSmoothBuffer)
-            LandscapeHeightmapCopyPool.release(hmVal.Value);
-        PixelSmoothBuffer.Clear();
-    }
     private static void SampleHeightPixelSmooth(object? instance, Vector3 worldPosition, ref int sampleCount, ref float sampleAverage)
     {
         IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
-            FieldInfo? field = typeof(TerrainEditor).GetField("pixelSmoothBuffer", BindingFlags.Instance | BindingFlags.NonPublic);
-            if (field == null)
-                Logger.LogWarning("Unable to find field: TerrainEditor.pixelSmoothBuffer.");
+            FieldInfo? field = typeof(TerrainEditor).GetField("heightmapPixelSmoothBuffer", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (field == null || typeof(float[,]) != field.FieldType)
+                Logger.LogWarning("Unable to find field: TerrainEditor.heightmapPixelSmoothBuffer.");
 
             FieldInfo buffer = typeof(HeightmapSmoothAction).GetField(nameof(PixelSmoothBuffer), BindingFlags.Static | BindingFlags.NonPublic)!;
 
@@ -567,6 +553,8 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrush
                     CodeInstruction c2 = new CodeInstruction(OpCodes.Ldsfld, buffer);
                     c2.labels.AddRange(c.labels);
                     c2.blocks.AddRange(c.blocks);
+                    c2.labels.AddRange(ins[i + 1].labels);
+                    c2.blocks.AddRange(ins[i + 1].blocks);
                     yield return c2;
                     one = true;
                     ++i;
@@ -889,7 +877,8 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushF
         public float Weight;
     }
 
-    private static readonly List<SampleBufferEntry> SmoothSampleAverageBuffer = new List<SampleBufferEntry>(Landscape.SPLATMAP_LAYERS * 2);
+    private static readonly List<SampleBufferEntry> BrushSmoothSampleAverageBuffer = new List<SampleBufferEntry>(Landscape.SPLATMAP_LAYERS * 2);
+    private static readonly Dictionary<LandscapeCoord, float[,,]> PixelSmoothBuffer = new Dictionary<LandscapeCoord, float[,,]>(4);
     private static int SmoothSampleAverageCount;
     private static int SmoothSampleCount;
     public ActionType Type => ActionType.SplatmapSmooth;
@@ -910,13 +899,20 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushF
             SmoothSampleCount = 0;
             Landscape.readSplatmap(Bounds, IntlHandleSplatmapReadBrushAverage);
         }
+        else if (SmoothMethod == EDevkitLandscapeToolSplatmapSmoothMethod.PIXEL_AVERAGE)
+        {
+            Bounds bounds2 = Bounds;
+            bounds2.Expand(Landscape.SPLATMAP_WORLD_UNIT * 2f);
+            LandscapeBounds landscapeBounds = new LandscapeBounds(bounds2);
+            LandscapeUtil.CopySplatmapTo(landscapeBounds, PixelSmoothBuffer);
+        }
         LandscapeUtil.WriteSplatmapNoTransactions(Bounds, IntlHandleSplatmapWriteSmooth);
+        if (SmoothMethod == EDevkitLandscapeToolSplatmapSmoothMethod.PIXEL_AVERAGE)
+            LandscapeUtil.ReleaseSplatmapBuffer(PixelSmoothBuffer);
     }
 #if SERVER
     public bool CheckCanApply()
     {
-        if (!DevkitServerConfig.Config.EnablePixelAverageSplatmapSmoothing && SmoothMethod == EDevkitLandscapeToolSplatmapSmoothMethod.PIXEL_AVERAGE)
-            return false;
         return VanillaPermissions.EditSplatmap.Has(Instigator.m_SteamID) ||
                VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
     }
@@ -929,24 +925,24 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushF
         bool found = false;
         for (int j = 0; j < SmoothSampleAverageCount; ++j)
         {
-            if (SmoothSampleAverageBuffer[j].Material == material.GUID)
+            if (BrushSmoothSampleAverageBuffer[j].Material == material.GUID)
             {
-                SmoothSampleAverageBuffer[j].Weight += weight;
+                BrushSmoothSampleAverageBuffer[j].Weight += weight;
                 found = true;
                 break;
             }
         }
         if (!found)
         {
-            if (SmoothSampleAverageBuffer.Count > SmoothSampleAverageCount)
+            if (BrushSmoothSampleAverageBuffer.Count > SmoothSampleAverageCount)
             {
-                SampleBufferEntry e = SmoothSampleAverageBuffer[SmoothSampleAverageCount];
+                SampleBufferEntry e = BrushSmoothSampleAverageBuffer[SmoothSampleAverageCount];
                 e.Material = material.GUID;
                 e.Weight = weight;
             }
             else
             {
-                SmoothSampleAverageBuffer.Add(new SampleBufferEntry { Material = material.GUID, Weight = weight });
+                BrushSmoothSampleAverageBuffer.Add(new SampleBufferEntry { Material = material.GUID, Weight = weight });
             }
             ++SmoothSampleAverageCount;
         }
@@ -1004,17 +1000,7 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushF
             {
                 SplatmapCoord splatmapCoord2 = new SplatmapCoord(splatmapCoord.x + dx, splatmapCoord.y + dy);
                 LandscapeCoord tileCoord2 = tileCoord;
-                LandscapeUtility.cleanSplatmapCoord(ref tileCoord2, ref splatmapCoord2);
-                LandscapeTile? tile2 = Landscape.getTile(tileCoord2);
-                if (tile2?.materials != null)
-                {
-                    for (int i = 0; i < Landscape.SPLATMAP_LAYERS; ++i)
-                    {
-                        AssetReference<LandscapeMaterialAsset> mat = tile2.materials[i];
-                        if (mat.isValid)
-                            AddOrIncrementSample(mat, tile2.splatmap[splatmapCoord2.x, splatmapCoord2.y, i]);
-                    }
-                }
+                IntlSampleSplatmapPixelSmooth(tileCoord2, splatmapCoord2);
             }
 
             if (SmoothSampleCount < 1)
@@ -1028,9 +1014,9 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushF
             Guid r = tile.materials[i].GUID;
             for (int j = 0; j < SmoothSampleAverageCount; ++j)
             {
-                if (SmoothSampleAverageBuffer[j].Material == r)
+                if (BrushSmoothSampleAverageBuffer[j].Material == r)
                 {
-                    total += SmoothSampleAverageBuffer[j].Weight / SmoothSampleCount;
+                    total += BrushSmoothSampleAverageBuffer[j].Weight / SmoothSampleCount;
                     break;
                 }
             }
@@ -1042,13 +1028,30 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushF
             float weight = 0;
             for (int j = 0; j < SmoothSampleAverageCount; ++j)
             {
-                if (SmoothSampleAverageBuffer[j].Material == r)
+                if (BrushSmoothSampleAverageBuffer[j].Material == r)
                 {
-                    weight = SmoothSampleAverageBuffer[j].Weight / SmoothSampleCount / total;
+                    weight = BrushSmoothSampleAverageBuffer[j].Weight / SmoothSampleCount / total;
                     break;
                 }
             }
             currentWeights[i] += (weight - currentWeights[i]) * speed;
+        }
+    }
+    private static void IntlSampleSplatmapPixelSmooth(LandscapeCoord tileCoord, SplatmapCoord splatmapCoord)
+    {
+        LandscapeUtility.cleanSplatmapCoord(ref tileCoord, ref splatmapCoord);
+        if (!PixelSmoothBuffer.TryGetValue(tileCoord, out float[,,] splatmap))
+            return;
+
+        LandscapeTile? tile2 = Landscape.getTile(tileCoord);
+        if (tile2?.materials != null)
+        {
+            for (int i = 0; i < Landscape.SPLATMAP_LAYERS; ++i)
+            {
+                AssetReference<LandscapeMaterialAsset> mat = tile2.materials[i];
+                if (mat.isValid)
+                    AddOrIncrementSample(mat, splatmap[splatmapCoord.x, splatmapCoord.y, i]);
+            }
         }
     }
 }
