@@ -26,7 +26,7 @@ public class ByteReader
     public Stream? Stream
     {
         get => _stream;
-        set
+        private set
         {
             if (value is not null && !value.CanRead)
                 throw new ArgumentException("Stream must be able to read.");
@@ -37,6 +37,7 @@ public class ByteReader
     public int Position => _streamMode ? _position : _index;
     public int BytesLeft => _streamMode ? (_streamLengthSupport ? (int)Math.Min(_stream!.Length - _stream!.Position, int.MaxValue) : (_buffer is not null ? _buffer.Length - _index : 0)) : _buffer!.Length - _index;
     public bool ThrowOnError { get; set; }
+    public bool LogOnError { get; set; } = true;
     public int StreamBufferSize { get; set; } = 128;
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private int GetStreamBufferLength() => !_streamLengthSupport
@@ -46,8 +47,8 @@ public class ByteReader
     public void LoadNew(Stream stream)
     {
         failure = false;
-        _stream = stream ?? throw new ArgumentNullException(nameof(stream));
-        if (!_stream.CanSeek)
+        Stream = stream ?? throw new ArgumentNullException(nameof(stream));
+        if (!_stream!.CanSeek)
         {
             _streamLengthSupport = false;
             if (_buffer is null || _buffer.Length < StreamBufferSize)
@@ -192,7 +193,8 @@ public class ByteReader
                     " B at offset " + _index.ToString(CultureInfo.InvariantCulture) + " / " + _length.ToString(CultureInfo.InvariantCulture) + ".";
         if (ThrowOnError)
             throw new ByteBufferOverflowException(ex);
-        Logger.LogWarning(ex);
+        if (LogOnError)
+            Logger.LogWarning(ex);
         return false;
     }
     public byte[] ReadBlock(int length)
@@ -230,6 +232,17 @@ public class ByteReader
     {
         EnsureMoreLength(bytes);
         _index += bytes;
+    }
+    public void Goto(int toPosition)
+    {
+        if (_streamMode)
+            throw new NotSupportedException("Not supported when using stream mode.");
+        if (Position < toPosition)
+            Skip(Position - toPosition);
+        else
+        {
+            _index = toPosition;
+        }
     }
 
     private static readonly MethodInfo ReadNullableByteArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableBytes), BindingFlags.Instance | BindingFlags.Public);
@@ -362,8 +375,7 @@ public class ByteReader
 
     private static readonly MethodInfo ReadInt16Method = typeof(ByteReader).GetMethod(nameof(ReadInt16), BindingFlags.Instance | BindingFlags.Public);
     public short ReadInt16() => !EnsureMoreLength(sizeof(short)) ? default : Read<short>();
-
-#pragma warning disable CS0675
+    
     public int ReadInt24()
     {
         if (!EnsureMoreLength(3))
@@ -373,7 +385,6 @@ public class ByteReader
         ++_index;
         return (sh | (bt << 16)) - DevkitServerUtility.Int24Bounds;
     }
-#pragma warning restore CS0675
 
     public uint ReadUInt24() => unchecked((uint)ReadInt24());
 
@@ -461,6 +472,86 @@ public class ByteReader
         string str = System.Text.Encoding.UTF8.GetString(_buffer, _index, length);
         _index += length;
         return str;
+    }
+
+    private static readonly MethodInfo ReadTypeMethod = typeof(ByteReader).GetMethod(nameof(ReadType), BindingFlags.Instance | BindingFlags.Public);
+    public string? ReadTypeInfo() => ReadTypeInfo(out _);
+    public string? ReadTypeInfo(out byte flag)
+    {
+        const string nsSdgUnturned = "SDG.Unturned";
+        const string nsSdgFrameworkDevkit = "SDG.Framework.Devkit";
+        const string nsSdgFramework = "SDG.Framework";
+        const string nsDevkitServer = "DevkitServer";
+        const string nsSystem = "System";
+
+        flag = ReadUInt8();
+        if ((flag & 128) != 0)
+            return null;
+
+        string ns = ReadString();
+        if ((flag & 1) != 0)
+        {
+            // AssemblyCSharp
+            if ((flag & 8) != 0)
+                ns = ns.Length == 0 ? nsSdgUnturned : nsSdgUnturned + "." + ns;
+            else if ((flag & 16) != 0)
+                ns = ns.Length == 0 ? nsSdgFrameworkDevkit : nsSdgFrameworkDevkit + "." + ns;
+            else if ((flag & 32) != 0)
+                ns = ns.Length == 0 ? nsSdgFramework : nsSdgFramework + "." + ns;
+            ns = "[Assembly-CSharp.dll] " + ns;
+        }
+        else if ((flag & 2) != 0)
+        {
+            // DevkitServer
+            if ((flag & 4) != 0)
+                ns = ns.Length == 0 ? nsDevkitServer : nsDevkitServer + "." + ns;
+            ns = "[DevkitServer.dll] " + ns;
+        }
+        if ((flag & 64) != 0)
+        {
+            // mscorlib
+            ns = "[mscorlib.dll] " + (ns.Length == 0 ? nsSystem : nsSystem + "." + ns);
+        }
+        return ns;
+    }
+    public Type? ReadType()
+    {
+        const string nsSdgUnturned = "SDG.Unturned";
+        const string nsSdgFrameworkDevkit = "SDG.Framework.Devkit";
+        const string nsSdgFramework = "SDG.Framework";
+        const string nsDevkitServer = "DevkitServer";
+        const string nsSystem = "System";
+
+        byte flag = ReadUInt8();
+        if ((flag & 128) != 0)
+            return null;
+
+        string ns = ReadString();
+        if ((flag & 1) != 0)
+        {
+            // AssemblyCSharp
+            if ((flag & 8) != 0)
+                ns = ns.Length == 0 ? nsSdgUnturned : nsSdgUnturned + "." + ns;
+            else if ((flag & 16) != 0)
+                ns = ns.Length == 0 ? nsSdgFrameworkDevkit : nsSdgFrameworkDevkit + "." + ns;
+            else if ((flag & 32) != 0)
+                ns = ns.Length == 0 ? nsSdgFramework : nsSdgFramework + "." + ns;
+            return Accessor.AssemblyCSharp.GetType(ns);
+        }
+        if ((flag & 2) != 0)
+        {
+            // DevkitServer
+            if ((flag & 4) != 0)
+                ns = ns.Length == 0 ? nsDevkitServer : nsDevkitServer + "." + ns;
+            return Accessor.DevkitServer.GetType(ns);
+        }
+        if ((flag & 64) != 0)
+        {
+            // mscorlib
+            return Accessor.MSCoreLib.GetType(ns.Length == 0 ? nsSystem : nsSystem + "." + ns);
+        }
+
+        return Type.GetType(ns);
     }
     public string ReadShortString()
     {
@@ -1076,6 +1167,10 @@ public class ByteReader
         else if (type == typeof(DateTime))
         {
             il.EmitCall(OpCodes.Call, isNullable ? ReadNullableDateTimeMethod : ReadDateTimeMethod, null);
+        }
+        else if (typeof(Type).IsAssignableFrom(type))
+        {
+            il.EmitCall(OpCodes.Call, ReadTypeMethod, null);
         }
         else if (type == typeof(DateTimeOffset))
         {

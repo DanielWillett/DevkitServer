@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using System.Reflection;
+using HarmonyLib;
 using JetBrains.Annotations;
 using System.Reflection.Emit;
 
@@ -403,5 +404,15 @@ public static class PatchUtil
             return @double;
 
         return false;
+    }
+    [Pure]
+    public static bool ShouldCallvirt(this MethodInfo method)
+    {
+        return method.DeclaringType is { IsInterface: true } || method.IsVirtual || method.IsAbstract;
+    }
+    [Pure]
+    public static OpCode GetCall(this MethodInfo method)
+    {
+        return method.ShouldCallvirt() ? OpCodes.Callvirt : OpCodes.Call;
     }
 }

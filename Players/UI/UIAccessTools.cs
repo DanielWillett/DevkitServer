@@ -197,15 +197,15 @@ public static class UIAccessTools
             UI.EditorEnvironment => typeof(EditorEnvironmentUI),
             UI.EditorTerrain => typeof(EditorTerrainUI),
             UI.EditorLevel => typeof(EditorLevelUI),
-            UI.EditorTerrainHeights => typeof(Provider).Assembly.GetType("SDG.Unturned.EditorTerrainHeightUI"),
-            UI.EditorTerrainMaterials => typeof(Provider).Assembly.GetType("SDG.Unturned.EditorTerrainMaterialsUI"),
-            UI.EditorTerrainDetails => typeof(Provider).Assembly.GetType("SDG.Unturned.EditorTerrainDetailsUI"),
-            UI.EditorTerrainTiles => typeof(Provider).Assembly.GetType("SDG.Unturned.EditorTerrainTilesUI"),
-            UI.EditorEnvironmentNodes => typeof(Provider).Assembly.GetType("SDG.Unturned.EditorEnvironmentNodesUI"),
+            UI.EditorTerrainHeights => Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorTerrainHeightUI"),
+            UI.EditorTerrainMaterials => Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorTerrainMaterialsUI"),
+            UI.EditorTerrainDetails => Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorTerrainDetailsUI"),
+            UI.EditorTerrainTiles => Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorTerrainTilesUI"),
+            UI.EditorEnvironmentNodes => Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorEnvironmentNodesUI"),
             UI.EditorEnvironmentLighting => typeof(EditorEnvironmentLightingUI),
             UI.EditorEnvironmentRoads => typeof(EditorEnvironmentRoadsUI),
             UI.EditorEnvironmentNavigation => typeof(EditorEnvironmentNavigationUI),
-            UI.EditorLevelVolumes => typeof(Provider).Assembly.GetType("SDG.Unturned.EditorVolumesUI"),
+            UI.EditorLevelVolumes => Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorVolumesUI"),
             UI.EditorLevelObjects => typeof(EditorLevelObjectsUI),
             UI.EditorLevelVisibility => typeof(EditorLevelVisibilityUI),
             UI.EditorLevelPlayers => typeof(EditorLevelPlayersUI),
@@ -459,7 +459,7 @@ public static class UIAccessTools
             Type accessTools = typeof(UIAccessTools);
             MethodInfo getEditorTerrainUI = accessTools.GetProperty(nameof(EditorTerrainUI), BindingFlags.Public | BindingFlags.Static)!.GetMethod;
             const MethodAttributes attr = MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig;
-            Assembly sdg = typeof(Provider).Assembly;
+            Assembly sdg = Accessor.AssemblyCSharp;
 
             /*
              * TERRAIN

@@ -114,7 +114,7 @@ public class UserInput : MonoBehaviour
 
     static UserInput()
     {
-        Type? type = typeof(Provider).Assembly.GetType("SDG.Unturned.EditorInteract");
+        Type? type = Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract");
         if (type == null)
         {
             Logger.LogWarning("Unable to find type: SDG.Unturned.EditorInteract.");

@@ -65,9 +65,25 @@ public class DevkitServerConfig
 #else
     [CreateDirectory]
     public static readonly string Directory = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer", Provider.serverID);
+
     public static readonly string ConfigFilePath = Path.Combine(Directory, "server_config.json");
     public static readonly string PermissionGroupsPath = Path.Combine(Directory, "permission_groups.json");
 #endif
+    private static string? _lvl;
+    private static LevelInfo? _lvlInfo;
+    public static string LevelDirectory
+    {
+        get
+        {
+            LevelInfo? lvl = Level.info;
+            if (_lvl != null && _lvlInfo == lvl) return _lvl;
+            _lvlInfo = lvl;
+            if (lvl != null)
+                return _lvl = Path.Combine(Directory, "Levels", lvl.name);
+
+            throw new NotSupportedException("Level not loaded");
+        }
+    }
 
     [CreateDirectory]
     public static readonly string BundlesFolder = Path.Combine(UnturnedPaths.RootDirectory.FullName, "Modules", DevkitServerModule.ModuleName, "Bundles");

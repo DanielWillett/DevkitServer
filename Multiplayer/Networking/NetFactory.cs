@@ -174,7 +174,7 @@ public static class NetFactory
         Type? netMessagesType;
         try
         {
-            netMessagesType = typeof(Provider).Assembly.GetType(netMessagesName, true, false);
+            netMessagesType = Accessor.AssemblyCSharp.GetType(netMessagesName, true, false);
             if (netMessagesType == null)
             {
                 Logger.LogError("Unable to find type " + netMessagesName + "!", method: "NET FACTORY");
@@ -342,7 +342,7 @@ public static class NetFactory
         PullFromTransportConnectionListPool = null;
         try
         {
-            MethodInfo? method = typeof(Provider).Assembly
+            MethodInfo? method = Accessor.AssemblyCSharp
                 .GetType("SDG.Unturned.TransportConnectionListPool", true, false)?.GetMethod("Get",
                     BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
             if (method != null)

@@ -34,8 +34,6 @@ public static class VanillaPermissions
     [Permission]
     public static readonly Permission EditLighting = new Permission("lighting.edit", core: true);
     [Permission]
-    public static readonly Permission BakeMapImages = new Permission("terrain.images.bake", core: true);
-    [Permission]
     public static readonly Permission EditObjects = new Permission("hierarchy.objects.*", core: true);
     [Permission]
     public static readonly Permission PlaceObjects = new Permission("hierarchy.objects.place", core: true);
@@ -50,15 +48,23 @@ public static class VanillaPermissions
     [Permission]
     public static readonly Permission MoveSavedVolumes = new Permission("hierarchy.volumes.transform", core: true);
     [Permission]
+    public static readonly Permission EditVolumes = new Permission("hierarchy.volumes.*", core: true);
+    [Permission]
+    public static readonly Permission BakeCartography = new Permission("hierarchy.cartography.bake", core: true);
+    [Permission]
+    public static readonly Permission PlaceCartographyVolumes = new Permission("hierarchy.cartography.volumes.place", core: true);
+    [Permission]
+    public static readonly Permission RemoveSavedCartographyVolumes = new Permission("hierarchy.cartography.remove", core: true);
+    [Permission]
+    public static readonly Permission MoveSavedCartographyVolumes = new Permission("hierarchy.cartography.transform", core: true);
+    [Permission]
+    public static readonly Permission EditCartographyVolumes = new Permission("hierarchy.cartography.*", core: true);
+    [Permission]
     public static readonly Permission PlaceNodes = new Permission("hierarchy.nodes.place", core: true);
     [Permission]
     public static readonly Permission RemoveSavedNodes = new Permission("hierarchy.nodes.remove", core: true);
     [Permission]
     public static readonly Permission MoveSavedNodes = new Permission("hierarchy.nodes.transform", core: true);
     [Permission]
-    public static readonly Permission PlacePlayerSpawns = new Permission("hierarchy.playerspawns.place", core: true);
-    [Permission]
-    public static readonly Permission RemoveSavedPlayerSpawns = new Permission("hierarchy.playerspawns.remove", core: true);
-    [Permission]
-    public static readonly Permission MoveSavedPlayerSpawns = new Permission("hierarchy.playerspawns.transform", core: true);
+    public static readonly Permission EditNodes = new Permission("hierarchy.nodes.*", core: true);
 }

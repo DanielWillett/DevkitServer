@@ -1062,7 +1062,7 @@ public class CommandContext : Exception
         onlinePlayer = null!;
         return false;
     }
-
+    
     /// <summary>Get an asset based on a <see cref="Guid"/> search, <see cref="ushort"/> search, then <see cref="Asset.FriendlyName"/> search.</summary>
     /// <typeparam name="TAsset"><see cref="Asset"/> type to find.</typeparam>
     /// <param name="len">Set to 1 to only get one parameter (default), set to -1 to get any remaining Arguments.</param>
@@ -1106,70 +1106,83 @@ public class CommandContext : Exception
                     return true;
                 }
             }
+        }
 
-            TAsset[] assets = selector is null ? Assets.find(type).OfType<TAsset>().OrderBy(x => x.FriendlyName.Length).ToArray() : Assets.find(type).OfType<TAsset>().Where(selector).OrderBy(x => x.FriendlyName.Length).ToArray();
-            if (allowMultipleResults)
+        List<TAsset> assets = new List<TAsset>();
+        Assets.find(assets);
+        if (selector != null)
+            assets.RemoveAll(x => !selector(x));
+        assets.Sort((a, b) => a.FriendlyName.Length.CompareTo(b.FriendlyName.Length));
+        if (allowMultipleResults)
+        {
+            for (int i = 0; i < assets.Count; ++i)
             {
-                for (int i = 0; i < assets.Length; ++i)
+                TAsset a = assets[i];
+                if ((selector == null || selector(a)) && a.FriendlyName.Equals(p, StringComparison.InvariantCultureIgnoreCase))
                 {
-                    if (assets[i].FriendlyName.Equals(p, StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        asset = assets[i];
-                        multipleResultsFound = false;
-                        return true;
-                    }
+                    asset = a;
+                    multipleResultsFound = false;
+                    return true;
                 }
-                for (int i = 0; i < assets.Length; ++i)
+            }
+            for (int i = 0; i < assets.Count; ++i)
+            {
+                TAsset a = assets[i];
+                if ((selector == null || selector(a)) && a.FriendlyName.IndexOf(p, StringComparison.InvariantCultureIgnoreCase) != -1)
                 {
-                    if (assets[i].FriendlyName.IndexOf(p, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    asset = a;
+                    multipleResultsFound = false;
+                    return true;
+                }
+            }
+        }
+        else
+        {
+            TAsset? found = null;
+            for (int i = 0; i < assets.Count; ++i)
+            {
+                TAsset a = assets[i];
+                if ((selector == null || selector(a)) && assets[i].FriendlyName.Equals(p, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    if (found == null)
+                        found = a;
+                    else
                     {
-                        asset = assets[i];
-                        multipleResultsFound = false;
-                        return true;
+                        multipleResultsFound = true;
+                        asset = found;
+                        return false;
                     }
                 }
             }
-            else
+
+            if (found != null)
             {
-                List<TAsset> results = new List<TAsset>(16);
-                for (int i = 0; i < assets.Length; ++i)
+                asset = found;
+                multipleResultsFound = false;
+                return true;
+            }
+
+            for (int i = 0; i < assets.Count; ++i)
+            {
+                TAsset a = assets[i];
+                if (assets[i].FriendlyName.IndexOf(p, StringComparison.InvariantCultureIgnoreCase) != -1)
                 {
-                    if (assets[i].FriendlyName.Equals(p, StringComparison.InvariantCultureIgnoreCase))
+                    if (found == null)
+                        found = a;
+                    else
                     {
-                        results.Add(assets[i]);
+                        multipleResultsFound = true;
+                        asset = found;
+                        return false;
                     }
                 }
-                if (results.Count == 1)
-                {
-                    asset = results[0];
-                    multipleResultsFound = false;
-                    return true;
-                }
-                if (results.Count > 1)
-                {
-                    multipleResultsFound = true;
-                    asset = results[0];
-                    return false; // if multiple results match for the full name then a partial will be the same
-                }
-                for (int i = 0; i < assets.Length; ++i)
-                {
-                    if (assets[i].FriendlyName.IndexOf(p, StringComparison.InvariantCultureIgnoreCase) != -1)
-                    {
-                        results.Add(assets[i]);
-                    }
-                }
-                if (results.Count == 1)
-                {
-                    asset = results[0];
-                    multipleResultsFound = false;
-                    return true;
-                }
-                if (results.Count > 1)
-                {
-                    multipleResultsFound = true;
-                    asset = results[0];
-                    return false;
-                }
+            }
+
+            if (found != null)
+            {
+                asset = found;
+                multipleResultsFound = false;
+                return true;
             }
         }
         multipleResultsFound = false;

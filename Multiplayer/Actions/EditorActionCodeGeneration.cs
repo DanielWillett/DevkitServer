@@ -411,7 +411,8 @@ internal static class EditorActionsCodeGeneration
             {
                 if (last + 1 != (int)attr.ActionType)
                 {
-                    Logger.LogWarning($"Missing {attr.ActionType.Format()} action to use switch expression in generated method.", method: "EDITOR ACTIONS");
+                    for (int i = last + 1; i < (int)attr.ActionType; ++i)
+                        Logger.LogWarning($"Missing {((ActionType)i).Format()} action to use switch expression in generated method.", method: "EDITOR ACTIONS");
                     gap = true;
                 }
                 else last = (int)attr.ActionType;

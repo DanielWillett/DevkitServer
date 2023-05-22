@@ -111,7 +111,7 @@ internal sealed class EditorClothes : MonoBehaviour
     private static readonly StaticGetter<int>? GetFaceEmissionTexturePropertyID = Accessor.GenerateStaticGetter<HumanClothes, int>("faceEmissionTexturePropertyID");
     private static readonly InstanceGetter<ItemClothingAsset, bool>? GetShouldMirrorLeftHandedModel = Accessor.GenerateInstanceGetter<ItemClothingAsset, bool>("shouldMirrorLeftHandedModel");
     private static readonly Action<GameObject, bool>? CallDestroyCollidersInChildren =
-        Accessor.GenerateStaticCaller<Action<GameObject, bool>>(typeof(Provider).Assembly
+        Accessor.GenerateStaticCaller<Action<GameObject, bool>>(Accessor.AssemblyCSharp
             .GetType("SDG.Unturned.PrefabUtil")
             ?.GetMethod("DestroyCollidersInChildren", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)!);
     

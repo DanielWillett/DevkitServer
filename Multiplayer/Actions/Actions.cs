@@ -16,6 +16,7 @@ public enum ActionSetting
     TileCoordinates = 1 << 6,
     AutoSlopeData = 1 << 7,
     AutoFoundationData = 1 << 8,
+    InstanceId = 1 << 9,
 
     Extended = 1 << 31
 }
@@ -38,9 +39,18 @@ public enum ActionType : byte
     RemoveResourceSpawnpoint,
     RemoveFoliageLevelObject,
     RemoveLevelObject,
+    HierarchyItemsTransforming,
+    HierarchyItemsTransform,
+    HierarchyItemsDelete,
+    HierarchyItemInstantiate,
+
 
     // for future use
     Extended = 255
+}
+public interface IReflectableAction : IAction
+{
+    void SendUndo(ITransportConnection sender);
 }
 
 public interface IAction
@@ -82,6 +92,11 @@ public interface IBrushFalloff
 public interface IBrushStrength
 {
     float BrushStrength { get; set; }
+}
+[ActionSetting(ActionSetting.InstanceId)]
+public interface IInstanceId
+{
+    uint InstanceId { get; set; }
 }
 [ActionSetting(ActionSetting.Sensitivity)]
 public interface IBrushSensitivity

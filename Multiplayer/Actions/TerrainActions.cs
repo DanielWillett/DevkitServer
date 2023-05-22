@@ -538,7 +538,7 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrush
         IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             FieldInfo? field = typeof(TerrainEditor).GetField("heightmapPixelSmoothBuffer", BindingFlags.Instance | BindingFlags.NonPublic);
-            if (field == null || typeof(float[,]) != field.FieldType)
+            if (field == null || typeof(Dictionary<LandscapeCoord, float[,]>) != field.FieldType)
                 Logger.LogWarning("Unable to find field: TerrainEditor.heightmapPixelSmoothBuffer.");
 
             FieldInfo buffer = typeof(HeightmapSmoothAction).GetField(nameof(PixelSmoothBuffer), BindingFlags.Static | BindingFlags.NonPublic)!;
@@ -1174,7 +1174,7 @@ public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinates
     private static readonly Action<int>? SetSelectedLayerIndex = UIAccessTools.GenerateUICaller<Action<int>>(UI.EditorTerrainTiles, "SetSelectedLayerIndex", throwOnFailure: false);
     private static readonly Action<object>? CallUpdateSelectedTile =
         Accessor.GenerateInstanceCaller<Action<object>>(
-            typeof(Provider).Assembly
+            Accessor.AssemblyCSharp
                 .GetType("SDG.Unturned.TerrainTileLayer")?
                 .GetMethod("UpdateSelectedTile", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!
             , false, useFptrReconstruction: true);

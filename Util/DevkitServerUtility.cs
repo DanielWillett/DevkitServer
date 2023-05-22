@@ -857,13 +857,15 @@ public static class DevkitServerUtility
     /// <summary>
     /// Tries to create a directory.
     /// </summary>
-    /// <remarks>Will not throw an exception. Use <see cref="Directory.CreateDirectory"/> if you want an exception.</remarks>
+    /// <remarks>Will not throw an exception. Use <see cref="Directory.CreateDirectory(string)"/> if you want an exception.</remarks>
     /// <param name="relative">If the path is relative to <see cref="ReadWrite.PATH"/>.</param>
     /// <param name="path">Relative or absolute path to a directory.</param>
     /// <returns><see langword="true"/> if the directory is created or already existed, otherwise false.</returns>
     public static bool CheckDirectory(bool relative, string path) => CheckDirectory(relative, false, path, null);
     internal static bool CheckDirectory(bool relative, bool fault, string path, MemberInfo? member)
     {
+        if (path == null)
+            return false;
         try
         {
             if (relative)
@@ -895,6 +897,11 @@ public static class DevkitServerUtility
                 DevkitServerModule.Fault();
             return false;
         }
+    }
+    [Pure]
+    public static bool IsNearlyIdentity(this Quaternion q, float tolerance = 0.001f)
+    {
+        return q.x > -tolerance && q.x < tolerance && q.y > -tolerance && q.y < tolerance && q.z > -tolerance && q.z < tolerance && q.w - 1f > -tolerance && q.w - 1f < tolerance;
     }
 }
 

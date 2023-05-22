@@ -9,6 +9,7 @@ using System.Text;
 namespace DevkitServer.Util;
 public static class FormattingUtil
 {
+    public static Func<object, string> FormatSelector = x => x.Format();
     public const string ANSIReset = "\u001b[39m";
     public const char ConsoleEscapeCharacter = '\u001b';
     public static unsafe string GetANSIForegroundString(ConsoleColor color)

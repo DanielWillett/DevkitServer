@@ -451,6 +451,63 @@ public class ByteWriter
         _size = newsize;
     }
 
+    private static readonly MethodInfo WriteTypeMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Type) }, null);
+    public void Write(Type? type)
+    {
+        const string nsSdgUnturned = "SDG.Unturned";
+        const string nsSdgFrameworkDevkit = "SDG.Framework.Devkit";
+        const string nsSdgFramework = "SDG.Framework";
+        const string nsDevkitServer = "DevkitServer";
+        const string nsSystem = "System";
+        byte flag = 0;
+        if (type == null)
+            flag = 128;
+        else if (type.Assembly == Accessor.AssemblyCSharp)
+            flag = 1;
+        else if (type.Assembly == Accessor.DevkitServer)
+            flag = 2;
+        if (flag == 128)
+        {
+            Write(flag);
+            return;
+        }
+
+        string ns = type!.Namespace ?? string.Empty;
+        if (flag == 1)
+        {
+            if (ns.StartsWith(nsSdgUnturned, StringComparison.Ordinal))
+            {
+                flag |= 8;
+                ns = ns.Length > nsSdgUnturned.Length ? ns.Substring(nsSdgUnturned.Length + 1) : string.Empty;
+            }
+            else if (ns.StartsWith(nsSdgFrameworkDevkit, StringComparison.Ordinal))
+            {
+                flag |= 16;
+                ns = ns.Length > nsSdgFrameworkDevkit.Length ? ns.Substring(nsSdgFrameworkDevkit.Length + 1) : string.Empty;
+            }
+            else if (ns.StartsWith(nsSdgFramework, StringComparison.Ordinal))
+            {
+                flag |= 32;
+                ns = ns.Length > nsSdgFramework.Length ? ns.Substring(nsSdgFramework.Length + 1) : string.Empty;
+            }
+        }
+        else if (flag == 2 && ns.StartsWith(nsDevkitServer, StringComparison.Ordinal))
+        {
+            flag |= 4;
+            ns = ns.Length > nsDevkitServer.Length ? ns.Substring(nsDevkitServer.Length + 1) : string.Empty;
+        }
+        else if (type.Assembly == Accessor.MSCoreLib && ns.StartsWith(nsSystem, StringComparison.Ordinal))
+        {
+            flag |= 64;
+            ns = ns.Length > nsSystem.Length ? ns.Substring(nsSystem.Length + 1) : string.Empty;
+        }
+
+        if (ns.Length > 0)
+            ns += ".";
+        WriteInternal(flag);
+        Write(ns + type.Name);
+    }
+
 
     private static readonly MethodInfo WriteNullableStringMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(string) }, null);
     public void WriteNullable(string? n)
@@ -1411,6 +1468,10 @@ public class ByteWriter
         else if (type == typeof(decimal))
         {
             il.EmitCall(OpCodes.Call, isNullable ? WriteNullableDecimalMethod : WriteDecimalMethod, null);
+        }
+        else if (typeof(Type).IsAssignableFrom(type))
+        {
+            il.EmitCall(OpCodes.Call, WriteTypeMethod, null);
         }
         else if (type == typeof(DateTime))
         {

@@ -50,8 +50,37 @@ public sealed class DevkitServerModule : IModuleNexus
     public static bool IsMainThread => ThreadUtil.gameThread == Thread.CurrentThread;
     public static CancellationToken UnloadToken => _tknSrc == null ? CancellationToken.None : _tknSrc.Token;
     public static Local MainLocalization { get; private set; } = null!;
+
+    private static readonly LocalDatDictionary DefaultMainLocalization = new LocalDatDictionary
+    {
+        { "Name", "Devkit Server" },
+        { "Help", "help" }
+    };
     public static Local CommandLocalization { get; private set; } = null!;
+
+    private static readonly LocalDatDictionary DefaultCommandLocalization = new LocalDatDictionary
+    {
+        { "CorrectUsage", "<#ff8c69>Correct usage: {0}." },
+        { "UnknownCommand", "<#ff8c69>Unknown command. <#b3ffb3>Type <#fff>/help</color> to learn more." },
+        { "ConsoleOnly", "<#ff8c69>This command can only be called from console." },
+        { "PlayersOnly", "<#ff8c69>This command can not be called from console." },
+        { "Exception", "<#ff8c69>Error executing command: <#4ec9b0>{0}</color>." },
+        { "NoPermissions", "<#ff8c69>You do not have permission to use this command." }
+    };
     public static Local MessageLocalization { get; private set; } = null!;
+
+    private static readonly LocalDatDictionary DefaultMessageLocalization = new LocalDatDictionary
+    {
+        { "NoPermissions", "No Permission" },
+        { "NoPermissionsWithPermission", "Missing Permission: {0}" },
+        { "Error", "Error {0}" },
+        { "UnknownError", "Unknown Error" },
+        { "BeingSynced", "Syncing" },
+        { "FeatureDisabled", "Disabled" },
+        { "UndoNotSupported", "Undo Not Supported" },
+        { "RedoNotSupported", "Redo Not Supported" },
+    };
+
     public static CultureInfo CommandParseLocale { get; set; } = CultureInfo.InvariantCulture;
     public static AssetOrigin BundleOrigin { get; }
     static DevkitServerModule()
@@ -91,11 +120,6 @@ public sealed class DevkitServerModule : IModuleNexus
             PluginAdvertising.Get().AddPlugin(MainLocalization.format("Name"));
             _tknSrc = new CancellationTokenSource();
             Logger.LogInfo("DevkitServer loading...");
-            if (!BitConverter.IsLittleEndian)
-            {
-                Logger.LogWarning("Your machine is big-endian, you may face issues with improper data transmission, " +
-                                  "please report it as I am unable to test with these conditioins.");
-            }
 
             DevkitServerConfig.Reload();
 
@@ -142,6 +166,7 @@ public sealed class DevkitServerModule : IModuleNexus
 
             Level.onPostLevelLoaded += OnPostLevelLoaded;
             Editor.onEditorCreated += OnEditorCreated;
+            Level.onPrePreLevelLoaded += OnPrePreLevelLoaded;
 #if SERVER
             Provider.onServerConnected += UserManager.AddPlayer;
             Provider.onServerDisconnected += UserManager.RemovePlayer;
@@ -209,6 +234,7 @@ public sealed class DevkitServerModule : IModuleNexus
 
     private void OnPostLevelLoaded(int level)
     {
+#if SERVER
         if (IsEditing && level == Level.BUILD_INDEX_GAME)
         {
 #if TILE_SYNC
@@ -217,6 +243,13 @@ public sealed class DevkitServerModule : IModuleNexus
         }
         else if (GameObjectHost.TryGetComponent(out TileSync sync))
             Object.Destroy(sync);
+#endif
+
+        if (!BitConverter.IsLittleEndian)
+        {
+            Logger.LogWarning("Your machine is big-endian, you may face issues with improper data transmission, " +
+                              "please report it as I am unable to test with these conditioins.");
+        }
     }
     internal void UnloadBundle()
     {
@@ -324,7 +357,7 @@ public sealed class DevkitServerModule : IModuleNexus
         Provider.modeConfigData.Gameplay.Timer_Exit = 0;
         Provider.modeConfigData.Gameplay.Timer_Home = 0;
         Provider.modeConfigData.Gameplay.Timer_Home = 0;
-        Assembly sdg = typeof(Provider).Assembly;
+        Assembly sdg = Accessor.AssemblyCSharp;
         Component comp = Level.editing.GetComponentInChildren(sdg.GetType("SDG.Unturned.EditorInteract"));
         if (comp != null)
             Object.Destroy(comp);
@@ -350,6 +383,16 @@ public sealed class DevkitServerModule : IModuleNexus
             _ = HighSpeedServer.Instance;
     }
 #endif
+    private void OnPrePreLevelLoaded(int level)
+    {
+        if (level != Level.BUILD_INDEX_GAME)
+            return;
+
+#if SERVER
+        DevkitServerUtility.CheckDirectory(false, false, DevkitServerConfig.LevelDirectory, typeof(DevkitServerConfig).GetProperty(nameof(DevkitServerConfig.LevelDirectory), BindingFlags.Public | BindingFlags.Static));
+#endif
+        HierarchyResponsibilities.Reload();
+    }
 
     public void shutdown()
     {
@@ -363,6 +406,8 @@ public sealed class DevkitServerModule : IModuleNexus
         UnloadBundle();
         Editor.onEditorCreated -= OnEditorCreated;
         Level.onPostLevelLoaded -= OnPostLevelLoaded;
+        Level.onPrePreLevelLoaded -= OnPrePreLevelLoaded;
+        HierarchyResponsibilities.Save();
 #if SERVER
         Provider.onServerConnected -= UserManager.AddPlayer;
         Provider.onServerDisconnected -= UserManager.RemovePlayer;
@@ -437,36 +482,18 @@ public sealed class DevkitServerModule : IModuleNexus
         DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultMessageLocalization, path);
         MessageLocalization = lcl;
     }
-    private static readonly LocalDatDictionary DefaultMainLocalization = new LocalDatDictionary
-    {
-        { "Name", "Devkit Server" },
-        { "Help", "help" }
-    };
-    private static readonly LocalDatDictionary DefaultCommandLocalization = new LocalDatDictionary
-    {
-        { "CorrectUsage", "<#ff8c69>Correct usage: {0}." },
-        { "UnknownCommand", "<#ff8c69>Unknown command. <#b3ffb3>Type <#fff>/help</color> to learn more." },
-        { "ConsoleOnly", "<#ff8c69>This command can only be called from console." },
-        { "PlayersOnly", "<#ff8c69>This command can not be called from console." },
-        { "Exception", "<#ff8c69>Error executing command: <#4ec9b0>{0}</color>." },
-        { "NoPermissions", "<#ff8c69>You do not have permission to use this command." }
-    };
-    private static readonly LocalDatDictionary DefaultMessageLocalization = new LocalDatDictionary
-    {
-        { "NoPermissions", "No Permission" },
-        { "BeingSynced", "Syncing" },
-        { "FeatureDisabled", "Disabled" },
-        { "UndoNotSupported", "Undo Not Supported" },
-        { "RedoNotSupported", "Redo Not Supported" },
-    };
 }
 
 public sealed class DevkitServerModuleComponent : MonoBehaviour
 {
     internal static ConcurrentQueue<MainThreadTask.MainThreadResult> ThreadActionRequests = new ConcurrentQueue<MainThreadTask.MainThreadResult>();
+    private static int _ticks;
+    public static int Ticks => _ticks;
+
     [UsedImplicitly]
     private void Update()
     {
+        ++_ticks;
         while (ThreadActionRequests.TryDequeue(out MainThreadTask.MainThreadResult res))
         {
             try
@@ -485,5 +512,11 @@ public sealed class DevkitServerModuleComponent : MonoBehaviour
                 res?.Complete();
             }
         }
+    }
+
+    [UsedImplicitly]
+    private void Start()
+    {
+        _ticks = 0;
     }
 }

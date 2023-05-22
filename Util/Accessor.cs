@@ -9,6 +9,9 @@ using HarmonyLib;
 namespace DevkitServer.Util;
 internal static class Accessor
 {
+    public static readonly Assembly AssemblyCSharp = typeof(Provider).Assembly;
+    public static readonly Assembly DevkitServer = Assembly.GetExecutingAssembly();
+    public static readonly Assembly MSCoreLib = typeof(object).Assembly;
     internal static Type[]? FuncTypes;
     internal static Type[]? ActionTypes;
     private static bool _castExCtorCalc;
@@ -465,7 +468,7 @@ internal static class Accessor
             {
                 generator.LoadParameter(i, paramTypes[i].IsByRef);
             }
-            generator.Emit(method.IsVirtual || method.IsAbstract ? OpCodes.Callvirt : OpCodes.Call, method);
+            generator.Emit(method.GetCall(), method);
             generator.Emit(OpCodes.Ret);
 
             try

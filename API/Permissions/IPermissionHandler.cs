@@ -211,13 +211,13 @@ public static class PermissionsEx
     /// </summary>
     public static bool Has(this Permission permission
 #if SERVER
-        , ulong player
+        , ulong user
 #endif
     , bool superuser = true)
     {
         return UserPermissions.UserHandler.HasPermission(
 #if SERVER
-            player,
+            user,
 #endif
             permission, superuser);
     }
@@ -226,13 +226,13 @@ public static class PermissionsEx
     /// </summary>
     public static bool HasPermission(this IUserPermissionHandler handler,
 #if SERVER
-        ulong player,
+        ulong user,
 #endif
         Permission permission, bool superuser = true)
     {
-        bool suEx = permission.Equals(Permission.SuperuserPermission);
+        bool suEx = superuser && permission.Equals(Permission.SuperuserPermission);
 #if SERVER
-        IReadOnlyList<Permission> list = handler.GetPermissions(player);
+        IReadOnlyList<Permission> list = handler.GetPermissions(user);
 #else
         IReadOnlyList<Permission> list = handler.Permissions;
 #endif
@@ -242,7 +242,7 @@ public static class PermissionsEx
                 return true;
         }
 #if SERVER
-        IReadOnlyList<PermissionGroup> list2 = handler.GetPermissionGroups(player);
+        IReadOnlyList<PermissionGroup> list2 = handler.GetPermissionGroups(user);
 #else
         IReadOnlyList<PermissionGroup> list2 = handler.PermissionGroups;
 #endif
