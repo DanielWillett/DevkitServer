@@ -1035,8 +1035,13 @@ public static class ClientEvents
     public static InstanceGetter<SelectionTool, TransformHandles>? GetSelectionHandles = Accessor.GenerateInstanceGetter<SelectionTool, TransformHandles>("handles");
 
     [HarmonyPatch(typeof(SelectionTool), "OnHandleTranslatedAndRotated")]
-    [HarmonyTranspiler]
+    [HarmonyPostfix]
     [UsedImplicitly]
+    private static void SelectionToolOnHandleTranslatedAndRotated(Vector3 worldPositionDelta, Quaternion worldRotationDelta, Vector3 pivotPosition, bool modifyRotation)
+    {
+        
+    }
+    /*
     private static IEnumerable<CodeInstruction> SelectionToolOnHandleTranslatedAndRotated(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
     {
         MethodInfo tempMoveHandleInvoker = new Action<DevkitSelection, Vector3, Quaternion, Vector3, bool>(OnTempMoveRotateHandle).Method;
@@ -1093,7 +1098,7 @@ public static class ClientEvents
         }
 
         return ins;
-    }
+    }*/
 
     /// <summary>Skipped for no permissions.</summary>
     private static bool _skippedMoveHandle;
@@ -1225,15 +1230,12 @@ public static class ClientEvents
             else if (recordDestruction != null && c.Calls(recordDestruction))
             {
                 ins.Insert(i + 1, new CodeInstruction(OpCodes.Call, recordDestructionInvoker));
-                List<CodeInstruction> ins2 = new List<CodeInstruction>(4);
                 for (int j = i - 1; j >= 0; --j)
                 {
-                    ins2.Add(ins[j].CopyWithoutSpecial());
+                    ins.Insert(i + 1, ins[j].CopyWithoutSpecial());
                     if (ins[j].operand is LocalBuilder bld && typeof(IEnumerator<DevkitSelection>).IsAssignableFrom(bld.LocalType))
                         break;
                 }
-                for (int j = 0; j < ins2.Count; ++j)
-                    ins.Insert(i + 1, ins2[j]);
                 Logger.LogDebug($"[CLIENT EVENTS] Patched in {recordDestructionInvoker.Format()} to {method.Format()}.");
             }
         }
