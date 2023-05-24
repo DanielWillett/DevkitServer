@@ -1,7 +1,7 @@
 ﻿namespace DevkitServer.Multiplayer.Networking;
 
 [Flags]
-public enum MessageFlags : ushort
+public enum MessageFlags : byte
 {
     /// <summary>Only look for base net methods.</summary>
     None = 0,
@@ -39,7 +39,6 @@ public enum MessageFlags : ushort
     GuidAcknowledgeResponse = Guid | AcknowledgeResponse,
     /// <summary>Requests an ACK message to be returned from a response to a request.</summary>
     RequestResponseWithAcknowledgeRequest = 32,
-    Relay = 64,
-    HighSpeed = 128,
-    Guid = 256
+    HighSpeed = 64,
+    Guid = 128
 }

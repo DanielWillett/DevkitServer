@@ -112,19 +112,6 @@ internal static class CommandTests
         }
         else ctx.SendCorrectUsage("/test ui <open|close>");
     }
-    private static void tpvrot(CommandContext ctx)
-    {
-        ctx.TryGet(0, out float x);
-        ctx.TryGet(0, out float y);
-        ctx.TryGet(0, out float z);
-        
-        ctx.AssertHelpCheck(0, "/test [x] [y] [z] - Set euler rotations.");
-        UserTPVControl.XRot = x;
-        UserTPVControl.YRot = y;
-        UserTPVControl.ZRot = z;
-        UserTPVControl.ApplyRotation();
-        ctx.ReplyString($"Set rotation to: ({x}, {y}, {z}).");
-    }
 #endif
 
 #if SERVER

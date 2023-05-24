@@ -17,12 +17,12 @@ public static class EncodingEx
     {
         typeof(ulong), typeof(float), typeof(long), typeof(ushort), typeof(short), typeof(byte), typeof(int), typeof(uint), typeof(bool), typeof(char), typeof(sbyte), typeof(double),
         typeof(string), typeof(decimal), typeof(DateTime), typeof(DateTimeOffset), typeof(TimeSpan), typeof(Guid),
-        typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Quaternion), typeof(Color), typeof(Color32), typeof(Bounds)
+        typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Quaternion), typeof(Color), typeof(Color32), typeof(Bounds), typeof(Type)
     };
     internal static readonly Type[] ValidArrayTypes =
     {
         typeof(ulong), typeof(float), typeof(long), typeof(ushort), typeof(short), typeof(byte), typeof(int), typeof(uint), typeof(bool), typeof(sbyte), typeof(decimal), typeof(char),
-        typeof(double), typeof(string), typeof(DateTime), typeof(DateTimeOffset), typeof(Guid)
+        typeof(double), typeof(string), typeof(DateTime), typeof(DateTimeOffset), typeof(Guid), typeof(Type)
     };
     public static bool IsValidAutoType(Type type)
     {

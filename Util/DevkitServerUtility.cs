@@ -84,38 +84,6 @@ public static class DevkitServerUtility
         Vector3 e = bounds.extents;
         return new Bounds(new Vector3(Mathf.Round(c.x), Mathf.Round(c.y), Mathf.Round(c.z)), new Vector3((e.x + 0.5f).CeilToIntIgnoreSign(), (e.y + 0.5f).CeilToIntIgnoreSign(), (e.z + 0.5f).CeilToIntIgnoreSign()));
     }
-    /// <summary>Convert an HTMLColor string to a actual color.</summary>
-    /// <param name="htmlColorCode">A hexadecimal/HTML color key.</param>
-    [Pure]
-    public static Color Hex(this string htmlColorCode)
-    {
-        if (htmlColorCode.Length == 0)
-            return Color.white;
-        if (htmlColorCode[0] != '#')
-            htmlColorCode = "#" + htmlColorCode;
-        return ColorUtility.TryParseHtmlString(htmlColorCode, out Color color) ? color : Color.white;
-    }
-    /// <summary>Convert an HTMLColor string to a actual color.</summary>
-    /// <param name="htmlColorCode">A hexadecimal/HTML color key.</param>
-    public static bool TryParseHex(this string htmlColorCode, out Color color)
-    {
-        if (htmlColorCode.Length == 0)
-        {
-            color = Color.white;
-            return false;
-        }
-
-        if (htmlColorCode[0] != '#')
-            htmlColorCode = "#" + htmlColorCode;
-
-        if (!ColorUtility.TryParseHtmlString(htmlColorCode, out color))
-        {
-            color = Color.white;
-            return false;
-        }
-
-        return true;
-    }
     [Pure]
     public static unsafe int GetLabelId(this Label label) => *(int*)&label;
     public static void PrintBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
@@ -902,6 +870,29 @@ public static class DevkitServerUtility
     public static bool IsNearlyIdentity(this Quaternion q, float tolerance = 0.001f)
     {
         return q.x > -tolerance && q.x < tolerance && q.y > -tolerance && q.y < tolerance && q.z > -tolerance && q.z < tolerance && q.w - 1f > -tolerance && q.w - 1f < tolerance;
+    }
+
+    /// <remarks><see cref="ItemPantsAsset"/> and <see cref="ItemShirtAsset"/> takes a <see cref="Texture2D"/> instead of a <see cref="GameObject"/> so they are not included in this method.</remarks>
+    [Pure]
+    public static GameObject? GetItemInstance(this ItemAsset asset)
+    {
+        return asset switch
+        {
+            ItemBackpackAsset a => a.backpack,
+            ItemBarrelAsset a => a.barrel,
+            ItemBarricadeAsset a => a.barricade,
+            ItemGlassesAsset a => a.glasses,
+            ItemGripAsset a => a.grip,
+            ItemHatAsset a => a.hat,
+            ItemMagazineAsset a => a.magazine,
+            ItemMaskAsset a => a.mask,
+            ItemSightAsset a => a.sight,
+            ItemStructureAsset a => a.structure,
+            ItemTacticalAsset a => a.tactical,
+            ItemThrowableAsset a => a.throwable,
+            ItemVestAsset a => a.vest,
+            _ => null
+        };
     }
 }
 

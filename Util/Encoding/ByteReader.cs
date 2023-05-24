@@ -474,6 +474,19 @@ public class ByteReader
         return str;
     }
 
+    private static readonly MethodInfo ReadTypeArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadTypeArray), BindingFlags.Instance | BindingFlags.Public);
+    public Type?[] ReadTypeArray()
+    {
+        int len = ReadUInt16();
+        Type?[] rtn = new Type?[len];
+        for (int i = 0; i < len; ++i)
+        {
+            rtn[i] = ReadType();
+        }
+
+        return rtn;
+    }
+
     private static readonly MethodInfo ReadTypeMethod = typeof(ByteReader).GetMethod(nameof(ReadType), BindingFlags.Instance | BindingFlags.Public);
     public string? ReadTypeInfo() => ReadTypeInfo(out _);
     public string? ReadTypeInfo(out byte flag)
@@ -1335,6 +1348,8 @@ public class ByteReader
             return isNullable ? ReadNullableColorMethod : ReadColorMethod;
         if (type == typeof(Color32))
             return isNullable ? ReadNullableColor32Method : ReadColor32Method;
+        if (typeof(Type).IsAssignableFrom(type))
+            return ReadTypeMethod;
         if (type.IsArray)
         {
             Type elemType = type.GetElementType();
@@ -1372,6 +1387,8 @@ public class ByteReader
                 return isNullable ? ReadNullableDateTimeArrayMethod : ReadDateTimeArrayMethod;
             if (elemType == typeof(DateTimeOffset))
                 return isNullable ? ReadNullableDateTimeOffsetArrayMethod : ReadDateTimeOffsetArrayMethod;
+            if (typeof(Type).IsAssignableFrom(elemType))
+                return ReadTypeArrayMethod;
         }
 
         return null;

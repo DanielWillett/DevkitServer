@@ -375,7 +375,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             }
             ActionType type = reader.ReadEnum<ActionType>();
             IAction? action = EditorActionsCodeGeneration.CreateAction!(type);
-            Logger.LogDebug($"[EDITOR ACTIONS] Loading action #{i.Format()} {action}, collection index: {collIndex}.");
+            Logger.LogDebug($"[EDITOR ACTIONS] Loading action #{i.Format()} {action.Format()}, collection index: {collIndex.Format()}.");
             if (action != null)
             {
                 action.Instigator = User.SteamId;

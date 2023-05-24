@@ -17,6 +17,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using DevkitServer.API.Abstractions;
 using DevkitServer.Multiplayer.Actions;
+using SDG.Framework.Utilities;
 using Action = System.Action;
 
 namespace DevkitServer.Patches;
@@ -38,7 +39,7 @@ public delegate void EditHeightmapRequest(TerrainEditor.EDevkitLandscapeToolHeig
 public delegate void EditSplatmapRequest(TerrainEditor.EDevkitLandscapeToolSplatmapMode mode, ref bool allow);
 public delegate void EditHolesRequest(bool isFilling, ref bool allow);
 public delegate void MovingHierarchyObject(DevkitSelection selection, IDevkitHierarchyItem item, in HierarchyObjectTransformation transformation, Vector3 pivotPoint);
-public delegate void MovingHierarchyObjects(uint[] instanceIds, in HierarchyObjectTransformation transformation, Vector3 pivotPoint);
+public delegate void MovingHierarchyObjects(uint[] instanceIds, HierarchyObjectTransformation[] transformations, Vector3 pivotPoint);
 public delegate void MovedHierarchyObject(DevkitSelection selection, IDevkitHierarchyItem item, in HierarchyObjectTransformation transformation, Vector3 scale, Vector3 originalScale, bool useScale);
 public delegate void MovedHierarchyObjects(uint[] instanceIds, HierarchyObjectTransformation[] transformations, Vector3[]? scales, Vector3[]? originalScales);
 public delegate void DeleteHierarchyObject(GameObject obj, IDevkitHierarchyItem item);
@@ -1039,66 +1040,58 @@ public static class ClientEvents
     [UsedImplicitly]
     private static void SelectionToolOnHandleTranslatedAndRotated(Vector3 worldPositionDelta, Quaternion worldRotationDelta, Vector3 pivotPosition, bool modifyRotation)
     {
-        
-    }
-    /*
-    private static IEnumerable<CodeInstruction> SelectionToolOnHandleTranslatedAndRotated(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
-    {
-        MethodInfo tempMoveHandleInvoker = new Action<DevkitSelection, Vector3, Quaternion, Vector3, bool>(OnTempMoveRotateHandle).Method;
+        if (!DevkitServerModule.IsEditing || _movingHandle)
+            return;
 
-        MethodInfo? getComponent = typeof(GameObject).GetMethods(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault(x =>
-            x.Name.Equals("GetComponent") && x.GetParameters().Length == 0 && x.GetGenericArguments().Length == 1)?.MakeGenericMethod(typeof(ITransformedHandler));
-        if (getComponent == null)
-        {
-            Logger.LogWarning("Unable to find method: GameObject.GetComponent<ITransformedHandler>.", method: "CLIENT EVENTS");
-            DevkitServerModule.Fault();
-        }
+        Logger.LogDebug($"[CLIENT EVENTS] Temp move requested at: {string.Join(",", DevkitSelectionManager.selection.Select(selection => selection.gameObject.name.Format()))}: deltaPos: {worldPositionDelta.Format()}, deltaRot: {worldRotationDelta.eulerAngles.Format()}, pivotPos: {pivotPosition.Format()}, modifyRotation: {modifyRotation}.");
 
-        MethodInfo? moveNext;
-        using (IEnumerator<DevkitSelection> e = DevkitSelectionManager.selection.GetEnumerator())
-            moveNext = e.GetType().GetMethod("MoveNext", BindingFlags.Public | BindingFlags.Instance);
-        if (moveNext == null)
-        {
-            Logger.LogWarning("Unable to find method: IEnumerator<DevkitSelection>.MoveNext.", method: "CLIENT EVENTS");
-            DevkitServerModule.Fault();
-        }
+        HierarchyObjectTransformation.TransformFlags flags = 0;
+        if (!worldPositionDelta.IsNearlyZero())
+            flags |= HierarchyObjectTransformation.TransformFlags.Position | HierarchyObjectTransformation.TransformFlags.OriginalPosition;
+        if (modifyRotation && !worldRotationDelta.IsNearlyIdentity())
+            flags |= HierarchyObjectTransformation.TransformFlags.Rotation | HierarchyObjectTransformation.TransformFlags.OriginalRotation;
 
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
-        StackTracker tracker = new StackTracker(ins);
-        CodeInstruction? ldLocCodeInst = null;
-        Label initLabel = generator.DefineLabel();
-        for (int i = 0; i < ins.Count; ++i)
+        List<uint> instanceIds = ListPool<uint>.claim();
+        List<HierarchyObjectTransformation> translations = ListPool<HierarchyObjectTransformation>.claim();
+        try
         {
-            CodeInstruction c = ins[i];
-            if (ldLocCodeInst == null && getComponent != null && c.Calls(getComponent) && i < ins.Count - 1 && ins[i + 1].opcode.IsStLoc())
+            if (translations.Capacity < DevkitSelectionManager.selection.Count)
+                translations.Capacity = DevkitSelectionManager.selection.Count;
+            if (instanceIds.Capacity < DevkitSelectionManager.selection.Count)
+                instanceIds.Capacity = DevkitSelectionManager.selection.Count;
+            foreach (DevkitSelection selection in DevkitSelectionManager.selection)
             {
-                int lastInd = tracker.GetLastUnconsumedIndex(i, c => c.IsLdLoc(), method);
-                if (lastInd != -1)
+                HierarchyObjectTransformation t = new HierarchyObjectTransformation(flags, worldPositionDelta, worldRotationDelta, selection.preTransformPosition, selection.preTransformRotation);
+                selection.gameObject.GetComponents(WorkingHierarchyItems);
+                try
                 {
-                    ldLocCodeInst = ins[lastInd].CopyWithoutSpecial();
+                    for (int i = 0; i < WorkingHierarchyItems.Count; ++i)
+                    {
+                        IDevkitHierarchyItem item = WorkingHierarchyItems[i];
+                        if (item.instanceID == 0u)
+                            Logger.LogWarning($"Skipped item: {item.Format()} because it was missing an instance ID.", method: "CLIENT EVENTS");
+                        else
+                        {
+                            instanceIds.Add(item.instanceID);
+                            translations.Add(t);
+                            OnMovingHierarchyObject?.Invoke(selection, item, in t, pivotPosition);
+                        }
+                    }
+                }
+                finally
+                {
+                    WorkingHierarchyItems.Clear();
                 }
             }
-            if (i > 0 && ldLocCodeInst != null && moveNext != null && ins[i].Calls(moveNext) && ins[i - 1].opcode.IsLdLoc(either: true))
-            {
-                ldLocCodeInst.labels.AddRange(ins[i - 1].labels);
-                ins[i - 1].labels.Clear();
-                ins[i - 1].labels.Add(initLabel);
-                ins.Insert(i - 1, ldLocCodeInst);
-                ins.Insert(i, new CodeInstruction(OpCodes.Brfalse, initLabel));
-                ins.Insert(i + 1, ldLocCodeInst.CopyWithoutSpecial());
-                ins.Insert(i + 2, new CodeInstruction(OpCodes.Ldarg_1));
-                ins.Insert(i + 3, new CodeInstruction(OpCodes.Ldarg_2));
-                ins.Insert(i + 4, new CodeInstruction(OpCodes.Ldarg_3));
-                ins.Insert(i + 5, new CodeInstruction(OpCodes.Ldarg_S, 4));
-                ins.Insert(i + 6, new CodeInstruction(OpCodes.Call, tempMoveHandleInvoker));
-                i += 6;
-                ldLocCodeInst = null;
-                Logger.LogDebug($"[CLIENT EVENTS] Patched in {tempMoveHandleInvoker.Format()} to {method.Format()}.");
-            }
-        }
 
-        return ins;
-    }*/
+            OnMovingHierarchyObjects?.Invoke(instanceIds.ToArray(), translations.ToArray(), pivotPosition);
+        }
+        finally
+        {
+            ListPool<uint>.release(instanceIds);
+            ListPool<HierarchyObjectTransformation>.release(translations);
+        }
+    }
 
     /// <summary>Skipped for no permissions.</summary>
     private static bool _skippedMoveHandle;
@@ -1251,6 +1244,62 @@ public static class ClientEvents
         if (!DevkitServerModule.IsEditing) return;
 
         Logger.LogDebug("[CLIENT EVENTS] Handle moved: " + position.Format() + " Rot: " + doRotation.Format() + ", Scale: " + hasScale.Format() + ".");
+        List<uint> instanceIds = ListPool<uint>.claim();
+        List<HierarchyObjectTransformation> translations = ListPool<HierarchyObjectTransformation>.claim();
+        List<Vector3>? originalScales = hasScale ? null : ListPool<Vector3>.claim();
+        try
+        {
+            HierarchyObjectTransformation.TransformFlags flags = HierarchyObjectTransformation.TransformFlags.Position;
+            if (doRotation) flags |= HierarchyObjectTransformation.TransformFlags.Rotation;
+            int c = DevkitSelectionManager.selection.Count;
+            if (translations.Capacity < c)
+                translations.Capacity = c;
+            if (instanceIds.Capacity < c)
+                instanceIds.Capacity = c;
+            if (originalScales != null && originalScales.Capacity < c)
+                originalScales.Capacity = c;
+            foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+            {
+                HierarchyObjectTransformation t = new HierarchyObjectTransformation(flags, position, rotation, selection.preTransformPosition, selection.preTransformRotation);
+                selection.gameObject.GetComponents(WorkingHierarchyItems);
+                try
+                {
+                    for (int i = 0; i < WorkingHierarchyItems.Count; ++i)
+                    {
+                        IDevkitHierarchyItem item = WorkingHierarchyItems[i];
+                        if (item.instanceID == 0u)
+                            Logger.LogWarning($"Skipped item: {item.Format()} because it was missing an instance ID.", method: "CLIENT EVENTS");
+                        else
+                        {
+                            instanceIds.Add(item.instanceID);
+                            translations.Add(t);
+                            originalScales?.Add(selection.preTransformLocalScale);
+                            OnMovedHierarchyObject?.Invoke(selection, item, in t, scale, selection.preTransformLocalScale, hasScale);
+                        }
+                    }
+                }
+                finally
+                {
+                    WorkingHierarchyItems.Clear();
+                }
+            }
+
+            Vector3[]? scales = null;
+            if (hasScale)
+            {
+                scales = new Vector3[instanceIds.Count];
+                for (int i = 0; i < scales.Length; ++i)
+                    scales[i] = scale;
+            }
+            OnMovedHierarchyObjects?.Invoke(instanceIds.ToArray(), translations.ToArray(), scales, originalScales?.ToArray());
+        }
+        finally
+        {
+            ListPool<uint>.release(instanceIds);
+            ListPool<HierarchyObjectTransformation>.release(translations);
+            if (originalScales != null)
+                ListPool<Vector3>.release(originalScales);
+        }
     }
 
     private static readonly Func<TempNodeSystemBase, Type>? GetNodeComponentType =
@@ -1335,46 +1384,6 @@ public static class ClientEvents
             
             OnHierarchyObjectsDeleted.Invoke(instanceIds);
         }
-    }
-
-    [UsedImplicitly]
-    private static void OnTempMoveRotateHandle(DevkitSelection selection, Vector3 deltaPos, Quaternion deltaRot, Vector3 pivotPos, bool modifyRotation)
-    {
-        if (!DevkitServerModule.IsEditing || _movingHandle || selection == null || selection.gameObject == null)
-            return;
-
-        Logger.LogDebug($"[CLIENT EVENTS] Temp move requested at: {selection.gameObject.name.Format()}: deltaPos: {deltaPos.Format()}, deltaRot: {deltaRot.eulerAngles.Format()}, pivotPos: {pivotPos.Format()}, modifyRotation: {modifyRotation}.");
-
-        HierarchyObjectTransformation.TransformFlags flags = 0;
-        if (!deltaPos.IsNearlyZero())
-            flags |= HierarchyObjectTransformation.TransformFlags.Position | HierarchyObjectTransformation.TransformFlags.OriginalPosition;
-        if (modifyRotation && !deltaRot.IsNearlyIdentity())
-            flags |= HierarchyObjectTransformation.TransformFlags.Rotation | HierarchyObjectTransformation.TransformFlags.OriginalRotation;
-
-        HierarchyObjectTransformation t = new HierarchyObjectTransformation(flags, deltaPos, deltaRot, selection.preTransformPosition, selection.preTransformRotation);
-
-        selection.gameObject.GetComponents(WorkingHierarchyItems);
-        uint[] instanceIds = new uint[WorkingHierarchyItems.Count];
-        try
-        {
-            for (int i = 0; i < WorkingHierarchyItems.Count; ++i)
-            {
-                IDevkitHierarchyItem item = WorkingHierarchyItems[i];
-                if (item.instanceID == 0u)
-                    Logger.LogWarning($"Skipped item: {item.Format()} because it was missing an instance ID.", method: "CLIENT EVENTS");
-                else
-                {
-                    instanceIds[i] = item.instanceID;
-                    OnMovingHierarchyObject?.Invoke(selection, item, in t, pivotPos);
-                }
-            }
-        }
-        finally
-        {
-            WorkingHierarchyItems.Clear();
-        }
-
-        OnMovingHierarchyObjects?.Invoke(instanceIds, in t, pivotPos);
     }
 
     [UsedImplicitly]
@@ -1494,7 +1503,16 @@ public readonly struct HierarchyObjectTransformation
     public Quaternion Rotation { get; }
     public Vector3 OriginalPosition { get; }
     public Quaternion OriginalRotation { get; }
-
+    public HierarchyObjectTransformation(ByteReader reader, TransformFlags flags, Vector3 position, Quaternion rotation)
+    {
+        Flags = flags;
+        Position = position;
+        Rotation = rotation;
+        if ((flags & TransformFlags.OriginalPosition) != 0)
+            OriginalPosition = reader.ReadVector3();
+        if ((flags & TransformFlags.Rotation) != 0)
+            OriginalRotation = reader.ReadQuaternion();
+    }
     public HierarchyObjectTransformation(ByteReader reader)
     {
         TransformFlags flags = reader.ReadEnum<TransformFlags>();
@@ -1546,6 +1564,13 @@ public readonly struct HierarchyObjectTransformation
         if ((Flags & TransformFlags.Rotation) != 0)
             writer.Write(Rotation);
         if ((Flags & TransformFlags.OriginalRotation) != 0)
+            writer.Write(OriginalRotation);
+    }
+    public void WritePartial(ByteWriter writer, TransformFlags flags)
+    {
+        if ((flags & TransformFlags.OriginalPosition) != 0)
+            writer.Write(OriginalPosition);
+        if ((flags & TransformFlags.OriginalRotation) != 0)
             writer.Write(OriginalRotation);
     }
 

@@ -2,6 +2,7 @@
 using JetBrains.Annotations;
 using System.Globalization;
 using System.Reflection;
+using DevkitServer.API.Abstractions;
 using DevkitServer.Multiplayer;
 using HarmonyLib;
 
@@ -9,22 +10,14 @@ namespace DevkitServer.Players;
 
 public class UserTPVControl : MonoBehaviour
 {
+    private static readonly Vector3 TPVScale = new Vector3(2.5f, 2.5f, 2.5f);
+    private static readonly Quaternion TPVRotation = Quaternion.Euler(90f, 0f, 0f);
     private static GameObject? _objectPrefab;
     private static bool _init;
     private EditorClothes _editorClothes = null!;
     public EditorUser User { get; internal set; } = null!;
     public GameObject Model { get; private set; } = null!;
-    public static float XRot = -90;
-    public static float YRot;
-    public static float ZRot;
-    public static void ApplyRotation()
-    {
-        foreach (EditorUser user in UserManager.Users)
-        {
-            if (!user.IsOwner && user.EditorObject != null && user.EditorObject.TryGetComponent(out UserTPVControl ctrl))
-                ctrl._editorClothes.transform.rotation = Quaternion.Euler(XRot, YRot, ZRot);
-        }
-    }
+
     [UsedImplicitly]
     private void Start()
     {
@@ -37,14 +30,15 @@ public class UserTPVControl : MonoBehaviour
         if (!_init)
         {
             _init = true;
-            if (DevkitServerModule.Bundle == null)
+            if (DevkitServerModule.Bundle == null || DevkitServerModule.Bundle.asset == null)
             {
                 Logger.LogError("Unable to set up UserTPVControl object, " + "devkitserver.masterbundle".Format() + " not loaded.");
                 return;
             }
 
             _objectPrefab = DevkitServerModule.Bundle.load<GameObject>("resources/tpv_char_server");
-            DontDestroyOnLoad(_objectPrefab);
+            if (_objectPrefab != null)
+                DontDestroyOnLoad(_objectPrefab);
         }
 
         if (_objectPrefab == null)
@@ -54,18 +48,20 @@ public class UserTPVControl : MonoBehaviour
         }
 
         Model = Instantiate(_objectPrefab, transform, false);
-        Model.transform.localScale = new Vector3(2.5f, 2.5f, 2.5f);
-        Model.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+        Model.transform.localScale = TPVScale;
+        Model.transform.localRotation = TPVRotation;
         Model.name = "TPV_Editor_" + User.SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture);
         _editorClothes = Model.AddComponent<EditorClothes>();
         _editorClothes.Face = User.Player.face;
-        _editorClothes.transform.rotation = Quaternion.Euler(XRot, YRot, ZRot);
         _editorClothes.Beard = User.Player.beard;
         _editorClothes.SkinColor = User.Player.skin;
         _editorClothes.Hair = User.Player.hair;
-        _editorClothes.VisualHat = User.Player.hatItem;
-        _editorClothes.IsVisual = User.Player.player.clothing.thirdClothes.isVisual;
-        _editorClothes.IsMythic = User.Player.player.clothing.thirdClothes.isMythic;
+        _editorClothes.Hat.SteamItem = User.Player.hatItem;
+        _editorClothes.Glasses.SteamItem = User.Player.glassesItem;
+        _editorClothes.Mask.SteamItem = User.Player.maskItem;
+        _editorClothes.IsLeftHanded = User.Player.IsLeftHanded;
+        _editorClothes.IsVisual = true;
+        _editorClothes.IsMythic = true;
         _editorClothes.Apply();
     }
     [UsedImplicitly]
@@ -102,8 +98,11 @@ public class UserTPVControl : MonoBehaviour
     }
 }
 [EarlyTypeInit]
+[HarmonyPatch]
 internal sealed class EditorClothes : MonoBehaviour
 {
+    private static readonly Quaternion CosmeticRotationOffset = Quaternion.Euler(-90f, 0f, -90f);
+    private static readonly Vector3 CosmeticPositionOffset = new Vector3(0f, -1.1f, 0f);
     private static readonly StaticGetter<Shader>? GetClothesShader = Accessor.GenerateStaticGetter<HumanClothes, Shader>("clothingShader");
     private static readonly StaticGetter<Shader>? GetHairShader = Accessor.GenerateStaticGetter<HumanClothes, Shader>("shader");
     private static readonly StaticGetter<int>? GetSkinColorPropertyId = Accessor.GenerateStaticGetter<HumanClothes, int>("skinColorPropertyID");
@@ -114,7 +113,7 @@ internal sealed class EditorClothes : MonoBehaviour
         Accessor.GenerateStaticCaller<Action<GameObject, bool>>(Accessor.AssemblyCSharp
             .GetType("SDG.Unturned.PrefabUtil")
             ?.GetMethod("DestroyCollidersInChildren", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)!);
-    
+
     private byte _hair;
     private byte _beard;
     private bool _hairDirty;
@@ -123,21 +122,21 @@ internal sealed class EditorClothes : MonoBehaviour
     private bool _faceDirty;
     private bool _hasHair;
     private bool _hasBeard;
-    private int _visualHat;
-    private ItemHatAsset? _visualHatAsset;
-    private ItemHatAsset? _hatAsset;
-    private bool _hatDirty;
     private bool _isVisual;
     private bool _isMythic;
     private bool _isLeftHanded;
     private Color _skinColor;
     private bool _skinColorDirty;
-    private Material? _materialClothing;
-    private Material? _materialHair;
+    private Color _hairColor;
+    private bool _hairColorDirty;
+    private Material _materialClothing = null!;
+    private Material _materialHair = null!;
     private Renderer[]? _meshes;
     private Transform? _hairModel;
     private Transform? _beardModel;
     private Transform? _hatModel;
+    private Transform? _glassesModel;
+    private Transform? _maskModel;
     public byte Hair
     {
         get => _hair;
@@ -182,44 +181,22 @@ internal sealed class EditorClothes : MonoBehaviour
             _skinColorDirty = true;
         }
     }
-    public int VisualHat
+    
+    public Color HairColor
     {
-        get => _visualHat;
+        get => _hairColor;
         set
         {
-            if (_visualHat == value)
+            if (_hairColor == value)
                 return;
-            _visualHat = value;
-            if (_visualHat != 0)
-            {
-                try
-                {
-                    _visualHatAsset = Assets.find<ItemHatAsset>(Provider.provider.economyService.getInventoryItemGuid(_visualHat));
-                }
-                catch
-                {
-                    _visualHatAsset = null;
-                }
-                if (_visualHatAsset is { isPro: false })
-                {
-                    _visualHat = 0;
-                    _visualHatAsset = null;
-                }
-            }
-            else
-                _visualHatAsset = null;
-            _hatDirty = true;
+            _hairColor = value;
+            _hairColorDirty = true;
         }
     }
-    public ItemHatAsset? HatAsset
-    {
-        get => _hatAsset;
-        internal set
-        {
-            _hatAsset = value;
-            _hatDirty = true;
-        }
-    }
+
+    public EconomyItem<ItemHatAsset> Hat { get; } = new EconomyItem<ItemHatAsset>();
+    public EconomyItem<ItemGlassesAsset> Glasses { get; } = new EconomyItem<ItemGlassesAsset>();
+    public EconomyItem<ItemMaskAsset> Mask { get; } = new EconomyItem<ItemMaskAsset>();
     public bool IsVisual
     {
         get => _isVisual;
@@ -228,7 +205,9 @@ internal sealed class EditorClothes : MonoBehaviour
             if (_isVisual == value)
                 return;
             _isVisual = value;
-            _hatDirty = true;
+            Hat.isDirty = true;
+            Glasses.isDirty = true;
+            Mask.isDirty = true;
         }
     }
     public bool IsMythic
@@ -239,10 +218,12 @@ internal sealed class EditorClothes : MonoBehaviour
             if (_isMythic == value)
                 return;
             _isMythic = value;
-            _hatDirty = true;
+            Hat.isDirty = true;
+            Glasses.isDirty = true;
+            Mask.isDirty = true;
         }
     }
-    public bool Hand
+    public bool IsLeftHanded
     {
         get => this._isLeftHanded;
         set
@@ -255,23 +236,22 @@ internal sealed class EditorClothes : MonoBehaviour
     }
     public void MarkAllDirty(bool dirty)
     {
+        Hat.isDirty = dirty;
+        Glasses.isDirty = dirty;
+        Mask.isDirty = dirty;
         _hairDirty = dirty;
-        _hatDirty = dirty;
+        _beardDirty = dirty;
         _skinColorDirty = dirty;
         _faceDirty = dirty;
+        _hairColorDirty = dirty;
     }
     public void Apply()
     {
         Logger.LogInfo("Applying...");
-        if (_hatAsset != null && _hatAsset.isPro)
-        {
-            _hatAsset = null;
-            _hatDirty = true;
-        }
         if (_skinColorDirty && _materialClothing != null)
         {
             _materialClothing.SetColor(GetSkinColorPropertyId?.Invoke() ?? Shader.PropertyToID("_SkinColor"), _skinColor);
-            Logger.LogInfo("Skin color updated: " + _skinColor.Format() + ".");
+            _skinColorDirty = false;
         }
         if (_faceDirty && _materialClothing != null)
         {
@@ -279,96 +259,110 @@ internal sealed class EditorClothes : MonoBehaviour
             Texture emission = Resources.Load<Texture2D>("Faces/" + _face.ToString(CultureInfo.InvariantCulture) + "/Emission");
             _materialClothing.SetTexture(GetFaceAlbedoTexturePropertyID?.Invoke() ?? Shader.PropertyToID("_FaceAlbedoTexture"), albedo);
             _materialClothing.SetTexture(GetFaceEmissionTexturePropertyID?.Invoke() ?? Shader.PropertyToID("_FaceEmissionTexture"), emission);
-            Logger.LogInfo("Face updated: " + _face.Format() + ".");
+            _faceDirty = false;
         }
-        ItemHatAsset? hat = this._visualHatAsset == null || !_isVisual ? _hatAsset : _visualHatAsset;
-        bool hairVis = (hat == null || hat.hairVisible);
+        bool hairVis = !(Hat.Asset is { hairVisible: false } || Glasses.Asset is { hairVisible: false } || Mask.Asset is { hairVisible: false });
+        bool beardVis = !(Hat.Asset is { beardVisible: false } || Glasses.Asset is { beardVisible: false } || Mask.Asset is { beardVisible: false });
         if (hairVis != _hasHair)
         {
             _hasHair = hairVis;
             _hairDirty = true;
         }
-        bool beardVis = (hat == null || hat.beardVisible);
         if (beardVis != _hasBeard)
         {
-            _hasBeard = hairVis;
+            _hasBeard = beardVis;
             _beardDirty = true;
         }
-        if (_hatDirty)
-        {
-            if (_hatModel != null)
-                Destroy(_hatModel.gameObject);
-            if (hat != null && hat.hat != null && hat.shouldBeVisible(false))
-            {
-                _hatModel = Instantiate(hat.hat, Vector3.zero, Quaternion.Euler(-180f, 0f, 0f), transform).transform;
-                _hatModel.name = "Hat" + hat.GUID.ToString("N");
-                _hatModel.transform.localScale = new Vector3(1f, !this._isLeftHanded || !(GetShouldMirrorLeftHandedModel != null && GetShouldMirrorLeftHandedModel(hat)) ? 1f : -1f, 1f);
-                if (hat.shouldDestroyClothingColliders)
-                    CallDestroyCollidersInChildren?.Invoke(_hatModel.gameObject, true);
-                _hatModel.DestroyRigidbody();
-                if (_isVisual && _isMythic && _visualHat != 0)
-                {
-                    ushort inventoryMythicId = Provider.provider.economyService.getInventoryMythicID(_visualHat);
-                    if (inventoryMythicId != 0)
-                        ItemTool.applyEffect(_hatModel, inventoryMythicId, EEffectType.HOOK);
-                }
-                ApplyHairOverride(hat, _hatModel);
-            }
-            Logger.LogInfo("Hat updated: " + (hat?.GUID.Format() ?? "null") + ".");
-        }
+        ApplyIfDirty(Hat, ref _hatModel, "Hat");
+        ApplyIfDirty(Glasses, ref _glassesModel, "Glasses");
+        ApplyIfDirty(Mask, ref _maskModel, "Mask");
+
         if (_hairDirty)
         {
-            if (_hairModel != null)
-                Destroy(_hairModel);
-            if (_hasHair)
-            {
-                GameObject hairModel = Resources.Load<GameObject>("Hairs/" + _hair.ToString(CultureInfo.InvariantCulture) + "/Hair");
-                if (hairModel != null)
-                {
-                    _hairModel = Instantiate(hairModel, Vector3.zero, Quaternion.Euler(-180f, 0f, 0f), transform).transform;
-                    _hairModel.name = "Hair" + _hair.ToString(CultureInfo.InvariantCulture);
-                    Transform m0 = _hairModel.Find("Model_0");
-                    if (m0 != null)
-                        m0.GetComponent<Renderer>().sharedMaterial = _materialHair;
-                    _hairModel.DestroyRigidbody();
-                }
-            }
-            Logger.LogInfo("Hair updated: " + _hair.Format() + " (Enabled: " + _hasHair.Format() + ").");
+            ApplyHair(_hair, ref _hairModel, "Hair", _hasHair);
+            _hairDirty = false;
         }
+
         if (_beardDirty)
         {
-            if (_beardModel != null)
-                Destroy(_beardModel);
-            if (_hasBeard)
-            {
-                GameObject beardModel = Resources.Load<GameObject>("Beards/" + _beard.ToString(CultureInfo.InvariantCulture) + "/Beard");
-                if (beardModel != null)
-                {
-                    _beardModel = Instantiate(beardModel, Vector3.zero, Quaternion.Euler(-180f, 0f, 0f), transform).transform;
-                    _beardModel.name = "Beard" + _beard.ToString(CultureInfo.InvariantCulture);
-                    Transform m0 = _beardModel.Find("Model_0");
-                    if (m0 != null)
-                        m0.GetComponent<Renderer>().sharedMaterial = _materialHair;
-                    _beardModel.DestroyRigidbody();
-                }
-            }
-            Logger.LogInfo("Beard updated: " + _beard.Format() + " (Enabled: " + _hasBeard.Format() + ").");
+            ApplyHair(_beard, ref _beardModel, "Beard", _hasBeard);
+            _beardDirty = false;
         }
 
         MarkAllDirty(false);
     }
-
+    private void ApplyHair(byte index, ref Transform? model, string prefix, bool enabled)
+    {
+        if (_hairColorDirty)
+        {
+            _materialHair.color = _hairColor;
+            _hairColorDirty = false;
+        }
+        if (model != null)
+        {
+            Destroy(model.gameObject);
+            model = null;
+        }
+        if (enabled)
+        {
+            GameObject hairModel = Resources.Load<GameObject>(prefix + "s/" + index.ToString(CultureInfo.InvariantCulture) + "/" + prefix);
+            if (hairModel != null)
+            {
+                model = Instantiate(hairModel, transform.position + CosmeticPositionOffset, transform.rotation * CosmeticRotationOffset, transform).transform;
+                model.name = prefix + index.ToString(CultureInfo.InvariantCulture);
+                Transform m0 = model.Find("Model_0");
+                if (m0 != null)
+                    m0.GetComponent<Renderer>().sharedMaterial = _materialHair;
+                model.DestroyRigidbody();
+            }
+        }
+    }
+    private void ApplyIfDirty<TAsset>(EconomyItem<TAsset> item, ref Transform? model, string namePrefix) where TAsset : ItemGearAsset
+    {
+        if (item.isDirty)
+        {
+            if (model != null)
+            {
+                Destroy(model.gameObject);
+                model = null;
+            }
+            TAsset? asset = item.Asset;
+            GameObject? instance = asset?.GetItemInstance();
+            if (instance != null && asset!.shouldBeVisible(false))
+            {
+                model = Instantiate(instance, transform.position + CosmeticPositionOffset, transform.rotation * CosmeticRotationOffset, transform).transform;
+                model.name = namePrefix + "_" + asset.GUID.ToString("N");
+                model.transform.localScale = new Vector3(1f, !_isLeftHanded || !(GetShouldMirrorLeftHandedModel != null && GetShouldMirrorLeftHandedModel(asset)) ? 1f : -1f, 1f);
+                if (asset.shouldDestroyClothingColliders)
+                    CallDestroyCollidersInChildren?.Invoke(model.gameObject, true);
+                model.DestroyRigidbody();
+                if (_isVisual && _isMythic)
+                {
+                    MythicAsset? mythic = item.Mythic;
+                    CenterHeadEffect(null, transform, model);
+                    if (mythic != null)
+                        ItemTool.applyEffect(model, mythic.id, EEffectType.HOOK);
+                }
+                ApplyHairOverride(asset, model);
+            }
+            item.isDirty = false;
+        }
+    }
+    [HarmonyPatch(typeof(HumanClothes), "centerHeadEffect")]
+    [HarmonyReversePatch]
+    [UsedImplicitly]
+    private void CenterHeadEffect(object? instance, Transform? skull, Transform model) { }
     private void ApplyHairOverride(ItemGearAsset itemAsset, Transform rootModel)
     {
         if (string.IsNullOrEmpty(itemAsset.hairOverride))
             return;
         Transform childRecursive = rootModel.FindChildRecursive(itemAsset.hairOverride);
         if (childRecursive == null)
-            Assets.reportError(itemAsset, "cannot find hair override '{0}'", itemAsset.hairOverride);
+            Assets.reportError(itemAsset, "Cannot find hair override \"" + itemAsset.hairOverride + "\".");
         else
         {
             Renderer component = childRecursive.GetComponent<Renderer>();
-            if (component != null)
+            if (component != null && _materialHair != null)
             {
                 component.sharedMaterial = _materialHair;
             }
@@ -405,14 +399,26 @@ internal sealed class EditorClothes : MonoBehaviour
         if (_materialClothing != null)
         {
             Destroy(_materialClothing);
-            _materialClothing = null;
+            _materialClothing = null!;
         }
         if (_materialHair != null)
         {
             Destroy(_materialHair);
-            _materialHair = null;
+            _materialHair = null!;
         }
     }
+
+    public override string ToString() => "Editor Clothes State: " +
+                                        $"Face: {Face.Format()}, " +
+                                        $"Beard: {Beard.Format()}, " +
+                                        $"Hair: {Hair.Format()}, " +
+                                        $"Skin Color: {ColorUtility.ToHtmlStringRGB(SkinColor).Colorize(SkinColor)}, " +
+                                        $"Hair Color: {ColorUtility.ToHtmlStringRGB(HairColor).Colorize(HairColor)}, " +
+                                        $"Hat: {Hat.Format()}, " +
+                                        $"Glasses: {Glasses.Format()}, " +
+                                        $"Mask: {Mask.Format()}, " +
+                                        $"Visual: {IsVisual.Format()}, " +
+                                        $"Mythic: {IsMythic.Format()}.";
 }
 
 #endif

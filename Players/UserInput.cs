@@ -484,19 +484,18 @@ public class UserInput : MonoBehaviour
 #endif
         User = null!;
     }
-
+#if CLIENT
     [UsedImplicitly]
     private void LateUpdate()
     {
-        if (!User.IsOnline)
-        {
-            Destroy(this);
-            return;
-        }
-        float t = Time.realtimeSinceStartup;
-#if CLIENT
         if (IsOwner)
         {
+            if (!User.IsOnline)
+            {
+                Destroy(this);
+                return;
+            }
+            float t = Time.realtimeSinceStartup;
             if (!_networkedInitialPosition || _movement == null)
                 return;
             Vector3 pos = transform.position;
@@ -562,8 +561,19 @@ public class UserInput : MonoBehaviour
                 _lastFlush = t;
             }
         }
-        else
+    }
 #endif
+    [UsedImplicitly]
+    private void Update()
+    {
+        if (IsOwner) return;
+        if (!User.IsOnline)
+        {
+            Destroy(this);
+            return;
+        }
+
+        float t = Time.realtimeSinceStartup;
         while (_packets is { Count: > 0 } && t >= _nextPacketApplyTime)
         {
             UserInputPacket packet = _packets.Dequeue();

@@ -93,7 +93,7 @@ public static class UserManager
             user.Player = pl;
             user.IsOnline = true;
 #if SERVER
-                    user.Connection = pl.transportConnection;
+            user.Connection = pl.transportConnection;
 #endif
             user.Init();
             OnUserConnected?.Invoke(user);

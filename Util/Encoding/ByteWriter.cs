@@ -451,6 +451,16 @@ public class ByteWriter
         _size = newsize;
     }
 
+    private static readonly MethodInfo WriteTypeArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Type[]) }, null);
+    public void Write(Type?[] types)
+    {
+        ushort len = (ushort)Math.Min(types.Length, ushort.MaxValue);
+        Write(len);
+        for (int i = 0; i < len; ++i)
+            Write(types[i]);
+    }
+
+
     private static readonly MethodInfo WriteTypeMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Type) }, null);
     public void Write(Type? type)
     {
@@ -460,11 +470,12 @@ public class ByteWriter
         const string nsDevkitServer = "DevkitServer";
         const string nsSystem = "System";
         byte flag = 0;
+        Assembly? typeAssembly = type?.Assembly;
         if (type == null)
             flag = 128;
-        else if (type.Assembly == Accessor.AssemblyCSharp)
+        else if (typeAssembly == Accessor.AssemblyCSharp)
             flag = 1;
-        else if (type.Assembly == Accessor.DevkitServer)
+        else if (typeAssembly == Accessor.DevkitServer)
             flag = 2;
         if (flag == 128)
         {
@@ -496,7 +507,7 @@ public class ByteWriter
             flag |= 4;
             ns = ns.Length > nsDevkitServer.Length ? ns.Substring(nsDevkitServer.Length + 1) : string.Empty;
         }
-        else if (type.Assembly == Accessor.MSCoreLib && ns.StartsWith(nsSystem, StringComparison.Ordinal))
+        else if (typeAssembly == Accessor.MSCoreLib && ns.StartsWith(nsSystem, StringComparison.Ordinal))
         {
             flag |= 64;
             ns = ns.Length > nsSystem.Length ? ns.Substring(nsSystem.Length + 1) : string.Empty;
@@ -1548,6 +1559,8 @@ public class ByteWriter
                 il.EmitCall(OpCodes.Call, isNullable ? WriteNullableDoubleArrayMethod : WriteDoubleArrayMethod, null);
             else if (elemType == typeof(string))
                 il.EmitCall(OpCodes.Call, isNullable ? WriteNullableStringArrayMethod : WriteStringArrayMethod, null);
+            else if (typeof(Type).IsAssignableFrom(elemType))
+                il.EmitCall(OpCodes.Call, WriteTypeArrayMethod, null);
             else if (elemType == typeof(Guid))
                 il.EmitCall(OpCodes.Call, isNullable ? WriteNullableGuidArrayMethod : WriteGuidArrayMethod, null);
             else if (elemType == typeof(DateTime))

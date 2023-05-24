@@ -137,7 +137,7 @@ public readonly struct MessageOverhead
         else
             msg = "Msg: " + NetFactory.GetInvokerName(MessageId, (Flags & MessageFlags.HighSpeed) != 0) + ";";
         msg += " " + DevkitServerUtility.FormatBytes(Size) + ";";
-        if ((Flags & MessageFlags.Relay) == 0 && ResponseKey != 0)
+        if (ResponseKey != 0)
             msg += " Snowflake: " + RequestKey.ToString(CultureInfo.InvariantCulture) + ";";
         if (RequestKey != 0)
             msg += (ResponseKey == 0 ? " Snowflake: " : " Request Key: ") + RequestKey.ToString(CultureInfo.InvariantCulture) + ";";

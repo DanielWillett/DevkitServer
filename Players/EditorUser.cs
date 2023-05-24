@@ -220,7 +220,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     }
     internal static void OnClientDisconnected()
     {
-        DevkitServerModule.Instance.UnloadBundle();
+        // DevkitServerModule.Instance.UnloadBundle();
         try
         {
             HighSpeedConnection.Instance?.CloseConnection();
