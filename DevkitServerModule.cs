@@ -8,6 +8,7 @@ using DevkitServer.API;
 using DevkitServer.Configuration;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Patches;
 using DevkitServer.Plugins;
 using JetBrains.Annotations;
@@ -237,9 +238,7 @@ public sealed class DevkitServerModule : IModuleNexus
 #if SERVER
         if (IsEditing && level == Level.BUILD_INDEX_GAME)
         {
-#if TILE_SYNC
-            GameObjectHost.AddComponent<TileSync>();
-#endif
+            TileSync.CreateServersideAuthority();
         }
         else if (GameObjectHost.TryGetComponent(out TileSync sync))
             Object.Destroy(sync);
@@ -399,7 +398,7 @@ public sealed class DevkitServerModule : IModuleNexus
         PluginLoader.Unload();
         _tknSrc?.Cancel();
         _tknSrc = null;
-        Object.Destroy(TileSync.ServersideAuthorityTileSync);
+        TileSync.DestroyServersideAuthority();
         Object.Destroy(GameObjectHost);
         Logger.LogInfo("Shutting down...");
         PatchesMain.Unpatch();

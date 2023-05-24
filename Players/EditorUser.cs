@@ -4,6 +4,7 @@ using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Comparers;
+using DevkitServer.Multiplayer.Sync;
 #if CLIENT
 using DevkitServer.Players.UI;
 #endif
@@ -12,6 +13,7 @@ using JetBrains.Annotations;
 namespace DevkitServer.Players;
 public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 {
+    internal readonly List<AuthoritativeSync> IntlSyncs = new List<AuthoritativeSync>(4);
     public ClientInfo ClientInfo { get; private set; } = null!;
 #if CLIENT
     public static EditorUser? User { get; internal set; }
@@ -33,11 +35,15 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     public TileSync TileSync { get; private set; } = null!;
     public string DisplayName { get; private set; } = null!;
     public SteamPlayer? Player { get; internal set; }
+    public IReadOnlyList<AuthoritativeSync> Syncs { get; }
 
     public bool IsOnline { get; internal set; }
     public bool IsOwner { get; private set; }
     public GameObject EditorObject { get; private set; } = null!;
-
+    private EditorUser()
+    {
+        Syncs = IntlSyncs.AsReadOnly();
+    }
     internal void PreInit(CSteamID player, string displayName)
     {
         SteamId = player;
@@ -55,6 +61,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         Transactions = EditorObject.GetComponent<UserTransactions>();
         Actions = EditorObject.GetComponent<EditorActions>();
         TileSync = EditorObject.GetComponent<TileSync>();
+        IntlSyncs.Add(TileSync);
 #if SERVER
         ClientInfo = DevkitServerGamemode.GetClientInfo(this);
         _lo = new HashSet<LevelObject>(32, LevelObjectComparer.Instance);
@@ -65,6 +72,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         ClientInfo.SendClientInfo.Invoke(Connection, ClientInfo);
         ClientInfo.TryInvokeOnClientInfoReady(this, ClientInfo);
         Logger.DumpJson(ClientInfo);
+        TileSync.SendAuthority(Connection);
 #endif
         Logger.LogDebug("[USERS] Editor User initialized: " + SteamId.m_SteamID.Format() + " (" + DisplayName.Format() + ").");
     }
@@ -203,6 +211,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 #if CLIENT
     internal static void OnClientConnected()
     {
+        TileSync.CreateServersideAuthority();
         if (!DevkitServerModule.IsEditing)
             return;
         Commander.init();
@@ -221,6 +230,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     internal static void OnClientDisconnected()
     {
         // DevkitServerModule.Instance.UnloadBundle();
+        TileSync.DestroyServersideAuthority();
         try
         {
             HighSpeedConnection.Instance?.CloseConnection();

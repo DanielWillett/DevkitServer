@@ -7,6 +7,7 @@ using DevkitServer.Util.Encoding;
 using JetBrains.Annotations;
 using SDG.Framework.Utilities;
 using SDG.NetPak;
+using DevkitServer.Multiplayer.Sync;
 
 namespace DevkitServer.Multiplayer.Actions;
 
@@ -388,9 +389,9 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 {
                     anyInvalid = true;
                     Logger.LogDebug($"[EDITOR ACTIONS] Invalid action request filtered from {action.Instigator.Format()}: {action}.");
-                    if (action is ITerrainAction tAction && TileSync.ServersideAuthorityTileSync != null && TileSync.ServersideAuthorityTileSync.HasAuthority)
+                    if (action is ITerrainAction tAction && TileSync.ServersideAuthority != null && TileSync.ServersideAuthority.HasAuthority)
                     {
-                        TileSync.ServersideAuthorityTileSync.InvalidateBounds(tAction.Bounds, tAction.EditorType switch
+                        TileSync.ServersideAuthority.InvalidateBounds(tAction.Bounds, tAction.EditorType switch
                         {
                             TerrainEditorType.Heightmap => TileSync.DataType.Heightmap,
                             TerrainEditorType.Splatmap => TileSync.DataType.Splatmap,

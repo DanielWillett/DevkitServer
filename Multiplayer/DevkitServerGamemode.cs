@@ -1,5 +1,6 @@
 ﻿using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Players;
+using DevkitServer.Multiplayer.Sync;
 #if SERVER
 using DevkitServer.API.Permissions;
 using DevkitServer.Configuration;

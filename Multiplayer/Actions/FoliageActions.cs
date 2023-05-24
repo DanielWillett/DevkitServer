@@ -1,11 +1,15 @@
-﻿using DevkitServer.API.Permissions;
-using DevkitServer.Core.Permissions;
-using DevkitServer.Patches;
-using DevkitServer.Util.Encoding;
+﻿using DevkitServer.Util.Encoding;
 using JetBrains.Annotations;
 using SDG.Framework.Devkit;
-using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Foliage;
+#if SERVER
+using DevkitServer.API.Permissions;
+using DevkitServer.Core.Permissions;
+#endif
+#if CLIENT
+using SDG.Framework.Devkit.Tools;
+using DevkitServer.Patches;
+#endif
 
 namespace DevkitServer.Multiplayer.Actions;
 public sealed class FoliageActions
@@ -269,7 +273,6 @@ public sealed class RemoveResourceSpawnpointAction : IAction, IAsset
     public void Apply()
     {
         Vector3 pos = ResourcePosition;
-        Logger.DumpJson(this);
         if (Regions.tryGetCoordinate(pos, out byte x, out byte y))
         {
             List<ResourceSpawnpoint> region = LevelGround.trees[x, y];

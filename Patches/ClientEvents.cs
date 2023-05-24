@@ -1,8 +1,8 @@
 ﻿using DevkitServer.Util.Encoding;
+using DevkitServer.Multiplayer.Sync;
 #if CLIENT
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;
-using DevkitServer.Multiplayer;
 using DevkitServer.Players;
 using DevkitServer.Players.UI;
 using HarmonyLib;
@@ -505,7 +505,8 @@ public static class ClientEvents
         if (UserInput.ActiveTool is TerrainEditor editor && GetTerrainBrushWorldPosition != null)
         {
             TileSync? sync = TileSync.GetAuthority();
-            if (sync != null && sync.Pending.HasValue)
+            TileSync.MapInvalidation? pendingSync = sync?.Pending;
+            if (sync != null && pendingSync.HasValue)
             {
                 float rad = TerrainEditor.toolMode switch
                 {
@@ -513,11 +514,11 @@ public static class ClientEvents
                     TerrainEditor.EDevkitLandscapeToolMode.SPLATMAP => editor.splatmapBrushRadius,
                     _ => 0
                 };
-                if (sync.Pending.Value.Type == TileSync.DataType.Heightmap && TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.HEIGHTMAP ||
-                    sync.Pending.Value.Type == TileSync.DataType.Splatmap && TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.SPLATMAP && TerrainEditor.splatmapMode != TerrainEditor.EDevkitLandscapeToolSplatmapMode.CUT ||
-                    sync.Pending.Value.Type == TileSync.DataType.Holes && TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.SPLATMAP && TerrainEditor.splatmapMode == TerrainEditor.EDevkitLandscapeToolSplatmapMode.CUT)
+                if (pendingSync.Value.Type == TileSync.DataType.Heightmap && TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.HEIGHTMAP ||
+                    pendingSync.Value.Type == TileSync.DataType.Splatmap && TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.SPLATMAP && TerrainEditor.splatmapMode != TerrainEditor.EDevkitLandscapeToolSplatmapMode.CUT ||
+                    pendingSync.Value.Type == TileSync.DataType.Holes && TerrainEditor.toolMode == TerrainEditor.EDevkitLandscapeToolMode.SPLATMAP && TerrainEditor.splatmapMode == TerrainEditor.EDevkitLandscapeToolSplatmapMode.CUT)
                 {
-                    if (sync.Pending.Value.CollidesWith2DCircle(GetTerrainBrushWorldPosition(editor), rad))
+                    if (pendingSync.Value.CollidesWith2DCircle(GetTerrainBrushWorldPosition(editor), rad))
                     {
                         UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("BeingSynced"));
                         return false;
@@ -1510,8 +1511,10 @@ public readonly struct HierarchyObjectTransformation
         Rotation = rotation;
         if ((flags & TransformFlags.OriginalPosition) != 0)
             OriginalPosition = reader.ReadVector3();
+        else OriginalPosition = default;
         if ((flags & TransformFlags.Rotation) != 0)
             OriginalRotation = reader.ReadQuaternion();
+        else OriginalRotation = Quaternion.identity;
     }
     public HierarchyObjectTransformation(ByteReader reader)
     {

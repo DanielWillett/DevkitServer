@@ -11,6 +11,7 @@ using DevkitServer.API;
 using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Plugins;
+using DevkitServer.Multiplayer.Sync;
 
 namespace DevkitServer.Multiplayer.Networking;
 
