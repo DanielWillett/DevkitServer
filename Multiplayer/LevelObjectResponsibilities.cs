@@ -4,14 +4,14 @@ using SDG.Framework.Devkit;
 
 namespace DevkitServer.Multiplayer;
 /// <summary>
-/// Stores the user that's responsible for placing an <see cref="IDevkitHierarchyItem"/>. On the client it only stores a set of the ones you placed.
+/// Stores the user that's responsible for placing an <see cref="LevelObject"/>. On the client it only stores a set of the ones you placed.
 /// </summary>
-public static class HierarchyResponsibilities
+public static class LevelObjectResponsibilities
 {
-    private const string Source = "HIERARCHY RESPONSIBILITIES";
+    private const string Source = "LEVEL OBJECT RESPONSIBILITIES";
 
-    private static readonly InstanceIdResponsibilityTable Table = new InstanceIdResponsibilityTable(Path.Combine(DevkitServerConfig.LevelDirectory, "hierarchy-responsibilities.dat"), Source);
-
+    private static readonly InstanceIdResponsibilityTable Table = new InstanceIdResponsibilityTable(Path.Combine(DevkitServerConfig.LevelDirectory, "level-object-responsibilities.dat"), Source);
+    
 #if SERVER
     public static ulong GetPlacer(uint instanceId) => Table.GetPlacer(instanceId);
     public static bool IsPlacer(uint instanceId, ulong user) => Table.IsPlacer(instanceId, user);

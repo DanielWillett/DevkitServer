@@ -268,7 +268,6 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                             else
                             {
                                 int index = (_historyBufferIndex - _historyBufferOffset) % _historyBuffer.Length;
-                                redo:
                                 if (_historyBuffer[index] != null)
                                 {
                                     string newStr = _historyBuffer[index];

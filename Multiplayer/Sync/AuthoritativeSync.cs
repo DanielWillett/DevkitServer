@@ -1,7 +1,9 @@
-﻿using System.Reflection;
-using DevkitServer.Multiplayer.Networking;
+﻿using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
 using JetBrains.Annotations;
+#if CLIENT
+using System.Reflection;
+#endif
 
 namespace DevkitServer.Multiplayer.Sync;
 public abstract class AuthoritativeSync : MonoBehaviour
@@ -87,12 +89,14 @@ public abstract class AuthoritativeSync<TSync> : AuthoritativeSync where TSync :
             ServersideAuthority = null;
         }
     }
+#if SERVER
     internal static void SendAuthority(ITransportConnection connection)
     {
         TSync? auth = GetAuthority();
         if (auth != null)
             SendAuthoritativeSyncAuthority.Invoke(connection, auth.User == null ? 0 : auth.User.SteamId.m_SteamID, typeof(TSync));
     }
+#endif
     [Pure]
     public static TSync? GetAuthority()
     {

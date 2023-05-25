@@ -391,6 +391,7 @@ public sealed class DevkitServerModule : IModuleNexus
         DevkitServerUtility.CheckDirectory(false, false, DevkitServerConfig.LevelDirectory, typeof(DevkitServerConfig).GetProperty(nameof(DevkitServerConfig.LevelDirectory), BindingFlags.Public | BindingFlags.Static));
 #endif
         HierarchyResponsibilities.Reload();
+        LevelObjectResponsibilities.Reload();
     }
 
     public void shutdown()
@@ -406,7 +407,6 @@ public sealed class DevkitServerModule : IModuleNexus
         Editor.onEditorCreated -= OnEditorCreated;
         Level.onPostLevelLoaded -= OnPostLevelLoaded;
         Level.onPrePreLevelLoaded -= OnPrePreLevelLoaded;
-        HierarchyResponsibilities.Save();
 #if SERVER
         Provider.onServerConnected -= UserManager.AddPlayer;
         Provider.onServerDisconnected -= UserManager.RemovePlayer;
