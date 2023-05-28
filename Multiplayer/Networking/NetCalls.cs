@@ -27,5 +27,11 @@ internal enum NetCalls : ushort
     SendPermissionGroupUpdate = 24,
     ReunRequest = 25,
     TileSyncAuthority = 26,
-    EditorUIMessage = 27
+    EditorUIMessage = 27,
+    RequestHierarchyInstantiation = 28,
+    SendHierarchyInstantiation = 29,
+    RequestLevelObjectInstantiation = 30,
+    SendLevelObjectInstantiation = 31,
+    RequestUpdateController = 32,
+    RequestInitialState = 33,
 }

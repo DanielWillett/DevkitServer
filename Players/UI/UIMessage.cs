@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
+using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer.Networking;
 using HarmonyLib;
 using JetBrains.Annotations;
@@ -92,7 +93,7 @@ public static class UIMessage
     /// Send a toast message to a user, or the current user when called client-side.
     /// </summary>
     /// <param name="message">Text to show. Not formatted at all.</param>
-    /// <returns>Client-side or server-side. Must be ran on main thread.</returns>
+    /// <remarks>Client-side or server-side. Must be ran on main thread.</remarks>
     /// <exception cref="NotSupportedException">Ran on non-game thread.</exception>
     public static
 #if CLIENT
@@ -129,5 +130,35 @@ public static class UIMessage
             _customText = null;
         }
 #endif
+    }
+    /// <summary>
+    /// Send a 'NoPermissions' toast message to a user, or the current user when called client-side.
+    /// </summary>
+    /// <param name="missingPermission">Optional missing permission argument to display.</param>
+    /// <remarks>Client-side or server-side. Must be ran on main thread.</remarks>
+    /// <exception cref="NotSupportedException">Ran on non-game thread.</exception>
+    public static
+#if CLIENT
+        bool
+#else
+        void
+#endif
+        SendNoPermissionMessage(
+#if SERVER
+        EditorUser user,
+#endif
+        Permission? missingPermission = null)
+    {
+#if CLIENT
+        return
+#endif
+        SendEditorMessage(
+#if SERVER
+        user, 
+#endif
+        missingPermission == null
+            ? DevkitServerModule.MessageLocalization.Translate("NoPermissions")
+            : DevkitServerModule.MessageLocalization.Translate("NoPermissionsWithPermission", missingPermission.ToString())
+            );
     }
 }

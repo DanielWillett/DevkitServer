@@ -71,9 +71,9 @@ public abstract class AuthoritativeSync<TSync> : AuthoritativeSync where TSync :
             }
             HasAuthorityIntl = value;
             if (User == null)
-                Logger.LogDebug($"Server-side authority {this.Format()} {(value ? "gained" : "lost")} authority.");
+                Logger.LogDebug($"Server-side authority {GetType().Format()} {(value ? "gained" : "lost")} authority.");
             else
-                Logger.LogDebug($"{User.Format()} {this.Format()} {(value ? "gained" : "lost")} authority.");
+                Logger.LogDebug($"{User.Format()} {GetType().Format()} {(value ? "gained" : "lost")} authority.");
             OnAuthorityUpdated(value);
         }
     }
@@ -135,7 +135,7 @@ public abstract class AuthoritativeSync<TSync> : AuthoritativeSync where TSync :
 #if CLIENT
             IsOwner = false;
 #endif
-            Logger.LogDebug("Server-side authority TileSync initialized.");
+            Logger.LogDebug($"Server-side authority {GetType().Format()} initialized.");
             if (ServersideAuthority != null)
                 Destroy(ServersideAuthority);
             ServersideAuthority = (TSync)this;
@@ -143,7 +143,7 @@ public abstract class AuthoritativeSync<TSync> : AuthoritativeSync where TSync :
         }
         else
         {
-            Logger.LogDebug($"Client {User.Format()} TileSync initialized.");
+            Logger.LogDebug($"Client {User.Format()} {GetType().Format()} initialized.");
 #if CLIENT
             IsOwner = User == EditorUser.User;
 #endif

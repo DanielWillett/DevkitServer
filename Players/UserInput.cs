@@ -5,27 +5,42 @@ using JetBrains.Annotations;
 using SDG.Framework.Devkit;
 using System.Reflection;
 using System.Reflection.Emit;
-using SDG.Framework.Landscapes;
-#if CLIENT
+using DevkitServer.API.Permissions;
+using DevkitServer.Core.Permissions;
 using DevkitServer.Players.UI;
-#endif
 using SDG.NetPak;
+#if CLIENT
 using EditorUI = SDG.Unturned.EditorUI;
+using HarmonyLib;
+#endif
 
 namespace DevkitServer.Players;
 
 [EarlyTypeInit(-1)]
+#if CLIENT
+[HarmonyPatch]
+#endif
 public class UserInput : MonoBehaviour
 {
-    private const ushort DataVersion = 3;
-    internal static readonly NetCall<ulong, Vector3> SendInitialPosition = new NetCall<ulong, Vector3>((ushort)NetCalls.SendInitialPosition);
-    internal static readonly NetCall<ulong, CameraController> SendUpdateController = new NetCall<ulong, CameraController>((ushort)NetCalls.SendUpdateController);
+    private const ushort DataVersion = 4;
+    [UsedImplicitly]
+    private static readonly NetCall<ulong, Vector3> SendInitialPosition = new NetCall<ulong, Vector3>(NetCalls.SendInitialPosition);
+    [UsedImplicitly]
+    private static readonly NetCall<ulong, CameraController> SendUpdateController = new NetCall<ulong, CameraController>(NetCalls.SendUpdateController);
+    [UsedImplicitly]
+    private static readonly NetCall<CameraController> RequestUpdateController = new NetCall<CameraController>(NetCalls.RequestUpdateController);
+    [UsedImplicitly]
+    private static readonly NetCall RequestInitialState = new NetCall(NetCalls.RequestInitialState);
+#if CLIENT
+    internal static CameraController CleaningUpController;
+#endif
     private CameraController _controller;
     private static Delegate[] _onUpdatedActions = Array.Empty<Delegate>();
-#if CLIENT
+
+    /*#if CLIENT
     private static StaticSetter<float>? SetLookPitch = Accessor.GenerateStaticSetter<EditorLook, float>("_pitch");
     private static StaticSetter<float>? SetLookYaw = Accessor.GenerateStaticSetter<EditorLook, float>("_yaw");
-#endif
+    #endif*/
     private static event Action<EditorUser>? _onUpdated;
     public static event Action<EditorUser>? OnUserPositionUpdated
     {
@@ -58,14 +73,27 @@ public class UserInput : MonoBehaviour
     // ReSharper disable once UnusedAutoPropertyAccessor.Local
     public bool IsOwner { get; private set; }
     public GameObject? ControllerObject { get; private set; }
-
+#if CLIENT
+    /// <summary>Set with <see cref="RequestSetController"/>.</summary>
+#elif SERVER
+    /// <remarks>Setter replicates to clients.</remarks>
+#endif
     public CameraController Controller
     {
         get => _controller;
+#if CLIENT
+        private
+#endif
         set
         {
-            if (_controller == value || value is not CameraController.Editor and not CameraController.Player)
+            ThreadUtil.assertIsGameThread();
+
+            if (_controller == value)
                 return;
+
+            if (value is not CameraController.Editor and not CameraController.Player)
+                throw new ArgumentOutOfRangeException(nameof(value), "Must be either Player or Editor.");
+
             switch (value)
             {
                 case CameraController.Editor:
@@ -76,7 +104,7 @@ public class UserInput : MonoBehaviour
                     break;
             }
 #if SERVER
-            SendUpdateController.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, Controller);
+            SendUpdateController.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, value);
 #endif
             _controller = value;
 
@@ -95,11 +123,17 @@ public class UserInput : MonoBehaviour
     };
 
     private static readonly Func<IDevkitTool>? GetDevkitTool;
+    [UsedImplicitly]
     private static readonly InstanceGetter<EditorMovement, float> GetSpeed = Accessor.GenerateInstanceGetter<EditorMovement, float>("speed", BindingFlags.NonPublic, throwOnError: true)!;
+    [UsedImplicitly]
     private static readonly InstanceGetter<EditorMovement, Vector3> GetInput = Accessor.GenerateInstanceGetter<EditorMovement, Vector3>("input", BindingFlags.NonPublic, throwOnError: true)!;
+    [UsedImplicitly]
     private static readonly InstanceSetter<PlayerInput, float>? SetLastInputted = Accessor.GenerateInstanceSetter<PlayerInput, float>("lastInputed");
+    [UsedImplicitly]
     private static readonly Action<PlayerUI> RestartPlayerUI = Accessor.GenerateInstanceCaller<PlayerUI, Action<PlayerUI>>("InitializePlayer", throwOnError: true)!;
-
+#if SERVER
+    private static readonly Action<Player, SteamPlayer> SendInitialState = Accessor.GenerateInstanceCaller<Player, Action<Player, SteamPlayer>>("SendInitialPlayerState", new Type[] { typeof(SteamPlayer) }, throwOnError: true)!;
+#endif
 #if CLIENT
     private EditorMovement? _movement;
     private static readonly ByteWriter Writer = new ByteWriter(false, 245);
@@ -160,6 +194,16 @@ public class UserInput : MonoBehaviour
             ctx.Acknowledge(StandardErrorCode.Success);
             TryInvokeOnUserPositionUpdated(user);
         }
+    }
+#endif
+#if SERVER
+    [NetCall(NetCallSource.FromClient, NetCalls.RequestInitialState)]
+    private static void ReceiveRequestInitialState(MessageContext ctx)
+    {
+        EditorUser? user = ctx.GetCaller();
+        if (user == null || !user.IsOnline || user.Player?.player == null)
+            return;
+        SendInitialState(user.Player.player, user.Player);
     }
 #endif
     private static void TryInvokeOnUserPositionUpdated(EditorUser user)
@@ -231,54 +275,53 @@ public class UserInput : MonoBehaviour
     {
         User.Player!.player.gameObject.SetActive(true);
         User.EditorObject.SetActive(true);
+        if (Controller == CameraController.Editor)
+        {
+#if SERVER
+            SetEditorPosition(User.Player!.player.look.aim.transform.position);
+#endif
+            User.Player!.player.gameObject.SetActive(false);
+        }
+        else if (Controller == CameraController.Player)
+        {
+            User.Player!.player.gameObject.SetActive(true);
+#if SERVER
+            Vector3 position = User.EditorObject.transform.position;
+            float yaw = User.EditorObject.transform.rotation.eulerAngles.y;
+            if (Physics.Raycast(new Ray(position with { y = Level.HEIGHT }, Vector3.down), out RaycastHit info, Level.HEIGHT, RayMasks.BLOCK_COLLISION, QueryTriggerInteraction.Ignore))
+            {
+                position.y = info.point.y + 1.5f;
+            }
+            else
+            {
+                PlayerSpawnpoint spawn = LevelPlayers.getSpawn(false);
+                position = spawn.point + new Vector3(0.0f, 1.5f, 0.0f);
+                yaw = spawn.angle;
+            }
+            User.Player!.player.teleportToLocationUnsafe(position, yaw);
+#endif
+        }
         if (IsOwner)
         {
             GameObject? ctrl = ControllerObject;
             if (ctrl == null || !SetActiveMainCamera(ctrl.transform))
+            {
+                Logger.LogDebug($"Unable to set main camera: {ctrl.Format()}.");
                 return;
+            }
             if (ctrl == User.EditorObject)
             {
-                Logger.LogInfo("Camera controller set to {Editor}.", ConsoleColor.DarkCyan);
 #if CLIENT
                 ChangeUI(true);
 #endif
             }
             else if (ctrl == User.Player!.player.gameObject)
             {
-                Logger.LogInfo("Camera controller set to {Player}.", ConsoleColor.DarkCyan);
 #if CLIENT
                 ChangeUI(false);
 #endif
             }
-            else
-                Logger.LogInfo("Camera controller set to \"" + ctrl.name + "\".", ConsoleColor.DarkCyan);
-        }
-        if (Controller == CameraController.Editor)
-        {
-#if SERVER
-            Vector3 position = User.Player!.player.transform.position;
-            SetEditorPosition(position);
-#endif
-            User.Player!.player.gameObject.SetActive(false);
-        }
-        else if (Controller == CameraController.Player)
-        {
-#if SERVER
-            Vector3 position = User.EditorObject.transform.position;
-            float yaw = User.EditorObject.transform.rotation.eulerAngles.y;
-            if (Physics.Raycast(new Ray(position with { y = Level.HEIGHT }, Vector3.down), out RaycastHit info, Level.HEIGHT, RayMasks.BLOCK_COLLISION, QueryTriggerInteraction.Ignore))
-            {
-                position.y = info.point.y + 1f;
-            }
-            else
-            {
-                PlayerSpawnpoint spawn = LevelPlayers.getSpawn(false);
-                position = spawn.point + new Vector3(0.0f, 1f, 0.0f);
-                yaw = spawn.angle;
-            }
-            User.Player!.player.teleportToLocationUnsafe(position, yaw);
-#endif
-            User.EditorObject.SetActive(false);
+            Logger.LogInfo($"Camera controller set to {Controller.Format()}.", ConsoleColor.DarkCyan);
         }
         OnUserControllerUpdated?.Invoke(User);
     }
@@ -286,13 +329,20 @@ public class UserInput : MonoBehaviour
     private void ChangeUI(bool editor)
     {
         Component? ui = !editor ? UIAccessTools.EditorUI : UIAccessTools.PlayerUI;
+        if (editor)
+        {
+            GameObject? editorObj = DevkitServerUtility.GetEditorObject();
+            if (editorObj != null && editorObj)
+                editorObj.SetActive(true);
+            CleaningUpController = CameraController.Editor;
+        }
         if (ui != null)
         {
-            Destroy(ui);
             if (!editor)
                 _editorUiObject = ui.transform;
             else
                 _playerUiObject = ui.transform;
+            Destroy(ui);
             Logger.LogInfo("Cleaned up " + (!editor ? "EditorUI." : "PlayerUI."));
         }
         else
@@ -309,27 +359,77 @@ public class UserInput : MonoBehaviour
     }
     private static IEnumerator SwitchToUI(GameObject parent, bool editor)
     {
-        yield return null;
-        while (!Level.isLoaded)
+        try
+        {
             yield return null;
-        if (parent == null) // check parent wasn't destroyed
-            yield break;
+            while (!Level.isLoaded)
+                yield return null;
+            if (parent == null) // check parent wasn't destroyed
+                yield break;
 
-        Component comp = parent.gameObject.AddComponent(editor ? typeof(EditorUI) : typeof(PlayerUI));
-        Logger.LogInfo("Added " + (editor ? "EditorUI." : "PlayerUI."));
-        if (comp is PlayerUI player && Player.player.first != null) // loaded
-        {
+            Component comp = parent.gameObject.AddComponent(editor ? typeof(EditorUI) : typeof(PlayerUI));
             yield return null;
-            RestartPlayerUI(player);
-            Logger.LogInfo("Restarted PlayerUI.");
-            DevkitEditorHUD.Close(true);
+            if (!editor)
+                CleaningUpController = CameraController.Player;
+            Logger.LogInfo("Added " + (editor ? "EditorUI." : "PlayerUI."));
+
+            if (comp is PlayerUI player) // loaded
+            {
+                try
+                {
+                    RestartPlayerUI(player);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Error initializing character.");
+                    Logger.LogError(ex);
+                }
+                Logger.LogInfo("Restarted PlayerUI.");
+                DevkitEditorHUD.Close(true);
+            }
+            else if (editor)
+            {
+                try
+                {
+                    VehicleManager.exitVehicle();
+                    Player.player.equipment.ReceiveEquip(byte.MaxValue, byte.MaxValue, byte.MaxValue, Guid.Empty, 100, Array.Empty<byte>(), NetId.INVALID);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Error deinitializing character.");
+                    Logger.LogError(ex);
+                }
+                DevkitEditorHUD.Close(true);
+                DevkitEditorHUD.Open();
+            }
+            if (Player.player.first != null)
+            {
+                Player.player.first.gameObject.SetActive(!editor);
+            }
         }
-        else if (editor)
+        finally
         {
-            DevkitEditorHUD.Close(true);
-            DevkitEditorHUD.Open();
+            if (!editor)
+            {
+                GameObject? editorObj = DevkitServerUtility.GetEditorObject();
+                if (editorObj != null && editorObj)
+                    editorObj.SetActive(false);
+                RequestInitialState.Invoke();
+            }
         }
     }
+    [HarmonyPatch(typeof(PlayerLook), "updateScope")]
+    [HarmonyFinalizer]
+    private static void PlayerLookUpdateScopeFinalizer(ref Exception __exception)
+    {
+        if (__exception != null)
+        {
+            Logger.LogError("Error updating player look scope settings.");
+            Logger.LogError(__exception);
+            __exception = null!;
+        }
+    }
+
 #endif
     private static bool SetActiveMainCamera(Transform tranform)
     {
@@ -450,7 +550,7 @@ public class UserInput : MonoBehaviour
     }
     private void HandleFlushPackets(ByteWriter writer)
     {
-        int c = Math.Min(byte.MaxValue, _packets!.Count);
+        int c = Math.Min(byte.MaxValue, _packets.Count);
         writer.Write((byte)c);
         for (int i = 0; i < c; ++i)
         {
@@ -566,6 +666,10 @@ public class UserInput : MonoBehaviour
     [UsedImplicitly]
     private void Update()
     {
+#if SERVER
+        if (Controller == CameraController.Player && User.Player?.player != null)
+            _lastPos = User.Player.player.transform.position;
+#endif
         if (IsOwner) return;
         if (!User.IsOnline)
         {
@@ -631,7 +735,7 @@ public class UserInput : MonoBehaviour
     }
 #if CLIENT
     [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendUpdateController)]
-    private void ReceiveControllerUpdated(MessageContext ctx, ulong steam64, CameraController controller)
+    private static void ReceiveControllerUpdated(MessageContext ctx, ulong steam64, CameraController controller)
     {
         EditorUser? user = UserManager.FromId(steam64);
         if (user != null)
@@ -639,8 +743,60 @@ public class UserInput : MonoBehaviour
 
         ctx.Acknowledge();
     }
+    /// <returns><see langword="false"/> if the player lacks permission.</returns>
+    public bool RequestSetController(CameraController controller)
+    {
+        if (controller is not CameraController.Editor and not CameraController.Player)
+            throw new ArgumentOutOfRangeException(nameof(controller), "Must be either Player or Editor.");
+        if (!IsOwner)
+            throw new InvalidOperationException("Can not set another user's controller.");
+
+        if (CheckPermissionForController(controller))
+            RequestUpdateController.Invoke(controller);
+        else return false;
+        return true;
+    }
 #endif
+    public static bool CheckPermissionForController(CameraController controller
 #if SERVER
+        , ulong user
+#endif
+    )
+    {
+        Permission perm = controller == CameraController.Player
+            ? VanillaPermissions.UsePlayerController
+            : VanillaPermissions.UseEditorController;
+        Permission otherPerm = controller != CameraController.Player
+            ? VanillaPermissions.UsePlayerController
+            : VanillaPermissions.UseEditorController;
+        return perm.Has(
+#if SERVER
+        user
+#endif
+            ) ||
+               !otherPerm.Has(
+#if SERVER
+        user
+#endif
+            );
+    }
+#if SERVER
+    [NetCall(NetCallSource.FromClient, NetCalls.RequestUpdateController)]
+    private static StandardErrorCode ReceiveUpdateControllerRequest(MessageContext ctx, CameraController controller)
+    {
+        EditorUser? user = ctx.GetCaller();
+        if (user == null || !user.IsOnline)
+            return StandardErrorCode.NotFound;
+
+        if (CheckPermissionForController(controller, user.SteamId.m_SteamID))
+        {
+            user.Input.Controller = controller;
+            return StandardErrorCode.Success;
+        }
+        
+        UIMessage.SendNoPermissionMessage(user);
+        return StandardErrorCode.NoPermissions;
+    }
     private void Load()
     {
         if (User?.Player == null) return;
@@ -664,8 +820,8 @@ public class UserInput : MonoBehaviour
             {
                 _lastPitch = 0;
                 _lastYaw = 0;
-                if (v > 0)
-                    Controller = (CameraController)block.readByte();
+                if (v is > 0 and < 4)
+                    block.readByte();
 
                 Logger.LogDebug(" Loaded position: " + pos.Format());
                 SetEditorPosition(pos);
@@ -706,7 +862,6 @@ public class UserInput : MonoBehaviour
         Block block = new Block();
         block.writeUInt16(DataVersion);
         block.writeSingleVector3(_lastPos);
-        block.writeByte((byte)Controller);
         Logger.LogDebug(" Saved position: " + _lastPos.Format() + ", (" + _lastPitch.Format() + ", " + _lastYaw.Format() + ").");
         PlayerSavedata.writeBlock(User.Player.playerID, "/DevkitServer/Input.dat", block);
     }

@@ -74,6 +74,7 @@ public class NetCallCustom : BaseNetCall
     public delegate Task MethodAsync(MessageContext context, ByteReader reader);
     private readonly ByteWriter _writer;
     private bool throwOnError;
+    internal NetCallCustom(NetCalls method, int capacity = 0) : this((ushort)method, capacity) { }
     internal NetCallCustom(ushort method, int capacity = 0) : base(method)
     {
         _writer = new ByteWriter(true, capacity);
@@ -160,6 +161,7 @@ public class NetCallCustom : BaseNetCall
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections, WriterTask task)
     {
+        if (connections.Count == 0) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         try
         {
@@ -299,6 +301,7 @@ public sealed class NetCall : BaseNetCall
 {
     public delegate void Method(MessageContext context);
     public delegate Task MethodAsync(MessageContext context);
+    internal NetCall(NetCalls method) : this((ushort)method) { }
     internal NetCall(ushort method) : base(method) { }
     public NetCall(Guid method) : base(method) { }
     public NetCall(Method method) : base(method) { }
@@ -342,6 +345,7 @@ public sealed class NetCall : BaseNetCall
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections)
     {
+        if (connections.Count == 0) return;
         _bytes ??= new MessageOverhead(DefaultFlags, ID, 0).GetBytes();
         connections.Send(_bytes);
     }
@@ -386,9 +390,9 @@ public sealed class NetCall : BaseNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = listener.Listen(TimeoutMS);
+        NetTask task = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -405,9 +409,9 @@ public sealed class NetCall : BaseNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = ListenAck(TimeoutMS);
+        NetTask task = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -428,6 +432,7 @@ public sealed class NetCallRaw<T> : NetCallRaw
     public delegate void Method(MessageContext context, T arg1);
     public delegate Task MethodAsync(MessageContext context, T arg1);
     /// <summary>Leave <paramref name="reader"/> or <paramref name="writer"/> null to auto-fill.</summary>
+    internal NetCallRaw(NetCalls method, ByteReader.Reader<T>? reader, ByteWriter.Writer<T>? writer, int capacity = 0) : this((ushort)method, reader, writer, capacity) { }
     internal NetCallRaw(ushort method, ByteReader.Reader<T>? reader, ByteWriter.Writer<T>? writer, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T>(writer, capacity: capacity);
@@ -504,6 +509,7 @@ public sealed class NetCallRaw<T> : NetCallRaw
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections, T arg)
     {
+        if (connections.Count == 0) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         byte[] bytes = _writer.Get(ref overhead, arg);
         try
@@ -580,9 +586,9 @@ public sealed class NetCallRaw<T> : NetCallRaw
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T arg, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T arg, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = listener.Listen(TimeoutMS);
+        NetTask task = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -599,9 +605,9 @@ public sealed class NetCallRaw<T> : NetCallRaw
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T arg, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T arg, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = ListenAck(TimeoutMS);
+        NetTask task = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -629,6 +635,8 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
     private readonly ByteWriterRaw<T1, T2> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2);
+    internal NetCallRaw(NetCalls method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, int capacity = 0)
+        : this((ushort)method, reader1, reader2, writer1, writer2, capacity) { }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     internal NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, int capacity = 0) : base(method)
     {
@@ -706,6 +714,7 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2)
     {
+        if (connections.Count == 0) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2);
         try
@@ -783,9 +792,9 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = listener.Listen(TimeoutMS);
+        NetTask task = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -802,9 +811,9 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = ListenAck(TimeoutMS);
+        NetTask task = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -834,6 +843,8 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
     private readonly ByteWriterRaw<T1, T2, T3> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3);
+    internal NetCallRaw(NetCalls method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, int capacity = 0)
+        : this((ushort)method, reader1, reader2, reader3, writer1, writer2, writer3, capacity) { }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     internal NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, int capacity = 0) : base(method)
     {
@@ -911,6 +922,7 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3)
     {
+        if (connections.Count == 0) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3);
         try
@@ -989,9 +1001,9 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = listener.Listen(TimeoutMS);
+        NetTask task = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -1008,9 +1020,9 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = ListenAck(TimeoutMS);
+        NetTask task = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -1023,6 +1035,7 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
             arg1, arg2, arg3);
         return task;
     }
+    
 
     public byte[] Write(T1 arg1, T2 arg2, T3 arg3)
     {
@@ -1040,6 +1053,8 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
     private readonly ByteWriterRaw<T1, T2, T3, T4> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4);
+    internal NetCallRaw(NetCalls method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, int capacity = 0)
+        : this((ushort)method, reader1, reader2, reader3, reader4, writer1, writer2, writer3, writer4, capacity) { }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     internal NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, int capacity = 0) : base(method)
     {
@@ -1117,6 +1132,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
     {
+        if (connections.Count == 0) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4);
         try
@@ -1196,9 +1212,9 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = listener.Listen(TimeoutMS);
+        NetTask task = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -1215,9 +1231,9 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = ListenAck(TimeoutMS);
+        NetTask task = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -1240,12 +1256,224 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
         => _writer.Get(ref overhead, arg1, arg2, arg3, arg4);
 }
+/// <summary>Leave any reader or writer null to auto-fill.</summary>
+public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
+{
+    private readonly ByteReaderRaw<T1, T2, T3, T4, T5> _reader;
+    private readonly ByteWriterRaw<T1, T2, T3, T4, T5> _writer;
+    public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5);
+    public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5);
+    internal NetCallRaw(NetCalls method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, int capacity = 0)
+        : this((ushort)method, reader1, reader2, reader3, reader4, reader5, writer1, writer2, writer3, writer4, writer5, capacity) { }
+    /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
+    internal NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, int capacity = 0) : base(method)
+    {
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3, T4, T5>(reader1, reader2, reader3, reader4, reader5);
+    }
+    /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
+    public NetCallRaw(Guid method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, int capacity = 0) : base(method)
+    {
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3, T4, T5>(reader1, reader2, reader3, reader4, reader5);
+    }
+    /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
+    public NetCallRaw(Method method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, int capacity = 0) : base(method)
+    {
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3, T4, T5>(reader1, reader2, reader3, reader4, reader5);
+    }
+    /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
+    public NetCallRaw(MethodAsync method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, int capacity = 0) : base(method)
+    {
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3, T4, T5>(reader1, reader2, reader3, reader4, reader5);
+    }
+    internal override void SetThrowOnError(bool value) => _reader.ThrowOnError = value;
+    public void Invoke(ref MessageOverhead overhead,
+#if SERVER
+        ITransportConnection connection, 
+#endif
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+    {
+#if SERVER
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
+            return;
+        }
+#endif
+        try
+        {
+#if SERVER
+            connection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5));
+#else
+            NetFactory.GetPlayerTransportConnection().Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5));
+#endif
+        }
+        catch (Exception ex)
+        {
+#if SERVER
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
+#else
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
+#endif
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(
+#if SERVER
+        ITransportConnection connection, 
+#endif
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
+        Invoke(ref overhead,
+#if SERVER
+            connection, 
+#endif
+            arg1, arg2, arg3, arg4, arg5);
+    }
+#if SERVER
+    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+    {
+        if (connections.Count == 0) return;
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5);
+        try
+        {
+            connections.Send(bytes);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
+            Logger.LogError(ex);
+        }
+    }
+#endif
+    public bool Read(byte[] message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5)
+    {
+        try
+        {
+            return _reader.Read(message, out arg1, out arg2, out arg3, out arg4, out arg5);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error reading method {ID.Format()}.");
+            Logger.LogError(ex);
+            arg1 = default!;
+            arg2 = default!;
+            arg3 = default!;
+            arg4 = default!;
+            arg5 = default!;
+            return false;
+        }
+    }
+    public override bool Read(byte[] message, out object[] parameters)
+    {
+        bool success = Read(message, out T1 a1, out T2 a2, out T3 a3, out T4 a4, out T5 a5);
+        parameters = success ? new object[] { a1!, a2!, a3!, a4!, a5! } : Array.Empty<object>();
+        return success;
+    }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5);
+        return task2;
+    }
+#endif
+    public NetTask Request(BaseNetCall listener,
+#if SERVER
+        ITransportConnection connection, 
+#endif
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
+        Invoke(ref overhead,
+#if SERVER
+            connection, 
+#endif
+            arg1, arg2, arg3, arg4, arg5);
+        return task;
+    }
+    public NetTask RequestAck(
+#if SERVER
+        ITransportConnection connection, 
+#endif
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
+        Invoke(ref overhead,
+#if SERVER
+            connection, 
+#endif
+            arg1, arg2, arg3, arg4, arg5);
+        return task;
+    }
+
+    public byte[] Write(T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg1, arg2, arg3, arg4, arg5);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5);
+}
 public sealed class NetCall<T> : DynamicNetCall
 {
     private readonly DynamicByteReader<T> _reader;
     private readonly DynamicByteWriter<T> _writer;
     public delegate void Method(MessageContext context, T arg1);
     public delegate Task MethodAsync(MessageContext context, T arg1);
+    internal NetCall(NetCalls method, int capacity = 0) : this((ushort)method, capacity) { }
     internal NetCall(ushort method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T>();
@@ -1318,6 +1546,7 @@ public sealed class NetCall<T> : DynamicNetCall
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections, T arg)
     {
+        if (connections.Count == 0) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         byte[] bytes = _writer.Get(ref overhead, arg);
         try
@@ -1394,9 +1623,9 @@ public sealed class NetCall<T> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T arg, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T arg, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = listener.Listen(TimeoutMS);
+        NetTask task = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -1413,9 +1642,9 @@ public sealed class NetCall<T> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T arg, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T arg, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = ListenAck(TimeoutMS);
+        NetTask task = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -1444,6 +1673,7 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
     private readonly DynamicByteWriter<T1, T2> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2);
+    internal NetCall(NetCalls method, int capacity = 0) : this((ushort)method, capacity) { }
     internal NetCall(ushort method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2>();
@@ -1516,6 +1746,7 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2)
     {
+        if (connections.Count == 0) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2);
         try
@@ -1593,9 +1824,9 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = listener.Listen(TimeoutMS);
+        NetTask task = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -1612,9 +1843,9 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = ListenAck(TimeoutMS);
+        NetTask task = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -1643,6 +1874,7 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
     private readonly DynamicByteWriter<T1, T2, T3> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3);
+    internal NetCall(NetCalls method, int capacity = 0) : this((ushort)method, capacity) { }
     internal NetCall(ushort method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3>();
@@ -1715,6 +1947,7 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3)
     {
+        if (connections.Count == 0) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3);
         try
@@ -1793,9 +2026,9 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = listener.Listen(TimeoutMS);
+        NetTask task = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -1812,9 +2045,9 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = ListenAck(TimeoutMS);
+        NetTask task = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -1843,6 +2076,7 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
     private readonly DynamicByteWriter<T1, T2, T3, T4> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4);
+    internal NetCall(NetCalls method, int capacity = 0) : this((ushort)method, capacity) { }
     internal NetCall(ushort method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4>();
@@ -1915,6 +2149,7 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
     {
+        if (connections.Count == 0) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4);
         try
@@ -1994,9 +2229,9 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = listener.Listen(TimeoutMS);
+        NetTask task = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -2013,9 +2248,9 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = ListenAck(TimeoutMS);
+        NetTask task = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -2044,6 +2279,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
     private readonly DynamicByteWriter<T1, T2, T3, T4, T5> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5);
+    internal NetCall(NetCalls method, int capacity = 0) : this((ushort)method, capacity) { }
     internal NetCall(ushort method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5>();
@@ -2116,6 +2352,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
     {
+        if (connections.Count == 0) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5);
         try
@@ -2196,9 +2433,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = listener.Listen(TimeoutMS);
+        NetTask task = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -2215,9 +2452,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = ListenAck(TimeoutMS);
+        NetTask task = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -2246,6 +2483,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
     private readonly DynamicByteWriter<T1, T2, T3, T4, T5, T6> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6);
+    internal NetCall(NetCalls method, int capacity = 0) : this((ushort)method, capacity) { }
     internal NetCall(ushort method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6>();
@@ -2318,6 +2556,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
     {
+        if (connections.Count == 0) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6);
         try
@@ -2399,9 +2638,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = listener.Listen(TimeoutMS);
+        NetTask task = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -2418,9 +2657,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = ListenAck(TimeoutMS);
+        NetTask task = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -2454,6 +2693,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6,
         T7 arg7);
 
+    internal NetCall(NetCalls method, int capacity = 0) : this((ushort)method, capacity) { }
     internal NetCall(ushort method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7>();
@@ -2530,6 +2770,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
     {
+        if (connections.Count == 0) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
         try
@@ -2616,9 +2857,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
 #if SERVER
         ITransportConnection connection,
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = listener.Listen(TimeoutMS);
+        NetTask task = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -2636,9 +2877,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
 #if SERVER
         ITransportConnection connection,
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = ListenAck(TimeoutMS);
+        NetTask task = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -2669,6 +2910,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
     private readonly DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8);
+    internal NetCall(NetCalls method, int capacity = 0) : this((ushort)method, capacity) { }
     internal NetCall(ushort method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8>();
@@ -2741,6 +2983,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
     {
+        if (connections.Count == 0) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
         try
@@ -2824,9 +3067,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = listener.Listen(TimeoutMS);
+        NetTask task = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -2843,9 +3086,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = ListenAck(TimeoutMS);
+        NetTask task = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -2873,6 +3116,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
     private readonly DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9);
+    internal NetCall(NetCalls method, int capacity = 0) : this((ushort)method, capacity) { }
     internal NetCall(ushort method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9>();
@@ -2945,6 +3189,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
     {
+        if (connections.Count == 0) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
         try
@@ -3029,9 +3274,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = listener.Listen(TimeoutMS);
+        NetTask task = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -3048,9 +3293,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = ListenAck(TimeoutMS);
+        NetTask task = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -3078,6 +3323,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
     private readonly DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10);
+    internal NetCall(NetCalls method, int capacity = 0) : this((ushort)method, capacity) { }
     internal NetCall(ushort method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>();
@@ -3150,6 +3396,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
 #if SERVER
     public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)
     {
+        if (connections.Count == 0) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
         try
@@ -3235,9 +3482,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = listener.Listen(TimeoutMS);
+        NetTask task = listener.Listen(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(RequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
@@ -3254,9 +3501,9 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
 #if SERVER
         ITransportConnection connection, 
 #endif
-        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, int TimeoutMS = NetTask.DEFAULT_TIMEOUT_MS)
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
     {
-        NetTask task = ListenAck(TimeoutMS);
+        NetTask task = ListenAck(timeoutMs);
         MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
 #if SERVER
                                                        | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)

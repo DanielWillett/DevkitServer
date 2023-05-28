@@ -44,12 +44,21 @@ public delegate void MovedHierarchyObject(DevkitSelection selection, IDevkitHier
 public delegate void MovedHierarchyObjects(uint[] instanceIds, HierarchyObjectTransformation[] transformations, Vector3[]? scales, Vector3[]? originalScales);
 public delegate void DeleteHierarchyObject(GameObject obj, IDevkitHierarchyItem item);
 public delegate void DeleteHierarchyObjects(uint[] instanceIds);
-public delegate void InstantiatedHierarchyObject(IHierarchyItemTypeIdentifier type, Vector3 position);
+public delegate void InstantiateHierarchyObjectRequesting(IHierarchyItemTypeIdentifier type, Vector3 position, ref bool shouldAllow);
+public delegate void InstantiateHierarchyObjectRequested(IHierarchyItemTypeIdentifier type, Vector3 position);
 
 [HarmonyPatch]
 [EarlyTypeInit]
 public static class ClientEvents
 {
+    public static event EditHeightmapRequest? OnEditHeightmapPermissionDenied;
+    public static event EditSplatmapRequest? OnEditSplatmapPermissionDenied;
+    public static event EditHolesRequest? OnEditHolesPermissionDenied;
+
+    public static event EditHeightmapRequest? OnEditHeightmapRequested;
+    public static event EditSplatmapRequest? OnEditSplatmapRequested;
+    public static event EditHolesRequest? OnEditHolesRequested;
+
     public static event RampAction? OnRampComplete;
     public static event AdjustAction? OnAdjusted;
     public static event FlattenAction? OnFlattened;
@@ -65,20 +74,16 @@ public static class ClientEvents
     public static event ResourceSpawnpointRemovedAction? OnResourceSpawnpointRemoved;
     public static event LevelObjectRemovedAction? OnLevelObjectRemoved;
     public static event SplatmapLayerMaterialsUpdateAction? OnSplatmapLayerMaterialsUpdate;
-    public static event EditHeightmapRequest? OnEditHeightmapPermissionDenied;
-    public static event EditSplatmapRequest? OnEditSplatmapPermissionDenied;
-    public static event EditHolesRequest? OnEditHolesPermissionDenied;
-    public static event EditHeightmapRequest? OnEditHeightmapRequested;
-    public static event EditSplatmapRequest? OnEditSplatmapRequested;
-    public static event EditHolesRequest? OnEditHolesRequested;
     public static event MovingHierarchyObject? OnMovingHierarchyObject;
     public static event MovingHierarchyObjects? OnMovingHierarchyObjects;
     public static event MovedHierarchyObject? OnMovedHierarchyObject;
     public static event MovedHierarchyObjects? OnMovedHierarchyObjects;
     public static event DeleteHierarchyObject? OnHierarchyObjectDeleted;
     public static event DeleteHierarchyObjects? OnHierarchyObjectsDeleted;
-    public static event InstantiatedHierarchyObject? OnHierarchyObjectInstantiated;
+    public static event InstantiateHierarchyObjectRequesting? OnHierarchyObjectInstantiationRequesting;
+    public static event InstantiateHierarchyObjectRequested? OnHierarchyObjectInstantiationRequested;
     public static readonly Type FoliageEditor = Accessor.AssemblyCSharp.GetType("SDG.Unturned.FoliageEditor");
+    private static readonly List<IDevkitHierarchyItem> WorkingHierarchyItems = new List<IDevkitHierarchyItem>(2);
 
     #region TerrainEditor.update
     [HarmonyPatch(typeof(TerrainEditor), nameof(TerrainEditor.update))]
@@ -490,7 +495,7 @@ public static class ClientEvents
         }
         rtn:
         if (!allow)
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("NoPermissions"));
+            UIMessage.SendNoPermissionMessage(null);
         return allow;
     }
     [UsedImplicitly]
@@ -1128,7 +1133,7 @@ public static class ClientEvents
             {
                 if (!HierarchyUtil.CheckMovePermission(WorkingHierarchyItems[i]))
                 {
-                    UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("NoPermissions"));
+                    UIMessage.SendNoPermissionMessage(null);
                     _skippedMoveHandle = true;
                     return false;
                 }
@@ -1167,28 +1172,28 @@ public static class ClientEvents
         MethodInfo? moveHandle = st.GetMethod("moveHandle", BindingFlags.Instance | BindingFlags.NonPublic, null, new Type[] { typeof(Vector3), typeof(Quaternion), typeof(Vector3), typeof(bool), typeof(bool) }, null);
         if (moveHandle == null)
         {
-            Logger.LogWarning("Unable to find method: SelectionTool.moveHandle.", method: "CLIENT EVENTS");
+            Logger.LogWarning($"{method.Format()} - Unable to find method: SelectionTool.moveHandle.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? requestInstantiation = st.GetMethod("RequestInstantiation", BindingFlags.Instance | BindingFlags.NonPublic, null, new Type[] { typeof(Vector3) }, null);
         if (requestInstantiation == null)
         {
-            Logger.LogWarning("Unable to find method: SelectionTool.RequestInstantiation.", method: "CLIENT EVENTS");
+            Logger.LogWarning($"{method.Format()} - Unable to find method: SelectionTool.RequestInstantiation.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? transformSelection = st.GetMethod("transformSelection", BindingFlags.Instance | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
         if (transformSelection == null)
         {
-            Logger.LogWarning("Unable to find method: SelectionTool.transformSelection.", method: "CLIENT EVENTS");
+            Logger.LogWarning($"{method.Format()} - Unable to find method: SelectionTool.transformSelection.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? recordDestruction = dtu.GetMethod(nameof(DevkitTransactionUtility.recordDestruction), BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(GameObject) }, null);
         if (recordDestruction == null)
         {
-            Logger.LogWarning("Unable to find method: DevkitTransactionUtility.recordDestruction.", method: "CLIENT EVENTS");
+            Logger.LogWarning($"{method.Format()} - Unable to find method: DevkitTransactionUtility.recordDestruction.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
 
@@ -1200,8 +1205,6 @@ public static class ClientEvents
             MethodInfo? invoker = null;
             if (moveHandle != null && c.Calls(moveHandle))
                 invoker = moveHandleInvoker;
-            else if (requestInstantiation != null && c.Calls(requestInstantiation))
-                invoker = requestInstantiationInvoker;
             else if (transformSelection != null && c.Calls(transformSelection))
                 invoker = transformSelectionInvoker;
 
@@ -1218,7 +1221,7 @@ public static class ClientEvents
                     }
                     
                     i += i - lastLdArg0;
-                    Logger.LogDebug($"[CLIENT EVENTS] Patched in {invoker.Format()} to {method.Format()}.");
+                    Logger.LogDebug($"[CLIENT EVENTS] {method.Format()} - Patched in {invoker.Format()} to {method.Format()}.");
                 }
             }
             else if (recordDestruction != null && c.Calls(recordDestruction))
@@ -1230,14 +1233,29 @@ public static class ClientEvents
                     if (ins[j].operand is LocalBuilder bld && typeof(IEnumerator<DevkitSelection>).IsAssignableFrom(bld.LocalType))
                         break;
                 }
-                Logger.LogDebug($"[CLIENT EVENTS] Patched in {recordDestructionInvoker.Format()} to {method.Format()}.");
+                Logger.LogDebug($"[CLIENT EVENTS] {method.Format()} - Patched in {recordDestructionInvoker.Format()} to {method.Format()}.");
+            }
+            else if (requestInstantiation != null && c.Calls(requestInstantiation))
+            {
+                int lastLdArg0 = tracker.GetLastUnconsumedIndex(i, OpCodes.Ldarg_0, method);
+                if (lastLdArg0 != -1)
+                {
+                    CodeInstruction ldarg0 = ins[lastLdArg0];
+                    ins.RemoveAt(lastLdArg0);
+                    ins[lastLdArg0].labels.AddRange(ldarg0.labels);
+                    ins[lastLdArg0].blocks.AddRange(ldarg0.blocks);
+                    --i;
+                    ins[i] = new CodeInstruction(OpCodes.Call, requestInstantiationInvoker);
+                    ins[i].labels.AddRange(c.labels);
+                    ins[i].blocks.AddRange(c.blocks);
+                }
+                Logger.LogDebug($"[CLIENT EVENTS] {method.Format()} - Replaced instantiation request {requestInstantiation.Format()} with {requestInstantiationInvoker.Format()}.");
             }
         }
 
         return ins;
     }
 
-    private static readonly List<IDevkitHierarchyItem> WorkingHierarchyItems = new List<IDevkitHierarchyItem>(2);
 
     [UsedImplicitly]
     private static void OnMoveHandle(Vector3 position, Quaternion rotation, Vector3 scale, bool doRotation, bool hasScale)
@@ -1344,7 +1362,39 @@ public static class ClientEvents
                 break;
         }
         if (id != null)
-            OnHierarchyObjectInstantiated?.Invoke(id, position);
+        {
+            // todo events
+            if (!HierarchyUtil.CheckPlacePermission(id))
+            {
+                Permission? place = HierarchyUtil.GetPlacePermission(id);
+                UIMessage.SendEditorMessage(place == null
+                    ? DevkitServerModule.MessageLocalization.Translate("NoPermissions")
+                    : DevkitServerModule.MessageLocalization.Translate("NoPermissionsWithPermission", place.ToString()));
+                return;
+            }
+            bool allow = true;
+            if (OnHierarchyObjectInstantiationRequesting != null)
+            {
+                foreach (InstantiateHierarchyObjectRequesting action in OnHierarchyObjectInstantiationRequesting.GetInvocationList().Cast<InstantiateHierarchyObjectRequesting>())
+                {
+                    try
+                    {
+                        action.Invoke(id, position, ref allow);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Error invoking event {nameof(OnHierarchyObjectInstantiationRequesting).Format()}: {action.Method.Format()}.", method: "CLIENT EVENTS");
+                        Logger.LogError(ex, method: "CLIENT EVENTS");
+                    }
+                    if (!allow)
+                        break;
+                }
+            }
+            if (allow)
+                OnHierarchyObjectInstantiationRequested?.Invoke(id, position);
+        }
+        else
+            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("UnknownError"));
 
         Logger.LogDebug("[CLIENT EVENTS] Instantiation requested at: " + position.Format() + " of " + (id == null ? ((object?)null).Format() : id.FormatToString()) + ".");
     }

@@ -249,6 +249,8 @@ public sealed class DevkitServerModule : IModuleNexus
             Logger.LogWarning("Your machine is big-endian, you may face issues with improper data transmission, " +
                               "please report it as I am unable to test with these conditioins.");
         }
+
+        Logger.ClearLoadingErrors();
     }
     internal void UnloadBundle()
     {
@@ -341,6 +343,7 @@ public sealed class DevkitServerModule : IModuleNexus
             Assets? instance = GetAssetsInstance?.Invoke();
             if (instance != null)
                 instance.StopAllCoroutines();
+            Logger.ClearLoadingErrors();
             Provider.shutdown(10, "DevkitServer failed to load.");
         }
     }
@@ -356,6 +359,7 @@ public sealed class DevkitServerModule : IModuleNexus
         Provider.modeConfigData.Gameplay.Timer_Exit = 0;
         Provider.modeConfigData.Gameplay.Timer_Home = 0;
         Provider.modeConfigData.Gameplay.Timer_Home = 0;
+        Provider.hasCheats = true;
         Assembly sdg = Accessor.AssemblyCSharp;
         Component comp = Level.editing.GetComponentInChildren(sdg.GetType("SDG.Unturned.EditorInteract"));
         if (comp != null)

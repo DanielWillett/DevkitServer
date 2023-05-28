@@ -79,7 +79,10 @@ internal static class PatchesMain
     {
         if (!DevkitServerModule.IsEditing)
             return false;
-
+#if CLIENT
+        if (caller.channel.isOwner)
+            return UserInput.CleaningUpController == CameraController.Editor;
+#endif
         EditorUser? user = UserManager.FromId(caller.player.channel.owner.playerID.steamID.m_SteamID);
         return !(user != null && user.Input.Controller == CameraController.Player);
     }
@@ -155,11 +158,11 @@ internal static class PatchesMain
 
     private static bool IsPlayerControlledOrNotEditing()
     {
-        return !DevkitServerModule.IsEditing || !Level.isEditor || EditorUser.User != null && EditorUser.User.Input.Controller == CameraController.Player;
+        return !DevkitServerModule.IsEditing || !Level.isEditor || UserInput.CleaningUpController == CameraController.Player;
     }
     private static bool IsEditorControlledOrNotEditing()
     {
-        return !DevkitServerModule.IsEditing || !Level.isEditor || EditorUser.User != null && EditorUser.User.Input.Controller == CameraController.Editor;
+        return !DevkitServerModule.IsEditing || !Level.isEditor || UserInput.CleaningUpController == CameraController.Editor;
     }
 
     [UsedImplicitly]
@@ -512,14 +515,47 @@ internal static class PatchesMain
         DevkitServerModule.IsEditing = true;
         Level.edit(info);
     }
-
-    [HarmonyPatch(typeof(ZombieManager), "onLevelLoaded")]
-    [HarmonyPrefix]
+    
+    [HarmonyPatch(typeof(LevelZombies), nameof(LevelZombies.load))]
+    [HarmonyPostfix]
     [UsedImplicitly]
-    private static bool PrefixZombieManagerOnLevelLoaded(int level)
+    private static void PostfixLoadLevelZombies()
     {
-        return false;
+        FieldInfo? field = typeof(LevelZombies).GetField("_zombies", BindingFlags.Static | BindingFlags.NonPublic);
+        if (field == null || !field.FieldType.IsAssignableFrom(typeof(List<ZombieSpawnpoint>[])))
+        {
+            Logger.LogError($"Unable to find field: {typeof(LevelZombies).Format()}._zombies.");
+            DevkitServerModule.Fault();
+            return;
+        }
+
+        List<ZombieSpawnpoint>[] regions = new List<ZombieSpawnpoint>[LevelNavigation.bounds.Count];
+        field.SetValue(null, regions);
+
+        for (int index = 0; index < regions.Length; ++index)
+        {
+            regions[index] = new List<ZombieSpawnpoint>();
+        }
+
+        int c = 0;
+        for (int x = 0; x < Regions.WORLD_SIZE; ++x)
+        {
+            for (int y = 0; y < Regions.WORLD_SIZE; ++y)
+            {
+                List<ZombieSpawnpoint> spawnpoints = LevelZombies.spawns[x, y];
+                foreach (ZombieSpawnpoint spawnpoint in spawnpoints)
+                {
+                    if (LevelNavigation.tryGetBounds(spawnpoint.point, out byte bound) && LevelNavigation.checkNavigation(spawnpoint.point))
+                    {
+                        regions[bound].Add(spawnpoint);
+                        ++c;
+                    }
+                }
+            }
+        }
+        Logger.LogInfo($"Copied over {c.Format()} zombie spawn{c.S()} from {typeof(LevelZombies).Format()}.");
     }
+
 
     [HarmonyPatch(typeof(VehicleManager), "onLevelLoaded")]
     [HarmonyTranspiler]

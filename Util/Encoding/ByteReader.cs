@@ -1494,6 +1494,34 @@ public sealed class ByteReaderRaw<T1, T2, T3, T4> : ByteReader
         return !HasFailed;
     }
 }
+public sealed class ByteReaderRaw<T1, T2, T3, T4, T5> : ByteReader
+{
+    private readonly Reader<T1> reader1;
+    private readonly Reader<T2> reader2;
+    private readonly Reader<T3> reader3;
+    private readonly Reader<T4> reader4;
+    private readonly Reader<T5> reader5;
+    /// <summary>Leave any reader null to auto-fill.</summary>
+    public ByteReaderRaw(Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5)
+    {
+        this.reader1 = reader1 ?? ReaderHelper<T1>.Reader!;
+        this.reader2 = reader2 ?? ReaderHelper<T2>.Reader!;
+        this.reader3 = reader3 ?? ReaderHelper<T3>.Reader!;
+        this.reader4 = reader4 ?? ReaderHelper<T4>.Reader!;
+        this.reader5 = reader5 ?? ReaderHelper<T5>.Reader!;
+    }
+    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5)
+    {
+        if (bytes != null)
+            LoadNew(bytes);
+        arg1 = reader1.Invoke(this);
+        arg2 = reader2.Invoke(this);
+        arg3 = reader3.Invoke(this);
+        arg4 = reader4.Invoke(this);
+        arg5 = reader5.Invoke(this);
+        return !HasFailed;
+    }
+}
 public sealed class DynamicByteReader<T1> : ByteReader
 {
     static DynamicByteReader()

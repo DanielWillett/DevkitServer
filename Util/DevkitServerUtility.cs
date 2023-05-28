@@ -4,6 +4,8 @@ using System.Reflection.Emit;
 using System.Text;
 using System.Text.RegularExpressions;
 using DevkitServer.API;
+using DevkitServer.Multiplayer.LevelData;
+using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 using JetBrains.Annotations;
 using Action = System.Action;
@@ -893,6 +895,64 @@ public static class DevkitServerUtility
             ItemVestAsset a => a.vest,
             _ => null
         };
+    }
+    /// <remarks>Includes pending connections.</remarks>
+    [Pure]
+    public static PooledTransportConnectionList GetAllConnections()
+    {
+        ThreadUtil.assertIsGameThread();
+        
+        PooledTransportConnectionList list = NetFactory.GetPooledTransportConnectionList(Provider.clients.Count + EditorLevel.PendingToReceiveActions.Count);
+        for (int i = 0; i < Provider.clients.Count; ++i)
+            list.Add(Provider.clients[i].transportConnection);
+        
+        for (int i = 0; i < EditorLevel.PendingToReceiveActions.Count; ++i)
+            list.Add(EditorLevel.PendingToReceiveActions[i]);
+
+        return list;
+    }
+    /// <remarks>Includes pending connections.</remarks>
+    [Pure]
+    public static PooledTransportConnectionList GetAllConnections(ITransportConnection exclude)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        bool found = false;
+        PooledTransportConnectionList list = NetFactory.GetPooledTransportConnectionList(Provider.clients.Count + EditorLevel.PendingToReceiveActions.Count);
+        for (int i = 0; i < Provider.clients.Count; ++i)
+        {
+            ITransportConnection c = Provider.clients[i].transportConnection;
+            if (!found && c.Equals(exclude))
+            {
+                found = true;
+                continue;
+            }
+            list.Add(c);
+        }
+        
+        for (int i = 0; i < EditorLevel.PendingToReceiveActions.Count; ++i)
+        {
+            ITransportConnection c = EditorLevel.PendingToReceiveActions[i];
+            if (!found && c.Equals(exclude))
+            {
+                found = true;
+                continue;
+            }
+            list.Add(c);
+        }
+
+        return list;
+    }
+
+    [Pure]
+    public static string S(this int num) => num == 1 ? string.Empty : "s";
+    [Pure]
+    public static string UpperS(this int num) => num == 1 ? string.Empty : "S";
+    [Pure]
+    public static GameObject? GetEditorObject()
+    {
+        Transform editor = Level.editing.Find("Editor");
+        return editor == null ? null : editor.gameObject;
     }
 }
 

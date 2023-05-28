@@ -4,10 +4,8 @@ using DevkitServer.API.Permissions;
 using DevkitServer.Patches;
 #endif
 using DevkitServer.API.Abstractions;
-using DevkitServer.Players.UI;
 using DevkitServer.Util.Encoding;
 using SDG.Framework.Devkit;
-using SDG.Framework.Devkit.Transactions;
 
 namespace DevkitServer.Multiplayer.Actions;
 
@@ -24,7 +22,7 @@ public sealed class HierarchyActions
         if (EditorActions.IsOwner)
         {
             ClientEvents.OnHierarchyObjectsDeleted += OnHierarchyObjectDeleted;
-            ClientEvents.OnHierarchyObjectInstantiated += OnHierarchyObjectInstantiated;
+            ClientEvents.OnHierarchyObjectInstantiationRequested += OnHierarchyObjectInstantiationRequesting;
             ClientEvents.OnMovingHierarchyObjects += OnMovingHierarchyObjects;
             ClientEvents.OnMovedHierarchyObjects += OnMovedHierarchyObjects;
         }
@@ -36,7 +34,7 @@ public sealed class HierarchyActions
         if (EditorActions.IsOwner)
         {
             ClientEvents.OnHierarchyObjectsDeleted -= OnHierarchyObjectDeleted;
-            ClientEvents.OnHierarchyObjectInstantiated -= OnHierarchyObjectInstantiated;
+            ClientEvents.OnHierarchyObjectInstantiationRequested -= OnHierarchyObjectInstantiationRequesting;
             ClientEvents.OnMovingHierarchyObjects -= OnMovingHierarchyObjects;
             ClientEvents.OnMovedHierarchyObjects -= OnMovedHierarchyObjects;
         }
@@ -51,14 +49,9 @@ public sealed class HierarchyActions
             InstanceIds = instanceIds
         });
     }
-    private void OnHierarchyObjectInstantiated(IHierarchyItemTypeIdentifier type, Vector3 position)
+    private static void OnHierarchyObjectInstantiationRequesting(IHierarchyItemTypeIdentifier type, Vector3 position)
     {
-        EditorActions.QueueAction(new InstantiateHierarchyItemsAction
-        {
-            DeltaTime = Time.deltaTime,
-            Identifier = type,
-            Position = position
-        });
+        HierarchyUtil.RequestInstantiation(type, position, Quaternion.identity, Vector3.one);
     }
     private void OnMovingHierarchyObjects(uint[] instanceIds, HierarchyObjectTransformation[] transformations, Vector3 pivotPoint)
     {

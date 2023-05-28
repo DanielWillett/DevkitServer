@@ -1,6 +1,7 @@
 ﻿#if SERVER
 using DevkitServer.Multiplayer.LevelData;
 #endif
+using DevkitServer.API.Abstractions;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
@@ -475,6 +476,8 @@ public interface IActionListener
 public class TemporaryEditorActions : IActionListener, IDisposable
 {
     public static TemporaryEditorActions? Instance { get; private set; }
+    private readonly List<PendingHierarchyInstantiation> _hierarchyInstantiations = new List<PendingHierarchyInstantiation>();
+    private readonly List<PendingLevelObjectInstantiation> _lvlObjectInstantiations = new List<PendingLevelObjectInstantiation>();
     private readonly List<IAction> _actions = new List<IAction>();
     public ActionSettings Settings { get; }
     public int QueueSize => _actions.Count;
@@ -483,6 +486,18 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         Settings = new ActionSettings(this);
         Instance = this;
         Logger.LogDebug("[TEMP EDITOR ACTIONS] Initialized.");
+    }
+    public void QueueInstantiation(IHierarchyItemTypeIdentifier type, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale)
+    {
+        if (type == null) throw new ArgumentNullException(nameof(type));
+        _hierarchyInstantiations.Add(new PendingHierarchyInstantiation(type, instanceId, position, rotation, scale));
+    }
+    public void QueueInstantiation(Asset objectAsset, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale)
+    {
+        if (objectAsset is not ObjectAsset && objectAsset is not ItemAsset)
+            throw new ArgumentException("Must be either ObjectAsset (LevelObject) or ItemAsset (LevelBuildableObject).", nameof(objectAsset));
+
+        _lvlObjectInstantiations.Add(new PendingLevelObjectInstantiation(objectAsset.getReferenceTo<Asset>(), instanceId, position, rotation, scale));
     }
     internal void HandleReadPackets(CSteamID user, ByteReader reader)
     {
@@ -530,6 +545,18 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     }
     internal IEnumerator Flush()
     {
+        foreach (PendingHierarchyInstantiation hierarchyItemInstantiation in _hierarchyInstantiations)
+        {
+            HierarchyUtil.ReceiveHierarchyInstantiation(MessageContext.Nil, hierarchyItemInstantiation.Type, hierarchyItemInstantiation.InstanceId, hierarchyItemInstantiation.Position, hierarchyItemInstantiation.Rotation, hierarchyItemInstantiation.Scale);
+        }
+        if (_hierarchyInstantiations.Count > 20)
+            yield return null;
+        foreach (PendingLevelObjectInstantiation lvlObjectInstantiation in _lvlObjectInstantiations)
+        {
+            // todo
+        }
+        if (_lvlObjectInstantiations.Count > 10)
+            yield return null;
         for (int i = 0; i < _actions.Count; ++i)
         {
             if (i != 0 && i % 30 == 0)
@@ -550,6 +577,39 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         _actions.Clear();
         Instance = null;
         Logger.LogDebug("[TEMP EDITOR ACTIONS] Cleaned up.");
+    }
+
+    private readonly struct PendingHierarchyInstantiation
+    {
+        public readonly IHierarchyItemTypeIdentifier Type;
+        public readonly uint InstanceId;
+        public readonly Vector3 Position;
+        public readonly Quaternion Rotation;
+        public readonly Vector3 Scale;
+        public PendingHierarchyInstantiation(IHierarchyItemTypeIdentifier type, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale)
+        {
+            Type = type;
+            InstanceId = instanceId;
+            Position = position;
+            Rotation = rotation;
+            Scale = scale;
+        }
+    }
+    private readonly struct PendingLevelObjectInstantiation
+    {
+        public readonly AssetReference<Asset> Asset;
+        public readonly uint InstanceId;
+        public readonly Vector3 Position;
+        public readonly Quaternion Rotation;
+        public readonly Vector3 Scale;
+        public PendingLevelObjectInstantiation(AssetReference<Asset> assetAsset, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale)
+        {
+            Asset = assetAsset;
+            InstanceId = instanceId;
+            Position = position;
+            Rotation = rotation;
+            Scale = scale;
+        }
     }
 }
 #endif

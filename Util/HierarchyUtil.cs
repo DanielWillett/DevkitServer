@@ -2,11 +2,154 @@
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer;
+using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Players;
+using DevkitServer.Players.UI;
+using JetBrains.Annotations;
 using SDG.Framework.Devkit;
 
 namespace DevkitServer.Util;
+[EarlyTypeInit]
 public static class HierarchyUtil
 {
+    private const string Source = "LEVEL HIERARCHY";
+#if CLIENT
+    private static readonly StaticSetter<uint>? SetAvailableInstanceId = Accessor.GenerateStaticSetter<LevelHierarchy, uint>("availableInstanceID");
+    private static readonly StaticGetter<uint>? GetAvailableInstanceId = Accessor.GenerateStaticGetter<LevelHierarchy, uint>("availableInstanceID");
+#endif
+
+    [UsedImplicitly]
+    private static readonly NetCallRaw<IHierarchyItemTypeIdentifier, Vector3, Quaternion, Vector3> SendRequestInstantiation =
+        new NetCallRaw<IHierarchyItemTypeIdentifier, Vector3, Quaternion, Vector3>(NetCalls.RequestHierarchyInstantiation, HierarchyItemTypeIdentifierEx.ReadIdentifier!, null, null, null, HierarchyItemTypeIdentifierEx.WriteIdentifier, null, null, null);
+
+    [UsedImplicitly]
+    private static readonly NetCallRaw<IHierarchyItemTypeIdentifier, uint, Vector3, Quaternion, Vector3> SendInstantiation =
+        new NetCallRaw<IHierarchyItemTypeIdentifier, uint, Vector3, Quaternion, Vector3>(NetCalls.SendHierarchyInstantiation, HierarchyItemTypeIdentifierEx.ReadIdentifier!, null, null, null, null, HierarchyItemTypeIdentifierEx.WriteIdentifier, null, null, null, null);
+#if CLIENT
+    public static void RequestInstantiation(IHierarchyItemTypeIdentifier type, Vector3 position, Quaternion rotation, Vector3 scale)
+    {
+        SendRequestInstantiation.Invoke(type, position, rotation, scale);
+    }
+    [NetCall(NetCallSource.FromServer, NetCalls.SendHierarchyInstantiation)]
+    public static StandardErrorCode ReceiveHierarchyInstantiation(MessageContext ctx, IHierarchyItemTypeIdentifier? type, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale)
+    {
+        if (type == null)
+            return StandardErrorCode.InvalidData;
+        uint lastInstanceId = uint.MaxValue;
+        if (GetAvailableInstanceId != null && SetAvailableInstanceId != null)
+        {
+            int existing = FindItemIndex(instanceId);
+            if (existing > -1)
+            {
+                IDevkitHierarchyItem existingItem = LevelHierarchy.instance.items[existing];
+                Logger.LogWarning($"Received instantiation of {type.FormatToString()} with overlapping instance ID with {existingItem.Format()} ({instanceId.Format()}). " +
+                                  "Conflict destroyed".Colorize(ConsoleColor.Red) + ".", method: Source);
+                RemoveItem(existingItem);
+            }
+
+            lastInstanceId = GetAvailableInstanceId();
+            if (lastInstanceId != instanceId)
+            {
+                SetAvailableInstanceId(lastInstanceId);
+                Logger.LogDebug($"Instance ID mismatch, resolving. New: {instanceId.Format()}, Expected: {lastInstanceId.Format()}.");
+            }
+        }
+
+        try
+        {
+            type.Instantiate(position, rotation, scale);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error instantiating {type.FormatToString()} at instance ID {instanceId.Format()}.", method: Source);
+            Logger.LogError(ex, method: Source);
+            throw;
+        }
+        finally
+        {
+            if (lastInstanceId != instanceId && lastInstanceId != uint.MaxValue)
+                SetAvailableInstanceId!(lastInstanceId);
+        }
+
+        IDevkitHierarchyItem? newItem = LevelHierarchy.instance.items.Count > 0 ? LevelHierarchy.instance.items.GetTail() : null;
+        if (newItem != null && type.Type.IsInstanceOfType(newItem))
+        {
+            if (newItem.instanceID != instanceId)
+            {
+                Logger.LogError($"Failed to assign correct instance ID: {instanceId.Format()}, to {type.FormatToString()}.", method: Source);
+                RemoveItem(newItem);
+            }
+            else return StandardErrorCode.Success;
+        }
+        else
+            Logger.LogError($"Failed to create {type.FormatToString()}, instance ID: {instanceId.Format()}.", method: Source);
+
+
+        return StandardErrorCode.GenericError;
+    }
+#elif SERVER
+    [NetCall(NetCallSource.FromClient, NetCalls.RequestHierarchyInstantiation)]
+    public static void ReceiveRequestHierarchyInstantiation(MessageContext ctx, IHierarchyItemTypeIdentifier? type, Vector3 position, Quaternion rotation, Vector3 scale)
+    {
+        EditorUser? user = ctx.GetCaller();
+        if (user == null || !user.IsOnline)
+        {
+            Logger.LogError("Unable to get user from hierarchy instantiation request.", method: Source);
+            return;
+        }
+        if (type == null)
+        {
+            UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+            return;
+        }
+
+        try
+        {
+            type.Instantiate(position, rotation, scale);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error instantiating {type.FormatToString()}.", method: Source);
+            Logger.LogError(ex, method: Source);
+            UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", ex.Message));
+            return;
+        }
+
+        IDevkitHierarchyItem? newItem = LevelHierarchy.instance.items.Count > 0 ? LevelHierarchy.instance.items.GetTail() : null;
+        if (newItem != null && type.Type.IsInstanceOfType(newItem))
+        {
+            if (newItem is Component comp)
+            {
+                position = comp.transform.position;
+                rotation = comp.transform.rotation;
+                scale = comp.transform.localScale;
+            }
+
+            PooledTransportConnectionList list;
+            if (ctx.IsRequest)
+            {
+                ctx.ReplyLayered(SendInstantiation, type, newItem.instanceID, position, rotation, scale);
+                list = DevkitServerUtility.GetAllConnections(ctx.Connection);
+            }
+            else list = DevkitServerUtility.GetAllConnections();
+            SendInstantiation.Invoke(list, type, newItem.instanceID, position, rotation, scale);
+            Logger.LogDebug($"[{Source}] Granted request for instantiation of {type.FormatToString()}, instance ID: {newItem.instanceID.Format()} ({newItem.Format()}).");
+        }
+        else
+        {
+            Logger.LogError($"Failed to create {type.FormatToString()}.", method: Source);
+            UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+        }
+    }
+#endif
+    public static void RemoveItem(IDevkitHierarchyItem item)
+    {
+        if (item is Component o2)
+            Object.Destroy(o2.gameObject);
+        else if (item is Object o)
+            Object.Destroy(o);
+        else LevelHierarchy.removeItem(item);
+    }
     public static IDevkitHierarchyItem? FindItem(uint instanceId)
     {
         int ind = FindItemIndex(instanceId);
@@ -144,6 +287,19 @@ public static class HierarchyUtil
                    VanillaPermissions.PlaceVolumes.Has(false)),
 
             _ => false
+        };
+    }
+    public static Permission? GetPlacePermission(IHierarchyItemTypeIdentifier type)
+    {
+        return type switch
+        {
+            NodeItemTypeIdentifier => VanillaPermissions.PlaceNodes,
+
+            VolumeItemTypeIdentifier v => typeof(CartographyVolume).IsAssignableFrom(v.Type)
+                ? VanillaPermissions.PlaceCartographyVolumes
+                : VanillaPermissions.PlaceVolumes,
+
+            _ => null
         };
     }
     public static bool CheckDeletePermission(IDevkitHierarchyItem item)

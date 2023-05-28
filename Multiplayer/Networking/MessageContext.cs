@@ -1,4 +1,5 @@
-﻿using DevkitServer.Util.Encoding;
+﻿using DevkitServer.Players;
+using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.Multiplayer.Networking;
 public readonly struct MessageContext
@@ -12,7 +13,12 @@ public readonly struct MessageContext
 #endif
         Connection;
     public readonly MessageOverhead Overhead;
-    public readonly bool HighSpeed;
+    public bool IsHighSpeed { get; }
+    public bool IsExternal => (Overhead.Flags & MessageFlags.Guid) != 0;
+    public bool IsRequest => (Overhead.Flags & MessageFlags.Request) != 0;
+    public bool IsLayered => (Overhead.Flags & MessageFlags.RunOriginalMethodOnRequest) != 0;
+    public bool IsResponse => (Overhead.Flags & MessageFlags.RequestResponse) != 0;
+    public bool IsAckRequest => (Overhead.Flags & MessageFlags.AcknowledgeRequest) != 0;
     public MessageContext(
 #if SERVER
         ITransportConnection
@@ -23,8 +29,14 @@ public readonly struct MessageContext
     {
         Connection = connection;
         Overhead = overhead;
-        HighSpeed = hs;
+        IsHighSpeed = hs;
     }
+#if SERVER
+    public EditorUser? GetCaller()
+    {
+        return Connection is not HighSpeedConnection hs ? UserManager.FromConnection(Connection) : UserManager.FromId(hs.Steam64);
+    }
+#endif
     public MessageOverhead GetReplyOverhead(ushort id, bool layered, bool ack)
     {
         MessageFlags flags;
@@ -151,6 +163,16 @@ public readonly struct MessageContext
             , Connection
 #endif
             , arg1, arg2, arg3, arg4);
+    }
+    public void Reply<T1, T2, T3, T4, T5>(NetCallRaw<T1, T2, T3, T4, T5> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+    {
+        if (Connection is null) throw NilError();
+        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        call.Invoke(ref overhead
+#if SERVER
+            , Connection
+#endif
+            , arg1, arg2, arg3, arg4, arg5);
     }
     public void Reply<T1>(NetCall<T1> call, T1 arg1)
     {
@@ -311,6 +333,16 @@ public readonly struct MessageContext
             , Connection
 #endif
             , arg1, arg2, arg3, arg4);
+    }
+    public void ReplyLayered<T1, T2, T3, T4, T5>(NetCallRaw<T1, T2, T3, T4, T5> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+    {
+        if (Connection is null) throw NilError();
+        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        call.Invoke(ref overhead
+#if SERVER
+            , Connection
+#endif
+            , arg1, arg2, arg3, arg4, arg5);
     }
     public void ReplyLayered<T1>(NetCall<T1> call, T1 arg1)
     {
@@ -482,6 +514,18 @@ public readonly struct MessageContext
             , Connection
 #endif
             , arg1, arg2, arg3, arg4);
+        return task;
+    }
+    public NetTask ReplyAndRequestAck<T1, T2, T3, T4, T5>(NetCallRaw<T1, T2, T3, T4, T5> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = 5000)
+    {
+        if (Connection is null) throw NilError();
+        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        NetTask task = call.ListenAck(timeoutMs);
+        call.Invoke(ref overhead
+#if SERVER
+            , Connection
+#endif
+            , arg1, arg2, arg3, arg4, arg5);
         return task;
     }
     public NetTask ReplyAndRequestAck<T1>(NetCall<T1> call, T1 arg1, int timeoutMs = 5000)
@@ -674,6 +718,18 @@ public readonly struct MessageContext
             , Connection
 #endif
             , arg1, arg2, arg3, arg4);
+        return task;
+    }
+    public NetTask ReplyLayeredAndRequestAck<T1, T2, T3, T4, T5>(NetCallRaw<T1, T2, T3, T4, T5> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = 5000)
+    {
+        if (Connection is null) throw NilError();
+        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        NetTask task = call.ListenAck(timeoutMs);
+        call.Invoke(ref overhead
+#if SERVER
+            , Connection
+#endif
+            , arg1, arg2, arg3, arg4, arg5);
         return task;
     }
     public NetTask ReplyLayeredAndRequestAck<T1>(NetCall<T1> call, T1 arg1, int timeoutMs = 5000)

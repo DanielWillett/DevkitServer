@@ -67,4 +67,9 @@ public static class VanillaPermissions
     public static readonly Permission MoveSavedNodes = new Permission("hierarchy.nodes.transform", core: true);
     [Permission]
     public static readonly Permission EditNodes = new Permission("hierarchy.nodes.*", core: true);
+
+    [Permission]
+    public static readonly Permission UsePlayerController = new Permission("controller.player", core: true);
+    [Permission]
+    public static readonly Permission UseEditorController = new Permission("controller.editor", core: true);
 }

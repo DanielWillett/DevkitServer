@@ -1,10 +1,6 @@
 ﻿using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using DevkitServer.Multiplayer;
 
 namespace DevkitServer.Util;
 public static class LevelObjectUtil
@@ -53,141 +49,130 @@ public static class LevelObjectUtil
         return false;
     }
 
-    public static bool TryFindObjectCoordinates(Vector3 pos, uint instanceId, out byte x, out byte y, out ushort index)
+    public static bool TryFindObjectCoordinates(Vector3 expectedPosition, uint instanceId, out byte x, out byte y, out ushort index)
     {
         ThreadUtil.assertIsGameThread();
 
-        if (Regions.tryGetCoordinate(pos, out x, out y))
+        bool r = false;
+        if (Regions.tryGetCoordinate(expectedPosition, out x, out y))
         {
-            List<LevelObject> region = LevelObjects.objects[x, y];
-            int c = Math.Min(region.Count, ushort.MaxValue);
-            for (int i = 0; i < c; ++i)
+            if (SearchInRegion(x, y, instanceId, ref x, ref y, out index))
+                return true;
+            if (SearchInRegion(x + 1, y, instanceId, ref x, ref y, out index))
+                return true;
+            if (SearchInRegion(x, y - 1, instanceId, ref x, ref y, out index))
+                return true;
+            if (SearchInRegion(x - 1, y, instanceId, ref x, ref y, out index))
+                return true;
+            if (SearchInRegion(x, y + 1, instanceId, ref x, ref y, out index))
+                return true;
+            if (SearchInRegion(x + 1, y + 1, instanceId, ref x, ref y, out index))
+                return true;
+            if (SearchInRegion(x + 1, y - 1, instanceId, ref x, ref y, out index))
+                return true;
+            if (SearchInRegion(x - 1, y - 1, instanceId, ref x, ref y, out index))
+                return true;
+            if (SearchInRegion(x - 1, y + 1, instanceId, ref x, ref y, out index))
+                return true;
+
+            r = true;
+        }
+
+        for (int x2 = 0; x2 < Regions.WORLD_SIZE; ++x2)
+        {
+            for (int y2 = 0; y2 < Regions.WORLD_SIZE; ++y2)
             {
-                if (region[i].instanceID == instanceId)
+                if (r && x2 <= x + 1 && x2 >= x - 1 && y2 <= y + 1 && y2 >= y - 1)
+                    continue;
+                List<LevelObject> region = LevelObjects.objects[x2, y2];
+                int c = Math.Min(region.Count, ushort.MaxValue);
+                for (int i = 0; i < c; ++i)
                 {
-                    index = (ushort)i;
-                    return true;
+                    if (region[i].instanceID == instanceId)
+                    {
+                        x = (byte)x2;
+                        y = (byte)y2;
+                        index = (ushort)i;
+                        return true;
+                    }
                 }
             }
         }
 
-        return TryFindObjectCoordinates(instanceId, out x, out y, out index);
+        x = byte.MaxValue;
+        y = byte.MaxValue;
+        index = ushort.MaxValue;
+        return false;
+    }
+    private static bool SearchInRegion(int regionX, int regionY, uint instanceId, ref byte x, ref byte y, out ushort index)
+    {
+        if (regionX is < 0 or > byte.MaxValue || regionY is < 0 or > byte.MaxValue)
+        {
+            index = ushort.MaxValue;
+            return false;
+        }
+        if (SearchInRegion((byte)regionX, (byte)regionY, instanceId, out index))
+        {
+            x = (byte)regionX;
+            y = (byte)regionY;
+            return true;
+        }
+
+        return false;
+    }
+    public static bool SearchInRegion(byte regionX, byte regionY, uint instanceId, out ushort index)
+    {
+        List<LevelObject> region = LevelObjects.objects[regionX, regionY];
+        int c = Math.Min(region.Count, ushort.MaxValue - 1);
+        for (int i = 0; i < c; ++i)
+        {
+            if (region[i].instanceID == instanceId)
+            {
+                index = (ushort)i;
+                return true;
+            }
+        }
+
+        index = ushort.MaxValue;
+        return false;
     }
 #if SERVER
-    public static bool CheckMovePermission(ulong user)
+    public static bool CheckMovePermission(uint instanceId, ulong user)
     {
-        if (Permission.SuperuserPermission.Has(user))
-            return true;
-
-        return VanillaPermissions.EditNodes.Has(user, false) ||
-               VanillaPermissions.MoveSavedNodes.Has(user, false) ||
-               VanillaPermissions.PlaceNodes.Has(user, false) &&
-               LevelObjectResponsibilities.IsPlacer(item.instanceID, user);
+        return VanillaPermissions.EditObjects.Has(user, true) ||
+               VanillaPermissions.MoveSavedObjects.Has(user, false) ||
+               VanillaPermissions.PlaceObjects.Has(user, false) &&
+               LevelObjectResponsibilities.IsPlacer(instanceId, user);
     }
-    public static bool CheckPlacePermission(IHierarchyItemTypeIdentifier type, ulong user)
+    public static bool CheckPlacePermission(ulong user)
     {
-        if (Permission.SuperuserPermission.Has(user))
-            return true;
-
-        return type switch
-        {
-            NodeItemTypeIdentifier => VanillaPermissions.EditNodes.Has(user, false) ||
-                                      VanillaPermissions.PlaceNodes.Has(user, false),
-
-            VolumeItemTypeIdentifier v => typeof(CartographyVolume).IsAssignableFrom(v.Type)
-                ? (VanillaPermissions.EditCartographyVolumes.Has(user, false) ||
-                   VanillaPermissions.PlaceCartographyVolumes.Has(user, false))
-                : (VanillaPermissions.EditVolumes.Has(user, false) ||
-                   VanillaPermissions.PlaceVolumes.Has(user, false)),
-
-            _ => false
-        };
+        return VanillaPermissions.EditObjects.Has(user, true) ||
+               VanillaPermissions.PlaceObjects.Has(user, false);
     }
-    public static bool CheckDeletePermission(IDevkitHierarchyItem item, ulong user)
+    public static bool CheckDeletePermission(uint instanceId, ulong user)
     {
-        if (Permission.SuperuserPermission.Has(user))
-            return true;
-
-        return item switch
-        {
-            TempNodeBase => VanillaPermissions.EditNodes.Has(user, false) ||
-                            VanillaPermissions.RemoveSavedNodes.Has(user, false) ||
-                            VanillaPermissions.PlaceNodes.Has(user, false) && HierarchyResponsibilities.IsPlacer(item.instanceID, user),
-
-            CartographyVolume => VanillaPermissions.EditCartographyVolumes.Has(user, false) ||
-                                 VanillaPermissions.RemoveSavedCartographyVolumes.Has(user, false) ||
-                                 VanillaPermissions.PlaceCartographyVolumes.Has(user, false) && HierarchyResponsibilities.IsPlacer(item.instanceID, user),
-
-            VolumeBase => VanillaPermissions.EditVolumes.Has(user, false) ||
-                          VanillaPermissions.RemoveSavedVolumes.Has(user, false) ||
-                          VanillaPermissions.PlaceVolumes.Has(user, false) && HierarchyResponsibilities.IsPlacer(item.instanceID, user),
-
-            _ => false
-        };
+        return VanillaPermissions.EditObjects.Has(user, true) ||
+               VanillaPermissions.RemoveSavedObjects.Has(user, false) ||
+               VanillaPermissions.PlaceObjects.Has(user, false) && HierarchyResponsibilities.IsPlacer(instanceId, user);
     }
 #elif CLIENT
-    public static bool CheckMovePermission(IDevkitHierarchyItem item)
+    public static bool CheckMovePermission(uint instanceId)
     {
-        if (Permission.SuperuserPermission.Has())
-            return true;
-
-        return item switch
-        {
-            TempNodeBase => VanillaPermissions.EditNodes.Has(false) ||
-                            VanillaPermissions.MoveSavedNodes.Has(false) ||
-                            VanillaPermissions.PlaceNodes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
-
-            CartographyVolume => VanillaPermissions.EditCartographyVolumes.Has(false) ||
-                                 VanillaPermissions.MoveSavedCartographyVolumes.Has(false) ||
-                                 VanillaPermissions.PlaceCartographyVolumes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
-
-            VolumeBase => VanillaPermissions.EditVolumes.Has(false) ||
-                            VanillaPermissions.MoveSavedVolumes.Has(false) ||
-                            VanillaPermissions.PlaceVolumes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
-
-            _ => false
-        };
+        return VanillaPermissions.EditObjects.Has(true) ||
+               VanillaPermissions.MoveSavedObjects.Has(false) ||
+               VanillaPermissions.PlaceObjects.Has(false) &&
+               LevelObjectResponsibilities.IsPlacer(instanceId);
     }
-    public static bool CheckPlacePermission(IHierarchyItemTypeIdentifier type)
+    public static bool CheckPlacePermission()
     {
-        if (Permission.SuperuserPermission.Has())
-            return true;
-
-        return type switch
-        {
-            NodeItemTypeIdentifier => VanillaPermissions.EditNodes.Has(false) ||
-                                      VanillaPermissions.PlaceNodes.Has(false),
-
-            VolumeItemTypeIdentifier v => typeof(CartographyVolume).IsAssignableFrom(v.Type)
-                ? (VanillaPermissions.EditCartographyVolumes.Has(false) ||
-                   VanillaPermissions.PlaceCartographyVolumes.Has(false))
-                : (VanillaPermissions.EditVolumes.Has(false) ||
-                   VanillaPermissions.PlaceVolumes.Has(false)),
-
-            _ => false
-        };
+        return VanillaPermissions.EditObjects.Has(true) ||
+               VanillaPermissions.PlaceObjects.Has(false);
     }
-    public static bool CheckDeletePermission(IDevkitHierarchyItem item)
+    public static bool CheckDeletePermission(uint instanceId)
     {
-        if (Permission.SuperuserPermission.Has())
-            return true;
-
-        return item switch
-        {
-            TempNodeBase => VanillaPermissions.EditNodes.Has(false) ||
-                            VanillaPermissions.RemoveSavedNodes.Has(false) ||
-                            VanillaPermissions.PlaceNodes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
-
-            CartographyVolume => VanillaPermissions.EditCartographyVolumes.Has(false) ||
-                                 VanillaPermissions.RemoveSavedCartographyVolumes.Has(false) ||
-                                 VanillaPermissions.PlaceCartographyVolumes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
-
-            VolumeBase => VanillaPermissions.EditVolumes.Has(false) ||
-                          VanillaPermissions.RemoveSavedVolumes.Has(false) ||
-                          VanillaPermissions.PlaceVolumes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
-
-            _ => false
-        };
+        return VanillaPermissions.EditObjects.Has(true) ||
+               VanillaPermissions.RemoveSavedObjects.Has(false) ||
+               VanillaPermissions.PlaceObjects.Has(false) && HierarchyResponsibilities.IsPlacer(instanceId);
     }
 #endif
 }

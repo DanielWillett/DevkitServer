@@ -259,6 +259,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 
         DevkitEditorHUD.Close(true);
         ClientInfo.OnDisconnect();
+        UserInput.CleaningUpController = 0;
     }
     internal static void OnEnemyDisconnected(SteamPlayer player)
     {

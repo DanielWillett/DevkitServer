@@ -662,13 +662,10 @@ public static class NetFactory
                                 }
                             }
                         }
-                        catch (ArgumentException)
-                        {
-                            Logger.LogError("Method " + info.Method.Format(), method: "NET FACTORY");
-                            Logger.LogError("Message: " + overhead.Format() + ".", method: "NET FACTORY");
-                        }
                         catch (Exception ex)
                         {
+                            if (ex is TargetInvocationException { InnerException: { } t })
+                                ex = t;
                             Logger.LogError("Error running method " + info.Method.Format(), method: "NET FACTORY");
                             Logger.LogError("Message: " + overhead.Format() + ".", method: "NET FACTORY");
                             Logger.LogError(ex);
@@ -824,8 +821,8 @@ public static class NetFactory
                     else if (typeof(NetCallCustom).IsAssignableFrom(callType))
                     {
                         if (parameters.Length != 2 ||
-                            parameters[0].ParameterType.IsAssignableFrom(ctx) ||
-                            parameters[1].ParameterType.IsAssignableFrom(typeof(ByteReader)) ||
+                            !parameters[0].ParameterType.IsAssignableFrom(ctx) ||
+                            !parameters[1].ParameterType.IsAssignableFrom(typeof(ByteReader)) ||
                             !info.Method.IsStatic)
                         {
                             Logger.LogWarning($"Method {info.Method.Format()} has the wrong signature for invoker {field.Format()}. {Environment.NewLine}" +
@@ -1063,6 +1060,7 @@ public sealed class NetCallAttribute : Attribute
     readonly NetCallSource type;
     readonly ushort methodId;
     readonly string? methodGuid;
+    internal NetCallAttribute(NetCallSource type, NetCalls methodId) : this (type, (ushort)methodId) { }
     internal NetCallAttribute(NetCallSource type, ushort methodId)
     {
         this.type = type;

@@ -1,17 +1,14 @@
-﻿using DevkitServer.Multiplayer.Networking;
+﻿using DevkitServer.Configuration;
+using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Patches;
 using DevkitServer.Util.Terminals;
+using HarmonyLib;
 using StackCleaner;
 using System.Diagnostics;
-using System.Globalization;
 using System.Reflection;
-using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
-using DevkitServer.API;
-using DevkitServer.Configuration;
-using DevkitServer.Patches;
-using HarmonyLib;
 
 namespace DevkitServer.Util;
 internal static class Logger
@@ -21,6 +18,8 @@ internal static class Logger
 #nullable restore
     public static readonly StackTraceCleaner StackCleaner;
     private static readonly NetCall<string, Severity> SendLogMessage = new NetCall<string, Severity>((ushort)NetCalls.SendLog);
+    private static List<(DateTime Timestamp, Severity Severity, string Message, ConsoleColor Color, string Method)>? _loadingErrors = new List<(DateTime, Severity, string, ConsoleColor, string)>();
+    private static List<(DateTime Timestamp, Exception Exception, string Method)>? _loadingExceptions = new List<(DateTime, Exception, string)>();
     public static event TerminalPreReadDelegate? OnInputting;
     public static event TerminalPostReadDelegate? OnInputted;
     public static event TerminalPreWriteDelegate? OnOutputting;
@@ -97,6 +96,38 @@ internal static class Logger
 #endif
         
         CommandWindow.Log("Loading logger with log type: " + Terminal.GetType().Format() + " colorized with: " + config.ColorFormatting.Format() + ".");
+    }
+    internal static void ClearLoadingErrors()
+    {
+        if (_loadingErrors != null)
+        {
+            if (_loadingErrors.Count > 0)
+            {
+                IEnumerable<(DateTime, Severity, string, ConsoleColor, string)> logs = _loadingErrors.OrderBy(x => x.Timestamp);
+                _loadingErrors = null;
+                Terminal.Write("---- LAUNCH " + "WARNINGS".Colorize(ConsoleColor.Yellow) + "/" + "ERRORS".Colorize(ConsoleColor.Red) + " ----", ConsoleColor.Cyan, false, Severity.Info);
+                foreach ((DateTime timestamp, Severity severity, string message, ConsoleColor color, string method) in logs)
+                {
+                    Terminal.Write("[" + timestamp.ToString(TimeFormat) + "] [DEVKIT SERVER] [" + (severity == Severity.Warning ? "WARN] " : "ERROR]") +
+                                   " [" + method.ToUpperInvariant() + "] " + message, color, false, severity);
+                }
+            }
+            else
+                _loadingErrors = null;
+        }
+        if (_loadingExceptions != null)
+        {
+            if (_loadingExceptions.Count > 0)
+            {
+                IEnumerable<(DateTime, Exception, string)> logs = _loadingExceptions.OrderBy(x => x.Timestamp);
+                _loadingExceptions = null;
+                Terminal.Write("---- LAUNCH " + "EXCEPTIONS".Colorize(ConsoleColor.DarkRed) + " ----", ConsoleColor.Cyan, false, Severity.Info);
+                foreach ((DateTime timestamp, Exception ex, string method) in logs)
+                    WriteExceptionIntl(ex, true, 0, timestamp, method);
+            }
+            else
+                _loadingExceptions = null;
+        }
     }
     internal static void InitLogger()
     {
@@ -239,13 +270,19 @@ internal static class Logger
     }
     public static void LogWarning(string message, ConsoleColor color = ConsoleColor.Yellow, [CallerMemberName] string method = "")
     {
+        DateTime now = DateTime.UtcNow;
         ChangeResets(ref message, color);
-        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [WARN]  " + "[" + method.ToUpperInvariant() + "] " + message, color, true, Severity.Warning);
+        if (!Level.isLoaded)
+            _loadingErrors?.Add((now, Severity.Warning, message, color, method));
+        Terminal.Write("[" + now.ToString(TimeFormat) + "] [DEVKIT SERVER] [WARN]  [" + method.ToUpperInvariant() + "] " + message, color, true, Severity.Warning);
     }
     public static void LogError(string message, ConsoleColor color = ConsoleColor.Red, [CallerMemberName] string method = "")
     {
+        DateTime now = DateTime.UtcNow;
         ChangeResets(ref message, color);
-        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [ERROR] " + "[" + method.ToUpperInvariant() + "] " + message, color, true, Severity.Error);
+        if (!Level.isLoaded)
+            _loadingErrors?.Add((now, Severity.Error, message, color, method));
+        Terminal.Write("[" + now.ToString(TimeFormat) + "] [DEVKIT SERVER] [ERROR] [" + method.ToUpperInvariant() + "] " + message, color, true, Severity.Error);
     }
     public static void DumpJson<T>(T obj, ConsoleColor color = ConsoleColor.DarkGray, bool condensed = false)
     {
@@ -289,8 +326,8 @@ internal static class Logger
             DumpGameObject(go.transform.GetChild(i).gameObject, color);
         }
     }
-    public static void LogError(Exception ex, bool cleanStack = true, [CallerMemberName] string method = "") => WriteExceptionIntl(ex, cleanStack, 0, method);
-    private static void WriteExceptionIntl(Exception ex, bool cleanStack, int indent, string? method = null)
+    public static void LogError(Exception ex, bool cleanStack = true, [CallerMemberName] string method = "") => WriteExceptionIntl(ex, cleanStack, 0, DateTime.UtcNow, method);
+    private static void WriteExceptionIntl(Exception ex, bool cleanStack, int indent, DateTime timestamp, string? method = null)
     {
         string ind = indent == 0 ? string.Empty : new string(' ', indent);
         bool inner = indent > 0;
@@ -300,7 +337,11 @@ internal static class Logger
             {
                 Terminal.Write(string.Empty, ConsoleColor.Red, true, Severity.Error);
             }
-            Terminal.Write(ind + (inner ? "Inner Exception: " : ((string.IsNullOrEmpty(method) ? string.Empty : ("[" + method!.ToUpper() + "] ")) + "Exception: ")) + ex.GetType().Format() + FormattingUtil.GetANSIForegroundString(ConsoleColor.Red), ConsoleColor.Red, true, Severity.Error);
+            Terminal.Write(ind + (
+                inner
+                    ? "Inner Exception: "
+                    : ("[" + timestamp.ToString(TimeFormat) + "]" + (string.IsNullOrEmpty(method) ? string.Empty : (" [" + method!.ToUpper() + "] "))) + "Exception: ")
+                               + ex.GetType().Format() + FormattingUtil.GetANSIForegroundString(ConsoleColor.Red) + ".", ConsoleColor.Red, true, Severity.Error);
             Terminal.Write(ind + (ex.Message ?? "No message"), ConsoleColor.DarkRed, true, Severity.Error);
             if (ex is TypeLoadException t)
             {
@@ -311,20 +352,20 @@ internal static class Logger
                 Terminal.Write(ind + "Type load exceptions:", ConsoleColor.DarkRed, true, Severity.Error);
                 foreach (Exception ex2 in t2.LoaderExceptions)
                 {
-                    WriteExceptionIntl(ex2, cleanStack, indent + 1);
+                    WriteExceptionIntl(ex2, cleanStack, indent + 1, timestamp);
                 }
             }
             else if (ex is TargetInvocationException { InnerException: not null } t4)
             {
                 Terminal.Write(ind + "Invoked exception:", ConsoleColor.DarkRed, true, Severity.Error);
-                WriteExceptionIntl(t4.InnerException, cleanStack, indent + 1);
+                WriteExceptionIntl(t4.InnerException, cleanStack, indent + 1, timestamp);
             }
             else if (ex is AggregateException t3)
             {
                 Terminal.Write(ind + "Inner exceptions:", ConsoleColor.DarkRed, true, Severity.Error);
                 foreach (Exception ex2 in t3.InnerExceptions)
                 {
-                    WriteExceptionIntl(ex2, cleanStack, indent + 1);
+                    WriteExceptionIntl(ex2, cleanStack, indent + 1, timestamp);
                 }
             }
             if (ex.StackTrace != null)
