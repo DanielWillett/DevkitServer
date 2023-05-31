@@ -9,6 +9,16 @@ public static class LandscapeUtil
     internal static bool SaveTransactions = true;
     internal static FieldInfo SaveTransactionsField = typeof(LandscapeUtil).GetField(nameof(SaveTransactions), BindingFlags.Static | BindingFlags.NonPublic)!;
 
+    private static readonly StaticGetter<Dictionary<LandscapeCoord, LandscapeTile>> GetTiles =
+        Accessor.GenerateStaticGetter<Landscape, Dictionary<LandscapeCoord, LandscapeTile>>("tiles", throwOnError: true)!;
+
+    /// <returns>An enumerable used to loop through all the existing tiles.</returns>
+    public static IReadOnlyCollection<LandscapeTile> EnumerateAllTiles() => GetTiles().Values;
+    /// <summary>
+    /// If possible, use <see cref="EnumerateAllTiles"/> instead.
+    /// </summary>
+    /// <returns>A copy of all existing tiles.</returns>
+    public static List<LandscapeTile> GetAllTiles() => new List<LandscapeTile>(EnumerateAllTiles());
     public static bool Encapsulates(this in LandscapeBounds outer, in LandscapeBounds inner) =>
         outer.min.x < inner.min.x && outer.min.y < inner.min.y && outer.max.x > inner.max.x && outer.max.y > inner.max.y;
     public static bool Encapsulates(this in HeightmapBounds outer, in HeightmapBounds inner) =>

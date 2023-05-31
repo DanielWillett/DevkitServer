@@ -30,7 +30,7 @@ public class UserTPVControl : MonoBehaviour
         if (!_init)
         {
             _init = true;
-            if (DevkitServerModule.Bundle == null || DevkitServerModule.Bundle.asset == null)
+            if (DevkitServerModule.Bundle == null)
             {
                 Logger.LogError("Unable to set up UserTPVControl object, " + "devkitserver.masterbundle".Format() + " not loaded.");
                 return;

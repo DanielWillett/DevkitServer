@@ -1,4 +1,5 @@
-﻿using JetBrains.Annotations;
+﻿using DevkitServer.Commands.Subsystem;
+using JetBrains.Annotations;
 
 namespace DevkitServer.Util.Terminals;
 internal sealed class BackgroundLoggingTerminal : MonoBehaviour, ITerminal
@@ -15,18 +16,26 @@ internal sealed class BackgroundLoggingTerminal : MonoBehaviour, ITerminal
         if (save)
         {
             _writing = true;
-            switch (severity)
+            CommandHandler.IsLoggingFromDevkitServer = true;
+            try
             {
-                case Severity.Warning:
-                    UnturnedLog.warn(input);
-                    break;
-                case Severity.Error:
-                case Severity.Fatal:
-                    UnturnedLog.error(input);
-                    break;
-                default:
-                    UnturnedLog.info(input);
-                    break;
+                switch (severity)
+                {
+                    case Severity.Warning:
+                        UnturnedLog.warn(input);
+                        break;
+                    case Severity.Error:
+                    case Severity.Fatal:
+                        UnturnedLog.error(input);
+                        break;
+                    default:
+                        UnturnedLog.info(input);
+                        break;
+                }
+            }
+            finally
+            {
+                CommandHandler.IsLoggingFromDevkitServer = false;
             }
             _writing = false;
         }

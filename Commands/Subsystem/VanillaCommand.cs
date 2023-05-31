@@ -1,7 +1,9 @@
 ﻿using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
+#if SERVER
 using DevkitServer.Players;
+#endif
 
 namespace DevkitServer.Commands.Subsystem;
 

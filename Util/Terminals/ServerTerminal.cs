@@ -1,5 +1,6 @@
 ﻿#if SERVER
 using System;
+using DevkitServer.Commands.Subsystem;
 
 namespace DevkitServer.Util.Terminals;
 internal class ServerTerminal : MonoBehaviour, ITerminal
@@ -62,7 +63,15 @@ internal class ServerTerminal : MonoBehaviour, ITerminal
         {
             Logger.TryRemoveDateFromLine(ref str);
             str = FormattingUtil.RemoveANSIFormatting(str);
-            Logs.printLine(str);
+            CommandHandler.IsLoggingFromDevkitServer = true;
+            try
+            {
+                Logs.printLine(str);
+            }
+            finally
+            {
+                CommandHandler.IsLoggingFromDevkitServer = false;
+            }
         }
         _writing = false;
     }

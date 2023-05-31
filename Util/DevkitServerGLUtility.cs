@@ -51,5 +51,85 @@ public static class DevkitServerGLUtility
         }
         GL.End();
     }
+    public static void BoxSolidIdentityMatrix(Vector3 center, Vector3 size, bool topOnly, bool quads)
+    {
+        float cx = center.x, cy = center.y, cz = center.z;
+        float sx = size.x / 2f, sy = size.y / 2f, sz = size.z / 2f;
+        if (!quads)
+        {
+            GL.Vertex3(cx - sx, cy + sy, cz + sz);
+            GL.Vertex3(cx + sx, cy + sy, cz - sz);
+            GL.Vertex3(cx - sx, cy + sy, cz - sz);
+
+            GL.Vertex3(cx + sx, cy + sy, cz - sz);
+            GL.Vertex3(cx - sx, cy + sy, cz + sz);
+            GL.Vertex3(cx + sx, cy + sy, cz + sz);
+
+            if (!topOnly)
+            {
+                GL.Vertex3(cx - sx, cy + sy, cz + sz);
+                GL.Vertex3(cx + sx, cy + sy, cz - sz);
+                GL.Vertex3(cx - sx, cy + sy, cz - sz);
+
+                GL.Vertex3(cx + sx, cy + sy, cz - sz);
+                GL.Vertex3(cx - sx, cy + sy, cz + sz);
+                GL.Vertex3(cx + sx, cy + sy, cz + sz);
+
+                GL.Vertex3(cx + sx, cy - sy, cz - sz);
+                GL.Vertex3(cx + sx, cy + sy, cz - sz);
+                GL.Vertex3(cx + sx, cy - sy, cz + sz);
+
+                GL.Vertex3(cx + sx, cy + sy, cz + sz);
+                GL.Vertex3(cx + sx, cy - sy, cz + sz);
+                GL.Vertex3(cx + sx, cy + sy, cz - sz);
+
+                GL.Vertex3(cx - sx, cy - sy, cz - sz);
+                GL.Vertex3(cx - sx, cy + sy, cz - sz);
+                GL.Vertex3(cx + sx, cy - sy, cz - sz);
+
+                GL.Vertex3(cx + sx, cy + sy, cz - sz);
+                GL.Vertex3(cx + sx, cy - sy, cz - sz);
+                GL.Vertex3(cx - sx, cy + sy, cz - sz);
+
+                GL.Vertex3(cx + sx, cy - sy, cz + sz);
+                GL.Vertex3(cx - sx, cy + sy, cz + sz);
+                GL.Vertex3(cx - sx, cy - sy, cz + sz);
+
+                GL.Vertex3(cx - sx, cy + sy, cz + sz);
+                GL.Vertex3(cx + sx, cy - sy, cz + sz);
+                GL.Vertex3(cx + sx, cy + sy, cz + sz);
+            }
+        }
+        else
+        {
+            GL.Vertex3(cx - sx, cy + sy, cz - sz);
+            GL.Vertex3(cx + sx, cy + sy, cz - sz);
+            GL.Vertex3(cx + sx, cy + sy, cz + sz);
+            GL.Vertex3(cx - sx, cy + sy, cz + sz);
+
+            if (!topOnly)
+            {
+                GL.Vertex3(cx + sx, cy + sy, cz - sz);
+                GL.Vertex3(cx + sx, cy - sy, cz - sz);
+                GL.Vertex3(cx + sx, cy - sy, cz + sz);
+                GL.Vertex3(cx + sx, cy + sy, cz + sz);
+
+                GL.Vertex3(cx - sx, cy + sy, cz - sz);
+                GL.Vertex3(cx - sx, cy - sy, cz - sz);
+                GL.Vertex3(cx - sx, cy - sy, cz + sz);
+                GL.Vertex3(cx - sx, cy + sy, cz + sz);
+
+                GL.Vertex3(cx - sx, cy + sy, cz + sz);
+                GL.Vertex3(cx - sx, cy - sy, cz + sz);
+                GL.Vertex3(cx + sx, cy - sy, cz + sz);
+                GL.Vertex3(cx + sx, cy + sy, cz + sz);
+
+                GL.Vertex3(cx - sx, cy + sy, cz - sz);
+                GL.Vertex3(cx - sx, cy - sy, cz - sz);
+                GL.Vertex3(cx + sx, cy - sy, cz - sz);
+                GL.Vertex3(cx + sx, cy + sy, cz - sz);
+            }
+        }
+    }
 }
 #endif

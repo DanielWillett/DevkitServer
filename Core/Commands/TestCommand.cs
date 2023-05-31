@@ -3,9 +3,12 @@ using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
 using DevkitServer.Commands.Subsystem;
 using System.Reflection;
+using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players;
+using SDG.Framework.Landscapes;
 #if CLIENT
 using DevkitServer.Players.UI;
+using DevkitServer.Util.Debugging;
 #endif
 
 namespace DevkitServer.Core.Commands;
@@ -112,7 +115,36 @@ internal static class CommandTests
         }
         else ctx.SendCorrectUsage("/test ui <open|close>");
     }
+
+#if DEBUG
+    private static void tiledebug(CommandContext ctx)
+    {
+        TileDebug.Enabled = !TileDebug.Enabled;
+        ctx.ReplyString($"Tile Debug: {TileDebug.Enabled}.");
+    }
 #endif
+
+#endif
+
+
+    private static void syncall(CommandContext ctx)
+    {
+        TileSync? auth = TileSync.GetAuthority();
+#if CLIENT
+        if (auth == null || !auth.IsOwner)
+            ctx.BreakAndRunOnServer();
+#endif
+        if (auth == null)
+            throw ctx.SendUnknownError();
+        float t = Time.realtimeSinceStartup;
+        if (!ctx.HasArg(0) || ctx.MatchParameter(0, "hm", "heightmap", "heights"))
+            auth.InvalidateBounds(CartographyUtil.CaptureBounds, TileSync.DataType.Heightmap, t);
+        if (!ctx.HasArg(0) || ctx.MatchParameter(0, "sm", "splatmap", "materials"))
+            auth.InvalidateBounds(CartographyUtil.CaptureBounds, TileSync.DataType.Splatmap, t);
+        if (!ctx.HasArg(0) || ctx.MatchParameter(0, "holes", "holemap"))
+            auth.InvalidateBounds(CartographyUtil.CaptureBounds, TileSync.DataType.Holes, t);
+        ctx.ReplyString("<#7bbc5f>Syncing...");
+    }
 
 #if SERVER
 

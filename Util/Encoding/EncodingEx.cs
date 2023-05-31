@@ -39,10 +39,10 @@ public static class EncodingEx
     {
         // 1 = sz full, 2 = sz ushort, 4 = pos full, 8 = pos ushort, 16 = ignore center y, 32 = ignore size y, 64 = preserve size signs, 128 = extra flag
         byte flags = reader.ReadUInt8();
-        extraFlag = (flags & 128) == 128;
+        extraFlag = (flags & 128) != 0;
         bool ignoreCenterY = (flags & 16) == 16, ignoreSizeY = (flags & 32) == 32, preserveSizeSigns = (flags & 64) == 64;
         Vector3 center;
-        Vector3 size;
+        Vector3 extents;
         if ((flags & 4) == 4)
         {
             center = !ignoreCenterY ? reader.ReadVector3() : new Vector3(reader.ReadFloat(), 0f, reader.ReadFloat());
@@ -58,58 +58,62 @@ public static class EncodingEx
 
         if ((flags & 1) == 1)
         {
-            size = !ignoreSizeY ? reader.ReadVector3() : new Vector3(reader.ReadFloat(), 0f, reader.ReadFloat());
+            extents = !ignoreSizeY ? reader.ReadVector3() : new Vector3(reader.ReadFloat(), 0f, reader.ReadFloat());
         }
         else if ((flags & 2) == 2)
         {
             if (preserveSizeSigns)
-                size = new Vector3(reader.ReadInt16(), ignoreSizeY ? 0 : reader.ReadInt16(), reader.ReadInt16());
+                extents = new Vector3(reader.ReadInt16(), ignoreSizeY ? 0 : reader.ReadInt16(), reader.ReadInt16());
             else
-                size = new Vector3(reader.ReadUInt16(), ignoreSizeY ? 0 : reader.ReadUInt16(), reader.ReadUInt16());
+                extents = new Vector3(reader.ReadUInt16(), ignoreSizeY ? 0 : reader.ReadUInt16(), reader.ReadUInt16());
         }
         else
         {
             if (preserveSizeSigns)
-                size = new Vector3(reader.ReadInt8(), ignoreSizeY ? 0 : reader.ReadInt8(), reader.ReadInt8());
+                extents = new Vector3(reader.ReadInt8(), ignoreSizeY ? 0 : reader.ReadInt8(), reader.ReadInt8());
             else
-                size = new Vector3(reader.ReadUInt8(), ignoreSizeY ? 0 : reader.ReadUInt8(), reader.ReadUInt8());
+                extents = new Vector3(reader.ReadUInt8(), ignoreSizeY ? 0 : reader.ReadUInt8(), reader.ReadUInt8());
         }
-
-        return new Bounds(center, size);
+        
+        return new Bounds(center, extents * 2);
     }
 
     public const int MaxHeightmapBoundsSize = MaxInflatedBoundsSizeNoYComponents;
-    public static void WriteHeightmapBounds(this ByteWriter writer, Bounds bounds, bool extraFlag = false) => writer.WriteInflatedBounds(bounds, true, true, false, extraFlag);
+    public static void WriteHeightmapBounds(this ByteWriter writer, Bounds bounds, bool extraFlag = false)
+    {
+        writer.WriteInflatedBounds(bounds, true, true, false, extraFlag);
+    }
 
     public const int MaxInflatedBoundsSize = 25;
     public const int MaxInflatedBoundsSizeMinusOneYComponent = 21;
     public const int MaxInflatedBoundsSizeNoYComponents = 17;
     public static void WriteInflatedBounds(this ByteWriter writer, Bounds bounds, bool ignoreCenterY = false, bool ignoreSizeY = false, bool preserveSizeSigns = false, bool extraFlag = false)
     {
+        int st = writer.Count;
         // 1 = sz full, 2 = sz ushort, 4 = pos full, 8 = pos ushort, 16 = ignore center y, 32 = ignore size y, 64 = preserve size signs, 128 = extra flag
         byte flags = (byte)(extraFlag ? 128 : 0);
-        Vector3 c = bounds.center;
-        Vector3 s = bounds.size;
-        Expand(ref s, 0.5f);
+        Vector3 center = bounds.center;
+        Vector3 extents = bounds.extents;
+        Expand(ref extents, 0.5f);
         if (!preserveSizeSigns)
         {
-            s = new Vector3(Mathf.Abs(s.x), Mathf.Abs(s.y), Mathf.Abs(s.z));
-            if (s.x > ushort.MaxValue || (!ignoreSizeY && s.y > ushort.MaxValue) || s.z > ushort.MaxValue)
+            extents = new Vector3(Mathf.Abs(extents.x), Mathf.Abs(extents.y), Mathf.Abs(extents.z));
+            if (extents.x > ushort.MaxValue || (!ignoreSizeY && extents.y > ushort.MaxValue) || extents.z > ushort.MaxValue)
                 flags = 1;
-            else if (s.x > byte.MaxValue || (!ignoreSizeY && s.y > byte.MaxValue) || s.z > byte.MaxValue)
+            else if (extents.x > byte.MaxValue || (!ignoreSizeY && extents.y > byte.MaxValue) || extents.z > byte.MaxValue)
                 flags = 2;
         }
         else
         {
-            if (s.x is > short.MaxValue or < short.MinValue || (!ignoreSizeY && s.y is > short.MaxValue or < short.MinValue) || s.z is > short.MaxValue or < short.MinValue)
+            if (extents.x is > short.MaxValue or < short.MinValue || (!ignoreSizeY && extents.y is > short.MaxValue or < short.MinValue) || extents.z is > short.MaxValue or < short.MinValue)
                 flags = 1;
-            else if (s.x is > sbyte.MaxValue or < sbyte.MinValue || (!ignoreSizeY && s.y is > sbyte.MaxValue or < sbyte.MinValue) || s.z is > sbyte.MaxValue or < sbyte.MinValue)
+            else if (extents.x is > sbyte.MaxValue or < sbyte.MinValue || (!ignoreSizeY && extents.y is > sbyte.MaxValue or < sbyte.MinValue) || extents.z is > sbyte.MaxValue or < sbyte.MinValue)
                 flags = 2;
         }
 
-        if (c.x is > short.MaxValue or < short.MinValue || (!ignoreCenterY && c.y is > short.MaxValue or < short.MinValue) || s.z is > short.MaxValue or < short.MinValue)
+        if (center.x is > short.MaxValue or < short.MinValue || (!ignoreCenterY && center.y is > short.MaxValue or < short.MinValue) || center.z is > short.MaxValue or < short.MinValue)
             flags |= 4;
-        else if (c.x is > sbyte.MaxValue or < sbyte.MinValue || (!ignoreCenterY && c.y is > sbyte.MaxValue or < sbyte.MinValue) || s.z is > sbyte.MaxValue or < sbyte.MinValue)
+        else if (center.x is > sbyte.MaxValue or < sbyte.MinValue || (!ignoreCenterY && center.y is > sbyte.MaxValue or < sbyte.MinValue) || center.z is > sbyte.MaxValue or < sbyte.MinValue)
             flags |= 8;
 
         if (ignoreCenterY)
@@ -125,72 +129,72 @@ public static class EncodingEx
         if ((flags & 4) == 4)
         {
             if (!ignoreCenterY)
-                writer.Write(c);
+                writer.Write(center);
             else
             {
-                writer.Write(c.x);
-                writer.Write(c.z);
+                writer.Write(center.x);
+                writer.Write(center.z);
             }
         }
         else if ((flags & 8) == 8)
         {
-            writer.Write((short)Mathf.RoundToInt(c.x));
+            writer.Write((short)Mathf.RoundToInt(center.x));
             if (!ignoreCenterY)
-                writer.Write((short)Mathf.RoundToInt(c.y));
-            writer.Write((short)Mathf.RoundToInt(c.z));
+                writer.Write((short)Mathf.RoundToInt(center.y));
+            writer.Write((short)Mathf.RoundToInt(center.z));
         }
         else
         {
-            writer.Write((sbyte)Mathf.RoundToInt(c.x));
+            writer.Write((sbyte)Mathf.RoundToInt(center.x));
             if (!ignoreCenterY)
-                writer.Write((sbyte)Mathf.RoundToInt(c.y));
-            writer.Write((sbyte)Mathf.RoundToInt(c.z));
+                writer.Write((sbyte)Mathf.RoundToInt(center.y));
+            writer.Write((sbyte)Mathf.RoundToInt(center.z));
         }
 
         if ((flags & 1) == 1)
         {
             if (!ignoreSizeY)
-                writer.Write(s);
+                writer.Write(extents);
             else
             {
-                writer.Write(s.x);
-                writer.Write(s.z);
+                writer.Write(extents.x);
+                writer.Write(extents.z);
             }
         }
         else if ((flags & 2) == 2)
         {
-            Expand(ref s, 0.5f);
+            Expand(ref extents, 0.5f);
             if (preserveSizeSigns)
             {
-                writer.Write((short)Mathf.Clamp(CeilToIntIgnoreSign(s.x), short.MinValue, short.MaxValue));
+                writer.Write((short)Mathf.Clamp(CeilToIntIgnoreSign(extents.x), short.MinValue, short.MaxValue));
                 if (!ignoreCenterY)
-                    writer.Write((short)Mathf.Clamp(CeilToIntIgnoreSign(s.y), short.MinValue, short.MaxValue));
-                writer.Write((short)Mathf.Clamp(CeilToIntIgnoreSign(s.z), short.MinValue, short.MaxValue));
+                    writer.Write((short)Mathf.Clamp(CeilToIntIgnoreSign(extents.y), short.MinValue, short.MaxValue));
+                writer.Write((short)Mathf.Clamp(CeilToIntIgnoreSign(extents.z), short.MinValue, short.MaxValue));
             }
             else
             {
-                writer.Write((ushort)Mathf.Clamp(Mathf.CeilToInt(s.x), 0, ushort.MaxValue));
+                writer.Write((ushort)Mathf.Clamp(Mathf.CeilToInt(extents.x), 0, ushort.MaxValue));
                 if (!ignoreCenterY)
-                    writer.Write((ushort)Mathf.Clamp(Mathf.CeilToInt(s.y), 0, ushort.MaxValue));
-                writer.Write((ushort)Mathf.Clamp(Mathf.CeilToInt(s.z), 0, ushort.MaxValue));
+                    writer.Write((ushort)Mathf.Clamp(Mathf.CeilToInt(extents.y), 0, ushort.MaxValue));
+                writer.Write((ushort)Mathf.Clamp(Mathf.CeilToInt(extents.z), 0, ushort.MaxValue));
             }
         }
         else
         {
-            Expand(ref s, 0.5f);
+            Expand(ref extents, 0.5f);
             if (preserveSizeSigns)
             {
-                writer.Write((sbyte)Mathf.Clamp(CeilToIntIgnoreSign(s.x), sbyte.MinValue, sbyte.MaxValue));
+                writer.Write((sbyte)Mathf.Clamp(CeilToIntIgnoreSign(extents.x), sbyte.MinValue, sbyte.MaxValue));
                 if (!ignoreCenterY)
-                    writer.Write((sbyte)Mathf.Clamp(CeilToIntIgnoreSign(s.y), sbyte.MinValue, sbyte.MaxValue));
-                writer.Write((sbyte)Mathf.Clamp(CeilToIntIgnoreSign(s.z), sbyte.MinValue, sbyte.MaxValue));
+                    writer.Write((sbyte)Mathf.Clamp(CeilToIntIgnoreSign(extents.y), sbyte.MinValue, sbyte.MaxValue));
+                writer.Write((sbyte)Mathf.Clamp(CeilToIntIgnoreSign(extents.z), sbyte.MinValue, sbyte.MaxValue));
             }
             else
             {
-                writer.Write((byte)Mathf.Clamp(Mathf.CeilToInt(s.x), 0, byte.MaxValue));
+                writer.Write((byte)Mathf.Clamp(Mathf.CeilToInt(extents.x), 0, byte.MaxValue));
                 if (!ignoreCenterY)
-                    writer.Write((byte)Mathf.Clamp(Mathf.CeilToInt(s.y), 0, byte.MaxValue));
-                writer.Write((byte)Mathf.Clamp(Mathf.CeilToInt(s.z), 0, byte.MaxValue));
+                    writer.Write((byte)Mathf.Clamp(Mathf.CeilToInt(extents.y), 0, byte.MaxValue));
+                writer.Write((byte)Mathf.Clamp(Mathf.CeilToInt(extents.z), 0, byte.MaxValue));
             }
         }
     }

@@ -55,6 +55,7 @@ public class CommandHandler : ICommandHandler, IDisposable
     public event ExecutingCommand? OnExecutingCommand;
     public event Action<IExecutableCommand>? OnCommandRegistered;
     public event Action<IExecutableCommand>? OnCommandDeregistered;
+    internal static bool IsLoggingFromDevkitServer;
 
     /// <exception cref="NotSupportedException">Called setter on non-game thread.</exception>
     public static ICommandHandler Handler
@@ -132,7 +133,7 @@ public class CommandHandler : ICommandHandler, IDisposable
 
     private static void OnLogged(string message)
     {
-        if (Handler is CommandHandler { _activeVanillaCommand.IsConsole: false } hndl)
+        if (!IsLoggingFromDevkitServer && Handler is CommandHandler { _activeVanillaCommand.IsConsole: false } hndl)
             hndl._activeVanillaCommand.ReplyString(message);
     }
 #if CLIENT

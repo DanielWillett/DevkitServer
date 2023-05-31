@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace DevkitServer.API;
-public interface IDevkitServerPlugin<out TConfig> : IDevkitServerPlugin, IConfigProvider<TConfig> where TConfig : class, new() { }
+public interface IDevkitServerPlugin<out TConfig> : IReloadableDevkitServerPlugin, IConfigProvider<TConfig> where TConfig : class, new() { }
 public interface IDevkitServerPlugin
 {
     /// <summary>
@@ -82,6 +82,14 @@ public interface IDevkitServerPlugin
     /// </summary>
     void Unload();
 }
+public interface IReloadableDevkitServerPlugin : IDevkitServerPlugin
+{
+    /// <summary>
+    /// Reload config files, etc.
+    /// </summary>
+    void Reload();
+}
+
 public interface IDevkitServerColorPlugin : IDevkitServerPlugin
 {
     /// <summary>

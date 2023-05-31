@@ -1,7 +1,6 @@
-﻿#if SERVER
-// #define USERINPUT_DEBUG
+﻿#if CLIENT
+#define TILE_DEBUG_GL
 #endif
-
 #define TILE_SYNC
 
 using DevkitServer.API;
@@ -20,6 +19,9 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using Module = SDG.Framework.Modules.Module;
 #if CLIENT
+#if DEBUG
+using DevkitServer.Util.Debugging;
+#endif
 using DevkitServer.Players;
 using DevkitServer.Players.UI;
 #endif
@@ -169,13 +171,16 @@ public sealed class DevkitServerModule : IModuleNexus
             Editor.onEditorCreated += OnEditorCreated;
             Level.onPrePreLevelLoaded += OnPrePreLevelLoaded;
 #if SERVER
-            Provider.onServerConnected += UserManager.AddPlayer;
-            Provider.onServerDisconnected += UserManager.RemovePlayer;
+            Provider.onServerConnected += UserManager.AddUser;
+            Provider.onServerDisconnected += UserManager.RemoveUser;
             Level.onLevelLoaded += OnLevelLoaded;
 #if USERINPUT_DEBUG
             Players.UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
 #endif
 #else
+#if CLIENT && DEBUG
+            GameObjectHost.AddComponent<TileDebug>();
+#endif
             Provider.onClientConnected += EditorUser.OnClientConnected;
             Provider.onEnemyConnected += EditorUser.OnEnemyConnected;
             Provider.onClientDisconnected += EditorUser.OnClientDisconnected;
@@ -396,6 +401,7 @@ public sealed class DevkitServerModule : IModuleNexus
 #endif
         HierarchyResponsibilities.Reload();
         LevelObjectResponsibilities.Reload();
+        CartographyUtil.Reset();
     }
 
     public void shutdown()
@@ -412,12 +418,9 @@ public sealed class DevkitServerModule : IModuleNexus
         Level.onPostLevelLoaded -= OnPostLevelLoaded;
         Level.onPrePreLevelLoaded -= OnPrePreLevelLoaded;
 #if SERVER
-        Provider.onServerConnected -= UserManager.AddPlayer;
-        Provider.onServerDisconnected -= UserManager.RemovePlayer;
+        Provider.onServerConnected -= UserManager.AddUser;
+        Provider.onServerDisconnected -= UserManager.RemoveUser;
         Level.onLevelLoaded -= OnLevelLoaded;
-#if USERINPUT_DEBUG
-        Players.UserInput.OnUserPositionUpdated -= OnUserPositionUpdated;
-#endif
         HighSpeedServer.Deinit();
 #else
         Provider.onClientConnected -= EditorUser.OnClientConnected;
@@ -433,24 +436,6 @@ public sealed class DevkitServerModule : IModuleNexus
         LoadFaulted = false;
         Logger.CloseLogger();
     }
-
-#if USERINPUT_DEBUG
-    private static EffectAsset? _debugEffectAsset;
-    private static void OnUserPositionUpdated(Players.EditorUser obj)
-    {
-        _debugEffectAsset ??= Assets.find<EffectAsset>(new Guid("5e2a0073025849d39322932d88609777"));
-        if (_debugEffectAsset != null && obj.Input != null)
-        {
-            TriggerEffectParameters p = new TriggerEffectParameters(_debugEffectAsset)
-            {
-                position = obj.Input.transform.position,
-                direction = obj.Input.transform.forward,
-                relevantDistance = Level.size
-            };
-            EffectManager.triggerEffect(p);
-        }
-    }
-#endif
 
     [ModuleInitializer]
     public static void ModuleInitializer()

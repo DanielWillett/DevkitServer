@@ -225,7 +225,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     }
     internal static void OnEnemyConnected(SteamPlayer player)
     {
-        UserManager.AddPlayer(player);
+        UserManager.AddUser(player);
     }
     internal static void OnClientDisconnected()
     {
@@ -263,7 +263,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     }
     internal static void OnEnemyDisconnected(SteamPlayer player)
     {
-        UserManager.RemovePlayer(player.playerID.steamID);
+        UserManager.RemoveUser(player.playerID.steamID);
     }
 #endif
     public int CompareTo(EditorUser other) => SteamId.m_SteamID.CompareTo(other.SteamId.m_SteamID);

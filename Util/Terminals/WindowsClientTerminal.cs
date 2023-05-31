@@ -1,8 +1,11 @@
 ﻿#if CLIENT
+using System.Diagnostics;
 using JetBrains.Annotations;
 using System.Runtime.InteropServices;
 using System.Text;
+using DevkitServer.Commands.Subsystem;
 using ThreadPriority = System.Threading.ThreadPriority;
+using ThreadState = System.Threading.ThreadState;
 
 namespace DevkitServer.Util.Terminals;
 internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
@@ -15,9 +18,6 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
     private readonly Queue<LogMessage> _messageQueue = new Queue<LogMessage>();
     private readonly Queue<string> _inputQueue = new Queue<string>();
     private volatile bool _cancellationRequested;
-    private string[] _historyBuffer = new string[32];
-    private int _historyBufferOffset = -1;
-    private int _historyBufferIndex;
     private Thread? _keyMonitor;
     private uint? _closeHandler;
     private bool _setup;
@@ -62,8 +62,6 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
             while (_inputQueue.Count > 0)
             {
                 string deq = _inputQueue.Dequeue();
-                _historyBuffer[_historyBufferIndex] = deq;
-                _historyBufferIndex = (_historyBufferIndex + 1) % _historyBuffer.Length;
                 bool shouldHandle = true;
                 OnInput?.Invoke(deq, ref shouldHandle);
             }
@@ -93,7 +91,15 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                             {
                                 string message = msg.Message;
                                 Logger.TryRemoveDateFromLine(ref message);
-                                Logs.printLine(FormattingUtil.RemoveANSIFormatting(message));
+                                CommandHandler.IsLoggingFromDevkitServer = true;
+                                try
+                                {
+                                    Logs.printLine(FormattingUtil.RemoveANSIFormatting(message));
+                                }
+                                finally
+                                {
+                                    CommandHandler.IsLoggingFromDevkitServer = false;
+                                }
                             }
                         }
                         Console.SetCursorPosition(x, y);
@@ -111,7 +117,15 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                             {
                                 string message = msg.Message;
                                 Logger.TryRemoveDateFromLine(ref message);
-                                Logs.printLine(FormattingUtil.RemoveANSIFormatting(message));
+                                CommandHandler.IsLoggingFromDevkitServer = true;
+                                try
+                                {
+                                    Logs.printLine(FormattingUtil.RemoveANSIFormatting(message));
+                                }
+                                finally
+                                {
+                                    CommandHandler.IsLoggingFromDevkitServer = false;
+                                }
                             }
                         }
                     }
@@ -245,49 +259,6 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                             Console.SetCursorPosition(current.Length, Console.CursorTop);
                             continue;
                         }
-                        else if (key.Key is ConsoleKey.UpArrow or ConsoleKey.DownArrow)
-                        {
-                            if (key.Key == ConsoleKey.DownArrow)
-                            {
-                                if (_historyBufferOffset > -1)
-                                    --_historyBufferOffset;
-                            }
-                            else
-                            {
-                                ++_historyBufferOffset;
-                                if (_historyBufferOffset >= current.Length)
-                                    _historyBufferOffset = 0;
-                            }
-                            
-                            if (_historyBufferOffset == -1)
-                            {
-                                Console.SetCursorPosition(0, Console.CursorTop);
-                                Console.Write("\r" + new string(' ', current.Length));
-                                current = string.Empty;
-                            }
-                            else
-                            {
-                                int index = (_historyBufferIndex - _historyBufferOffset) % _historyBuffer.Length;
-                                if (_historyBuffer[index] != null)
-                                {
-                                    string newStr = _historyBuffer[index];
-                                    if (newStr.Length < current.Length)
-                                    {
-                                        newStr += new string(' ', current.Length - newStr.Length);
-                                    }
-                                    current = _historyBuffer[index];
-                                    Console.SetCursorPosition(0, Console.CursorTop);
-                                    Console.Write(newStr);
-                                }
-                                else
-                                {
-                                    _historyBufferOffset = -1;
-                                    Console.SetCursorPosition(0, Console.CursorTop);
-                                    Console.Write("\r" + new string(' ', current.Length));
-                                    current = string.Empty;
-                                }
-                            }
-                        }
                         else
                         {
                             current += (key.Modifiers & ConsoleModifiers.Shift) != 0 ? char.ToUpper(key.KeyChar) : char.ToLower(key.KeyChar);
@@ -303,7 +274,6 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                 if (current.Length > 0)
                 {
                     _inputQueue.Enqueue(current);
-                    _historyBufferOffset = -1;
                 }
                 _inText = false;
             }

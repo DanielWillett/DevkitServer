@@ -972,7 +972,7 @@ public class CommandContext : Exception
     /// <param name="remainder">Select the rest of the arguments instead of just one.</param>
     /// <remarks>Zero based indexing.</remarks>
     /// <returns><see langword="true"/> if a valid Steam64 id is parsed (even when the user is offline).</returns>
-    public bool TryGet(int parameter, out ulong steam64, out EditorUser? onlinePlayer, bool remainder = false)
+    public bool TryGet(int parameter, out ulong steam64, out EditorUser? onlinePlayer, bool remainder = false, NameSearchType type = NameSearchType.CharacterName)
     {
         parameter += ArgumentOffset;
         if (parameter < 0 || parameter >= Arguments.Length)
@@ -997,7 +997,7 @@ public class CommandContext : Exception
                 steam64 = csteam64.m_SteamID;
                 return true;
             }
-            onlinePlayer = UserManager.FromName(s, true);
+            onlinePlayer = UserManager.FromName(s, type);
             if (onlinePlayer is not null)
             {
                 steam64 = onlinePlayer.SteamId.m_SteamID;
@@ -1017,7 +1017,7 @@ public class CommandContext : Exception
     /// <param name="remainder">Select the rest of the arguments instead of just one.</param>
     /// <remarks>Zero based indexing.</remarks>
     /// <returns><see langword="true"/> if a valid Steam64 id is parsed and that player is in <paramref name="selection"/>.</returns>
-    public bool TryGet(int parameter, out ulong steam64, out EditorUser onlinePlayer, IEnumerable<EditorUser> selection, bool remainder = false)
+    public bool TryGet(int parameter, out ulong steam64, out EditorUser onlinePlayer, IEnumerable<EditorUser> selection, bool remainder = false, NameSearchType type = NameSearchType.CharacterName)
     {
         parameter += ArgumentOffset;
         if (parameter < 0 || parameter >= Arguments.Length)
@@ -1050,7 +1050,7 @@ public class CommandContext : Exception
                 onlinePlayer = UserManager.FromId(steam64)!;
                 return false;
             }
-            onlinePlayer = UserManager.FromName(s, true, selection)!;
+            onlinePlayer = UserManager.FromName(s, type, selection)!;
             if (onlinePlayer is not null)
             {
                 steam64 = onlinePlayer.SteamId.m_SteamID;

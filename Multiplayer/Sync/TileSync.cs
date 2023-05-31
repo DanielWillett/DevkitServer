@@ -1,5 +1,5 @@
 ﻿#if CLIENT
-// #define GL_SAMPLES
+#define GL_SAMPLES
 #endif
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
@@ -52,11 +52,12 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
     private int _ttlPackets;
     private MapInvalidation _receiving;
 #if CLIENT
-    private bool _renderGl;
 #if GL_SAMPLES
+    private MapInvalidation _gl;
     private PreviewSample[]? _samples;
     private bool _invalSamples;
 #endif
+    private bool _renderGl;
 #endif
     private BitArray? _packetMask;
     static TileSync()
@@ -101,6 +102,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             MapInvalidation inv = _invalidations[_invalidateIndex];
             DevkitServerGLUtility.DrawTerrainBounds(inv.Tile, inv.XMin, inv.XMax, inv.YMin, inv.YMax, inv.Type != DataType.Heightmap, Color.magenta);
         }
+        GLUtility.matrix = Matrix4x4.identity;
         float time = Time.realtimeSinceStartup;
         Color pink = new Color(1f, 0.7f, 0.7f);
         Color red = Color.red;
@@ -111,20 +113,21 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
                 i == _invalidateIndex ? Color.magenta : Color.Lerp(pink, red, (time - inv.Time) / 10f));
         }
 
-        if (!_renderGl)
-            return;
-        DevkitServerGLUtility.DrawTerrainBounds(_receiving.Tile, _receiving.XMin, _receiving.XMax, _receiving.YMin, _receiving.YMax, _receiving.Type != DataType.Heightmap);
-#if GL_SAMPLES
+#if !GL_SAMPLES
+        if (_renderGl)
+            DevkitServerGLUtility.DrawTerrainBounds(_receiving.Tile, _receiving.XMin, _receiving.XMax, _receiving.YMin, _receiving.YMax, _receiving.Type != DataType.Heightmap);
+#else
+        DevkitServerGLUtility.DrawTerrainBounds(_gl.Tile, _gl.XMin, _gl.XMax, _gl.YMin, _gl.YMax, _gl.Type != DataType.Heightmap);
         unsafe
         {
-            int offsetX = _receiving.XMin;
-            int offsetY = _receiving.YMin;
-            int sizeX = _receiving.XMax - offsetX + 1;
-            int sizeY = _receiving.YMax - offsetY + 1;
+            int offsetX = _gl.XMin;
+            int offsetY = _gl.YMin;
+            int sizeX = _gl.XMax - offsetX + 1;
+            int sizeY = _gl.YMax - offsetY + 1;
             int sampleCt = sizeX * sizeY;
-            if (_invalSamples)
+            if (_invalSamples || _samples == null)
             {
-                LandscapeCoord tile = _receiving.Tile;
+                LandscapeCoord tile = _gl.Tile;
                 fixed (byte* ptr = _buffer)
                 {
                     if (_samples == null || _samples.Length < sampleCt)
@@ -138,37 +141,33 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
                             {
                                 for (int y = offsetY; y < offsetY + sizeY; ++y)
                                 {
-                                    _samples[++sampleIndex] = (new PreviewSample(Landscape.getWorldPosition(tile, new HeightmapCoord(x, y), *buffer), Color.Lerp(Color.red, Color.green, *buffer)));
+                                    _samples[++sampleIndex] = (new PreviewSample(Landscape.getWorldPosition(tile, new HeightmapCoord(x, y), *buffer), !_renderGl || (sampleIndex * sizeof(float)) < _index ? Color.green : Color.red));
                                     ++buffer;
                                 }
                             }
                             break;
                         case DataType.Splatmap:
-                            buffer = (float*)ptr;
                             AssetReference<LandscapeMaterialAsset> mat = TerrainEditor.splatmapMaterialTarget;
                             LandscapeTile? tile2 = Landscape.getTile(tile);
                             int index = tile2 == null || !mat.isValid ? -1 : tile2.materials.FindIndex(x => x.GUID == mat.GUID);
                             if (index >= 0)
                             {
+                                int l = Landscape.SPLATMAP_LAYERS;
                                 for (int x = offsetX; x < offsetX + sizeX; ++x)
                                 {
                                     for (int y = offsetY; y < offsetY + sizeY; ++y)
                                     {
-                                        _samples[++sampleIndex] = (new PreviewSample(Landscape.getWorldPosition(tile, new SplatmapCoord(x, y)), Color.Lerp(Color.red, Color.green, buffer[index])));
-                                        buffer += Landscape.SPLATMAP_LAYERS;
+                                        _samples[++sampleIndex] = (new PreviewSample(Landscape.getWorldPosition(tile, new SplatmapCoord(x, y)), !_renderGl || (sampleIndex * sizeof(float) * l) < _index ? Color.green : Color.red));
                                     }
                                 }
                             }
                             break;
                         case DataType.Holes:
-                            int c = 0;
                             for (int x = offsetX; x < offsetX + sizeX; ++x)
                             {
                                 for (int y = offsetY; y < offsetY + sizeY; ++y)
                                 {
-                                    bool val = (ptr[c / 8] & (1 << (c % 8))) > 0;
-                                    _samples[++sampleIndex] = (new PreviewSample(Landscape.getWorldPosition(tile, new SplatmapCoord(x, y)), val ? Color.green : Color.red));
-                                    ++c;
+                                    _samples[++sampleIndex] = (new PreviewSample(Landscape.getWorldPosition(tile, new SplatmapCoord(x, y)), !_renderGl || Mathf.CeilToInt(sampleIndex / 8f) < _index ? Color.green : Color.red));
                                 }
                             }
                             break;
@@ -177,21 +176,16 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             }
             if (_samples != null)
             {
-                GL.Begin(GL.TRIANGLES);
+                GL.Begin(GL.QUADS);
                 const float length = 0.5f;
                 Vector3 size = new Vector3(length, length, length);
                 int c2 = Math.Min(sampleCt, _samples.Length);
-                int skip = c2 > 1024 ? (c2 > 8192 ? 8 : 4) : 1;
                 for (int i = 0; i < c2; ++i)
                 {
-                    if (i % skip == 0)
-                    {
-                        ref PreviewSample sample = ref _samples[i];
-                        GL.Color(sample.Color);
-                        GLUtility.boxSolid(sample.Position, size);
-                    }
+                    ref PreviewSample sample = ref _samples[i];
+                    GL.Color(sample.Color);
+                    DevkitServerGLUtility.BoxSolidIdentityMatrix(sample.Position, size, c2 > 16384, true);
                 }
-
                 GL.End();
             }
         }
@@ -264,11 +258,11 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             _receiving = new MapInvalidation(new LandscapeCoord(xtile, ytile), xmin, ymin, xmax, ymax, _dataType, Time.realtimeSinceStartup);
 #if CLIENT
             _renderGl = true;
-#endif
-            Logger.LogDebug($"Received starting packet: Len: {_bufferLen}. Packets: {_ttlPackets}. {_receiving.Format()}.");
 #if GL_SAMPLES
             _gl = _receiving;
 #endif
+#endif
+            Logger.LogDebug($"Received starting packet: Len: {_bufferLen}. Packets: {_ttlPackets}. {_receiving.Format()}.");
         }
         else if (packetId >= _ttlPackets)
         {
@@ -525,6 +519,9 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
 
         _receiving = default;
         _index = 0;
+#if CLIENT
+        _renderGl = false;
+#endif
         _packetId = 0;
         // Array.Clear(_buffer, 0, _bufferLen);
     }

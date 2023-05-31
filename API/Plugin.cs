@@ -75,6 +75,16 @@ public abstract class Plugin : IDevkitServerColorPlugin
     /// </summary>
     protected abstract void Unload();
 
+    /// <summary>
+    /// Re-read the main translation file.
+    /// </summary>
+    public void ReloadTranslations()
+    {
+        Local lcl = Localization.tryRead(MainLocalizationDirectory, false);
+        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultLocalization, MainLocalizationDirectory);
+        Translations = lcl;
+    }
+
     /// <inheritdoc/>
     public void LogDebug(string message, ConsoleColor color = ConsoleColor.DarkGray) =>
         Logger.LogDebug("[" + Name.ToUpperInvariant().Colorize(Color) + "] " + message, color);
@@ -108,6 +118,22 @@ public abstract class Plugin<TConfig> : Plugin, IDevkitServerPlugin<TConfig> whe
 
         _config.ReloadConfig();
     }
+
+    void IReloadableDevkitServerPlugin.Reload()
+    {
+        ReloadConfig();
+        Reload();
+    }
+    /// <summary>
+    /// Reload external config files, etc.
+    /// </summary>
+    public virtual void Reload() { }
+    /// <summary>
+    /// Reload <see cref="Configuration"/>.
+    /// </summary>
     public void ReloadConfig() => _config.ReloadConfig();
+    /// <summary>
+    /// Save <see cref="Configuration"/>.
+    /// </summary>
     public void SaveConfig() => _config.SaveConfig();
 }
