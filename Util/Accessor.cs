@@ -12,6 +12,23 @@ internal static class Accessor
     public static readonly Assembly AssemblyCSharp = typeof(Provider).Assembly;
     public static readonly Assembly DevkitServer = Assembly.GetExecutingAssembly();
     public static readonly Assembly MSCoreLib = typeof(object).Assembly;
+
+    public static readonly MethodInfo GetRealtimeSinceStartup =
+        typeof(Time).GetProperty(nameof(Time.realtimeSinceStartup), BindingFlags.Static | BindingFlags.Public)
+            ?.GetMethod ?? throw new Exception("Unable to find Time.realtimeSinceStartup.");
+    public static readonly MethodInfo GetRealtimeSinceStartupAsDouble =
+        typeof(Time).GetProperty(nameof(Time.realtimeSinceStartupAsDouble), BindingFlags.Static | BindingFlags.Public)
+            ?.GetMethod ?? throw new Exception("Unable to find Time.realtimeSinceStartupAsDouble.");
+    public static readonly MethodInfo GetTime =
+        typeof(Time).GetProperty(nameof(Time.time), BindingFlags.Static | BindingFlags.Public)
+            ?.GetMethod ?? throw new Exception("Unable to find Time.time.");
+    public static readonly MethodInfo GetDeltaTime =
+        typeof(Time).GetProperty(nameof(Time.deltaTime), BindingFlags.Static | BindingFlags.Public)
+            ?.GetMethod ?? throw new Exception("Unable to find Time.deltaTime.");
+    public static readonly MethodInfo GetFixedDeltaTime =
+        typeof(Time).GetProperty(nameof(Time.fixedDeltaTime), BindingFlags.Static | BindingFlags.Public)
+            ?.GetMethod ?? throw new Exception("Unable to find Time.fixedDeltaTime.");
+
     internal static Type[]? FuncTypes;
     internal static Type[]? ActionTypes;
     private static bool _castExCtorCalc;
@@ -76,6 +93,14 @@ internal static class Accessor
         => GenerateStaticGetter<TValue>(typeof(TInstance), fieldName, flags, throwOnError);
     public static InstanceSetter<object, TValue>? GenerateInstanceSetter<TValue>(Type instance, string fieldName, BindingFlags flags = BindingFlags.NonPublic, bool throwOnError = false)
     {
+        if (instance == null)
+        {
+            string message = $"Error generating instance setter for <unknown>.{fieldName}. Instance type not found.";
+            Logger.LogError(message);
+            if (throwOnError)
+                throw new Exception(message);
+            return null;
+        }
         try
         {
             flags |= BindingFlags.Instance;
@@ -123,6 +148,14 @@ internal static class Accessor
     }
     public static InstanceGetter<object, TValue>? GenerateInstanceGetter<TValue>(Type instance, string fieldName, BindingFlags flags = BindingFlags.NonPublic, bool throwOnError = false)
     {
+        if (instance == null)
+        {
+            string message = $"Error generating instance getter for <unknown>.{fieldName}. Instance type not found.";
+            Logger.LogError(message);
+            if (throwOnError)
+                throw new Exception(message);
+            return null;
+        }
         try
         {
             flags |= BindingFlags.Instance;
@@ -169,6 +202,14 @@ internal static class Accessor
     }
     public static StaticSetter<TValue>? GenerateStaticSetter<TValue>(Type instance, string fieldName, BindingFlags flags = BindingFlags.NonPublic, bool throwOnError = false)
     {
+        if (instance == null)
+        {
+            string message = $"Error generating static setter for <unknown>.{fieldName}. Instance type not found.";
+            Logger.LogError(message);
+            if (throwOnError)
+                throw new Exception(message);
+            return null;
+        }
         try
         {
             flags |= BindingFlags.Static;
@@ -196,6 +237,14 @@ internal static class Accessor
     }
     public static StaticGetter<TValue>? GenerateStaticGetter<TValue>(Type instance, string fieldName, BindingFlags flags = BindingFlags.NonPublic, bool throwOnError = false)
     {
+        if (instance == null)
+        {
+            string message = $"Error generating static getter for <unknown>.{fieldName}. Instance type not found.";
+            Logger.LogError(message);
+            if (throwOnError)
+                throw new Exception(message);
+            return null;
+        }
         try
         {
             flags |= BindingFlags.Static;
@@ -261,7 +310,6 @@ internal static class Accessor
                 yield return instr;
         }
     }
-
     public static void AddFunctionBreakpoints(MethodBase method) => PatchesMain.Patcher.Patch(method,
         transpiler: new HarmonyMethod(typeof(Accessor).GetMethod(nameof(AddFunctionBreakpointsTranspiler),
             BindingFlags.NonPublic | BindingFlags.Static)));
@@ -725,7 +773,8 @@ internal static class Accessor
 
         if (removeIgnored)
             types.RemoveAll(x => Attribute.IsDefined(x, typeof(IgnoreAttribute)));
-        
+
+        types.RemoveAll(x => x == null);
         types.Sort(SortTypesByPriorityHandler);
         return types;
     }
@@ -747,7 +796,7 @@ internal static class Accessor
 
         if (removeIgnored)
             types.RemoveAll(x => Attribute.IsDefined(x, typeof(IgnoreAttribute)));
-        
+        types.RemoveAll(x => x == null);
         types.Sort(SortTypesByPriorityHandler);
         return types;
     }

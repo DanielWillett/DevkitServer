@@ -77,7 +77,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
     protected override void Init()
     {
 #if CLIENT
-        GLRenderer.render += HandleGLRender;
+        DevkitServerGLUtility.OnRenderAny += HandleGLRender;
 #endif
     }
 
@@ -652,7 +652,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
     protected override void Deinit()
     {
 #if CLIENT
-        GLRenderer.render -= HandleGLRender;
+        DevkitServerGLUtility.OnRenderAny -= HandleGLRender;
 #endif
     }
     public struct MapInvalidation

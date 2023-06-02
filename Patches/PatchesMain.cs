@@ -7,14 +7,14 @@ using DevkitServer.Configuration;
 using DevkitServer.Players;
 using SDG.Framework.Landscapes;
 #if CLIENT
+using DevkitServer.Multiplayer.Levels;
 using System.Reflection.Emit;
-using DevkitServer.Multiplayer.LevelData;
 using SDG.Provider;
 #endif
 #if SERVER
+using DevkitServer.Multiplayer.Networking;
 using SDG.NetPak;
 using System.Reflection.Emit;
-using DevkitServer.Multiplayer.Networking;
 #endif
 
 namespace DevkitServer.Patches;

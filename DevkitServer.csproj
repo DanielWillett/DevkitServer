@@ -16,6 +16,9 @@
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <NoWarn>1701;1702,1591,1587,1711,1735,1573,1574,1570,1584,1658</NoWarn>
   </PropertyGroup>
+  <PropertyGroup>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ClientDebug|AnyCPU'">
     <DefineConstants>$(DefineConstants);DEBUG;CLIENT</DefineConstants>
   </PropertyGroup>
@@ -53,6 +56,9 @@
     <Reference Include="com.rlabrecque.steamworks.net">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\com.rlabrecque.steamworks.net.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.CSharp">
+      <Aliases>CSharp</Aliases>
+    </Reference>
     <Reference Include="SDG.Glazier.Runtime">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\SDG.Glazier.Runtime.dll</HintPath>
     </Reference>
@@ -65,10 +71,12 @@
     <Reference Include="StackCleaner">
       <HintPath>C:\Libraries\StackCleaner.dll</HintPath>
     </Reference>
+    <Reference Include="System.Core" />
     <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.IO.Compression" />
-    <Reference Include="System.Net.Http" />
+    <Reference Include="System.IO.Compression.FileSystem">
+      <HintPath>..\..\..\..\..\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Libraries\System.IO.Compression.FileSystem.dll</HintPath>
+    </Reference>
     <Reference Include="SystemEx">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\SystemEx.dll</HintPath>
     </Reference>

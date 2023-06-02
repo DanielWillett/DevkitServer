@@ -1,5 +1,4 @@
-﻿using System.ComponentModel;
-using HarmonyLib;
+﻿using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -68,12 +67,12 @@ public class StackTracker
             {
                 case StackBehaviour.Pop1:
                 case StackBehaviour.Popi:
-                case StackBehaviour.Popref:
                 case StackBehaviour.Push1:
                 case StackBehaviour.Pushi:
                 case StackBehaviour.Pushi8:
                 case StackBehaviour.Pushr4:
                 case StackBehaviour.Pushr8:
+                case StackBehaviour.Popref:
                 case StackBehaviour.Pushref:
                     return 1;
                 case StackBehaviour.Pop1_pop1:
@@ -88,11 +87,11 @@ public class StackTracker
                     return 2;
                 case StackBehaviour.Popi_popi_popi:
                 case StackBehaviour.Popref_popi_popi:
+                case StackBehaviour.Popref_popi_pop1:
                 case StackBehaviour.Popref_popi_popi8:
                 case StackBehaviour.Popref_popi_popr4:
                 case StackBehaviour.Popref_popi_popr8:
                 case StackBehaviour.Popref_popi_popref:
-                case StackBehaviour.Popref_popi_pop1:
                     return 3;
                 default: return 0;
             }

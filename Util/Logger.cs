@@ -1,14 +1,19 @@
 ﻿using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Networking;
-using DevkitServer.Patches;
 using DevkitServer.Util.Terminals;
-using HarmonyLib;
 using StackCleaner;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.Json;
+#if SERVER
+using DevkitServer.Levels;
+#endif
+#if CLIENT
+using System.Text;
+using DevkitServer.Patches;
+using HarmonyLib;
+#endif
 
 namespace DevkitServer.Util;
 internal static class Logger
@@ -399,14 +404,50 @@ internal static class Logger
     {
         OnInputting?.Invoke(input, ref shouldhandle);
         if (!shouldhandle) return;
-        OnInputted?.Invoke(input);
-        LogInfo(input);
+        if (DevkitServerModule.IsMainThread)
+            OnTerminalInputIntl(input);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnTerminalInputIntl(input));
     }
     private static void OnTerminalOutput(ref string outputMessage, ref ConsoleColor color)
     {
         OnOutputting?.Invoke(ref outputMessage, ref color);
+        if (DevkitServerModule.IsMainThread)
+            OnTerminalOutputIntl(outputMessage, color);
+        else
+        {
+            string om2 = outputMessage;
+            ConsoleColor cc2 = color;
+            DevkitServerUtility.QueueOnMainThread(() => OnTerminalOutputIntl(om2, cc2));
+        }
+    }
+    private static void OnTerminalOutputIntl(string outputMessage, ConsoleColor color)
+    {
+#if SERVER
+        BackupLogs? logs = BackupLogs.Instance;
+        logs?.GetOrAdd<LogQueue>().Logs.Add(outputMessage);
+#endif
         OnOutputed?.Invoke(outputMessage, color);
     }
+    private static void OnTerminalInputIntl(string input)
+    {
+        OnInputted?.Invoke(input);
+        LogInfo(input);
+    }
+#if SERVER
+    private sealed class LogQueue : IBackupLog
+    {
+        public List<string> Logs { get; } = new List<string>(1024);
+        public string RelativeName => "main_log";
+        public void Write(TextWriter fileWriter)
+        {
+            for (int i = Logs.Count - 1; i >= 0; --i)
+            {
+                fileWriter.WriteLine(FormattingUtil.RemoveANSIFormatting(Logs[i]));
+            }
+        }
+    }
+#endif
 }
 
 public enum Severity : byte

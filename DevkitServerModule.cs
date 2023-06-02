@@ -25,6 +25,9 @@ using DevkitServer.Util.Debugging;
 using DevkitServer.Players;
 using DevkitServer.Players.UI;
 #endif
+#if SERVER
+using DevkitServer.Levels;
+#endif
 
 namespace DevkitServer;
 
@@ -53,6 +56,9 @@ public sealed class DevkitServerModule : IModuleNexus
     public static bool IsMainThread => ThreadUtil.gameThread == Thread.CurrentThread;
     public static CancellationToken UnloadToken => _tknSrc == null ? CancellationToken.None : _tknSrc.Token;
     public static Local MainLocalization { get; private set; } = null!;
+#if SERVER
+    public static BackupManager? BackupManager { get; private set; }
+#endif
 
     private static readonly LocalDatDictionary DefaultMainLocalization = new LocalDatDictionary
     {
@@ -139,7 +145,7 @@ public sealed class DevkitServerModule : IModuleNexus
                     "Failed to load! Loading cancelled. Check for updates on https://github.com/DanielWillett/DevkitServer.");
                 return;
             }
-
+            
             foreach (Type type in Assembly.GetExecutingAssembly()
                          .GetTypes()
                          .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x,
@@ -152,6 +158,7 @@ public sealed class DevkitServerModule : IModuleNexus
                 try
                 {
                     RuntimeHelpers.RunClassConstructor(type.TypeHandle);
+                    CreateDirectoryAttribute.CreateInType(type, true);
                     Logger.LogDebug("Initialized static module \"" + type.Name + "\".");
                 }
                 catch (Exception ex)
@@ -178,9 +185,10 @@ public sealed class DevkitServerModule : IModuleNexus
             Players.UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
 #endif
 #else
-#if CLIENT && DEBUG
+#if DEBUG
             GameObjectHost.AddComponent<TileDebug>();
 #endif
+            DevkitServerGLUtility.Init();
             Provider.onClientConnected += EditorUser.OnClientConnected;
             Provider.onEnemyConnected += EditorUser.OnEnemyConnected;
             Provider.onClientDisconnected += EditorUser.OnClientDisconnected;
@@ -190,6 +198,7 @@ public sealed class DevkitServerModule : IModuleNexus
             UIAccessTools.EditorUIReady += EditorUIReady;
 #endif
             PluginLoader.Load();
+            CreateDirectoryAttribute.DisposeLoadList();
         }
         catch (Exception ex)
         {
@@ -216,8 +225,8 @@ public sealed class DevkitServerModule : IModuleNexus
                 Logger.LogError("Error unloading...");
                 Logger.LogError(ex);
             }
-
         }
+        GC.Collect();
     }
 
 #if CLIENT
@@ -255,7 +264,13 @@ public sealed class DevkitServerModule : IModuleNexus
                               "please report it as I am unable to test with these conditioins.");
         }
 
+        ComponentHost.StartCoroutine(ClearLoggingErrorsIn1Second());
+    }
+    private static IEnumerator<WaitForSeconds> ClearLoggingErrorsIn1Second()
+    {
+        yield return new WaitForSeconds(1);
         Logger.ClearLoadingErrors();
+        Logger.LogDebug($"Load memory usage: {DevkitServerUtility.FormatBytes(GC.GetTotalMemory(true)).Format(false)}");
     }
     internal void UnloadBundle()
     {
@@ -398,6 +413,7 @@ public sealed class DevkitServerModule : IModuleNexus
 
 #if SERVER
         DevkitServerUtility.CheckDirectory(false, false, DevkitServerConfig.LevelDirectory, typeof(DevkitServerConfig).GetProperty(nameof(DevkitServerConfig.LevelDirectory), BindingFlags.Public | BindingFlags.Static));
+        BackupManager = GameObjectHost.AddComponent<BackupManager>();
 #endif
         HierarchyResponsibilities.Reload();
         LevelObjectResponsibilities.Reload();
@@ -410,6 +426,10 @@ public sealed class DevkitServerModule : IModuleNexus
         _tknSrc?.Cancel();
         _tknSrc = null;
         TileSync.DestroyServersideAuthority();
+#if SERVER
+        Object.Destroy(BackupManager);
+        BackupManager = null;
+#endif
         Object.Destroy(GameObjectHost);
         Logger.LogInfo("Shutting down...");
         PatchesMain.Unpatch();
@@ -423,6 +443,7 @@ public sealed class DevkitServerModule : IModuleNexus
         Level.onLevelLoaded -= OnLevelLoaded;
         HighSpeedServer.Deinit();
 #else
+        DevkitServerGLUtility.Shutdown();
         Provider.onClientConnected -= EditorUser.OnClientConnected;
         Provider.onEnemyConnected -= EditorUser.OnEnemyConnected;
         Provider.onClientDisconnected -= EditorUser.OnClientDisconnected;

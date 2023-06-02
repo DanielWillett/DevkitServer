@@ -1,9 +1,10 @@
-﻿#if CLIENT
+﻿using DevkitServer.Players;
+#if SERVER
+using DevkitServer.Levels;
+#endif
+#if CLIENT
 using DevkitServer.Multiplayer.Networking;
 #endif
-using DevkitServer.Multiplayer.Sync;
-using DevkitServer.Players;
-using Unturned.SystemEx;
 
 namespace DevkitServer.Multiplayer;
 [EarlyTypeInit]
@@ -52,6 +53,9 @@ public static class UserManager
     public static EditorUser? FromPlayer(Player player) => player == null ? null : FromId(player.channel.owner.playerID.steamID.m_SteamID);
     internal static void AddUser(CSteamID player)
     {
+#if SERVER
+        BackupManager.PlayerHasJoinedSinceLastBackup = true;
+#endif
         for (int i = 0; i < Provider.clients.Count; ++i)
         {
             SteamPlayer pl = Provider.clients[i];

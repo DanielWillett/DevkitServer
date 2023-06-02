@@ -67,16 +67,7 @@ public static class CommandEx
         Assembly local = Assembly.GetExecutingAssembly();
         foreach (Assembly asm in new Assembly[] { local }.Concat(PluginLoader.Plugins.Select(x => x.Assembly).Distinct()))
         {
-            Type[] types;
-            try
-            {
-                types = asm.GetTypes();
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                types = ex.Types;
-            }
-            foreach (Type type in types)
+            foreach (Type type in Accessor.GetTypesSafe(asm))
             {
                 if (type.IsAbstract || !exe.IsAssignableFrom(type) || Attribute.IsDefined(type, typeof(IgnoreAttribute)))
                     continue;

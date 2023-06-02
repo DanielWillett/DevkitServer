@@ -18,9 +18,9 @@ internal sealed class TileDebug : MonoBehaviour
             if (_enabled == value) return;
             _enabled = value;
             if (value)
-                GLRenderer.render += HandleGLRender;
+                DevkitServerGLUtility.OnRenderAny += HandleGLRender;
             else
-                GLRenderer.render -= HandleGLRender;
+                DevkitServerGLUtility.OnRenderAny -= HandleGLRender;
         }
     }
 
@@ -28,13 +28,13 @@ internal sealed class TileDebug : MonoBehaviour
     private void Start()
     {
         if (_enabled)
-            GLRenderer.render += HandleGLRender;
+            DevkitServerGLUtility.OnRenderAny += HandleGLRender;
     }
     [UsedImplicitly]
     private void OnDestroy()
     {
         if (_enabled)
-            GLRenderer.render -= HandleGLRender;
+            DevkitServerGLUtility.OnRenderAny -= HandleGLRender;
     }
     [UsedImplicitly]
     private void OnGUI()
@@ -48,10 +48,11 @@ internal sealed class TileDebug : MonoBehaviour
     }
     private static void HandleGLRender()
     {
+        if (UserInput.LocalController != CameraController.Editor) return;
         GLUtility.matrix = Matrix4x4.identity;
         GLUtility.LINE_FLAT_COLOR.SetPass(0);
         GL.Begin(GL.LINES);
-        LandscapeTile? current = EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null ? null : Landscape.getTile(EditorUser.User.Input.ControllerObject.transform.position);
+        LandscapeTile? current = EditorUser.User!.Input.ControllerObject == null ? null : Landscape.getTile(EditorUser.User.Input.ControllerObject.transform.position);
         bool lastWasCurrent = false;
         IReadOnlyCollection<LandscapeTile> tiles = LandscapeUtil.EnumerateAllTiles();
         int index = -1;

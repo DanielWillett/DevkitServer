@@ -33,6 +33,7 @@ public class UserInput : MonoBehaviour
     private static readonly NetCall RequestInitialState = new NetCall(NetCalls.RequestInitialState);
 #if CLIENT
     internal static CameraController CleaningUpController;
+    public static CameraController LocalController => EditorUser.User?.Input is { } input ? input.Controller : 0;
 #endif
     private CameraController _controller;
     private static Delegate[] _onUpdatedActions = Array.Empty<Delegate>();
@@ -103,12 +104,11 @@ public class UserInput : MonoBehaviour
                     ControllerObject = User.Player!.player.gameObject;
                     break;
             }
+            _controller = value;
+            HandleControllerUpdated();
 #if SERVER
             SendUpdateController.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, value);
 #endif
-            _controller = value;
-
-            HandleControllerUpdated();
         }
     }
 
@@ -277,14 +277,22 @@ public class UserInput : MonoBehaviour
         User.EditorObject.SetActive(true);
         if (Controller == CameraController.Editor)
         {
+            // on controller set to editor
 #if SERVER
             SetEditorPosition(User.Player!.player.look.aim.transform.position);
+            if (User.Player.player.life.isDead)
+                User.Player.player.life.ReceiveRespawnRequest(false);
+            else
+                User.Player.player.life.sendRevive(); // heal the player
 #endif
+            User.Player.player.movement.canAddSimulationResultsToUpdates = false;
             User.Player!.player.gameObject.SetActive(false);
         }
         else if (Controller == CameraController.Player)
         {
+            // on controller set to player
             User.Player!.player.gameObject.SetActive(true);
+            User.Player.player.movement.canAddSimulationResultsToUpdates = true;
 #if SERVER
             Vector3 position = User.EditorObject.transform.position;
             float yaw = User.EditorObject.transform.rotation.eulerAngles.y;
@@ -301,6 +309,7 @@ public class UserInput : MonoBehaviour
             User.Player!.player.teleportToLocationUnsafe(position, yaw);
 #endif
         }
+#if CLIENT
         if (IsOwner)
         {
             GameObject? ctrl = ControllerObject;
@@ -311,18 +320,15 @@ public class UserInput : MonoBehaviour
             }
             if (ctrl == User.EditorObject)
             {
-#if CLIENT
                 ChangeUI(true);
-#endif
             }
             else if (ctrl == User.Player!.player.gameObject)
             {
-#if CLIENT
                 ChangeUI(false);
-#endif
             }
             Logger.LogInfo($"Camera controller set to {Controller.Format()}.", ConsoleColor.DarkCyan);
         }
+#endif
         OnUserControllerUpdated?.Invoke(User);
     }
 #if CLIENT
@@ -420,6 +426,7 @@ public class UserInput : MonoBehaviour
     }
     [HarmonyPatch(typeof(PlayerLook), "updateScope")]
     [HarmonyFinalizer]
+    [UsedImplicitly]
     private static void PlayerLookUpdateScopeFinalizer(ref Exception __exception)
     {
         if (__exception != null)

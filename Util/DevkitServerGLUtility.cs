@@ -1,10 +1,4 @@
 ﻿#if CLIENT
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using DevkitServer.Multiplayer;
 using SDG.Framework.Landscapes;
 using SDG.Framework.Rendering;
 using SDG.Framework.Utilities;
@@ -12,6 +6,22 @@ using SDG.Framework.Utilities;
 namespace DevkitServer.Util;
 public static class DevkitServerGLUtility
 {
+    public static event GLRenderHandler? OnRenderAny;
+    internal static void Init()
+    {
+        GLRenderer.render += OnRender;
+        GLRenderer.OnGameRender += OnRender;
+    }
+    internal static void Shutdown()
+    {
+        GLRenderer.render -= OnRender;
+        GLRenderer.OnGameRender -= OnRender;
+    }
+    private static void OnRender()
+    {
+        if (DevkitServerModule.IsEditing)
+            OnRenderAny?.Invoke();
+    }
     public static void DrawTerrainBounds(LandscapeCoord tile, int xMin, int xMax, int yMin, int yMax, bool splatmap, Color? constColor = null)
     {
         GLUtility.matrix = MathUtility.IDENTITY_MATRIX;

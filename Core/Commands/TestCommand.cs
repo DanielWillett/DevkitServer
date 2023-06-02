@@ -4,8 +4,6 @@ using DevkitServer.API.Permissions;
 using DevkitServer.Commands.Subsystem;
 using System.Reflection;
 using DevkitServer.Multiplayer.Sync;
-using DevkitServer.Players;
-using SDG.Framework.Landscapes;
 #if CLIENT
 using DevkitServer.Players.UI;
 using DevkitServer.Util.Debugging;
@@ -41,8 +39,6 @@ internal sealed class TestCommand : SynchronousCommand, ICommandLocalizationFile
 
     public override void Execute(CommandContext ctx)
     {
-        ctx.AssertRanByPlayer();
-
         ctx.AssertHelpCheckFormat(0, "CorrectUsage");
 
         if (ctx.TryGet(0, out string method))

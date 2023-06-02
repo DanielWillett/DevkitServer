@@ -1,6 +1,6 @@
 ﻿using DevkitServer.Multiplayer.Networking;
 
-namespace DevkitServer.Multiplayer.LevelData;
+namespace DevkitServer.Levels;
 [EarlyTypeInit]
 public sealed class LevelData
 {
@@ -27,7 +27,7 @@ public sealed class LevelData
 
         return data;
     }
-    
+
     private static bool ShouldSendFile(FileInfo file)
     {
         string nm = file.Name;

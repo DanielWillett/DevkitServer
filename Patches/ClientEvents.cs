@@ -205,7 +205,6 @@ public static class ClientEvents
             Logger.LogWarning("Unable to find method: Landscape.writeHoles.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
-        
         MethodInfo? rampInvoker = ce.GetMethod(nameof(OnRampConfirm), BindingFlags.Static | BindingFlags.NonPublic);
         MethodInfo? adjustInvoker = ce.GetMethod(nameof(OnAdjustConfirm), BindingFlags.Static | BindingFlags.NonPublic);
         MethodInfo? flattenInvoker = ce.GetMethod(nameof(OnFlattenConfirm), BindingFlags.Static | BindingFlags.NonPublic);
@@ -259,9 +258,22 @@ public static class ClientEvents
         LocalBuilder? addTileLcl2 = null;
         int pCt = 0;
         bool pAddTile = false, pRemoveTile = false;
+        Label stLbl = generator.DefineLabel();
+
+        // limits to 60 actions per second
+        yield return new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter);
+        yield return new CodeInstruction(OpCodes.Brfalse_S, stLbl);
+        yield return new CodeInstruction(OpCodes.Call, Accessor.GetRealtimeSinceStartup);
+        yield return new CodeInstruction(OpCodes.Ldsfld, EditorActions.LocalLastActionField);
+        yield return new CodeInstruction(OpCodes.Sub);
+        yield return new CodeInstruction(OpCodes.Ldc_R4, 1f/60f);
+        yield return new CodeInstruction(OpCodes.Bge_S, stLbl);
+        yield return new CodeInstruction(OpCodes.Ret);
         for (int i = 0; i < ins.Count; ++i)
         {
             CodeInstruction c = ins[i];
+            if (i == 0)
+                c.labels.Add(stLbl);
             CodeInstruction? n = i == ins.Count - 1 ? null : ins[i + 1];
             // look for pattern: ldftn (load function ptr for handler), newobj (create delegate), call
             if (n != null && n.opcode == OpCodes.Ldftn && n.operand is MethodInfo method)
@@ -759,10 +771,23 @@ public static class ClientEvents
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
         LocalBuilder lvlObject = generator.DeclareLocal(typeof(LevelObject));
         LocalBuilder lvlObjectPos = generator.DeclareLocal(typeof(Vector3));
+        Label stLbl = generator.DefineLabel();
+
+        // limits to 60 actions per second
+        yield return new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter);
+        yield return new CodeInstruction(OpCodes.Brfalse_S, stLbl);
+        yield return new CodeInstruction(OpCodes.Call, Accessor.GetRealtimeSinceStartup);
+        yield return new CodeInstruction(OpCodes.Ldsfld, EditorActions.LocalLastActionField);
+        yield return new CodeInstruction(OpCodes.Sub);
+        yield return new CodeInstruction(OpCodes.Ldc_R4, 1f / 60f);
+        yield return new CodeInstruction(OpCodes.Bge_S, stLbl);
+        yield return new CodeInstruction(OpCodes.Ret);
         int ri = 0, rspd = 0, lod = 0;
         for (int i = 0; i < ins.Count; ++i)
         {
             CodeInstruction c = ins[i];
+            if (i == 0)
+                c.labels.Add(stLbl);
             if (removeInstances != null && c.Calls(removeInstances))
             {
                 ParameterInfo[] ps = removeInstances.GetParameters();
@@ -1197,11 +1222,24 @@ public static class ClientEvents
             DevkitServerModule.Fault();
         }
 
+        Label stLbl = generator.DefineLabel();
+
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        // limits to 60 actions per second
+        ins.Insert(0, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
+        ins.Insert(1, new CodeInstruction(OpCodes.Brfalse_S, stLbl));
+        ins.Insert(2, new CodeInstruction(OpCodes.Call, Accessor.GetRealtimeSinceStartup));
+        ins.Insert(3, new CodeInstruction(OpCodes.Ldsfld, EditorActions.LocalLastActionField));
+        ins.Insert(4, new CodeInstruction(OpCodes.Sub));
+        ins.Insert(5, new CodeInstruction(OpCodes.Ldc_R4, 1f / 60f));
+        ins.Insert(6, new CodeInstruction(OpCodes.Bge_S, stLbl));
+        ins.Insert(7, new CodeInstruction(OpCodes.Ret));
         StackTracker tracker = new StackTracker(ins);
         for (int i = 0; i < ins.Count; ++i)
         {
             CodeInstruction c = ins[i];
+            if (i == 0)
+                c.labels.Add(stLbl);
             MethodInfo? invoker = null;
             if (moveHandle != null && c.Calls(moveHandle))
                 invoker = moveHandleInvoker;
@@ -1504,6 +1542,113 @@ public static class ClientEvents
 
     #endregion
 
+    #region LevelObjects.Update
+    [HarmonyPatch(typeof(EditorObjects), "Update")]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    private static IEnumerable<CodeInstruction> LevelObjectsUpdateTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
+    {
+        Type eo = typeof(EditorObjects);
+        Type lo = typeof(LevelObjects);
+        Type dtu = typeof(DevkitTransactionUtility);
+        // Type vp = typeof(VanillaPermissions);
+
+        MethodInfo pointSelectionInvoker = new Func<bool>(CheckMoveSelectionPermission).Method;
+        MethodInfo undoInvoker = new Action(OnUndoRequested).Method;
+        MethodInfo redoInvoker = new Action(OnRedoRequested).Method;
+
+        MethodInfo? pointSelection = eo.GetMethod("pointSelection", BindingFlags.Static | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+        if (pointSelection == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find method: EditorObjects.pointSelection.", method: "CLIENT EVENTS");
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo? clearSelection = lo.GetMethod("clearSelection", BindingFlags.Static | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+        if (clearSelection == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find method: EditorObjects.clearSelection.", method: "CLIENT EVENTS");
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo? undo = lo.GetMethod("undo", BindingFlags.Static | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+        if (undo == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelObjects.undo.", method: "CLIENT EVENTS");
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo? redo = lo.GetMethod("redo", BindingFlags.Static | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+        if (redo == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelObjects.redo.", method: "CLIENT EVENTS");
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo? recordDestruction = dtu.GetMethod(nameof(DevkitTransactionUtility.recordDestruction), BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(GameObject) }, null);
+        if (recordDestruction == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find method: DevkitTransactionUtility.recordDestruction.", method: "CLIENT EVENTS");
+            DevkitServerModule.Fault();
+        }
+
+        Label stLbl = generator.DefineLabel();
+
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        int index = 1;
+        while (index <= ins.Count && ins[index - 1].opcode != OpCodes.Ret)
+            ++index;
+        // limits to 60 actions per second
+        ins.Insert(index, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
+        ins.Insert(index + 1, new CodeInstruction(OpCodes.Brfalse_S, stLbl));
+        ins.Insert(index + 2, new CodeInstruction(OpCodes.Call, Accessor.GetRealtimeSinceStartup));
+        ins.Insert(index + 3, new CodeInstruction(OpCodes.Ldsfld, EditorActions.LocalLastActionField));
+        ins.Insert(index + 4, new CodeInstruction(OpCodes.Sub));
+        ins.Insert(index + 5, new CodeInstruction(OpCodes.Ldc_R4, 1f / 60f));
+        ins.Insert(index + 6, new CodeInstruction(OpCodes.Bge_S, stLbl));
+        ins.Insert(index + 7, new CodeInstruction(OpCodes.Ret));
+        for (int i = 0; i < ins.Count; ++i)
+        {
+            CodeInstruction c = ins[i];
+            if (i == 0)
+                c.labels.Add(stLbl);
+            
+            if (i < ins.Count - 1 && clearSelection != null && ins[i].Calls(clearSelection) && (redo != null && ins[i + 1].Calls(redo) || undo != null && ins[i + 1].Calls(undo)))
+            {
+                ins.RemoveAt(i + 1);
+                ins[i] = new CodeInstruction(OpCodes.Call, redo != null && ins[i + 1].Calls(redo) ? redoInvoker : undoInvoker);
+            }
+            
+            if (pointSelection != null && c.Calls(pointSelection))
+            {
+                ins.Insert(i, new CodeInstruction(OpCodes.Call, pointSelectionInvoker));
+                Label lbl = generator.DefineLabel();
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Brtrue, lbl));
+                ins.Insert(i + 2, new CodeInstruction(OpCodes.Ret));
+                i += 3;
+                ins[i + 3].labels.Add(lbl);
+            }
+        }
+
+        return ins;
+    }
+    private static readonly StaticGetter<List<EditorSelection>> GetEditorObjectSelection = Accessor.GenerateStaticGetter<EditorObjects, List<EditorSelection>>("selection", throwOnError: true)!;
+    private static bool CheckMoveSelectionPermission()
+    {
+        List<EditorSelection> selection = GetEditorObjectSelection();
+        for (int i = 0; i < selection.Count; ++i)
+        {
+            LevelObject? obj = LevelObjectUtil.FindObject(selection[i].transform);
+            if (obj == null || !LevelObjectUtil.CheckMovePermission(obj.instanceID))
+            {
+                UIMessage.SendNoPermissionMessage(VanillaPermissions.MoveSavedObjects);
+                return false;
+            }
+        }
+
+        return true;
+    }
+    #endregion
 
     private static void CheckCopiedMethodPatchOutOfDate(ref MethodInfo original, MethodInfo invoker)
     {
@@ -1542,7 +1687,6 @@ public static class ClientEvents
             }
         }
     }
-
 }
 
 #endif

@@ -1,6 +1,7 @@
 ﻿#if SERVER
 using System;
 using DevkitServer.Commands.Subsystem;
+using DevkitServer.Levels;
 
 namespace DevkitServer.Util.Terminals;
 internal class ServerTerminal : MonoBehaviour, ITerminal

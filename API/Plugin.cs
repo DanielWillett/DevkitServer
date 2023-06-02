@@ -129,11 +129,11 @@ public abstract class Plugin<TConfig> : Plugin, IDevkitServerPlugin<TConfig> whe
     /// </summary>
     public virtual void Reload() { }
     /// <summary>
-    /// Reload <see cref="Configuration"/>.
+    /// Re-read <see cref="Configuration"/> from file.
     /// </summary>
     public void ReloadConfig() => _config.ReloadConfig();
     /// <summary>
-    /// Save <see cref="Configuration"/>.
+    /// Save <see cref="Configuration"/> to file.
     /// </summary>
     public void SaveConfig() => _config.SaveConfig();
 }

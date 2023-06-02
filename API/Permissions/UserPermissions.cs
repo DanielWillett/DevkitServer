@@ -81,17 +81,8 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         foreach (Assembly assembly in new Assembly[] { asm }.Concat(PluginLoader.Plugins.Select(x => x.Assembly).Distinct()))
         {
             bool thisAssembly = asm == assembly;
-            Type[] types;
-            try
-            {
-                types = assembly.GetTypes();
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                types = ex.Types;
-            }
 
-            foreach (Type type in types)
+            foreach (Type type in Accessor.GetTypesSafe(assembly))
             {
                 if (Attribute.IsDefined(type, typeof(IgnoreAttribute)))
                     continue;

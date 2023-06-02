@@ -1,11 +1,18 @@
 ﻿using DevkitServer.Configuration;
 using SDG.Framework.Devkit;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace DevkitServer.API;
 public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvider<TConfig> where TConfig : class, new()
 {
+    /// <summary>
+    /// Any edits done during this event will be written.
+    /// </summary>
+    public event System.Action? OnRead;
+    [JsonIgnore]
     public virtual TConfig? Default => null;
+    [JsonIgnore]
     public TConfig Configuration
     {
         get => _config;
@@ -13,17 +20,26 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
         {
             lock (_sync)
             {
-                _config = value;
+                TConfig old = Interlocked.Exchange(ref _config, value);
+                if (old is IDisposable d)
+                    d.Dispose();
             }
         }
     }
 
+    [JsonIgnore]
     private TConfig _config = null!;
+    [JsonIgnore]
     private readonly object _sync = new object();
+    [JsonIgnore]
     private string _file = null!;
+    [JsonIgnore]
     public JsonReaderOptions ReaderOptions { get; set; } = DevkitServerConfig.ReaderOptions;
+    [JsonIgnore]
     public JsonWriterOptions WriterOptions { get; set; } = DevkitServerConfig.WriterOptions;
+    [JsonIgnore]
     public JsonSerializerOptions SerializerOptions { get; set; } = DevkitServerConfig.SerializerSettings;
+    [JsonIgnore]
     public string File
     {
         get => _file;
@@ -39,11 +55,36 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
     {
         File = file;
     }
+    protected virtual void OnReload() { }
     public void ReloadConfig()
     {
         lock (_sync)
         {
-            _config = ReadFromFile(File, this, Default);
+            TConfig old = ReadFromFile(File, this, Default);
+            old = Interlocked.Exchange(ref _config, old);
+            if (old is IDisposable d)
+                d.Dispose();
+            if (OnRead != null)
+            {
+                try
+                {
+                    OnRead.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Exception in {nameof(OnRead).Colorize(ConsoleColor.White)} after reading {typeof(TConfig).Format()} config at {File.Format(false)}.");
+                    Logger.LogError(ex);
+                }
+            }
+            try
+            {
+                OnReload();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Exception in {nameof(OnReload).Colorize(ConsoleColor.White)} after reading {typeof(TConfig).Format()} config at {File.Format(false)}.");
+                Logger.LogError(ex);
+            }
             WriteToFile(File, _config);
         }
     }
@@ -108,6 +149,7 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
                            ?? throw new JsonException("Failed to read SystemConfig: returned null.");
                     if (config is IDirtyable dirty2)
                         dirty2.isDirty = false;
+                    return config;
                 }
             }
 
@@ -126,7 +168,7 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
                 do
                 {
                     ++c;
-                    path = Path.Combine(Path.GetDirectoryName(path)!, Path.GetFileNameWithoutExtension(path) + "_backup_" + c + Path.GetExtension(path));
+                    path = Path.Combine(Path.GetDirectoryName(oldpath)!, Path.GetFileNameWithoutExtension(oldpath) + "_backup_" + c + Path.GetExtension(oldpath));
                 }
                 while (System.IO.File.Exists(path));
                 System.IO.File.Move(oldpath, path);

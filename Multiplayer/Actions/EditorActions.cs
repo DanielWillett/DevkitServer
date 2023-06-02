@@ -1,20 +1,27 @@
 ﻿#if SERVER
-using DevkitServer.Multiplayer.LevelData;
+using DevkitServer.Multiplayer.Levels;
+using DevkitServer.Multiplayer.Sync;
 #endif
+#if CLIENT
+using System.Reflection;
 using DevkitServer.API.Abstractions;
+#endif
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
 using JetBrains.Annotations;
 using SDG.Framework.Utilities;
 using SDG.NetPak;
-using DevkitServer.Multiplayer.Sync;
 
 namespace DevkitServer.Multiplayer.Actions;
 
 [EarlyTypeInit]
 public sealed class EditorActions : MonoBehaviour, IActionListener
 {
+#if CLIENT
+    internal static readonly FieldInfo LocalLastActionField = typeof(EditorActions).GetField(nameof(LocalLastAction), BindingFlags.NonPublic | BindingFlags.Static)!;
+    internal static float LocalLastAction;
+#endif
     public const ushort DataVersion = 1;
     public const ushort ActionBaseSize = 1;
     public const int MaxPacketSize = 16384;
@@ -130,6 +137,8 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     internal void QueueAction(IAction action)
     {
         action.Instigator = Provider.client;
+        if (IsOwner)
+            LocalLastAction = Time.realtimeSinceStartup;
         if (_queuedThisFrame)
             action.DeltaTime = 0f;
         else

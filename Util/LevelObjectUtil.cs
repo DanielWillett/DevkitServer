@@ -5,6 +5,106 @@ using DevkitServer.Multiplayer;
 namespace DevkitServer.Util;
 public static class LevelObjectUtil
 {
+    public static LevelObject? FindObject(Transform transform)
+    {
+        ThreadUtil.assertIsGameThread();
+        if (transform == null)
+            return null;
+
+        bool r = false;
+        if (Regions.tryGetCoordinate(transform.position, out byte x, out byte y))
+        {
+            LevelObject? obj =
+                SearchInRegion(transform, x, y) ??
+                SearchInRegion(transform, x + 1, y) ??
+                SearchInRegion(transform, x - 1, y) ??
+                SearchInRegion(transform, x, y + 1) ??
+                SearchInRegion(transform, x + 1, y + 1) ??
+                SearchInRegion(transform, x + 1, y - 1) ??
+                SearchInRegion(transform, x - 1, y - 1) ??
+                SearchInRegion(transform, x - 1, y + 1);
+
+            if (obj != null)
+                return obj;
+
+            r = true;
+        }
+
+        for (int x2 = 0; x2 < Regions.WORLD_SIZE; ++x2)
+        {
+            for (int y2 = 0; y2 < Regions.WORLD_SIZE; ++y2)
+            {
+                if (r && x2 <= x + 1 && x2 >= x - 1 && y2 <= y + 1 && y2 >= y - 1)
+                    continue;
+                List<LevelObject> region = LevelObjects.objects[x2, y2];
+                int c = Math.Min(region.Count, ushort.MaxValue);
+                for (int i = 0; i < c; ++i)
+                {
+                    if (ReferenceEquals(region[i].transform, transform))
+                        return region[i];
+                }
+            }
+        }
+
+        return null;
+    }
+    public static bool TryFindObject(Transform transform, out byte x, out byte y, out ushort index)
+    {
+        ThreadUtil.assertIsGameThread();
+        if (transform != null)
+        {
+            bool r = false;
+            if (Regions.tryGetCoordinate(transform.position, out x, out y))
+            {
+                if (SearchInRegion(transform, x, y, ref x, ref y, out index))
+                    return true;
+                if (SearchInRegion(transform, x + 1, y, ref x, ref y, out index))
+                    return true;
+                if (SearchInRegion(transform, x, y - 1, ref x, ref y, out index))
+                    return true;
+                if (SearchInRegion(transform, x - 1, y, ref x, ref y, out index))
+                    return true;
+                if (SearchInRegion(transform, x, y + 1, ref x, ref y, out index))
+                    return true;
+                if (SearchInRegion(transform, x + 1, y + 1, ref x, ref y, out index))
+                    return true;
+                if (SearchInRegion(transform, x + 1, y - 1, ref x, ref y, out index))
+                    return true;
+                if (SearchInRegion(transform, x - 1, y - 1, ref x, ref y, out index))
+                    return true;
+                if (SearchInRegion(transform, x - 1, y + 1, ref x, ref y, out index))
+                    return true;
+
+                r = true;
+            }
+
+            for (int x2 = 0; x2 < Regions.WORLD_SIZE; ++x2)
+            {
+                for (int y2 = 0; y2 < Regions.WORLD_SIZE; ++y2)
+                {
+                    if (r && x2 <= x + 1 && x2 >= x - 1 && y2 <= y + 1 && y2 >= y - 1)
+                        continue;
+                    List<LevelObject> region = LevelObjects.objects[x2, y2];
+                    int c = Math.Min(region.Count, ushort.MaxValue);
+                    for (int i = 0; i < c; ++i)
+                    {
+                        if (ReferenceEquals(region[i].transform, transform))
+                        {
+                            x = (byte)x2;
+                            y = (byte)y2;
+                            index = (ushort)i;
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        x = byte.MaxValue;
+        y = byte.MaxValue;
+        index = ushort.MaxValue;
+        return false;
+    }
     public static LevelObject? FindObject(uint instanceId)
     {
         if (TryFindObjectCoordinates(instanceId, out byte x, out byte y, out ushort index))
@@ -104,7 +204,7 @@ public static class LevelObjectUtil
         index = ushort.MaxValue;
         return false;
     }
-    private static bool SearchInRegion(int regionX, int regionY, uint instanceId, ref byte x, ref byte y, out ushort index)
+    public static bool SearchInRegion(int regionX, int regionY, uint instanceId, ref byte x, ref byte y, out ushort index)
     {
         if (regionX is < 0 or > byte.MaxValue || regionY is < 0 or > byte.MaxValue)
         {
@@ -118,6 +218,34 @@ public static class LevelObjectUtil
             return true;
         }
 
+        return false;
+    }
+    public static LevelObject? SearchInRegion(Transform transform, int regionX, int regionY)
+    {
+        List<LevelObject> region = LevelObjects.objects[regionX, regionY];
+        for (int i = 0; i < region.Count; ++i)
+        {
+            if (ReferenceEquals(region[i].transform, transform))
+                return region[i];
+        }
+
+        return null;
+    }
+    public static bool SearchInRegion(Transform transform, int regionX, int regionY, ref byte x, ref byte y, out ushort index)
+    {
+        List<LevelObject> region = LevelObjects.objects[regionX, regionY];
+        for (int i = 0; i < region.Count; ++i)
+        {
+            if (ReferenceEquals(region[i].transform, transform))
+            {
+                x = (byte)regionX;
+                y = (byte)regionY;
+                index = (ushort)i;
+                return true;
+            }
+        }
+
+        index = ushort.MaxValue;
         return false;
     }
     public static bool SearchInRegion(byte regionX, byte regionY, uint instanceId, out ushort index)

@@ -202,6 +202,8 @@ public class CommandParser
                 continue;
                 getCommand:
                 shouldList = false;
+                if (cmdStart < 0 || cmdEnd - cmdStart < 0)
+                    goto notCommand;
                 string command = new string(ptr, cmdStart, cmdEnd - cmdStart + 1);
                 Logger.LogDebug("Command: \"" + command + "\"");
                 for (int k = 0; k < _handler.Commands.Count; ++k)

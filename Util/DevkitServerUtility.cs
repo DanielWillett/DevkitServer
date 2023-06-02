@@ -1,10 +1,12 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
 using System.Text.RegularExpressions;
 using DevkitServer.API;
-using DevkitServer.Multiplayer.LevelData;
+using DevkitServer.Levels;
+using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 using JetBrains.Annotations;
@@ -954,98 +956,211 @@ public static class DevkitServerUtility
         Transform editor = Level.editing.Find("Editor");
         return editor == null ? null : editor.gameObject;
     }
+    [Pure]
+    public static double GetElapsedMilliseconds(this Stopwatch stopwatch) => stopwatch.ElapsedTicks / (double)Stopwatch.Frequency * 1000d;
+    [Pure]
+    public static DateTime? FindNextSchedule(DateTime[] schedule, bool utc, ScheduleInterval interval)
+    {
+        if (schedule == null)
+            throw new ArgumentNullException(nameof(schedule));
+        if (schedule.Length == 0)
+            return null;
+        DateTime now = utc ? DateTime.UtcNow : DateTime.Now;
+        for (int i = 0; i < schedule.Length; ++i)
+        {
+            DateTime contender = schedule[i];
+            switch (interval)
+            {
+                case ScheduleInterval.Daily:
+                    contender = new DateTime(now.Year, now.Month, now.Day, contender.Hour, contender.Minute, contender.Second, utc ? DateTimeKind.Utc : DateTimeKind.Local);
+                    goto default;
+                case ScheduleInterval.Monthly:
+                    if (DateTime.DaysInMonth(now.Year, now.Month) > contender.Day)
+                        continue;
+                    contender = new DateTime(now.Year, now.Month, contender.Day, contender.Hour, contender.Minute, contender.Second, utc ? DateTimeKind.Utc : DateTimeKind.Local);
+                    goto default;
+                case ScheduleInterval.Yearly:
+                    if (DateTime.DaysInMonth(now.Year, contender.Month) > contender.Day) // feb 29th
+                        continue;
+                    contender = new DateTime(now.Year, contender.Month, contender.Day, contender.Hour, contender.Minute, contender.Second, utc ? DateTimeKind.Utc : DateTimeKind.Local);
+                    goto default;
+                case ScheduleInterval.Weekly:
+                    contender = new DateTime(now.Year, now.Month, now.Day, contender.Hour, contender.Minute, contender.Second, utc ? DateTimeKind.Utc : DateTimeKind.Local)
+                        .AddDays(Math.Min(contender.Day, 7) - 1 - (int)now.DayOfWeek);
+                    goto default;
+                case ScheduleInterval.None:
+                default:
+                    if (now < contender)
+                        return contender;
+                    break;
+            }
+        }
+        
+        if (interval is ScheduleInterval.Daily or ScheduleInterval.Weekly or ScheduleInterval.Monthly or ScheduleInterval.Yearly)
+        {
+            DateTime next = schedule[0];
+            return interval switch
+            {
+                ScheduleInterval.Daily => new DateTime(now.Year, now.Month, now.Day, next.Hour, next.Minute, next.Second, utc ? DateTimeKind.Utc : DateTimeKind.Local)
+                    .AddDays(1d),
+                ScheduleInterval.Monthly => new DateTime(now.Year, now.Month, next.Day, next.Hour, next.Minute, next.Second, utc ? DateTimeKind.Utc : DateTimeKind.Local)
+                    .AddMonths(1),
+                ScheduleInterval.Yearly => new DateTime(now.Year, next.Month, next.Day, next.Hour, next.Minute, next.Second, utc ? DateTimeKind.Utc : DateTimeKind.Local)
+                    .AddYears(1),
+                _ /* Weekly */ => new DateTime(now.Year, now.Month, now.Day, next.Hour, next.Minute, next.Second, utc ? DateTimeKind.Utc : DateTimeKind.Local)
+                    .AddDays(Math.Min(next.Day, 7) + 6 - (int)now.DayOfWeek)
+            };
+        }
+        return null;
+    }
+
+    [Pure]
+    public static long ConvertTBToB(double tb) => (long)Math.Round(tb * 1000000000000d);
+    [Pure]
+    public static long ConvertGBToB(double gb) => (long)Math.Round(gb * 1000000000d);
+    [Pure]
+    public static long ConvertMBToB(double mb) => (long)Math.Round(mb * 1000000d);
+    [Pure]
+    public static long ConvertKBToB(double kb) => (long)Math.Round(kb * 1000d);
+    [Pure]
+    public static long ConvertTiBToB(double tib) => (long)Math.Round(tib * 1099511627776d);
+    [Pure]
+    public static long ConvertGiBToB(double gib) => (long)Math.Round(gib * 1073741824d);
+    [Pure]
+    public static long ConvertMiBToB(double mib) => (long)Math.Round(mib * 1048576d);
+    [Pure]
+    public static long ConvertKiBToB(double kib) => (long)Math.Round(kib * 1024d);
+    [Pure]
+    public static long GetDirectorySize(string directory)
+    {
+        DirectoryInfo dir = new DirectoryInfo(directory);
+        return GetDirectorySize(dir);
+    }
+    [Pure]
+    public static long GetDirectorySize(DirectoryInfo directory)
+    {
+        if (!directory.Exists)
+            return 0L;
+        FileSystemInfo[] files = directory.GetFileSystemInfos("*", SearchOption.TopDirectoryOnly);
+        long ttl = 0;
+        for (int i = 0; i < files.Length; ++i)
+        {
+            switch (files[i])
+            {
+                case FileInfo f:
+                    ttl += f.Length;
+                    break;
+                case DirectoryInfo d:
+                    ttl += GetDirectorySize(d);
+                    break;
+            }
+        }
+
+        return ttl;
+    }
 }
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
 public sealed class CreateDirectoryAttribute : Attribute
 {
+    private static List<Type>? _checkedTypes = new List<Type>(64);
     public bool RelativeToGameDir { get; set; }
     internal bool FaultOnFailure { get; set; } = true;
+    internal static void DisposeLoadList() => _checkedTypes = null;
     public static void CreateInAssembly(Assembly assembly) => CreateInAssembly(assembly, false);
+    public static void CreateInType(Type type) => CreateInType(type, false);
     internal static void CreateInAssembly(Assembly assembly, bool allowFault)
     {
         List<Type> types = Accessor.GetTypesSafe(assembly, false);
         for (int index = 0; index < types.Count; index++)
         {
             Type type = types[index];
-            FieldInfo[] fields = type.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-            for (int f = 0; f < fields.Length; ++f)
+            CreateInType(type, allowFault);
+        }
+    }
+    internal static void CreateInType(Type type, bool allowFault)
+    {
+        if (_checkedTypes != null && _checkedTypes.Contains(type))
+            return;
+        FieldInfo[] fields = type.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+        for (int f = 0; f < fields.Length; ++f)
+        {
+            FieldInfo field = fields[f];
+            if (!field.IsStatic || IsDefined(field, typeof(IgnoreAttribute)) || GetCustomAttribute(field, typeof(CreateDirectoryAttribute)) is not CreateDirectoryAttribute cdir)
+                continue;
+            if (typeof(string).IsAssignableFrom(field.FieldType))
             {
-                FieldInfo field = fields[f];
-                if (!field.IsStatic || IsDefined(field, typeof(IgnoreAttribute)) || GetCustomAttribute(field, typeof(CreateDirectoryAttribute)) is not CreateDirectoryAttribute cdir)
-                    continue;
-                if (typeof(string).IsAssignableFrom(field.FieldType))
-                {
-                    string? path = (string?)field.GetValue(null);
-                    if (path == null)
-                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
-                    else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, field);
-                }
-                else if (typeof(FileInfo).IsAssignableFrom(field.FieldType))
-                {
-                    FileInfo? fileInfo = (FileInfo?)field.GetValue(null);
-                    cdir.RelativeToGameDir = false;
-                    string? file = fileInfo?.DirectoryName;
-                    if (file == null)
-                    {
-                        if (fileInfo == null)
-                            Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
-                    }
-                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, field);
-                }
-                else if (typeof(DirectoryInfo).IsAssignableFrom(field.FieldType))
-                {
-                    string? dir = ((DirectoryInfo?)field.GetValue(null))?.FullName;
-                    cdir.RelativeToGameDir = false;
-                    if (dir == null)
-                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
-                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, field);
-                }
-                else
-                {
-                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, valid on types: " +
-                                      $"{typeof(string).Format()}, {typeof(FileInfo).Format()}, or {typeof(DirectoryInfo).Format()}.");
-                }
+                string? path = (string?)field.GetValue(null);
+                if (path == null)
+                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
+                else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, field);
             }
-            PropertyInfo[] properties = type.GetProperties(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-            for (int p = 0; p < properties.Length; ++p)
+            else if (typeof(FileInfo).IsAssignableFrom(field.FieldType))
             {
-                PropertyInfo property = properties[p];
-                if (property.GetMethod == null || property.GetMethod.IsStatic || property.GetIndexParameters() is { Length: > 0 } ||
-                    IsDefined(property, typeof(IgnoreAttribute)) || GetCustomAttribute(property, typeof(CreateDirectoryAttribute)) is not CreateDirectoryAttribute cdir)
-                    continue;
-                if (typeof(string).IsAssignableFrom(property.PropertyType))
+                FileInfo? fileInfo = (FileInfo?)field.GetValue(null);
+                cdir.RelativeToGameDir = false;
+                string? file = fileInfo?.DirectoryName;
+                if (file == null)
                 {
-                    string? path = (string?)property.GetMethod?.Invoke(null, Array.Empty<object>());
-                    if (path == null)
-                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
-                    else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, property);
+                    if (fileInfo == null)
+                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
                 }
-                else if (typeof(FileInfo).IsAssignableFrom(property.PropertyType))
-                {
-                    FileInfo? fileInfo = (FileInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>());
-                    string? file = fileInfo?.DirectoryName;
-                    if (file == null)
-                    {
-                        if (fileInfo == null)
-                            Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
-                    }
-                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, property);
-                }
-                else if (typeof(DirectoryInfo).IsAssignableFrom(property.PropertyType))
-                {
-                    string? dir = ((DirectoryInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>()))?.FullName;
-                    if (dir == null)
-                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
-                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, property);
-                }
-                else
-                {
-                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, valid on types: " +
-                                      $"{typeof(string).Format()}, {typeof(FileInfo).Format()}, or {typeof(DirectoryInfo).Format()}.");
-                }
+                else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, field);
+            }
+            else if (typeof(DirectoryInfo).IsAssignableFrom(field.FieldType))
+            {
+                string? dir = ((DirectoryInfo?)field.GetValue(null))?.FullName;
+                cdir.RelativeToGameDir = false;
+                if (dir == null)
+                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
+                else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, field);
+            }
+            else
+            {
+                Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, valid on types: " +
+                                  $"{typeof(string).Format()}, {typeof(FileInfo).Format()}, or {typeof(DirectoryInfo).Format()}.");
             }
         }
+        PropertyInfo[] properties = type.GetProperties(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+        for (int p = 0; p < properties.Length; ++p)
+        {
+            PropertyInfo property = properties[p];
+            if (property.GetMethod == null || property.GetMethod.IsStatic || property.GetIndexParameters() is { Length: > 0 } ||
+                IsDefined(property, typeof(IgnoreAttribute)) || GetCustomAttribute(property, typeof(CreateDirectoryAttribute)) is not CreateDirectoryAttribute cdir)
+                continue;
+            if (typeof(string).IsAssignableFrom(property.PropertyType))
+            {
+                string? path = (string?)property.GetMethod?.Invoke(null, Array.Empty<object>());
+                if (path == null)
+                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
+                else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, property);
+            }
+            else if (typeof(FileInfo).IsAssignableFrom(property.PropertyType))
+            {
+                FileInfo? fileInfo = (FileInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>());
+                string? file = fileInfo?.DirectoryName;
+                if (file == null)
+                {
+                    if (fileInfo == null)
+                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
+                }
+                else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, property);
+            }
+            else if (typeof(DirectoryInfo).IsAssignableFrom(property.PropertyType))
+            {
+                string? dir = ((DirectoryInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>()))?.FullName;
+                if (dir == null)
+                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
+                else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, property);
+            }
+            else
+            {
+                Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, valid on types: " +
+                                  $"{typeof(string).Format()}, {typeof(FileInfo).Format()}, or {typeof(DirectoryInfo).Format()}.");
+            }
+        }
+
+        _checkedTypes?.Add(type);
     }
 }
 
@@ -1075,4 +1190,27 @@ public static class AssetTypeHelper<TAsset>
             return EAssetType.SPAWN;
         return typeof(DialogueAsset).IsAssignableFrom(c) || typeof(VendorAsset).IsAssignableFrom(c) || typeof(QuestAsset).IsAssignableFrom(c) ? EAssetType.NPC : EAssetType.NONE;
     }
+}
+public enum ScheduleInterval
+{
+    /// <summary>
+    /// Dates are taken literally. Schedule is only valid until the last date.
+    /// </summary>
+    None,
+    /// <summary>
+    /// Only hours, minutes, and seconds are considered from the dates.
+    /// </summary>
+    Daily,
+    /// <summary>
+    /// The day should be from 1 - 7, which is then added from the most recent Sunday.
+    /// </summary>
+    Weekly,
+    /// <summary>
+    /// Only days, hours, minutes, and seconds are considered from the dates.
+    /// </summary>
+    Monthly,
+    /// <summary>
+    /// Only months, days, hours, minutes, and seconds are considered from the dates.
+    /// </summary>
+    Yearly
 }

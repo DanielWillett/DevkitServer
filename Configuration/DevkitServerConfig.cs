@@ -5,6 +5,7 @@ using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;
 
 namespace DevkitServer.Configuration;
+[EarlyTypeInit(-1)]
 public class DevkitServerConfig
 {
     private static readonly object Sync = new object();

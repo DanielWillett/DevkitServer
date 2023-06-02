@@ -522,7 +522,7 @@ public static class FormattingUtil
 
         return str;
     }
-    public static string Format(this object? obj)
+    public static string Format(this object? obj, string? format = null)
     {
         if (obj == null)
         {
@@ -539,6 +539,8 @@ public static class FormattingUtil
         }
         if (obj is Guid guid)
         {
+            if (format != null)
+                return guid.ToString(format).Colorize(Logger.StackCleaner.Configuration.Colors!.StructColor);
             return ("{" + guid.ToString("N") + "}").Colorize(Logger.StackCleaner.Configuration.Colors!.StructColor);
         }
         if (obj is MemberInfo)
@@ -606,7 +608,38 @@ public static class FormattingUtil
                 if (obj is bool)
                     return GetColor(Logger.StackCleaner.Configuration.Colors!.KeywordColor) + str + ANSIReset;
 
-                return GetColor(ToArgb(new Color32(181, 206, 168, 255))) + str + ANSIReset;
+                Color32 color = new Color32(181, 206, 168, 255);
+                if (format != null)
+                {
+                    switch (obj)
+                    {
+                        case float n:
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                        case double n:
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                        case decimal n:
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                        case int n:
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                        case uint n:
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                        case short n:
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                        case ushort n:
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                        case sbyte n:
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                        case byte n:
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                        case long n:
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                        case ulong n:
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                    }
+                }
+
+
+                return GetColor(ToArgb(color)) + str + ANSIReset;
             }
 
             if (type.IsInterface)

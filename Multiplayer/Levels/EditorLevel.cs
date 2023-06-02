@@ -1,4 +1,5 @@
-﻿using DevkitServer.Multiplayer.Networking;
+﻿using DevkitServer.Levels;
+using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 using System.IO.Compression;
 using JetBrains.Annotations;
@@ -10,8 +11,9 @@ using SDG.Framework.Utilities;
 #if SERVER
 using CompressionLevel = System.IO.Compression.CompressionLevel;
 #endif
+using DeflateStream = System.IO.Compression.DeflateStream;
 
-namespace DevkitServer.Multiplayer.LevelData;
+namespace DevkitServer.Multiplayer.Levels;
 
 [EarlyTypeInit]
 public static class EditorLevel
