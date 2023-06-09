@@ -30,6 +30,54 @@ public static class PatchUtil
         };
     }
     [Pure]
+    public static OpCode GetArgumentCode(int index, bool set, bool byref = false)
+    {
+        if (index > ushort.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(index));
+        if (set)
+            return index > byte.MaxValue ? OpCodes.Starg : OpCodes.Starg_S;
+        if (byref)
+            return index > byte.MaxValue ? OpCodes.Ldarga : OpCodes.Ldarga_S;
+        
+        return index switch
+        {
+            0 => OpCodes.Ldarg_0,
+            1 => OpCodes.Ldarg_1,
+            2 => OpCodes.Ldarg_2,
+            3 => OpCodes.Ldarg_3,
+            _ => index > byte.MaxValue ? OpCodes.Ldarg : OpCodes.Ldarg_S
+        };
+    }
+    public static void EmitArgument(ILGenerator il, int index, bool set, bool byref = false)
+    {
+        if (index > ushort.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(index));
+        if (set)
+        {
+            il.Emit(index > byte.MaxValue ? OpCodes.Starg : OpCodes.Starg_S, index);
+            return;
+        }
+        if (byref)
+        {
+            il.Emit(index > byte.MaxValue ? OpCodes.Ldarga : OpCodes.Ldarga_S, index);
+            return;
+        }
+        
+        if (index is < 4 and > -1)
+        {
+            il.Emit(index switch
+            {
+                0 => OpCodes.Ldarg_0,
+                1 => OpCodes.Ldarg_1,
+                2 => OpCodes.Ldarg_2,
+                _ => OpCodes.Ldarg_3
+            });
+            return;
+        }
+
+        il.Emit(index > byte.MaxValue ? OpCodes.Ldarg : OpCodes.Ldarg_S, index);
+    }
+    [Pure]
     public static int GetLocalIndex(CodeInstruction code, bool set)
     {
         if (code.opcode.OperandType == OperandType.ShortInlineVar &&
@@ -414,5 +462,50 @@ public static class PatchUtil
     public static OpCode GetCall(this MethodInfo method)
     {
         return method.ShouldCallvirt() ? OpCodes.Callvirt : OpCodes.Call;
+    }
+    public static void CheckCopiedMethodPatchOutOfDate(ref MethodInfo original, MethodBase invoker)
+    {
+        if (original == null)
+            return;
+        if (invoker == null)
+        {
+            Logger.LogWarning("Method invoker not found: " + original.Format() + ".", method: "CLIENT EVENTS");
+            original = null!;
+            return;
+        }
+        ParameterInfo[] p = original.GetParameters();
+        ParameterInfo[] p2 = invoker.GetParameters();
+        bool instanceMatches = !original.IsStatic && original.DeclaringType != null && p2.Length > 0 &&
+                               (p2[0].ParameterType.IsAssignableFrom(original.DeclaringType) ||
+                                p2[0].ParameterType.IsByRef && p2[0].ParameterType.GetElementType()!
+                                    .IsAssignableFrom(original.DeclaringType));
+        if (p.Length != p2.Length)
+        {
+            if (!instanceMatches || p.Length != p2.Length - 1)
+            {
+                Logger.LogWarning("Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".", method: "CLIENT EVENTS");
+
+                original = null!;
+                return;
+            }
+        }
+
+        int invOffset = instanceMatches ? 1 : 0;
+
+        for (int i = 0; i < p.Length; ++i)
+        {
+            if (!p2[i + invOffset].ParameterType.IsAssignableFrom(p[i].ParameterType))
+            {
+                if (p[i].ParameterType.IsByRef &&
+                    p2[i + invOffset].ParameterType.IsAssignableFrom(p[i].ParameterType.GetElementType()))
+                    continue;
+                if (p2[i + invOffset].ParameterType.IsByRef &&
+                    p2[i + invOffset].ParameterType.GetElementType()!.IsAssignableFrom(p[i].ParameterType))
+                    continue;
+                Logger.LogWarning("Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".", method: "CLIENT EVENTS");
+                original = null!;
+                return;
+            }
+        }
     }
 }

@@ -6,10 +6,6 @@ using SDG.Framework.Foliage;
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;
 #endif
-#if CLIENT
-using SDG.Framework.Devkit.Tools;
-using DevkitServer.Patches;
-#endif
 
 namespace DevkitServer.Multiplayer.Actions;
 public sealed class FoliageActions
@@ -24,10 +20,10 @@ public sealed class FoliageActions
 #if CLIENT
         if (EditorActions.IsOwner)
         {
-            ClientEvents.OnFoliageAdded += OnFoliageAdded;
-            ClientEvents.OnFoliageRemoved += OnFoliageRemoved;
-            ClientEvents.OnResourceSpawnpointRemoved += OnResourceSpawnpointRemoved;
-            ClientEvents.OnLevelObjectRemoved += OnLevelObjectRemoved;
+            ClientEvents.OnAddFoliage += OnAddFoliage;
+            ClientEvents.OnRemoveFoliage += OnRemoveFoliage;
+            ClientEvents.OnRemoveResourceSpawnpointFoliage += OnRemoveResourceSpawnpointFoliage;
+            ClientEvents.OnRemoveLevelObjectFoliage += OnRemoveLevelObjectFoliage;
         }
 #endif
     }
@@ -37,68 +33,68 @@ public sealed class FoliageActions
 #if CLIENT
         if (EditorActions.IsOwner)
         {
-            ClientEvents.OnFoliageAdded -= OnFoliageAdded;
-            ClientEvents.OnFoliageRemoved -= OnFoliageRemoved;
-            ClientEvents.OnResourceSpawnpointRemoved -= OnResourceSpawnpointRemoved;
-            ClientEvents.OnLevelObjectRemoved -= OnLevelObjectRemoved;
+            ClientEvents.OnAddFoliage -= OnAddFoliage;
+            ClientEvents.OnRemoveFoliage -= OnRemoveFoliage;
+            ClientEvents.OnRemoveResourceSpawnpointFoliage -= OnRemoveResourceSpawnpointFoliage;
+            ClientEvents.OnRemoveLevelObjectFoliage -= OnRemoveLevelObjectFoliage;
         }
 #endif
     }
 #if CLIENT
-    private void OnFoliageAdded(FoliageInfoAsset asset, Vector3 position, Quaternion rotation, Vector3 scale, bool clearWhenBaked)
+    private void OnAddFoliage(in AddFoliageProperties properties)
     {
         EditorActions.QueueAction(new AddFoliageToSurfaceAction
         {
-            Position = position,
-            Rotation = rotation,
-            Scale = scale,
-            ClearWhenBaked = clearWhenBaked,
-            FoliageAsset = new AssetReference<FoliageInfoAsset>(asset.GUID),
-            DeltaTime = Time.deltaTime
+            Position = properties.Position,
+            Rotation = properties.Rotation,
+            Scale = properties.Scale,
+            ClearWhenBaked = properties.ClearWhenBaked,
+            FoliageAsset = new AssetReference<FoliageInfoAsset>(properties.Asset.GUID),
+            DeltaTime = properties.DeltaTime
         });
     }
-    private void OnFoliageRemoved(Vector3 brushPosition, FoliageTile foliageTile, FoliageInstanceList list, float sqrBrushRadius, float sqrBrushFalloffRadius, bool allowRemoveBaked, int sampleCount)
+    private void OnRemoveFoliage(in RemoveFoliageProperties properties)
     {
-        if (sampleCount == 0)
+        if (properties.SampleCount == 0)
             return;
         EditorActions.QueueAction(new RemoveFoliageInstancesAction
         {
-            CoordinateX = foliageTile.coord.x,
-            CoordinateY = foliageTile.coord.y,
-            FoliageAsset = list.assetReference,
-            BrushPosition = brushPosition,
-            BrushRadius = DevkitFoliageToolOptions.instance.brushRadius,
-            BrushFalloff = DevkitFoliageToolOptions.instance.brushFalloff,
-            AllowRemoveBaked = allowRemoveBaked,
-            SampleCount = sampleCount,
-            DeltaTime = Time.deltaTime
+            CoordinateX = properties.Tile.coord.x,
+            CoordinateY = properties.Tile.coord.y,
+            FoliageAsset = properties.FoliageInstances.assetReference,
+            BrushPosition = properties.BrushPosition,
+            BrushRadius = properties.BrushRadius,
+            BrushFalloff = properties.BrushFalloff,
+            AllowRemoveBaked = properties.AllowRemovingBakedFoliage,
+            SampleCount = properties.SampleCount,
+            DeltaTime = properties.DeltaTime
         });
     }
-    private void OnResourceSpawnpointRemoved(ResourceSpawnpoint spawnpoint)
+    private void OnRemoveResourceSpawnpointFoliage(in RemoveResourceSpawnpointFoliageProperties properties)
     {
         EditorActions.QueueAction(new RemoveResourceSpawnpointAction
         {
-            ResourcePosition = spawnpoint.point,
-            FoliageAsset = spawnpoint.asset.getReferenceTo<ResourceAsset>(),
-            DeltaTime = Time.deltaTime
+            ResourcePosition = properties.Spawnpoint.point,
+            FoliageAsset = properties.Spawnpoint.asset.getReferenceTo<ResourceAsset>(),
+            DeltaTime = properties.DeltaTime
         });
     }
-    private void OnLevelObjectRemoved(Vector3 position, LevelObject obj)
+    private void OnRemoveLevelObjectFoliage(in RemoveLevelObjectFoliageProperties properties)
     {
-        if (Regions.tryGetCoordinate(position, out byte x, out byte y))
+        if (Regions.tryGetCoordinate(properties.Position, out byte x, out byte y))
         {
             EditorActions.QueueAction(new RemoveLevelObjectAction
             {
                 CoordinateX = x,
                 CoordinateY = y,
-                InstanceId = obj.instanceID,
+                InstanceId = properties.LevelObject.instanceID,
                 IsFoliage = true,
-                DeltaTime = Time.deltaTime
+                DeltaTime = properties.DeltaTime
             });
         }
         else
         {
-            Logger.LogWarning("Unknown region for object " + obj.asset?.FriendlyName.Format() + " #" + obj.instanceID + ".");
+            Logger.LogWarning("Unknown region for object " + properties.LevelObject.asset?.FriendlyName.Format() + " #" + properties.LevelObject.instanceID + ".");
         }
     }
 #endif

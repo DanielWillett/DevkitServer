@@ -15,16 +15,16 @@ public class MainThreadTask
 
     private MainThreadTask(bool skipFrame)
     {
-        this.SkipFrame = skipFrame;
-        this.Token = CancellationToken.None;
+        SkipFrame = skipFrame;
+        Token = CancellationToken.None;
         IsCompleted = true;
         Awaiter = new MainThreadResult(this);
     }
     public MainThreadTask(bool skipFrame, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        this.SkipFrame = skipFrame;
-        this.Token = token;
+        SkipFrame = skipFrame;
+        Token = token;
         Awaiter = new MainThreadResult(this);
     }
     public MainThreadResult GetAwaiter()
@@ -37,7 +37,7 @@ public class MainThreadTask
         public readonly MainThreadTask Task;
         public MainThreadResult(MainThreadTask task)
         {
-            this.Task = task ?? throw new ArgumentNullException(nameof(task), "Task was null in MainThreadResult constructor.");
+            Task = task ?? throw new ArgumentNullException(nameof(task), "Task was null in MainThreadResult constructor.");
         }
         public bool IsCompleted => DevkitServerModule.IsMainThread || Task.IsCompleted;
         public void OnCompleted(Action continuation)
@@ -50,7 +50,7 @@ public class MainThreadTask
             }
             else
             {
-                this.Continuation = continuation;
+                Continuation = continuation;
                 lock (DevkitServerModuleComponent.ThreadActionRequests)
                     DevkitServerModuleComponent.ThreadActionRequests.Enqueue(this);
             }

@@ -44,9 +44,9 @@ public class ByteWriter
 
     public ByteWriter(bool shouldPrepend = true, int capacity = 0)
     {
-        this.BaseCapacity = capacity;
+        BaseCapacity = capacity;
         _buffer = BaseCapacity < 1 ? Array.Empty<byte>() : new byte[BaseCapacity];
-        this.ShouldPrepend = shouldPrepend;
+        ShouldPrepend = shouldPrepend;
     }
     /// <summary>The value of <paramref name="overhead"/>.<see cref="MessageOverhead.Size">Size</see> will be overwritten.</summary>
     public unsafe void PrependData(ref MessageOverhead overhead)
@@ -1905,6 +1905,54 @@ public sealed class ByteWriterRaw<T1, T2, T3, T4, T5> : ByteWriter
             writer3.Invoke(this, arg3);
             writer4.Invoke(this, arg4);
             writer5.Invoke(this, arg5);
+            return ToArray();
+        }
+    }
+}
+public sealed class ByteWriterRaw<T1, T2, T3, T4, T5, T6> : ByteWriter
+{
+    private readonly Writer<T1> writer1;
+    private readonly Writer<T2> writer2;
+    private readonly Writer<T3> writer3;
+    private readonly Writer<T4> writer4;
+    private readonly Writer<T5> writer5;
+    private readonly Writer<T6> writer6;
+    /// <summary>Leave any writer null to auto-fill.</summary>
+    public ByteWriterRaw(Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, Writer<T6>? writer6, bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity)
+    {
+        this.writer1 = writer1 ?? WriterHelper<T1>.Writer;
+        this.writer2 = writer2 ?? WriterHelper<T2>.Writer;
+        this.writer3 = writer3 ?? WriterHelper<T3>.Writer;
+        this.writer4 = writer4 ?? WriterHelper<T4>.Writer;
+        this.writer5 = writer5 ?? WriterHelper<T5>.Writer;
+        this.writer6 = writer6 ?? WriterHelper<T6>.Writer;
+    }
+    public byte[] Get(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+    {
+        lock (this)
+        {
+            Flush();
+            writer1.Invoke(this, arg1);
+            writer2.Invoke(this, arg2);
+            writer3.Invoke(this, arg3);
+            writer4.Invoke(this, arg4);
+            writer5.Invoke(this, arg5);
+            writer6.Invoke(this, arg6);
+            PrependData(ref overhead);
+            return ToArray();
+        }
+    }
+    public byte[] Get(T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+    {
+        lock (this)
+        {
+            Flush();
+            writer1.Invoke(this, arg1);
+            writer2.Invoke(this, arg2);
+            writer3.Invoke(this, arg3);
+            writer4.Invoke(this, arg4);
+            writer5.Invoke(this, arg5);
+            writer6.Invoke(this, arg6);
             return ToArray();
         }
     }

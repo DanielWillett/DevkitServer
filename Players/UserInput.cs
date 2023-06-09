@@ -702,7 +702,7 @@ public class UserInput : MonoBehaviour
                 {
                     _nextPacketApplyTime = t + packet.DeltaTime;
                     _hasStopped = true;
-                    this.transform.SetPositionAndRotation(packet.Position, Quaternion.Euler(packet.Pitch, packet.Yaw, 0f));
+                    transform.SetPositionAndRotation(packet.Position, Quaternion.Euler(packet.Pitch, packet.Yaw, 0f));
                     _lastPos = packet.Position;
                     _lastPitch = packet.Pitch;
                     _lastYaw = packet.Yaw;

@@ -1,7 +1,6 @@
 ﻿#if SERVER
 using DevkitServer.API.Permissions;
 #elif CLIENT
-using DevkitServer.Patches;
 #endif
 using DevkitServer.API.Abstractions;
 using DevkitServer.Util.Encoding;
@@ -21,10 +20,10 @@ public sealed class HierarchyActions
 #if CLIENT
         if (EditorActions.IsOwner)
         {
-            ClientEvents.OnHierarchyObjectsDeleted += OnHierarchyObjectDeleted;
-            ClientEvents.OnHierarchyObjectInstantiationRequested += OnHierarchyObjectInstantiationRequesting;
-            ClientEvents.OnMovingHierarchyObjects += OnMovingHierarchyObjects;
-            ClientEvents.OnMovedHierarchyObjects += OnMovedHierarchyObjects;
+            ClientEvents.OnDeleteHierarchyObjects += OnDeleteHierarchyObjects;
+            ClientEvents.OnRequestInstantiateHierarchyObject += OnRequestInstantiateHierarchyObject;
+            ClientEvents.OnMoveHierarchyObjectsPreview += OnMoveHierarchyObjectsPreview;
+            ClientEvents.OnMoveHierarchyObjectsFinal += OnMoveHierarchyObjectsFinal;
         }
 #endif
     }
@@ -33,27 +32,27 @@ public sealed class HierarchyActions
 #if CLIENT
         if (EditorActions.IsOwner)
         {
-            ClientEvents.OnHierarchyObjectsDeleted -= OnHierarchyObjectDeleted;
-            ClientEvents.OnHierarchyObjectInstantiationRequested -= OnHierarchyObjectInstantiationRequesting;
-            ClientEvents.OnMovingHierarchyObjects -= OnMovingHierarchyObjects;
-            ClientEvents.OnMovedHierarchyObjects -= OnMovedHierarchyObjects;
+            ClientEvents.OnDeleteHierarchyObjects -= OnDeleteHierarchyObjects;
+            ClientEvents.OnRequestInstantiateHierarchyObject -= OnRequestInstantiateHierarchyObject;
+            ClientEvents.OnMoveHierarchyObjectsPreview -= OnMoveHierarchyObjectsPreview;
+            ClientEvents.OnMoveHierarchyObjectsFinal -= OnMoveHierarchyObjectsFinal;
         }
 #endif
     }
 #if CLIENT
-    private void OnHierarchyObjectDeleted(uint[] instanceIds)
+    private void OnDeleteHierarchyObjects(in DeleteHierarchyObjectsProperties properties)
     {
         EditorActions.QueueAction(new DeleteHierarchyItemsAction
         {
-            DeltaTime = Time.deltaTime,
-            InstanceIds = instanceIds
+            DeltaTime = properties.DeltaTime,
+            InstanceIds = properties.InstanceIds
         });
     }
-    private static void OnHierarchyObjectInstantiationRequesting(IHierarchyItemTypeIdentifier type, Vector3 position)
+    private static void OnRequestInstantiateHierarchyObject(in InstantiateHierarchyObjectProperties properties)
     {
-        HierarchyUtil.RequestInstantiation(type, position, Quaternion.identity, Vector3.one);
+        HierarchyUtil.RequestInstantiation(properties.Type, properties.Position, Quaternion.identity, Vector3.one);
     }
-    private void OnMovingHierarchyObjects(uint[] instanceIds, HierarchyObjectTransformation[] transformations, Vector3 pivotPoint)
+    private void OnMoveHierarchyObjectsPreview(in MoveHierarchyObjectsPreviewProperties properties)
     {
         const int samples = 4;
         if (DevkitServerModuleComponent.Ticks % samples != 0)
@@ -61,25 +60,25 @@ public sealed class HierarchyActions
 
         EditorActions.QueueAction(new MovingHierarchyItemsAction
         {
-            DeltaTime = Time.deltaTime * samples,
-            InstanceIds = instanceIds,
-            TransformDeltas = transformations,
-            Pivot = pivotPoint
+            DeltaTime = properties.DeltaTime * samples,
+            InstanceIds = properties.InstanceIds,
+            TransformDeltas = properties.Transformations,
+            Pivot = properties.PivotPoint
         });
     }
-    private void OnMovedHierarchyObjects(uint[] instanceIds, HierarchyObjectTransformation[] transformations, Vector3[]? scales, Vector3[]? originalScales)
+    private void OnMoveHierarchyObjectsFinal(in MoveHierarchyObjectsFinalProperties properties)
     {
         MovedHierarchyObjectsAction action = new MovedHierarchyObjectsAction
         {
-            DeltaTime = Time.deltaTime,
-            InstanceIds = instanceIds,
-            TransformDeltas = transformations
+            DeltaTime = properties.DeltaTime,
+            InstanceIds = properties.InstanceIds,
+            TransformDeltas = properties.Transformations
         };
-        if (scales != null && originalScales != null)
+        if (properties.Scales != null && properties.OriginalScales != null)
         {
             action.UseScale = true;
-            action.Scales = scales;
-            action.OriginalScales = originalScales;
+            action.Scales = properties.Scales;
+            action.OriginalScales = properties.OriginalScales;
         }
         EditorActions.QueueAction(action);
     }

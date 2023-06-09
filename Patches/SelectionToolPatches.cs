@@ -1,0 +1,492 @@
+﻿#if CLIENT
+using DevkitServer.API.Abstractions;
+using DevkitServer.API.Permissions;
+using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Players;
+using DevkitServer.Players.UI;
+using HarmonyLib;
+using JetBrains.Annotations;
+using SDG.Framework.Devkit;
+using SDG.Framework.Devkit.Transactions;
+using SDG.Framework.Landscapes;
+using SDG.Framework.Utilities;
+using System.Reflection;
+using System.Reflection.Emit;
+using Action = System.Action;
+
+namespace DevkitServer.Patches;
+
+[HarmonyPatch]
+internal static class SelectionToolPatches
+{
+    public static InstanceGetter<SelectionTool, TransformHandles>? GetSelectionHandles = Accessor.GenerateInstanceGetter<SelectionTool, TransformHandles>("handles");
+
+    [HarmonyPatch(typeof(SelectionTool), "OnHandleTranslatedAndRotated")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void SelectionToolOnHandleTranslatedAndRotated(Vector3 worldPositionDelta, Quaternion worldRotationDelta, Vector3 pivotPosition, bool modifyRotation)
+    {
+        if (!DevkitServerModule.IsEditing || _movingHandle)
+            return;
+
+        Logger.LogDebug($"[CLIENT EVENTS] Temp move requested at: {string.Join(",", DevkitSelectionManager.selection.Select(selection => selection.gameObject.name.Format()))}: deltaPos: {worldPositionDelta.Format()}, deltaRot: {worldRotationDelta.eulerAngles.Format()}, pivotPos: {pivotPosition.Format()}, modifyRotation: {modifyRotation}.");
+
+        HierarchyObjectTransformation.TransformFlags flags = 0;
+        if (!worldPositionDelta.IsNearlyZero())
+            flags |= HierarchyObjectTransformation.TransformFlags.Position | HierarchyObjectTransformation.TransformFlags.OriginalPosition;
+        if (modifyRotation && !worldRotationDelta.IsNearlyIdentity())
+            flags |= HierarchyObjectTransformation.TransformFlags.Rotation | HierarchyObjectTransformation.TransformFlags.OriginalRotation;
+
+        List<uint> instanceIds = ListPool<uint>.claim();
+        List<HierarchyObjectTransformation> translations = ListPool<HierarchyObjectTransformation>.claim();
+        float dt = Time.deltaTime;
+        try
+        {
+            if (translations.Capacity < DevkitSelectionManager.selection.Count)
+                translations.Capacity = DevkitSelectionManager.selection.Count;
+            if (instanceIds.Capacity < DevkitSelectionManager.selection.Count)
+                instanceIds.Capacity = DevkitSelectionManager.selection.Count;
+            foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+            {
+                HierarchyObjectTransformation t = new HierarchyObjectTransformation(flags, worldPositionDelta, worldRotationDelta, selection.preTransformPosition, selection.preTransformRotation);
+                selection.gameObject.GetComponents(HierarchyUtil.HierarchyItemBuffer);
+                try
+                {
+                    for (int i = 0; i < HierarchyUtil.HierarchyItemBuffer.Count; ++i)
+                    {
+                        IDevkitHierarchyItem item = HierarchyUtil.HierarchyItemBuffer[i];
+                        if (item.instanceID == 0u)
+                            Logger.LogWarning($"Skipped item: {item.Format()} because it was missing an instance ID.", method: "CLIENT EVENTS");
+                        else
+                        {
+                            instanceIds.Add(item.instanceID);
+                            translations.Add(t);
+                            if (ClientEvents.ListeningOnMoveHierarchyObjectPreview)
+                                ClientEvents.InvokeOnMoveHierarchyObjectPreview(new MoveHierarchyObjectPreviewProperties(selection, item, t, pivotPosition, dt));
+                        }
+                    }
+                }
+                finally
+                {
+                    HierarchyUtil.HierarchyItemBuffer.Clear();
+                }
+            }
+
+            if (ClientEvents.ListeningOnMoveHierarchyObjectsPreview)
+                ClientEvents.InvokeOnMoveHierarchyObjectsPreview(new MoveHierarchyObjectsPreviewProperties(instanceIds.ToArray(), translations.ToArray(), pivotPosition, dt));
+        }
+        finally
+        {
+            ListPool<uint>.release(instanceIds);
+            ListPool<HierarchyObjectTransformation>.release(translations);
+        }
+    }
+
+    /// <summary>Skipped for no permissions.</summary>
+    private static bool _skippedMoveHandle;
+
+    /// <summary>Is currently in <see cref="SelectionTool"/>.moveHandle.</summary>
+    private static bool _movingHandle;
+
+    [HarmonyPatch(typeof(SelectionTool), "moveHandle")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    private static bool MoveHandlePrefix(Vector3 position, Quaternion rotation, Vector3 scale, bool doRotation, bool hasScale)
+    {
+        _skippedMoveHandle = false;
+        if (DevkitSelectionManager.selection.Count <= 0)
+        {
+            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+            _skippedMoveHandle = true;
+            return false;
+        }
+
+        DevkitSelection? sel = DevkitSelectionManager.selection.FirstOrDefault();
+        if (sel == null || sel.gameObject == null)
+        {
+            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+            _skippedMoveHandle = true;
+            return false;
+        }
+
+        sel.gameObject.GetComponents(HierarchyUtil.HierarchyItemBuffer);
+        try
+        {
+            for (int i = 0; i < HierarchyUtil.HierarchyItemBuffer.Count; ++i)
+            {
+                if (!HierarchyUtil.CheckMovePermission(HierarchyUtil.HierarchyItemBuffer[i]))
+                {
+                    UIMessage.SendNoPermissionMessage(null);
+                    _skippedMoveHandle = true;
+                    return false;
+                }
+            }
+        }
+        finally
+        {
+            HierarchyUtil.HierarchyItemBuffer.Clear();
+        }
+
+        _movingHandle = true;
+        return true;
+    }
+    [HarmonyPatch(typeof(SelectionTool), "moveHandle")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void MoveHandlePostfix(Vector3 position, Quaternion rotation, Vector3 scale, bool doRotation, bool hasScale)
+    {
+        _movingHandle = false;
+    }
+
+    [HarmonyPatch(typeof(SelectionTool), nameof(SelectionTool.update))]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    private static IEnumerable<CodeInstruction> SelectionToolUpdateTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
+    {
+        Type st = typeof(SelectionTool);
+        Type dtu = typeof(DevkitTransactionUtility);
+        // Type vp = typeof(VanillaPermissions);
+
+        MethodInfo moveHandleInvoker = new Action<Vector3, Quaternion, Vector3, bool, bool>(OnMoveHandle).Method;
+        MethodInfo requestInstantiationInvoker = new Action<Vector3>(OnRequestInstantiaion).Method;
+        MethodInfo recordDestructionInvoker = new Action<GameObject>(OnDestruction).Method;
+        MethodInfo transformSelectionInvoker = new Action(OnFinishTransform).Method;
+
+        MethodInfo? moveHandle = st.GetMethod("moveHandle", BindingFlags.Instance | BindingFlags.NonPublic, null, new Type[] { typeof(Vector3), typeof(Quaternion), typeof(Vector3), typeof(bool), typeof(bool) }, null);
+        if (moveHandle == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find method: SelectionTool.moveHandle.", method: "CLIENT EVENTS");
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo? requestInstantiation = st.GetMethod("RequestInstantiation", BindingFlags.Instance | BindingFlags.NonPublic, null, new Type[] { typeof(Vector3) }, null);
+        if (requestInstantiation == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find method: SelectionTool.RequestInstantiation.", method: "CLIENT EVENTS");
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo? transformSelection = st.GetMethod("transformSelection", BindingFlags.Instance | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+        if (transformSelection == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find method: SelectionTool.transformSelection.", method: "CLIENT EVENTS");
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo? recordDestruction = dtu.GetMethod(nameof(DevkitTransactionUtility.recordDestruction), BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(GameObject) }, null);
+        if (recordDestruction == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find method: DevkitTransactionUtility.recordDestruction.", method: "CLIENT EVENTS");
+            DevkitServerModule.Fault();
+        }
+
+        Label stLbl = generator.DefineLabel();
+
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        // limits to 60 actions per second
+        ins.Insert(0, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
+        ins.Insert(1, new CodeInstruction(OpCodes.Brfalse_S, stLbl));
+        ins.Insert(2, new CodeInstruction(OpCodes.Call, Accessor.GetRealtimeSinceStartup));
+        ins.Insert(3, new CodeInstruction(OpCodes.Ldsfld, EditorActions.LocalLastActionField));
+        ins.Insert(4, new CodeInstruction(OpCodes.Sub));
+        ins.Insert(5, new CodeInstruction(OpCodes.Ldc_R4, 1f / 60f));
+        ins.Insert(6, new CodeInstruction(OpCodes.Bge_S, stLbl));
+        ins.Insert(7, new CodeInstruction(OpCodes.Ret));
+        StackTracker tracker = new StackTracker(ins);
+        for (int i = 0; i < ins.Count; ++i)
+        {
+            CodeInstruction c = ins[i];
+            if (i == 0)
+                c.labels.Add(stLbl);
+            MethodInfo? invoker = null;
+            if (moveHandle != null && c.Calls(moveHandle))
+                invoker = moveHandleInvoker;
+            else if (transformSelection != null && c.Calls(transformSelection))
+                invoker = transformSelectionInvoker;
+
+            if (invoker != null)
+            {
+                int lastLdArg0 = tracker.GetLastUnconsumedIndex(i, OpCodes.Ldarg_0, method);
+                if (lastLdArg0 != -1)
+                {
+                    ins.Insert(i + 1, new CodeInstruction(OpCodes.Call, invoker));
+
+                    for (int j = i - 1; j > lastLdArg0; --j)
+                    {
+                        ins.Insert(i + 1, ins[j].CopyWithoutSpecial());
+                    }
+
+                    i += i - lastLdArg0;
+                    Logger.LogDebug($"[CLIENT EVENTS] {method.Format()} - Patched in {invoker.Format()} to {method.Format()}.");
+                }
+            }
+            else if (recordDestruction != null && c.Calls(recordDestruction))
+            {
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Call, recordDestructionInvoker));
+                for (int j = i - 1; j >= 0; --j)
+                {
+                    ins.Insert(i + 1, ins[j].CopyWithoutSpecial());
+                    if (ins[j].operand is LocalBuilder bld && typeof(IEnumerator<DevkitSelection>).IsAssignableFrom(bld.LocalType))
+                        break;
+                }
+                Logger.LogDebug($"[CLIENT EVENTS] {method.Format()} - Patched in {recordDestructionInvoker.Format()} to {method.Format()}.");
+            }
+            else if (requestInstantiation != null && c.Calls(requestInstantiation))
+            {
+                int lastLdArg0 = tracker.GetLastUnconsumedIndex(i, OpCodes.Ldarg_0, method);
+                if (lastLdArg0 != -1)
+                {
+                    CodeInstruction ldarg0 = ins[lastLdArg0];
+                    ins.RemoveAt(lastLdArg0);
+                    ins[lastLdArg0].labels.AddRange(ldarg0.labels);
+                    ins[lastLdArg0].blocks.AddRange(ldarg0.blocks);
+                    --i;
+                    ins[i] = new CodeInstruction(OpCodes.Call, requestInstantiationInvoker);
+                    ins[i].labels.AddRange(c.labels);
+                    ins[i].blocks.AddRange(c.blocks);
+                }
+                Logger.LogDebug($"[CLIENT EVENTS] {method.Format()} - Replaced instantiation request {requestInstantiation.Format()} with {requestInstantiationInvoker.Format()}.");
+            }
+        }
+
+        return ins;
+    }
+
+
+    [UsedImplicitly]
+    private static void OnMoveHandle(Vector3 position, Quaternion rotation, Vector3 scale, bool doRotation, bool hasScale)
+    {
+        if (!DevkitServerModule.IsEditing) return;
+
+        Logger.LogDebug("[CLIENT EVENTS] Handle moved: " + position.Format() + " Rot: " + doRotation.Format() + ", Scale: " + hasScale.Format() + ".");
+        List<uint> instanceIds = ListPool<uint>.claim();
+        List<HierarchyObjectTransformation> translations = ListPool<HierarchyObjectTransformation>.claim();
+        List<Vector3>? originalScales = hasScale ? null : ListPool<Vector3>.claim();
+        float dt = Time.deltaTime;
+        try
+        {
+            HierarchyObjectTransformation.TransformFlags flags = HierarchyObjectTransformation.TransformFlags.Position;
+            if (doRotation) flags |= HierarchyObjectTransformation.TransformFlags.Rotation;
+            int c = DevkitSelectionManager.selection.Count;
+            if (translations.Capacity < c)
+                translations.Capacity = c;
+            if (instanceIds.Capacity < c)
+                instanceIds.Capacity = c;
+            if (originalScales != null && originalScales.Capacity < c)
+                originalScales.Capacity = c;
+            foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+            {
+                HierarchyObjectTransformation t = new HierarchyObjectTransformation(flags, position, rotation, selection.preTransformPosition, selection.preTransformRotation);
+                selection.gameObject.GetComponents(HierarchyUtil.HierarchyItemBuffer);
+                try
+                {
+                    for (int i = 0; i < HierarchyUtil.HierarchyItemBuffer.Count; ++i)
+                    {
+                        IDevkitHierarchyItem item = HierarchyUtil.HierarchyItemBuffer[i];
+                        if (item.instanceID == 0u)
+                            Logger.LogWarning($"Skipped item: {item.Format()} because it was missing an instance ID.", method: "CLIENT EVENTS");
+                        else
+                        {
+                            instanceIds.Add(item.instanceID);
+                            translations.Add(t);
+                            originalScales?.Add(selection.preTransformLocalScale);
+                            if (ClientEvents.ListeningOnMoveHierarchyObjectsFinal)
+                                ClientEvents.InvokeOnMoveHierarchyObjectFinal(new MoveHierarchyObjectFinalProperties(selection, item, t, scale, selection.preTransformLocalScale, hasScale, dt));
+                        }
+                    }
+                }
+                finally
+                {
+                    HierarchyUtil.HierarchyItemBuffer.Clear();
+                }
+            }
+
+            Vector3[]? scales = null;
+            if (hasScale)
+            {
+                scales = new Vector3[instanceIds.Count];
+                for (int i = 0; i < scales.Length; ++i)
+                    scales[i] = scale;
+            }
+            if (ClientEvents.ListeningOnMoveHierarchyObjectsFinal)
+                ClientEvents.InvokeOnMoveHierarchyObjectsFinal(new MoveHierarchyObjectsFinalProperties(instanceIds.ToArray(), translations.ToArray(), scales, originalScales?.ToArray(), dt));
+        }
+        finally
+        {
+            ListPool<uint>.release(instanceIds);
+            ListPool<HierarchyObjectTransformation>.release(translations);
+            if (originalScales != null)
+                ListPool<Vector3>.release(originalScales);
+        }
+    }
+
+    private static readonly Func<TempNodeSystemBase, Type>? GetNodeComponentType =
+        Accessor.GenerateInstanceCaller<TempNodeSystemBase, Func<TempNodeSystemBase, Type>>("GetComponentType",
+            Array.Empty<Type>(), throwOnError: true);
+
+    [UsedImplicitly]
+    private static void OnRequestInstantiaion(Vector3 position)
+    {
+        if (!DevkitServerModule.IsEditing) return;
+
+        IDevkitTool? tool = UserInput.ActiveTool;
+        IHierarchyItemTypeIdentifier? id = null;
+        switch (tool)
+        {
+            case NodesEditor n:
+                if (GetNodeComponentType == null)
+                    return;
+                if (n.activeNodeSystem != null)
+                {
+                    Type? t = GetNodeComponentType(n.activeNodeSystem);
+                    if (t != null)
+                        id = new NodeItemTypeIdentifier(t);
+                }
+                break;
+            case VolumesEditor v:
+                if (GetNodeComponentType == null)
+                    return;
+                if (v.activeVolumeManager != null)
+                {
+                    if (v.activeVolumeManager is LandscapeHoleVolumeManager)
+                    {
+                        UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("FeatureDisabled"));
+                        return;
+                    }
+
+                    Type? t = VolumeItemTypeIdentifier.TryGetComponentType(v.activeVolumeManager);
+                    if (t != null)
+                        id = new VolumeItemTypeIdentifier(t);
+                }
+                break;
+        }
+        if (id != null)
+        {
+            // todo events
+            if (!HierarchyUtil.CheckPlacePermission(id))
+            {
+                Permission? place = HierarchyUtil.GetPlacePermission(id);
+                UIMessage.SendEditorMessage(place == null
+                    ? DevkitServerModule.MessageLocalization.Translate("NoPermissions")
+                    : DevkitServerModule.MessageLocalization.Translate("NoPermissionsWithPermission", place.ToString()));
+                return;
+            }
+            bool allow = true;
+            InstantiateHierarchyObjectProperties instantiation = new InstantiateHierarchyObjectProperties(id, position);
+            ClientEvents.EventOnTryInstantiateHierarchyObject.TryInvoke(ref instantiation, ref allow);
+            if (allow)
+                ClientEvents.EventOnRequestInstantiateHierarchyObject.TryInvoke(in instantiation);
+        }
+        else
+            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+
+        Logger.LogDebug("[CLIENT EVENTS] Instantiation requested at: " + position.Format() + " of " + (id == null ? ((object?)null).Format() : id.FormatToString()) + ".");
+    }
+
+    [UsedImplicitly]
+    private static void OnDestruction(GameObject obj)
+    {
+        if (!DevkitServerModule.IsEditing) return;
+
+        Logger.LogDebug("[CLIENT EVENTS] Destruction requested at: " + obj.name.Format() + ".");
+        obj.GetComponents(HierarchyUtil.HierarchyItemBuffer);
+        uint[] instanceIds = new uint[HierarchyUtil.HierarchyItemBuffer.Count];
+        int index = -1;
+        try
+        {
+            for (int i = 0; i < HierarchyUtil.HierarchyItemBuffer.Count; ++i)
+            {
+                IDevkitHierarchyItem item = HierarchyUtil.HierarchyItemBuffer[i];
+                if (item.instanceID == 0u)
+                    Logger.LogWarning($"Skipped item: {item.Format()} because it was missing an instance ID.", method: "CLIENT EVENTS");
+                else
+                {
+                    instanceIds[++index] = item.instanceID;
+                    ClientEvents.InvokeOnDeleteHierarchyObject(new DeleteHierarchyObjectProperties(obj, item));
+                }
+            }
+        }
+        finally
+        {
+            HierarchyUtil.HierarchyItemBuffer.Clear();
+        }
+
+        if (ClientEvents.ListeningOnDeleteHierarchyObjects)
+        {
+            ++index;
+            if (index < HierarchyUtil.HierarchyItemBuffer.Count)
+                Array.Resize(ref instanceIds, index);
+
+            ClientEvents.InvokeOnDeleteHierarchyObjects(new DeleteHierarchyObjectsProperties(instanceIds, Time.deltaTime));
+        }
+    }
+
+    [UsedImplicitly]
+    private static void OnFinishTransform()
+    {
+        int ct = DevkitSelectionManager.selection.Count;
+        if (!DevkitServerModule.IsEditing || _skippedMoveHandle || ct <= 0) return;
+
+        HierarchyObjectTransformation[] translations = new HierarchyObjectTransformation[ct];
+        uint[] instanceIds = new uint[ct];
+        Vector3[] scales = new Vector3[ct];
+        Vector3[] originalScales = new Vector3[ct];
+        bool useScale = false;
+        int index = -1;
+        float dt = Time.deltaTime;
+        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+        {
+            selection.gameObject.GetComponents(HierarchyUtil.HierarchyItemBuffer);
+            try
+            {
+                for (int i = 0; i < HierarchyUtil.HierarchyItemBuffer.Count; ++i)
+                {
+                    IDevkitHierarchyItem item = HierarchyUtil.HierarchyItemBuffer[i];
+                    if (item.instanceID == 0u)
+                        Logger.LogWarning($"Skipped item: {item.Format()} because it was missing an instance ID.", method: "CLIENT EVENTS");
+                    else
+                    {
+                        ref HierarchyObjectTransformation t = ref translations[++index];
+                        Transform transform = selection.gameObject.transform;
+                        Vector3 transformLocalScale = transform.localScale, selectionLocalScale = selection.preTransformLocalScale;
+                        t = new HierarchyObjectTransformation(HierarchyObjectTransformation.TransformFlags.All,
+                            transform.position, transform.rotation, selection.preTransformPosition, selection.preTransformRotation);
+
+                        instanceIds[index] = item.instanceID;
+                        scales[index] = transformLocalScale;
+                        originalScales[index] = selectionLocalScale;
+                        bool useScaleSingle = !transformLocalScale.IsNearlyEqual(selectionLocalScale);
+                        if (useScaleSingle)
+                            useScale = true;
+                        if (ClientEvents.ListeningOnMoveHierarchyObjectsFinal)
+                            ClientEvents.InvokeOnMoveHierarchyObjectFinal(new MoveHierarchyObjectFinalProperties(selection, item, t, transformLocalScale, selectionLocalScale, useScaleSingle, dt));
+                    }
+                }
+            }
+            finally
+            {
+                HierarchyUtil.HierarchyItemBuffer.Clear();
+            }
+        }
+        if (ClientEvents.ListeningOnMoveHierarchyObjectsFinal)
+        {
+            ++index;
+            if (index != ct)
+            {
+                Array.Resize(ref translations, index);
+                Array.Resize(ref instanceIds, index);
+                if (useScale)
+                {
+                    Array.Resize(ref scales, index);
+                    Array.Resize(ref originalScales, index);
+                }
+            }
+
+            ClientEvents.InvokeOnMoveHierarchyObjectsFinal(new MoveHierarchyObjectsFinalProperties(instanceIds,
+                translations, useScale ? scales : null, useScale ? originalScales : null, dt));
+        }
+
+        Logger.LogDebug("[CLIENT EVENTS] Move completed for: " + string.Join(Environment.NewLine, translations) + ".");
+    }
+}
+#endif

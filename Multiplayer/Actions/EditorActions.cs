@@ -496,17 +496,17 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         Instance = this;
         Logger.LogDebug("[TEMP EDITOR ACTIONS] Initialized.");
     }
-    public void QueueInstantiation(IHierarchyItemTypeIdentifier type, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale)
+    public void QueueInstantiation(IHierarchyItemTypeIdentifier type, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner)
     {
         if (type == null) throw new ArgumentNullException(nameof(type));
-        _hierarchyInstantiations.Add(new PendingHierarchyInstantiation(type, instanceId, position, rotation, scale));
+        _hierarchyInstantiations.Add(new PendingHierarchyInstantiation(type, instanceId, position, rotation, scale, owner));
     }
-    public void QueueInstantiation(Asset objectAsset, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale)
+    public void QueueInstantiation(Asset objectAsset, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner)
     {
-        if (objectAsset is not ObjectAsset && objectAsset is not ItemAsset)
+        if (objectAsset is not ObjectAsset && objectAsset is not ItemBarricadeAsset and not ItemStructureAsset)
             throw new ArgumentException("Must be either ObjectAsset (LevelObject) or ItemAsset (LevelBuildableObject).", nameof(objectAsset));
 
-        _lvlObjectInstantiations.Add(new PendingLevelObjectInstantiation(objectAsset.getReferenceTo<Asset>(), instanceId, position, rotation, scale));
+        _lvlObjectInstantiations.Add(new PendingLevelObjectInstantiation(objectAsset.getReferenceTo<Asset>(), instanceId, position, rotation, scale, owner));
     }
     internal void HandleReadPackets(CSteamID user, ByteReader reader)
     {
@@ -556,13 +556,13 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     {
         foreach (PendingHierarchyInstantiation hierarchyItemInstantiation in _hierarchyInstantiations)
         {
-            HierarchyUtil.ReceiveHierarchyInstantiation(MessageContext.Nil, hierarchyItemInstantiation.Type, hierarchyItemInstantiation.InstanceId, hierarchyItemInstantiation.Position, hierarchyItemInstantiation.Rotation, hierarchyItemInstantiation.Scale);
+            HierarchyUtil.ReceiveHierarchyInstantiation(MessageContext.Nil, hierarchyItemInstantiation.Type, hierarchyItemInstantiation.InstanceId, hierarchyItemInstantiation.Position, hierarchyItemInstantiation.Rotation, hierarchyItemInstantiation.Scale, hierarchyItemInstantiation.Owner);
         }
         if (_hierarchyInstantiations.Count > 20)
             yield return null;
         foreach (PendingLevelObjectInstantiation lvlObjectInstantiation in _lvlObjectInstantiations)
         {
-            // todo
+            LevelObjectUtil.ReceiveInstantiation(MessageContext.Nil, lvlObjectInstantiation.Asset.GUID, lvlObjectInstantiation.InstanceId, lvlObjectInstantiation.Position, lvlObjectInstantiation.Rotation, lvlObjectInstantiation.Scale, lvlObjectInstantiation.Owner);
         }
         if (_lvlObjectInstantiations.Count > 10)
             yield return null;
@@ -595,13 +595,15 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         public readonly Vector3 Position;
         public readonly Quaternion Rotation;
         public readonly Vector3 Scale;
-        public PendingHierarchyInstantiation(IHierarchyItemTypeIdentifier type, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale)
+        public readonly ulong Owner;
+        public PendingHierarchyInstantiation(IHierarchyItemTypeIdentifier type, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner)
         {
             Type = type;
             InstanceId = instanceId;
             Position = position;
             Rotation = rotation;
             Scale = scale;
+            Owner = owner;
         }
     }
     private readonly struct PendingLevelObjectInstantiation
@@ -611,13 +613,15 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         public readonly Vector3 Position;
         public readonly Quaternion Rotation;
         public readonly Vector3 Scale;
-        public PendingLevelObjectInstantiation(AssetReference<Asset> assetAsset, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale)
+        public readonly ulong Owner;
+        public PendingLevelObjectInstantiation(AssetReference<Asset> assetAsset, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner)
         {
             Asset = assetAsset;
             InstanceId = instanceId;
             Position = position;
             Rotation = rotation;
             Scale = scale;
+            Owner = owner;
         }
     }
 }

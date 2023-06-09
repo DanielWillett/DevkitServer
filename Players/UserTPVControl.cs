@@ -225,7 +225,7 @@ internal sealed class EditorClothes : MonoBehaviour
     }
     public bool IsLeftHanded
     {
-        get => this._isLeftHanded;
+        get => _isLeftHanded;
         set
         {
             if (_isLeftHanded == value)

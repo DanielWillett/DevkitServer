@@ -83,12 +83,12 @@ public class ByteReader
     }
     public void LoadNew(byte[] bytes)
     {
-        this._buffer = bytes ?? throw new ArgumentNullException(nameof(bytes));
+        _buffer = bytes ?? throw new ArgumentNullException(nameof(bytes));
         _length = _buffer.Length;
         _streamMode = false;
         _index = 0;
         _position = 0;
-        this.failure = false;
+        failure = false;
     }
     private unsafe void Reverse(byte* litEndStrt, int size)
     {
@@ -1519,6 +1519,37 @@ public sealed class ByteReaderRaw<T1, T2, T3, T4, T5> : ByteReader
         arg3 = reader3.Invoke(this);
         arg4 = reader4.Invoke(this);
         arg5 = reader5.Invoke(this);
+        return !HasFailed;
+    }
+}
+public sealed class ByteReaderRaw<T1, T2, T3, T4, T5, T6> : ByteReader
+{
+    private readonly Reader<T1> reader1;
+    private readonly Reader<T2> reader2;
+    private readonly Reader<T3> reader3;
+    private readonly Reader<T4> reader4;
+    private readonly Reader<T5> reader5;
+    private readonly Reader<T6> reader6;
+    /// <summary>Leave any reader null to auto-fill.</summary>
+    public ByteReaderRaw(Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Reader<T6>? reader6)
+    {
+        this.reader1 = reader1 ?? ReaderHelper<T1>.Reader!;
+        this.reader2 = reader2 ?? ReaderHelper<T2>.Reader!;
+        this.reader3 = reader3 ?? ReaderHelper<T3>.Reader!;
+        this.reader4 = reader4 ?? ReaderHelper<T4>.Reader!;
+        this.reader5 = reader5 ?? ReaderHelper<T5>.Reader!;
+        this.reader6 = reader6 ?? ReaderHelper<T6>.Reader!;
+    }
+    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6)
+    {
+        if (bytes != null)
+            LoadNew(bytes);
+        arg1 = reader1.Invoke(this);
+        arg2 = reader2.Invoke(this);
+        arg3 = reader3.Invoke(this);
+        arg4 = reader4.Invoke(this);
+        arg5 = reader5.Invoke(this);
+        arg6 = reader6.Invoke(this);
         return !HasFailed;
     }
 }

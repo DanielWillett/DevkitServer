@@ -1,8 +1,11 @@
-﻿using DevkitServer.API;
+﻿using System.Diagnostics;
+using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
 using DevkitServer.Commands.Subsystem;
 using System.Reflection;
+using DevkitServer.AssetTools;
+using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Sync;
 #if CLIENT
 using DevkitServer.Players.UI;
@@ -111,6 +114,30 @@ internal static class CommandTests
         }
         else ctx.SendCorrectUsage("/test ui <open|close>");
     }
+    private static void savetexture(CommandContext ctx)
+    {
+        if (ctx.HasArgsExact(1) && ctx.TryGet(0, out string resourcePath))
+        {
+            string actualPath = Path.Combine(DevkitServerConfig.Directory, "AssetExports", resourcePath);
+            Grabber.DownloadResource<Texture2D>(resourcePath, actualPath);
+            ctx.ReplyString("Saved to <#fff>" + actualPath + "</color>.");
+            Process.Start(Path.GetDirectoryName(actualPath)!);
+        }
+        else if (ctx.HasArgsExact(2) && ctx.TryGet(0, out string bundlePath) && ctx.TryGet(1, out resourcePath))
+        {
+            if (bundlePath.EndsWith(".unity3d", StringComparison.OrdinalIgnoreCase))
+            {
+                Bundle bundle = new Bundle(bundlePath, true, "Temp bundle");
+
+                string actualPath = Path.Combine(DevkitServerConfig.Directory, "AssetExports", Path.GetFileName(bundlePath), resourcePath);
+                Grabber.DownloadFromBundle<Texture2D>(bundle, resourcePath, actualPath);
+
+                bundle.unload();
+                Process.Start(Path.GetDirectoryName(actualPath)!);
+            }
+        }
+        else ctx.SendCorrectUsage("/test savetexture <resource>");
+    }
 
 #if DEBUG
     private static void tiledebug(CommandContext ctx)
@@ -121,8 +148,6 @@ internal static class CommandTests
 #endif
 
 #endif
-
-
     private static void syncall(CommandContext ctx)
     {
         TileSync? auth = TileSync.GetAuthority();

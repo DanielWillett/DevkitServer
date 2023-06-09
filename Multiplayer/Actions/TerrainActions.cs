@@ -9,7 +9,6 @@ using System.Reflection;
 using System.Reflection.Emit;
 #if SERVER
 using DevkitServer.API.Permissions;
-using DevkitServer.Configuration;
 using DevkitServer.Core.Permissions;
 #endif
 #if CLIENT
@@ -29,17 +28,17 @@ public sealed class TerrainActions
 #if CLIENT
         if (EditorActions.IsOwner)
         {
-            ClientEvents.OnRampComplete += OnHeightmapRampConfirmed;
-            ClientEvents.OnAdjusted += OnHeightmapAdjust;
-            ClientEvents.OnFlattened += OnHeightmapFlatten;
-            ClientEvents.OnSmoothed += OnHeightmapSmooth;
-            ClientEvents.OnPainted += OnPaint;
-            ClientEvents.OnAutoPainted += OnAutoPaint;
-            ClientEvents.OnPaintSmoothed += OnPaintSmooth;
-            ClientEvents.OnHolePainted += OnPaintHole;
-            ClientEvents.OnTileAdded += OnTileAdded;
-            ClientEvents.OnTileDeleted += OnTileDeleted;
-            ClientEvents.OnSplatmapLayerMaterialsUpdate += OnSplatmapLayerMaterialsUpdate;
+            ClientEvents.OnPaintRamp += OnPaintRamp;
+            ClientEvents.OnAdjustHeightmap += OnAdjustHeightmap;
+            ClientEvents.OnFlattenHeightmap += OnFlattenHeightmap;
+            ClientEvents.OnSmoothHeightmap += OnSmoothHeightmap;
+            ClientEvents.OnPaintSplatmap += OnPaintSplatmap;
+            ClientEvents.OnAutoPaintSplatmap += OnAutoPaintSplatmap;
+            ClientEvents.OnSmoothSplatmap += OnSmoothSplatmap;
+            ClientEvents.OnPaintHoles += OnPaintHoles;
+            ClientEvents.OnAddTile += OnAddTile;
+            ClientEvents.OnDeleteTile += OnDeleteTile;
+            ClientEvents.OnUpdateTileSplatmapLayers += OnUpdateTileSplatmapLayers;
         }
 #endif
     }
@@ -49,183 +48,177 @@ public sealed class TerrainActions
 #if CLIENT
         if (EditorActions.IsOwner)
         {
-            ClientEvents.OnRampComplete -= OnHeightmapRampConfirmed;
-            ClientEvents.OnAdjusted -= OnHeightmapAdjust;
-            ClientEvents.OnFlattened -= OnHeightmapFlatten;
-            ClientEvents.OnSmoothed -= OnHeightmapSmooth;
-            ClientEvents.OnPainted -= OnPaint;
-            ClientEvents.OnAutoPainted -= OnAutoPaint;
-            ClientEvents.OnPaintSmoothed -= OnPaintSmooth;
-            ClientEvents.OnHolePainted -= OnPaintHole;
-            ClientEvents.OnTileAdded -= OnTileAdded;
-            ClientEvents.OnTileDeleted -= OnTileDeleted;
-            ClientEvents.OnSplatmapLayerMaterialsUpdate -= OnSplatmapLayerMaterialsUpdate;
+            ClientEvents.OnPaintRamp -= OnPaintRamp;
+            ClientEvents.OnAdjustHeightmap -= OnAdjustHeightmap;
+            ClientEvents.OnFlattenHeightmap -= OnFlattenHeightmap;
+            ClientEvents.OnSmoothHeightmap -= OnSmoothHeightmap;
+            ClientEvents.OnPaintSplatmap -= OnPaintSplatmap;
+            ClientEvents.OnAutoPaintSplatmap -= OnAutoPaintSplatmap;
+            ClientEvents.OnSmoothSplatmap -= OnSmoothSplatmap;
+            ClientEvents.OnPaintHoles -= OnPaintHoles;
+            ClientEvents.OnAddTile -= OnAddTile;
+            ClientEvents.OnDeleteTile -= OnDeleteTile;
+            ClientEvents.OnUpdateTileSplatmapLayers -= OnUpdateTileSplatmapLayers;
         }
 #endif
     }
 #if CLIENT
-    private void OnHeightmapRampConfirmed(Bounds bounds, Vector3 start, Vector3 end, float radius, float falloff)
+    private void OnPaintRamp(in PaintRampProperties properties)
     {
         EditorActions.QueueAction(new HeightmapRampAction
         {
-            Bounds = bounds,
-            StartPosition = start,
-            EndPosition = end,
-            BrushRadius = radius,
-            BrushFalloff = falloff,
-            DeltaTime = Time.deltaTime
+            Bounds = properties.Bounds,
+            StartPosition = properties.Start,
+            EndPosition = properties.End,
+            BrushRadius = properties.Radius,
+            BrushFalloff = properties.Falloff,
+            DeltaTime = properties.DeltaTime
         });
     }
-    private void OnHeightmapAdjust(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, bool subtracting, float dt)
+    private void OnAdjustHeightmap(in AdjustHeightmapProperties properties)
     {
         EditorActions.QueueAction(new HeightmapAdjustAction
         {
-            Bounds = bounds,
-            BrushPosition = position.ToVector2(),
-            BrushRadius = radius,
-            BrushFalloff = falloff,
-            BrushStrength = strength,
-            BrushSensitivity = sensitivity,
-            Subtracting = subtracting,
-            DeltaTime = dt
+            Bounds = properties.Bounds,
+            BrushPosition = properties.Position.ToVector2(),
+            BrushRadius = properties.Radius,
+            BrushFalloff = properties.Falloff,
+            BrushStrength = properties.Strength,
+            BrushSensitivity = properties.Sensitivity,
+            Subtracting = properties.IsSubtracting,
+            DeltaTime = properties.DeltaTime
         });
     }
-    private void OnHeightmapFlatten(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, float target, EDevkitLandscapeToolHeightmapFlattenMethod method, float dt)
+    private void OnFlattenHeightmap(in FlattenHeightmapProperties properties)
     {
         EditorActions.QueueAction(new HeightmapFlattenAction
         {
-            Bounds = bounds,
-            BrushPosition = position.ToVector2(),
-            BrushRadius = radius,
-            BrushFalloff = falloff,
-            BrushStrength = strength,
-            BrushSensitivity = sensitivity,
-            BrushTarget = target,
-            FlattenMethod = method,
-            DeltaTime = dt
+            Bounds = properties.Bounds,
+            BrushPosition = properties.Position.ToVector2(),
+            BrushRadius = properties.Radius,
+            BrushFalloff = properties.Falloff,
+            BrushStrength = properties.Strength,
+            BrushSensitivity = properties.Sensitivity,
+            BrushTarget = properties.Target,
+            FlattenMethod = properties.FlattenMethod,
+            DeltaTime = properties.DeltaTime
         });
     }
-    private void OnHeightmapSmooth(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float target, EDevkitLandscapeToolHeightmapSmoothMethod method, float dt)
+    private void OnSmoothHeightmap(in SmoothHeightmapProperties properties)
     {
         EditorActions.QueueAction(new HeightmapSmoothAction
         {
-            Bounds = bounds,
-            BrushPosition = position.ToVector2(),
-            BrushRadius = radius,
-            BrushFalloff = falloff,
-            BrushStrength = strength,
-            SmoothTarget = target,
-            SmoothMethod = method,
-            DeltaTime = dt
+            Bounds = properties.Bounds,
+            BrushPosition = properties.Position.ToVector2(),
+            BrushRadius = properties.Radius,
+            BrushFalloff = properties.Falloff,
+            BrushStrength = properties.Strength,
+            SmoothTarget = properties.Target,
+            SmoothMethod = properties.SmoothMethod,
+            DeltaTime = properties.DeltaTime
         });
     }
-    private void OnPaint(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, float target,
-        bool useWeightTarget, bool autoSlope, bool autoFoundation, float autoMinAngleBegin, float autoMinAngleEnd,
-        float autoMaxAngleBegin, float autoMaxAngleEnd, float autoRayLength, float autoRayRadius, ERayMask autoRayMask,
-        bool isRemoving, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt)
+    private void OnPaintSplatmap(in PaintSplatmapProperties properties)
     {
         EditorActions.QueueAction(new SplatmapPaintAction
         {
-            Bounds = bounds,
-            BrushPosition = position.ToVector2(),
-            BrushRadius = radius,
-            BrushFalloff = falloff,
-            BrushStrength = strength,
-            BrushSensitivity = sensitivity,
-            BrushTarget = target,
-            UseWeightTarget = useWeightTarget,
-            UseAutoSlope = autoSlope,
-            UseAutoFoundation = autoFoundation,
-            AutoSlopeMinAngleBegin = autoMinAngleBegin,
-            AutoSlopeMinAngleEnd = autoMinAngleEnd,
-            AutoSlopeMaxAngleBegin = autoMaxAngleBegin,
-            AutoSlopeMaxAngleEnd = autoMaxAngleEnd,
-            AutoFoundationRayLength = autoRayLength,
-            AutoFoundationRayRadius = autoRayRadius,
-            AutoFoundationRayMask = autoRayMask,
-            IsRemoving = isRemoving,
-            SplatmapMaterial = selectedMaterial,
-            DeltaTime = dt
+            Bounds = properties.Bounds,
+            BrushPosition = properties.Position.ToVector2(),
+            BrushRadius = properties.Radius,
+            BrushFalloff = properties.Falloff,
+            BrushStrength = properties.Strength,
+            BrushSensitivity = properties.Sensitivity,
+            BrushTarget = properties.Target,
+            UseWeightTarget = properties.UseWeightTarget,
+            UseAutoSlope = properties.UseAutoSlope,
+            UseAutoFoundation = properties.UseAutoFoundation,
+            AutoSlopeMinAngleBegin = properties.AutoSlopeProperties.MinimumAngleStart,
+            AutoSlopeMinAngleEnd = properties.AutoSlopeProperties.MinimumAngleEnd,
+            AutoSlopeMaxAngleBegin = properties.AutoSlopeProperties.MaximumAngleStart,
+            AutoSlopeMaxAngleEnd = properties.AutoSlopeProperties.MaximumAngleEnd,
+            AutoFoundationRayLength = properties.AutoFoundationProperties.Length,
+            AutoFoundationRayRadius = properties.AutoFoundationProperties.Radius,
+            AutoFoundationRayMask = properties.AutoFoundationProperties.Mask,
+            IsRemoving = properties.IsRemoving,
+            SplatmapMaterial = properties.Material,
+            DeltaTime = properties.DeltaTime
         });
     }
-    private void OnAutoPaint(Bounds bounds, Vector3 position, float radius, float falloff, float strength, float sensitivity, float target,
-        bool useWeightTarget, bool autoSlope, bool autoFoundation, float autoMinAngleBegin, float autoMinAngleEnd,
-        float autoMaxAngleBegin, float autoMaxAngleEnd, float autoRayLength, float autoRayRadius, ERayMask autoRayMask,
-        bool isRemoving, AssetReference<LandscapeMaterialAsset> selectedMaterial, float dt)
+    private void OnAutoPaintSplatmap(in PaintSplatmapProperties properties)
     {
         EditorActions.QueueAction(new SplatmapPaintAction
         {
             IsAuto = true,
-            Bounds = bounds,
-            BrushPosition = position.ToVector2(),
-            BrushRadius = radius,
-            BrushFalloff = falloff,
-            BrushStrength = strength,
-            BrushSensitivity = sensitivity,
-            BrushTarget = target,
-            UseWeightTarget = useWeightTarget,
-            UseAutoSlope = autoSlope,
-            UseAutoFoundation = autoFoundation,
-            AutoSlopeMinAngleBegin = autoMinAngleBegin,
-            AutoSlopeMinAngleEnd = autoMinAngleEnd,
-            AutoSlopeMaxAngleBegin = autoMaxAngleBegin,
-            AutoSlopeMaxAngleEnd = autoMaxAngleEnd,
-            AutoFoundationRayLength = autoRayLength,
-            AutoFoundationRayRadius = autoRayRadius,
-            AutoFoundationRayMask = autoRayMask,
-            IsRemoving = isRemoving,
-            SplatmapMaterial = selectedMaterial,
-            DeltaTime = dt
+            Bounds = properties.Bounds,
+            BrushPosition = properties.Position.ToVector2(),
+            BrushRadius = properties.Radius,
+            BrushFalloff = properties.Falloff,
+            BrushStrength = properties.Strength,
+            BrushSensitivity = properties.Sensitivity,
+            BrushTarget = properties.Target,
+            UseWeightTarget = properties.UseWeightTarget,
+            UseAutoSlope = properties.UseAutoSlope,
+            UseAutoFoundation = properties.UseAutoFoundation,
+            AutoSlopeMinAngleBegin = properties.AutoSlopeProperties.MinimumAngleStart,
+            AutoSlopeMinAngleEnd = properties.AutoSlopeProperties.MinimumAngleEnd,
+            AutoSlopeMaxAngleBegin = properties.AutoSlopeProperties.MaximumAngleStart,
+            AutoSlopeMaxAngleEnd = properties.AutoSlopeProperties.MaximumAngleEnd,
+            AutoFoundationRayLength = properties.AutoFoundationProperties.Length,
+            AutoFoundationRayRadius = properties.AutoFoundationProperties.Radius,
+            AutoFoundationRayMask = properties.AutoFoundationProperties.Mask,
+            IsRemoving = properties.IsRemoving,
+            SplatmapMaterial = properties.Material,
+            DeltaTime = properties.DeltaTime
         });
     }
-    private void OnPaintSmooth(Bounds bounds, Vector3 position, float radius, float falloff, float strength, EDevkitLandscapeToolSplatmapSmoothMethod method, float dt)
+    private void OnSmoothSplatmap(in SmoothSplatmapProperties properties)
     {
         EditorActions.QueueAction(new SplatmapSmoothAction
         {
-            Bounds = bounds,
-            BrushPosition = position.ToVector2(),
-            BrushRadius = radius,
-            BrushFalloff = falloff,
-            BrushStrength = strength,
-            SmoothMethod = method,
-            DeltaTime = dt
+            Bounds = properties.Bounds,
+            BrushPosition = properties.Position.ToVector2(),
+            BrushRadius = properties.Radius,
+            BrushFalloff = properties.Falloff,
+            BrushStrength = properties.Strength,
+            SmoothMethod = properties.SmoothMethod,
+            DeltaTime = properties.DeltaTime
         });
     }
-    private void OnPaintHole(Bounds bounds, Vector3 position, float radius, bool put)
+    private void OnPaintHoles(in PaintHolesProperties properties)
     {
         EditorActions.QueueAction(new HolemapPaintAction
         {
-            Bounds = bounds,
-            BrushPosition = position.ToVector2(),
-            BrushRadius = radius,
-            IsFilling = put,
-            DeltaTime = Time.deltaTime
+            Bounds = properties.Bounds,
+            BrushPosition = properties.Position.ToVector2(),
+            BrushRadius = properties.Radius,
+            IsFilling = properties.IsFilling,
+            DeltaTime = properties.DeltaTime
         });
     }
-    private void OnTileAdded(LandscapeTile tile)
+    private void OnAddTile(in UpdateLandscapeTileProperties properties)
     {
         EditorActions.QueueAction(new TileModifyAction
         {
-            Coordinates = tile.coord,
-            DeltaTime = Time.deltaTime
+            Coordinates = properties.Tile.coord,
+            DeltaTime = properties.DeltaTime
         });
     }
-    private void OnTileDeleted(LandscapeTile tile)
-    {
-        EditorActions.QueueAction(new TileModifyAction
-        {
-            IsDelete = true,
-            Coordinates = tile.coord,
-            DeltaTime = Time.deltaTime
-        });
-    }
-    private void OnSplatmapLayerMaterialsUpdate(LandscapeTile tile)
+    private void OnDeleteTile(in UpdateLandscapeTileProperties properties)
     {
         EditorActions.QueueAction(new TileModifyAction
         {
             IsDelete = true,
-            Coordinates = tile.coord,
-            DeltaTime = Time.deltaTime
+            Coordinates = properties.Tile.coord,
+            DeltaTime = properties.DeltaTime
+        });
+    }
+    private void OnUpdateTileSplatmapLayers(in UpdateLandscapeTileProperties properties)
+    {
+        EditorActions.QueueAction(new TileSplatmapLayersUpdateAction
+        {
+            Coordinates = properties.Tile.coord,
+            DeltaTime = properties.DeltaTime,
+            Layers = properties.Tile.materials.ToArray()
         });
     }
 #endif

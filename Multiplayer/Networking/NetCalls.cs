@@ -34,4 +34,5 @@ internal enum NetCalls : ushort
     SendLevelObjectInstantiation = 31,
     RequestUpdateController = 32,
     RequestInitialState = 33,
+    SendLevelBuildableObjectInstantiation = 34,
 }

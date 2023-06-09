@@ -28,10 +28,10 @@ public struct Folder
             {
                 Folders[i] = GetRelativePath(parentPath, dirs[i].FullName);
             }
-            this.Files = new File[files.Length];
+            Files = new File[files.Length];
             for (int i = 0; i < files.Length; i++)
             {
-                this.Files[i] = new File
+                Files[i] = new File
                 {
                     Path = GetRelativePath(parentPath, files[i].FullName),
                     Content = System.IO.File.ReadAllBytes(files[i].FullName)
@@ -106,7 +106,7 @@ public struct Folder
                 Files = new File[files.Length];
                 for (int i = 0; i < files.Length; i++)
                 {
-                    this.Files[i] = new File
+                    Files[i] = new File
                     {
                         Path = FormatPath(GetRelativePath(parentPath, files[i].FullName)),
                         Content = System.IO.File.ReadAllBytes(files[i].FullName)

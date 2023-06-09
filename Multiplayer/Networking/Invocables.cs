@@ -1467,6 +1467,218 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
         => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5);
 }
+/// <summary>Leave any reader or writer null to auto-fill.</summary>
+public sealed class NetCallRaw<T1, T2, T3, T4, T5, T6> : NetCallRaw
+{
+    private readonly ByteReaderRaw<T1, T2, T3, T4, T5, T6> _reader;
+    private readonly ByteWriterRaw<T1, T2, T3, T4, T5, T6> _writer;
+    public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6);
+    public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6);
+    internal NetCallRaw(NetCalls method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteReader.Reader<T6>? reader6, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, ByteWriter.Writer<T6>? writer6, int capacity = 0)
+        : this((ushort)method, reader1, reader2, reader3, reader4, reader5, reader6, writer1, writer2, writer3, writer4, writer5, writer6, capacity) { }
+    /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
+    internal NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteReader.Reader<T6>? reader6, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, ByteWriter.Writer<T6>? writer6, int capacity = 0) : base(method)
+    {
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3, T4, T5, T6>(reader1, reader2, reader3, reader4, reader5, reader6);
+    }
+    /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
+    public NetCallRaw(Guid method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteReader.Reader<T6>? reader6, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, ByteWriter.Writer<T6>? writer6, int capacity = 0) : base(method)
+    {
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3, T4, T5, T6>(reader1, reader2, reader3, reader4, reader5, reader6);
+    }
+    /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
+    public NetCallRaw(Method method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteReader.Reader<T6>? reader6, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, ByteWriter.Writer<T6>? writer6, int capacity = 0) : base(method)
+    {
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3, T4, T5, T6>(reader1, reader2, reader3, reader4, reader5, reader6);
+    }
+    /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
+    public NetCallRaw(MethodAsync method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteReader.Reader<T6>? reader6, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, ByteWriter.Writer<T6>? writer6, int capacity = 0) : base(method)
+    {
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity);
+        _reader = new ByteReaderRaw<T1, T2, T3, T4, T5, T6>(reader1, reader2, reader3, reader4, reader5, reader6);
+    }
+    internal override void SetThrowOnError(bool value) => _reader.ThrowOnError = value;
+    public void Invoke(ref MessageOverhead overhead,
+#if SERVER
+        ITransportConnection connection, 
+#endif
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+    {
+#if SERVER
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
+            return;
+        }
+#endif
+        try
+        {
+#if SERVER
+            connection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6));
+#else
+            NetFactory.GetPlayerTransportConnection().Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6));
+#endif
+        }
+        catch (Exception ex)
+        {
+#if SERVER
+            Logger.LogError($"Error sending method {ID.Format()} to connection {connection.Format()}.");
+#else
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
+#endif
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(
+#if SERVER
+        ITransportConnection connection, 
+#endif
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0);
+        Invoke(ref overhead,
+#if SERVER
+            connection, 
+#endif
+            arg1, arg2, arg3, arg4, arg5, arg6);
+    }
+#if SERVER
+    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+    {
+        if (connections.Count == 0) return;
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6);
+        try
+        {
+            connections.Send(bytes);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID.Format()} to 1+ connection(s).");
+            Logger.LogError(ex);
+        }
+    }
+#endif
+    public bool Read(byte[] message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6)
+    {
+        try
+        {
+            return _reader.Read(message, out arg1, out arg2, out arg3, out arg4, out arg5, out arg6);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error reading method {ID.Format()}.");
+            Logger.LogError(ex);
+            arg1 = default!;
+            arg2 = default!;
+            arg3 = default!;
+            arg4 = default!;
+            arg5 = default!;
+            arg6 = default!;
+            return false;
+        }
+    }
+    public override bool Read(byte[] message, out object[] parameters)
+    {
+        bool success = Read(message, out T1 a1, out T2 a2, out T3 a3, out T4 a4, out T5 a5, out T6 a6);
+        parameters = success ? new object[] { a1!, a2!, a3!, a4!, a5!, a6! } : Array.Empty<object>();
+        return success;
+    }
+#if CLIENT
+    public void Invoke(ref MessageOverhead overhead, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+    {
+        if (connection == null)
+        {
+            Logger.LogError($"Error sending method {ID.Format()} to null connection.");
+            return;
+        }
+        try
+        {
+            connection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error sending method {ID.Format()} to server.");
+            Logger.LogError(ex);
+            Logger.LogError(ex);
+        }
+    }
+    public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, ID, 0);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6);
+    }
+    public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6);
+        return task2;
+    }
+    public NetTask RequestAck(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task2 = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, ID, 0, task2.requestId);
+        Invoke(ref overhead, connection, arg1, arg2, arg3, arg4, arg5, arg6);
+        return task2;
+    }
+#endif
+    public NetTask Request(BaseNetCall listener,
+#if SERVER
+        ITransportConnection connection, 
+#endif
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task = listener.Listen(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
+        Invoke(ref overhead,
+#if SERVER
+            connection, 
+#endif
+            arg1, arg2, arg3, arg4, arg5, arg6);
+        return task;
+    }
+    public NetTask RequestAck(
+#if SERVER
+        ITransportConnection connection, 
+#endif
+        T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = NetTask.DEFAULT_TIMEOUT_MS)
+    {
+        NetTask task = ListenAck(timeoutMs);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags
+#if SERVER
+                                                       | (connection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None)
+#endif
+                                                        , ID, 0, task.requestId);
+        Invoke(ref overhead,
+#if SERVER
+            connection, 
+#endif
+            arg1, arg2, arg3, arg4, arg5, arg6);
+        return task;
+    }
+
+    public byte[] Write(T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+    {
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags, ID, 0);
+        return Write(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6);
+    }
+
+    public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6);
+}
 public sealed class NetCall<T> : DynamicNetCall
 {
     private readonly DynamicByteReader<T> _reader;

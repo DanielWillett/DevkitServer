@@ -167,7 +167,7 @@ public class CommandHandler : ICommandHandler, IDisposable
             }
             catch (Exception ex)
             {
-                Logger.LogError("Plugin threw an error in " + this.GetType().Format() + "." + nameof(OnCommandRegistered) + ".");
+                Logger.LogError("Plugin threw an error in " + GetType().Format() + "." + nameof(OnCommandRegistered) + ".");
                 Logger.LogError(ex);
             }
         }
@@ -185,7 +185,7 @@ public class CommandHandler : ICommandHandler, IDisposable
             }
             catch (Exception ex)
             {
-                Logger.LogError("Plugin threw an error in " + this.GetType().Format() + "." + nameof(OnCommandDeregistered) + ".");
+                Logger.LogError("Plugin threw an error in " + GetType().Format() + "." + nameof(OnCommandDeregistered) + ".");
                 Logger.LogError(ex);
             }
         }
@@ -247,7 +247,7 @@ public class CommandHandler : ICommandHandler, IDisposable
             }
             catch (Exception ex)
             {
-                Logger.LogError("Plugin threw an error in " + this.GetType().Format() + "." + nameof(OnCommandExecuted) + ".");
+                Logger.LogError("Plugin threw an error in " + GetType().Format() + "." + nameof(OnCommandExecuted) + ".");
                 Logger.LogError(ex);
             }
         }
@@ -274,7 +274,7 @@ public class CommandHandler : ICommandHandler, IDisposable
             }
             catch (Exception ex)
             {
-                Logger.LogError("Plugin threw an error in " + this.GetType().Format() + "." + nameof(OnExecutingCommand) + ".");
+                Logger.LogError("Plugin threw an error in " + GetType().Format() + "." + nameof(OnExecutingCommand) + ".");
                 Logger.LogError(ex);
             }
         }

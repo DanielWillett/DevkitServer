@@ -16,10 +16,6 @@ public sealed class LevelData
 
         Level.save();
         Folder folder = new Folder(Level.info.path, ShouldSendFile, null);
-#if DEBUG
-        // Logger.LogInfo("Level data:");
-        // Logger.LogInfo(folder.ToString());
-#endif
         LevelData data = new LevelData
         {
             LevelFolderContent = folder

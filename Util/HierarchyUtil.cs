@@ -3,8 +3,10 @@ using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
+#if SERVER
 using DevkitServer.Players;
 using DevkitServer.Players.UI;
+#endif
 using JetBrains.Annotations;
 using SDG.Framework.Devkit;
 
@@ -13,6 +15,9 @@ namespace DevkitServer.Util;
 public static class HierarchyUtil
 {
     private const string Source = "LEVEL HIERARCHY";
+    
+    internal static readonly List<IDevkitHierarchyItem> HierarchyItemBuffer = new List<IDevkitHierarchyItem>(64);
+
 #if CLIENT
     private static readonly StaticSetter<uint>? SetAvailableInstanceId = Accessor.GenerateStaticSetter<LevelHierarchy, uint>("availableInstanceID");
     private static readonly StaticGetter<uint>? GetAvailableInstanceId = Accessor.GenerateStaticGetter<LevelHierarchy, uint>("availableInstanceID");
@@ -20,18 +25,22 @@ public static class HierarchyUtil
 
     [UsedImplicitly]
     private static readonly NetCallRaw<IHierarchyItemTypeIdentifier, Vector3, Quaternion, Vector3> SendRequestInstantiation =
-        new NetCallRaw<IHierarchyItemTypeIdentifier, Vector3, Quaternion, Vector3>(NetCalls.RequestHierarchyInstantiation, HierarchyItemTypeIdentifierEx.ReadIdentifier!, null, null, null, HierarchyItemTypeIdentifierEx.WriteIdentifier, null, null, null);
+        new NetCallRaw<IHierarchyItemTypeIdentifier, Vector3, Quaternion, Vector3>(NetCalls.RequestHierarchyInstantiation,
+            HierarchyItemTypeIdentifierEx.ReadIdentifier!, null, null, null,
+            HierarchyItemTypeIdentifierEx.WriteIdentifier, null, null, null);
 
     [UsedImplicitly]
-    private static readonly NetCallRaw<IHierarchyItemTypeIdentifier, uint, Vector3, Quaternion, Vector3> SendInstantiation =
-        new NetCallRaw<IHierarchyItemTypeIdentifier, uint, Vector3, Quaternion, Vector3>(NetCalls.SendHierarchyInstantiation, HierarchyItemTypeIdentifierEx.ReadIdentifier!, null, null, null, null, HierarchyItemTypeIdentifierEx.WriteIdentifier, null, null, null, null);
+    private static readonly NetCallRaw<IHierarchyItemTypeIdentifier, uint, Vector3, Quaternion, Vector3, ulong> SendInstantiation =
+        new NetCallRaw<IHierarchyItemTypeIdentifier, uint, Vector3, Quaternion, Vector3, ulong>(NetCalls.SendHierarchyInstantiation,
+            HierarchyItemTypeIdentifierEx.ReadIdentifier!, null, null, null, null, null,
+            HierarchyItemTypeIdentifierEx.WriteIdentifier, null, null, null, null, null);
 #if CLIENT
     public static void RequestInstantiation(IHierarchyItemTypeIdentifier type, Vector3 position, Quaternion rotation, Vector3 scale)
     {
         SendRequestInstantiation.Invoke(type, position, rotation, scale);
     }
     [NetCall(NetCallSource.FromServer, NetCalls.SendHierarchyInstantiation)]
-    public static StandardErrorCode ReceiveHierarchyInstantiation(MessageContext ctx, IHierarchyItemTypeIdentifier? type, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale)
+    public static StandardErrorCode ReceiveHierarchyInstantiation(MessageContext ctx, IHierarchyItemTypeIdentifier? type, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner)
     {
         if (type == null)
             return StandardErrorCode.InvalidData;
@@ -63,7 +72,7 @@ public static class HierarchyUtil
         {
             Logger.LogError($"Error instantiating {type.FormatToString()} at instance ID {instanceId.Format()}.", method: Source);
             Logger.LogError(ex, method: Source);
-            throw;
+            return StandardErrorCode.GenericError;
         }
         finally
         {
@@ -79,7 +88,13 @@ public static class HierarchyUtil
                 Logger.LogError($"Failed to assign correct instance ID: {instanceId.Format()}, to {type.FormatToString()}.", method: Source);
                 RemoveItem(newItem);
             }
-            else return StandardErrorCode.Success;
+            else
+            {
+                if (owner == Provider.client.m_SteamID)
+                    HierarchyResponsibilities.Set(newItem.instanceID);
+                
+                return StandardErrorCode.Success;
+            }
         }
         else
             Logger.LogError($"Failed to create {type.FormatToString()}, instance ID: {instanceId.Format()}.", method: Source);
@@ -125,15 +140,17 @@ public static class HierarchyUtil
                 scale = comp.transform.localScale;
             }
 
+            HierarchyResponsibilities.Set(newItem.instanceID, user.SteamId.m_SteamID);
+
             PooledTransportConnectionList list;
             if (ctx.IsRequest)
             {
-                ctx.ReplyLayered(SendInstantiation, type, newItem.instanceID, position, rotation, scale);
+                ctx.ReplyLayered(SendInstantiation, type, newItem.instanceID, position, rotation, scale, user.SteamId.m_SteamID);
                 list = DevkitServerUtility.GetAllConnections(ctx.Connection);
             }
             else list = DevkitServerUtility.GetAllConnections();
-            SendInstantiation.Invoke(list, type, newItem.instanceID, position, rotation, scale);
-            Logger.LogDebug($"[{Source}] Granted request for instantiation of {type.FormatToString()}, instance ID: {newItem.instanceID.Format()} ({newItem.Format()}).");
+            SendInstantiation.Invoke(list, type, newItem.instanceID, position, rotation, scale, user.SteamId.m_SteamID);
+            Logger.LogDebug($"[{Source}] Granted request for instantiation of {type.FormatToString()}, instance ID: {newItem.instanceID.Format()} ({newItem.Format()}) from {user.SteamId.Format()}.");
         }
         else
         {
