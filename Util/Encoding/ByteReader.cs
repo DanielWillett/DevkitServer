@@ -209,15 +209,10 @@ public class ByteReader
     {
         return !EnsureMoreLength(sizeof(T)) ? default(T) : Read<T>();
     }
+    
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public byte[] ReadUInt8Array() => ReadBytes();
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public byte[]? ReadNullableUInt8Array() => ReadNullableBytes();
-
-    private static readonly MethodInfo ReadByteArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadBytes), BindingFlags.Instance | BindingFlags.Public);
-    public byte[] ReadBytes()
+    private static readonly MethodInfo ReadByteArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadUInt8Array), BindingFlags.Instance | BindingFlags.Public);
+    public byte[] ReadUInt8Array()
     {
         ushort length = ReadUInt16();
         if (length == 0) return Array.Empty<byte>();
@@ -227,6 +222,23 @@ public class ByteReader
         Buffer.BlockCopy(_buffer, _index, rtn, 0, length);
         _index += length;
         return rtn;
+    }
+    public byte[] ReadZeroCompressedUInt8Array(bool @long = false)
+    {
+        int len = @long ? ReadInt32() : ReadUInt16();
+        if (len == 0) return Array.Empty<byte>();
+        byte[] output = new byte[len];
+        for (int i = 0; i < len; ++i)
+        {
+            byte b = ReadUInt8();
+            if (b == 255)
+            {
+                for (int j = ReadUInt8(); j > 0; --j)
+                    output[i++] = ReadUInt8();
+            }
+            else i += b;
+        }
+        return output;
     }
     public void Skip(int bytes)
     {
@@ -245,13 +257,13 @@ public class ByteReader
         }
     }
 
-    private static readonly MethodInfo ReadNullableByteArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableBytes), BindingFlags.Instance | BindingFlags.Public);
-    public byte[]? ReadNullableBytes()
+    private static readonly MethodInfo ReadNullableByteArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableUInt8Array), BindingFlags.Instance | BindingFlags.Public);
+    public byte[]? ReadNullableUInt8Array()
     {
         if (!ReadBool()) return null;
-        return ReadBytes();
+        return ReadUInt8Array();
     }
-    public byte[] ReadLongBytes()
+    public byte[] ReadLongUInt8Array()
     {
         int length = ReadInt32();
         if (length == 0) return Array.Empty<byte>();
@@ -265,7 +277,7 @@ public class ByteReader
     public byte[]? ReadNullableLongBytes()
     {
         if (!ReadBool()) return null;
-        return ReadLongBytes();
+        return ReadLongUInt8Array();
     }
 
     private static readonly MethodInfo ReadInt32Method = typeof(ByteReader).GetMethod(nameof(ReadInt32), BindingFlags.Instance | BindingFlags.Public);
@@ -383,10 +395,16 @@ public class ByteReader
         ushort sh = Read<ushort>();
         byte bt = _buffer![_index];
         ++_index;
-        return (sh | (bt << 16)) - DevkitServerUtility.Int24Bounds;
+        return (sh | (bt << 16)) - DevkitServerUtility.Int24MaxValue;
     }
 
-    public uint ReadUInt24() => unchecked((uint)ReadInt24());
+    public uint ReadUInt24()
+    {
+        int i = ReadInt24();
+        if (i < 0)
+            return (uint)-(i - DevkitServerUtility.Int24MaxValue);
+        return (uint)i;
+    }
 
     public int? ReadNullableInt24()
     {
@@ -472,6 +490,23 @@ public class ByteReader
         string str = System.Text.Encoding.UTF8.GetString(_buffer, _index, length);
         _index += length;
         return str;
+    }
+    public string ReadAsciiSmall()
+    {
+        bool hf = HasFailed;
+        byte length = ReadUInt8();
+        if (length == 0) return !hf && HasFailed ? null! : string.Empty;
+        byte[]? ascii = ReadBlock(length);
+        if (ascii != null)
+            return System.Text.Encoding.ASCII.GetString(ascii);
+
+        return null!;
+    }
+
+    public string? ReadNullableAsciiSmall()
+    {
+        if (!ReadBool()) return null;
+        return ReadAsciiSmall();
     }
 
     private static readonly MethodInfo ReadTypeArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadTypeArray), BindingFlags.Instance | BindingFlags.Public);
@@ -687,7 +722,7 @@ public class ByteReader
     }
 
 
-    private static readonly MethodInfo ReadBoundsMethod = typeof(ByteReader).GetMethod(nameof(ReadVector4), BindingFlags.Instance | BindingFlags.Public);
+    private static readonly MethodInfo ReadBoundsMethod = typeof(ByteReader).GetMethod(nameof(ReadBounds), BindingFlags.Instance | BindingFlags.Public);
     public Bounds ReadBounds() =>
         !EnsureMoreLength(sizeof(float) * 6)
             ? BoundsNaN
@@ -776,6 +811,23 @@ public class ByteReader
             rtn[i] = BitConverter.ToInt32(_buffer, _index + i * sizeof(int));
         _index += size;
         return rtn;
+    }
+    public int[] ReadZeroCompressedInt32Array(bool @long = false)
+    {
+        int len = @long ? ReadInt32() : ReadUInt16();
+        if (len == 0) return Array.Empty<int>();
+        int[] output = new int[len];
+        for (int i = 0; i < len; ++i)
+        {
+            byte b = ReadUInt8();
+            if (b == 255)
+            {
+                for (int j = ReadUInt8(); j > 0; --j)
+                    output[i++] = ReadInt32();
+            }
+            else i += b;
+        }
+        return output;
     }
 
 
@@ -873,6 +925,23 @@ public class ByteReader
         _index += size;
         return rtn;
     }
+    public uint[] ReadZeroCompressedUInt32Array(bool @long = false)
+    {
+        int len = @long ? ReadInt32() : ReadUInt16();
+        if (len == 0) return Array.Empty<uint>();
+        uint[] output = new uint[len];
+        for (int i = 0; i < len; ++i)
+        {
+            byte b = ReadUInt8();
+            if (b == 255)
+            {
+                for (int j = ReadUInt8(); j > 0; --j)
+                    output[i++] = ReadUInt32();
+            }
+            else i += b;
+        }
+        return output;
+    }
 
 
     private static readonly MethodInfo ReadNullableUInt32ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableUInt32Array), BindingFlags.Instance | BindingFlags.Public);
@@ -892,6 +961,23 @@ public class ByteReader
         _index += len;
         return rtn;
     }
+    public sbyte[] ReadZeroCompressedInt8Array(bool @long = false)
+    {
+        int len = @long ? ReadInt32() : ReadUInt16();
+        if (len == 0) return Array.Empty<sbyte>();
+        sbyte[] output = new sbyte[len];
+        for (int i = 0; i < len; ++i)
+        {
+            byte b = ReadUInt8();
+            if (b == 255)
+            {
+                for (int j = ReadUInt8(); j > 0; --j)
+                    output[i++] = ReadInt8();
+            }
+            else i += b;
+        }
+        return output;
+    }
 
 
     private static readonly MethodInfo ReadNullableInt8ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableInt8Array), BindingFlags.Instance | BindingFlags.Public);
@@ -902,6 +988,33 @@ public class ByteReader
     public unsafe bool[] ReadBoolArray()
     {
         ushort len = ReadUInt16();
+        if (len < 1) return Array.Empty<bool>();
+        int blen = (int)Math.Ceiling(len / 8d);
+        if (!EnsureMoreLength(blen))
+            return null!;
+        bool[] rtn = new bool[len];
+        fixed (byte* ptr = _buffer)
+        {
+            byte* ptr2 = ptr + _index;
+            byte current = *ptr2;
+            for (int i = 0; i < len; i++)
+            {
+                byte mod = (byte)(i % 8);
+                if (mod == 0 & i != 0)
+                {
+                    ptr2++;
+                    current = *ptr2;
+                }
+                rtn[i] = (1 & (current >> mod)) == 1;
+            }
+        }
+
+        _index += blen;
+        return rtn;
+    }
+    public unsafe bool[] ReadLongBoolArray()
+    {
+        int len = ReadInt32();
         if (len < 1) return Array.Empty<bool>();
         int blen = (int)Math.Ceiling(len / 8d);
         if (!EnsureMoreLength(blen))
@@ -946,6 +1059,23 @@ public class ByteReader
         _index += size;
         return rtn;
     }
+    public long[] ReadZeroCompressedInt64Array(bool @long = false)
+    {
+        int len = @long ? ReadInt32() : ReadUInt16();
+        if (len == 0) return Array.Empty<long>();
+        long[] output = new long[len];
+        for (int i = 0; i < len; ++i)
+        {
+            byte b = ReadUInt8();
+            if (b == 255)
+            {
+                for (int j = ReadUInt8(); j > 0; --j)
+                    output[i++] = ReadInt64();
+            }
+            else i += b;
+        }
+        return output;
+    }
 
 
     private static readonly MethodInfo ReadNullableInt64ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableInt64Array), BindingFlags.Instance | BindingFlags.Public);
@@ -966,7 +1096,23 @@ public class ByteReader
         _index += size;
         return rtn;
     }
-
+    public ulong[] ReadZeroCompressedUInt64Array(bool @long = false)
+    {
+        int len = @long ? ReadInt32() : ReadUInt16();
+        if (len == 0) return Array.Empty<ulong>();
+        ulong[] output = new ulong[len];
+        for (int i = 0; i < len; ++i)
+        {
+            byte b = ReadUInt8();
+            if (b == 255)
+            {
+                for (int j = ReadUInt8(); j > 0; --j)
+                    output[i++] = ReadUInt64();
+            }
+            else i += b;
+        }
+        return output;
+    }
 
     private static readonly MethodInfo ReadNullableUInt64ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableUInt64Array), BindingFlags.Instance | BindingFlags.Public);
     public ulong[]? ReadNullableUInt64Array() => !ReadBool() ? null : ReadUInt64Array();
@@ -985,6 +1131,23 @@ public class ByteReader
             rtn[i] = BitConverter.ToInt16(_buffer, _index + i * sizeof(short));
         _index += size;
         return rtn;
+    }
+    public short[] ReadZeroCompressedInt16Array(bool @long = false)
+    {
+        int len = @long ? ReadInt32() : ReadUInt16();
+        if (len == 0) return Array.Empty<short>();
+        short[] output = new short[len];
+        for (int i = 0; i < len; ++i)
+        {
+            byte b = ReadUInt8();
+            if (b == 255)
+            {
+                for (int j = ReadUInt8(); j > 0; --j)
+                    output[i++] = ReadInt16();
+            }
+            else i += b;
+        }
+        return output;
     }
 
 
@@ -1005,6 +1168,23 @@ public class ByteReader
             rtn[i] = BitConverter.ToUInt16(_buffer, _index + i * sizeof(ushort));
         _index += size;
         return rtn;
+    }
+    public ushort[] ReadZeroCompressedUInt16Array(bool @long = false)
+    {
+        int len = @long ? ReadInt32() : ReadUInt16();
+        if (len == 0) return Array.Empty<ushort>();
+        ushort[] output = new ushort[len];
+        for (int i = 0; i < len; ++i)
+        {
+            byte b = ReadUInt8();
+            if (b == 255)
+            {
+                for (int j = ReadUInt8(); j > 0; --j)
+                    output[i++] = ReadUInt16();
+            }
+            else i += b;
+        }
+        return output;
     }
 
 

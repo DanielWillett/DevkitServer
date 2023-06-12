@@ -1,6 +1,7 @@
 ﻿#if SERVER
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Sync;
+using DevkitServer.Players.UI;
 #endif
 #if CLIENT
 using System.Reflection;
@@ -56,6 +57,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 #endif
 
     private float _nextApply;
+    private float _lastNoPermissionMessage;
     public EditorUser User { get; internal set; } = null!;
     public bool IsOwner { get; private set; }
     public static IAction? ActiveAction { get; private set; }
@@ -138,7 +140,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     {
         action.Instigator = Provider.client;
         if (IsOwner)
-            LocalLastAction = Time.realtimeSinceStartup;
+            LocalLastAction = CachedTime.RealtimeSinceStartup;
         if (_queuedThisFrame)
             action.DeltaTime = 0f;
         else
@@ -219,7 +221,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         if (!CanProcess)
             return;
 #endif
-        float t = Time.realtimeSinceStartup;
+        float t = CachedTime.RealtimeSinceStartup;
 #if CLIENT
         _queuedThisFrame = false;
         if (IsOwner)
@@ -369,7 +371,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             c.Add(collection);
         }
         int collIndex = -1, stInd = _pendingActions.Count;
-        float t = Time.realtimeSinceStartup;
+        float t = CachedTime.RealtimeSinceStartup;
         if (stInd == 0)
             _nextApply = t;
 #if SERVER
@@ -407,6 +409,11 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                             TerrainEditorType.Splatmap => TileSync.DataType.Splatmap,
                             _ => TileSync.DataType.Holes
                         }, t);
+                    }
+                    if (CachedTime.RealtimeSinceStartup - _lastNoPermissionMessage > 5f)
+                    {
+                        UIMessage.SendNoPermissionMessage(User);
+                        _lastNoPermissionMessage = CachedTime.RealtimeSinceStartup;
                     }
                 }
 #else

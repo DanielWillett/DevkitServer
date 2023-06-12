@@ -86,7 +86,7 @@ public sealed class HierarchyActions
 }
 
 
-[Action(ActionType.HierarchyItemsTransforming, 65 + HierarchyObjectTransformation.Capacity * 8, 4)]
+[Action(ActionType.HierarchyItemsTransforming, 65 + TransformationDelta.Capacity * 8, 4)]
 [EarlyTypeInit]
 public sealed class MovingHierarchyItemsAction : IAction
 {
@@ -94,7 +94,7 @@ public sealed class MovingHierarchyItemsAction : IAction
     public CSteamID Instigator { get; set; }
     public float DeltaTime { get; set; }
     public uint[] InstanceIds { get; set; } = Array.Empty<uint>();
-    public HierarchyObjectTransformation[] TransformDeltas { get; set; } = Array.Empty<HierarchyObjectTransformation>();
+    public TransformationDelta[] TransformDeltas { get; set; } = Array.Empty<TransformationDelta>();
     public Vector3 Pivot { get; set; }
     public void Apply()
     {
@@ -104,8 +104,8 @@ public sealed class MovingHierarchyItemsAction : IAction
         Vector3 pivot = default;
         for (int i = 0; i < len; ++i)
         {
-            ref HierarchyObjectTransformation t = ref TransformDeltas[i];
-            HierarchyObjectTransformation.TransformFlags flags = t.Flags;
+            ref TransformationDelta t = ref TransformDeltas[i];
+            TransformationDelta.TransformFlags flags = t.Flags;
             IDevkitHierarchyItem? item =
 #if SERVER
                 i == 0 ? _item : 
@@ -119,7 +119,7 @@ public sealed class MovingHierarchyItemsAction : IAction
             else if (i == 1)
                 pivot = Pivot;
             Vector3 newPos;
-            bool modifyRotation = (flags & HierarchyObjectTransformation.TransformFlags.Rotation) != 0;
+            bool modifyRotation = (flags & TransformationDelta.TransformFlags.Rotation) != 0;
             if (modifyRotation)
             {
                 newPos = t.OriginalPosition - pivot;
@@ -132,8 +132,8 @@ public sealed class MovingHierarchyItemsAction : IAction
             if (comp.gameObject.TryGetComponent(out ITransformedHandler handler))
             {
                 handler.OnTransformed(
-                    (flags & HierarchyObjectTransformation.TransformFlags.OriginalPosition) != 0 ? t.OriginalPosition : comp.gameObject.transform.position,
-                    (flags & HierarchyObjectTransformation.TransformFlags.OriginalRotation) != 0 ? t.OriginalRotation : comp.gameObject.transform.rotation,
+                    (flags & TransformationDelta.TransformFlags.OriginalPosition) != 0 ? t.OriginalPosition : comp.gameObject.transform.position,
+                    (flags & TransformationDelta.TransformFlags.OriginalRotation) != 0 ? t.OriginalRotation : comp.gameObject.transform.rotation,
                     Vector3.zero,
                     newPos,
                     newRot,
@@ -184,8 +184,8 @@ public sealed class MovingHierarchyItemsAction : IAction
             writer.Write((byte)InstanceIds.Length);
         for (int i = 0; i < InstanceIds.Length; ++i)
             writer.Write(InstanceIds[i]);
-        ref HierarchyObjectTransformation t = ref TransformDeltas[0];
-        HierarchyObjectTransformation.TransformFlags flags = t.Flags;
+        ref TransformationDelta t = ref TransformDeltas[0];
+        TransformationDelta.TransformFlags flags = t.Flags;
         t.Write(writer);
         for (int i = 1; i < TransformDeltas.Length; ++i)
         {
@@ -210,29 +210,29 @@ public sealed class MovingHierarchyItemsAction : IAction
             if (InstanceIds == null || InstanceIds.Length != len)
                 InstanceIds = new uint[len];
             if (TransformDeltas == null || TransformDeltas.Length != len)
-                TransformDeltas = new HierarchyObjectTransformation[len];
+                TransformDeltas = new TransformationDelta[len];
             for (int i = 0; i < len; ++i)
                 InstanceIds[i] = reader.ReadUInt32();
-            ref HierarchyObjectTransformation t = ref TransformDeltas[0];
-            t = new HierarchyObjectTransformation(reader);
-            HierarchyObjectTransformation.TransformFlags flags = t.Flags;
+            ref TransformationDelta t = ref TransformDeltas[0];
+            t = new TransformationDelta(reader);
+            TransformationDelta.TransformFlags flags = t.Flags;
             Vector3 pos = t.Position;
             Quaternion rot = t.Rotation;
             for (int i = 1; i < TransformDeltas.Length; ++i)
             {
                 t = ref TransformDeltas[i];
-                t = new HierarchyObjectTransformation(reader, flags, pos, rot);
+                t = new TransformationDelta(reader, flags, pos, rot);
             }
         }
         else
         {
             Pivot = Vector3.zero;
             InstanceIds = Array.Empty<uint>();
-            TransformDeltas = Array.Empty<HierarchyObjectTransformation>();
+            TransformDeltas = Array.Empty<TransformationDelta>();
         }
     }
 }
-[Action(ActionType.HierarchyItemsTransform, 65 + HierarchyObjectTransformation.Capacity * 16 + sizeof(float) * 3 * 16 * 2, 0)]
+[Action(ActionType.HierarchyItemsTransform, 65 + TransformationDelta.Capacity * 16 + sizeof(float) * 3 * 16 * 2, 0)]
 [EarlyTypeInit]
 public sealed class MovedHierarchyObjectsAction : IAction
 {
@@ -240,7 +240,7 @@ public sealed class MovedHierarchyObjectsAction : IAction
     public CSteamID Instigator { get; set; }
     public float DeltaTime { get; set; }
     public uint[] InstanceIds { get; set; } = Array.Empty<uint>();
-    public HierarchyObjectTransformation[] TransformDeltas { get; set; } = Array.Empty<HierarchyObjectTransformation>();
+    public TransformationDelta[] TransformDeltas { get; set; } = Array.Empty<TransformationDelta>();
     public Vector3[] Scales { get; set; } = Array.Empty<Vector3>();
     public Vector3[] OriginalScales { get; set; } = Array.Empty<Vector3>();
     public bool UseScale { get; set; }
@@ -266,15 +266,15 @@ public sealed class MovedHierarchyObjectsAction : IAction
                 continue;
             }
 #endif
-            ref HierarchyObjectTransformation t = ref TransformDeltas[i];
-            HierarchyObjectTransformation.TransformFlags flags = t.Flags;
-            bool modifyRotation = (flags & HierarchyObjectTransformation.TransformFlags.Rotation) != 0;
+            ref TransformationDelta t = ref TransformDeltas[i];
+            TransformationDelta.TransformFlags flags = t.Flags;
+            bool modifyRotation = (flags & TransformationDelta.TransformFlags.Rotation) != 0;
 
             if (comp.gameObject.TryGetComponent(out ITransformedHandler handler))
             {
                 handler.OnTransformed(
-                    (flags & HierarchyObjectTransformation.TransformFlags.OriginalPosition) != 0 ? t.OriginalPosition : comp.gameObject.transform.position,
-                    (flags & HierarchyObjectTransformation.TransformFlags.OriginalRotation) != 0 ? t.OriginalRotation : comp.gameObject.transform.rotation,
+                    (flags & TransformationDelta.TransformFlags.OriginalPosition) != 0 ? t.OriginalPosition : comp.gameObject.transform.position,
+                    (flags & TransformationDelta.TransformFlags.OriginalRotation) != 0 ? t.OriginalRotation : comp.gameObject.transform.rotation,
                     UseScale ? OriginalScales[i] : Vector3.zero,
                     t.Position,
                     t.Rotation,
@@ -324,7 +324,7 @@ public sealed class MovedHierarchyObjectsAction : IAction
         for (int i = 0; i < wrtLen; ++i)
         {
             writer.Write(InstanceIds[i]);
-            ref HierarchyObjectTransformation t = ref TransformDeltas[i];
+            ref TransformationDelta t = ref TransformDeltas[i];
             t.Write(writer);
             if (UseScale)
             {
@@ -346,7 +346,7 @@ public sealed class MovedHierarchyObjectsAction : IAction
         else
             len = reader.ReadUInt8();
         InstanceIds = len == 0 ? Array.Empty<uint>() : new uint[len];
-        TransformDeltas = len == 0 ? Array.Empty<HierarchyObjectTransformation>() : new HierarchyObjectTransformation[len];
+        TransformDeltas = len == 0 ? Array.Empty<TransformationDelta>() : new TransformationDelta[len];
         if (UseScale)
         {
             Scales = len == 0 ? Array.Empty<Vector3>() : new Vector3[len];
@@ -355,7 +355,7 @@ public sealed class MovedHierarchyObjectsAction : IAction
         for (int i = 0; i < len; ++i)
         {
             InstanceIds[i] = reader.ReadUInt32();
-            TransformDeltas[i] = new HierarchyObjectTransformation(reader);
+            TransformDeltas[i] = new TransformationDelta(reader);
             if (UseScale)
             {
                 Scales[i] = reader.ReadVector3();

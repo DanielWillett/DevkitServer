@@ -103,7 +103,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             DevkitServerGLUtility.DrawTerrainBounds(inv.Tile, inv.XMin, inv.XMax, inv.YMin, inv.YMax, inv.Type != DataType.Heightmap, Color.magenta);
         }
         GLUtility.matrix = Matrix4x4.identity;
-        float time = Time.realtimeSinceStartup;
+        float time = CachedTime.RealtimeSinceStartup;
         Color pink = new Color(1f, 0.7f, 0.7f);
         Color red = Color.red;
         for (int i = 0; i < _invalidations.Count; ++i)
@@ -255,7 +255,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             offset += HeaderSize;
             len -= HeaderSize;
 
-            _receiving = new MapInvalidation(new LandscapeCoord(xtile, ytile), xmin, ymin, xmax, ymax, _dataType, Time.realtimeSinceStartup);
+            _receiving = new MapInvalidation(new LandscapeCoord(xtile, ytile), xmin, ymin, xmax, ymax, _dataType, CachedTime.RealtimeSinceStartup);
 #if CLIENT
             _renderGl = true;
 #if GL_SAMPLES
@@ -534,7 +534,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
 #endif
         if (!HasAuthority || !IsOwner)
             return;
-        float time = Time.realtimeSinceStartup;
+        float time = CachedTime.RealtimeSinceStartup;
         if (_dataType == DataType.None && time - _lastSent > 1.5f)
         {
             if (_invalidations.Count == 0)
@@ -614,10 +614,10 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
     {
 #if SERVER
         if (ServersideAuthority != null && ServersideAuthority.HasAuthority)
-            ServersideAuthority.InvalidateBounds(worldBounds, DataType.Heightmap, Time.realtimeSinceStartup);
+            ServersideAuthority.InvalidateBounds(worldBounds, DataType.Heightmap, CachedTime.RealtimeSinceStartup);
 #else
         if (EditorUser.User != null && EditorUser.User.TileSync != null && EditorUser.User.TileSync.HasAuthority)
-            EditorUser.User.TileSync.InvalidateBounds(worldBounds, DataType.Heightmap, Time.realtimeSinceStartup);
+            EditorUser.User.TileSync.InvalidateBounds(worldBounds, DataType.Heightmap, CachedTime.RealtimeSinceStartup);
 #endif
     }
 
@@ -628,10 +628,10 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
     {
 #if SERVER
         if (ServersideAuthority != null && ServersideAuthority.HasAuthority)
-            ServersideAuthority.InvalidateBounds(worldBounds, DataType.Splatmap, Time.realtimeSinceStartup);
+            ServersideAuthority.InvalidateBounds(worldBounds, DataType.Splatmap, CachedTime.RealtimeSinceStartup);
 #else
         if (EditorUser.User != null && EditorUser.User.TileSync != null && EditorUser.User.TileSync.HasAuthority)
-            EditorUser.User.TileSync.InvalidateBounds(worldBounds, DataType.Splatmap, Time.realtimeSinceStartup);
+            EditorUser.User.TileSync.InvalidateBounds(worldBounds, DataType.Splatmap, CachedTime.RealtimeSinceStartup);
 #endif
     }
 
@@ -642,10 +642,10 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
     {
 #if SERVER
         if (ServersideAuthority != null && ServersideAuthority.HasAuthority)
-            ServersideAuthority.InvalidateBounds(worldBounds, DataType.Holes, Time.realtimeSinceStartup);
+            ServersideAuthority.InvalidateBounds(worldBounds, DataType.Holes, CachedTime.RealtimeSinceStartup);
 #else
         if (EditorUser.User != null && EditorUser.User.TileSync != null && EditorUser.User.TileSync.HasAuthority)
-            EditorUser.User.TileSync.InvalidateBounds(worldBounds, DataType.Holes, Time.realtimeSinceStartup);
+            EditorUser.User.TileSync.InvalidateBounds(worldBounds, DataType.Holes, CachedTime.RealtimeSinceStartup);
 #endif
     }
 

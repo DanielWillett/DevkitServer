@@ -33,7 +33,8 @@ internal static class FoliageEditorPatches
         MethodInfo removeInstancesInvoker = fep.GetMethod(nameof(OnRemoveInstances), BindingFlags.Static | BindingFlags.NonPublic)!;
         MethodInfo resourceSpawnpointDestroyedInvoker = fep.GetMethod(nameof(OnResourceSpawnpointDestroyed), BindingFlags.Static | BindingFlags.NonPublic)!;
         MethodInfo levelObjectRemovedInvoker = fep.GetMethod(nameof(OnLevelObjectRemovedInvoker), BindingFlags.Static | BindingFlags.NonPublic)!;
-        MethodInfo findLevelObjectUtil = typeof(DevkitServerUtility).GetMethod(nameof(DevkitServerUtility.FindLevelObject), BindingFlags.Static | BindingFlags.Public)!;
+        MethodInfo findLevelObjectUtil = typeof(LevelObjectUtil).GetMethod(nameof(LevelObjectUtil.FindObject),
+            BindingFlags.Static | BindingFlags.Public, null, CallingConventions.Any, new Type[] { typeof(Transform) }, null)!;
 
         MethodInfo? removeInstances = FoliageEditor.GetMethod("removeInstances",
             BindingFlags.NonPublic | BindingFlags.Instance);
@@ -213,7 +214,7 @@ internal static class FoliageEditorPatches
     {
         if (!DevkitServerModule.IsEditing) return;
         
-        ClientEvents.InvokeOnAddFoliage(new AddFoliageProperties(asset, position, rotation, scale, clearWhenBaked, Time.deltaTime));
+        ClientEvents.InvokeOnAddFoliage(new AddFoliageProperties(asset, position, rotation, scale, clearWhenBaked, CachedTime.DeltaTime));
     }
 
     [UsedImplicitly]
@@ -226,7 +227,7 @@ internal static class FoliageEditorPatches
 
         ClientEvents.InvokeOnRemoveFoliage(new RemoveFoliageProperties(GetFoliageBrushWorldPosition(tool), foliageTile,
             list, DevkitFoliageToolOptions.instance.brushRadius, DevkitFoliageToolOptions.instance.brushFalloff,
-            Time.deltaTime, allowRemoveBaked, oldSampleCount - sampleCount));
+            CachedTime.DeltaTime, allowRemoveBaked, oldSampleCount - sampleCount));
     }
 
     [UsedImplicitly]
@@ -234,7 +235,7 @@ internal static class FoliageEditorPatches
     {
         if (!DevkitServerModule.IsEditing) return;
         
-        ClientEvents.InvokeOnRemoveResourceSpawnpointFoliage(new RemoveResourceSpawnpointFoliageProperties(sp, Time.deltaTime));
+        ClientEvents.InvokeOnRemoveResourceSpawnpointFoliage(new RemoveResourceSpawnpointFoliageProperties(sp, CachedTime.DeltaTime));
     }
 
     [UsedImplicitly]
@@ -248,7 +249,7 @@ internal static class FoliageEditorPatches
             return;
         }
         
-        ClientEvents.InvokeOnRemoveLevelObjectFoliage(new RemoveLevelObjectFoliageProperties(position, obj, Time.deltaTime));
+        ClientEvents.InvokeOnRemoveLevelObjectFoliage(new RemoveLevelObjectFoliageProperties(position, obj, CachedTime.DeltaTime));
     }
 
 }

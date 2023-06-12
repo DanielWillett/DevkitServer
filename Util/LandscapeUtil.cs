@@ -1,13 +1,25 @@
-﻿using System.Reflection;
-using DevkitServer.Multiplayer;
-using SDG.Framework.Devkit;
+﻿using SDG.Framework.Devkit;
 using SDG.Framework.Landscapes;
+using System.Reflection;
 
 namespace DevkitServer.Util;
 public static class LandscapeUtil
 {
     internal static bool SaveTransactions = true;
     internal static FieldInfo SaveTransactionsField = typeof(LandscapeUtil).GetField(nameof(SaveTransactions), BindingFlags.Static | BindingFlags.NonPublic)!;
+
+    internal static int[] SurroundingOffsets =
+    {
+         0,  0,
+         1,  0,
+         0, -1,
+        -1,  0,
+         0,  1,
+         1,  1,
+         1, -1,
+        -1, -1,
+        -1,  1
+    };
 
     private static readonly StaticGetter<Dictionary<LandscapeCoord, LandscapeTile>> GetTiles =
         Accessor.GenerateStaticGetter<Landscape, Dictionary<LandscapeCoord, LandscapeTile>>("tiles", throwOnError: true)!;

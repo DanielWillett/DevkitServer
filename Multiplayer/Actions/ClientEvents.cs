@@ -78,6 +78,12 @@ public static class ClientEvents
     public static event MoveHierarchyObjectsFinal? OnMoveHierarchyObjectsFinal;
     public static event DeleteHierarchyObject? OnDeleteHierarchyObject;
     public static event DeleteHierarchyObjects? OnDeleteHierarchyObjects;
+    public static event DeleteObject? OnDeleteObject;
+    public static event DeleteBuildable? OnDeleteBuildable;
+    public static event DeleteLevelObjects? OnDeleteLevelObjects;
+    public static event MoveObjectFinal? OnMoveObjectFinal;
+    public static event MoveBuildableFinal? OnMoveBuildableFinal;
+    public static event MoveLevelObjectsFinal? OnMoveLevelObjectsFinal;
 
     public static bool ListeningOnEditHeightmapPermissionDenied => !EventOnEditHeightmapPermissionDenied.IsEmpty;
     public static bool ListeningOnEditSplatmapPermissionDenied => !EventOnEditSplatmapPermissionDenied.IsEmpty;
@@ -86,6 +92,9 @@ public static class ClientEvents
     public static bool ListeningOnEditHeightmapRequested => !EventOnEditHeightmapRequested.IsEmpty;
     public static bool ListeningOnEditSplatmapRequested => !EventOnEditSplatmapRequested.IsEmpty;
     public static bool ListeningOnEditHolesRequested => !EventOnEditHolesRequested.IsEmpty;
+
+    public static bool ListeningOnTryInstantiateHierarchyObject => !EventOnTryInstantiateHierarchyObject.IsEmpty;
+    public static bool ListeningOnRequestInstantiateHierarchyObject => !EventOnRequestInstantiateHierarchyObject.IsEmpty;
 
     public static bool ListeningOnPaintRamp => OnPaintRamp != null;
     public static bool ListeningOnAdjustHeightmap => OnAdjustHeightmap != null;
@@ -108,8 +117,12 @@ public static class ClientEvents
     public static bool ListeningOnMoveHierarchyObjectsFinal => OnMoveHierarchyObjectsFinal != null;
     public static bool ListeningOnDeleteHierarchyObject => OnDeleteHierarchyObject != null;
     public static bool ListeningOnDeleteHierarchyObjects => OnDeleteHierarchyObjects != null;
-    public static bool ListeningOnTryInstantiateHierarchyObject => !EventOnTryInstantiateHierarchyObject.IsEmpty;
-    public static bool ListeningOnRequestInstantiateHierarchyObject => !EventOnRequestInstantiateHierarchyObject.IsEmpty;
+    public static bool ListeningOnDeleteObject => OnDeleteObject != null;
+    public static bool ListeningOnDeleteBuildable => OnDeleteBuildable != null;
+    public static bool ListeningOnDeleteLevelObjects => OnDeleteLevelObjects != null;
+    public static bool ListeningOnMoveObjectFinal => OnMoveObjectFinal != null;
+    public static bool ListeningOnMoveBuildableFinal => OnMoveBuildableFinal != null;
+    public static bool ListeningOnMoveLevelObjectsFinal => OnMoveLevelObjectsFinal != null;
     
     internal static void InvokeOnPaintRamp(in PaintRampProperties properties) => OnPaintRamp?.Invoke(in properties);
     internal static void InvokeOnAdjustHeightmap(in AdjustHeightmapProperties properties) => OnAdjustHeightmap?.Invoke(in properties);
@@ -132,6 +145,12 @@ public static class ClientEvents
     internal static void InvokeOnMoveHierarchyObjectsFinal(in MoveHierarchyObjectsFinalProperties properties) => OnMoveHierarchyObjectsFinal?.Invoke(in properties);
     internal static void InvokeOnDeleteHierarchyObject(in DeleteHierarchyObjectProperties properties) => OnDeleteHierarchyObject?.Invoke(in properties);
     internal static void InvokeOnDeleteHierarchyObjects(in DeleteHierarchyObjectsProperties properties) => OnDeleteHierarchyObjects?.Invoke(in properties);
+    internal static void InvokeOnDeleteObject(in DeleteObjectProperties properties) => OnDeleteObject?.Invoke(in properties);
+    internal static void InvokeOnDeleteBuildable(in DeleteBuildableProperties properties) => OnDeleteBuildable?.Invoke(in properties);
+    internal static void InvokeOnDeleteLevelObjects(in DeleteLevelObjectsProperties properties) => OnDeleteLevelObjects?.Invoke(in properties);
+    internal static void InvokeOnMoveObjectFinal(in MoveObjectFinalProperties properties) => OnMoveObjectFinal?.Invoke(in properties);
+    internal static void InvokeOnMoveBuildableFinal(in MoveBuildableFinalProperties properties) => OnMoveBuildableFinal?.Invoke(in properties);
+    internal static void InvokeOnMoveLevelObjectsFinal(in MoveLevelObjectsFinalProperties properties) => OnMoveLevelObjectsFinal?.Invoke(in properties);
 }
 
 public delegate void TryInstantiateHierarchyObject(ref InstantiateHierarchyObjectProperties properties, ref bool shouldAllow);

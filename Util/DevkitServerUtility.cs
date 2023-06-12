@@ -1,11 +1,8 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
-using System.Reflection.Emit;
-using System.Text;
 using System.Text.RegularExpressions;
 using DevkitServer.API;
-using DevkitServer.Levels;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
@@ -20,7 +17,7 @@ using System.Net;
 namespace DevkitServer.Util;
 public static class DevkitServerUtility
 {
-    public const int Int24Bounds = 8388607;
+    public const int Int24MaxValue = 8388607;
     public static string QuickFormat(string input, string? val)
     {
         int ind = input.IndexOf("{0}", StringComparison.Ordinal);
@@ -88,112 +85,6 @@ public static class DevkitServerUtility
         Vector3 e = bounds.extents;
         return new Bounds(new Vector3(Mathf.Round(c.x), Mathf.Round(c.y), Mathf.Round(c.z)), new Vector3((e.x + 0.5f).CeilToIntIgnoreSign(), (e.y + 0.5f).CeilToIntIgnoreSign(), (e.z + 0.5f).CeilToIntIgnoreSign()));
     }
-    [Pure]
-    public static unsafe int GetLabelId(this Label label) => *(int*)&label;
-    public static void PrintBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
-    {
-        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, columnCount, offset, len));
-    }
-    public static void PrintBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
-    {
-        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, columnCount, offset, len));
-    }
-    [Pure]
-    public static string GetBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
-    {
-        return BytesToString(bytes, columnCount, offset, len, "X2");
-    }
-    [Pure]
-    public static string GetBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
-    {
-        return BytesToString(bytes, columnCount, offset, len, "000");
-    }
-    public static unsafe void PrintBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0)
-    {
-        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, len, columnCount, offset));
-    }
-    public static unsafe void PrintBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0)
-    {
-        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, len, columnCount, offset));
-    }
-    [Pure]
-    public static unsafe string GetBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0)
-    {
-        return BytesToString(bytes, columnCount, offset, len, "X2");
-    }
-    [Pure]
-    public static unsafe string GetBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0)
-    {
-        return BytesToString(bytes, columnCount, offset, len, "000");
-    }
-    public static unsafe void PrintBytesHex<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
-    {
-        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, len, columnCount, offset));
-    }
-    public static unsafe void PrintBytesDec<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
-    {
-        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, len, columnCount, offset));
-    }
-    [Pure]
-    public static unsafe string GetBytesHex<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
-    {
-        return BytesToString(bytes, columnCount, offset, len);
-    }
-    [Pure]
-    public static unsafe string GetBytesDec<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
-    {
-        return BytesToString(bytes, columnCount, offset, len);
-    }
-    [Pure]
-    public static string BytesToString(byte[] bytes, int columnCount, int offset, int len, string fmt)
-    {
-        if (offset >= bytes.Length)
-            offset = bytes.Length - 1;
-        if (len < 0 || len + offset < 0 || len + offset > bytes.Length)
-            len = bytes.Length - offset;
-        StringBuilder sb = new StringBuilder(len * 4);
-        for (int i = 0; i < len; ++i)
-        {
-            if (i != 0 && i % columnCount == 0)
-                sb.Append(Environment.NewLine);
-            else if (i != 0)
-                sb.Append(' ');
-            sb.Append(bytes[i + offset].ToString(fmt));
-        }
-        return sb.ToString();
-    }
-    [Pure]
-    public static unsafe string BytesToString(byte* bytes, int columnCount, int offset, int len, string fmt)
-    {
-        if (offset >= len)
-            offset = len - 1;
-        StringBuilder sb = new StringBuilder(len * 4);
-        for (int i = 0; i < len; ++i)
-        {
-            if (i != 0 && i % columnCount == 0)
-                sb.Append(Environment.NewLine);
-            else if (i != 0)
-                sb.Append(' ');
-            sb.Append(bytes[i + offset].ToString(fmt));
-        }
-        return sb.ToString();
-    }
-    [Pure]
-    public static unsafe string BytesToString<T>(T* bytes, int columnCount, int offset, int len) where T : unmanaged
-    {
-        if (offset >= len)
-            offset = len - 1;
-        StringBuilder sb = new StringBuilder(len * 4);
-        for (int i = 0; i < len; ++i)
-        {
-            if (i != 0 && i % columnCount == 0)
-                sb.Append(Environment.NewLine);
-            else if (i != 0)
-                sb.Append(' ');
-            sb.Append(bytes[i + offset].ToString());
-        }
-        return sb.ToString();
-    }
     public static unsafe void ReverseFloat(byte* ptr, int index)
     {
         byte b = ptr[index + 1];
@@ -248,15 +139,25 @@ public static class DevkitServerUtility
             return true;
         }
 
-        if (ulong.TryParse(str, NumberStyles.Number, CultureInfo.InvariantCulture, out ulong id))
+        if (uint.TryParse(str, NumberStyles.Number, CultureInfo.InvariantCulture, out uint acctId1))
         {
-            steamId = new CSteamID(id);
+            steamId = new CSteamID(new AccountID_t(acctId1), EUniverse.k_EUniversePublic, EAccountType.k_EAccountTypeIndividual);
             return true;
         }
 
-        if (uint.TryParse(str, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint acctId1))
+        if (ulong.TryParse(str, NumberStyles.Number, CultureInfo.InvariantCulture, out ulong id))
         {
-            steamId = new CSteamID(new AccountID_t(acctId1), EUniverse.k_EUniversePublic, EAccountType.k_EAccountTypeIndividual);
+            steamId = new CSteamID(id);
+
+            // try parse as hex instead
+            if (steamId.GetEAccountType() != EAccountType.k_EAccountTypeIndividual)
+            {
+                if (!ulong.TryParse(str, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out id) ||
+                    new CSteamID(id).GetEAccountType() != EAccountType.k_EAccountTypeIndividual)
+                    return true;
+
+                steamId = new CSteamID(id);
+            }
             return true;
         }
 
@@ -440,11 +341,11 @@ public static class DevkitServerUtility
             {
                 int c2 = *c;
                 if (c2 is > 96 and < 103)
-                    return (byte)((c2 - 87) * 0x10);
+                    return (byte)((c2 - 87) * 0x10 + (c2 - 87));
                 if (c2 is > 64 and < 71)
-                    return (byte)((c2 - 55) * 0x10);
+                    return (byte)((c2 - 55) * 0x10 + (c2 - 55));
                 if (c2 is > 47 and < 58)
-                    return (byte)((c2 - 48) * 0x10);
+                    return (byte)((c2 - 48) * 0x10 + (c2 - 48));
                 res = false;
             }
 
@@ -482,7 +383,7 @@ public static class DevkitServerUtility
         if (strs.Length is 3 or 4)
         {
             bool hsv = strs[0].StartsWith("hsv");
-            float a = 1f;
+            float a = 255f;
             int ind = strs[0].IndexOf('(');
             if (ind != -1 && strs[0].Length > ind + 1) strs[0] = strs[0].Substring(ind + 1);
             if (!float.TryParse(strs[0], NumberStyles.Number, CultureInfo.InvariantCulture, out float r))
@@ -496,13 +397,14 @@ public static class DevkitServerUtility
 
             if (hsv)
             {
-                color = Color.HSVToRGB(r, g, b, false) with { a = a };
+                color = Color.HSVToRGB(r / 360f, g / 100f, b / 100f, false) with { a = a / 255f };
                 return true;
             }
             
-            r = Mathf.Clamp01(r);
-            g = Mathf.Clamp01(g);
-            b = Mathf.Clamp01(b);
+            r = Mathf.Clamp01(r / 255f);
+            g = Mathf.Clamp01(g / 255f);
+            b = Mathf.Clamp01(b / 255f);
+            a = Mathf.Clamp01(a / 255f);
             color = new Color(r, g, b, a);
             return true;
             fail:
@@ -545,10 +447,10 @@ public static class DevkitServerUtility
         if (strs.Length is 3 or 4)
         {
             bool hsv = strs[0].StartsWith("hsv");
-            byte a = 1;
+            byte a = byte.MaxValue;
             int ind = strs[0].IndexOf('(');
             if (ind != -1 && strs[0].Length > ind + 1) strs[0] = strs[0].Substring(ind + 1);
-            if (!byte.TryParse(strs[0], NumberStyles.Number, CultureInfo.InvariantCulture, out byte r))
+            if (!int.TryParse(strs[0], NumberStyles.Number, CultureInfo.InvariantCulture, out int r))
                 goto fail;
             if (!byte.TryParse(strs[1], NumberStyles.Number, CultureInfo.InvariantCulture, out byte g))
                 goto fail;
@@ -559,11 +461,11 @@ public static class DevkitServerUtility
 
             if (hsv)
             {
-                color = Color.HSVToRGB(r, g, b, false) with { a = a };
+                color = Color.HSVToRGB(r / 360f, g / 100f, b / 100f, false) with { a = a / 255f };
                 return true;
             }
 
-            color = new Color32(r, g, b, a);
+            color = new Color32((byte)(r > 255 ? 255 : (r < 0 ? 0 : r)), g, b, a);
             return true;
             fail:
             color = default;
@@ -720,95 +622,7 @@ public static class DevkitServerUtility
         return RemoveTMProRichTextRegex.Replace(text, string.Empty);
     }
     [Pure]
-    public static Color GetColor(this IDevkitServerPlugin? plugin) => plugin == null ? DevkitServerModule.PluginColor : (plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor);
-    [Pure]
-    public static LevelObject? FindLevelObject(Transform t)
-    {
-        if (t == null || !Regions.tryGetCoordinate(t.position, out byte x, out byte y))
-            return null;
-        List<LevelObject> region = LevelObjects.objects[x, y];
-        for (int i = 0; i < region.Count; ++i)
-        {
-            if (region[i].transform == t)
-            {
-                return region[i];
-            }
-        }
-        for (int i = 0; i < region.Count; ++i)
-        {
-            if (region[i].placeholderTransform == t)
-            {
-                return region[i];
-            }
-        }
-        for (int i = 0; i < region.Count; ++i)
-        {
-            if (region[i].skybox == t)
-            {
-                return region[i];
-            }
-        }
-
-        int ws = Regions.WORLD_SIZE;
-        for (int x2 = 0; x2 < ws; ++x2)
-        {
-            for (int y2 = 0; y2 < ws; ++y2)
-            {
-                if (x2 == x && y2 == y) continue;
-                region = LevelObjects.objects[x, y];
-                for (int i = 0; i < region.Count; ++i)
-                {
-                    if (region[i].transform == t)
-                        return region[i];
-                }
-            }
-        }
-        
-        for (int x2 = 0; x2 < ws; ++x2)
-        {
-            for (int y2 = 0; y2 < ws; ++y2)
-            {
-                if (x2 == x && y2 == y) continue;
-                region = LevelObjects.objects[x, y];
-                for (int i = 0; i < region.Count; ++i)
-                {
-                    if (region[i].placeholderTransform == t)
-                        return region[i];
-                }
-            }
-        }
-        
-        for (int x2 = 0; x2 < ws; ++x2)
-        {
-            for (int y2 = 0; y2 < ws; ++y2)
-            {
-                if (x2 == x && y2 == y) continue;
-                region = LevelObjects.objects[x, y];
-                for (int i = 0; i < region.Count; ++i)
-                {
-                    if (region[i].skybox == t)
-                        return region[i];
-                }
-            }
-        }
-
-        return null;
-    }
-
-    [Pure]
-    public static Transform? GetTransform(this LevelObject obj)
-    {
-        if (obj.transform != null)
-            return obj.transform;
-        
-        if (obj.skybox != null)
-            return obj.skybox;
-
-        if (obj.placeholderTransform != null)
-            return obj.placeholderTransform;
-
-        return null;
-    }
+    public static Color GetColor(this IDevkitServerPlugin? plugin) => plugin == null ? DevkitServerModule.ModuleColor : (plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor);
 
     public static void CustomDisconnect(
 #if SERVER

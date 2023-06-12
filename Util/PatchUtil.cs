@@ -1,16 +1,263 @@
-﻿using System.Reflection;
+﻿using DevkitServer.Multiplayer.Actions;
 using HarmonyLib;
 using JetBrains.Annotations;
+using System.Reflection;
 using System.Reflection.Emit;
 
 namespace DevkitServer.Util;
 public static class PatchUtil
 {
     [Pure]
+    public static bool FollowPattern(IList<CodeInstruction> instructions, ref int index, params PatternMatch?[] matches)
+    {
+        if (MatchPattern(instructions, index, matches))
+        {
+            index += matches.Length;
+            return true;
+        }
+        return false;
+    }
+    [Pure]
+    public static bool RemovePattern(IList<CodeInstruction> instructions, int index, params PatternMatch?[] matches)
+    {
+        if (MatchPattern(instructions, index, matches))
+        {
+            if (instructions is List<CodeInstruction> list)
+            {
+                list.RemoveRange(index, matches.Length);
+            }
+            else
+            {
+                for (int i = 0; i < matches.Length; ++i)
+                    instructions.RemoveAt(index);
+            }
+            return true;
+        }
+        return false;
+    }
+    [Pure]
+    public static bool MatchPattern(IList<CodeInstruction> instructions, int index, params PatternMatch?[] matches)
+    {
+        int c = matches.Length;
+        if (c <= 0 || index >= instructions.Count - matches.Length)
+            return false;
+        for (int i = index; i < index + matches.Length; ++i)
+        {
+            PatternMatch? pattern = matches[i - index];
+            if (pattern != null && !pattern.Invoke(instructions[i]))
+                return false;
+        }
+        return true;
+    }
+
+    public static void ReturnIfFalse(IList<CodeInstruction> instructions, ILGenerator generator, ref int index, Func<bool> checker, Label? @goto = null)
+    {
+        Label continueLbl = generator.DefineLabel();
+        CodeInstruction instruction = new CodeInstruction(OpCodes.Call, checker.Method);
+        instruction.labels.AddRange(instructions[index].labels);
+        instructions[index].labels.Clear();
+        instructions.Insert(index, instruction);
+
+        instructions.Insert(index + 1, new CodeInstruction(OpCodes.Brtrue, continueLbl));
+        instructions.Insert(index + 2, @goto.HasValue ? new CodeInstruction(OpCodes.Br, @goto) : new CodeInstruction(OpCodes.Ret));
+        index += 3;
+        if (instructions.Count > index)
+            instructions[index].labels.Add(continueLbl);
+    }
+    [Pure]
+    public static int RemoveUntil(IList<CodeInstruction> instructions, int index, PatternMatch match, bool includeMatch = true)
+    {
+        int amt = 0;
+        for (int i = index; i < instructions.Count; ++i)
+        {
+            if (match(instructions[i]))
+            {
+                amt = index - i + (includeMatch ? 1 : 0);
+                if (instructions is List<CodeInstruction> list)
+                {
+                    list.RemoveRange(index, amt);
+                }
+                else
+                {
+                    for (int j = 0; j < amt; ++j)
+                        instructions.RemoveAt(index);
+                }
+
+                break;
+            }
+        }
+        return amt;
+    }
+    [Pure]
+    public static int ContinueUntil(IList<CodeInstruction> instructions, ref int index, PatternMatch match, bool includeMatch = true)
+    {
+        int amt = 0;
+        for (int i = index; i < instructions.Count; ++i)
+        {
+            ++amt;
+            if (match(instructions[i]))
+            {
+                index = includeMatch ? i : i + 1;
+                if (includeMatch)
+                    --amt;
+                break;
+            }
+        }
+        return amt;
+    }
+    [Pure]
+    public static int ContinueWhile(IList<CodeInstruction> instructions, ref int index, PatternMatch match, bool includeNext = true)
+    {
+        int amt = 0;
+        for (int i = index; i < instructions.Count; ++i)
+        {
+            ++amt;
+            if (!match(instructions[i]))
+            {
+                index = includeNext ? i : i - 1;
+                if (!includeNext)
+                    --amt;
+                break;
+            }
+        }
+        return amt;
+    }
+    [Pure]
+    public static bool LabelNext(IList<CodeInstruction> instructions, int index, Label label, PatternMatch match, int shift = 0, bool labelRtnIfFailure = false)
+    {
+        for (int i = index; i < instructions.Count; ++i)
+        {
+            if (match(instructions[i]))
+            {
+                int newIndex = i + shift;
+                if (instructions.Count > i)
+                {
+                    instructions[newIndex].labels.Add(label);
+                    return true;
+                }
+            }
+        }
+        if (labelRtnIfFailure)
+        {
+            if (instructions[instructions.Count - 1].opcode == OpCodes.Ret)
+                instructions[instructions.Count - 1].labels.Add(label);
+            else
+            {
+                CodeInstruction instruction = new CodeInstruction(OpCodes.Ret);
+                instruction.labels.Add(label);
+                instructions.Add(instruction);
+            }
+        }
+        return false;
+    }
+    [Pure]
+    public static Label? LabelNext(IList<CodeInstruction> instructions, ILGenerator generator, int index, PatternMatch match, int shift = 0)
+    {
+        for (int i = index; i < instructions.Count; ++i)
+        {
+            if (match(instructions[i]))
+            {
+                int newIndex = i + shift;
+                if (instructions.Count > i)
+                {
+                    Label label = generator.DefineLabel();
+                    instructions[newIndex].labels.Add(label);
+                    return label;
+                }
+            }
+        }
+        return null;
+    }
+    [Pure]
+    public static Label LabelNextOrReturn(IList<CodeInstruction> instructions, ILGenerator generator, int index, PatternMatch match, int shift = 0)
+    {
+        Label label = generator.DefineLabel();
+        for (int i = index; i < instructions.Count; ++i)
+        {
+            if (match(instructions[i]))
+            {
+                int newIndex = i + shift;
+                if (instructions.Count > i)
+                {
+                    instructions[newIndex].labels.Add(label);
+                    return label;
+                }
+            }
+        }
+
+        if (instructions[instructions.Count - 1].opcode == OpCodes.Ret)
+            instructions[instructions.Count - 1].labels.Add(label);
+        else
+        {
+            CodeInstruction instruction = new CodeInstruction(OpCodes.Ret);
+            instruction.labels.Add(label);
+            instructions.Add(instruction);
+        }
+
+        return label;
+    }
+    [Pure]
+    public static Label? GetNextBranchTarget(IList<CodeInstruction> instructions, int index)
+    {
+        if (index < 0)
+            index = 0;
+        for (int i = index; i < instructions.Count; ++i)
+        {
+            if (instructions[i].Branches(out Label? label) && label.HasValue)
+                return label;
+        }
+
+        return null;
+    }
+    [Pure]
+    public static int FindLabelDestinationIndex(IList<CodeInstruction> instructions, Label label, int startIndex = 0)
+    {
+        if (startIndex < 0)
+            startIndex = 0;
+        for (int i = startIndex; i < instructions.Count; ++i)
+        {
+            List<Label>? labels = instructions[i].labels;
+            if (labels != null)
+            {
+                for (int j = 0; j < labels.Count; ++j)
+                {
+                    if (labels[j] == label)
+                        return i;
+                }
+            }
+        }
+
+        return -1;
+    }
+    [Pure]
     public static CodeInstruction GetLocalCodeInstruction(LocalBuilder? builder, int index, bool set, bool byref = false)
     {
         return new CodeInstruction(GetLocalCode(builder != null ? builder.LocalIndex : index, set, byref), builder);
     }
+#if CLIENT
+    /// <summary>Limits to 60 actions per second.</summary>
+    public static void InsertActionRateLimiter(int offset, Label beginLabel, IList<CodeInstruction> ins)
+    {
+        ins.Insert(offset, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
+        ins.Insert(offset + 1, new CodeInstruction(OpCodes.Brfalse_S, beginLabel));
+        ins.Insert(offset + 2, new CodeInstruction(OpCodes.Call, Accessor.GetRealtimeSinceStartup));
+        ins.Insert(offset + 3, new CodeInstruction(OpCodes.Ldsfld, EditorActions.LocalLastActionField));
+        ins.Insert(offset + 4, new CodeInstruction(OpCodes.Sub));
+        ins.Insert(offset + 5, new CodeInstruction(OpCodes.Ldc_R4, 1f / 60f));
+        ins.Insert(offset + 6, new CodeInstruction(OpCodes.Bge_S, beginLabel));
+        ins.Insert(offset + 7, new CodeInstruction(OpCodes.Ret));
+        if (ins.Count > offset + 8)
+            ins[offset + 8].labels.Add(beginLabel);
+        else
+        {
+            CodeInstruction rtn = new CodeInstruction(OpCodes.Ret);
+            rtn.labels.Add(beginLabel);
+            ins.Insert(offset + 8, rtn);
+        }
+    }
+#endif
+    [Pure]
+    public static unsafe int GetLabelId(this Label label) => *(int*)&label;
     [Pure]
     public static OpCode GetLocalCode(int index, bool set, bool byref = false)
     {
@@ -309,8 +556,8 @@ public static class PatchUtil
                 return comparand.IsLdc(false, false, false, false, true);
             if (opcode.IsLdc(false, false, false, false, false, true))
                 return comparand.IsLdc(false, false, false, false, false, true);
-            if (opcode.IsBr())
-                return comparand.IsBr();
+            if (opcode.IsBr(true))
+                return comparand.IsBr(true);
             if (opcode.IsBr(false, true))
                 return comparand.IsBr(false, true);
             if (opcode.IsBr(false, false, true))
@@ -389,7 +636,11 @@ public static class PatchUtil
     }
 
     [Pure]
-    public static bool IsBr(this OpCode opcode, bool br = true, bool brtrue = false, bool brfalse = false, bool beq = false, bool bne = false, bool bge = false, bool ble = false, bool bgt = false, bool blt = false)
+    public static bool IsBrAny(this OpCode opcode, bool br = true, bool brtrue = true, bool brfalse = true,
+        bool beq = true, bool bne = true, bool bge = true, bool ble = true, bool bgt = true, bool blt = true)
+        => opcode.IsBr(br, brtrue, brfalse, beq, bne, bge, ble, bgt, blt);
+    [Pure]
+    public static bool IsBr(this OpCode opcode, bool br = false, bool brtrue = false, bool brfalse = false, bool beq = false, bool bne = false, bool bge = false, bool ble = false, bool bgt = false, bool blt = false)
     {
         if (opcode == OpCodes.Br_S || opcode == OpCodes.Br)
             return br;
@@ -509,3 +760,4 @@ public static class PatchUtil
         }
     }
 }
+public delegate bool PatternMatch(CodeInstruction instruction);

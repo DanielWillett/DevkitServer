@@ -19,7 +19,7 @@ public sealed class NetTask : CustomYieldInstruction
     private Timer? timer;
     private static long lastReqId = 0;
     internal bool isCompleted = false;
-    public RequestResponse Parameters = RequestResponse.FAIL;
+    public RequestResponse Parameters = RequestResponse.Failed;
     internal readonly bool isAck;
     public override bool keepWaiting => !isCompleted;
     private NetTask()
@@ -77,7 +77,7 @@ public sealed class NetTask : CustomYieldInstruction
         isCompleted = true;
         if (!responded || parameters is null || parameters.Length == 0 || parameters[0] is not MessageContext ctx)
         {
-            Parameters = RequestResponse.FAIL;
+            Parameters = RequestResponse.Failed;
         }
         else
         {
@@ -97,7 +97,7 @@ public sealed class NetTask : CustomYieldInstruction
     {
         isCompleted = true;
         Parameters = !responded
-            ? RequestResponse.FAIL
+            ? RequestResponse.Failed
             : errorCode.HasValue
                 ? new RequestResponse(true, ctx, errorCode.Value)
                 : new RequestResponse(true, ctx, Array.Empty<object>());
@@ -138,19 +138,19 @@ public sealed class NetTask : CustomYieldInstruction
             SpinWait.SpinUntil(() => task1.isCompleted || DateTime.UtcNow > task1._awaiter.end);
             if (!task.isCompleted)
                 NetFactory.RemoveListener(task);
-            return task.Parameters.Parameters is null ? RequestResponse.FAIL : task.Parameters;
+            return task.Parameters.Parameters is null ? RequestResponse.Failed : task.Parameters;
         }
     }
 
 }
 public readonly struct RequestResponse
 {
-    public readonly static RequestResponse FAIL = new RequestResponse(false, MessageContext.Nil, Array.Empty<object>());
+    public static readonly RequestResponse Failed = new RequestResponse(false, MessageContext.Nil, Array.Empty<object>());
     public readonly bool Responded;
     public readonly MessageContext Context;
     public readonly object[] Parameters;
     public readonly int? ErrorCode;
-
+    public bool Success => Responded && ErrorCode is null or (int)StandardErrorCode.Success;
     public RequestResponse(bool responded, MessageContext context, int errorCode) : this(responded, context, Array.Empty<object>())
     {
         ErrorCode = errorCode;

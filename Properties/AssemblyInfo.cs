@@ -9,3 +9,4 @@ using System.Runtime.InteropServices;
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
 [assembly: Guid("c0fab04d-a5ef-4a40-88ec-4f8f9fb24180")]
+[assembly: InternalsVisibleTo("DevkitServer.Tests")]

@@ -1,4 +1,5 @@
-﻿using DevkitServer.Players;
+﻿using DevkitServer.Multiplayer.Levels;
+using DevkitServer.Players;
 #if SERVER
 using DevkitServer.Levels;
 #endif
@@ -68,6 +69,11 @@ public static class UserManager
         }
 
         Provider.kick(player, "Player not properly set up.");
+    }
+    internal static void OnAccepted(SteamPlayer steamPlayer)
+    {
+        EditorLevel.PendingToReceiveActions.Remove(steamPlayer.transportConnection);
+        Logger.LogInfo($"{steamPlayer.playerID.steamID.Format()} ({steamPlayer.playerID.playerName.Format(false)}) accepted.");
     }
     internal static bool AddUser(SteamPlayer pl)
     {

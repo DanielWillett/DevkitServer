@@ -17,6 +17,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Security;
+using UnityEngine.SceneManagement;
 using Module = SDG.Framework.Modules.Module;
 #if CLIENT
 #if DEBUG
@@ -40,7 +42,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static readonly string ServerRule = "DevkitServer";
     private static CancellationTokenSource? _tknSrc;
     private static string? _helpCache;
-    internal static readonly Color PluginColor = new Color32(0, 255, 153, 255);
+    internal static readonly Color ModuleColor = new Color32(0, 255, 153, 255);
     internal static readonly Color UnturnedColor = new Color32(99, 123, 99, 255);
     public Assembly Assembly { get; } = Assembly.GetExecutingAssembly();
     internal static string HelpCache => _helpCache ??= CommandLocalization.format("Help");
@@ -59,6 +61,8 @@ public sealed class DevkitServerModule : IModuleNexus
 #if SERVER
     public static BackupManager? BackupManager { get; private set; }
 #endif
+    public static bool UnityLoaded { get; private set; }
+    public static bool UnturnedLoaded { get; private set; }
 
     private static readonly LocalDatDictionary DefaultMainLocalization = new LocalDatDictionary
     {
@@ -81,13 +85,14 @@ public sealed class DevkitServerModule : IModuleNexus
     private static readonly LocalDatDictionary DefaultMessageLocalization = new LocalDatDictionary
     {
         { "NoPermissions", "No Permission" },
-        { "NoPermissionsWithPermission", "Missing Permission: {0}" },
-        { "Error", "Error {0}" },
+        { "NoPermissionsWithPermission", "Missing Permission\n{0}" },
+        { "Error", "Error\n{0}" },
         { "UnknownError", "Unknown Error" },
-        { "BeingSynced", "Syncing" },
+        { "Syncing", "Syncing" },
         { "FeatureDisabled", "Disabled" },
         { "UndoNotSupported", "Undo Not Supported" },
         { "RedoNotSupported", "Redo Not Supported" },
+        { "TooManySelections", "Too many items selected.\n{0}/{1}"}
     };
 
     public static CultureInfo CommandParseLocale { get; set; } = CultureInfo.InvariantCulture;
@@ -97,29 +102,61 @@ public sealed class DevkitServerModule : IModuleNexus
         BundleOrigin = new AssetOrigin { name = ModuleName, workshopFileId = 0ul };
         SetOverrideIDs?.Invoke(BundleOrigin, true);
     }
-    public static void EarlyInitialize()
-    {
-        LoadFaulted = false;
-        GameObjectHost = new GameObject(ModuleName);
-        ComponentHost = GameObjectHost.AddComponent<DevkitServerModuleComponent>();
-        Provider.gameMode = new DevkitServerGamemode();
-        Object.DontDestroyOnLoad(GameObjectHost);
-
-        Logger.InitLogger();
-        Logger.LogInfo($"{ModuleName.Colorize(PluginColor)} by {"BlazingFlame#0001".Colorize(new Color32(86, 98, 246, 255))} ({"https://github.com/DanielWillett".Format(false)}) initialized.");
-        Logger.LogInfo($"Please create an Issue for any bugs at {(RepositoryUrl + "/issues").Format(false)} (one bug per issue please).");
-        Logger.LogInfo($"Please give suggestions as a Discussion at {(RepositoryUrl + "/discussions/categories/ideas").Format(false)}.");
-        PatchesMain.Init();
-#if CLIENT
-        Logger.PostPatcherSetupInitLogger();
-#endif
-        GetAssetsInstance = Accessor.GenerateStaticGetter<Assets, Assets>("instance");
-        SetOverrideIDs = Accessor.GenerateInstanceSetter<AssetOrigin, bool>("shouldAssetsOverrideExistingIds");
-    }
-
     public void initialize()
     {
         Stopwatch watch = Stopwatch.StartNew();
+        bool loggerInited = false;
+        LoadFaulted = false;
+        try
+        {
+            try
+            {
+                _ = SceneManager.GetActiveScene();
+                UnityLoaded = true;
+            }
+            catch (SecurityException)
+            {
+                UnityLoaded = false;
+                UnturnedLoaded = false;
+                goto fault;
+            }
+            if (Type.GetType("SDG.Unturned.Provider, Assembly-CSharp", false, false) == null)
+            {
+                UnturnedLoaded = false;
+                goto fault;
+            }
+
+            UnturnedLoaded = true;
+            GameObjectHost = new GameObject(ModuleName);
+            ComponentHost = GameObjectHost.AddComponent<DevkitServerModuleComponent>();
+            GameObjectHost.AddComponent<CachedTime>();
+            Provider.gameMode = new DevkitServerGamemode();
+            Object.DontDestroyOnLoad(GameObjectHost);
+
+            Logger.InitLogger();
+            loggerInited = true;
+            PatchesMain.Init();
+#if CLIENT
+            Logger.PostPatcherSetupInitLogger();
+#endif
+            GetAssetsInstance = Accessor.GenerateStaticGetter<Assets, Assets>("instance");
+            SetOverrideIDs = Accessor.GenerateInstanceSetter<AssetOrigin, bool>("shouldAssetsOverrideExistingIds");
+        }
+        catch (Exception ex)
+        {
+            if (loggerInited)
+            {
+                Logger.LogError($"Error setting up {ModuleName.Colorize(ModuleColor)}");
+                Logger.LogError(ex);
+            }
+            else
+            {
+                CommandWindow.LogError($"Error setting up {ModuleName}.");
+                CommandWindow.LogError(ex);
+            }
+            Fault();
+            goto fault;
+        }
         try
         {
             Instance = this;
@@ -179,6 +216,7 @@ public sealed class DevkitServerModule : IModuleNexus
             Level.onPrePreLevelLoaded += OnPrePreLevelLoaded;
 #if SERVER
             Provider.onServerConnected += UserManager.AddUser;
+            Provider.onEnemyConnected += UserManager.OnAccepted;
             Provider.onServerDisconnected += UserManager.RemoveUser;
             Level.onLevelLoaded += OnLevelLoaded;
 #if USERINPUT_DEBUG
@@ -186,7 +224,7 @@ public sealed class DevkitServerModule : IModuleNexus
 #endif
 #else
 #if DEBUG
-            GameObjectHost.AddComponent<TileDebug>();
+            GameObjectHost.AddComponent<RegionDebug>();
 #endif
             DevkitServerGLUtility.Init();
             Provider.onClientConnected += EditorUser.OnClientConnected;
@@ -202,16 +240,14 @@ public sealed class DevkitServerModule : IModuleNexus
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error loading...");
-            Logger.LogError(ex);
             Fault();
+            Logger.LogError($"Error loading {ModuleName.Colorize(ModuleColor)}");
+            Logger.LogError(ex);
         }
-        finally
-        {
-            watch.Stop();
+        fault:
+        watch.Stop();
+        if (UnturnedLoaded)
             Logger.LogInfo($"{ModuleName} initializer took {watch.ElapsedMilliseconds} ms.");
-        }
-
         if (LoadFaulted)
         {
             try
@@ -222,9 +258,23 @@ public sealed class DevkitServerModule : IModuleNexus
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error unloading...");
-                Logger.LogError(ex);
+                if (loggerInited)
+                {
+                    Logger.LogError($"Error unloading {ModuleName.Colorize(ModuleColor)}.");
+                    Logger.LogError(ex);
+                }
+                else
+                {
+                    CommandWindow.LogError($"Error unloading {ModuleName}.");
+                    CommandWindow.LogError(ex);
+                }
             }
+        }
+        else
+        {
+            Logger.LogInfo($"{ModuleName.Colorize(ModuleColor)} by {"BlazingFlame#0001".Colorize(new Color32(86, 98, 246, 255))} ({"https://github.com/DanielWillett".Format(false)}) initialized.");
+            Logger.LogInfo($"Please create an Issue for any bugs at {(RepositoryUrl + "/issues").Format(false)} (one bug per issue please).");
+            Logger.LogInfo($"Please give suggestions as a Discussion at {(RepositoryUrl + "/discussions/categories/ideas").Format(false)}.");
         }
         GC.Collect();
     }
@@ -415,13 +465,19 @@ public sealed class DevkitServerModule : IModuleNexus
         DevkitServerUtility.CheckDirectory(false, false, DevkitServerConfig.LevelDirectory, typeof(DevkitServerConfig).GetProperty(nameof(DevkitServerConfig.LevelDirectory), BindingFlags.Public | BindingFlags.Static));
         BackupManager = GameObjectHost.AddComponent<BackupManager>();
 #endif
-        HierarchyResponsibilities.Reload();
-        LevelObjectResponsibilities.Reload();
+        BuildableResponsibilities.Init();
+        HierarchyResponsibilities.Init();
+        LevelObjectResponsibilities.Init();
         CartographyUtil.Reset();
     }
 
     public void shutdown()
     {
+        /* SAVE DATA */
+        HierarchyResponsibilities.Save();
+        LevelObjectResponsibilities.Save();
+        BuildableResponsibilities.Save();
+
         PluginLoader.Unload();
         _tknSrc?.Cancel();
         _tknSrc = null;
@@ -439,6 +495,7 @@ public sealed class DevkitServerModule : IModuleNexus
         Level.onPrePreLevelLoaded -= OnPrePreLevelLoaded;
 #if SERVER
         Provider.onServerConnected -= UserManager.AddUser;
+        Provider.onEnemyConnected -= UserManager.OnAccepted;
         Provider.onServerDisconnected -= UserManager.RemoveUser;
         Level.onLevelLoaded -= OnLevelLoaded;
         HighSpeedServer.Deinit();
@@ -450,18 +507,13 @@ public sealed class DevkitServerModule : IModuleNexus
         Provider.onEnemyDisconnected -= EditorUser.OnEnemyDisconnected;
         ChatManager.onChatMessageReceived -= OnChatMessageReceived;
         UserTPVControl.Deinit();
+        UIAccessTools.EditorUIReady -= EditorUIReady;
 #endif
 
         Instance = null!;
         GameObjectHost = null!;
         LoadFaulted = false;
         Logger.CloseLogger();
-    }
-
-    [ModuleInitializer]
-    public static void ModuleInitializer()
-    {
-        EarlyInitialize();
     }
 #if CLIENT
     internal static void RegisterDisconnectFromEditingServer()

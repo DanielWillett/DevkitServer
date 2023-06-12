@@ -39,6 +39,7 @@ public static class HierarchyUtil
     {
         SendRequestInstantiation.Invoke(type, position, rotation, scale);
     }
+    // todo queue in TemporaryActions if joining
     [NetCall(NetCallSource.FromServer, NetCalls.SendHierarchyInstantiation)]
     public static StandardErrorCode ReceiveHierarchyInstantiation(MessageContext ctx, IHierarchyItemTypeIdentifier? type, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner)
     {
@@ -167,6 +168,7 @@ public static class HierarchyUtil
             Object.Destroy(o);
         else LevelHierarchy.removeItem(item);
     }
+    [Pure]
     public static IDevkitHierarchyItem? FindItem(uint instanceId)
     {
         int ind = FindItemIndex(instanceId);
@@ -201,6 +203,7 @@ public static class HierarchyUtil
         return ~min;
     }
 #if SERVER
+    [Pure]
     public static bool CheckMovePermission(IDevkitHierarchyItem item, ulong user)
     {
         if (Permission.SuperuserPermission.Has(user))
@@ -223,6 +226,7 @@ public static class HierarchyUtil
             _ => false
         };
     }
+    [Pure]
     public static bool CheckPlacePermission(IHierarchyItemTypeIdentifier type, ulong user)
     {
         if (Permission.SuperuserPermission.Has(user))
@@ -242,6 +246,7 @@ public static class HierarchyUtil
             _ => false
         };
     }
+    [Pure]
     public static bool CheckDeletePermission(IDevkitHierarchyItem item, ulong user)
     {
         if (Permission.SuperuserPermission.Has(user))
@@ -265,6 +270,7 @@ public static class HierarchyUtil
         };
     }
 #elif CLIENT
+    [Pure]
     public static bool CheckMovePermission(IDevkitHierarchyItem item)
     {
         if (Permission.SuperuserPermission.Has())
@@ -287,6 +293,7 @@ public static class HierarchyUtil
             _ => false
         };
     }
+    [Pure]
     public static bool CheckPlacePermission(IHierarchyItemTypeIdentifier type)
     {
         if (Permission.SuperuserPermission.Has())
@@ -306,6 +313,7 @@ public static class HierarchyUtil
             _ => false
         };
     }
+    [Pure]
     public static Permission? GetPlacePermission(IHierarchyItemTypeIdentifier type)
     {
         return type switch
@@ -319,6 +327,7 @@ public static class HierarchyUtil
             _ => null
         };
     }
+    [Pure]
     public static bool CheckDeletePermission(IDevkitHierarchyItem item)
     {
         if (Permission.SuperuserPermission.Has())

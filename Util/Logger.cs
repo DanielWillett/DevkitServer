@@ -22,7 +22,6 @@ internal static class Logger
     private static ITerminal _term;
 #nullable restore
     public static readonly StackTraceCleaner StackCleaner;
-    private static readonly NetCall<string, Severity> SendLogMessage = new NetCall<string, Severity>((ushort)NetCalls.SendLog);
     private static List<(DateTime Timestamp, Severity Severity, string Message, ConsoleColor Color, string Method)>? _loadingErrors = new List<(DateTime, Severity, string, ConsoleColor, string)>();
     private static List<(DateTime Timestamp, Exception Exception, string Method)>? _loadingExceptions = new List<(DateTime, Exception, string)>();
     public static event TerminalPreReadDelegate? OnInputting;
@@ -186,27 +185,6 @@ internal static class Logger
         Terminal.OnInput -= OnTerminalInput;
         if (Terminal is Object obj)
             Object.Destroy(obj);
-    }
-#if SERVER
-    public static void SendLog(ITransportConnection connection, string message, Severity severity)
-    {
-        SendLogMessage.Invoke(connection, message, severity);
-    }
-    public static void SendLog(List<ITransportConnection> connections, string message, Severity severity)
-    {
-        SendLogMessage.Invoke(connections, message, severity);
-    }
-#else
-    public static void SendLog(string message, Severity severity)
-    {
-        SendLogMessage.Invoke(message, severity);
-    }
-#endif
-    [NetCall(NetCallSource.FromEither, (ushort)NetCalls.SendLog)]
-    private static void ReceiveLogMessage(MessageContext ctx, string message, Severity severity)
-    {
-        Log(severity, message);
-        ctx.Acknowledge(StandardErrorCode.Success);
     }
     public static void Log(Severity severity, string message, ConsoleColor? color = null)
     {

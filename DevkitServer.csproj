@@ -10,7 +10,7 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <RepositoryUrl>https://github.com/DanielWillett/DevkitServer</RepositoryUrl>
-    <Configurations>ClientDebug;ClientRelease;Debug;Release;ServerDebug;ServerRelease</Configurations>
+    <Configurations>ClientDebug;ClientRelease;ServerDebug;ServerRelease</Configurations>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
@@ -19,107 +19,27 @@
   <PropertyGroup>
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ClientDebug|AnyCPU'">
-    <DefineConstants>$(DefineConstants);DEBUG;CLIENT</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ClientRelease|AnyCPU'">
-    <DefineConstants>CLIENT</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ServerDebug|AnyCPU'">
-    <DefineConstants>$(DefineConstants);DEBUG;SERVER</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ServerRelease|AnyCPU'">
-    <DefineConstants>SERVER</DefineConstants>
-  </PropertyGroup>
+  <Import Project="$(SolutionDir)Common.targets" Condition="exists('$(SolutionDir)Common.targets')" />
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
     <Exec Command="SET &quot;sourcedir=$(OutDir)&#xD;&#xA;SET &quot;config=$(ConfigurationName)&#xD;&#xA;ECHO Building %25config%25&#xD;&#xA;IF %25config%25 == ClientDebug (&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Bin\$(ProjectName)_Client.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Bin\$(ProjectName)_Client.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Bin\$(ProjectName)_Client.xml*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Bin\$(ProjectName)_Client.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Bin\$(ProjectName)_Client.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Bin\$(ProjectName)_Client.xml*&quot;&#xD;&#xA;) ELSE IF %25config%25 == ClientRelease (&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Bin\$(ProjectName)_Client.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Bin\$(ProjectName)_Client.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Bin\$(ProjectName)_Client.xml*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Bin\$(ProjectName)_Client.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Bin\$(ProjectName)_Client.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Bin\$(ProjectName)_Client.xml*&quot;&#xD;&#xA;) ELSE IF %25config%25 == ServerDebug (&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Bin\$(ProjectName)_Server.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Bin\$(ProjectName)_Server.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Bin\$(ProjectName)_Server.xml*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Bin\$(ProjectName)_Server.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Bin\$(ProjectName)_Server.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Bin\$(ProjectName)_Server.xml*&quot;&#xD;&#xA;) ELSE IF %25config%25 == ServerRelease (&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Bin\$(ProjectName)_Server.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Bin\$(ProjectName)_Server.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Bin\$(ProjectName)_Server.xml*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Bin\$(ProjectName)_Server.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Bin\$(ProjectName)_Server.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Bin\$(ProjectName)_Server.xml*&quot;&#xD;&#xA;) ELSE (&#xD;&#xA; ECHO No files copied.&#xD;&#xA;)" />
   </Target>
-  <ItemGroup Condition="'$(Configuration)|$(Platform)'=='ServerRelease|AnyCPU' OR '$(Configuration)|$(Platform)'=='ServerDebug|AnyCPU'">
-    <Reference Include="Assembly-CSharp">
-      <HintPath>C:\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\Assembly-CSharp.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-  <ItemGroup Condition="'$(Configuration)|$(Platform)'=='ClientRelease|AnyCPU' OR '$(Configuration)|$(Platform)'=='ClientDebug|AnyCPU'">
-    <Reference Include="Assembly-CSharp">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\Assembly-CSharp.dll</HintPath>
-    </Reference>
-  </ItemGroup>
   <ItemGroup>
+    <Compile Remove="DevkitServer.Tests\**" />
+    <Compile Remove="packages\**" />
     <Compile Remove="TestPlugin\**" />
+    <EmbeddedResource Remove="DevkitServer.Tests\**" />
+    <EmbeddedResource Remove="packages\**" />
     <EmbeddedResource Remove="TestPlugin\**" />
+    <None Remove="DevkitServer.Tests\**" />
+    <None Remove="packages\**" />
     <None Remove="TestPlugin\**" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Assembly-CSharp">
-      <HintPath>..\..\..\..\..\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\Assembly-CSharp.dll</HintPath>
-    </Reference>
-    <Reference Include="com.rlabrecque.steamworks.net">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\com.rlabrecque.steamworks.net.dll</HintPath>
-    </Reference>
-    <Reference Include="Microsoft.CSharp">
-      <Aliases>CSharp</Aliases>
-    </Reference>
-    <Reference Include="SDG.Glazier.Runtime">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\SDG.Glazier.Runtime.dll</HintPath>
-    </Reference>
-    <Reference Include="SDG.NetPak.Runtime">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\SDG.NetPak.Runtime.dll</HintPath>
-    </Reference>
-    <Reference Include="SDG.NetTransport">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\SDG.NetTransport.dll</HintPath>
-    </Reference>
-    <Reference Include="StackCleaner">
-      <HintPath>C:\Libraries\StackCleaner.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Core" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="System.IO.Compression" />
-    <Reference Include="System.IO.Compression.FileSystem">
-      <HintPath>..\..\..\..\..\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Libraries\System.IO.Compression.FileSystem.dll</HintPath>
-    </Reference>
-    <Reference Include="SystemEx">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\SystemEx.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.TextMeshPro">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\Unity.TextMeshPro.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnityEngine.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.AssetBundleModule">
-      <HintPath>..\..\..\..\..\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\UnityEngine.AssetBundleModule.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.CoreModule">
-      <HintPath>..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.ImageConversionModule">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.IMGUIModule">
-      <HintPath>..\..\..\..\..\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.InputModule">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnityEngine.InputModule.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.PhysicsModule">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.TerrainModule">
-      <HintPath>..\..\..\..\..\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\UnityEngine.TerrainModule.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEx">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnityEx.dll</HintPath>
-    </Reference>
-    <Reference Include="UnturnedDat">
-      <HintPath>..\..\..\..\..\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\UnturnedDat.dll</HintPath>
-    </Reference>
+    <None Remove="Common.targets" />
   </ItemGroup>
   <ItemGroup>
     <Using Remove="System.Net.Http" />
     <Using Remove="System.Text" />
-    <PackageReference Include="Lib.Harmony" Version="2.2.2" />
-    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
-    <PackageReference Include="System.Text.Json" Version="7.0.2" />
     <Using Include="SDG.NetTransport" />
     <Using Include="SDG.Unturned" />
     <Using Include="Steamworks" />

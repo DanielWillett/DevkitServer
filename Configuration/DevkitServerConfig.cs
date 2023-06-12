@@ -214,6 +214,9 @@ public class SystemConfig
     [JsonPropertyName("visual_ansi_support")]
     public bool ConsoleVisualANSISupport { get; set; }
 
+    [JsonPropertyName("walmart_pc_support")]
+    public bool RemoveCosmeticImprovements { get; set; } // todo
+
 #if SERVER
     [JsonPropertyName("disable_map_download")]
     public bool DisableMapDownload { get; set; }
@@ -241,6 +244,7 @@ public class SystemConfig
     {
         ConsoleExtendedVisualANSISupport = true;
         ConsoleVisualANSISupport = true;
+        RemoveCosmeticImprovements = false;
 #if SERVER
         DisableMapDownload = false;
         TcpSettings = new TcpServerInfo { EnableHighSpeedSupport = false, HighSpeedPort = (ushort)(Provider.port + 2) };

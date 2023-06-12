@@ -1,12 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using DevkitServer.API;
+﻿using DevkitServer.API;
 using DevkitServer.API.Permissions;
 using DevkitServer.Plugins;
+using System.Reflection;
 
 namespace DevkitServer.Commands.Subsystem;
 public static class CommandEx

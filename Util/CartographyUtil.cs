@@ -51,7 +51,7 @@ public static class CartographyUtil
         Vector3 n = new Vector3((mapPos.x / _lvl.IntlMapImageWidth - 0.5f) * _lvl.IntlCaptureSize.x, (mapPos.y / _lvl.IntlMapImageHeight - 0.5f) * _lvl.IntlCaptureSize.y, 0f);
         return _lvl.IntlTransformMatrix.MultiplyPoint3x4(n);
     }
-    internal static void Reset() => _lvl?.Calculate();
+    internal static void Reset() => (_lvl ??= new CartographyData()).Calculate();
     private sealed class CartographyData
     {
         public bool IntlLegacyMapping;

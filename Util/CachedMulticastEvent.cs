@@ -110,6 +110,8 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
 
         DynamicMethod method = new DynamicMethod("TryInvoke" + type.Name, MethodAttributes.Private, CallingConventions.HasThis, typeof(void), types, wrapperType, true);
         ILGenerator il = method.GetILGenerator();
+        for (int i = 0; i < expectedParameters.Length; ++i)
+            method.DefineParameter(i + 1, expectedParameters[i].Attributes, expectedParameters[i].Name);
         il.DeclareLocal(typeof(int));
         il.DeclareLocal(type);
         il.DeclareLocal(type.MakeArrayType());

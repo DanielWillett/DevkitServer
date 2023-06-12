@@ -16,7 +16,7 @@ internal class LandscapeTilePatches
         // was ran in the read method or during an apply call, no need to update.
         if (!LandscapeUtil.SaveTransactions || Landscape.getTile(__instance.coord) == null) return;
 
-        ClientEvents.InvokeOnUpdateTileSplatmapLayers(new UpdateLandscapeTileProperties(__instance, Time.deltaTime));
+        ClientEvents.InvokeOnUpdateTileSplatmapLayers(new UpdateLandscapeTileProperties(__instance, CachedTime.DeltaTime));
         Logger.LogDebug("[CLIENT EVENTS] Tile prototypes updated: " + __instance.coord.Format() + ".");
     }
 }

@@ -29,7 +29,7 @@ public sealed class BackupManager : MonoBehaviour
         RefreshFromConfig(); // runs Restart in the OnReload handler.
         BackupConfiguration config = BackupConfiguration.Config;
         // if backup on startup is enabled and it didn't just save and it's not within the cooldown, backup.
-        if (config.BackupOnStartup && Time.realtimeSinceStartup - _lastSave > 5f)
+        if (config.BackupOnStartup && CachedTime.RealtimeSinceStartup - _lastSave > 5f)
         {
             if (config.BackupOnStartupCooldown <= TimeSpan.Zero ||
                 !TryGetLatestBackup(Level.info.name, out _, out DateTime utcTimestamp) ||
@@ -67,8 +67,8 @@ public sealed class BackupManager : MonoBehaviour
             LogNotEnabled();
             if (config.Behavior != BackupConfiguration.BackupBehavior.Disabled)
             {
-                Logger.LogWarning($"[BACKUPS] This is because \"{"max_backups".Colorize(DevkitServerModule.PluginColor)}\" or " +
-                                  $"\"{"max_total_backup_size_mb".Colorize(DevkitServerModule.PluginColor)}\" is set to zero. " +
+                Logger.LogWarning($"[BACKUPS] This is because \"{"max_backups".Colorize(DevkitServerModule.ModuleColor)}\" or " +
+                                  $"\"{"max_total_backup_size_mb".Colorize(DevkitServerModule.ModuleColor)}\" is set to zero. " +
                                   $"Use {(-1).Format()} instead for unlimited.", method: Source);
             }
             return;
@@ -91,8 +91,8 @@ public sealed class BackupManager : MonoBehaviour
         else
         {
             Logger.LogWarning("There are no limits set on backups, not recommended. " +
-                             $"Set \"{"max_backups".Colorize(DevkitServerModule.PluginColor)}\" and/or " +
-                             $"\"{"max_total_backup_size_mb".Colorize(DevkitServerModule.PluginColor)}\" " +
+                             $"Set \"{"max_backups".Colorize(DevkitServerModule.ModuleColor)}\" and/or " +
+                             $"\"{"max_total_backup_size_mb".Colorize(DevkitServerModule.ModuleColor)}\" " +
                               "to create a ring buffer for backups.", method: Source);
         }
 
@@ -158,7 +158,7 @@ public sealed class BackupManager : MonoBehaviour
 
     private void OnDisconnected(CSteamID steamid)
     {
-        if (Time.realtimeSinceStartup - _lastSave > 5f)
+        if (CachedTime.RealtimeSinceStartup - _lastSave > 5f)
             Backup();
         else
             Logger.LogInfo($"[{Source}] Backup {DateTime.UtcNow.ToString(FileNameDateFormat).Format(false)} (UTC) skipped because the level was very recently backed up.");
@@ -171,7 +171,7 @@ public sealed class BackupManager : MonoBehaviour
         Stopwatch timer = Stopwatch.StartNew();
         if (_working)
             SpinWait.SpinUntil(() => !_working);
-        _lastSave = Time.realtimeSinceStartup;
+        _lastSave = CachedTime.RealtimeSinceStartup;
         Logger.LogInfo($"[{Source}] Backing up {Level.info.name.Format(false)}...");
         DateTimeOffset timestamp = DateTimeOffset.UtcNow;
         LevelData save = LevelData.GatherLevelData();
@@ -443,7 +443,7 @@ public sealed class BackupManager : MonoBehaviour
             yield return new WaitForSecondsRealtime((float)interval);
             if (!configSkipInactive || PlayerHasJoinedSinceLastBackup)
             {
-                if (Time.realtimeSinceStartup - _lastSave > 5f)
+                if (CachedTime.RealtimeSinceStartup - _lastSave > 5f)
                     Backup(maxBackups, maxSizeMb, configSaveLogs);
                 else
                     Logger.LogInfo($"[{Source}] Backup {DateTime.Now.ToString(FileNameDateFormat).Format(false)} (LOCAL) skipped because the level was very recently backed up.");
@@ -484,7 +484,7 @@ public sealed class BackupManager : MonoBehaviour
             yield return new WaitForSecondsRealtime((float)(next.Value - now).TotalSeconds);
             if (!configSkipInactive || PlayerHasJoinedSinceLastBackup)
             {
-                if (Time.realtimeSinceStartup - _lastSave > 5f)
+                if (CachedTime.RealtimeSinceStartup - _lastSave > 5f)
                     Backup(maxBackups, maxSizeMb, configSaveLogs);
                 else
                     Logger.LogInfo($"[{Source}] Backup {DateTime.Now.ToString(FileNameDateFormat).Format(false)} (LOCAL) skipped because the level was very recently backed up.");

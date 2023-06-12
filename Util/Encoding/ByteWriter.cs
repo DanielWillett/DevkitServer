@@ -115,31 +115,31 @@ public class ByteWriter
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static unsafe void EndianCheck(byte* litEndStrt, int size)
     {
-        if (IsBigEndian && size > 1) Reverse(litEndStrt, size);
+        if (size > 1 && IsBigEndian) Reverse(litEndStrt, size);
     }
     private unsafe void WriteInternal<T>(T value) where T : unmanaged
     {
+        int size = sizeof(T);
         if (_streamMode)
         {
-            int size = sizeof(T);
             if (_buffer.Length < size)
                 _buffer = new byte[size];
             fixed (byte* ptr = _buffer)
             {
                 *(T*)ptr = value;
-                EndianCheck(ptr, sizeof(T));
+                EndianCheck(ptr, size);
             }
             _stream!.Write(_buffer, 0, size);
             _size += size;
             return;
         }
-        int newsize = _size + sizeof(T);
+        int newsize = _size + size;
         if (newsize > _buffer.Length)
             ExtendBufferIntl(newsize);
         fixed (byte* ptr = &_buffer[_size])
         {
             *(T*)ptr = value;
-            EndianCheck(ptr, sizeof(T));
+            EndianCheck(ptr, size);
         }
         _size = newsize;
     }
@@ -342,18 +342,25 @@ public class ByteWriter
 
     public void WriteInt24(int n)
     {
-        if (n > DevkitServerUtility.Int24Bounds)
-            n = DevkitServerUtility.Int24Bounds;
-        if (n < -DevkitServerUtility.Int24Bounds)
-            n = -DevkitServerUtility.Int24Bounds;
-        n += DevkitServerUtility.Int24Bounds;
+        if (n > DevkitServerUtility.Int24MaxValue)
+            n = DevkitServerUtility.Int24MaxValue;
+        if (n < -DevkitServerUtility.Int24MaxValue)
+            n = -DevkitServerUtility.Int24MaxValue;
+        n += DevkitServerUtility.Int24MaxValue;
         // sign bit
         byte b = (byte)((n >> 16) & 0xFF);
         WriteInternal((ushort)(n & 0xFFFF));
         WriteInternal(b);
     }
 
-    public void WriteUInt24(uint n) => WriteInt24(unchecked((int)n));
+    public void WriteUInt24(uint n)
+    {
+        if (n > DevkitServerUtility.Int24MaxValue)
+        {
+            WriteInt24((int)-(n - DevkitServerUtility.Int24MaxValue));
+        }
+        else WriteInt24((int)n);
+    }
 
     private static readonly MethodInfo WriteNullableUInt16Method = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(ushort?) }, null);
     public void WriteNullable(ushort? n)
@@ -516,7 +523,10 @@ public class ByteWriter
         if (ns.Length > 0)
             ns += ".";
         WriteInternal(flag);
-        Write(ns + type.Name);
+        string str = ns + type.Name;
+        if (flag == 0)
+            str += ", " + type.Assembly.GetName().Name;
+        Write(str);
     }
 
 
@@ -1024,6 +1034,57 @@ public class ByteWriter
         System.Buffer.BlockCopy(n, 0, _buffer, _size + sizeof(ushort), len);
         _size = newsize;
     }
+    public void WriteZeroCompressed(byte[] n, bool @long = false)
+    {
+        int len = n.Length;
+        if (!@long)
+        {
+            len = Math.Min(len, ushort.MaxValue);
+            WriteInternal((ushort)len);
+        }
+        else
+            WriteInternal(len);
+
+        int valuesWriting = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            byte c = n[i];
+
+            if (valuesWriting == 0)
+            {
+                if (c == 0)
+                {
+                    int ct = 1;
+                    for (int j = i + 1; j < len; ++j)
+                    {
+                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        {
+                            ct = j - i + 1;
+                            break;
+                        }
+                    }
+                    WriteInternal((byte)ct);
+                    i += ct - 1;
+                    continue;
+                }
+                WriteInternal((byte)255);
+                valuesWriting = len - i;
+                for (int j = i + 1; j < len; ++j)
+                {
+                    if (j - i > 254 || n[j] == 0 && j + 2 < len && n[j + 1] == 0 && n[j + 2] == 0)
+                    {
+                        valuesWriting = j - i;
+                        break;
+                    }
+                }
+
+                WriteInternal((byte)valuesWriting);
+            }
+
+            WriteInternal(n[i]);
+            --valuesWriting;
+        }
+    }
 
 
     private static readonly MethodInfo WriteNullableUInt8ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(byte[]) }, null);
@@ -1101,6 +1162,57 @@ public class ByteWriter
 
     private static readonly MethodInfo WriteInt32ArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int[]) }, null);
     public void Write(int[] n) => WriteInternal(n);
+    public void WriteZeroCompressed(int[] n, bool @long = false)
+    {
+        int len = n.Length;
+        if (!@long)
+        {
+            len = Math.Min(len, ushort.MaxValue);
+            WriteInternal((ushort)len);
+        }
+        else
+            WriteInternal(len);
+
+        int valuesWriting = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            int c = n[i];
+
+            if (valuesWriting == 0)
+            {
+                if (c == 0)
+                {
+                    int ct = 1;
+                    for (int j = i + 1; j < len; ++j)
+                    {
+                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        {
+                            ct = j - i + 1;
+                            break;
+                        }
+                    }
+                    WriteInternal((byte)ct);
+                    i += ct - 1;
+                    continue;
+                }
+                WriteInternal((byte)255);
+                valuesWriting = len - i;
+                for (int j = i + 1; j < len; ++j)
+                {
+                    if (j - i > 254 || n[j] == 0 && j + 2 < len && n[j + 1] == 0 && n[j + 2] == 0)
+                    {
+                        valuesWriting = j - i;
+                        break;
+                    }
+                }
+
+                WriteInternal((byte)valuesWriting);
+            }
+
+            WriteInternal(n[i]);
+            --valuesWriting;
+        }
+    }
 
 
     private static readonly MethodInfo WriteNullableInt32ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int[]) }, null);
@@ -1117,6 +1229,57 @@ public class ByteWriter
 
     private static readonly MethodInfo WriteUInt32ArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(uint[]) }, null);
     public void Write(uint[] n) => WriteInternal(n);
+    public void WriteZeroCompressed(uint[] n, bool @long = false)
+    {
+        int len = n.Length;
+        if (!@long)
+        {
+            len = Math.Min(len, ushort.MaxValue);
+            WriteInternal((ushort)len);
+        }
+        else
+            WriteInternal(len);
+
+        int valuesWriting = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            uint c = n[i];
+
+            if (valuesWriting == 0)
+            {
+                if (c == 0)
+                {
+                    int ct = 1;
+                    for (int j = i + 1; j < len; ++j)
+                    {
+                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        {
+                            ct = j - i + 1;
+                            break;
+                        }
+                    }
+                    WriteInternal((byte)ct);
+                    i += ct - 1;
+                    continue;
+                }
+                WriteInternal((byte)255);
+                valuesWriting = len - i;
+                for (int j = i + 1; j < len; ++j)
+                {
+                    if (j - i > 254 || n[j] == 0 && j + 2 < len && n[j + 1] == 0 && n[j + 2] == 0)
+                    {
+                        valuesWriting = j - i;
+                        break;
+                    }
+                }
+
+                WriteInternal((byte)valuesWriting);
+            }
+
+            WriteInternal(n[i]);
+            --valuesWriting;
+        }
+    }
 
 
     private static readonly MethodInfo WriteNullableUInt32ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(uint[]) }, null);
@@ -1133,6 +1296,57 @@ public class ByteWriter
 
     private static readonly MethodInfo WriteInt8ArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(sbyte[]) }, null);
     public void Write(sbyte[] n) => WriteInternal(n);
+    public void WriteZeroCompressed(sbyte[] n, bool @long = false)
+    {
+        int len = n.Length;
+        if (!@long)
+        {
+            len = Math.Min(len, ushort.MaxValue);
+            WriteInternal((ushort)len);
+        }
+        else
+            WriteInternal(len);
+
+        int valuesWriting = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            sbyte c = n[i];
+
+            if (valuesWriting == 0)
+            {
+                if (c == 0)
+                {
+                    int ct = 1;
+                    for (int j = i + 1; j < len; ++j)
+                    {
+                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        {
+                            ct = j - i + 1;
+                            break;
+                        }
+                    }
+                    WriteInternal((byte)ct);
+                    i += ct - 1;
+                    continue;
+                }
+                WriteInternal((byte)255);
+                valuesWriting = len - i;
+                for (int j = i + 1; j < len; ++j)
+                {
+                    if (j - i > 254 || n[j] == 0 && j + 2 < len && n[j + 1] == 0 && n[j + 2] == 0)
+                    {
+                        valuesWriting = j - i;
+                        break;
+                    }
+                }
+
+                WriteInternal((byte)valuesWriting);
+            }
+
+            WriteInternal(n[i]);
+            --valuesWriting;
+        }
+    }
 
 
     private static readonly MethodInfo WriteNullableInt8ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(sbyte[]) }, null);
@@ -1203,6 +1417,55 @@ public class ByteWriter
             _size += size;
         }
     }
+    
+    public unsafe void WriteLong(bool[] n)
+    {
+        int size;
+        if (!_streamMode)
+        {
+            int newsize = _size + (int)Math.Ceiling(n.Length / 8f) + sizeof(int);
+            if (newsize > _buffer.Length)
+                ExtendBufferIntl(newsize);
+            size = newsize;
+        }
+        else
+        {
+            size = (int)Math.Ceiling(n.Length / 8d) + sizeof(int);
+            if (_buffer.Length < size) _buffer = new byte[size];
+        }
+
+        fixed (byte* ptr = _buffer)
+        {
+            byte* ptr2 = _streamMode ? ptr : ptr + _size;
+            *(int*)ptr2 = n.Length;
+            EndianCheck(ptr, sizeof(int));
+            ptr2 += sizeof(int);
+            byte current = 0;
+            int cutoff = n.Length - 1;
+            for (int i = 0; i < n.Length; i++)
+            {
+                bool c = n[i];
+                int mod = i % 8;
+                if (mod == 0 && i != 0)
+                {
+                    *ptr2 = current;
+                    ptr2++;
+                    current = (byte)(c ? 1 : 0);
+                }
+                else if (c) current |= (byte)(1 << mod);
+                if (i == cutoff)
+                    *ptr2 = current;
+            }
+        }
+
+        if (!_streamMode)
+            _size = size;
+        else
+        {
+            _stream!.Write(_buffer, 0, size);
+            _size += size;
+        }
+    }
 
 
     private static readonly MethodInfo WriteNullableBooleanArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(bool[]) }, null);
@@ -1219,6 +1482,57 @@ public class ByteWriter
 
     private static readonly MethodInfo WriteInt64ArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(long[]) }, null);
     public void Write(long[] n) => WriteInternal(n);
+    public void WriteZeroCompressed(long[] n, bool @long = false)
+    {
+        int len = n.Length;
+        if (!@long)
+        {
+            len = Math.Min(len, ushort.MaxValue);
+            WriteInternal((ushort)len);
+        }
+        else
+            WriteInternal(len);
+
+        int valuesWriting = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            long c = n[i];
+
+            if (valuesWriting == 0)
+            {
+                if (c == 0)
+                {
+                    int ct = 1;
+                    for (int j = i + 1; j < len; ++j)
+                    {
+                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        {
+                            ct = j - i + 1;
+                            break;
+                        }
+                    }
+                    WriteInternal((byte)ct);
+                    i += ct - 1;
+                    continue;
+                }
+                WriteInternal((byte)255);
+                valuesWriting = len - i;
+                for (int j = i + 1; j < len; ++j)
+                {
+                    if (j - i > 254 || n[j] == 0 && j + 1 < len && n[j + 1] == 0)
+                    {
+                        valuesWriting = j - i;
+                        break;
+                    }
+                }
+
+                WriteInternal((byte)valuesWriting);
+            }
+
+            WriteInternal(n[i]);
+            --valuesWriting;
+        }
+    }
 
 
     private static readonly MethodInfo WriteNullableInt64ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(long[]) }, null);
@@ -1235,6 +1549,57 @@ public class ByteWriter
 
     private static readonly MethodInfo WriteUInt64ArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(ulong[]) }, null);
     public void Write(ulong[] n) => WriteInternal(n);
+    public void WriteZeroCompressed(ulong[] n, bool @long = false)
+    {
+        int len = n.Length;
+        if (!@long)
+        {
+            len = Math.Min(len, ushort.MaxValue);
+            WriteInternal((ushort)len);
+        }
+        else
+            WriteInternal(len);
+
+        int valuesWriting = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            ulong c = n[i];
+
+            if (valuesWriting == 0)
+            {
+                if (c == 0)
+                {
+                    int ct = 1;
+                    for (int j = i + 1; j < len; ++j)
+                    {
+                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        {
+                            ct = j - i + 1;
+                            break;
+                        }
+                    }
+                    WriteInternal((byte)ct);
+                    i += ct - 1;
+                    continue;
+                }
+                WriteInternal((byte)255);
+                valuesWriting = len - i;
+                for (int j = i + 1; j < len; ++j)
+                {
+                    if (j - i > 254 || n[j] == 0 && j + 1 < len && n[j + 1] == 0)
+                    {
+                        valuesWriting = j - i;
+                        break;
+                    }
+                }
+
+                WriteInternal((byte)valuesWriting);
+            }
+
+            WriteInternal(n[i]);
+            --valuesWriting;
+        }
+    }
 
 
     private static readonly MethodInfo WriteNullableUInt64ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(ulong[]) }, null);
@@ -1251,6 +1616,57 @@ public class ByteWriter
 
     private static readonly MethodInfo WriteInt16ArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(short[]) }, null);
     public void Write(short[] n) => WriteInternal(n);
+    public void WriteZeroCompressed(short[] n, bool @long)
+    {
+        int len = n.Length;
+        if (!@long)
+        {
+            len = Math.Min(len, ushort.MaxValue);
+            WriteInternal((ushort)len);
+        }
+        else
+            WriteInternal(len);
+
+        int valuesWriting = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            short c = n[i];
+
+            if (valuesWriting == 0)
+            {
+                if (c == 0)
+                {
+                    int ct = 1;
+                    for (int j = i + 1; j < len; ++j)
+                    {
+                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        {
+                            ct = j - i + 1;
+                            break;
+                        }
+                    }
+                    WriteInternal((byte)ct);
+                    i += ct - 1;
+                    continue;
+                }
+                WriteInternal((byte)255);
+                valuesWriting = len - i;
+                for (int j = i + 1; j < len; ++j)
+                {
+                    if (j - i > 254 || n[j] == 0 && j + 2 < len && n[j + 1] == 0 && n[j + 2] == 0)
+                    {
+                        valuesWriting = j - i;
+                        break;
+                    }
+                }
+
+                WriteInternal((byte)valuesWriting);
+            }
+
+            WriteInternal(n[i]);
+            --valuesWriting;
+        }
+    }
 
 
     private static readonly MethodInfo WriteNullableInt16ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(short[]) }, null);
@@ -1267,6 +1683,57 @@ public class ByteWriter
 
     private static readonly MethodInfo WriteUInt16ArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(ushort[]) }, null);
     public void Write(ushort[] n) => WriteInternal(n);
+    public void WriteZeroCompressed(ushort[] n, bool @long)
+    {
+        int len = n.Length;
+        if (!@long)
+        {
+            len = Math.Min(len, ushort.MaxValue);
+            WriteInternal((ushort)len);
+        }
+        else
+            WriteInternal(len);
+
+        int valuesWriting = 0;
+        for (int i = 0; i < len; ++i)
+        {
+            ushort c = n[i];
+
+            if (valuesWriting == 0)
+            {
+                if (c == 0)
+                {
+                    int ct = 1;
+                    for (int j = i + 1; j < len; ++j)
+                    {
+                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        {
+                            ct = j - i + 1;
+                            break;
+                        }
+                    }
+                    WriteInternal((byte)ct);
+                    i += ct - 1;
+                    continue;
+                }
+                WriteInternal((byte)255);
+                valuesWriting = len - i;
+                for (int j = i + 1; j < len; ++j)
+                {
+                    if (j - i > 254 || n[j] == 0 && j + 2 < len && n[j + 1] == 0 && n[j + 2] == 0)
+                    {
+                        valuesWriting = j - i;
+                        break;
+                    }
+                }
+
+                WriteInternal((byte)valuesWriting);
+            }
+
+            WriteInternal(n[i]);
+            --valuesWriting;
+        }
+    }
 
 
     private static readonly MethodInfo WriteNullableUInt16ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(ushort[]) }, null);

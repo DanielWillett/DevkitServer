@@ -404,7 +404,7 @@ internal static class TerrainEditorPatches
         bool allow = true;
         if (EditorActions.IsPlayingCatchUp)
         {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("BeingSynced"));
+            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
         if (UserInput.ActiveTool is TerrainEditor editor && GetTerrainBrushWorldPosition != null)
@@ -425,7 +425,7 @@ internal static class TerrainEditorPatches
                 {
                     if (pendingSync.Value.CollidesWith2DCircle(GetTerrainBrushWorldPosition(editor), rad))
                     {
-                        UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("BeingSynced"));
+                        UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
                         return false;
                     }
                 }
@@ -464,7 +464,7 @@ internal static class TerrainEditorPatches
     {
         if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetRampStart == null || GetRampEnd == null) return;
 
-        ClientEvents.InvokeOnPaintRamp(new PaintRampProperties(bounds, GetRampStart(editor), GetRampEnd(editor), editor.heightmapBrushRadius, editor.heightmapBrushFalloff, Time.deltaTime));
+        ClientEvents.InvokeOnPaintRamp(new PaintRampProperties(bounds, GetRampStart(editor), GetRampEnd(editor), editor.heightmapBrushRadius, editor.heightmapBrushFalloff, CachedTime.DeltaTime));
     }
     [UsedImplicitly]
     private static void OnAdjustConfirm(Bounds bounds)
@@ -474,7 +474,7 @@ internal static class TerrainEditorPatches
         ClientEvents.InvokeOnAdjustHeightmap(new AdjustHeightmapProperties(bounds, GetTerrainBrushWorldPosition(editor),
             editor.heightmapBrushRadius, editor.heightmapBrushFalloff,
             editor.heightmapBrushStrength, editor.heightmapAdjustSensitivity,
-            Time.deltaTime, InputEx.GetKey(KeyCode.LeftShift)));
+            CachedTime.DeltaTime, InputEx.GetKey(KeyCode.LeftShift)));
     }
     [UsedImplicitly]
     private static void OnFlattenConfirm(Bounds bounds)
@@ -484,7 +484,7 @@ internal static class TerrainEditorPatches
         ClientEvents.InvokeOnFlattenHeightmap(new FlattenHeightmapProperties(bounds, GetTerrainBrushWorldPosition(editor), DevkitLandscapeToolHeightmapOptions.instance.flattenMethod,
             editor.heightmapBrushRadius, editor.heightmapBrushFalloff,
             editor.heightmapBrushStrength, editor.heightmapFlattenSensitivity,
-            editor.heightmapFlattenTarget, Time.deltaTime));
+            editor.heightmapFlattenTarget, CachedTime.DeltaTime));
     }
     [UsedImplicitly]
     private static void OnSmoothConfirm(Bounds bounds)
@@ -493,7 +493,7 @@ internal static class TerrainEditorPatches
 
         ClientEvents.InvokeOnSmoothHeightmap(new SmoothHeightmapProperties(bounds, GetTerrainBrushWorldPosition(editor), DevkitLandscapeToolHeightmapOptions.instance.smoothMethod,
             editor.heightmapBrushRadius, editor.heightmapBrushFalloff,
-            editor.heightmapBrushStrength, GetHeightmapSmoothTarget(editor), Time.deltaTime));
+            editor.heightmapBrushStrength, GetHeightmapSmoothTarget(editor), CachedTime.DeltaTime));
     }
     [UsedImplicitly]
     private static void OnPaintConfirm(Bounds bounds)
@@ -504,7 +504,7 @@ internal static class TerrainEditorPatches
 
         ClientEvents.InvokeOnPaintSplatmap(new PaintSplatmapProperties(bounds, GetTerrainBrushWorldPosition(editor), editor.splatmapBrushRadius,
             editor.splatmapBrushFalloff, editor.splatmapBrushStrength, editor.splatmapPaintSensitivity,
-            editor.splatmapWeightTarget, Time.deltaTime, InputEx.GetKey(KeyCode.LeftControl) || editor.splatmapUseWeightTarget,
+            editor.splatmapWeightTarget, CachedTime.DeltaTime, InputEx.GetKey(KeyCode.LeftControl) || editor.splatmapUseWeightTarget,
             settings.useAutoSlope, settings.useAutoFoundation,
             InputEx.GetKey(KeyCode.LeftShift),
             new AutoSlopeProperties(settings.autoMinAngleBegin, settings.autoMinAngleEnd, settings.autoMaxAngleBegin, settings.autoMaxAngleEnd),
@@ -520,7 +520,7 @@ internal static class TerrainEditorPatches
 
         ClientEvents.InvokeOnAutoPaintSplatmap(new PaintSplatmapProperties(bounds, GetTerrainBrushWorldPosition(editor), editor.splatmapBrushRadius,
             editor.splatmapBrushFalloff, editor.splatmapBrushStrength, editor.splatmapPaintSensitivity,
-            editor.splatmapWeightTarget, Time.deltaTime, InputEx.GetKey(KeyCode.LeftControl) || editor.splatmapUseWeightTarget,
+            editor.splatmapWeightTarget, CachedTime.DeltaTime, InputEx.GetKey(KeyCode.LeftControl) || editor.splatmapUseWeightTarget,
             settings.useAutoSlope, settings.useAutoFoundation,
             InputEx.GetKey(KeyCode.LeftShift),
             new AutoSlopeProperties(settings.autoMinAngleBegin, settings.autoMinAngleEnd, settings.autoMaxAngleBegin, settings.autoMaxAngleEnd),
@@ -534,7 +534,7 @@ internal static class TerrainEditorPatches
         if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
 
         ClientEvents.InvokeOnSmoothSplatmap(new SmoothSplatmapProperties(bounds, GetTerrainBrushWorldPosition(editor), DevkitLandscapeToolSplatmapOptions.instance.smoothMethod, editor.splatmapBrushRadius,
-            editor.splatmapBrushFalloff, editor.splatmapBrushStrength, Time.deltaTime));
+            editor.splatmapBrushFalloff, editor.splatmapBrushStrength, CachedTime.DeltaTime));
     }
     [UsedImplicitly]
     private static void OnHoleConfirm(Bounds bounds)
@@ -549,7 +549,7 @@ internal static class TerrainEditorPatches
         if (!DevkitServerModule.IsEditing) return;
 
         Logger.LogDebug("[CLIENT EVENTS] Tile added: " + tile.coord.Format() + ".");
-        ClientEvents.InvokeOnAddTile(new UpdateLandscapeTileProperties(tile, Time.deltaTime));
+        ClientEvents.InvokeOnAddTile(new UpdateLandscapeTileProperties(tile, CachedTime.DeltaTime));
     }
     [UsedImplicitly]
     private static void OnRemoveTile()
@@ -558,7 +558,7 @@ internal static class TerrainEditorPatches
 
         LandscapeTile? tile = TerrainEditor.selectedTile;
         if (tile == null) return;
-        ClientEvents.InvokeOnDeleteTile(new UpdateLandscapeTileProperties(tile, Time.deltaTime));
+        ClientEvents.InvokeOnDeleteTile(new UpdateLandscapeTileProperties(tile, CachedTime.DeltaTime));
     }
 }
 #endif

@@ -32,7 +32,7 @@ public static class EditorLevel
     [UsedImplicitly]
     private static readonly NetCall<int, int> SendCheckup = new NetCall<int, int>((ushort)NetCalls.RequestLevelCheckup);
     [UsedImplicitly]
-    private static readonly NetCallRaw<byte[], bool> SendWholeLevel = new NetCallRaw<byte[], bool>((ushort)HighSpeedNetCall.SendWholeLevel, reader => reader.ReadLongBytes(), null, (writer, b) => writer.WriteLong(b), null
+    private static readonly NetCallRaw<byte[], bool> SendWholeLevel = new NetCallRaw<byte[], bool>((ushort)HighSpeedNetCall.SendWholeLevel, reader => reader.ReadLongUInt8Array(), null, (writer, b) => writer.WriteLong(b), null
 #if SERVER
         , capacity: 80000000
 #endif
@@ -131,7 +131,7 @@ public static class EditorLevel
 
             Logger.LogDebug(lowSpeedDownload ? "[SEND LEVEL] Using low-speed (Steamworks) download option." : "[SEND LEVEL] Using high-speed (TCP) download option.");
             const int firstCheckupPosition = 25 - 1;
-            float startTime = Time.realtimeSinceStartup;
+            float startTime = CachedTime.RealtimeSinceStartup;
             string lvlName = Level.info.name;
             Coroutine compress = DevkitServerModule.ComponentHost.StartCoroutine(GatherAndCompressLevel(connection));
             NetTask task2 = EndSendLevel.Listen();
@@ -144,7 +144,7 @@ public static class EditorLevel
                 float[] pings = new float[pingCt];
                 for (int i = 0; i < pingCt; ++i)
                 {
-                    float start = Time.realtimeSinceStartup;
+                    float start = CachedTime.RealtimeSinceStartup;
                     NetTask task4 = Ping.RequestAck(connection, 2000);
                     while (!task4.isCompleted)
                         yield return null;
@@ -155,7 +155,7 @@ public static class EditorLevel
                         yield break;
                     }
 
-                    pings[i] = Time.realtimeSinceStartup - start;
+                    pings[i] = CachedTime.RealtimeSinceStartup - start;
                     yield return new WaitForSeconds(pingSpacing);
                 }
 
@@ -181,7 +181,7 @@ public static class EditorLevel
             yield return new WaitForSecondsRealtime(0.25f);
             if (!_isCompressingLevel)
                 _lvl = null;
-            Logger.LogInfo($"[SEND LEVEL] Gathered level data ({DevkitServerUtility.FormatBytes(data.Length)}) for ({connection.Format()}) after {Time.realtimeSinceStartup - startTime:F2} seconds.", ConsoleColor.DarkCyan);
+            Logger.LogInfo($"[SEND LEVEL] Gathered level data ({DevkitServerUtility.FormatBytes(data.Length)}) for ({connection.Format()}) after {CachedTime.RealtimeSinceStartup - startTime:F2} seconds.", ConsoleColor.DarkCyan);
 
             if (!lowSpeedDownload)
             {
@@ -246,7 +246,7 @@ public static class EditorLevel
                     packetDelay = 0.05f;
                 int checkup = firstCheckupPosition;
                 int lastCheckup = 0;
-                startTime = Time.realtimeSinceStartup;
+                startTime = CachedTime.RealtimeSinceStartup;
                 Logger.LogInfo($"[SEND LEVEL] Sending {ttl} packets for level data ({lvlName}).", ConsoleColor.DarkCyan);
                 while (true)
                 {
@@ -259,9 +259,6 @@ public static class EditorLevel
                     cpy.GetBytes(dataBuffer, 0);
                     UnsafeBitConverter.GetBytes(dataBuffer, c, cpy.Length);
                     connection.Send(dataBuffer, false);
-                    //yield return null;
-                    // DevkitServerUtility.PrintBytesHex(dataBuffer, 32, 64);
-                    // Logger.LogDebug($"[SEND LEVEL] Sent {DevkitServerUtility.FormatBytes(len)} from index #{index} as packet {c + 1} / {ttl} at time {Time.realtimeSinceStartup - startTime:F3} for level ({lvlName}).");
 
                     if (c == checkup)
                     {
@@ -357,21 +354,18 @@ public static class EditorLevel
                             Provider.reject(connection, ESteamRejection.PLUGIN, "Failed to download " + lvlName + ".");
                             yield break;
                         }
-
-                        // Logger.LogDebug($"[SEND LEVEL] {(retry ? "Resent" : "Sent")} {DevkitServerUtility.FormatBytes(len)} from index #{index} as recovery packet {packet + 1} / {ttl} at time {Time.realtimeSinceStartup - startTime:F3} for level ({lvlName}).");
                     }
 
                     yield return new WaitForSecondsRealtime(0.125f);
                     goto rerequest;
                 }
             }
-            Logger.LogInfo($"[SEND LEVEL] Sent level data ({data.Length:N} B) for level {lvlName} in {Time.realtimeSinceStartup - startTime} seconds.", ConsoleColor.DarkCyan);
+            Logger.LogInfo($"[SEND LEVEL] Sent level data ({data.Length:N} B) for level {lvlName} in {CachedTime.RealtimeSinceStartup - startTime} seconds.", ConsoleColor.DarkCyan);
         }
         finally
         {
             if (hsConn != null)
                 HighSpeedNetFactory.ReleaseConnection(hsConn);
-            PendingToReceiveActions.Remove(connection);
         }
     }
 #endif
@@ -434,7 +428,7 @@ public static class EditorLevel
     }
     private static void FixedUpdate()
     {
-        float t = Time.realtimeSinceStartup;
+        float t = CachedTime.RealtimeSinceStartup;
         if (_lastDirty)
         {
             _lastDirty = false;
@@ -455,7 +449,7 @@ public static class EditorLevel
 
         if (_hs)
         {
-            float time = Time.realtimeSinceStartup;
+            float time = CachedTime.RealtimeSinceStartup;
             string t = _pendingLevelName + " [ " + DevkitServerUtility.FormatBytes(_lastPart) +
                        " / " + DevkitServerUtility.FormatBytes(_lastWhole) + " ]";
             if (_lastPart > 0 && _lastWhole > 0)
@@ -482,7 +476,7 @@ public static class EditorLevel
         }
         else
         {
-            float time = Time.realtimeSinceStartup;
+            float time = CachedTime.RealtimeSinceStartup;
             string t = _pendingLevelName + " [ " + DevkitServerUtility.FormatBytes(_pendingLevelIndex) +
                        " / " + DevkitServerUtility.FormatBytes(_pendingLevelLength) + " ]";
             if (_pendingLevelIndex > 0)
@@ -539,7 +533,7 @@ public static class EditorLevel
 
             inst.BufferProgressUpdated += OnBufferUpdated;
             TimeUtility.physicsUpdated += FixedUpdate;
-            _lastKeepalive = Time.realtimeSinceStartup + 5f;
+            _lastKeepalive = CachedTime.RealtimeSinceStartup + 5f;
             ctx.Acknowledge(StandardErrorCode.Success);
         }
         else
@@ -552,7 +546,7 @@ public static class EditorLevel
         _pendingLevelLength = length;
         _pendingLevelName = lvlName;
         _pendingCancelKey = reqId;
-        _pendingLevelStartTime = Time.realtimeSinceStartup;
+        _pendingLevelStartTime = CachedTime.RealtimeSinceStartup;
         LoadingUI.SetDownloadFileName(_pendingLevelName);
         Logger.LogInfo($"[RECEIVE LEVEL] Started receiving level data ({DevkitServerUtility.FormatBytes(length)}) for level {lvlName}.", ConsoleColor.DarkCyan);
         UpdateLoadingUI();

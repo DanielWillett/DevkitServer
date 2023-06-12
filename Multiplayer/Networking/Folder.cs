@@ -164,7 +164,7 @@ public struct Folder
             folder.Files[i] = new File
             {
                 Path = UnformatPath(reader.ReadString()),
-                Content = reader.ReadLongBytes() ?? Array.Empty<byte>()
+                Content = reader.ReadLongUInt8Array() ?? Array.Empty<byte>()
             };
             // Logger.LogInfo("File: " + folder.Files[i].Path + " (" + DevkitServerUtility.FormatBytes(folder.Files[i].Content.Length) + ")");
         }

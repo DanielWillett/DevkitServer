@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
+using JetBrains.Annotations;
 
 namespace DevkitServer.Util;
 public static class FormattingUtil
@@ -543,6 +544,17 @@ public static class FormattingUtil
                 return guid.ToString(format).Colorize(Logger.StackCleaner.Configuration.Colors!.StructColor);
             return ("{" + guid.ToString("N") + "}").Colorize(Logger.StackCleaner.Configuration.Colors!.StructColor);
         }
+        if (obj is Asset asset)
+        {
+            Color color = asset switch
+            {
+                ItemAsset item => ItemTool.getRarityColorUI(item.rarity),
+                VehicleAsset vehicle => ItemTool.getRarityColorUI(vehicle.rarity),
+                _ => ItemTool.getRarityColorUI(EItemRarity.COMMON)
+            };
+            string name = (asset.FriendlyName ?? asset.name).Colorize(color);
+            return ("[" + asset.assetCategory + "] {" + asset.GUID.ToString("N") + "}").Colorize(color) + " : ".Colorize(ConsoleColor.White) + name;
+        }
         if (obj is MemberInfo)
         {
             if (obj is FieldInfo field)
@@ -707,4 +719,109 @@ public static class FormattingUtil
                 : GetANSIForegroundString(ToConsoleColor(argb))));
     }
     private static string GetReset() => Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIReset;
+
+    public static void PrintBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
+    {
+        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, columnCount, offset, len));
+    }
+    public static void PrintBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
+    {
+        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, columnCount, offset, len));
+    }
+    [Pure]
+    public static string GetBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
+    {
+        return BytesToString(bytes, columnCount, offset, len, "X2");
+    }
+    [Pure]
+    public static string GetBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
+    {
+        return BytesToString(bytes, columnCount, offset, len, "000");
+    }
+    public static unsafe void PrintBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0)
+    {
+        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, len, columnCount, offset));
+    }
+    public static unsafe void PrintBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0)
+    {
+        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, len, columnCount, offset));
+    }
+    [Pure]
+    public static unsafe string GetBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0)
+    {
+        return BytesToString(bytes, columnCount, offset, len, "X2");
+    }
+    [Pure]
+    public static unsafe string GetBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0)
+    {
+        return BytesToString(bytes, columnCount, offset, len, "000");
+    }
+    public static unsafe void PrintBytesHex<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
+    {
+        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, len, columnCount, offset));
+    }
+    public static unsafe void PrintBytesDec<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
+    {
+        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, len, columnCount, offset));
+    }
+    [Pure]
+    public static unsafe string GetBytesHex<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
+    {
+        return BytesToString(bytes, columnCount, offset, len);
+    }
+    [Pure]
+    public static unsafe string GetBytesDec<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
+    {
+        return BytesToString(bytes, columnCount, offset, len);
+    }
+    [Pure]
+    public static string BytesToString(byte[] bytes, int columnCount, int offset, int len, string fmt)
+    {
+        if (offset >= bytes.Length)
+            offset = bytes.Length - 1;
+        if (len < 0 || len + offset < 0 || len + offset > bytes.Length)
+            len = bytes.Length - offset;
+        StringBuilder sb = new StringBuilder(len * 4);
+        for (int i = 0; i < len; ++i)
+        {
+            if (i != 0 && i % columnCount == 0)
+                sb.Append(Environment.NewLine);
+            else if (i != 0)
+                sb.Append(' ');
+            sb.Append(bytes[i + offset].ToString(fmt));
+        }
+        return sb.ToString();
+    }
+    [Pure]
+    public static unsafe string BytesToString(byte* bytes, int columnCount, int offset, int len, string fmt)
+    {
+        if (offset >= len)
+            offset = len - 1;
+        StringBuilder sb = new StringBuilder(len * 4);
+        for (int i = 0; i < len; ++i)
+        {
+            if (i != 0 && i % columnCount == 0)
+                sb.Append(Environment.NewLine);
+            else if (i != 0)
+                sb.Append(' ');
+            sb.Append(bytes[i + offset].ToString(fmt));
+        }
+        return sb.ToString();
+    }
+    [Pure]
+    public static unsafe string BytesToString<T>(T* bytes, int columnCount, int offset, int len) where T : unmanaged
+    {
+        if (offset >= len)
+            offset = len - 1;
+        StringBuilder sb = new StringBuilder(len * 4);
+        for (int i = 0; i < len; ++i)
+        {
+            if (i != 0 && i % columnCount == 0)
+                sb.Append(Environment.NewLine);
+            else if (i != 0)
+                sb.Append(' ');
+            sb.Append(bytes[i + offset].ToString());
+        }
+        return sb.ToString();
+    }
 }

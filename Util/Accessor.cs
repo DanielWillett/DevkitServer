@@ -13,21 +13,21 @@ internal static class Accessor
     public static readonly Assembly DevkitServer = Assembly.GetExecutingAssembly();
     public static readonly Assembly MSCoreLib = typeof(object).Assembly;
 
-    public static readonly MethodInfo GetRealtimeSinceStartup =
-        typeof(Time).GetProperty(nameof(Time.realtimeSinceStartup), BindingFlags.Static | BindingFlags.Public)
-            ?.GetMethod ?? throw new Exception("Unable to find Time.realtimeSinceStartup.");
-    public static readonly MethodInfo GetRealtimeSinceStartupAsDouble =
-        typeof(Time).GetProperty(nameof(Time.realtimeSinceStartupAsDouble), BindingFlags.Static | BindingFlags.Public)
-            ?.GetMethod ?? throw new Exception("Unable to find Time.realtimeSinceStartupAsDouble.");
-    public static readonly MethodInfo GetTime =
-        typeof(Time).GetProperty(nameof(Time.time), BindingFlags.Static | BindingFlags.Public)
-            ?.GetMethod ?? throw new Exception("Unable to find Time.time.");
-    public static readonly MethodInfo GetDeltaTime =
-        typeof(Time).GetProperty(nameof(Time.deltaTime), BindingFlags.Static | BindingFlags.Public)
-            ?.GetMethod ?? throw new Exception("Unable to find Time.deltaTime.");
-    public static readonly MethodInfo GetFixedDeltaTime =
-        typeof(Time).GetProperty(nameof(Time.fixedDeltaTime), BindingFlags.Static | BindingFlags.Public)
-            ?.GetMethod ?? throw new Exception("Unable to find Time.fixedDeltaTime.");
+    private static MethodInfo? _getRealtimeSinceStartup;
+    private static MethodInfo? _getRealtimeSinceStartupAsDouble;
+    private static MethodInfo? _getTime;
+    private static MethodInfo? _getDeltaTime;
+    private static MethodInfo? _getFixedDeltaTime;
+    private static MethodInfo? _getGameObjectTransform;
+    private static MethodInfo? _getComponentTransform;
+    private static MethodInfo? _getComponentGameObject;
+    private static MethodInfo? _getIsServer;
+    private static MethodInfo? _getIsEditor;
+    private static MethodInfo? _getIsDevkitServer;
+    private static MethodInfo? _logDebug;
+    private static MethodInfo? _getKeyDown;
+    private static MethodInfo? _getKeyUp;
+    private static MethodInfo? _getKey;
 
     internal static Type[]? FuncTypes;
     internal static Type[]? ActionTypes;
@@ -279,11 +279,6 @@ internal static class Accessor
             return null!;
         }
     }
-
-    internal static readonly MethodInfo IsServerGetter = typeof(Provider).GetProperty(nameof(Provider.isServer), BindingFlags.Static | BindingFlags.Public)?.GetGetMethod()!;
-    internal static readonly MethodInfo IsEditorGetter = typeof(Level).GetProperty(nameof(Level.isEditor), BindingFlags.Static | BindingFlags.Public)?.GetGetMethod()!;
-    internal static readonly MethodInfo IsDevkitServerGetter = typeof(DevkitServerModule).GetProperty(nameof(DevkitServerModule.IsEditing), BindingFlags.Static | BindingFlags.Public)?.GetGetMethod()!;
-    internal static readonly MethodInfo LogDebug = typeof(Logger).GetMethod(nameof(Logger.LogDebug), BindingFlags.Public | BindingFlags.Static)!;
     public static IEnumerable<CodeInstruction> AddIsEditorCall(IEnumerable<CodeInstruction> instructions, MethodBase __method)
     {
         if (IsServerGetter == null || IsEditorGetter == null)
@@ -313,9 +308,9 @@ internal static class Accessor
     public static void AddFunctionBreakpoints(MethodBase method) => PatchesMain.Patcher.Patch(method,
         transpiler: new HarmonyMethod(typeof(Accessor).GetMethod(nameof(AddFunctionBreakpointsTranspiler),
             BindingFlags.NonPublic | BindingFlags.Static)));
-    private static IEnumerable<CodeInstruction> AddFunctionBreakpointsTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase __method)
+    private static IEnumerable<CodeInstruction> AddFunctionBreakpointsTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
-        yield return new CodeInstruction(OpCodes.Ldstr, "Breakpointing Method: " + __method.Format() + ":");
+        yield return new CodeInstruction(OpCodes.Ldstr, "Breakpointing Method: " + method.Format() + ":");
         yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
         yield return new CodeInstruction(OpCodes.Call, LogDebug);
         foreach (CodeInstruction instr in instructions)
@@ -552,7 +547,6 @@ internal static class Accessor
             return null;
         }
     }
-
     public static Delegate? GenerateStaticCaller<TInstance>(string methodName, Type[]? parameters = null, bool throwOnError = false, bool useFptrReconstruction = false)
     {
         MethodInfo? method = null;
@@ -800,6 +794,97 @@ internal static class Accessor
         types.Sort(SortTypesByPriorityHandler);
         return types;
     }
+
+
+    /// <summary><see cref="Provider.isServer"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo IsServerGetter => _getIsServer ??=
+        typeof(Provider).GetProperty(nameof(Provider.isServer), BindingFlags.Static | BindingFlags.Public)
+            ?.GetMethod ?? throw new MemberAccessException("Unable to find Provider.isServer.");
+
+    /// <summary><see cref="Level.isEditor"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo IsEditorGetter => _getIsEditor ??=
+        typeof(Level).GetProperty(nameof(Level.isEditor), BindingFlags.Static | BindingFlags.Public)
+            ?.GetMethod ?? throw new MemberAccessException("Unable to find Level.isEditor.");
+
+    /// <summary><see cref="DevkitServerModule.IsEditing"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo IsDevkitServerGetter => _getIsDevkitServer ??=
+        typeof(DevkitServerModule).GetProperty(nameof(DevkitServerModule.IsEditing), BindingFlags.Static | BindingFlags.Public)
+            ?.GetMethod ?? throw new MemberAccessException("Unable to find DevkitServerModule.IsEditing.");
+
+    /// <summary><see cref="Logger.LogDebug"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo LogDebug => _logDebug ??=
+        typeof(Logger).GetMethod(nameof(Logger.LogDebug), BindingFlags.Public | BindingFlags.Static)
+        ?? throw new MemberAccessException("Unable to find Logger.LogDebug.");
+
+    /// <summary><see cref="CachedTime.RealtimeSinceStartup"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo GetRealtimeSinceStartup => _getRealtimeSinceStartup ??=
+        typeof(CachedTime).GetProperty(nameof(CachedTime.RealtimeSinceStartup), BindingFlags.Static | BindingFlags.Public)
+            ?.GetMethod ?? throw new MemberAccessException("Unable to find CachedTime.RealtimeSinceStartup.");
+
+    /// <summary><see cref="Time.realtimeSinceStartupAsDouble"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo GetRealtimeSinceStartupAsDouble => _getRealtimeSinceStartupAsDouble ??=
+        typeof(Time).GetProperty(nameof(Time.realtimeSinceStartupAsDouble), BindingFlags.Static | BindingFlags.Public)
+            ?.GetMethod ?? throw new MemberAccessException("Unable to find Time.realtimeSinceStartupAsDouble.");
+
+    /// <summary><see cref="Time.time"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo GetTime => _getTime ??=
+        typeof(Time).GetProperty(nameof(Time.time), BindingFlags.Static | BindingFlags.Public)
+            ?.GetMethod ?? throw new MemberAccessException("Unable to find Time.time.");
+
+    /// <summary><see cref="CachedTime.DeltaTime"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo GetDeltaTime => _getDeltaTime ??=
+        typeof(CachedTime).GetProperty(nameof(CachedTime.DeltaTime), BindingFlags.Static | BindingFlags.Public)
+            ?.GetMethod ?? throw new MemberAccessException("Unable to find CachedTime.DeltaTime.");
+
+    /// <summary><see cref="Time.fixedDeltaTime"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo GetFixedDeltaTime => _getFixedDeltaTime ??=
+        typeof(Time).GetProperty(nameof(Time.fixedDeltaTime), BindingFlags.Static | BindingFlags.Public)
+            ?.GetMethod ?? throw new MemberAccessException("Unable to find Time.fixedDeltaTime.");
+
+    /// <summary><see cref="GameObject.transform"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo GetGameObjectTransform => _getGameObjectTransform ??=
+        typeof(GameObject).GetProperty(nameof(GameObject.transform), BindingFlags.Instance | BindingFlags.Public)
+            ?.GetMethod ?? throw new MemberAccessException("Unable to find GameObject.transform.");
+
+    /// <summary><see cref="Component.transform"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo GetComponentTransform => _getComponentTransform ??=
+        typeof(Component).GetProperty(nameof(Component.transform), BindingFlags.Instance | BindingFlags.Public)
+            ?.GetMethod ?? throw new MemberAccessException("Unable to find Component.transform.");
+
+    /// <summary><see cref="Component.gameObject"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo GetComponentGameObject => _getComponentGameObject ??=
+        typeof(Component).GetProperty(nameof(Component.gameObject), BindingFlags.Instance | BindingFlags.Public)
+            ?.GetMethod ?? throw new MemberAccessException("Unable to find Component.gameObject.");
+
+    /// <summary><see cref="InputEx.GetKeyDown"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo GetKeyDown => _getKeyDown ??=
+        typeof(InputEx).GetMethod(nameof(InputEx.GetKeyDown), BindingFlags.Public | BindingFlags.Static)
+        ?? throw new MemberAccessException("Unable to find InputEx.GetKeyDown.");
+
+    /// <summary><see cref="InputEx.GetKeyUp"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo GetKeyUp => _getKeyUp ??=
+        typeof(InputEx).GetMethod(nameof(InputEx.GetKeyUp), BindingFlags.Public | BindingFlags.Static)
+        ?? throw new MemberAccessException("Unable to find InputEx.GetKeyUp.");
+
+    /// <summary><see cref="InputEx.GetKey"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo GetKey => _getKey ??=
+        typeof(InputEx).GetMethod(nameof(InputEx.GetKey), BindingFlags.Public | BindingFlags.Static)
+        ?? throw new MemberAccessException("Unable to find InputEx.GetKey.");
 }
 
 public delegate void InstanceSetter<in TInstance, in T>(TInstance owner, T value);

@@ -267,10 +267,10 @@ public readonly struct MoveHierarchyObjectPreviewProperties
 {
     public readonly DevkitSelection Selection;
     public readonly IDevkitHierarchyItem Item;
-    public readonly HierarchyObjectTransformation Transformation;
+    public readonly TransformationDelta Transformation;
     public readonly Vector3 PivotPoint;
     public readonly float DeltaTime;
-    public MoveHierarchyObjectPreviewProperties(DevkitSelection selection, IDevkitHierarchyItem item, HierarchyObjectTransformation transformation, Vector3 pivotPoint, float deltaTime)
+    public MoveHierarchyObjectPreviewProperties(DevkitSelection selection, IDevkitHierarchyItem item, TransformationDelta transformation, Vector3 pivotPoint, float deltaTime)
     {
         Selection = selection;
         Item = item;
@@ -284,10 +284,10 @@ public delegate void MoveHierarchyObjectsPreview(in MoveHierarchyObjectsPreviewP
 public readonly struct MoveHierarchyObjectsPreviewProperties
 {
     public readonly uint[] InstanceIds;
-    public readonly HierarchyObjectTransformation[] Transformations;
+    public readonly TransformationDelta[] Transformations;
     public readonly Vector3 PivotPoint;
     public readonly float DeltaTime;
-    public MoveHierarchyObjectsPreviewProperties(uint[] instanceIds, HierarchyObjectTransformation[] transformations, Vector3 pivotPoint, float deltaTime)
+    public MoveHierarchyObjectsPreviewProperties(uint[] instanceIds, TransformationDelta[] transformations, Vector3 pivotPoint, float deltaTime)
     {
         InstanceIds = instanceIds;
         Transformations = transformations;
@@ -301,12 +301,12 @@ public readonly struct MoveHierarchyObjectFinalProperties
 {
     public readonly DevkitSelection Selection;
     public readonly IDevkitHierarchyItem Item;
-    public readonly HierarchyObjectTransformation Transformation;
+    public readonly TransformationDelta Transformation;
     public readonly Vector3 Scale;
     public readonly Vector3 OriginalScale;
     public readonly bool UseScale;
     public readonly float DeltaTime;
-    public MoveHierarchyObjectFinalProperties(DevkitSelection selection, IDevkitHierarchyItem item, HierarchyObjectTransformation transformation, Vector3 scale, Vector3 originalScale, bool useScale, float deltaTime)
+    public MoveHierarchyObjectFinalProperties(DevkitSelection selection, IDevkitHierarchyItem item, TransformationDelta transformation, Vector3 scale, Vector3 originalScale, bool useScale, float deltaTime)
     {
         Selection = selection;
         Item = item;
@@ -322,11 +322,11 @@ public delegate void MoveHierarchyObjectsFinal(in MoveHierarchyObjectsFinalPrope
 public readonly struct MoveHierarchyObjectsFinalProperties
 {
     public readonly uint[] InstanceIds;
-    public readonly HierarchyObjectTransformation[] Transformations;
+    public readonly TransformationDelta[] Transformations;
     public readonly Vector3[]? Scales;
     public readonly Vector3[]? OriginalScales;
     public readonly float DeltaTime;
-    public MoveHierarchyObjectsFinalProperties(uint[] instanceIds, HierarchyObjectTransformation[] transformations, Vector3[]? scales, Vector3[]? originalScales, float deltaTime)
+    public MoveHierarchyObjectsFinalProperties(uint[] instanceIds, TransformationDelta[] transformations, Vector3[]? scales, Vector3[]? originalScales, float deltaTime)
     {
         InstanceIds = instanceIds;
         Transformations = transformations;
@@ -369,5 +369,110 @@ public readonly struct InstantiateHierarchyObjectProperties
     {
         Type = type;
         Position = position;
+    }
+}
+
+public delegate void DeleteObject(in DeleteObjectProperties properties);
+public readonly struct DeleteObjectProperties
+{
+    public readonly uint InstanceId;
+    public readonly float DeltaTime;
+    public DeleteObjectProperties(uint instanceId, float deltaTime)
+    {
+        InstanceId = instanceId;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void DeleteBuildable(in DeleteBuildableProperties properties);
+public readonly struct DeleteBuildableProperties
+{
+    public readonly RegionIdentifier Identifier;
+    public readonly float DeltaTime;
+    public DeleteBuildableProperties(RegionIdentifier identifier, float deltaTime)
+    {
+        Identifier = identifier;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void DeleteLevelObjects(in DeleteLevelObjectsProperties properties);
+public readonly struct DeleteLevelObjectsProperties
+{
+    public readonly uint[] Objects;
+    public readonly RegionIdentifier[] Buildables;
+    public readonly float DeltaTime;
+    public DeleteLevelObjectsProperties(uint[] objects, RegionIdentifier[] buildables, float deltaTime)
+    {
+        Objects = objects;
+        Buildables = buildables;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void MoveBuildableFinal(in MoveBuildableFinalProperties properties);
+public readonly struct MoveBuildableFinalProperties
+{
+    public readonly RegionIdentifier Identifier;
+    public readonly TransformationDelta Transformation;
+    public readonly Vector3 OriginalScale;
+    public readonly Vector3 Scale;
+    public readonly bool UseScale;
+    public readonly float DeltaTime;
+    public MoveBuildableFinalProperties(RegionIdentifier identifier, TransformationDelta transformation, Vector3 scale, Vector3 originalScale, bool useScale, float deltaTime)
+    {
+        Identifier = identifier;
+        Transformation = transformation;
+        OriginalScale = originalScale;
+        Scale = scale;
+        UseScale = useScale;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void MoveObjectFinal(in MoveObjectFinalProperties properties);
+public readonly struct MoveObjectFinalProperties
+{
+    public readonly uint InstanceId;
+    public readonly TransformationDelta Transformation;
+    public readonly Vector3 OriginalScale;
+    public readonly Vector3 Scale;
+    public readonly bool UseScale;
+    public readonly float DeltaTime;
+    public MoveObjectFinalProperties(uint instanceId, TransformationDelta transformation, Vector3 scale, Vector3 originalScale, bool useScale, float deltaTime)
+    {
+        InstanceId = instanceId;
+        Transformation = transformation;
+        OriginalScale = originalScale;
+        Scale = scale;
+        UseScale = useScale;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void MoveLevelObjectsFinal(in MoveLevelObjectsFinalProperties properties);
+public readonly struct MoveLevelObjectsFinalProperties
+{
+    public readonly uint[] InstanceIds;
+    public readonly TransformationDelta[] ObjectTransformations;
+    public readonly Vector3[]? OriginalObjectScales;
+    public readonly Vector3[]? ObjectScales;
+    public readonly RegionIdentifier[] Buildables;
+    public readonly TransformationDelta[] BuildableTransformations;
+    public readonly Vector3[]? OriginalBuildableScales;
+    public readonly Vector3[]? BuildableScales;
+    public readonly float DeltaTime;
+    public MoveLevelObjectsFinalProperties(uint[] instanceIds, TransformationDelta[] objectTransformations, Vector3[]? originalObjectScales, Vector3[]? objectScales,
+        RegionIdentifier[] buildables, TransformationDelta[] buildableTransformations, Vector3[]? originalBuildableScales, Vector3[]? buildableScales, float deltaTime)
+    {
+        InstanceIds = instanceIds;
+        ObjectTransformations = objectTransformations;
+        OriginalObjectScales = originalObjectScales;
+        ObjectScales = objectScales;
+        Buildables = buildables;
+        BuildableTransformations = buildableTransformations;
+        OriginalBuildableScales = originalBuildableScales;
+        BuildableScales = buildableScales;
+        DeltaTime = deltaTime;
     }
 }

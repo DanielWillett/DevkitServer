@@ -35,7 +35,7 @@ public static class TransportPatcher
     {
         if (GetNetTransportFlag?.Invoke() is { hasValue: true, value: { } flag } && !flag.Equals("SteamNetworkingSockets", StringComparison.OrdinalIgnoreCase) && !flag.Equals(DevkitServerModule.ModuleName, StringComparison.OrdinalIgnoreCase))
         {
-            Logger.LogWarning($"Unable to use specified transport type: \"{"-NetTransport".Colorize(ConsoleColor.White)} {flag.Colorize(ConsoleColor.Red)}\", only \"{"-NetTransport".Colorize(ConsoleColor.White)} {"SteamNetworkingSockets".Colorize(DevkitServerModule.UnturnedColor)}\" or \"{"-NetTransport".Colorize(ConsoleColor.White)} {DevkitServerModule.ModuleName.Colorize(DevkitServerModule.PluginColor)}\" is supported.");
+            Logger.LogWarning($"Unable to use specified transport type: \"{"-NetTransport".Colorize(ConsoleColor.White)} {flag.Colorize(ConsoleColor.Red)}\", only \"{"-NetTransport".Colorize(ConsoleColor.White)} {"SteamNetworkingSockets".Colorize(DevkitServerModule.UnturnedColor)}\" or \"{"-NetTransport".Colorize(ConsoleColor.White)} {DevkitServerModule.ModuleName.Colorize(DevkitServerModule.ModuleColor)}\" is supported.");
             TransportType = null;
         }
         else

@@ -9,8 +9,11 @@ internal class TestPluginSubmodule : Plugin
     protected override void Load()
     {
         LogInfo("Loaded " + Name + ".");
+#if SERVER
         LogInfo("On Server: " + Provider.serverID);
+#elif CLIENT
         LogInfo("On Client: " + Provider.client);
+#endif
     }
     protected override void Unload()
     {

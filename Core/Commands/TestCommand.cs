@@ -142,8 +142,13 @@ internal static class CommandTests
 #if DEBUG
     private static void tiledebug(CommandContext ctx)
     {
-        TileDebug.Enabled = !TileDebug.Enabled;
-        ctx.ReplyString($"Tile Debug: {TileDebug.Enabled}.");
+        RegionDebug.TilesEnabled = !RegionDebug.TilesEnabled;
+        ctx.ReplyString($"Tile Debug: {RegionDebug.TilesEnabled}.");
+    }
+    private static void regiondebug(CommandContext ctx)
+    {
+        RegionDebug.RegionsEnabled = !RegionDebug.RegionsEnabled;
+        ctx.ReplyString($"Tile Debug: {RegionDebug.RegionsEnabled}.");
     }
 #endif
 
@@ -157,7 +162,7 @@ internal static class CommandTests
 #endif
         if (auth == null)
             throw ctx.SendUnknownError();
-        float t = Time.realtimeSinceStartup;
+        float t = CachedTime.RealtimeSinceStartup;
         if (!ctx.HasArg(0) || ctx.MatchParameter(0, "hm", "heightmap", "heights"))
             auth.InvalidateBounds(CartographyUtil.CaptureBounds, TileSync.DataType.Heightmap, t);
         if (!ctx.HasArg(0) || ctx.MatchParameter(0, "sm", "splatmap", "materials"))

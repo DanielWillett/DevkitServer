@@ -1,0 +1,156 @@
+<Project>
+    <PropertyGroup Condition="'$(Configuration)'=='ClientDebug'">
+        <DefineConstants>$(DefineConstants);DEBUG;CLIENT</DefineConstants>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Configuration)'=='ClientRelease'">
+        <DefineConstants>$(DefineConstants);RELEASE;CLIENT</DefineConstants>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Configuration)'=='ServerDebug'">
+        <DefineConstants>$(DefineConstants);DEBUG;SERVER</DefineConstants>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Configuration)'=='ServerRelease'">
+        <DefineConstants>$(DefineConstants);RELEASE;SERVER</DefineConstants>
+    </PropertyGroup>
+    <ItemGroup Condition="$(DefineConstants.Contains(SERVER))">
+
+        <!-- System.IO.Compression -->
+        <Reference Include="System.Data.DataSetExtensions" />
+        <Reference Include="System.IO.Compression" />
+        <Reference Include="System.IO.Compression.FileSystem">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Libraries\System.IO.Compression.FileSystem.dll</HintPath>
+        </Reference>
+        
+        <!-- Unturned -->
+        <Reference Include="Assembly-CSharp">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\Assembly-CSharp.dll</HintPath>
+        </Reference>
+        <Reference Include="com.rlabrecque.steamworks.net">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\com.rlabrecque.steamworks.net.dll</HintPath>
+        </Reference>
+        <Reference Include="SDG.NetTransport">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\SDG.NetTransport.dll</HintPath>
+        </Reference>
+        <Reference Include="SDG.NetPak.Runtime">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\SDG.NetPak.Runtime.dll</HintPath>
+        </Reference>
+        <Reference Include="SystemEx">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\SystemEx.dll</HintPath>
+        </Reference>
+
+        <!-- Unity -->
+        <Reference Include="UnityEngine">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\UnityEngine.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.CoreModule">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEx">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\UnityEx.dll</HintPath>
+        </Reference>
+        <Reference Include="UnturnedDat">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\UnturnedDat.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.ImageConversionModule">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.PhysicsModule">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.TerrainModule">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\UnityEngine.TerrainModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.AssetBundleModule">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Unturned_Data\Managed\UnityEngine.AssetBundleModule.dll</HintPath>
+        </Reference>
+
+        <!-- Other -->
+        <Reference Include="StackCleaner">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Libraries\StackCleaner.dll</HintPath>
+        </Reference>
+    </ItemGroup>
+    <ItemGroup Condition="$(DefineConstants.Contains(CLIENT))">
+        
+        <!-- Unturned -->
+        <Reference Include="Assembly-CSharp">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\Assembly-CSharp.dll</HintPath>
+        </Reference>
+        <Reference Include="com.rlabrecque.steamworks.net">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\com.rlabrecque.steamworks.net.dll</HintPath>
+        </Reference>
+        <Reference Include="SDG.NetTransport">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\SDG.NetTransport.dll</HintPath>
+        </Reference>
+        <Reference Include="SDG.NetPak.Runtime">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\SDG.NetPak.Runtime.dll</HintPath>
+        </Reference>
+        <Reference Include="SystemEx">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\SystemEx.dll</HintPath>
+        </Reference>
+        <Reference Include="SDG.Glazier.Runtime">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\SDG.Glazier.Runtime.dll</HintPath>
+        </Reference>
+
+        <!-- Unity -->
+        <Reference Include="UnityEngine">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnityEngine.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.CoreModule">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEx">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnityEx.dll</HintPath>
+        </Reference>
+        <Reference Include="UnturnedDat">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnturnedDat.dll</HintPath>
+        </Reference>
+        <Reference Include="Unity.TextMeshPro">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.ImageConversionModule">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.IMGUIModule">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.InputModule">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnityEngine.InputModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.PhysicsModule">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.TerrainModule">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnityEngine.TerrainModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.AssetBundleModule">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Unturned_Data\Managed\UnityEngine.AssetBundleModule.dll</HintPath>
+        </Reference>
+
+        <!-- Other -->
+        <Reference Include="StackCleaner">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Libraries\StackCleaner.dll</HintPath>
+        </Reference>
+    </ItemGroup>
+    <ItemGroup>
+        <Reference Include="System.Data.DataSetExtensions" />
+        <Reference Include="System.Core" />
+        <Reference Include="Microsoft.CSharp" />
+        <Reference Include="System.IO.Compression" />
+        <Reference Include="System.Net.Http" />
+        <PackageReference Include="Lib.Harmony" Version="2.2.2" />
+        <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
+        <PackageReference Include="System.Text.Json" Version="7.0.2" />
+    </ItemGroup>
+    <ItemGroup>
+        <Using Remove="System.Net.Http" />
+        <Using Remove="System.Text" />
+        <Using Include="SDG.NetTransport" />
+        <Using Include="SDG.Unturned" />
+        <Using Include="Steamworks" />
+        <Using Include="System.Collections" />
+        <Using Include="UnityEngine" />
+        <Using Include="DevkitServer.Util" />
+        <Using Include="UnityEngine.Object">
+            <Alias>Object</Alias>
+        </Using>
+    </ItemGroup>
+</Project>

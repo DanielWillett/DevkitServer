@@ -101,7 +101,7 @@ public static class NetFactory
         Listeners = new Delegate[methods.Length];
         _inByteCt = new long[BlockSize];
         _outByteCt = new long[BlockSize];
-        _inByteCtStTime = _outByteCtStTime = Time.realtimeSinceStartup;
+        _inByteCtStTime = _outByteCtStTime = CachedTime.RealtimeSinceStartup;
 
         // patch reading enum method.
 
@@ -267,22 +267,22 @@ public static class NetFactory
         {
             Array.Clear(send.Value ? _outByteCt : _inByteCt, 0, BlockSize);
             if (send.Value)
-                _outByteCtStTime = Time.realtimeSinceStartup;
+                _outByteCtStTime = CachedTime.RealtimeSinceStartup;
             else
-                _inByteCtStTime = Time.realtimeSinceStartup;
+                _inByteCtStTime = CachedTime.RealtimeSinceStartup;
         }
         else
         {
             Array.Clear(_outByteCt, 0, BlockSize);
             Array.Clear(_inByteCt, 0, BlockSize);
-            _inByteCtStTime = _outByteCtStTime = Time.realtimeSinceStartup;
+            _inByteCtStTime = _outByteCtStTime = CachedTime.RealtimeSinceStartup;
         }
     }
     public static float GetBytesPerSecondAvg(DevkitMessage message, bool send) => GetBytesTotal(message, send, out float timespan) / timespan;
     public static float GetBytesPerSecondAvg(bool send) => GetBytesTotal(send, out float timespan) / timespan;
     public static long GetBytesTotal(DevkitMessage message, bool send, out float timespan)
     {
-        timespan = Time.realtimeSinceStartup - (send ? _outByteCtStTime : _inByteCtStTime);
+        timespan = CachedTime.RealtimeSinceStartup - (send ? _outByteCtStTime : _inByteCtStTime);
         if ((int)message < BlockSize)
             return (send ? _outByteCt : _inByteCt)[(int)message];
 
@@ -291,7 +291,7 @@ public static class NetFactory
     public static long GetBytesTotal(bool send, out float timespan)
     {
         long ttl = 0;
-        timespan = Time.realtimeSinceStartup - (send ? _outByteCtStTime : _inByteCtStTime);
+        timespan = CachedTime.RealtimeSinceStartup - (send ? _outByteCtStTime : _inByteCtStTime);
         for (int i = 0; i < BlockSize; ++i)
             ttl += (send ? _outByteCt : _inByteCt)[i];
 

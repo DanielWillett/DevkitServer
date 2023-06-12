@@ -22,7 +22,8 @@ namespace DevkitServer.Players;
 #endif
 public class UserInput : MonoBehaviour
 {
-    private const ushort DataVersion = 4;
+    public const ushort SaveDataVersion = 4;
+    public const ushort SendDataVersion = 0;
     [UsedImplicitly]
     private static readonly NetCall<ulong, Vector3> SendInitialPosition = new NetCall<ulong, Vector3>(NetCalls.SendInitialPosition);
     [UsedImplicitly]
@@ -253,7 +254,7 @@ public class UserInput : MonoBehaviour
         Controller = CameraController.Editor;
 #endif
 
-        _nextPacketApplyTime = Time.realtimeSinceStartup;
+        _nextPacketApplyTime = CachedTime.RealtimeSinceStartup;
         TryInvokeOnUserPositionUpdated(User);
         
 #if SERVER
@@ -437,7 +438,6 @@ public class UserInput : MonoBehaviour
         }
     }
 
-#endif
     private static bool SetActiveMainCamera(Transform tranform)
     {
         Transform? child = tranform.FindChildRecursive("Camera");
@@ -488,6 +488,7 @@ public class UserInput : MonoBehaviour
 
         return false;
     }
+#endif
 
     internal static void ReceiveMovementRelay(
 #if SERVER
@@ -558,6 +559,7 @@ public class UserInput : MonoBehaviour
     private void HandleFlushPackets(ByteWriter writer)
     {
         int c = Math.Min(byte.MaxValue, _packets.Count);
+        writer.Write(SendDataVersion);
         writer.Write((byte)c);
         for (int i = 0; i < c; ++i)
         {
@@ -568,6 +570,7 @@ public class UserInput : MonoBehaviour
 #endif
     private void HandleReadPackets(ByteReader reader)
     {
+        _ = reader.ReadUInt16(); // UserInput.SendDataVersion
         byte c = reader.ReadUInt8();
         for (int i = 0; i < c; ++i)
         {
@@ -576,8 +579,8 @@ public class UserInput : MonoBehaviour
             _packets.Enqueue(p);
         }
         if (User.Player != null && User.Player.player != null)
-            SetLastInputted?.Invoke(User.Player.player.input, Time.realtimeSinceStartup);
-        float time = Time.realtimeSinceStartup;
+            SetLastInputted?.Invoke(User.Player.player.input, CachedTime.RealtimeSinceStartup);
+        float time = CachedTime.RealtimeSinceStartup;
         if (time > _nextPacketApplyTime)
             _nextPacketApplyTime = time;
     }
@@ -602,7 +605,7 @@ public class UserInput : MonoBehaviour
                 Destroy(this);
                 return;
             }
-            float t = Time.realtimeSinceStartup;
+            float t = CachedTime.RealtimeSinceStartup;
             if (!_networkedInitialPosition || _movement == null)
                 return;
             Vector3 pos = transform.position;
@@ -643,7 +646,7 @@ public class UserInput : MonoBehaviour
                             ? 1f
                             : (InputEx.GetKey(ControlsSettings.descend) ? -1f : 0f)
                     },
-                    DeltaTime = Time.deltaTime
+                    DeltaTime = CachedTime.DeltaTime
                 };
                 _packets.Enqueue(_lastPacket);
             }
@@ -653,7 +656,7 @@ public class UserInput : MonoBehaviour
                 _lastPacket = new UserInputPacket
                 {
                     Flags = Flags.StopMsg,
-                    DeltaTime = Time.deltaTime,
+                    DeltaTime = CachedTime.DeltaTime,
                     Yaw = _lastYaw = yaw,
                     Pitch = _lastPitch = pitch,
                     Position = _lastPos = pos
@@ -684,7 +687,7 @@ public class UserInput : MonoBehaviour
             return;
         }
 
-        float t = Time.realtimeSinceStartup;
+        float t = CachedTime.RealtimeSinceStartup;
         while (_packets is { Count: > 0 } && t >= _nextPacketApplyTime)
         {
             UserInputPacket packet = _packets.Dequeue();
@@ -852,7 +855,7 @@ public class UserInput : MonoBehaviour
             Pitch = 0,
             Yaw = 0,
             Flags = Flags.StopMsg,
-            DeltaTime = Time.deltaTime,
+            DeltaTime = CachedTime.DeltaTime,
             Input = Vector3.zero,
             Speed = 0f
         };
@@ -867,7 +870,7 @@ public class UserInput : MonoBehaviour
         if (!_networkedInitialPosition || User?.Player == null)
             return;
         Block block = new Block();
-        block.writeUInt16(DataVersion);
+        block.writeUInt16(SaveDataVersion);
         block.writeSingleVector3(_lastPos);
         Logger.LogDebug(" Saved position: " + _lastPos.Format() + ", (" + _lastPitch.Format() + ", " + _lastYaw.Format() + ").");
         PlayerSavedata.writeBlock(User.Player.playerID, "/DevkitServer/Input.dat", block);
@@ -875,7 +878,6 @@ public class UserInput : MonoBehaviour
 #endif
     private struct UserInputPacket
     {
-        private const ushort DataVersion = 0;
         public Vector3 Position { get; set; }
         public float Pitch { get; set; }
         public float Yaw { get; set; }
@@ -888,7 +890,6 @@ public class UserInput : MonoBehaviour
 
         public void Read(ByteReader reader)
         {
-            _ = reader.ReadUInt16();
             Flags = reader.ReadEnum<Flags>();
             DeltaTime = reader.ReadFloat();
             if ((Flags & Flags.StopMsg) == 0)
@@ -916,9 +917,10 @@ public class UserInput : MonoBehaviour
                 Yaw = reader.ReadFloat();
             }
         }
+
+#if CLIENT
         public void Write(ByteWriter writer)
         {
-            writer.Write(DataVersion);
             writer.Write(Flags);
             writer.Write(DeltaTime);
             if ((Flags & Flags.StopMsg) == 0)
@@ -946,6 +948,7 @@ public class UserInput : MonoBehaviour
                 writer.Write(Yaw);
             }
         }
+#endif
 
         public override string ToString()
         {

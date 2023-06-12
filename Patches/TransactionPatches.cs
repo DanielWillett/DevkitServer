@@ -72,11 +72,15 @@ internal static class TransactionPatches
     }
     internal static void OnUndoRequested()
     {
+        if (!DevkitServerModule.IsEditing)
+            return;
         if (EditorUser.User != null && EditorUser.User.Transactions != null)
             EditorUser.User.Transactions.RequestUndo();
     }
     internal static void OnRedoRequested()
     {
+        if (!DevkitServerModule.IsEditing)
+            return;
         if (EditorUser.User != null && EditorUser.User.Transactions != null)
             EditorUser.User.Transactions.RequestRedo();
     }

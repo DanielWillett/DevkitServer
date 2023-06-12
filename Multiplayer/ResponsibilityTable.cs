@@ -157,7 +157,6 @@ internal sealed class InstanceIdResponsibilityTable
 
         if (Responsibilities.Count > 0)
         {
-            List<uint>? remove = null;
             DevkitServerUtility.CheckDirectory(false, Path.GetDirectoryName(SavePath)!);
             Thread.BeginCriticalRegion();
             try
@@ -173,22 +172,10 @@ internal sealed class InstanceIdResponsibilityTable
                 foreach (uint instanceId in Responsibilities)
                 {
 #endif
-                    if (HierarchyUtil.FindItemIndex(instanceId) < 0)
-                    {
-                        (remove ??= new List<uint>()).Add(instanceId);
-                        continue;
-                    }
                     Writer.Write(instanceId);
 #if SERVER
                     Writer.Write(pair.Value);
 #endif
-                }
-                if (remove != null)
-                {
-                    for (int i = 0; i < remove.Count; ++i)
-                        Responsibilities.Remove(remove[i]);
-
-                    Logger.LogDebug($"[{Source}] Removed {remove.Count.Format()} expired responsibilities: {string.Join(",", remove.Select(x => x.Format()))}");
                 }
                 Writer.Flush();
             }

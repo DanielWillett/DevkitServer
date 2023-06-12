@@ -9,8 +9,6 @@ namespace DevkitServer.Players.UI;
 [HarmonyPatch]
 public static class UIAccessTools
 {
-    public static int MessageBlockOffset { get; private set; }
-    public static int MessageBlockSize { get; private set; }
 
     private static readonly StaticGetter<EditorUI?> GetEditorUIInstance
         = Accessor.GenerateStaticGetter<EditorUI, EditorUI?>("instance", throwOnError: true)!;

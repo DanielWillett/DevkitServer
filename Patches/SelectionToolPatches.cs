@@ -21,123 +21,6 @@ internal static class SelectionToolPatches
 {
     public static InstanceGetter<SelectionTool, TransformHandles>? GetSelectionHandles = Accessor.GenerateInstanceGetter<SelectionTool, TransformHandles>("handles");
 
-    [HarmonyPatch(typeof(SelectionTool), "OnHandleTranslatedAndRotated")]
-    [HarmonyPostfix]
-    [UsedImplicitly]
-    private static void SelectionToolOnHandleTranslatedAndRotated(Vector3 worldPositionDelta, Quaternion worldRotationDelta, Vector3 pivotPosition, bool modifyRotation)
-    {
-        if (!DevkitServerModule.IsEditing || _movingHandle)
-            return;
-
-        Logger.LogDebug($"[CLIENT EVENTS] Temp move requested at: {string.Join(",", DevkitSelectionManager.selection.Select(selection => selection.gameObject.name.Format()))}: deltaPos: {worldPositionDelta.Format()}, deltaRot: {worldRotationDelta.eulerAngles.Format()}, pivotPos: {pivotPosition.Format()}, modifyRotation: {modifyRotation}.");
-
-        HierarchyObjectTransformation.TransformFlags flags = 0;
-        if (!worldPositionDelta.IsNearlyZero())
-            flags |= HierarchyObjectTransformation.TransformFlags.Position | HierarchyObjectTransformation.TransformFlags.OriginalPosition;
-        if (modifyRotation && !worldRotationDelta.IsNearlyIdentity())
-            flags |= HierarchyObjectTransformation.TransformFlags.Rotation | HierarchyObjectTransformation.TransformFlags.OriginalRotation;
-
-        List<uint> instanceIds = ListPool<uint>.claim();
-        List<HierarchyObjectTransformation> translations = ListPool<HierarchyObjectTransformation>.claim();
-        float dt = Time.deltaTime;
-        try
-        {
-            if (translations.Capacity < DevkitSelectionManager.selection.Count)
-                translations.Capacity = DevkitSelectionManager.selection.Count;
-            if (instanceIds.Capacity < DevkitSelectionManager.selection.Count)
-                instanceIds.Capacity = DevkitSelectionManager.selection.Count;
-            foreach (DevkitSelection selection in DevkitSelectionManager.selection)
-            {
-                HierarchyObjectTransformation t = new HierarchyObjectTransformation(flags, worldPositionDelta, worldRotationDelta, selection.preTransformPosition, selection.preTransformRotation);
-                selection.gameObject.GetComponents(HierarchyUtil.HierarchyItemBuffer);
-                try
-                {
-                    for (int i = 0; i < HierarchyUtil.HierarchyItemBuffer.Count; ++i)
-                    {
-                        IDevkitHierarchyItem item = HierarchyUtil.HierarchyItemBuffer[i];
-                        if (item.instanceID == 0u)
-                            Logger.LogWarning($"Skipped item: {item.Format()} because it was missing an instance ID.", method: "CLIENT EVENTS");
-                        else
-                        {
-                            instanceIds.Add(item.instanceID);
-                            translations.Add(t);
-                            if (ClientEvents.ListeningOnMoveHierarchyObjectPreview)
-                                ClientEvents.InvokeOnMoveHierarchyObjectPreview(new MoveHierarchyObjectPreviewProperties(selection, item, t, pivotPosition, dt));
-                        }
-                    }
-                }
-                finally
-                {
-                    HierarchyUtil.HierarchyItemBuffer.Clear();
-                }
-            }
-
-            if (ClientEvents.ListeningOnMoveHierarchyObjectsPreview)
-                ClientEvents.InvokeOnMoveHierarchyObjectsPreview(new MoveHierarchyObjectsPreviewProperties(instanceIds.ToArray(), translations.ToArray(), pivotPosition, dt));
-        }
-        finally
-        {
-            ListPool<uint>.release(instanceIds);
-            ListPool<HierarchyObjectTransformation>.release(translations);
-        }
-    }
-
-    /// <summary>Skipped for no permissions.</summary>
-    private static bool _skippedMoveHandle;
-
-    /// <summary>Is currently in <see cref="SelectionTool"/>.moveHandle.</summary>
-    private static bool _movingHandle;
-
-    [HarmonyPatch(typeof(SelectionTool), "moveHandle")]
-    [HarmonyPrefix]
-    [UsedImplicitly]
-    private static bool MoveHandlePrefix(Vector3 position, Quaternion rotation, Vector3 scale, bool doRotation, bool hasScale)
-    {
-        _skippedMoveHandle = false;
-        if (DevkitSelectionManager.selection.Count <= 0)
-        {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("UnknownError"));
-            _skippedMoveHandle = true;
-            return false;
-        }
-
-        DevkitSelection? sel = DevkitSelectionManager.selection.FirstOrDefault();
-        if (sel == null || sel.gameObject == null)
-        {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("UnknownError"));
-            _skippedMoveHandle = true;
-            return false;
-        }
-
-        sel.gameObject.GetComponents(HierarchyUtil.HierarchyItemBuffer);
-        try
-        {
-            for (int i = 0; i < HierarchyUtil.HierarchyItemBuffer.Count; ++i)
-            {
-                if (!HierarchyUtil.CheckMovePermission(HierarchyUtil.HierarchyItemBuffer[i]))
-                {
-                    UIMessage.SendNoPermissionMessage(null);
-                    _skippedMoveHandle = true;
-                    return false;
-                }
-            }
-        }
-        finally
-        {
-            HierarchyUtil.HierarchyItemBuffer.Clear();
-        }
-
-        _movingHandle = true;
-        return true;
-    }
-    [HarmonyPatch(typeof(SelectionTool), "moveHandle")]
-    [HarmonyPostfix]
-    [UsedImplicitly]
-    private static void MoveHandlePostfix(Vector3 position, Quaternion rotation, Vector3 scale, bool doRotation, bool hasScale)
-    {
-        _movingHandle = false;
-    }
-
     [HarmonyPatch(typeof(SelectionTool), nameof(SelectionTool.update))]
     [HarmonyTranspiler]
     [UsedImplicitly]
@@ -252,6 +135,122 @@ internal static class SelectionToolPatches
         return ins;
     }
 
+    [HarmonyPatch(typeof(SelectionTool), "OnHandleTranslatedAndRotated")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void SelectionToolOnHandleTranslatedAndRotated(Vector3 worldPositionDelta, Quaternion worldRotationDelta, Vector3 pivotPosition, bool modifyRotation)
+    {
+        if (!DevkitServerModule.IsEditing || _movingHandle)
+            return;
+
+        Logger.LogDebug($"[CLIENT EVENTS] Temp move requested at: {string.Join(",", DevkitSelectionManager.selection.Select(selection => selection.gameObject.name.Format()))}: deltaPos: {worldPositionDelta.Format()}, deltaRot: {worldRotationDelta.eulerAngles.Format()}, pivotPos: {pivotPosition.Format()}, modifyRotation: {modifyRotation}.");
+
+        TransformationDelta.TransformFlags flags = 0;
+        if (!worldPositionDelta.IsNearlyZero())
+            flags |= TransformationDelta.TransformFlags.Position | TransformationDelta.TransformFlags.OriginalPosition;
+        if (modifyRotation && !worldRotationDelta.IsNearlyIdentity())
+            flags |= TransformationDelta.TransformFlags.Rotation | TransformationDelta.TransformFlags.OriginalRotation;
+
+        List<uint> instanceIds = ListPool<uint>.claim();
+        List<TransformationDelta> translations = ListPool<TransformationDelta>.claim();
+        float dt = CachedTime.DeltaTime;
+        try
+        {
+            if (translations.Capacity < DevkitSelectionManager.selection.Count)
+                translations.Capacity = DevkitSelectionManager.selection.Count;
+            if (instanceIds.Capacity < DevkitSelectionManager.selection.Count)
+                instanceIds.Capacity = DevkitSelectionManager.selection.Count;
+            foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+            {
+                TransformationDelta t = new TransformationDelta(flags, worldPositionDelta, worldRotationDelta, selection.preTransformPosition, selection.preTransformRotation);
+                selection.gameObject.GetComponents(HierarchyUtil.HierarchyItemBuffer);
+                try
+                {
+                    for (int i = 0; i < HierarchyUtil.HierarchyItemBuffer.Count; ++i)
+                    {
+                        IDevkitHierarchyItem item = HierarchyUtil.HierarchyItemBuffer[i];
+                        if (item.instanceID == 0u)
+                            Logger.LogWarning($"Skipped item: {item.Format()} because it was missing an instance ID.", method: "CLIENT EVENTS");
+                        else
+                        {
+                            instanceIds.Add(item.instanceID);
+                            translations.Add(t);
+                            if (ClientEvents.ListeningOnMoveHierarchyObjectPreview)
+                                ClientEvents.InvokeOnMoveHierarchyObjectPreview(new MoveHierarchyObjectPreviewProperties(selection, item, t, pivotPosition, dt));
+                        }
+                    }
+                }
+                finally
+                {
+                    HierarchyUtil.HierarchyItemBuffer.Clear();
+                }
+            }
+
+            if (ClientEvents.ListeningOnMoveHierarchyObjectsPreview)
+                ClientEvents.InvokeOnMoveHierarchyObjectsPreview(new MoveHierarchyObjectsPreviewProperties(instanceIds.ToArray(), translations.ToArray(), pivotPosition, dt));
+        }
+        finally
+        {
+            ListPool<uint>.release(instanceIds);
+            ListPool<TransformationDelta>.release(translations);
+        }
+    }
+
+    /// <summary>Skipped for no permissions.</summary>
+    private static bool _skippedMoveHandle;
+
+    /// <summary>Is currently in <see cref="SelectionTool"/>.moveHandle.</summary>
+    private static bool _movingHandle;
+
+    [HarmonyPatch(typeof(SelectionTool), "moveHandle")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    private static bool MoveHandlePrefix(Vector3 position, Quaternion rotation, Vector3 scale, bool doRotation, bool hasScale)
+    {
+        _skippedMoveHandle = false;
+        if (DevkitSelectionManager.selection.Count <= 0)
+        {
+            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+            _skippedMoveHandle = true;
+            return false;
+        }
+
+        DevkitSelection? sel = DevkitSelectionManager.selection.FirstOrDefault();
+        if (sel == null || sel.gameObject == null)
+        {
+            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+            _skippedMoveHandle = true;
+            return false;
+        }
+
+        sel.gameObject.GetComponents(HierarchyUtil.HierarchyItemBuffer);
+        try
+        {
+            for (int i = 0; i < HierarchyUtil.HierarchyItemBuffer.Count; ++i)
+            {
+                if (!HierarchyUtil.CheckMovePermission(HierarchyUtil.HierarchyItemBuffer[i]))
+                {
+                    UIMessage.SendNoPermissionMessage(null);
+                    _skippedMoveHandle = true;
+                    return false;
+                }
+            }
+        }
+        finally
+        {
+            HierarchyUtil.HierarchyItemBuffer.Clear();
+        }
+
+        _movingHandle = true;
+        return true;
+    }
+    [HarmonyPatch(typeof(SelectionTool), "moveHandle")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void MoveHandlePostfix(Vector3 position, Quaternion rotation, Vector3 scale, bool doRotation, bool hasScale)
+    {
+        _movingHandle = false;
+    }
 
     [UsedImplicitly]
     private static void OnMoveHandle(Vector3 position, Quaternion rotation, Vector3 scale, bool doRotation, bool hasScale)
@@ -260,13 +259,13 @@ internal static class SelectionToolPatches
 
         Logger.LogDebug("[CLIENT EVENTS] Handle moved: " + position.Format() + " Rot: " + doRotation.Format() + ", Scale: " + hasScale.Format() + ".");
         List<uint> instanceIds = ListPool<uint>.claim();
-        List<HierarchyObjectTransformation> translations = ListPool<HierarchyObjectTransformation>.claim();
+        List<TransformationDelta> translations = ListPool<TransformationDelta>.claim();
         List<Vector3>? originalScales = hasScale ? null : ListPool<Vector3>.claim();
-        float dt = Time.deltaTime;
+        float dt = CachedTime.DeltaTime;
         try
         {
-            HierarchyObjectTransformation.TransformFlags flags = HierarchyObjectTransformation.TransformFlags.Position;
-            if (doRotation) flags |= HierarchyObjectTransformation.TransformFlags.Rotation;
+            TransformationDelta.TransformFlags flags = TransformationDelta.TransformFlags.Position;
+            if (doRotation) flags |= TransformationDelta.TransformFlags.Rotation;
             int c = DevkitSelectionManager.selection.Count;
             if (translations.Capacity < c)
                 translations.Capacity = c;
@@ -276,7 +275,7 @@ internal static class SelectionToolPatches
                 originalScales.Capacity = c;
             foreach (DevkitSelection selection in DevkitSelectionManager.selection)
             {
-                HierarchyObjectTransformation t = new HierarchyObjectTransformation(flags, position, rotation, selection.preTransformPosition, selection.preTransformRotation);
+                TransformationDelta t = new TransformationDelta(flags, position, rotation, selection.preTransformPosition, selection.preTransformRotation);
                 selection.gameObject.GetComponents(HierarchyUtil.HierarchyItemBuffer);
                 try
                 {
@@ -314,7 +313,7 @@ internal static class SelectionToolPatches
         finally
         {
             ListPool<uint>.release(instanceIds);
-            ListPool<HierarchyObjectTransformation>.release(translations);
+            ListPool<TransformationDelta>.release(translations);
             if (originalScales != null)
                 ListPool<Vector3>.release(originalScales);
         }
@@ -417,7 +416,7 @@ internal static class SelectionToolPatches
             if (index < HierarchyUtil.HierarchyItemBuffer.Count)
                 Array.Resize(ref instanceIds, index);
 
-            ClientEvents.InvokeOnDeleteHierarchyObjects(new DeleteHierarchyObjectsProperties(instanceIds, Time.deltaTime));
+            ClientEvents.InvokeOnDeleteHierarchyObjects(new DeleteHierarchyObjectsProperties(instanceIds, CachedTime.DeltaTime));
         }
     }
 
@@ -427,13 +426,13 @@ internal static class SelectionToolPatches
         int ct = DevkitSelectionManager.selection.Count;
         if (!DevkitServerModule.IsEditing || _skippedMoveHandle || ct <= 0) return;
 
-        HierarchyObjectTransformation[] translations = new HierarchyObjectTransformation[ct];
+        TransformationDelta[] translations = new TransformationDelta[ct];
         uint[] instanceIds = new uint[ct];
         Vector3[] scales = new Vector3[ct];
         Vector3[] originalScales = new Vector3[ct];
         bool useScale = false;
         int index = -1;
-        float dt = Time.deltaTime;
+        float dt = CachedTime.DeltaTime;
         foreach (DevkitSelection selection in DevkitSelectionManager.selection)
         {
             selection.gameObject.GetComponents(HierarchyUtil.HierarchyItemBuffer);
@@ -446,10 +445,10 @@ internal static class SelectionToolPatches
                         Logger.LogWarning($"Skipped item: {item.Format()} because it was missing an instance ID.", method: "CLIENT EVENTS");
                     else
                     {
-                        ref HierarchyObjectTransformation t = ref translations[++index];
+                        ref TransformationDelta t = ref translations[++index];
                         Transform transform = selection.gameObject.transform;
                         Vector3 transformLocalScale = transform.localScale, selectionLocalScale = selection.preTransformLocalScale;
-                        t = new HierarchyObjectTransformation(HierarchyObjectTransformation.TransformFlags.All,
+                        t = new TransformationDelta(TransformationDelta.TransformFlags.All,
                             transform.position, transform.rotation, selection.preTransformPosition, selection.preTransformRotation);
 
                         instanceIds[index] = item.instanceID;

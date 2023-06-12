@@ -714,7 +714,7 @@ public class CommandHandler : ICommandHandler, IDisposable
         else if (command is VanillaCommand)
             command.LogInfo("Registered from ".Colorize(clr) + "Unturned".Colorize(DevkitServerModule.UnturnedColor) + ".".Colorize(clr), ConsoleColor.DarkGray);
         else
-            command.LogInfo("Registered from ".Colorize(clr) + DevkitServerModule.MainLocalization.format("Name").Colorize(DevkitServerModule.PluginColor) + ".".Colorize(clr), ConsoleColor.DarkGray);
+            command.LogInfo("Registered from ".Colorize(clr) + DevkitServerModule.MainLocalization.format("Name").Colorize(DevkitServerModule.ModuleColor) + ".".Colorize(clr), ConsoleColor.DarkGray);
 
         TryInvokeOnCommandRegistered(command);
 

@@ -2,7 +2,7 @@
 
 namespace DevkitServer.Multiplayer.Actions;
 
-public readonly struct HierarchyObjectTransformation
+public readonly struct TransformationDelta
 {
     public const int Capacity = 15;
     public TransformFlags Flags { get; }
@@ -10,7 +10,7 @@ public readonly struct HierarchyObjectTransformation
     public Quaternion Rotation { get; }
     public Vector3 OriginalPosition { get; }
     public Quaternion OriginalRotation { get; }
-    public HierarchyObjectTransformation(ByteReader reader, TransformFlags flags, Vector3 position, Quaternion rotation)
+    public TransformationDelta(ByteReader reader, TransformFlags flags, Vector3 position, Quaternion rotation)
     {
         Flags = flags;
         Position = position;
@@ -22,7 +22,7 @@ public readonly struct HierarchyObjectTransformation
             OriginalRotation = reader.ReadQuaternion();
         else OriginalRotation = Quaternion.identity;
     }
-    public HierarchyObjectTransformation(ByteReader reader)
+    public TransformationDelta(ByteReader reader)
     {
         TransformFlags flags = reader.ReadEnum<TransformFlags>();
         Flags = flags & ~(TransformFlags)8;
@@ -43,7 +43,7 @@ public readonly struct HierarchyObjectTransformation
         else
             OriginalRotation = Quaternion.identity;
     }
-    public HierarchyObjectTransformation(TransformFlags flags, Vector3 position, Quaternion rotation, Vector3 originalPosition, Quaternion originalRotation)
+    public TransformationDelta(TransformFlags flags, Vector3 position, Quaternion rotation, Vector3 originalPosition, Quaternion originalRotation)
     {
         Flags = flags;
         Position = position;
