@@ -10,10 +10,22 @@ using JetBrains.Annotations;
 namespace DevkitServer.Util;
 public static class FormattingUtil
 {
+    // For unit tests
+    internal static ITerminalFormatProvider FormatProvider = new LoggerFormatProvider();
+    private static char[][]? _tags;
     public static Func<object, string> FormatSelector = x => x.Format();
-    public const string ANSIReset = "\u001b[39m";
     public const char ConsoleEscapeCharacter = '\u001b';
-    public static unsafe string GetANSIForegroundString(ConsoleColor color)
+    public const string ANSIForegroundReset = "\u001b[39m";
+    public const string ANSIBackgroundReset = "\u001b[49m";
+    private const int DefaultForeground = -9013642;  // gray
+    private const int DefaultBackground = -15987700; // black
+    public static unsafe string GetANSIString(ConsoleColor color, bool background)
+    {
+        char* chrs = stackalloc char[5];
+        SetANSICode(chrs, 0, color, background);
+        return new string(chrs, 0, 5);
+    }
+    private static unsafe void SetANSICode(char* data, int index, ConsoleColor color, bool background)
     {
         int num = color switch
         {
@@ -35,57 +47,55 @@ public static class FormattingUtil
             ConsoleColor.White => 97,
             _ => 39
         };
-        char* chrs = stackalloc char[5];
-        chrs[0] = '\u001b';
-        chrs[1] = '[';
-        chrs[2] = (char)(num / 10 + 48);
-        chrs[3] = (char)(num % 10 + 48);
-        chrs[4] = 'm';
-
-        return new string(chrs, 0, 5);
+        if (background)
+            num += 10;
+        data[index] = '\u001b';
+        data[index + 1] = '[';
+        data[index + 2] = (char)(num / 10 + 48);
+        data[index + 3] = (char)(num % 10 + 48);
+        data[index + 4] = 'm';
     }
-    /// <summary>
-    /// Returns extended ANSI text format codes for 32 bit ARGB data formatted as <code>
-    /// ESC[38;2;*r*;*g*;*b*m
-    /// </code> where 'ESC' is '\u001b'.
-    /// </summary>
-    /// <param name="argb">32 bit ARGB data, convert using <see cref="System.Drawing.Color.ToArgb"/> and <see cref="System.Drawing.Color.FromArgb(int)"/>.</param>
-    public static unsafe string GetExtANSIForegroundString(int argb)
+    public static unsafe string GetExtendedANSIString(int argb, bool background)
     {
-        // https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences?redirectedfrom=MSDN#text-formatting
         byte r = unchecked((byte)(argb >> 16));
         byte g = unchecked((byte)(argb >> 8));
         byte b = unchecked((byte)argb);
         int l = 10 + (r > 9 ? r > 99 ? 3 : 2 : 1) + (g > 9 ? g > 99 ? 3 : 2 : 1) + (b > 9 ? b > 99 ? 3 : 2 : 1);
         char* chrs = stackalloc char[l];
-        chrs[0] = ConsoleEscapeCharacter;
-        chrs[1] = '[';
-        chrs[2] = '3';
-        chrs[3] = '8';
-        chrs[4] = ';';
-        chrs[5] = '2';
-        chrs[6] = ';';
-        int index = 6;
-        if (r > 99)
-            chrs[++index] = (char)(r / 100 + 48);
-        if (r > 9)
-            chrs[++index] = (char)((r % 100) / 10 + 48);
-        chrs[++index] = (char)(r % 10 + 48);
-        chrs[++index] = ';';
-        if (g > 99)
-            chrs[++index] = (char)(g / 100 + 48);
-        if (g > 9)
-            chrs[++index] = (char)((g % 100) / 10 + 48);
-        chrs[++index] = (char)(g % 10 + 48);
-        chrs[++index] = ';';
-        if (b > 99)
-            chrs[++index] = (char)(b / 100 + 48);
-        if (b > 9)
-            chrs[++index] = (char)((b % 100) / 10 + 48);
-        chrs[++index] = (char)(b % 10 + 48);
-        chrs[index + 1] = 'm';
+        SetExtendedANSICode(chrs, 0, r, g, b, background);
         return new string(chrs, 0, l);
     }
+    private static unsafe void SetExtendedANSICode(char* data, int index, byte r, byte g, byte b, bool background)
+    {
+        // https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences?redirectedfrom=MSDN#text-formatting
+        data[index] = ConsoleEscapeCharacter;
+        data[index + 1] = '[';
+        data[index + 2] = background ? '4' : '3';
+        data[index + 3] = '8';
+        data[index + 4] = ';';
+        data[index + 5] = '2';
+        data[index + 6] = ';';
+        index += 6;
+        if (r > 99)
+            data[++index] = (char)(r / 100 + 48);
+        if (r > 9)
+            data[++index] = (char)((r % 100) / 10 + 48);
+        data[++index] = (char)(r % 10 + 48);
+        data[++index] = ';';
+        if (g > 99)
+            data[++index] = (char)(g / 100 + 48);
+        if (g > 9)
+            data[++index] = (char)((g % 100) / 10 + 48);
+        data[++index] = (char)(g % 10 + 48);
+        data[++index] = ';';
+        if (b > 99)
+            data[++index] = (char)(b / 100 + 48);
+        if (b > 9)
+            data[++index] = (char)((b % 100) / 10 + 48);
+        data[++index] = (char)(b % 10 + 48);
+        data[index + 1] = 'm';
+    }
+    
     /// <summary>
     /// Convert to <see cref="Color"/> to ARGB data.
     /// </summary>
@@ -180,147 +190,147 @@ public static class FormattingUtil
     }
     // this is not a mess, scroll away
     public static string Format(this FieldInfo? field) => field == null ? ((object)null!).Format() : ((field.DeclaringType != null
-                                                              ? Logger.StackCleaner.GetString(field.DeclaringType)
-                                                              : ((Logger.StackCleaner.Configuration.ColorFormatting ==
+                                                              ? FormatProvider.StackCleaner.GetString(field.DeclaringType)
+                                                              : ((FormatProvider.StackCleaner.Configuration.ColorFormatting ==
                                                                   StackColorFormatType.None
                                                                      ? string.Empty
-                                                                     : (Logger.StackCleaner.Configuration.ColorFormatting ==
+                                                                     : (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
                                                                         StackColorFormatType.ExtendedANSIColor
-                                                                         ? GetExtANSIForegroundString(
-                                                                             Logger.StackCleaner.Configuration.Colors!
-                                                                                 .KeywordColor)
-                                                                         : GetANSIForegroundString(
+                                                                         ? GetExtendedANSIString(
+                                                                             FormatProvider.StackCleaner.Configuration.Colors!
+                                                                                 .KeywordColor, false)
+                                                                         : GetANSIString(
                                                                              ToConsoleColor(
-                                                                                 Logger.StackCleaner.Configuration.Colors!
-                                                                                     .KeywordColor)))) + "global" +
-                                                                 (Logger.StackCleaner.Configuration.ColorFormatting ==
+                                                                                 FormatProvider.StackCleaner.Configuration.Colors!
+                                                                                     .KeywordColor), false))) + "global" +
+                                                                 (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
                                                                   StackColorFormatType.None
                                                                      ? string.Empty
-                                                                     : (Logger.StackCleaner.Configuration.ColorFormatting ==
+                                                                     : (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
                                                                         StackColorFormatType.ExtendedANSIColor
-                                                                         ? GetExtANSIForegroundString(
-                                                                             Logger.StackCleaner.Configuration.Colors!
-                                                                                 .PunctuationColor)
-                                                                         : GetANSIForegroundString(
+                                                                         ? GetExtendedANSIString(
+                                                                             FormatProvider.StackCleaner.Configuration.Colors!
+                                                                                 .PunctuationColor, false)
+                                                                         : GetANSIString(
                                                                              ToConsoleColor(
-                                                                                 Logger.StackCleaner.Configuration.Colors!
-                                                                                     .PunctuationColor)))) + "::" +
-                                                                 (Logger.StackCleaner.Configuration.ColorFormatting ==
+                                                                                 FormatProvider.StackCleaner.Configuration.Colors!
+                                                                                     .PunctuationColor), false))) + "::" +
+                                                                 (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
                                                                   StackColorFormatType.None
                                                                      ? string.Empty
-                                                                     : ANSIReset))) + " " +
-                                                          (Logger.StackCleaner.Configuration.ColorFormatting ==
+                                                                     : ANSIForegroundReset))) + " " +
+                                                          (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
                                                            StackColorFormatType.None
                                                               ? string.Empty
-                                                              : (Logger.StackCleaner.Configuration.ColorFormatting ==
+                                                              : (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
                                                                  StackColorFormatType.ExtendedANSIColor
-                                                                  ? GetExtANSIForegroundString(
-                                                                      Logger.StackCleaner.Configuration.Colors!.PropertyColor)
-                                                                  : GetANSIForegroundString(
-                                                                      ToConsoleColor(Logger.StackCleaner.Configuration.Colors!
-                                                                          .PropertyColor)))) + field.Name +
-                                                          (Logger.StackCleaner.Configuration.ColorFormatting ==
+                                                                  ? GetExtendedANSIString(
+                                                                      FormatProvider.StackCleaner.Configuration.Colors!.PropertyColor, false)
+                                                                  : GetANSIString(
+                                                                      ToConsoleColor(FormatProvider.StackCleaner.Configuration.Colors!
+                                                                          .PropertyColor), false))) + field.Name +
+                                                          (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
                                                            StackColorFormatType.None
                                                               ? string.Empty
-                                                              : ANSIReset));
+                                                              : ANSIForegroundReset));
     public static string Format(this PropertyInfo? property) => property == null ? ((object)null!).Format() : ((property.DeclaringType != null
-                                                                     ? Logger.StackCleaner.GetString(property.DeclaringType)
-                                                                     : ((Logger.StackCleaner.Configuration.ColorFormatting ==
+                                                                     ? FormatProvider.StackCleaner.GetString(property.DeclaringType)
+                                                                     : ((FormatProvider.StackCleaner.Configuration.ColorFormatting ==
                                                                          StackColorFormatType.None
                                                                             ? string.Empty
-                                                                            : (Logger.StackCleaner.Configuration
+                                                                            : (FormatProvider.StackCleaner.Configuration
                                                                                    .ColorFormatting ==
                                                                                StackColorFormatType.ExtendedANSIColor
-                                                                                ? GetExtANSIForegroundString(
-                                                                                    Logger.StackCleaner.Configuration.Colors!
-                                                                                        .KeywordColor)
-                                                                                : GetANSIForegroundString(
+                                                                                ? GetExtendedANSIString(
+                                                                                    FormatProvider.StackCleaner.Configuration.Colors!
+                                                                                        .KeywordColor, false)
+                                                                                : GetANSIString(
                                                                                     ToConsoleColor(
-                                                                                        Logger.StackCleaner.Configuration
-                                                                                            .Colors!.KeywordColor)))) +
-                                                                        "global" + (Logger.StackCleaner.Configuration
+                                                                                        FormatProvider.StackCleaner.Configuration
+                                                                                            .Colors!.KeywordColor), false))) +
+                                                                        "global" + (FormatProvider.StackCleaner.Configuration
                                                                             .ColorFormatting == StackColorFormatType.None
                                                                             ? string.Empty
-                                                                            : (Logger.StackCleaner.Configuration
+                                                                            : (FormatProvider.StackCleaner.Configuration
                                                                                    .ColorFormatting ==
                                                                                StackColorFormatType.ExtendedANSIColor
-                                                                                ? GetExtANSIForegroundString(
-                                                                                    Logger.StackCleaner.Configuration.Colors!
-                                                                                        .PunctuationColor)
-                                                                                : GetANSIForegroundString(
+                                                                                ? GetExtendedANSIString(
+                                                                                    FormatProvider.StackCleaner.Configuration.Colors!
+                                                                                        .PunctuationColor, false)
+                                                                                : GetANSIString(
                                                                                     ToConsoleColor(
-                                                                                        Logger.StackCleaner.Configuration
+                                                                                        FormatProvider.StackCleaner.Configuration
                                                                                             .Colors!
-                                                                                            .PunctuationColor)))) +
+                                                                                            .PunctuationColor), false))) +
                                                                         "::" +
-                                                                        (Logger.StackCleaner.Configuration.ColorFormatting ==
+                                                                        (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
                                                                          StackColorFormatType.None
                                                                             ? string.Empty
-                                                                            : ANSIReset))) + " " +
-                                                                 (Logger.StackCleaner.Configuration.ColorFormatting ==
+                                                                            : ANSIForegroundReset))) + " " +
+                                                                 (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
                                                                   StackColorFormatType.None
                                                                      ? string.Empty
-                                                                     : (Logger.StackCleaner.Configuration.ColorFormatting ==
+                                                                     : (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
                                                                         StackColorFormatType.ExtendedANSIColor
-                                                                         ? GetExtANSIForegroundString(
-                                                                             Logger.StackCleaner.Configuration.Colors!
-                                                                                 .PropertyColor)
-                                                                         : GetANSIForegroundString(
+                                                                         ? GetExtendedANSIString(
+                                                                             FormatProvider.StackCleaner.Configuration.Colors!
+                                                                                 .PropertyColor, false)
+                                                                         : GetANSIString(
                                                                              ToConsoleColor(
-                                                                                 Logger.StackCleaner.Configuration.Colors!
-                                                                                     .PropertyColor)))) + property.Name +
-                                                                 (Logger.StackCleaner.Configuration.ColorFormatting ==
+                                                                                 FormatProvider.StackCleaner.Configuration.Colors!
+                                                                                     .PropertyColor), false))) + property.Name +
+                                                                 (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
                                                                   StackColorFormatType.None
                                                                      ? string.Empty
-                                                                     : ANSIReset));
-    public static string Format(this MethodBase? method) => method == null ? ((object)null!).Format() : Logger.StackCleaner.GetString(method);
+                                                                     : ANSIForegroundReset));
+    public static string Format(this MethodBase? method) => method == null ? ((object)null!).Format() : FormatProvider.StackCleaner.GetString(method);
     public static string FormatMethod(Type rtnType, Type? declType, string name, (Type type, string? name)[]? namedArguments = null, Type[]? arguments = null, Type[]? genericArgs = null, bool isStatic = false, bool isAsync = false, bool isGetter = false, bool isSetter = false, bool isIndexer = false)
     {
         StringBuilder sb = new StringBuilder(32);
         if (!isIndexer && isStatic)
-            sb.Append("static ".Colorize(Logger.StackCleaner.Configuration.Colors!.KeywordColor));
+            sb.Append("static ".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor));
         if (isAsync && !(isGetter || isSetter || isIndexer))
-            sb.Append("async ".Colorize(Logger.StackCleaner.Configuration.Colors!.KeywordColor));
+            sb.Append("async ".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor));
 
         sb.Append(Format(rtnType)).Append(' ');
 
         if (isGetter)
-            sb.Append("get ".Colorize(Logger.StackCleaner.Configuration.Colors!.KeywordColor));
+            sb.Append("get ".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor));
         if (isSetter)
-            sb.Append("set ".Colorize(Logger.StackCleaner.Configuration.Colors!.KeywordColor));
+            sb.Append("set ".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor));
 
         if (declType != null)
             sb.Append(Format(declType)).Append('.');
 
         if (!isIndexer)
-            sb.Append(name.Colorize(Logger.StackCleaner.Configuration.Colors!.MethodColor));
+            sb.Append(name.Colorize(FormatProvider.StackCleaner.Configuration.Colors!.MethodColor));
         else
-            sb.Append("this".Colorize(Logger.StackCleaner.Configuration.Colors!.KeywordColor));
+            sb.Append("this".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor));
 
         if (!(isGetter || isSetter || isIndexer) && genericArgs is { Length: > 0 })
         {
-            sb.Append("<".Colorize(Logger.StackCleaner.Configuration.Colors!.PunctuationColor));
+            sb.Append("<".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor));
             for (int i = 0; i < genericArgs.Length; ++i)
             {
                 if (i != 0)
-                    sb.Append(", ".Colorize(Logger.StackCleaner.Configuration.Colors!.PunctuationColor));
+                    sb.Append(", ".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor));
                 sb.Append(Format(genericArgs[i]));
             }
-            sb.Append(">".Colorize(Logger.StackCleaner.Configuration.Colors!.PunctuationColor));
+            sb.Append(">".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor));
         }
         if (isIndexer || !isGetter && !isSetter)
         {
-            sb.Append((isIndexer ? "[" : "(").Colorize(Logger.StackCleaner.Configuration.Colors!.PunctuationColor));
+            sb.Append((isIndexer ? "[" : "(").Colorize(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor));
             if (namedArguments is { Length: > 0 })
             {
                 for (int i = 0; i < namedArguments.Length; ++i)
                 {
                     (Type type, string? paramName) = namedArguments[i];
                     if (i != 0)
-                        sb.Append(", ".Colorize(Logger.StackCleaner.Configuration.Colors!.PunctuationColor));
+                        sb.Append(", ".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor));
                     sb.Append(Format(type));
                     if (!string.IsNullOrEmpty(paramName))
-                        sb.Append(" " + paramName!.Colorize(Logger.StackCleaner.Configuration.Colors!.ParameterColor));
+                        sb.Append(" " + paramName!.Colorize(FormatProvider.StackCleaner.Configuration.Colors!.ParameterColor));
                 }
             }
             else if (arguments is { Length: > 0 })
@@ -329,15 +339,15 @@ public static class FormattingUtil
                 {
                     Type type = arguments[i];
                     if (i != 0)
-                        sb.Append(", ".Colorize(Logger.StackCleaner.Configuration.Colors!.PunctuationColor));
+                        sb.Append(", ".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor));
                     sb.Append(Format(type));
                 }
             }
-            sb.Append((isIndexer ? "]" : ")").Colorize(Logger.StackCleaner.Configuration.Colors!.PunctuationColor));
+            sb.Append((isIndexer ? "]" : ")").Colorize(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor));
         }
         return sb.ToString();
     }
-    public static string Format(this Type? typedef) => typedef == null ? ((object)null!).Format() : Logger.StackCleaner.GetString(typedef);
+    public static string Format(this Type? typedef) => typedef == null ? ((object)null!).Format() : FormatProvider.StackCleaner.GetString(typedef);
     public static string Format(this ExceptionBlock? block)
     {
         if (block == null)
@@ -345,30 +355,30 @@ public static class FormattingUtil
         switch (block.blockType)
         {
             case ExceptionBlockType.BeginExceptionBlock:
-                return GetColor(Logger.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "try" + GetReset() + Environment.NewLine + "{";
+                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "try" + GetReset() + Environment.NewLine + "{";
             case ExceptionBlockType.EndExceptionBlock:
                 return "}";
             case ExceptionBlockType.BeginExceptFilterBlock:
-                return GetColor(Logger.StackCleaner.Configuration.Colors!.FlowKeywordColor) + " when" + GetReset() + Environment.NewLine + "{";
+                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + " when" + GetReset() + Environment.NewLine + "{";
             case ExceptionBlockType.BeginCatchBlock:
-                string str = "}" + GetColor(Logger.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "catch" + GetReset() + Environment.NewLine;
+                string str = "}" + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "catch" + GetReset() + Environment.NewLine;
                 if (block.catchType != null)
                     str += " (" + block.catchType.Format() + ")";
                 return str;
             case ExceptionBlockType.BeginFinallyBlock:
-                return "}" + GetColor(Logger.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "finally" + GetReset() + Environment.NewLine + "{";
+                return "}" + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "finally" + GetReset() + Environment.NewLine + "{";
             case ExceptionBlockType.BeginFaultBlock:
-                return "}" + GetColor(Logger.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "fault" + GetReset() + Environment.NewLine + "{";
+                return "}" + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "fault" + GetReset() + Environment.NewLine + "{";
         }
 
-        return "}" + GetColor(Logger.StackCleaner.Configuration.Colors!.FlowKeywordColor) + block.blockType + GetReset() + Environment.NewLine + "{";
+        return "}" + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + block.blockType + GetReset() + Environment.NewLine + "{";
     }
-    public static string Format(this Label label) => (Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
+    public static string Format(this Label label) => (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
         ? string.Empty
-        : (Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-            ? GetExtANSIForegroundString(Logger.StackCleaner.Configuration.Colors!.StructColor)
-            : GetANSIForegroundString(ToConsoleColor(Logger.StackCleaner.Configuration.Colors!.StructColor)))) + "Label #" + label.GetLabelId() +
-                                                     (Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIReset);
+        : (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+            ? GetExtendedANSIString(FormatProvider.StackCleaner.Configuration.Colors!.StructColor, false)
+            : GetANSIString(ToConsoleColor(FormatProvider.StackCleaner.Configuration.Colors!.StructColor), false))) + "Label #" + label.GetLabelId() +
+                                                     (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIForegroundReset);
     public static string Format(this CodeInstruction? instruction)
     {
         if (instruction == null)
@@ -390,7 +400,7 @@ public static class FormattingUtil
                 try
                 {
                     int num = Convert.ToInt32(instruction.operand);
-                    op += " " + GetColor(Logger.StackCleaner.Configuration.Colors!.ExtraDataColor) + num + GetReset();
+                    op += " " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + num + GetReset();
                 }
                 catch
                 {
@@ -401,7 +411,7 @@ public static class FormattingUtil
                 try
                 {
                     long lng = Convert.ToInt64(instruction.operand);
-                    op += " " + GetColor(Logger.StackCleaner.Configuration.Colors!.ExtraDataColor) + lng + GetReset();
+                    op += " " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + lng + GetReset();
                 }
                 catch
                 {
@@ -417,7 +427,7 @@ public static class FormattingUtil
                 try
                 {
                     double dbl = Convert.ToDouble(instruction.operand);
-                    op += " " + GetColor(Logger.StackCleaner.Configuration.Colors!.ExtraDataColor) + dbl + GetReset();
+                    op += " " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + dbl + GetReset();
                 }
                 catch
                 {
@@ -428,7 +438,7 @@ public static class FormattingUtil
                 try
                 {
                     int num = Convert.ToInt32(instruction.operand);
-                    op += " " + GetColor(Logger.StackCleaner.Configuration.Colors!.ExtraDataColor) + num + GetReset();
+                    op += " " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + num + GetReset();
                 }
                 catch
                 {
@@ -444,7 +454,7 @@ public static class FormattingUtil
                 {
                     op += Environment.NewLine + "{";
                     for (int i = 0; i < jumps.Length; ++i)
-                        op += Environment.NewLine + "  " + GetColor(Logger.StackCleaner.Configuration.Colors!.ExtraDataColor) + i + GetReset() + " => " + GetColor(Logger.StackCleaner.Configuration.Colors!.StructColor) + " Label #" + jumps[i].GetLabelId() + GetReset();
+                        op += Environment.NewLine + "  " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + i + GetReset() + " => " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.StructColor) + " Label #" + jumps[i].GetLabelId() + GetReset();
 
                     op += Environment.NewLine + "}";
                 }
@@ -470,7 +480,7 @@ public static class FormattingUtil
             case OperandType.ShortInlineVar:
             case OperandType.InlineVar:
                 if (instruction.operand is LocalBuilder lb)
-                    op += " " + GetColor(Logger.StackCleaner.Configuration.Colors!.ExtraDataColor) + lb.LocalIndex + GetReset() + " : " + lb.LocalType!.Format();
+                    op += " " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + lb.LocalIndex + GetReset() + " : " + lb.LocalType!.Format();
                 break;
         }
 
@@ -485,7 +495,7 @@ public static class FormattingUtil
     public static string Format(this OpCode instruction)
     {
         string? clr = null;
-        if (Logger.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+        if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             int argb = ToArgb(instruction.FlowControl switch
             {
@@ -495,30 +505,30 @@ public static class FormattingUtil
                 FlowControl.Break or FlowControl.Return or FlowControl.Throw => new Color32(208, 140, 217, 255),
                 _ => new Color32(86, 156, 214, 255)
             });
-            if (Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor)
-                clr = GetExtANSIForegroundString(argb);
+            if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor)
+                clr = GetExtendedANSIString(argb, false);
             else
-                clr = GetANSIForegroundString(ToConsoleColor(argb));
+                clr = GetANSIString(ToConsoleColor(argb), false);
         }
 
         if (clr != null)
-            return clr + instruction.Name + ANSIReset;
+            return clr + instruction.Name + ANSIForegroundReset;
 
         return instruction.Name;
     }
     public static string Format(this string? str, bool quotes)
     {
         if (str == null) return ((object?)null).Format();
-        if (Logger.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+        if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            string clr = (Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetExtANSIForegroundString(ToArgb(new Color32(214, 157, 133, 255)))
-                : GetANSIForegroundString(ToConsoleColor(ToArgb(new Color32(214, 157, 133, 255)))));
+            string clr = FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                ? GetExtendedANSIString(ToArgb(new Color32(214, 157, 133, 255)), false)
+                : GetANSIString(ToConsoleColor(ToArgb(new Color32(214, 157, 133, 255))), false);
 
             if (quotes)
-                return clr + "\"" + str + "\"" + ANSIReset;
+                return clr + "\"" + str + "\"" + ANSIForegroundReset;
             
-            return clr + str + ANSIReset;
+            return clr + str + ANSIForegroundReset;
         }
 
         return str;
@@ -527,22 +537,22 @@ public static class FormattingUtil
     {
         if (obj == null)
         {
-            if (Logger.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
-                return GetColor(Logger.StackCleaner.Configuration.Colors!.KeywordColor) + "null" + ANSIReset;
+            if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) + "null" + ANSIForegroundReset;
             return "null";
         }
 
         if (obj is IDevkitServerPlugin plugin)
         {
-            if (Logger.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
-                return GetColor(ToArgb(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor)) + plugin.Name + ANSIReset;
+            if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+                return GetColor(ToArgb(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor)) + plugin.Name + ANSIForegroundReset;
             return "null";
         }
         if (obj is Guid guid)
         {
             if (format != null)
-                return guid.ToString(format).Colorize(Logger.StackCleaner.Configuration.Colors!.StructColor);
-            return ("{" + guid.ToString("N") + "}").Colorize(Logger.StackCleaner.Configuration.Colors!.StructColor);
+                return guid.ToString(format).Colorize(FormatProvider.StackCleaner.Configuration.Colors!.StructColor);
+            return ("{" + guid.ToString("N") + "}").Colorize(FormatProvider.StackCleaner.Configuration.Colors!.StructColor);
         }
         if (obj is Asset asset)
         {
@@ -570,21 +580,21 @@ public static class FormattingUtil
         string str = obj.ToString();
         if (obj is ulong s64 && s64.UserSteam64())
         {
-            if (Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
+            if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
                 return s64.ToString("D17");
 
-            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + s64.ToString("D17") + ANSIReset;
+            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + s64.ToString("D17") + ANSIForegroundReset;
         }
         if (obj is CSteamID cs64 && cs64.UserSteam64())
         {
-            if (Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
+            if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
                 return cs64.m_SteamID.ToString("D17");
 
-            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + cs64.m_SteamID.ToString("D17") + ANSIReset;
+            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + cs64.m_SteamID.ToString("D17") + ANSIForegroundReset;
         }
         if (obj is ITransportConnection connection)
         {
-            if (Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
+            if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
                 return connection.GetAddressString(true);
 
             if (connection.TryGetIPv4Address(out uint addr))
@@ -592,33 +602,33 @@ public static class FormattingUtil
                 str = GetColor(ToArgb(new Color32(204, 255, 102, 255)))
                       + Parser.getIPFromUInt32(addr);
                 if (connection.TryGetPort(out ushort port))
-                    str += GetColor(Logger.StackCleaner.Configuration.Colors!.PunctuationColor) + ":" +
+                    str += GetColor(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor) + ":" +
                            GetColor(ToArgb(new Color32(170, 255, 0, 255))) +
                            port.ToString(CultureInfo.InvariantCulture);
 
-                return str + ANSIReset;
+                return str + ANSIForegroundReset;
             }
 
-            return GetColor(ToArgb(new Color32(204, 255, 102, 255))) + (connection.GetAddressString(true) ?? "<unknown address>") + ANSIReset;
+            return GetColor(ToArgb(new Color32(204, 255, 102, 255))) + (connection.GetAddressString(true) ?? "<unknown address>") + ANSIForegroundReset;
         }
 
-        if (Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
+        if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
             return str;
         if (str.Equals(type.ToString(), StringComparison.Ordinal))
             return "{" + type.Format() + "}";
 
-        if (Logger.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+        if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             if (obj is string or char)
-                return GetColor(ToArgb(new Color32(214, 157, 133, 255))) + "\"" + str + "\"" + ANSIReset;
+                return GetColor(ToArgb(new Color32(214, 157, 133, 255))) + "\"" + str + "\"" + ANSIForegroundReset;
 
             if (type.IsEnum)
-                return GetColor(Logger.StackCleaner.Configuration.Colors!.EnumColor) + str + ANSIReset;
+                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.EnumColor) + str + ANSIForegroundReset;
 
             if (type.IsPrimitive)
             {
                 if (obj is bool)
-                    return GetColor(Logger.StackCleaner.Configuration.Colors!.KeywordColor) + str + ANSIReset;
+                    return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) + str + ANSIForegroundReset;
 
                 Color32 color = new Color32(181, 206, 168, 255);
                 if (format != null)
@@ -626,99 +636,99 @@ public static class FormattingUtil
                     switch (obj)
                     {
                         case float n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
                         case double n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
                         case decimal n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
                         case int n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
                         case uint n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
                         case short n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
                         case ushort n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
                         case sbyte n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
                         case byte n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
                         case long n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
                         case ulong n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIReset;
+                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
                     }
                 }
 
 
-                return GetColor(ToArgb(color)) + str + ANSIReset;
+                return GetColor(ToArgb(color)) + str + ANSIForegroundReset;
             }
 
             if (type.IsInterface)
-                return GetColor(Logger.StackCleaner.Configuration.Colors!.InterfaceColor) + str + ANSIReset;
+                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.InterfaceColor) + str + ANSIForegroundReset;
 
             if (type.IsValueType)
-                return GetColor(Logger.StackCleaner.Configuration.Colors!.StructColor) + str + ANSIReset;
+                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.StructColor) + str + ANSIForegroundReset;
 
-            return GetColor(Logger.StackCleaner.Configuration.Colors!.ClassColor) + str + ANSIReset;
+            return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ClassColor) + str + ANSIForegroundReset;
         }
 
         return str;
     }
     public static string Colorize(this string str, ConsoleColor color)
     {
-        if (Logger.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+        if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            return GetANSIForegroundString(color) + str + ANSIReset;
+            return GetANSIString(color, false) + str + ANSIForegroundReset;
         }
 
         return str;
     }
     public static string Colorize(this string str, Color color)
     {
-        if (Logger.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+        if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            return (Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                       ? GetExtANSIForegroundString(ToArgb(color))
-                       : GetANSIForegroundString(ToConsoleColor(ToArgb(color))))
-                + str + ANSIReset;
+            return (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                       ? GetExtendedANSIString(ToArgb(color), false)
+                       : GetANSIString(ToConsoleColor(ToArgb(color)), false))
+                + str + ANSIForegroundReset;
         }
 
         return str;
     }
     public static string Colorize(this string str, Color32 color)
     {
-        if (Logger.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+        if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            return (Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                       ? GetExtANSIForegroundString(ToArgb(color))
-                       : GetANSIForegroundString(ToConsoleColor(ToArgb(color))))
-                + str + ANSIReset;
+            return (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                       ? GetExtendedANSIString(ToArgb(color), false)
+                       : GetANSIString(ToConsoleColor(ToArgb(color)), false))
+                + str + ANSIForegroundReset;
         }
 
         return str;
     }
     public static string Colorize(this string str, int argb)
     {
-        if (Logger.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+        if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            return (Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                       ? GetExtANSIForegroundString(argb)
-                       : GetANSIForegroundString(ToConsoleColor(argb)))
-                + str + ANSIReset;
+            return (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                       ? GetExtendedANSIString(argb, false)
+                       : GetANSIString(ToConsoleColor(argb), false))
+                + str + ANSIForegroundReset;
         }
 
         return str;
     }
     private static string GetColor(int argb)
     {
-        return (Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
+        return (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
             ? string.Empty
-            : (Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetExtANSIForegroundString(argb)
-                : GetANSIForegroundString(ToConsoleColor(argb))));
+            : (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                ? GetExtendedANSIString(argb, false)
+                : GetANSIString(ToConsoleColor(argb), false)));
     }
-    private static string GetReset() => Logger.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIReset;
+    private static string GetReset() => FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIForegroundReset;
 
     public static void PrintBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
     {
@@ -823,5 +833,378 @@ public static class FormattingUtil
             sb.Append(bytes[i + offset].ToString());
         }
         return sb.ToString();
+    }
+    private static void CheckTags() => _tags ??= new char[][]
+    {
+        "align".ToCharArray(),
+        "allcaps".ToCharArray(),
+        "alpha".ToCharArray(),
+        "b".ToCharArray(),
+        "br".ToCharArray(),
+        "cspace".ToCharArray(),
+        "font".ToCharArray(),
+        "font-weight".ToCharArray(),
+        "gradient".ToCharArray(),
+        "i".ToCharArray(),
+        "indent".ToCharArray(),
+        "line-height".ToCharArray(),
+        "line-indent".ToCharArray(),
+        "link".ToCharArray(),
+        "lowercase".ToCharArray(),
+        "material".ToCharArray(),
+        "margin".ToCharArray(),
+        "mark".ToCharArray(),
+        "mspace".ToCharArray(),
+        "nobr".ToCharArray(),
+        "noparse".ToCharArray(),
+        "page".ToCharArray(),
+        "pos".ToCharArray(),
+        "quad".ToCharArray(),
+        "rotate".ToCharArray(),
+        "s".ToCharArray(),
+        "size".ToCharArray(),
+        "smallcaps".ToCharArray(),
+        "space".ToCharArray(),
+        "sprite".ToCharArray(),
+        "strikethrough".ToCharArray(),
+        "style".ToCharArray(),
+        "sub".ToCharArray(),
+        "sup".ToCharArray(),
+        "u".ToCharArray(),
+        "uppercase".ToCharArray(),
+        "voffset".ToCharArray(),
+        "width".ToCharArray()
+    };
+    /// <summary>
+    /// Remove rich text tags from text, and replace color and mark tags with the ANSI or extended ANSI equivalent.
+    /// </summary>
+    /// <param name="argbForeground">Color to reset the foreground to.</param>
+    /// <param name="argbBackground">Color to reset the background to.</param>
+    /// <param name="checkForBackground">Whether or not to check for mark tags.</param>
+    /// <exception cref="ArgumentOutOfRangeException"/>
+    [Pure]
+    public static unsafe string ConvertRichTextToANSI(string str, int index = 0, int length = -1, int argbForeground = DefaultForeground, int argbBackground = DefaultBackground, bool checkForBackground = true)
+    {
+        CheckTags();
+        if (index >= str.Length || index < 0)
+            throw new ArgumentOutOfRangeException(nameof(index));
+        if (length < 0)
+            length = str.Length - index;
+        else if (index + length > str.Length)
+            throw new ArgumentOutOfRangeException(nameof(length));
+        else if (length == 0)
+            return str;
+
+        const int defaultForegroundStackSize = 2;
+        StackColorFormatType format = FormatProvider.StackCleaner.Configuration.ColorFormatting;
+
+        char[] rtn = new char[str.Length + 16];
+        int foregroundStackLength = defaultForegroundStackSize;
+        int backgroundStackLength = 0;
+        Color32* foregroundStack = stackalloc Color32[defaultForegroundStackSize];
+        Color32* backgroundStack = null;
+        int foregroundStackValuesLength = 0;
+        int backgroundStackValuesLength = 0;
+        int nextCopyStartIndex = 0;
+        int writeIndex = 0;
+        bool useColor = format is StackColorFormatType.ExtendedANSIColor or StackColorFormatType.ANSIColor;
+
+        int nonDefaults = 1 | 2;
+        if (useColor)
+            AppendDefaults();
+
+
+        fixed (char* mainPtr = str)
+        {
+            char* ptr = mainPtr + index;
+            for (int i = 0; i < length; ++i)
+            {
+                char current = ptr[i];
+                if (current == '<')
+                {
+                    bool pushColor = false;
+                    bool background = false;
+                    bool isEndTag = i != length - 1 && ptr[i + 1] == '/';
+                    int endIndex = -1;
+                    for (int j = i + (isEndTag ? 2 : 1); j < length; ++j)
+                    {
+                        if (ptr[j] == '>')
+                        {
+                            endIndex = j;
+                            break;
+                        }
+                    }
+
+                    if (endIndex == -1)
+                        continue;
+
+                    if (!isEndTag && useColor)
+                    {
+                        int colorIndex = -1;
+                        int colorLength = 0;
+                        // <color=#etc>
+                        if (ptr[i + 1] is 'c' or 'C' && i + 7 <= endIndex &&
+                            ptr[i + 2] is 'o' or 'O' &&
+                            ptr[i + 3] is 'l' or 'L' &&
+                            ptr[i + 4] is 'o' or 'O' &&
+                            ptr[i + 5] is 'r' or 'R' &&
+                            ptr[i + 6] == '=')
+                        {
+                            colorIndex = i + 7;
+                            colorLength = endIndex - (i + 7);
+                        }
+                        else if (ptr[i + 1] == '#' && i + 2 <= endIndex)
+                        {
+                            colorIndex = i + 1;
+                            colorLength = endIndex - (i + 1);
+                        }
+                        else if (checkForBackground &&
+                                 ptr[i + 1] is 'm' or 'M' && i + 6 <= endIndex &&
+                                 ptr[i + 2] is 'a' or 'A' &&
+                                 ptr[i + 3] is 'r' or 'R' &&
+                                 ptr[i + 4] is 'k' or 'K' &&
+                                 ptr[i + 5] == '=')
+                        {
+                            colorIndex = i + 6;
+                            colorLength = endIndex - (i + 6);
+                            background = true;
+                        }
+                        else if (!CompareTag(ptr, endIndex, i))
+                            continue;
+
+                        if (colorIndex >= 0 && DevkitServerUtility.TryParseColor32(new string(ptr, colorIndex, colorLength), out Color32 color))
+                        {
+                            pushColor = true;
+                            if (!background)
+                            {
+                                if (foregroundStackValuesLength >= foregroundStackLength)
+                                {
+                                    // ReSharper disable once StackAllocInsideLoop (won't happen much)
+                                    Color32* newAlloc = stackalloc Color32[foregroundStackValuesLength + 1];
+                                    if (foregroundStackValuesLength > 0)
+                                        Buffer.MemoryCopy(foregroundStack, newAlloc, foregroundStackValuesLength * sizeof(Color32), foregroundStackValuesLength * sizeof(Color32));
+                                    foregroundStackLength = foregroundStackValuesLength + 1;
+                                    foregroundStack = newAlloc;
+                                }
+
+                                foregroundStack[foregroundStackValuesLength] = color;
+                                ++foregroundStackValuesLength;
+                            }
+                            else
+                            {
+                                background = true;
+                                if (backgroundStackValuesLength >= backgroundStackLength)
+                                {
+                                    // ReSharper disable once StackAllocInsideLoop (won't happen much)
+                                    Color32* newAlloc = stackalloc Color32[backgroundStackLength + 1];
+                                    if (backgroundStackValuesLength > 0)
+                                        Buffer.MemoryCopy(backgroundStack, newAlloc, backgroundStackValuesLength * sizeof(Color32), backgroundStackValuesLength * sizeof(Color32));
+                                    backgroundStackLength = backgroundStackValuesLength + 1;
+                                    backgroundStack = newAlloc;
+                                }
+
+                                backgroundStack![backgroundStackValuesLength] = color;
+                                ++backgroundStackValuesLength;
+                            }
+                        }
+                    }
+                    else if (useColor &&
+                             ptr[i + 2] is 'c' or 'C' &&
+                             ptr[i + 3] is 'o' or 'O' &&
+                             ptr[i + 4] is 'l' or 'L' &&
+                             ptr[i + 5] is 'o' or 'O' &&
+                             ptr[i + 6] is 'r' or 'R')
+                    {
+                        if (foregroundStackValuesLength > 0)
+                            --foregroundStackValuesLength;
+                        pushColor = true;
+                    }
+                    else if (checkForBackground && useColor &&
+                             ptr[i + 2] is 'm' or 'M' &&
+                             ptr[i + 3] is 'a' or 'A' &&
+                             ptr[i + 4] is 'r' or 'R' &&
+                             ptr[i + 5] is 'k' or 'K')
+                    {
+                        if (backgroundStackValuesLength > 0)
+                            --backgroundStackValuesLength;
+                        pushColor = true;
+                        background = true;
+                    }
+                    else if (!CompareTag(ptr, endIndex, i))
+                        continue;
+
+                    Append(ref rtn, ptr + nextCopyStartIndex, writeIndex, i - nextCopyStartIndex);
+                    writeIndex += i - nextCopyStartIndex;
+                    nextCopyStartIndex = endIndex + 1;
+                    i = endIndex;
+                    if (pushColor)
+                    {
+                        int len = background ? backgroundStackValuesLength : foregroundStackValuesLength;
+                        if (len > 0)
+                        {
+                            Color32* nextColor = (background ? backgroundStack : foregroundStack) + (len - 1);
+
+                            if (format == StackColorFormatType.ExtendedANSIColor)
+                                writeIndex += AppendExtANSIForegroundCode(ref rtn, writeIndex, nextColor->r, nextColor->g, nextColor->b, background);
+                            else
+                                writeIndex += AppendANSIForegroundCode(ref rtn, writeIndex, ToConsoleColor(ToArgb(*nextColor)), background);
+                            nonDefaults |= background ? 2 : 1;
+                        }
+                        else
+                        {
+                            AppendDefaults();
+                        }
+                    }
+                }
+            }
+            Append(ref rtn, ptr + nextCopyStartIndex, writeIndex, str.Length - nextCopyStartIndex);
+            writeIndex += str.Length - nextCopyStartIndex;
+            if (useColor)
+                AppendDefaults();
+        }
+
+        bool CompareTag(char* ptr, int endIndex, int i)
+        {
+            ++i;
+            if (ptr[i] == '/')
+                ++i;
+            for (int j = i; j < endIndex; ++j)
+            {
+                if (ptr[j] is '=' or ' ')
+                {
+                    endIndex = j;
+                    break;
+                }
+            }
+
+            int length = endIndex - i;
+            bool found = false;
+            for (int j = 0; j < _tags!.Length; ++j)
+            {
+                char[] tag = _tags[j];
+                if (tag.Length != length) continue;
+                bool matches = true;
+                for (int k = 0; k < length; ++k)
+                {
+                    char c = ptr[i + k];
+                    if ((int)c is > 64 and < 91)
+                        c = (char)(c + 32);
+                    if (tag[k] != c)
+                    {
+                        matches = false;
+                        break;
+                    }
+                }
+
+                if (matches)
+                {
+                    found = true;
+                    break;
+                }
+            }
+
+            return found;
+        }
+        void AppendDefaults()
+        {
+            if (checkForBackground && (nonDefaults & 2) != 0)
+            {
+                if (argbBackground == DefaultBackground)
+                {
+                    fixed (char* ptr2 = ANSIBackgroundReset)
+                        Append(ref rtn, ptr2, writeIndex, ANSIBackgroundReset.Length);
+                    writeIndex += ANSIBackgroundReset.Length;
+                }
+                else if (format == StackColorFormatType.ExtendedANSIColor)
+                    writeIndex += AppendExtANSIForegroundCode(ref rtn, writeIndex, (byte)(argbBackground >> 16), (byte)(argbBackground >> 8), (byte)argbBackground, true);
+                else
+                {
+                    ConsoleColor consoleColor = ToConsoleColor(argbBackground);
+                    if (consoleColor == ConsoleColor.Black)
+                    {
+                        fixed (char* ptr2 = ANSIBackgroundReset)
+                            Append(ref rtn, ptr2, writeIndex, ANSIBackgroundReset.Length);
+                        writeIndex += ANSIBackgroundReset.Length;
+                    }
+                    else
+                        writeIndex += AppendANSIForegroundCode(ref rtn, writeIndex, consoleColor, true);
+                }
+            }
+
+            if ((nonDefaults & 1) != 0)
+            {
+                if (argbForeground == DefaultForeground)
+                {
+                    fixed (char* ptr2 = ANSIForegroundReset)
+                        Append(ref rtn, ptr2, writeIndex, ANSIForegroundReset.Length);
+                    writeIndex += ANSIForegroundReset.Length;
+                }
+                else if (format == StackColorFormatType.ExtendedANSIColor)
+                    writeIndex += AppendExtANSIForegroundCode(ref rtn, writeIndex, (byte)(argbForeground >> 16), (byte)(argbForeground >> 8), (byte)argbForeground, false);
+                else
+                {
+                    ConsoleColor consoleColor = ToConsoleColor(argbForeground);
+                    if (consoleColor == ConsoleColor.Gray)
+                    {
+                        fixed (char* ptr2 = ANSIForegroundReset)
+                            Append(ref rtn, ptr2, writeIndex, ANSIForegroundReset.Length);
+                        writeIndex += ANSIForegroundReset.Length;
+                    }
+                    else
+                        writeIndex += AppendANSIForegroundCode(ref rtn, writeIndex, consoleColor, false);
+                }
+            }
+
+            nonDefaults = 0;
+        }
+
+        return new string(rtn, 0, writeIndex);
+    }
+    private static unsafe void Append(ref char[] arr, char* data, int index, int length)
+    {
+        if (length == 0) return;
+
+        if (index + length > arr.Length)
+        {
+            char[] old = arr;
+            arr = new char[index + length];
+            Buffer.BlockCopy(old, 0, arr, 0, old.Length * sizeof(char));
+        }
+        for (int i = 0; i < length; ++i)
+            arr[i + index] = data[i];
+    }
+    private static unsafe int AppendANSIForegroundCode(ref char[] data, int index, ConsoleColor color, bool background)
+    {
+        char* ptr = stackalloc char[5];
+        SetANSICode(ptr, 0, color, background);
+        Append(ref data, ptr, index, 5);
+        return 5;
+    }
+    private static unsafe int AppendExtANSIForegroundCode(ref char[] data, int index, byte r, byte g, byte b, bool background)
+    {
+        int l = 10 + (r > 9 ? r > 99 ? 3 : 2 : 1) + (g > 9 ? g > 99 ? 3 : 2 : 1) + (b > 9 ? b > 99 ? 3 : 2 : 1);
+        char* ptr = stackalloc char[l];
+        SetExtendedANSICode(ptr, 0, r, g, b, background);
+        Append(ref data, ptr, index, l);
+        return l;
+    }
+}
+
+internal interface ITerminalFormatProvider
+{
+    public StackTraceCleaner StackCleaner { get; }
+}
+
+internal class LoggerFormatProvider : ITerminalFormatProvider
+{
+    public StackTraceCleaner StackCleaner => Logger.StackCleaner;
+}
+
+internal class CustomTerminalFormatProvider
+{
+    public StackTraceCleaner StackCleaner { get; }
+    public CustomTerminalFormatProvider(StackTraceCleaner stackCleaner)
+    {
+        StackCleaner = stackCleaner;
     }
 }

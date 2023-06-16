@@ -707,8 +707,11 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         {
             string path = DevkitServerUtility.GetPlayerSavedataLocation(user, Path.Combine("DevkitServer", "Permissions.dat"));
             string? dir = Path.GetDirectoryName(path);
-            if (dir != null)
-                Directory.CreateDirectory(dir);
+            if (dir != null && !DevkitServerUtility.CheckDirectory(false, dir))
+            {
+                CommonErrors.LogPlayerSavedataAccessError(dir);
+                return;
+            }
             using FileStream str = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
             Writer.Stream = str;
             Writer.Write(DataVersion);

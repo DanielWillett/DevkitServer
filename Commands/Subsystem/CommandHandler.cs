@@ -378,6 +378,7 @@ public class CommandHandler : ICommandHandler, IDisposable
             ctx, ref shouldExecute);
         if (!shouldExecute)
             return;
+
         if (command.Asynchronous)
         {
             Task.Run(async () =>
@@ -599,7 +600,7 @@ public class CommandHandler : ICommandHandler, IDisposable
                 DevkitServerUtility.QueueOnMainThread(() => ChatManager.say(user.SteamId, tr, Palette.AMBIENT, EChatMode.SAY, true));
         }
         else
-            Log(DevkitServerUtility.RemoveRichText(tr));
+            Log(FormattingUtil.ConvertRichTextToANSI(tr));
 #else
         if (!console)
         {
@@ -608,7 +609,7 @@ public class CommandHandler : ICommandHandler, IDisposable
             else
                 DevkitServerUtility.QueueOnMainThread(() => ChatManager.receiveChatMessage(CSteamID.Nil, string.Empty, EChatMode.SAY, Palette.AMBIENT, true, tr));
         }
-        Log(DevkitServerUtility.RemoveRichText(tr));
+        Log(FormattingUtil.ConvertRichTextToANSI(tr));
 #endif
         void Log(string msg)
         {

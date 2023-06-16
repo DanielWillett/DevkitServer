@@ -9,9 +9,9 @@ using HarmonyLib;
 namespace DevkitServer.Util;
 internal static class Accessor
 {
-    public static readonly Assembly AssemblyCSharp = typeof(Provider).Assembly;
-    public static readonly Assembly DevkitServer = Assembly.GetExecutingAssembly();
-    public static readonly Assembly MSCoreLib = typeof(object).Assembly;
+    private static Assembly? _sdgAssembly;
+    private static Assembly? _devkitServerAssembly;
+    private static Assembly? _mscorlibAssembly;
 
     private static MethodInfo? _getRealtimeSinceStartup;
     private static MethodInfo? _getRealtimeSinceStartupAsDouble;
@@ -795,6 +795,10 @@ internal static class Accessor
         return types;
     }
 
+    /// <exception cref="TypeLoadException"/>
+    public static Assembly AssemblyCSharp => _sdgAssembly ??= typeof(Provider).Assembly;
+    public static Assembly DevkitServer => _devkitServerAssembly ??= Assembly.GetExecutingAssembly();
+    public static Assembly MSCoreLib => _mscorlibAssembly ??= typeof(object).Assembly;
 
     /// <summary><see cref="Provider.isServer"/>.</summary>
     /// <exception cref="MemberAccessException"/>

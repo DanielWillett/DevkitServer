@@ -69,6 +69,13 @@ public class CommandContext : Exception
     /// </summary>
     public int ArgumentCount => Arguments.Length - ArgumentOffset;
 
+    private bool ReplyingToConsole => IsConsole
+#if CLIENT
+        || InvokedFromConsole;
+#else
+        ;
+#endif
+
     public CommandContext(IExecutableCommand command, string[] arguments, string originalMessage
 #if SERVER
         , EditorUser? caller
@@ -124,7 +131,7 @@ public class CommandContext : Exception
     /// </summary>
     /// <remarks>If <see cref="IsConsole"/> is true, rich text is removed from the result.</remarks>
     /// <param name="format">Formatting key.</param>
-    public string Translate(string format) => IsConsole ? DevkitServerUtility.RemoveRichText(Translations.Translate(format)) : Translations.Translate(format);
+    public string Translate(string format) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(Translations.Translate(format)) : Translations.Translate(format);
 
     /// <summary>
     /// Translate a formatting key using the default translation file (<see cref="Translations"/>).
@@ -132,7 +139,7 @@ public class CommandContext : Exception
     /// <remarks>If <see cref="IsConsole"/> is true, rich text is removed from the result.</remarks>
     /// <param name="format">Formatting key.</param>
     /// <param name="arg0">Replaces '{0}' in the value of the localization.</param>
-    public string Translate(string format, object? arg0) => IsConsole ? DevkitServerUtility.RemoveRichText(Translations.Translate(format, arg0)) : Translations.Translate(format, arg0);
+    public string Translate(string format, object? arg0) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(Translations.Translate(format, arg0)) : Translations.Translate(format, arg0);
 
     /// <summary>
     /// Translate a formatting key using the default translation file (<see cref="Translations"/>).
@@ -141,7 +148,7 @@ public class CommandContext : Exception
     /// <param name="format">Formatting key.</param>
     /// <param name="arg0">Replaces '{0}' in the value of the localization.</param>
     /// <param name="arg1">Replaces '{1}' in the value of the localization.</param>
-    public string Translate(string format, object? arg0, object? arg1) => IsConsole ? DevkitServerUtility.RemoveRichText(Translations.Translate(format, arg0, arg1)) : Translations.Translate(format, arg0, arg1);
+    public string Translate(string format, object? arg0, object? arg1) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(Translations.Translate(format, arg0, arg1)) : Translations.Translate(format, arg0, arg1);
 
     /// <summary>
     /// Translate a formatting key using the default translation file (<see cref="Translations"/>).
@@ -151,7 +158,7 @@ public class CommandContext : Exception
     /// <param name="arg0">Replaces '{0}' in the value of the localization.</param>
     /// <param name="arg1">Replaces '{1}' in the value of the localization.</param>
     /// <param name="arg2">Replaces '{2}' in the value of the localization.</param>
-    public string Translate(string format, object? arg0, object? arg1, object? arg2) => IsConsole ? DevkitServerUtility.RemoveRichText(Translations.Translate(format, arg0, arg1, arg2)) : Translations.Translate(format, arg0, arg1, arg2);
+    public string Translate(string format, object? arg0, object? arg1, object? arg2) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(Translations.Translate(format, arg0, arg1, arg2)) : Translations.Translate(format, arg0, arg1, arg2);
 
     /// <summary>
     /// Translate a formatting key using the default translation file (<see cref="Translations"/>).
@@ -159,7 +166,7 @@ public class CommandContext : Exception
     /// <remarks>If <see cref="IsConsole"/> is true, rich text is removed from the result.</remarks>
     /// <param name="format">Formatting key.</param>
     /// <param name="args">Replaces '{n}' in the value of the localization.</param>
-    public string Translate(string format, params object?[] args) => IsConsole ? DevkitServerUtility.RemoveRichText(Translations.Translate(format, args)) : Translations.Translate(format, args);
+    public string Translate(string format, params object?[] args) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(Translations.Translate(format, args)) : Translations.Translate(format, args);
 
     /// <summary>
     /// Translate a formatting key using <paramref name="lcl"/>.
@@ -167,7 +174,7 @@ public class CommandContext : Exception
     /// <remarks>If <see cref="IsConsole"/> is true, rich text is removed from the result.</remarks>
     /// <param name="format">Formatting key.</param>
     /// <param name="lcl">Localization table to use for the translation.</param>
-    public string Translate(Local lcl, string format) => IsConsole ? DevkitServerUtility.RemoveRichText(lcl.Translate(format)) : lcl.Translate(format);
+    public string Translate(Local lcl, string format) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(lcl.Translate(format)) : lcl.Translate(format);
 
     /// <summary>
     /// Translate a formatting key using <paramref name="lcl"/>.
@@ -176,7 +183,7 @@ public class CommandContext : Exception
     /// <param name="format">Formatting key.</param>
     /// <param name="arg0">Replaces '{0}' in the value of the localization.</param>
     /// <param name="lcl">Localization table to use for the translation.</param>
-    public string Translate(Local lcl, string format, object? arg0) => IsConsole ? DevkitServerUtility.RemoveRichText(lcl.Translate(format, arg0)) : lcl.Translate(format, arg0);
+    public string Translate(Local lcl, string format, object? arg0) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(lcl.Translate(format, arg0)) : lcl.Translate(format, arg0);
 
     /// <summary>
     /// Translate a formatting key using <paramref name="lcl"/>.
@@ -186,7 +193,7 @@ public class CommandContext : Exception
     /// <param name="arg0">Replaces '{0}' in the value of the localization.</param>
     /// <param name="arg1">Replaces '{1}' in the value of the localization.</param>
     /// <param name="lcl">Localization table to use for the translation.</param>
-    public string Translate(Local lcl, string format, object? arg0, object? arg1) => IsConsole ? DevkitServerUtility.RemoveRichText(lcl.Translate(format, arg0, arg1)) : lcl.Translate(format, arg0, arg1);
+    public string Translate(Local lcl, string format, object? arg0, object? arg1) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(lcl.Translate(format, arg0, arg1)) : lcl.Translate(format, arg0, arg1);
 
     /// <summary>
     /// Translate a formatting key using <paramref name="lcl"/>.
@@ -197,7 +204,7 @@ public class CommandContext : Exception
     /// <param name="arg1">Replaces '{1}' in the value of the localization.</param>
     /// <param name="arg2">Replaces '{2}' in the value of the localization.</param>
     /// <param name="lcl">Localization table to use for the translation.</param>
-    public string Translate(Local lcl, string format, object? arg0, object? arg1, object? arg2) => IsConsole ? DevkitServerUtility.RemoveRichText(lcl.Translate(format, arg0, arg1, arg2)) : lcl.Translate(format, arg0, arg1, arg2);
+    public string Translate(Local lcl, string format, object? arg0, object? arg1, object? arg2) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(lcl.Translate(format, arg0, arg1, arg2)) : lcl.Translate(format, arg0, arg1, arg2);
 
     /// <summary>
     /// Translate a formatting key using <paramref name="lcl"/>.
@@ -206,7 +213,7 @@ public class CommandContext : Exception
     /// <param name="format">Formatting key.</param>
     /// <param name="args">Replaces '{n}' in the value of the localization.</param>
     /// <param name="lcl">Localization table to use for the translation.</param>
-    public string Translate(Local lcl, string format, params object?[] args) => IsConsole ? DevkitServerUtility.RemoveRichText(lcl.Translate(format, args)) : lcl.Translate(format, args);
+    public string Translate(Local lcl, string format, params object?[] args) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(lcl.Translate(format, args)) : lcl.Translate(format, args);
 
     /// <summary>
     /// Send a message to the caller or console using the default translation file (<see cref="Translations"/>).
@@ -214,7 +221,7 @@ public class CommandContext : Exception
     /// <remarks>Thread safe. Rich text is always enabled.</remarks>
     /// <param name="format">Formatting key.</param>
     /// <returns>A throwable execption to break out of the command.</returns>
-    public Exception Reply(string format) => ReplyString(Translate(format));
+    public Exception Reply(string format) => ReplyStringIntl(Translate(format));
 
     /// <summary>
     /// Send a message to the caller or console using the default translation file (<see cref="Translations"/>).
@@ -223,7 +230,7 @@ public class CommandContext : Exception
     /// <param name="format">Formatting key.</param>
     /// <param name="arg0">Replaces '{0}' in the value of the localization.</param>
     /// <returns>A throwable execption to break out of the command.</returns>
-    public Exception Reply(string format, object? arg0) => ReplyString(Translate(format, arg0));
+    public Exception Reply(string format, object? arg0) => ReplyStringIntl(Translate(format, arg0));
 
     /// <summary>
     /// Send a message to the caller or console using the default translation file (<see cref="Translations"/>).
@@ -233,7 +240,7 @@ public class CommandContext : Exception
     /// <param name="arg0">Replaces '{0}' in the value of the localization.</param>
     /// <param name="arg1">Replaces '{1}' in the value of the localization.</param>
     /// <returns>A throwable execption to break out of the command.</returns>
-    public Exception Reply(string format, object? arg0, object? arg1) => ReplyString(Translate(format, arg0, arg1));
+    public Exception Reply(string format, object? arg0, object? arg1) => ReplyStringIntl(Translate(format, arg0, arg1));
 
     /// <summary>
     /// Send a message to the caller or console using the default translation file (<see cref="Translations"/>).
@@ -244,7 +251,7 @@ public class CommandContext : Exception
     /// <param name="arg1">Replaces '{1}' in the value of the localization.</param>
     /// <param name="arg2">Replaces '{2}' in the value of the localization.</param>
     /// <returns>A throwable execption to break out of the command.</returns>
-    public Exception Reply(string format, object? arg0, object? arg1, object? arg2) => ReplyString(Translate(format, arg0, arg1, arg2));
+    public Exception Reply(string format, object? arg0, object? arg1, object? arg2) => ReplyStringIntl(Translate(format, arg0, arg1, arg2));
 
     /// <summary>
     /// Send a message to the caller or console using the default translation file (<see cref="Translations"/>).
@@ -253,7 +260,7 @@ public class CommandContext : Exception
     /// <param name="format">Formatting key.</param>
     /// <param name="args">Replaces '{n}' in the value of the localization.</param>
     /// <returns>A throwable execption to break out of the command.</returns>
-    public Exception Reply(string format, params object?[] args) => ReplyString(Translate(format, args));
+    public Exception Reply(string format, params object?[] args) => ReplyStringIntl(Translate(format, args));
 
     /// <summary>
     /// Send a message to the caller or console using <paramref name="lcl"/>.
@@ -261,7 +268,7 @@ public class CommandContext : Exception
     /// <remarks>Thread safe. Rich text is always enabled.</remarks>
     /// <param name="format">Formatting key.</param>
     /// <returns>A throwable execption to break out of the command.</returns>
-    public Exception Reply(Local lcl, string format) => ReplyString(Translate(lcl, format));
+    public Exception Reply(Local lcl, string format) => ReplyStringIntl(Translate(lcl, format));
 
     /// <summary>
     /// Send a message to the caller or console using <paramref name="lcl"/>.
@@ -270,7 +277,7 @@ public class CommandContext : Exception
     /// <param name="format">Formatting key.</param>
     /// <param name="arg0">Replaces '{0}' in the value of the localization.</param>
     /// <returns>A throwable execption to break out of the command.</returns>
-    public Exception Reply(Local lcl, string format, object? arg0) => ReplyString(Translate(lcl, format, arg0));
+    public Exception Reply(Local lcl, string format, object? arg0) => ReplyStringIntl(Translate(lcl, format, arg0));
 
     /// <summary>
     /// Send a message to the caller or console using <paramref name="lcl"/>.
@@ -280,7 +287,7 @@ public class CommandContext : Exception
     /// <param name="arg0">Replaces '{0}' in the value of the localization.</param>
     /// <param name="arg1">Replaces '{1}' in the value of the localization.</param>
     /// <returns>A throwable execption to break out of the command.</returns>
-    public Exception Reply(Local lcl, string format, object? arg0, object? arg1) => ReplyString(Translate(lcl, format, arg0, arg1));
+    public Exception Reply(Local lcl, string format, object? arg0, object? arg1) => ReplyStringIntl(Translate(lcl, format, arg0, arg1));
 
     /// <summary>
     /// Send a message to the caller or console using <paramref name="lcl"/>.
@@ -291,7 +298,7 @@ public class CommandContext : Exception
     /// <param name="arg1">Replaces '{1}' in the value of the localization.</param>
     /// <param name="arg2">Replaces '{2}' in the value of the localization.</param>
     /// <returns>A throwable execption to break out of the command.</returns>
-    public Exception Reply(Local lcl, string format, object? arg0, object? arg1, object? arg2) => ReplyString(Translate(lcl, format, arg0, arg1, arg2));
+    public Exception Reply(Local lcl, string format, object? arg0, object? arg1, object? arg2) => ReplyStringIntl(Translate(lcl, format, arg0, arg1, arg2));
 
     /// <summary>
     /// Send a message to the caller or console using <paramref name="lcl"/>.
@@ -300,7 +307,7 @@ public class CommandContext : Exception
     /// <param name="format">Formatting key.</param>
     /// <param name="args">Replaces '{n}' in the value of the localization.</param>
     /// <returns>A throwable execption to break out of the command.</returns>
-    public Exception Reply(Local lcl, string format, params object?[] args) => ReplyString(Translate(lcl, format, args));
+    public Exception Reply(Local lcl, string format, params object?[] args) => ReplyStringIntl(Translate(lcl, format, args));
 
     /// <summary>
     /// Send a message to the caller or console without translation.
@@ -308,16 +315,19 @@ public class CommandContext : Exception
     /// <remarks>Thread safe. Rich text is always enabled.</remarks>
     /// <param name="rawText">Formatting key.</param>
     /// <returns>A throwable execption to break out of the command.</returns>
-    public Exception ReplyString(string rawText)
+    public Exception ReplyString(string rawText) => ReplyStringIntl(ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(rawText) : rawText);
+    private Exception ReplyStringIntl(string rawText)
     {
-        if (IsConsole)
-            Command.LogInfo(DevkitServerUtility.RemoveRichText(rawText));
+        if (ReplyingToConsole)
+        {
+            Command.LogInfo(rawText);
+        }
         else
         {
 #if SERVER
             CommandHandler.SendMessage(rawText, Caller, Command, Severity.Info);
 #else
-            CommandHandler.SendMessage(rawText, InvokedFromConsole, Command, Severity.Info);
+            CommandHandler.SendMessage(rawText, false, Command, Severity.Info);
 #endif
         }
 
@@ -1455,7 +1465,7 @@ public class CommandContext : Exception
     /// <exception cref="CommandContext"/>
     public void AssertHelpCheckString(int parameter, string helpMessage)
     {
-        if (MatchParameter(parameter, DevkitServerModule.HelpCache))
+        if (MatchParameter(parameter, DevkitServerModule.HelpMessage))
             throw ReplyString(helpMessage);
     }
 
@@ -1465,7 +1475,7 @@ public class CommandContext : Exception
     /// <exception cref="CommandContext"/>
     public void AssertHelpCheckFormat(int parameter, string format)
     {
-        if (MatchParameter(parameter, DevkitServerModule.HelpCache))
+        if (MatchParameter(parameter, DevkitServerModule.HelpMessage))
             throw Reply(format);
     }
 
@@ -1476,7 +1486,7 @@ public class CommandContext : Exception
     /// <exception cref="CommandContext"/>
     public void AssertHelpCheckFormat(int parameter, string format, params object?[] args)
     {
-        if (MatchParameter(parameter, DevkitServerModule.HelpCache))
+        if (MatchParameter(parameter, DevkitServerModule.HelpMessage))
             throw Reply(format, args);
     }
 
@@ -1486,7 +1496,7 @@ public class CommandContext : Exception
     /// <exception cref="CommandContext"/>
     public void AssertHelpCheck(int parameter, string usage)
     {
-        if (MatchParameter(parameter, DevkitServerModule.HelpCache))
+        if (MatchParameter(parameter, DevkitServerModule.HelpMessage))
             throw SendCorrectUsage(usage);
     }
 

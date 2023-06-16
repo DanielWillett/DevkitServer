@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Globalization;
 using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
@@ -114,14 +115,19 @@ internal static class CommandTests
         }
         else ctx.SendCorrectUsage("/test ui <open|close>");
     }
-    private static void savetexture(CommandContext ctx)
+    private static void grab(CommandContext ctx)
     {
         if (ctx.HasArgsExact(1) && ctx.TryGet(0, out string resourcePath))
         {
             string actualPath = Path.Combine(DevkitServerConfig.Directory, "AssetExports", resourcePath);
-            Grabber.DownloadResource<Texture2D>(resourcePath, actualPath);
-            ctx.ReplyString("Saved to <#fff>" + actualPath + "</color>.");
-            Process.Start(Path.GetDirectoryName(actualPath)!);
+            if (Grabber.DownloadResource<Object>(resourcePath, actualPath))
+            {
+                ctx.ReplyString("Saved to <#fff>" + actualPath + "</color>.");
+                if (!Directory.Exists(actualPath))
+                    actualPath = Path.GetDirectoryName(actualPath)!;
+                Process.Start(actualPath);
+            }
+            else ctx.ReplyString("<#ffae3d>Couldn't save.");
         }
         else if (ctx.HasArgsExact(2) && ctx.TryGet(0, out string bundlePath) && ctx.TryGet(1, out resourcePath))
         {
@@ -130,10 +136,14 @@ internal static class CommandTests
                 Bundle bundle = new Bundle(bundlePath, true, "Temp bundle");
 
                 string actualPath = Path.Combine(DevkitServerConfig.Directory, "AssetExports", Path.GetFileName(bundlePath), resourcePath);
-                Grabber.DownloadFromBundle<Texture2D>(bundle, resourcePath, actualPath);
+                if (Grabber.DownloadFromBundle<Object>(bundle, resourcePath, actualPath))
+                {
+                    Process.Start(Path.GetDirectoryName(actualPath)!);
+                    ctx.ReplyString("Saved to <#fff>" + actualPath + "</color>.");
+                }
+                else ctx.ReplyString("<#ffae3d>Couldn't save.");
 
                 bundle.unload();
-                Process.Start(Path.GetDirectoryName(actualPath)!);
             }
         }
         else ctx.SendCorrectUsage("/test savetexture <resource>");

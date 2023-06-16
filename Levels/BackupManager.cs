@@ -340,7 +340,7 @@ public sealed class BackupManager : MonoBehaviour
                     if (backups[j].UtcTimestamp >= utcTimestamp)
                         continue;
                     ++index;
-                    for (int k = index; k > j; ++k)
+                    for (int k = index; k > j; --k)
                         backups[k] = backups[k - 1];
                     backups[j] = (entry, utcTimestamp);
                     added = true;

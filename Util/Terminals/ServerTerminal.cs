@@ -1,7 +1,5 @@
 ﻿#if SERVER
-using System;
 using DevkitServer.Commands.Subsystem;
-using DevkitServer.Levels;
 
 namespace DevkitServer.Util.Terminals;
 internal class ServerTerminal : MonoBehaviour, ITerminal
@@ -26,7 +24,7 @@ internal class ServerTerminal : MonoBehaviour, ITerminal
     {
         CheckInit();
         OnOutput?.Invoke(ref input, ref color);
-        string str = FormattingUtil.GetANSIForegroundString(color) + input + FormattingUtil.ANSIReset;
+        string str = FormattingUtil.GetANSIString(color, false) + input + FormattingUtil.ANSIForegroundReset;
         _writing = true;
         switch (severity)
         {

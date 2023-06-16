@@ -290,7 +290,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
         public readonly bool Save;
         public LogMessage(string message, ConsoleColor color, bool save)
         {
-            Message = FormattingUtil.GetANSIForegroundString(color) + message + FormattingUtil.ANSIReset;
+            Message = FormattingUtil.GetANSIString(color, false) + message + FormattingUtil.ANSIForegroundReset;
             Save = save;
         }
         public void Write()

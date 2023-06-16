@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using DevkitServer.API;
+using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
@@ -564,10 +565,27 @@ public static class DevkitServerUtility
     public static unsafe bool UserSteam64(this ulong s64) => ((CSteamID*)&s64)->GetEAccountType() == EAccountType.k_EAccountTypeIndividual;
     [Pure]
     public static bool UserSteam64(this CSteamID s64) => s64.GetEAccountType() == EAccountType.k_EAccountTypeIndividual;
+#if SERVER
     [Pure]
-    public static string GetPlayerSavedataLocation(ulong s64, string path, int characterId = 0) => PlayerSavedata.hasSync
-        ? (Path.Combine(ReadWrite.PATH, "Sync", s64 + "_" + characterId, Level.info.name, path))
-        : (Path.Combine(ReadWrite.PATH, ServerSavedata.directory, Provider.serverID, "Players", s64 + "_" + characterId, Level.info.name, path));
+    public static string GetPlayerSavedataLocation(ulong s64, string path, int characterId = 0)
+    {
+        string basePath;
+        if (!string.IsNullOrEmpty(DevkitServerConfig.Config.PlayerSavedataLocationOverride))
+        {
+            basePath = DevkitServerConfig.Config.PlayerSavedataLocationOverride!;
+            if (!Path.IsPathRooted(basePath))
+                basePath = Path.Combine(ReadWrite.PATH, basePath);
+        }
+        else if (PlayerSavedata.hasSync)
+            basePath = Path.Combine(ReadWrite.PATH, "Sync");
+        else
+            basePath = Path.Combine(ReadWrite.PATH, ServerSavedata.directory, Provider.serverID, "Players");
+
+        // intentionally using cultured toString here since the base game also does
+        return Path.Combine(basePath, s64 + "_" + characterId, Level.info.name, path);
+    }
+#endif
+
     public static void UpdateLocalizationFile(ref Local read, LocalDatDictionary @default, string directory)
     {
         LocalDatDictionary def = @default;

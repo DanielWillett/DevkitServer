@@ -35,17 +35,17 @@ namespace DevkitServer;
 
 public sealed class DevkitServerModule : IModuleNexus
 {
-    public static readonly string RepositoryUrl = "https://github.com/DanielWillett/DevkitServer"; // don't end with '/'
+    public static readonly string RepositoryUrl = "https://github.com/DanielWillett/DevkitServer"; // don't suffix this with '/'
     private static StaticGetter<Assets>? GetAssetsInstance;
     private static InstanceSetter<AssetOrigin, bool>? SetOverrideIDs;
     public const string ModuleName = "DevkitServer";
     public static readonly string ServerRule = "DevkitServer";
     private static CancellationTokenSource? _tknSrc;
-    private static string? _helpCache;
     internal static readonly Color ModuleColor = new Color32(0, 255, 153, 255);
     internal static readonly Color UnturnedColor = new Color32(99, 123, 99, 255);
+    private static string? _asmPath;
     public Assembly Assembly { get; } = Assembly.GetExecutingAssembly();
-    internal static string HelpCache => _helpCache ??= CommandLocalization.format("Help");
+    internal static string HelpMessage => CommandLocalization.format("Help");
     public static GameObject GameObjectHost { get; private set; } = null!;
     public static DevkitServerModuleComponent ComponentHost { get; private set; } = null!;
     public static DevkitServerModule Instance { get; private set; } = null!;
@@ -63,6 +63,7 @@ public sealed class DevkitServerModule : IModuleNexus
 #endif
     public static bool UnityLoaded { get; private set; }
     public static bool UnturnedLoaded { get; private set; }
+    public static string AssemblyPath => _asmPath ??= Accessor.DevkitServer.Location;
 
     private static readonly LocalDatDictionary DefaultMainLocalization = new LocalDatDictionary
     {
@@ -291,7 +292,7 @@ public sealed class DevkitServerModule : IModuleNexus
         {
             ReceivedChatMessage msg = ChatManager.receivedChatHistory[0];
             Logger.CoreLog("[" + (msg.speaker?.playerID?.characterName ?? "SERVER") + " | " + msg.mode.ToString().ToUpperInvariant() + "] "
-                           + DevkitServerUtility.RemoveRichText(msg.contents),
+                           + (msg.useRichTextFormatting ? FormattingUtil.ConvertRichTextToANSI(msg.contents) : msg.contents),
                 "UNTURNED", "CHAT", color: ConsoleColor.White, Severity.Info);
         }
     }
@@ -354,11 +355,28 @@ public sealed class DevkitServerModule : IModuleNexus
 
         while (Assets.isLoading)
             yield return null;
-        
-        string path = Path.Combine(ReadWrite.PATH, "Modules", "DevkitServer", "Bundles");
-        if (!Directory.Exists(path))
+        string asmDir = Path.GetDirectoryName(AssemblyPath)!;
+        string[] searchLocations =
         {
-            Logger.LogError("Failed to find DevkitServer bundle folder: " + path.Format() + ".");
+            asmDir,
+            Path.Combine(asmDir, "..", "Bundles"),
+            Path.Combine(asmDir, "Bundles"),
+            Path.Combine(asmDir, "..", "..", "Bundles")
+        };
+        string? path = null;
+        for (int i = 0; i < searchLocations.Length; ++i)
+        {
+            string searchLocation = searchLocations[i];
+            if (File.Exists(Path.Combine(searchLocation, "MasterBundle.dat")) &&
+                File.Exists(Path.Combine(searchLocation, "devkitserver.masterbundle")))
+            {
+                path = Path.GetFullPath(searchLocation);
+                break;
+            }
+        }
+        if (path == null)
+        {
+            Logger.LogError("Failed to find DevkitServer bundle folder near " + asmDir.Format() + ".");
             callback?.Invoke();
             yield break;
         }
@@ -377,10 +395,6 @@ public sealed class DevkitServerModule : IModuleNexus
             bundle = Assets.findMasterBundleByPath(path);
             if (bundle == null)
             {
-#if DEBUG
-                foreach (MasterBundleConfig config in (IEnumerable<MasterBundleConfig>?)typeof(Assets).GetField("allMasterBundles", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null) ?? Array.Empty<MasterBundleConfig>())
-                    Logger.LogDebug("Bundle: " + config.assetBundleName.Format() + " (" + config.directoryPath.Format() + ").");
-#endif
                 Logger.LogError("Failed to find DevkitServer bundle: " + Path.Combine(path, "devkitserver.masterbundle").Format() + ".");
                 callback?.Invoke();
                 yield break;

@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;
+using JetBrains.Annotations;
 
 namespace DevkitServer.Configuration;
 [EarlyTypeInit(-1)]
@@ -15,6 +16,7 @@ public class DevkitServerConfig
     private static readonly JsonConverter[] Converters =
     {
         new QuaternionJsonConverter(),
+        new Vector4JsonConverter(),
         new Vector3JsonConverter(),
         new Vector2JsonConverter(),
         new ColorJsonConverter(),
@@ -239,7 +241,12 @@ public class SystemConfig
     }
 #endif
 #nullable restore
+#if SERVER
 
+    [JsonPropertyName("player_savedata_override")]
+    public string? PlayerSavedataLocationOverride { get; set; }
+
+#endif
     public void SetDefaults()
     {
         ConsoleExtendedVisualANSISupport = true;
@@ -253,6 +260,7 @@ public class SystemConfig
         {
             "viewer"
         };
+        PlayerSavedataLocationOverride = null;
 #endif
     }
 }

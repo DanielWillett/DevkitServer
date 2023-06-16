@@ -235,9 +235,9 @@ internal static class Logger
     }
     public static void ChangeResets(ref string message, ConsoleColor color)
     {
-        if (message.IndexOf(FormattingUtil.ConsoleEscapeCharacter) != -1)
+        if (color != ConsoleColor.Gray && message.IndexOf(FormattingUtil.ConsoleEscapeCharacter) != -1)
         {
-            message = message.Replace(FormattingUtil.ANSIReset, FormattingUtil.GetANSIForegroundString(color)) + FormattingUtil.ANSIReset;
+            message = message.Replace(FormattingUtil.ANSIForegroundReset, FormattingUtil.GetANSIString(color, false)) + FormattingUtil.ANSIForegroundReset;
         }
     }
     [Conditional("DEBUG")]
@@ -299,7 +299,7 @@ internal static class Logger
         foreach (Component comp in comps)
         {
             Terminal.Write($" Parent: {comp.transform.gameObject.name}", color, true, Severity.Debug);
-            Terminal.Write($" Type: {comp.GetType().Format()}{FormattingUtil.GetANSIForegroundString(color)}", color, true, Severity.Debug);
+            Terminal.Write($" Type: {comp.GetType().Format()}{FormattingUtil.GetANSIString(color, false)}", color, true, Severity.Debug);
             Terminal.Write(" ========================================", color, true, Severity.Debug);
         }
         int childCt = go.transform.childCount;
@@ -324,7 +324,7 @@ internal static class Logger
                 inner
                     ? "Inner Exception: "
                     : ("[" + timestamp.ToString(TimeFormat) + "]" + (string.IsNullOrEmpty(method) ? string.Empty : (" [" + method!.ToUpper() + "] "))) + "Exception: ")
-                               + ex.GetType().Format() + FormattingUtil.GetANSIForegroundString(ConsoleColor.Red) + ".", ConsoleColor.Red, true, Severity.Error);
+                               + ex.GetType().Format() + FormattingUtil.GetANSIString(ConsoleColor.Red, false) + ".", ConsoleColor.Red, true, Severity.Error);
             Terminal.Write(ind + (ex.Message ?? "No message"), ConsoleColor.DarkRed, true, Severity.Error);
             if (ex is TypeLoadException t)
             {
