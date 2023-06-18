@@ -236,7 +236,7 @@ public static class PatchUtil
     }
 #if CLIENT
     /// <summary>Limits to 60 actions per second.</summary>
-    public static void InsertActionRateLimiter(int offset, Label beginLabel, IList<CodeInstruction> ins)
+    public static void InsertActionRateLimiter(ref int offset, Label beginLabel, IList<CodeInstruction> ins)
     {
         ins.Insert(offset, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
         ins.Insert(offset + 1, new CodeInstruction(OpCodes.Brfalse_S, beginLabel));
@@ -247,12 +247,16 @@ public static class PatchUtil
         ins.Insert(offset + 6, new CodeInstruction(OpCodes.Bge_S, beginLabel));
         ins.Insert(offset + 7, new CodeInstruction(OpCodes.Ret));
         if (ins.Count > offset + 8)
+        {
             ins[offset + 8].labels.Add(beginLabel);
+            offset += 8;
+        }
         else
         {
             CodeInstruction rtn = new CodeInstruction(OpCodes.Ret);
             rtn.labels.Add(beginLabel);
             ins.Insert(offset + 8, rtn);
+            offset += 9;
         }
     }
 #endif

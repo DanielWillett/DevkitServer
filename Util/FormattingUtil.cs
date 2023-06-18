@@ -13,6 +13,7 @@ public static class FormattingUtil
     // For unit tests
     internal static ITerminalFormatProvider FormatProvider = new LoggerFormatProvider();
     private static char[][]? _tags;
+    private static RemoveRichTextOptions[]? _tagFlags;
     public static Func<object, string> FormatSelector = x => x.Format();
     public const char ConsoleEscapeCharacter = '\u001b';
     public const string ANSIForegroundReset = "\u001b[39m";
@@ -834,56 +835,16 @@ public static class FormattingUtil
         }
         return sb.ToString();
     }
-    private static void CheckTags() => _tags ??= new char[][]
-    {
-        "align".ToCharArray(),
-        "allcaps".ToCharArray(),
-        "alpha".ToCharArray(),
-        "b".ToCharArray(),
-        "br".ToCharArray(),
-        "cspace".ToCharArray(),
-        "font".ToCharArray(),
-        "font-weight".ToCharArray(),
-        "gradient".ToCharArray(),
-        "i".ToCharArray(),
-        "indent".ToCharArray(),
-        "line-height".ToCharArray(),
-        "line-indent".ToCharArray(),
-        "link".ToCharArray(),
-        "lowercase".ToCharArray(),
-        "material".ToCharArray(),
-        "margin".ToCharArray(),
-        "mark".ToCharArray(),
-        "mspace".ToCharArray(),
-        "nobr".ToCharArray(),
-        "noparse".ToCharArray(),
-        "page".ToCharArray(),
-        "pos".ToCharArray(),
-        "quad".ToCharArray(),
-        "rotate".ToCharArray(),
-        "s".ToCharArray(),
-        "size".ToCharArray(),
-        "smallcaps".ToCharArray(),
-        "space".ToCharArray(),
-        "sprite".ToCharArray(),
-        "strikethrough".ToCharArray(),
-        "style".ToCharArray(),
-        "sub".ToCharArray(),
-        "sup".ToCharArray(),
-        "u".ToCharArray(),
-        "uppercase".ToCharArray(),
-        "voffset".ToCharArray(),
-        "width".ToCharArray()
-    };
+
     /// <summary>
-    /// Remove rich text tags from text, and replace color and mark tags with the ANSI or extended ANSI equivalent.
+    /// Remove rich text tags from text, and replace &lt;color&gt; and &lt;mark&gt; tags with the ANSI or extended ANSI equivalent.
     /// </summary>
+    /// <param name="options">Tags to check for and remove.</param>
     /// <param name="argbForeground">Color to reset the foreground to.</param>
     /// <param name="argbBackground">Color to reset the background to.</param>
-    /// <param name="checkForBackground">Whether or not to check for mark tags.</param>
     /// <exception cref="ArgumentOutOfRangeException"/>
     [Pure]
-    public static unsafe string ConvertRichTextToANSI(string str, int index = 0, int length = -1, int argbForeground = DefaultForeground, int argbBackground = DefaultBackground, bool checkForBackground = true)
+    public static unsafe string ConvertRichTextToANSI(string str, int index = 0, int length = -1, RemoveRichTextOptions options = RemoveRichTextOptions.All, int argbForeground = DefaultForeground, int argbBackground = DefaultBackground)
     {
         CheckTags();
         if (index >= str.Length || index < 0)
@@ -912,7 +873,6 @@ public static class FormattingUtil
         int nonDefaults = 1 | 2;
         if (useColor)
             AppendDefaults();
-
 
         fixed (char* mainPtr = str)
         {
@@ -943,7 +903,7 @@ public static class FormattingUtil
                         int colorIndex = -1;
                         int colorLength = 0;
                         // <color=#etc>
-                        if (ptr[i + 1] is 'c' or 'C' && i + 7 <= endIndex &&
+                        if (ptr[i + 1] is 'c' or 'C' && i + 7 <= endIndex && (options & RemoveRichTextOptions.Color) != 0 &&
                             ptr[i + 2] is 'o' or 'O' &&
                             ptr[i + 3] is 'l' or 'L' &&
                             ptr[i + 4] is 'o' or 'O' &&
@@ -953,12 +913,12 @@ public static class FormattingUtil
                             colorIndex = i + 7;
                             colorLength = endIndex - (i + 7);
                         }
-                        else if (ptr[i + 1] == '#' && i + 2 <= endIndex)
+                        else if (ptr[i + 1] == '#' && (options & RemoveRichTextOptions.Color) != 0 && i + 2 <= endIndex)
                         {
                             colorIndex = i + 1;
                             colorLength = endIndex - (i + 1);
                         }
-                        else if (checkForBackground &&
+                        else if ((options & RemoveRichTextOptions.Mark) != 0 &&
                                  ptr[i + 1] is 'm' or 'M' && i + 6 <= endIndex &&
                                  ptr[i + 2] is 'a' or 'A' &&
                                  ptr[i + 3] is 'r' or 'R' &&
@@ -969,7 +929,7 @@ public static class FormattingUtil
                             colorLength = endIndex - (i + 6);
                             background = true;
                         }
-                        else if (!CompareTag(ptr, endIndex, i))
+                        else if (!CompareRichTextTag(ptr, endIndex, i, options))
                             continue;
 
                         if (colorIndex >= 0 && DevkitServerUtility.TryParseColor32(new string(ptr, colorIndex, colorLength), out Color32 color))
@@ -1008,7 +968,7 @@ public static class FormattingUtil
                             }
                         }
                     }
-                    else if (useColor &&
+                    else if (useColor && (options & RemoveRichTextOptions.Color) != 0 &&
                              ptr[i + 2] is 'c' or 'C' &&
                              ptr[i + 3] is 'o' or 'O' &&
                              ptr[i + 4] is 'l' or 'L' &&
@@ -1019,7 +979,7 @@ public static class FormattingUtil
                             --foregroundStackValuesLength;
                         pushColor = true;
                     }
-                    else if (checkForBackground && useColor &&
+                    else if (useColor && (options & RemoveRichTextOptions.Mark) != 0 &&
                              ptr[i + 2] is 'm' or 'M' &&
                              ptr[i + 3] is 'a' or 'A' &&
                              ptr[i + 4] is 'r' or 'R' &&
@@ -1030,7 +990,7 @@ public static class FormattingUtil
                         pushColor = true;
                         background = true;
                     }
-                    else if (!CompareTag(ptr, endIndex, i))
+                    else if (!CompareRichTextTag(ptr, endIndex, i, options))
                         continue;
 
                     Append(ref rtn, ptr + nextCopyStartIndex, writeIndex, i - nextCopyStartIndex);
@@ -1062,52 +1022,9 @@ public static class FormattingUtil
             if (useColor)
                 AppendDefaults();
         }
-
-        bool CompareTag(char* ptr, int endIndex, int i)
-        {
-            ++i;
-            if (ptr[i] == '/')
-                ++i;
-            for (int j = i; j < endIndex; ++j)
-            {
-                if (ptr[j] is '=' or ' ')
-                {
-                    endIndex = j;
-                    break;
-                }
-            }
-
-            int length = endIndex - i;
-            bool found = false;
-            for (int j = 0; j < _tags!.Length; ++j)
-            {
-                char[] tag = _tags[j];
-                if (tag.Length != length) continue;
-                bool matches = true;
-                for (int k = 0; k < length; ++k)
-                {
-                    char c = ptr[i + k];
-                    if ((int)c is > 64 and < 91)
-                        c = (char)(c + 32);
-                    if (tag[k] != c)
-                    {
-                        matches = false;
-                        break;
-                    }
-                }
-
-                if (matches)
-                {
-                    found = true;
-                    break;
-                }
-            }
-
-            return found;
-        }
         void AppendDefaults()
         {
-            if (checkForBackground && (nonDefaults & 2) != 0)
+            if ((nonDefaults & 2) != 0)
             {
                 if (argbBackground == DefaultBackground)
                 {
@@ -1160,6 +1077,197 @@ public static class FormattingUtil
 
         return new string(rtn, 0, writeIndex);
     }
+    /// <summary>
+    /// Remove rich text, including TextMeshPro and normal Unity tags.
+    /// </summary>
+    /// <param name="options">Tags to check for and remove.</param>
+    /// <exception cref="ArgumentOutOfRangeException"/>
+    [Pure]
+    public static unsafe string RemoveRichText(string str, int index = 0, int length = -1, RemoveRichTextOptions options = RemoveRichTextOptions.All)
+    {
+        CheckTags();
+        if (index >= str.Length || index < 0)
+            throw new ArgumentOutOfRangeException(nameof(index));
+        if (length < 0)
+            length = str.Length - index;
+        else if (index + length > str.Length)
+            throw new ArgumentOutOfRangeException(nameof(length));
+        else if (length == 0)
+            return str;
+        
+        char[] rtn = new char[str.Length + 16];
+        int nextCopyStartIndex = 0;
+        int writeIndex = 0;
+
+        fixed (char* mainPtr = str)
+        {
+            char* ptr = mainPtr + index;
+            for (int i = 0; i < length; ++i)
+            {
+                char current = ptr[i];
+                if (current == '<')
+                {
+                    bool isEndTag = i != length - 1 && ptr[i + 1] == '/';
+                    int endIndex = -1;
+                    for (int j = i + (isEndTag ? 2 : 1); j < length; ++j)
+                    {
+                        if (ptr[j] == '>')
+                        {
+                            endIndex = j;
+                            break;
+                        }
+                    }
+
+                    if (endIndex == -1 || !CompareRichTextTag(ptr, endIndex, i, options))
+                        continue;
+
+                    Append(ref rtn, ptr + nextCopyStartIndex, writeIndex, i - nextCopyStartIndex);
+                    writeIndex += i - nextCopyStartIndex;
+                    nextCopyStartIndex = endIndex + 1;
+                    i = endIndex;
+                }
+            }
+            Append(ref rtn, ptr + nextCopyStartIndex, writeIndex, str.Length - nextCopyStartIndex);
+            writeIndex += str.Length - nextCopyStartIndex;
+        }
+
+        return new string(rtn, 0, writeIndex);
+    }
+    private static unsafe bool CompareRichTextTag(char* data, int endIndex, int index, RemoveRichTextOptions options)
+    {
+        ++index;
+        if (data[index] == '/')
+            ++index;
+        else if (data[index] == '#')
+            return true;
+        for (int j = index; j < endIndex; ++j)
+        {
+            if (data[j] is '=' or ' ')
+            {
+                endIndex = j;
+                break;
+            }
+        }
+
+        int length = endIndex - index;
+        bool found = false;
+        for (int j = 0; j < _tags!.Length; ++j)
+        {
+            char[] tag = _tags[j];
+            if (tag.Length != length) continue;
+            if ((options & _tagFlags![j]) == 0)
+                continue;
+            bool matches = true;
+            for (int k = 0; k < length; ++k)
+            {
+                char c = data[index + k];
+                if ((int)c is > 64 and < 91)
+                    c = (char)(c + 32);
+                if (tag[k] != c)
+                {
+                    matches = false;
+                    break;
+                }
+            }
+
+            if (matches)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        return found;
+    }
+    private static void CheckTags()
+    {
+        _tags ??= new char[][]
+        {
+            "align".ToCharArray(),
+            "allcaps".ToCharArray(),
+            "alpha".ToCharArray(),
+            "b".ToCharArray(),
+            "br".ToCharArray(),
+            "color".ToCharArray(),
+            "cspace".ToCharArray(),
+            "font".ToCharArray(),
+            "font-weight".ToCharArray(),
+            "gradient".ToCharArray(),
+            "i".ToCharArray(),
+            "indent".ToCharArray(),
+            "line-height".ToCharArray(),
+            "line-indent".ToCharArray(),
+            "link".ToCharArray(),
+            "lowercase".ToCharArray(),
+            "material".ToCharArray(),
+            "margin".ToCharArray(),
+            "mark".ToCharArray(),
+            "mspace".ToCharArray(),
+            "nobr".ToCharArray(),
+            "noparse".ToCharArray(),
+            "page".ToCharArray(),
+            "pos".ToCharArray(),
+            "quad".ToCharArray(),
+            "rotate".ToCharArray(),
+            "s".ToCharArray(),
+            "size".ToCharArray(),
+            "smallcaps".ToCharArray(),
+            "space".ToCharArray(),
+            "sprite".ToCharArray(),
+            "strikethrough".ToCharArray(),
+            "style".ToCharArray(),
+            "sub".ToCharArray(),
+            "sup".ToCharArray(),
+            "u".ToCharArray(),
+            "underline".ToCharArray(),
+            "uppercase".ToCharArray(),
+            "voffset".ToCharArray(),
+            "width".ToCharArray()
+        };
+        _tagFlags ??= new RemoveRichTextOptions[]
+        {
+            RemoveRichTextOptions.Align,
+            RemoveRichTextOptions.Uppercase,
+            RemoveRichTextOptions.Alpha,
+            RemoveRichTextOptions.Bold,
+            RemoveRichTextOptions.LineBreak,
+            RemoveRichTextOptions.Color,
+            RemoveRichTextOptions.CharacterSpacing,
+            RemoveRichTextOptions.Font,
+            RemoveRichTextOptions.FontWeight,
+            RemoveRichTextOptions.Gradient,
+            RemoveRichTextOptions.Italic,
+            RemoveRichTextOptions.Indent,
+            RemoveRichTextOptions.LineHeight,
+            RemoveRichTextOptions.LineIndent,
+            RemoveRichTextOptions.Link,
+            RemoveRichTextOptions.Lowercase,
+            RemoveRichTextOptions.Material,
+            RemoveRichTextOptions.Margin,
+            RemoveRichTextOptions.Mark,
+            RemoveRichTextOptions.Monospace,
+            RemoveRichTextOptions.NoLineBreak,
+            RemoveRichTextOptions.NoParse,
+            RemoveRichTextOptions.PageBreak,
+            RemoveRichTextOptions.Position,
+            RemoveRichTextOptions.Quad,
+            RemoveRichTextOptions.Rotate,
+            RemoveRichTextOptions.Strikethrough,
+            RemoveRichTextOptions.Size,
+            RemoveRichTextOptions.Smallcaps,
+            RemoveRichTextOptions.Space,
+            RemoveRichTextOptions.Sprite,
+            RemoveRichTextOptions.Strikethrough,
+            RemoveRichTextOptions.Style,
+            RemoveRichTextOptions.Subscript,
+            RemoveRichTextOptions.Superscript,
+            RemoveRichTextOptions.Underline,
+            RemoveRichTextOptions.Underline,
+            RemoveRichTextOptions.Uppercase,
+            RemoveRichTextOptions.VerticalOffset,
+            RemoveRichTextOptions.TextWidth
+        };
+    }
     private static unsafe void Append(ref char[] arr, char* data, int index, int length)
     {
         if (length == 0) return;
@@ -1187,6 +1295,169 @@ public static class FormattingUtil
         SetExtendedANSICode(ptr, 0, r, g, b, background);
         Append(ref data, ptr, index, l);
         return l;
+    }
+
+
+    [Flags]
+    public enum RemoveRichTextOptions : ulong
+    {
+        None = 0L,
+        /// <summary>
+        /// &lt;align&gt;
+        /// </summary>
+        Align = 1L << 0,
+        /// <summary>
+        /// &lt;allcaps&gt;, &lt;uppercase&gt;
+        /// </summary>
+        Uppercase = 1L << 1,
+        /// <summary>
+        /// &lt;alpha&gt;
+        /// </summary>
+        Alpha = 1L << 2,
+        /// <summary>
+        /// &lt;b&gt;
+        /// </summary>
+        Bold = 1L << 3,
+        /// <summary>
+        /// &lt;br&gt;
+        /// </summary>
+        LineBreak = 1L << 4,
+        /// <summary>
+        /// &lt;color=...&gt;, &lt;#...&gt;
+        /// </summary>
+        Color = 1L << 5,
+        /// <summary>
+        /// &lt;cspace&gt;
+        /// </summary>
+        CharacterSpacing = 1L << 6,
+        /// <summary>
+        /// &lt;font&gt;
+        /// </summary>
+        Font = 1L << 7,
+        /// <summary>
+        /// &lt;font-weight&gt;
+        /// </summary>
+        FontWeight = 1L << 8,
+        /// <summary>
+        /// &lt;gradient&gt;
+        /// </summary>
+        Gradient = 1L << 9,
+        /// <summary>
+        /// &lt;i&gt;
+        /// </summary>
+        Italic = 1L << 10,
+        /// <summary>
+        /// &lt;indent&gt;
+        /// </summary>
+        Indent = 1L << 11,
+        /// <summary>
+        /// &lt;line-height&gt;
+        /// </summary>
+        LineHeight = 1L << 12,
+        /// <summary>
+        /// &lt;line-indent&gt;
+        /// </summary>
+        LineIndent = 1L << 13,
+        /// <summary>
+        /// &lt;link&gt;
+        /// </summary>
+        Link = 1L << 14,
+        /// <summary>
+        /// &lt;lowercase&gt;
+        /// </summary>
+        Lowercase = 1L << 15,
+        /// <summary>
+        /// &lt;material&gt;
+        /// </summary>
+        Material = 1L << 16,
+        /// <summary>
+        /// &lt;margin&gt;
+        /// </summary>
+        Margin = 1L << 17,
+        /// <summary>
+        /// &lt;mark&gt;
+        /// </summary>
+        Mark = 1L << 18,
+        /// <summary>
+        /// &lt;mspace&gt;
+        /// </summary>
+        Monospace = 1L << 19,
+        /// <summary>
+        /// &lt;nobr&gt;
+        /// </summary>
+        NoLineBreak = 1L << 20,
+        /// <summary>
+        /// &lt;noparse&gt;
+        /// </summary>
+        NoParse = 1L << 21,
+        /// <summary>
+        /// &lt;page&gt;
+        /// </summary>
+        PageBreak = 1L << 22,
+        /// <summary>
+        /// &lt;pos&gt;
+        /// </summary>
+        Position = 1L << 23,
+        /// <summary>
+        /// &lt;quad&gt;
+        /// </summary>
+        Quad = 1L << 24,
+        /// <summary>
+        /// &lt;rotate&gt;
+        /// </summary>
+        Rotate = 1L << 25,
+        /// <summary>
+        /// &lt;s&gt;, &lt;strikethrough&gt;
+        /// </summary>
+        Strikethrough = 1L << 26,
+        /// <summary>
+        /// &lt;size&gt;
+        /// </summary>
+        Size = 1L << 27,
+        /// <summary>
+        /// &lt;smallcaps&gt;
+        /// </summary>
+        Smallcaps = 1L << 28,
+        /// <summary>
+        /// &lt;space&gt;
+        /// </summary>
+        Space = 1L << 29,
+        /// <summary>
+        /// &lt;sprite&gt;
+        /// </summary>
+        Sprite = 1L << 30,
+        /// <summary>
+        /// &lt;style&gt;
+        /// </summary>
+        Style = 1L << 31,
+        /// <summary>
+        /// &lt;sub&gt;
+        /// </summary>
+        Subscript = 1L << 32,
+        /// <summary>
+        /// &lt;sup&gt;
+        /// </summary>
+        Superscript = 1L << 33,
+        /// <summary>
+        /// &lt;u&gt;, &lt;underline&gt;
+        /// </summary>
+        Underline = 1L << 34,
+        /// <summary>
+        /// &lt;voffset&gt;
+        /// </summary>
+        VerticalOffset = 1L << 35,
+        /// <summary>
+        /// &lt;width&gt;
+        /// </summary>
+        TextWidth = 1L << 36,
+
+        /// <summary>
+        /// All rich text tags.
+        /// </summary>
+        All = Align | Alpha | Bold | LineBreak | CharacterSpacing | Font | FontWeight | Gradient | Italic | Indent |
+              LineHeight | LineIndent | Link | Lowercase | Material | Margin | Mark | Monospace | NoLineBreak |
+              NoParse | PageBreak | Position | Quad | Rotate | Strikethrough | Size | Smallcaps | Space | Sprite |
+              Style | Subscript | Superscript | Underline | Uppercase | VerticalOffset | TextWidth
     }
 }
 

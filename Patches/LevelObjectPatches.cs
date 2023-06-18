@@ -114,10 +114,16 @@ internal static class LevelObjectPatches
 
         Label stLbl = generator.DefineLabel();
 
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        int patchedReun = 0;
+        bool patchedCopy = false;
+        bool patchedPaste = false;
+        bool patchedDelete = false;
+        bool patchedPasteTransform = false;
 
-        PatchUtil.InsertActionRateLimiter(0, stLbl, ins);
-        for (int i = 0; i < ins.Count; ++i)
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        int i = 0;
+        PatchUtil.InsertActionRateLimiter(ref i, stLbl, ins);
+        for (; i < ins.Count; ++i)
         {
             if (i < ins.Count - 1 && clearSelection != null && ins[i].Calls(clearSelection) && (redo != null && ins[i + 1].Calls(redo) || undo != null && ins[i + 1].Calls(undo)))
             {
@@ -127,6 +133,7 @@ internal static class LevelObjectPatches
                 ins.RemoveAt(i + 1);
                 ins[i] = new CodeInstruction(OpCodes.Call, invoker);
                 Logger.LogInfo($"[{Source}] Removed call to {original.Format()} in place of {invoker.Format()}.");
+                ++patchedReun;
                 continue;
             }
 
@@ -152,6 +159,7 @@ internal static class LevelObjectPatches
                 Label? @goto = PatchUtil.GetNextBranchTarget(ins, i - 1);
                 PatchUtil.ReturnIfFalse(ins, generator, ref i, OnDeleteSelection, @goto);
                 Logger.LogDebug($"[{Source}] Patched deleting objects.");
+                patchedDelete = true;
                 continue;
             }
 
@@ -164,6 +172,7 @@ internal static class LevelObjectPatches
                 Label? @goto = PatchUtil.GetNextBranchTarget(ins, i - 1);
                 PatchUtil.ReturnIfFalse(ins, generator, ref i, CheckCanCopy, @goto);
                 Logger.LogDebug($"[{Source}] Patched copying objects.");
+                patchedCopy = true;
                 continue;
             }
 
@@ -188,23 +197,20 @@ internal static class LevelObjectPatches
                 ))
             {
                 Label? @goto = PatchUtil.GetNextBranchTarget(ins, i - 1);
-                if (@goto.HasValue)
-                {
-                    Label notDevkitServerLabel = generator.DefineLabel();
-                    ins[i].labels.Add(notDevkitServerLabel);
-                    ins.Insert(i, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
-                    ins.Insert(i + 1, new CodeInstruction(OpCodes.Brfalse, notDevkitServerLabel));
-                    i += 2;
-                    ins.Insert(i, new CodeInstruction(OpCodes.Call, new Action(Paste).Method));
-                    ins.Insert(i + 1, new CodeInstruction(OpCodes.Br, @goto.Value));
-                    PatchUtil.ReturnIfFalse(ins, generator, ref i, CheckCanPaste, @goto);
-                    i += 2;
-                    Logger.LogDebug($"[{Source}] Patched pasteing objects.");
-                }
-                else
-                {
-                    Logger.LogWarning($"Unable to replace paste operations in {method.Format()}.", method: Source);
-                }
+                if (!@goto.HasValue)
+                    continue;
+
+                Label notDevkitServerLabel = generator.DefineLabel();
+                ins[i].labels.Add(notDevkitServerLabel);
+                ins.Insert(i, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Brfalse, notDevkitServerLabel));
+                i += 2;
+                ins.Insert(i, new CodeInstruction(OpCodes.Call, new Action(Paste).Method));
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Br, @goto.Value));
+                PatchUtil.ReturnIfFalse(ins, generator, ref i, CheckCanPaste, @goto);
+                i += 2;
+                Logger.LogDebug($"[{Source}] Patched pasteing objects.");
+                patchedPaste = true;
                 continue;
             }
 
@@ -230,8 +236,35 @@ internal static class LevelObjectPatches
                 PatchUtil.ContinueUntil(ins, ref i, x => x.Calls(calculateHandleOffsets), false);
                 ins.Insert(i, new CodeInstruction(OpCodes.Call, new Action(OnMoveOneObject).Method));
                 Logger.LogDebug($"[{Source}] Patched pasteing transform.");
+                patchedPasteTransform = true;
                 continue;
             }
+        }
+
+        if (!patchedCopy)
+        {
+            Logger.LogWarning($"Unable to patch copy operations in {method.Format()}.", method: Source);
+            DevkitServerModule.Fault();
+        }
+        if (!patchedPaste)
+        {
+            Logger.LogWarning($"Unable to replace paste operations in {method.Format()}.", method: Source);
+            DevkitServerModule.Fault();
+        }
+        if (!patchedDelete)
+        {
+            Logger.LogWarning($"Unable to patch delete operations in {method.Format()}.", method: Source);
+            DevkitServerModule.Fault();
+        }
+        if (!patchedPasteTransform)
+        {
+            Logger.LogWarning($"Unable to patch paste transform (Ctrl + N) operations in {method.Format()}.", method: Source);
+            DevkitServerModule.Fault();
+        }
+        if (patchedReun < 2)
+        {
+            Logger.LogWarning($"Patched {patchedReun.Format()}/{2.Format()} undo/redo operations in {method.Format()}.", method: Source);
+            DevkitServerModule.Fault();
         }
 
         return ins;

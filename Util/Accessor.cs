@@ -750,15 +750,15 @@ internal static class Accessor
 
     /// <returns>Every type defined in the calling assembly.</returns>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static List<Type> GetTypesSafe(bool removeIgnored = false) => GetTypesSafe(Assembly.GetCallingAssembly(), removeIgnored);
+    public static List<Type> GetTypesSafe(bool removeIgnored = false) => GetTypesSafe(DevkitServer, removeIgnored);
 
-    /// <returns>Every type defined in <paramref name="assmebly"/>.</returns>
-    public static List<Type> GetTypesSafe(Assembly assmebly, bool removeIgnored = false)
+    /// <returns>Every type defined in <paramref name="assembly"/>.</returns>
+    public static List<Type> GetTypesSafe(Assembly assembly, bool removeIgnored = false)
     {
         List<Type> types;
         try
         {
-            types = new List<Type>(assmebly.GetTypes());
+            types = new List<Type>(assembly.GetTypes());
         }
         catch (ReflectionTypeLoadException ex)
         {

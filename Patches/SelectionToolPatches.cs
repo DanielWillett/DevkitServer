@@ -66,17 +66,10 @@ internal static class SelectionToolPatches
         Label stLbl = generator.DefineLabel();
 
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
-        // limits to 60 actions per second
-        ins.Insert(0, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
-        ins.Insert(1, new CodeInstruction(OpCodes.Brfalse_S, stLbl));
-        ins.Insert(2, new CodeInstruction(OpCodes.Call, Accessor.GetRealtimeSinceStartup));
-        ins.Insert(3, new CodeInstruction(OpCodes.Ldsfld, EditorActions.LocalLastActionField));
-        ins.Insert(4, new CodeInstruction(OpCodes.Sub));
-        ins.Insert(5, new CodeInstruction(OpCodes.Ldc_R4, 1f / 60f));
-        ins.Insert(6, new CodeInstruction(OpCodes.Bge_S, stLbl));
-        ins.Insert(7, new CodeInstruction(OpCodes.Ret));
+        int i = 0;
+        PatchUtil.InsertActionRateLimiter(ref i, stLbl, ins);
         StackTracker tracker = new StackTracker(ins);
-        for (int i = 0; i < ins.Count; ++i)
+        for (; i < ins.Count; ++i)
         {
             CodeInstruction c = ins[i];
             if (i == 0)

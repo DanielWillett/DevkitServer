@@ -255,6 +255,8 @@ public static class BuildableResponsibilities
     /// <summary>Save all responsibilities.</summary>
     public static void Save()
     {
+        if (SavePath == null)
+            return;
         ThreadUtil.assertIsGameThread();
 
         int removed = 0;

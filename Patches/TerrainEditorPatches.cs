@@ -192,17 +192,9 @@ internal static class TerrainEditorPatches
         int pCt = 0;
         bool pAddTile = false, pRemoveTile = false;
         Label stLbl = generator.DefineLabel();
-
-        // limits to 60 actions per second
-        yield return new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter);
-        yield return new CodeInstruction(OpCodes.Brfalse_S, stLbl);
-        yield return new CodeInstruction(OpCodes.Call, Accessor.GetRealtimeSinceStartup);
-        yield return new CodeInstruction(OpCodes.Ldsfld, EditorActions.LocalLastActionField);
-        yield return new CodeInstruction(OpCodes.Sub);
-        yield return new CodeInstruction(OpCodes.Ldc_R4, 1f / 60f);
-        yield return new CodeInstruction(OpCodes.Bge_S, stLbl);
-        yield return new CodeInstruction(OpCodes.Ret);
-        for (int i = 0; i < ins.Count; ++i)
+        int i = 0;
+        PatchUtil.InsertActionRateLimiter(ref i, stLbl, ins);
+        for (; i < ins.Count; ++i)
         {
             CodeInstruction c = ins[i];
             if (i == 0)

@@ -628,11 +628,6 @@ public static class DevkitServerUtility
         
         return local.format(format, args);
     }
-    [Pure]
-    public static string RemoveRichText(string text)
-    {
-        return RemoveRichTextRegex.Replace(text, string.Empty);
-    }
     /// <remarks>Does not include &lt;#ffffff&gt; colors.</remarks>
     [Pure]
     public static string RemoveTMProRichText(string text)

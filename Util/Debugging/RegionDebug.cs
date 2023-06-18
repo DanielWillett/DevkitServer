@@ -8,6 +8,30 @@ using SDG.Framework.Rendering;
 namespace DevkitServer.Util.Debugging;
 internal sealed class RegionDebug : MonoBehaviour
 {
+    private static readonly GUIStyle DebugStyle = new GUIStyle
+    {
+        normal = new GUIStyleState
+        {
+            textColor = new Color(0.9f, 0.9f, 0.9f)
+        },
+        wordWrap = false,
+        richText = true,
+        fontSize = 14,
+        stretchHeight = true,
+        stretchWidth = true,
+        name = "DevkitServer Debug"
+    };
+    private static readonly GUIStyle DebugShadowStyle = new GUIStyle(DebugStyle)
+    {
+        normal = new GUIStyleState
+        {
+            textColor = new Color(0.1f, 0.1f, 0.1f)
+        },
+        fontSize = 14,
+        stretchHeight = true,
+        stretchWidth = true,
+        richText = true
+    };
     private static bool _tilesEnabled = true;
     private static bool _regionsEnabled = true;
     private static Vector3[,]? _tileCorners;
@@ -51,25 +75,57 @@ internal sealed class RegionDebug : MonoBehaviour
         if (_tilesEnabled || _regionsEnabled)
             DevkitServerGLUtility.OnRenderAny -= HandleGLRender;
     }
+    private static void Label(string content, ref float y)
+    {
+        float height = DebugStyle.CalcHeight(new GUIContent(content), 1024f);
+        GUI.Label(new Rect(6, y + 1, 1024f, height + 5f), FormattingUtil.RemoveRichText(content,
+            options: FormattingUtil.RemoveRichTextOptions.Color | FormattingUtil.RemoveRichTextOptions.Mark), DebugShadowStyle);
+        GUI.Label(new Rect(5, y, 1024f, height + 5f), content, DebugStyle);
+        y += height + 5f;
+    }
     [UsedImplicitly]
     private void OnGUI()
     {
         if (!_tilesEnabled && !_regionsEnabled) return;
         if (!DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null)
             return;
-        GUI.Label(new Rect(5, 80f, 1024f, 20f), "Position: " + EditorUser.User.Input.ControllerObject.transform.position.ToString("F2"));
-        float y = 80f;
-        Vector3 position = EditorUser.User.Input.ControllerObject.transform.position;
+        Transform ctrlTransform = EditorUser.User.Input.ControllerObject.transform;
+        float yaw = ctrlTransform.rotation.eulerAngles.y;
+        yaw %= 360;
+        if (yaw < 0) yaw += 360;
+        float y = 80;
+        Label("<b>Position</b>: " + ctrlTransform.position.ToString("F2") + ", Yaw: " + yaw.ToString("F2") + "°", ref y);
+        Transform? aim = EditorUser.User.Input.Aim;
+        if (aim != null)
+        {
+            string facing;
+
+            Vector3 forward = aim.forward;
+            Vector3 abs = new Vector3(Mathf.Abs(forward.x), Mathf.Abs(forward.y), Mathf.Abs(forward.z));
+
+            if (abs.x > abs.y && abs.x > abs.z)
+                facing = forward.x >= 0 ? "+ X" : "- X";
+            else if (abs.y > abs.x && abs.y > abs.z)
+                facing = forward.y >= 0 ? "+ Y" : "- Y";
+            else if (abs.z > abs.x && abs.z > abs.y)
+                facing = forward.z >= 0 ? "+ Z" : "- Z";
+            else
+                facing = "0";
+
+            Label("<b>Facing</b>: " + facing, ref y);
+        }
+
+        Vector3 position = ctrlTransform.position;
         if (_tilesEnabled)
         {
             if (Landscape.getTile(position) is { } tile)
-                GUI.Label(new Rect(5, y += 25f, 1024f, 20f), "Tile: " + tile.coord);
+                Label("<b>Tile</b>: " + tile.coord, ref y);
         }
 
         if (_regionsEnabled)
         {
             if (Regions.tryGetCoordinate(position, out byte x2, out byte y2))
-                GUI.Label(new Rect(5, y += 25f, 1024f, 20f), "Region: (" + x2.ToString(CultureInfo.InvariantCulture) + ", " + y2.ToString(CultureInfo.InvariantCulture) + ")");
+                Label("<b>Region</b>: (" + x2.ToString(CultureInfo.InvariantCulture) + ", " + y2.ToString(CultureInfo.InvariantCulture) + ")", ref y);
         }
     }
     
@@ -81,7 +137,7 @@ internal sealed class RegionDebug : MonoBehaviour
         GL.Begin(GL.LINES);
         float avgLineHeight = _avgLineHeight;
         int index = -1;
-        IReadOnlyCollection<LandscapeTile> tiles = LandscapeUtil.EnumerateAllTiles();
+        IReadOnlyCollection<LandscapeTile> tiles = LandscapeUtil.Tiles;
         if (_tileCorners == null || _tileCorners.GetLength(0) != tiles.Count)
         {
             float y = 0;
@@ -142,55 +198,57 @@ internal sealed class RegionDebug : MonoBehaviour
         {
             byte worldSize = Regions.WORLD_SIZE;
             byte cx = 0, cy = 0;
-            bool current = EditorUser.User!.Input.ControllerObject != null;
-            Vector3 position = !current ? Vector3.zero : EditorUser.User.Input.ControllerObject!.transform.position;
-            current = current && Regions.tryGetCoordinate(position, out cx, out cy);
+            bool isInRegion = EditorUser.User!.Input.ControllerObject != null;
+            Vector3 position = !isInRegion ? Vector3.zero : EditorUser.User.Input.ControllerObject!.transform.position;
+            isInRegion = isInRegion && Regions.tryGetCoordinate(position, out cx, out cy);
             float lvlSizeX = Mathf.Min(4096, Mathf.Max(Mathf.Abs(CartographyUtil.CaptureBounds.max.x), Mathf.Abs(CartographyUtil.CaptureBounds.min.x)));
             float lvlSizeZ = Mathf.Min(4096, Mathf.Max(Mathf.Abs(CartographyUtil.CaptureBounds.max.z), Mathf.Abs(CartographyUtil.CaptureBounds.min.z)));
-            GL.Color(new Color(0.25f, 0.25f, 0.25f, 0.3f));
             float regionSize = Regions.REGION_SIZE;
+            bool outOfBoundsX = Mathf.Abs(position.x) > lvlSizeX;
+            bool outOfBoundsZ = Mathf.Abs(position.z) > lvlSizeZ;
+            GL.Color(new Color(0.25f, 0.25f, 0.25f, 0.3f));
             for (int i = 0; i <= worldSize; ++i)
             {
-                if (!current || cx != i - 1)
+                if (!isInRegion || outOfBoundsZ || cx != i - 1)
                 {
                     float xpos = i * regionSize - 4096f;
                     if (Mathf.Abs(xpos) < lvlSizeX)
                         GLUtility.line(new Vector3(xpos, avgLineHeight, -lvlSizeZ), new Vector3(xpos, avgLineHeight, lvlSizeZ));
                 }
-                if (!current || cy != i - 1)
+                if (!isInRegion || outOfBoundsX || cy != i - 1)
                 {
                     float zpos = i * regionSize - 4096f;
                     if (Mathf.Abs(zpos) < lvlSizeZ)
                         GLUtility.line(new Vector3(-lvlSizeX, avgLineHeight, zpos), new Vector3(lvlSizeX, avgLineHeight, zpos));
                 }
             }
-            if (current)
+            if (isInRegion)
             {
                 Regions.tryGetPoint(cx, cy, out Vector3 pos);
-                float xpos = pos.x;
-                float zpos = pos.z;
-                if (Mathf.Abs(xpos) < lvlSizeX)
+                float regionPosX = pos.x;
+                float regionPosZ = pos.z;
+                if (Mathf.Abs(regionPosX) < lvlSizeX)
                 {
                     if (cx > 0)
-                        GLUtility.line(new Vector3(xpos + Regions.REGION_SIZE, avgLineHeight, -lvlSizeZ), new Vector3(xpos + Regions.REGION_SIZE, avgLineHeight, Mathf.Min(zpos, lvlSizeZ)));
-                    if (cx < worldSize - 1)
-                        GLUtility.line(new Vector3(xpos + Regions.REGION_SIZE, avgLineHeight, Mathf.Max(zpos + regionSize, -lvlSizeZ)), new Vector3(xpos + Regions.REGION_SIZE, avgLineHeight, lvlSizeZ));
+                        GLUtility.line(new Vector3(regionPosX + Regions.REGION_SIZE, avgLineHeight, -lvlSizeZ), new Vector3(regionPosX + Regions.REGION_SIZE, avgLineHeight, Mathf.Min(regionPosZ, lvlSizeZ)));
+                    if (cx < worldSize)
+                        GLUtility.line(new Vector3(regionPosX + Regions.REGION_SIZE, avgLineHeight, Mathf.Max(regionPosZ + regionSize, -lvlSizeZ)), new Vector3(regionPosX + Regions.REGION_SIZE, avgLineHeight, lvlSizeZ));
                 }
-                if (Mathf.Abs(zpos) < lvlSizeZ)
+                if (Mathf.Abs(regionPosZ) < lvlSizeZ)
                 {
                     if (cy > 0)
-                        GLUtility.line(new Vector3(-lvlSizeX, avgLineHeight, zpos + Regions.REGION_SIZE), new Vector3(Mathf.Min(xpos, lvlSizeX), avgLineHeight, zpos + Regions.REGION_SIZE));
-                    if (cx < worldSize - 1)
-                        GLUtility.line(new Vector3(Mathf.Max(xpos + regionSize, -lvlSizeX), avgLineHeight, zpos + Regions.REGION_SIZE), new Vector3(lvlSizeX, avgLineHeight, zpos + Regions.REGION_SIZE));
+                        GLUtility.line(new Vector3(-lvlSizeX, avgLineHeight, regionPosZ + Regions.REGION_SIZE), new Vector3(Mathf.Min(regionPosX, lvlSizeX), avgLineHeight, regionPosZ + Regions.REGION_SIZE));
+                    if (cx < worldSize)
+                        GLUtility.line(new Vector3(Mathf.Max(regionPosX + regionSize, -lvlSizeX), avgLineHeight, regionPosZ + Regions.REGION_SIZE), new Vector3(lvlSizeX, avgLineHeight, regionPosZ + Regions.REGION_SIZE));
                 }
 
                 GL.Color(new Color(0.5f, 0.5f, 0f, 1f));
-                GLUtility.line(new Vector3(xpos, avgLineHeight, zpos), new Vector3(xpos + regionSize, avgLineHeight, zpos));
-                GLUtility.line(new Vector3(xpos, avgLineHeight, zpos), new Vector3(xpos, avgLineHeight, zpos + regionSize));
-                GLUtility.line(new Vector3(xpos + regionSize, avgLineHeight, zpos),
-                    new Vector3(xpos + regionSize, avgLineHeight, zpos + regionSize));
-                GLUtility.line(new Vector3(xpos, avgLineHeight, zpos + regionSize),
-                    new Vector3(xpos + regionSize, avgLineHeight, zpos + regionSize));
+                GLUtility.line(new Vector3(regionPosX, avgLineHeight, regionPosZ), new Vector3(regionPosX + regionSize, avgLineHeight, regionPosZ));
+                GLUtility.line(new Vector3(regionPosX, avgLineHeight, regionPosZ), new Vector3(regionPosX, avgLineHeight, regionPosZ + regionSize));
+                GLUtility.line(new Vector3(regionPosX + regionSize, avgLineHeight, regionPosZ),
+                    new Vector3(regionPosX + regionSize, avgLineHeight, regionPosZ + regionSize));
+                GLUtility.line(new Vector3(regionPosX, avgLineHeight, regionPosZ + regionSize),
+                    new Vector3(regionPosX + regionSize, avgLineHeight, regionPosZ + regionSize));
             }
         }
         GL.End();
