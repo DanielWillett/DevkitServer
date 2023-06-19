@@ -109,22 +109,25 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         FieldInfo field = wrapperType.GetField(nameof(_delegates), BindingFlags.FlattenHierarchy | BindingFlags.NonPublic | BindingFlags.Instance)!;
 
         DynamicMethod method = new DynamicMethod("TryInvoke" + type.Name, MethodAttributes.Private, CallingConventions.HasThis, typeof(void), types, wrapperType, true);
-        ILGenerator il = method.GetILGenerator();
+        DebuggableEmitter il = new DebuggableEmitter(method.GetILGenerator(), method) { DebugLog = true, Breakpointing = true };
         for (int i = 0; i < expectedParameters.Length; ++i)
             method.DefineParameter(i + 1, expectedParameters[i].Attributes, expectedParameters[i].Name);
+        method.DefineParameter(0, ParameterAttributes.None, "this");
         il.DeclareLocal(typeof(int));
         il.DeclareLocal(type);
         il.DeclareLocal(type.MakeArrayType());
-        il.DeclareLocal(typeof(Exception));
         il.DeclareLocal(typeof(string));
         Label loopStartLabel = il.DefineLabel();
-        Label checkLbl = il.DefineLabel();
         Label incrLbl = il.DefineLabel();
+        Label checkLbl = il.DefineLabel();
 
         // TDelegate[] delegates = this._delegates;
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldfld, field);
         il.Emit(OpCodes.Stloc_2);
+
+        // goto check out of bounds;
+        il.Emit(OpCodes.Br, checkLbl);
 
         il.MarkLabel(loopStartLabel);
 
@@ -137,7 +140,8 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         for (int i = 1; i < types.Length; ++i)
             PatchUtil.EmitArgument(il, i, false, types[i].IsByRef);
 
-        il.Emit(OpCodes.Callvirt, invoke);
+        il.Emit(OpCodes.Call, invoke);
+        // crash
 
         if (shouldAllowIndex > -1)
         {
@@ -150,27 +154,24 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         il.Emit(OpCodes.Leave_S, incrLbl);
 
         il.BeginCatchBlock(typeof(Exception));
-
-        il.Emit(OpCodes.Stloc_3);
-
+        
         // string method = this.DeclaringType.Name.ToUpperInvariant()
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Call, getDeclaringType);
         il.Emit(OpCodes.Call, getTypeName);
         il.Emit(OpCodes.Call, toUpperInvariant);
-        il.Emit(OpCodes.Stloc_S, 4);
+        il.Emit(OpCodes.Stloc_3);
 
         // Logger.LogError(this.ErrorMessage, method: method);
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Call, getErrorMessage);
         PatchUtil.LoadConstantI4(il, (int)ConsoleColor.Red);
-        il.Emit(OpCodes.Ldloc_S, 4);
+        il.Emit(OpCodes.Ldloc_3);
         il.Emit(OpCodes.Call, logErrorText);
 
         // Logger.LogError(ex, method: method);
-        il.Emit(OpCodes.Ldloc_2);
         il.Emit(OpCodes.Ldc_I4_1);
-        il.Emit(OpCodes.Ldloc_S, 4);
+        il.Emit(OpCodes.Ldloc_3);
         il.Emit(OpCodes.Call, logErrorEx);
 
         il.Emit(OpCodes.Leave_S, incrLbl);
@@ -184,7 +185,7 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         il.Emit(OpCodes.Add);
         il.Emit(OpCodes.Stloc_0);
 
-        // if (i < delegates.Length) break;
+        // if (i < delegates.Length) return;
         il.MarkLabel(checkLbl);
         il.Emit(OpCodes.Ldloc_0);
         il.Emit(OpCodes.Ldloc_2);

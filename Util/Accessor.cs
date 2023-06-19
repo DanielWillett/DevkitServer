@@ -1,10 +1,12 @@
-﻿using System.Reflection;
+﻿using System.Diagnostics;
+using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using DevkitServer.API;
 using DevkitServer.Patches;
 using HarmonyLib;
+using StackCleaner;
 
 namespace DevkitServer.Util;
 internal static class Accessor
@@ -28,11 +30,17 @@ internal static class Accessor
     private static MethodInfo? _getKeyDown;
     private static MethodInfo? _getKeyUp;
     private static MethodInfo? _getKey;
+    private static MethodInfo? _concat2Strings;
+    private static MethodInfo? _getStackTraceString;
+
+    private static FieldInfo? _getStackCleaner;
+
+    private static ConstructorInfo? _castExCtor;
+    private static ConstructorInfo? _stackTraceIntCtor;
 
     internal static Type[]? FuncTypes;
     internal static Type[]? ActionTypes;
     private static bool _castExCtorCalc;
-    private static ConstructorInfo? _castExCtor;
     public static InstanceSetter<TInstance, TValue>? GenerateInstanceSetter<TInstance, TValue>(string fieldName, BindingFlags flags = BindingFlags.NonPublic, bool throwOnError = false)
     {
         try
@@ -889,6 +897,32 @@ internal static class Accessor
     public static MethodInfo GetKey => _getKey ??=
         typeof(InputEx).GetMethod(nameof(InputEx.GetKey), BindingFlags.Public | BindingFlags.Static)
         ?? throw new MemberAccessException("Unable to find InputEx.GetKey.");
+
+    /// <summary><see cref="StackTrace(int)"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static ConstructorInfo StackTraceIntConstructor => _stackTraceIntCtor ??= 
+        typeof(StackTrace).GetConstructor(BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int) },
+            null) ?? throw new MemberAccessException("Unable to find StackTrace.StackTrace(int).");
+
+    /// <summary><see cref="string.Concat(string, string)"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo Concat2StringsMethod => _concat2Strings ??=
+        typeof(string).GetMethod(nameof(string.Concat), BindingFlags.Static | BindingFlags.Public, null,
+            new Type[] { typeof(string), typeof(string) }, null)
+        ?? throw new MemberAccessException("Unable to find string.Concat(string, string).");
+
+    /// <summary><see cref="StackTraceCleaner.GetString(StackTrace)"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo StackTraceCleanerGetStringMethod => _getStackTraceString ??=
+        typeof(StackTraceCleaner).GetMethod(nameof(StackTraceCleaner.GetString), BindingFlags.Instance | BindingFlags.Public, null,
+            new Type[] { typeof(StackTrace) }, null)
+        ?? throw new MemberAccessException("Unable to find StackTraceCleaner.GetString(StackTrace).");
+
+    /// <summary><see cref="Logger.StackCleaner"/>.</summary>
+    /// <exception cref="MemberAccessException"/>
+    public static FieldInfo LoggerStackCleanerField => _getStackCleaner ??=
+        typeof(Logger).GetField(nameof(Logger.StackCleaner), BindingFlags.Static | BindingFlags.Public)
+        ?? throw new MemberAccessException("Unable to find Logger.StackCleaner.");
 }
 
 public delegate void InstanceSetter<in TInstance, in T>(TInstance owner, T value);

@@ -482,6 +482,8 @@ public static class FormattingUtil
             case OperandType.InlineVar:
                 if (instruction.operand is LocalBuilder lb)
                     op += " " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + lb.LocalIndex + GetReset() + " : " + lb.LocalType!.Format();
+                else if (instruction.operand is int index)
+                    op += " " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + index + GetReset();
                 break;
         }
 

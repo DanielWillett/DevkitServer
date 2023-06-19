@@ -132,6 +132,8 @@ public class StackTracker
                 }
             }
             stackSize += GetStackChange(current.opcode, current.operand, method);
+            if (current.blocks.Any(x => x.blockType == ExceptionBlockType.BeginCatchBlock))
+                ++stackSize;
         }
         return last;
     }
@@ -170,6 +172,8 @@ public class StackTracker
                 }
             }
             stackSize += GetStackChange(current.opcode, current.operand, method);
+            if (current.blocks.Any(x => x.blockType == ExceptionBlockType.BeginCatchBlock))
+                ++stackSize;
         }
         return last;
     }

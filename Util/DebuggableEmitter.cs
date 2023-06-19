@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Diagnostics.SymbolStore;
 using System.Reflection;
 using System.Reflection.Emit;
+using StackCleaner;
 
 namespace DevkitServer.Util;
 public class DebuggableEmitter
@@ -36,6 +37,24 @@ public class DebuggableEmitter
             if (Breakpointing)
                 Logger.LogDebug(" (with breakpointing)", ConsoleColor.DarkRed);
         }
+        if (Breakpointing)
+        {
+            try
+            {
+                Generator.Emit(OpCodes.Ldstr, ".method " + Method.Format() + Environment.NewLine);
+                Generator.Emit(OpCodes.Ldsfld, Accessor.LoggerStackCleanerField);
+                Generator.Emit(OpCodes.Ldc_I4_1);
+                Generator.Emit(OpCodes.Newobj, Accessor.StackTraceIntConstructor);
+                Generator.Emit(OpCodes.Call, Accessor.StackTraceCleanerGetStringMethod);
+                Generator.Emit(OpCodes.Call, Accessor.Concat2StringsMethod);
+            }
+            catch (MemberAccessException)
+            {
+                Generator.Emit(OpCodes.Ldstr, ".method " + Method.Format());
+            }
+            PatchUtil.LoadConstantI4(Generator, (int)ConsoleColor.DarkRed);
+            Generator.Emit(OpCodes.Call, Accessor.LogDebug);
+        }
         _init = true;
 #endif
     }
@@ -49,19 +68,21 @@ public class DebuggableEmitter
     }
     public void BeginCatchBlock(Type type)
     {
+        --LogIndent;
+        Log("}");
         Log(".catch (" + type.Format() + ") {");
         ++LogIndent;
         Generator.BeginCatchBlock(type);
     }
     public void BeginExceptFilterBlock()
     {
-        Log(".exception filter {");
+        Log(".try (filter) {");
         ++LogIndent;
         Generator.BeginExceptFilterBlock();
     }
     public void BeginExceptionBlock()
     {
-        Log(".exception {");
+        Log(".try {");
         ++LogIndent;
         Generator.BeginExceptionBlock();
     }
@@ -73,6 +94,8 @@ public class DebuggableEmitter
     }
     public void BeginFinallyBlock()
     {
+        --LogIndent;
+        Log("}");
         Log(".finally {");
         ++LogIndent;
         Generator.BeginFinallyBlock();
@@ -87,7 +110,7 @@ public class DebuggableEmitter
     public LocalBuilder DeclareLocal(Type type, bool pinned)
     {
         LocalBuilder lcl = Generator.DeclareLocal(type, pinned);
-        Log("// Declared local: " + (lcl.LocalType ?? type).Format() + " # " + lcl.LocalIndex.Format() + " (Pinned: " + lcl.IsPinned.Format() + ")");
+        Log("// Declared local: # " + lcl.LocalIndex.Format() + " " + (lcl.LocalType ?? type).Format() + " (Pinned: " + lcl.IsPinned.Format() + ")");
         return lcl;
     }
     public Label DefineLabel()
@@ -213,14 +236,14 @@ public class DebuggableEmitter
     }
     public void EndExceptionBlock()
     {
-        Log("}");
         --LogIndent;
+        Log("}");
         Generator.EndExceptionBlock();
     }
     public void EndScope()
     {
-        Log("}");
         --LogIndent;
+        Log("}");
         Generator.EndScope();
     }
     public void MarkLabel(Label label)

@@ -328,6 +328,35 @@ public static class PatchUtil
 
         il.Emit(index > byte.MaxValue ? OpCodes.Ldarg : OpCodes.Ldarg_S, index);
     }
+    public static void EmitArgument(DebuggableEmitter il, int index, bool set, bool byref = false)
+    {
+        if (index > ushort.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(index));
+        if (set)
+        {
+            il.Emit(index > byte.MaxValue ? OpCodes.Starg : OpCodes.Starg_S, index);
+            return;
+        }
+        if (byref)
+        {
+            il.Emit(index > byte.MaxValue ? OpCodes.Ldarga : OpCodes.Ldarga_S, index);
+            return;
+        }
+        
+        if (index is < 4 and > -1)
+        {
+            il.Emit(index switch
+            {
+                0 => OpCodes.Ldarg_0,
+                1 => OpCodes.Ldarg_1,
+                2 => OpCodes.Ldarg_2,
+                _ => OpCodes.Ldarg_3
+            });
+            return;
+        }
+
+        il.Emit(index > byte.MaxValue ? OpCodes.Ldarg : OpCodes.Ldarg_S, index);
+    }
     [Pure]
     public static int GetLocalIndex(CodeInstruction code, bool set)
     {
@@ -653,16 +682,16 @@ public static class PatchUtil
         if (opcode == OpCodes.Brfalse_S || opcode == OpCodes.Brfalse)
             return brfalse;
         if (opcode == OpCodes.Beq_S || opcode == OpCodes.Beq)
-            return brfalse;
+            return beq;
         if (opcode == OpCodes.Bne_Un_S || opcode == OpCodes.Bne_Un)
             return bne;
-        if (opcode == OpCodes.Bge || opcode == OpCodes.Bge || opcode == OpCodes.Bge_Un_S || opcode == OpCodes.Bge_Un)
+        if (opcode == OpCodes.Bge_S || opcode == OpCodes.Bge || opcode == OpCodes.Bge_Un_S || opcode == OpCodes.Bge_Un)
             return bge;
-        if (opcode == OpCodes.Ble || opcode == OpCodes.Ble || opcode == OpCodes.Ble_Un_S || opcode == OpCodes.Ble_Un)
+        if (opcode == OpCodes.Ble_S || opcode == OpCodes.Ble || opcode == OpCodes.Ble_Un_S || opcode == OpCodes.Ble_Un)
             return ble;
-        if (opcode == OpCodes.Bgt || opcode == OpCodes.Bgt || opcode == OpCodes.Bgt_Un_S || opcode == OpCodes.Bgt_Un)
+        if (opcode == OpCodes.Bgt_S || opcode == OpCodes.Bgt || opcode == OpCodes.Bgt_Un_S || opcode == OpCodes.Bgt_Un)
             return bgt;
-        if (opcode == OpCodes.Blt || opcode == OpCodes.Blt || opcode == OpCodes.Blt_Un_S || opcode == OpCodes.Blt_Un)
+        if (opcode == OpCodes.Blt_S || opcode == OpCodes.Blt || opcode == OpCodes.Blt_Un_S || opcode == OpCodes.Blt_Un)
             return blt;
 
         return false;
