@@ -29,7 +29,7 @@ public abstract class Plugin : IDevkitServerColorPlugin
     public string MainLocalizationDirectory { get; }
 
     /// <inheritdoc/>
-    public Assembly Assembly { get; }
+    public PluginAssembly Assembly { get; set; } = null!;
 
     /// <inheritdoc/>
     public Local Translations { get; private set; }
@@ -39,11 +39,11 @@ public abstract class Plugin : IDevkitServerColorPlugin
 
     protected Plugin()
     {
-        Assembly = GetType().Assembly;
-        _defaultName = Assembly.GetName().Name + "/" + GetType().Name;
+        string asmName = GetType().Assembly.GetName().Name;
+        _defaultName = asmName + "/" + GetType().Name;
         // ReSharper disable once VirtualMemberCallInConstructor (Reason: expecting literal string override)
         string name = Name ?? _defaultName;
-        DataDirectory = Path.Combine(PluginLoader.PluginDirectory, Assembly.GetName().Name + "." + name);
+        DataDirectory = Path.Combine(PluginLoader.PluginDirectory, asmName + "." + name);
         LocalizationDirectory = Path.Combine(DataDirectory, "Localization");
         MainLocalizationDirectory = Path.Combine(LocalizationDirectory, "Main");
         Translations = Localization.tryRead(MainLocalizationDirectory, false);
@@ -95,11 +95,11 @@ public abstract class Plugin : IDevkitServerColorPlugin
 
     /// <inheritdoc/>
     public void LogWarning(string message, ConsoleColor color = ConsoleColor.Yellow) =>
-        Logger.LogWarning("[" + Name.ToUpperInvariant().Colorize(Color) + "] " + message, color);
+        Logger.LogWarning(message, color, method: Name.ToUpperInvariant().Colorize(Color));
 
     /// <inheritdoc/>
     public void LogError(string message, ConsoleColor color = ConsoleColor.Red) =>
-        Logger.LogError("[" + Name.ToUpperInvariant().Colorize(Color) + "] " + message, color);
+        Logger.LogError(message, color, method: Name.ToUpperInvariant().Colorize(Color));
 
     /// <inheritdoc/>
     public void LogError(Exception ex) =>

@@ -217,11 +217,17 @@ public class SystemConfig
     public bool ConsoleVisualANSISupport { get; set; }
 
     [JsonPropertyName("walmart_pc_support")]
-    public bool RemoveCosmeticImprovements { get; set; } // todo
+    public bool RemoveCosmeticImprovements { get; set; }
 
 #if SERVER
     [JsonPropertyName("disable_map_download")]
     public bool DisableMapDownload { get; set; }
+
+    /// <summary>
+    /// Not recommended. Enables usage of the <see cref="VanillaPermissions.BypassObjectSelectionLimits"/>.
+    /// </summary>
+    [JsonPropertyName("use_bypassing_object_selection_limit_permission")]
+    public bool UseBypassingObjectSelectionLimitPermission { get; set; }
 
     [JsonPropertyName("default_permissions")]
     public string[] DefaultUserPermissions { get; set; }
@@ -261,6 +267,7 @@ public class SystemConfig
             "viewer"
         };
         PlayerSavedataLocationOverride = null;
+        UseBypassingObjectSelectionLimitPermission = null;
 #endif
     }
 }

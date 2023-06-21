@@ -4,6 +4,8 @@ using DevkitServer.Commands.Subsystem;
 using DevkitServer.Configuration;
 using System.Reflection;
 using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Patches;
+using HarmonyLib;
 using Action = System.Action;
 
 namespace DevkitServer.Plugins;
@@ -12,44 +14,67 @@ public static class PluginLoader
     public static readonly string PluginDirectory = Path.Combine(DevkitServerConfig.Directory, "Plugins");
     public static readonly string LibraryDirectory = Path.Combine(DevkitServerConfig.Directory, "Libraries");
 
-    private static readonly List<IDevkitServerPlugin> _plugins = new List<IDevkitServerPlugin>();
-    private static readonly List<PluginLibrary> _libs = new List<PluginLibrary>();
-    private static readonly List<PluginAssembly> _pluginWrappers = new List<PluginAssembly>();
-    private static readonly IReadOnlyList<IDevkitServerPlugin> _roPlugins = _plugins.AsReadOnly();
-    private static readonly IReadOnlyList<PluginLibrary> _roLibs = _libs.AsReadOnly();
+    private static readonly CachedMulticastEvent<Action<IDevkitServerPlugin>> OnPluginLoadedEvent = new CachedMulticastEvent<Action<IDevkitServerPlugin>>(typeof(PluginLoader), nameof(OnPluginLoaded));
+    private static readonly CachedMulticastEvent<Action<IDevkitServerPlugin>> OnPluginUnloadedEvent = new CachedMulticastEvent<Action<IDevkitServerPlugin>>(typeof(PluginLoader), nameof(OnPluginUnloaded));
+    private static readonly CachedMulticastEvent<Action> OnPluginsLoadedEvent = new CachedMulticastEvent<Action>(typeof(PluginLoader), nameof(OnPluginsLoaded));
+    private static readonly CachedMulticastEvent<Action> OnPluginsUnloadingEvent = new CachedMulticastEvent<Action>(typeof(PluginLoader), nameof(OnPluginsUnloading));
+
+    private static readonly List<IDevkitServerPlugin> PluginsIntl = new List<IDevkitServerPlugin>();
+    private static readonly List<PluginLibrary> LibrariesIntl = new List<PluginLibrary>();
+    private static readonly List<PluginAssembly> AssembliesIntl = new List<PluginAssembly>();
 
     /// <summary>
     /// Invoked a plugin loads, either on startup or by <see cref="RegisterPlugin"/>.
     /// </summary>
     /// <remarks>Exceptions will not break execution.</remarks>
-    public static event Action<IDevkitServerPlugin>? OnPluginLoaded;
+    public static event Action<IDevkitServerPlugin> OnPluginLoaded
+    {
+        add => OnPluginLoadedEvent.Add(value);
+        remove => OnPluginLoadedEvent.Remove(value);
+    }
 
     /// <summary>
     /// Invoked a plugin unloads, either on startup, shutdown or by <see cref="DeregisterPlugin"/>.
     /// </summary>
     /// <remarks>All plugins in an assembly will unload if any fail to load on startup, invoking this event. Exceptions will not break execution.</remarks>
-    public static event Action<IDevkitServerPlugin>? OnPluginUnloaded;
+    public static event Action<IDevkitServerPlugin> OnPluginUnloaded
+    {
+        add => OnPluginUnloadedEvent.Add(value);
+        remove => OnPluginUnloadedEvent.Remove(value);
+    }
 
     /// <summary>
     /// Invoked after all plugins load on startup.
     /// </summary>
     /// <remarks>Exceptions will not break execution.</remarks>
-    public static event Action? OnPluginsLoaded;
+    public static event Action OnPluginsLoaded
+    {
+        add => OnPluginsLoadedEvent.Add(value);
+        remove => OnPluginsLoadedEvent.Remove(value);
+    }
 
     /// <summary>
-    /// Invoked after all plugins unload on shutdown.
+    /// Invoked before all plugins unload on shutdown.
     /// </summary>
     /// <remarks>Exceptions will not break execution.</remarks>
-    public static event Action? OnPluginsUnloaded;
+    public static event Action OnPluginsUnloading
+    {
+        add => OnPluginsUnloadingEvent.Add(value);
+        remove => OnPluginsUnloadingEvent.Remove(value);
+    }
 
     /// <summary>
     /// All currently loaded plugins.
     /// </summary>
-    public static IReadOnlyList<IDevkitServerPlugin> Plugins => _roPlugins;
+    public static IReadOnlyList<IDevkitServerPlugin> Plugins { get; } = PluginsIntl.AsReadOnly();
     /// <summary>
     /// All loaded libraries.
     /// </summary>
-    public static IReadOnlyList<PluginLibrary> Libraries => _roLibs;
+    public static IReadOnlyList<PluginLibrary> Libraries { get; } = LibrariesIntl.AsReadOnly();
+    /// <summary>
+    /// All loaded assemblies and their plugins and patching info.
+    /// </summary>
+    public static IReadOnlyList<PluginAssembly> Assemblies { get; } = AssembliesIntl.AsReadOnly();
     private static void AssertPluginValid(IDevkitServerPlugin plugin)
     {
         if (string.IsNullOrWhiteSpace(plugin.DataDirectory) || !Uri.TryCreate(plugin.DataDirectory, UriKind.Absolute, out Uri uri) || !uri.IsFile)
@@ -111,9 +136,9 @@ public static class PluginLoader
         while (dup)
         {
             dup = false;
-            for (int i = 0; i < _plugins.Count; i++)
+            for (int i = 0; i < PluginsIntl.Count; i++)
             {
-                IDevkitServerPlugin plugin2 = _plugins[i];
+                IDevkitServerPlugin plugin2 = PluginsIntl[i];
                 if (plugin2.PermissionPrefix.Equals(plugin.PermissionPrefix, StringComparison.InvariantCultureIgnoreCase))
                 {
                     plugin.PermissionPrefix = "_" + plugin.PermissionPrefix;
@@ -129,22 +154,22 @@ public static class PluginLoader
             plugin.Load();
             AssertPluginValid(plugin);
             PluginAdvertising.Get().AddPlugin(plugin.MenuName);
-            _plugins.Add(plugin);
+            PluginsIntl.Add(plugin);
             Assembly asm = plugin.GetType().Assembly;
-            for (int i = 0; i < _pluginWrappers.Count; ++i)
+            for (int i = 0; i < AssembliesIntl.Count; ++i)
             {
-                if (_pluginWrappers[i].Assembly == asm)
+                if (AssembliesIntl[i].Assembly == asm)
                 {
-                    _pluginWrappers[i].Plugins.Add(plugin);
+                    AssembliesIntl[i].AddPlugin(plugin);
                     goto skipAssemblyAdd;
                 }
             }
 
             PluginAssembly assemblyWrapper = new PluginAssembly(asm);
-            assemblyWrapper.Plugins.Add(plugin);
-            _pluginWrappers.Add(assemblyWrapper);
+            assemblyWrapper.AddPlugin(plugin);
+            AssembliesIntl.Add(assemblyWrapper);
             skipAssemblyAdd:
-            TryInvokeOnPluginLoaded(plugin);
+            OnPluginLoadedEvent.TryInvoke(plugin);
             Logger.LogInfo("[LOAD " + plugin.Name.ToUpperInvariant() + "] Loaded " + plugin.Name.Colorize(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor));
         }
         catch (Exception ex)
@@ -155,7 +180,7 @@ public static class PluginLoader
             try
             {
                 plugin.Unload();
-                TryInvokeOnPluginUnloaded(plugin);
+                OnPluginUnloadedEvent.TryInvoke(plugin);
             }
             catch (Exception ex2)
             {
@@ -173,19 +198,20 @@ public static class PluginLoader
     {
         if (plugin == null)
             throw new ArgumentNullException(nameof(plugin));
-        for (int i = _plugins.Count - 1; i >= 0; --i)
+        for (int i = PluginsIntl.Count - 1; i >= 0; --i)
         {
-            if (_plugins[i].Equals(plugin))
+            if (PluginsIntl[i].Equals(plugin))
             {
-                plugin = _plugins[i];
+                plugin = PluginsIntl[i];
                 PluginAdvertising.Get().RemovePlugin(plugin.MenuName);
-                _plugins.RemoveAt(i);
+                PluginsIntl.RemoveAt(i);
                 Assembly asm = plugin.GetType().Assembly;
-                for (int j = 0; j < _pluginWrappers.Count; ++j)
+                for (int j = 0; j < AssembliesIntl.Count; ++j)
                 {
-                    if (_pluginWrappers[j].Assembly == asm)
+                    PluginAssembly assembly = AssembliesIntl[j];
+                    if (assembly.Assembly == asm)
                     {
-                        _pluginWrappers[j].Plugins.Remove(plugin);
+                        assembly.RemovePlugin(plugin);
                         break;
                     }
                 }
@@ -202,7 +228,7 @@ public static class PluginLoader
                 }
                 finally
                 {
-                    TryInvokeOnPluginUnloaded(plugin);
+                    OnPluginUnloadedEvent.TryInvoke(plugin);
                 }
                 break;
             }
@@ -230,7 +256,7 @@ public static class PluginLoader
             {
                 Logger.LogInfo("Loaded Library: " + Path.GetFileName(libDll).Format() + ".");
                 PluginLibrary lib = new PluginLibrary(asm, libDll);
-                _libs.Add(lib);
+                LibrariesIntl.Add(lib);
             }
         }
 
@@ -277,16 +303,21 @@ public static class PluginLoader
 
             if (pluginsTemp.Count > 0)
             {
-                Logger.LogInfo("Found " + pluginsTemp.Count.Format() + " plugin" + (pluginsTemp.Count == 1 ? string.Empty : "s") +
+                Logger.LogInfo("[LOAD PLUGINS] Found " + pluginsTemp.Count.Format() + " plugin" + (pluginsTemp.Count == 1 ? string.Empty : "s") +
                                " from " + Path.GetFileName(pluginDll).Format() + " (" + assembly.GetName().Version.Format() + ")");
-                PluginAssembly info = new PluginAssembly(assembly);
-                info.Plugins.AddRange(pluginsTemp);
-                _pluginWrappers.Add(info);
-                _plugins.AddRange(pluginsTemp);
+                PluginAssembly? info = AssembliesIntl.Find(x => x.Assembly == assembly);
+                if (info == null)
+                {
+                    info = new PluginAssembly(assembly);
+                    AssembliesIntl.Add(info);
+                }
+                for (int k = 0; k < pluginsTemp.Count; ++k)
+                    info.AddPlugin(pluginsTemp[k]);
+                PluginsIntl.AddRange(pluginsTemp);
             }
             else
             {
-                Logger.LogInfo("Found no plugins from " + Path.GetFileName(pluginDll).Format() + " (" + assembly.GetName().Version.Format() + ")");
+                Logger.LogInfo("[LOAD PLUGINS] Found no plugins from " + Path.GetFileName(pluginDll).Format() + " (" + assembly.GetName().Version.Format() + ")");
             }
         }
 
@@ -294,12 +325,12 @@ public static class PluginLoader
         while (dup)
         {
             dup = false;
-            for (int i = 0; i < _plugins.Count; i++)
+            for (int i = 0; i < PluginsIntl.Count; i++)
             {
-                IDevkitServerPlugin plugin = _plugins[i];
-                for (int j = i + 1; j < _plugins.Count; ++j)
+                IDevkitServerPlugin plugin = PluginsIntl[i];
+                for (int j = i + 1; j < PluginsIntl.Count; ++j)
                 {
-                    IDevkitServerPlugin plugin2 = _plugins[j];
+                    IDevkitServerPlugin plugin2 = PluginsIntl[j];
                     if (plugin2.PermissionPrefix.Equals(plugin.PermissionPrefix, StringComparison.InvariantCultureIgnoreCase))
                     {
                         plugin2.PermissionPrefix = "_" + plugin2.PermissionPrefix;
@@ -319,35 +350,22 @@ public static class PluginLoader
                 ? attr.Priority
                 : 0
         ).ToList();
-        List<Assembly> reflected = new List<Assembly>(pluginsTemp.Count + 1) { Assembly.GetExecutingAssembly() };
         for (int i = 0; i < pluginsTemp.Count; ++i)
         {
             IDevkitServerPlugin plugin = pluginsTemp[i];
+            Color color = plugin.GetColor();
+            string src = "LOAD " + plugin.Name.ToUpperInvariant().Colorize(color);
             try
             {
-                plugin.Load();
-                if (!reflected.Contains(plugin.Assembly))
-                {
-                    reflected.Add(plugin.Assembly);
-
-                    CreateDirectoryAttribute.CreateInAssembly(plugin.Assembly);
-
-                    NetFactory.Reflect(plugin.Assembly,
-#if SERVER
-                        NetCallSource.FromClient
-#else
-                        NetCallSource.FromServer
-#endif
-                    );
-                }
                 AssertPluginValid(plugin);
-                TryInvokeOnPluginLoaded(plugin);
-                Logger.LogInfo("[LOAD " + plugin.Name.ToUpperInvariant() + "] Loaded " + plugin.Name.Colorize(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor));
+                plugin.Load();
+                OnPluginLoadedEvent.TryInvoke(plugin);
+                Logger.LogInfo($"[{src}] Loaded successfully.");
             }
             catch (Exception ex)
             {
-                Logger.LogError("Plugin failed to load: " + plugin.GetType().Format() + ".", method: "LOAD " + plugin.Name.ToUpperInvariant());
-                Logger.LogError(ex, method: "LOAD " + plugin.Name.ToUpperInvariant());
+                Logger.LogError("Plugin failed to load: " + plugin.GetType().Format() + ".", method: src);
+                Logger.LogError(ex, method: src);
                 for (int j = i; j >= 0; --j)
                 {
                     IDevkitServerPlugin plugin2 = pluginsTemp[j];
@@ -356,32 +374,39 @@ public static class PluginLoader
                         try
                         {
                             plugin2.Unload();
-                            TryInvokeOnPluginUnloaded(plugin2);
+                            OnPluginUnloadedEvent.TryInvoke(plugin2);
+                            Logger.LogInfo($"[{src}]  Unloaded {plugin2.GetType().Format()}.");
                         }
                         catch (Exception ex2)
                         {
-                            Logger.LogError(" Plugin failed to unload: " + plugin2.GetType().Format() + ".",
-                                method: "LOAD " + plugin2.Name.ToUpperInvariant());
-                            Logger.LogError(ex2, method: "LOAD " + plugin2.Name.ToUpperInvariant());
+                            Logger.LogError($" Plugin failed to unload: {plugin2.GetType().Format()}.", method: src);
+                            Logger.LogError(ex2, method: src);
                         }
                     }
                 }
-
+                plugin.Assembly.Unpatch();
                 pluginsTemp.Clear();
-                Logger.LogError("Failed to load assembly: " + plugin.Assembly.GetName().Name.Format() + ".", method: "LOAD " + plugin.Name.ToUpperInvariant());
+                Logger.LogError("Failed to load assembly: " + plugin.Assembly.Assembly.GetName().Name.Format() + ".", method: src);
                 break;
             }
+            plugin.Assembly.ReflectAndPatch();
         }
 
-        foreach (IDevkitServerPlugin plugin in _plugins.OrderBy(x => x.Name))
-            PluginAdvertising.Get().AddPlugin(plugin.MenuName);
+        IPluginAdvertising advertisingFramework = PluginAdvertising.Get();
+
+        string devkitServer = DevkitServerModule.MainLocalization.Translate("Name");
+        advertisingFramework.RemovePlugins(advertisingFramework.GetPluginNames().Where(x => !x.Equals(devkitServer, StringComparison.Ordinal)));
+        advertisingFramework.AddPlugins(PluginsIntl.OrderBy(x => x.Name).Select(x => x.MenuName).Where(x => !string.IsNullOrEmpty(x)));
 
         CommandHandler.InitImpl();
-        TryInvokeOnPluginsLoaded();
+
+        OnPluginsLoadedEvent.TryInvoke();
     }
     internal static void Unload()
     {
-        foreach (IDevkitServerPlugin plugin in _plugins.ToList())
+        OnPluginsUnloadingEvent.TryInvoke();
+
+        foreach (IDevkitServerPlugin plugin in PluginsIntl.ToList())
         {
             try
             {
@@ -390,76 +415,6 @@ public static class PluginLoader
             catch
             {
                 // ignored
-            }
-        }
-
-        TryInvokeOnPluginsUnloaded();
-    }
-    private static void TryInvokeOnPluginLoaded(IDevkitServerPlugin plugin)
-    {
-        if (OnPluginLoaded == null)
-            return;
-        foreach (Action<IDevkitServerPlugin> action in OnPluginLoaded.GetInvocationList().Cast<Action<IDevkitServerPlugin>>())
-        {
-            try
-            {
-                action(plugin);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("A plugin threw an exception from " + nameof(PluginLoader) + "." + nameof(OnPluginLoaded) + ":");
-                Logger.LogError(ex);
-            }
-        }
-    }
-    private static void TryInvokeOnPluginUnloaded(IDevkitServerPlugin plugin)
-    {
-        if (OnPluginUnloaded == null)
-            return;
-        foreach (Action<IDevkitServerPlugin> action in OnPluginUnloaded.GetInvocationList().Cast<Action<IDevkitServerPlugin>>())
-        {
-            try
-            {
-                action(plugin);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("A plugin threw an exception from " + nameof(PluginLoader) + "." + nameof(OnPluginUnloaded) + ":");
-                Logger.LogError(ex);
-            }
-        }
-    }
-    private static void TryInvokeOnPluginsLoaded()
-    {
-        if (OnPluginsLoaded == null)
-            return;
-        foreach (Action action in OnPluginsLoaded.GetInvocationList().Cast<Action>())
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("A plugin threw an exception from " + nameof(PluginLoader) + "." + nameof(OnPluginsLoaded) + ":");
-                Logger.LogError(ex);
-            }
-        }
-    }
-    private static void TryInvokeOnPluginsUnloaded()
-    {
-        if (OnPluginsUnloaded == null)
-            return;
-        foreach (Action action in OnPluginsUnloaded.GetInvocationList().Cast<Action>())
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("A plugin threw an exception from " + nameof(PluginLoader) + "." + nameof(OnPluginsUnloaded) + ":");
-                Logger.LogError(ex);
             }
         }
     }
@@ -474,12 +429,12 @@ public static class PluginLoader
         // check if the assembly just has one plugin
         Assembly asm = relaventType.Assembly;
         if (asm == Assembly.GetExecutingAssembly()) return null;
-        for (int i = 0; i < _pluginWrappers.Count; ++i)
+        for (int i = 0; i < AssembliesIntl.Count; ++i)
         {
-            if (_pluginWrappers[i].Assembly == asm)
+            if (AssembliesIntl[i].Assembly == asm)
             {
-                if (_pluginWrappers[i].Plugins.Count == 1)
-                    return _pluginWrappers[i].Plugins[0];
+                if (AssembliesIntl[i].Plugins.Count == 1)
+                    return AssembliesIntl[i].Plugins[0];
                 break;
             }
         }
@@ -489,19 +444,19 @@ public static class PluginLoader
         // find attribute on member
         if (Attribute.GetCustomAttribute(member, typeof(PluginIdentifierAttribute)) is PluginIdentifierAttribute { PluginType: { } ptype })
         {
-            for (int i = 0; i < _plugins.Count; ++i)
+            for (int i = 0; i < PluginsIntl.Count; ++i)
             {
-                if (ptype == _plugins[i].GetType())
+                if (ptype == PluginsIntl[i].GetType())
                 {
-                    plugin = _plugins[i];
+                    plugin = PluginsIntl[i];
                     goto checkAssembly;
                 }
             }
-            for (int i = 0; i < _plugins.Count; ++i)
+            for (int i = 0; i < PluginsIntl.Count; ++i)
             {
-                if (ptype.IsInstanceOfType(_plugins[i]))
+                if (ptype.IsInstanceOfType(PluginsIntl[i]))
                 {
-                    plugin = _plugins[i];
+                    plugin = PluginsIntl[i];
                     goto checkAssembly;
                 }
             }
@@ -518,15 +473,15 @@ public static class PluginLoader
 
         IDevkitServerPlugin? FindPluginInstanceOfType(Type type)
         {
-            for (int i = 0; i < _plugins.Count; ++i)
+            for (int i = 0; i < PluginsIntl.Count; ++i)
             {
-                if (type.IsInstanceOfType(_plugins[i]))
-                    return _plugins[i];
+                if (type.IsInstanceOfType(PluginsIntl[i]))
+                    return PluginsIntl[i];
             }
-            for (int i = 0; i < _plugins.Count; ++i)
+            for (int i = 0; i < PluginsIntl.Count; ++i)
             {
-                if (type.IsInstanceOfType(_plugins[i]))
-                    return _plugins[i];
+                if (type.IsInstanceOfType(PluginsIntl[i]))
+                    return PluginsIntl[i];
             }
 
             return null;
@@ -544,7 +499,7 @@ public static class PluginLoader
         checkAssembly:
         if (plugin == null)
             return null;
-        if (plugin.Assembly != asm)
+        if (plugin.Assembly.Assembly != asm)
             return null;
 
         return plugin;
@@ -561,13 +516,109 @@ public class PluginLibrary
         File = file;
     }
 }
-internal class PluginAssembly
+public class PluginAssembly
 {
-    public List<IDevkitServerPlugin> Plugins { get; } = new List<IDevkitServerPlugin>();
+    private readonly List<IDevkitServerPlugin> _plugins = new List<IDevkitServerPlugin>();
+    private readonly List<NetInvokerInfo> _netCalls = new List<NetInvokerInfo>();
+    private readonly List<NetMethodInfo> _netMethods = new List<NetMethodInfo>();
+    public IReadOnlyList<IDevkitServerPlugin> Plugins { get; }
     public Assembly Assembly { get; }
-
+    public Harmony Patcher { get; internal set; }
+    public bool HasReflected { get; private set; }
+    public bool HasPatched { get; private set; }
+    public string HarmonyId => Patcher.Id;
+    public IReadOnlyList<NetInvokerInfo> NetCalls { get; }
+    public IReadOnlyList<NetMethodInfo> NetMethods { get; }
     public PluginAssembly(Assembly assembly)
     {
         Assembly = assembly;
+        Plugins = _plugins.AsReadOnly();
+        NetCalls = _netCalls.AsReadOnly();
+        NetMethods = _netMethods.AsReadOnly();
+        Patcher = new Harmony(PatchesMain.HarmonyId + ".assembly." + assembly.GetName().Name.ToLowerInvariant());
+    }
+    internal void AddPlugin(IDevkitServerPlugin plugin)
+    {
+        plugin.Assembly = this;
+        _plugins.Add(plugin);
+    }
+
+    internal void RemovePlugin(IDevkitServerPlugin plugin) => _plugins.Remove(plugin);
+
+    internal void ReflectAndPatch()
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (!HasReflected)
+        {
+            HasReflected = true;
+            CreateDirectoryAttribute.CreateInAssembly(Assembly);
+            _netMethods.Clear();
+            _netCalls.Clear();
+            NetFactory.Reflect(Assembly,
+#if SERVER
+                NetCallSource.FromClient
+#else
+                NetCallSource.FromServer
+#endif
+                , _netMethods, _netCalls
+            );
+        }
+        if (!HasPatched)
+        {
+            HasPatched = true;
+            try
+            {
+                Patcher.PatchAll(Assembly);
+                if (Plugins.Count > 0)
+                    Plugins[0].LogInfo($"Applied all patches in {Assembly.Location.Format()}.");
+                else
+                    Logger.LogError($"Applied all patches in {Assembly.Location.Format()}.", method: Assembly.GetName().Name.ToUpperInvariant());
+            }
+            catch (Exception ex)
+            {
+                if (Plugins.Count > 0)
+                {
+                    Plugins[0].LogError($"Error while patching in assembly at {Assembly.Location.Format()}.");
+                    Plugins[0].LogError(ex);
+                }
+                else
+                {
+                    string src = Assembly.GetName().Name.ToUpperInvariant();
+                    Logger.LogError($"Error while patching in assembly at {Assembly.Location.Format()}.", method: src);
+                    Logger.LogError(ex, method: src);
+                }
+            }
+        }
+    }
+    internal void Unpatch()
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (!HasPatched) return;
+        HasPatched = false;
+
+        try
+        {
+            Patcher.UnpatchAll(HarmonyId);
+            if (Plugins.Count > 0)
+                Plugins[0].LogInfo($"Removed all patches in {Assembly.Location.Format()}.");
+            else
+                Logger.LogError($"Removed all patches in {Assembly.Location.Format()}.", method: Assembly.GetName().Name.ToUpperInvariant());
+        }
+        catch (Exception ex)
+        {
+            if (Plugins.Count > 0)
+            {
+                Plugins[0].LogError($"Error while unpatching in assembly at {Assembly.Location.Format()}.");
+                Plugins[0].LogError(ex);
+            }
+            else
+            {
+                string src = Assembly.GetName().Name.ToUpperInvariant();
+                Logger.LogError($"Error while unpatching in assembly at {Assembly.Location.Format()}.", method: src);
+                Logger.LogError(ex, method: src);
+            }
+        }
     }
 }

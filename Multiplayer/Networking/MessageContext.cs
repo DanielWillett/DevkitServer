@@ -36,6 +36,10 @@ public readonly struct MessageContext
     {
         return Connection is not HighSpeedConnection hs ? UserManager.FromConnection(Connection) : UserManager.FromId(hs.Steam64);
     }
+    public static MessageContext CreateFromCaller(EditorUser user)
+    {
+        return new MessageContext(user.Connection, new MessageOverhead(MessageFlags.None, 0, 0), false);
+    }
 #endif
     public MessageOverhead GetReplyOverhead(ushort id, bool layered, bool ack)
     {

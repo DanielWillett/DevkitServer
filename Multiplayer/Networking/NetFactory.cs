@@ -1,5 +1,9 @@
-﻿using DevkitServer.Patches;
+﻿using DevkitServer.API;
+using DevkitServer.API.Permissions;
+using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Patches;
 using DevkitServer.Players;
+using DevkitServer.Plugins;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
 using JetBrains.Annotations;
@@ -7,32 +11,31 @@ using SDG.NetPak;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using DevkitServer.API;
-using DevkitServer.API.Permissions;
-using DevkitServer.Multiplayer.Actions;
-using DevkitServer.Plugins;
+#if CLIENT
 using DevkitServer.Multiplayer.Sync;
+#endif
 
 namespace DevkitServer.Multiplayer.Networking;
 
 [EarlyTypeInit]
 public static class NetFactory
 {
-    public enum DevkitMessage
-    {
-        InvokeMethod,
-        InvokeGuidMethod,
-        MovementRelay,
-        SendTileData,
-        ActionRelay
-    }
+    /// <summary>The maximum amount of time in seconds a listener is guaranteed to stay active.</summary>
+    public const double MaxListenTimeout = 600d;
+
+    /// <summary>The maximum recommended low-speed packet size (due to steamworks throughput limitations).</summary>
+#if CLIENT
+    public const int MaxPacketSize = 61440;
+#else
+    public const int MaxPacketSize = 40960;
+#endif
+
 #nullable disable
     private static long[] _inByteCt;
     private static long[] _outByteCt;
 #nullable restore
     private static float _inByteCtStTime;
     private static float _outByteCtStTime;
-    public const int MaxPacketSize = 61440;
     private static readonly List<Listener> localListeners = new List<Listener>(16);
     private static readonly List<Listener> localAckRequests = new List<Listener>(16);
     private static readonly List<NetMethodInfo> registeredMethods = new List<NetMethodInfo>(16);
@@ -41,9 +44,6 @@ public static class NetFactory
     private static readonly Dictionary<Guid, BaseNetCall> guidInvokers = new Dictionary<Guid, BaseNetCall>(16);
     private static readonly Dictionary<Guid, BaseNetCall> guidHsInvokers = new Dictionary<Guid, BaseNetCall>(16);
     private static Func<PooledTransportConnectionList>? PullFromTransportConnectionListPool;
-    /// <summary>The maximum amount of time in seconds a listener is guaranteed to stay active.</summary>
-    public const double MaxListenTimeout = 600d;
-    private static readonly object sync = new object();
     private static readonly NetPakWriter Writer = new NetPakWriter();
     public static int ReceiveBlockOffset { get; private set; }
     public static int WriteBlockOffset { get; private set; }
@@ -51,12 +51,6 @@ public static class NetFactory
     public static int NewReceiveBitCount { get; private set; }
     public static int NewWriteBitCount { get; private set; }
     public static Delegate[] Listeners { get; private set; } = Array.Empty<Delegate>();
-#if DEBUG
-    private static readonly InstanceGetter<ClientMethodHandle, ClientMethodInfo>? ServerGetMethodInfo = Accessor.GenerateInstanceGetter<ClientMethodHandle, ClientMethodInfo>("clientMethodInfo");
-    private static readonly InstanceGetter<ServerMethodHandle, ServerMethodInfo>? ClientGetMethodInfo = Accessor.GenerateInstanceGetter<ServerMethodHandle, ServerMethodInfo>("serverMethodInfo");
-    private static readonly InstanceGetter<ClientMethodInfo, string>? ServerGetMethodName = Accessor.GenerateInstanceGetter<ClientMethodInfo, string>("name");
-    private static readonly InstanceGetter<ServerMethodInfo, string>? ClientGetMethodName = Accessor.GenerateInstanceGetter<ServerMethodInfo, string>("name");
-#endif
 
 
 #if CLIENT
@@ -156,20 +150,6 @@ public static class NetFactory
             Logger.LogError(ex, method: "NET FACTORY");
             goto reset;
         }
-#if DEBUG
-        try
-        {
-            PatchesMain.Patcher.Patch(typeof(ClientMethodHandle).GetMethod("GetWriterWithStaticHeader", BindingFlags.Instance | BindingFlags.NonPublic),
-                prefix: new HarmonyMethod(typeof(NetFactory).GetMethod(nameof(PatchServerGetWriterWithStaticHeader), BindingFlags.Static | BindingFlags.NonPublic)));
-            PatchesMain.Patcher.Patch(typeof(ServerMethodHandle).GetMethod("GetWriterWithStaticHeader", BindingFlags.Instance | BindingFlags.NonPublic),
-                prefix: new HarmonyMethod(typeof(NetFactory).GetMethod(nameof(PatchClientGetWriterWithStaticHeader), BindingFlags.Static | BindingFlags.NonPublic)));
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError("Failed to patch in debug prints for GetWriterWithStaticHeader in client and server method handle.", method: "NET FACTORY");
-            Logger.LogError(ex, method: "NET FACTORY");
-        }
-#endif
 
         const string netMessagesName = "SDG.Unturned.NetMessages";
         Type? netMessagesType;
@@ -308,24 +288,6 @@ public static class NetFactory
             (send ? _outByteCt : _inByteCt)[(int)msg] += length;
         }
     }
-#if DEBUG
-    private static void PatchServerGetWriterWithStaticHeader(ClientMethodHandle __instance)
-    {
-        /* Uncomment for netmessage logging
-        ClientMethodInfo? info = ServerGetMethodInfo?.Invoke(__instance);
-        string name = (info == null || ServerGetMethodName == null ? null : ServerGetMethodName(info)) ?? "unknown";
-        Logger.LogDebug($"[CLIENT MTD HNDL] Unturned.InvokeMessage sending: {name,-36} (Type: {__instance.GetType().Format(),-24})");
-        */
-    }
-    private static void PatchClientGetWriterWithStaticHeader(ServerMethodHandle __instance)
-    {
-        /* Uncomment for netmessage logging
-        ServerMethodInfo? info = ClientGetMethodInfo?.Invoke(__instance);
-        string name = (info == null || ClientGetMethodName == null ? null : ClientGetMethodName(info)) ?? "unknown";
-        Logger.LogDebug($"[SERVER MTD HNDL] Unturned.InvokeMessage sending: {name,-36} (Type: {__instance.GetType().Format(),-24})");
-        */
-    }
-#endif
     internal static bool Init()
     {
         Writer.buffer = Block.buffer;
@@ -497,185 +459,191 @@ public static class NetFactory
 #endif
             connection, in MessageOverhead overhead, bool hs)
     {
-        lock (sync)
+        if (message.Length < MessageOverhead.MinimumSize)
         {
-            if (message.Length < MessageOverhead.MinimumSize)
-            {
-                Logger.LogError("Received too short of a message.", method: "NET FACTORY");
-                goto rtn;
-            }
-            int size = overhead.Size;
-            if (size > message.Length)
-            {
-                Logger.LogError("Message overhead read a size larger than the message payload: " + size + " bytes.", method: "NET FACTORY");
-                goto rtn;
-            }
-            // Logger.LogDebug("Received method invocation: " + overhead + " ( in data: " + message.Length + " size: " + size + " )");
-            byte[] data = new byte[size];
-            Buffer.BlockCopy(message, overhead.Length, data, 0, size);
-//#if DEBUG
-//            if (overhead.MessageId is not (ushort)NetCalls.SendLevel)
-//            {
-//                DevkitServerUtility.PrintBytesHex(data, 32);
-//            }
-//#endif
-            if ((hs ? hsInvokers : invokers).TryGetValue(overhead.MessageId, out BaseNetCall call))
-            {
-                bool verified = !hs || connection is not HighSpeedConnection hsc || hsc.Verified;
-                object[]? parameters = null;
-                bool one = false;
-                if (overhead.RequestKey != default && verified)
-                {
-                    if ((overhead.Flags & MessageFlags.RequestResponse) == MessageFlags.RequestResponse)
-                    {
-                        one = true;
-                        long rk = overhead.RequestKey;
-                        for (int l = 0; l < localListeners.Count; ++l)
-                        {
-                            if (localListeners[l].RequestId == rk)
-                            {
-                                Listener lt = localListeners[l];
-                                if (lt.Caller.ID == call.ID && lt.Caller.HighSpeed == hs)
-                                {
-                                    if (lt.Task != null && !lt.Task.isCompleted)
-                                    {
-                                        lock (call)
-                                        {
-                                            if (!call.Read(data, out parameters))
-                                            {
-                                                Logger.LogWarning(
-                                                    $"Unable to read incoming message for message {overhead.Format()}.", method: "NET FACTORY");
-                                                goto rtn;
-                                            }
-                                        }
-
-                                        object[] old = parameters;
-                                        parameters = new object[old.Length + 1];
-                                        parameters[0] = new MessageContext(connection, overhead, hs);
-                                        Array.Copy(old, 0, parameters, 1, old.Length);
-                                        lt.Task.TellCompleted(parameters, true);
-                                    }
-                                    localListeners.RemoveAt(l);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    else if ((overhead.Flags & MessageFlags.AcknowledgeResponse) == MessageFlags.AcknowledgeResponse)
-                    {
-                        one = true;
-                        long rk = overhead.RequestKey;
-                        for (int l = 0; l < localAckRequests.Count; ++l)
-                        {
-                            if (localAckRequests[l].RequestId == rk)
-                            {
-                                Listener lt = localAckRequests[l];
-                                if (lt.Caller.ID == call.ID && lt.Caller.HighSpeed == hs)
-                                {
-                                    int? errorCode = null;
-                                    if (overhead.Size == sizeof(int))
-                                    {
-                                        if (data.Length >= sizeof(int))
-                                            errorCode = BitConverter.ToInt32(data, 0);
-                                    }
-                                    if (lt.Task != null && !lt.Task.isCompleted)
-                                    {
-                                        lt.Task.TellCompleted(new MessageContext(connection, overhead, hs), true, errorCode);
-                                    }
-                                    localAckRequests.RemoveAt(l);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                if (one && (overhead.Flags & MessageFlags.RunOriginalMethodOnRequest) != MessageFlags.RunOriginalMethodOnRequest)
-                    goto rtn;
-                for (int i = 0; i < registeredMethods.Count; ++i)
-                {
-                    if (registeredMethods[i].Attribute.MethodID == call.ID && registeredMethods[i].Attribute.HighSpeed == hs && (verified || registeredMethods[i].Attribute.HighSpeedAllowUnverified))
-                    {
-                        NetMethodInfo info = registeredMethods[i];
-                        if (parameters == null)
-                        {
-                            lock (call)
-                            {
-                                if (!call.Read(data, out parameters))
-                                {
-                                    Logger.LogWarning(
-                                        $"Unable to read incoming message for message {overhead.Format()}\n.", method: "NET FACTORY");
-                                    goto rtn;
-                                }
-                            }
-
-                            object[] old = parameters;
-                            parameters = new object[old.Length + 1];
-                            parameters[0] = new MessageContext(connection, overhead, hs);
-                            Array.Copy(old, 0, parameters, 1, old.Length);
-                        }
-                        try
-                        {
-                            object res = info.Method.Invoke(null, parameters);
-                            // Logger.LogDebug("Invoked received method: " + info.Method.Format() + ".");
-                            if (res is int resp)
-                            {
-                                ((MessageContext)parameters[0]).Acknowledge(resp);
-                            }
-                            else if (res is StandardErrorCode resp1)
-                            {
-                                ((MessageContext)parameters[0]).Acknowledge(resp1);
-                            }
-                            else if (res is Task task)
-                            {
-                                if (!task.IsCompleted)
-                                {
-                                    MessageOverhead ovh = overhead;
-                                    Task.Run(async () =>
-                                    {
-                                        try
-                                        {
-                                            await task.ConfigureAwait(false);
-                                            if (task is Task<int> ti)
-                                            {
-                                                ((MessageContext)parameters[0]).Acknowledge(ti.Result);
-                                            }
-                                            else if (task is Task<StandardErrorCode> ti2)
-                                            {
-                                                ((MessageContext)parameters[0]).Acknowledge(ti2.Result);
-                                            }
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Logger.LogError("Error running method " + info.Method.Format(), method: "NET FACTORY");
-                                            Logger.LogError("Message: " + ovh.Format() + ".", method: "NET FACTORY");
-                                            Logger.LogError(ex);
-                                        }
-                                    });
-                                }
-                                else if (task is Task<int> ti)
-                                {
-                                    ((MessageContext)parameters[0]).Acknowledge(ti.Result);
-                                }
-                                else if (task is Task<StandardErrorCode> ti2)
-                                {
-                                    ((MessageContext)parameters[0]).Acknowledge(ti2.Result);
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            if (ex is TargetInvocationException { InnerException: { } t })
-                                ex = t;
-                            Logger.LogError("Error running method " + info.Method.Format(), method: "NET FACTORY");
-                            Logger.LogError("Message: " + overhead.Format() + ".", method: "NET FACTORY");
-                            Logger.LogError(ex);
-                        }
-                    }
-                }
-            }
-            rtn:
-            RemoveExpiredListeners();
+            Logger.LogError("Received too short of a message.", method: "NET FACTORY");
+            goto rtn;
         }
+
+        int size = overhead.Size;
+        if (size > message.Length)
+        {
+            Logger.LogError("Message overhead read a size larger than the message payload: " + size + " bytes.",
+                method: "NET FACTORY");
+            goto rtn;
+        }
+        
+        byte[] data = new byte[size];
+        Buffer.BlockCopy(message, overhead.Length, data, 0, size);
+
+        if ((hs ? hsInvokers : invokers).TryGetValue(overhead.MessageId, out BaseNetCall call))
+        {
+            bool verified = !hs || connection is not HighSpeedConnection hsc || hsc.Verified;
+            object[]? parameters = null;
+            bool one = false;
+            if (overhead.RequestKey != default && verified)
+            {
+                if ((overhead.Flags & MessageFlags.RequestResponse) == MessageFlags.RequestResponse)
+                {
+                    one = true;
+                    long rk = overhead.RequestKey;
+                    for (int l = 0; l < localListeners.Count; ++l)
+                    {
+                        if (localListeners[l].RequestId == rk)
+                        {
+                            Listener lt = localListeners[l];
+                            if (lt.Caller.ID == call.ID && lt.Caller.HighSpeed == hs)
+                            {
+                                if (lt.Task != null && !lt.Task.isCompleted)
+                                {
+                                    lock (call)
+                                    {
+                                        if (!call.Read(data, out parameters))
+                                        {
+                                            Logger.LogWarning(
+                                                $"Unable to read incoming message for message {overhead.Format()}.",
+                                                method: "NET FACTORY");
+                                            goto rtn;
+                                        }
+                                    }
+
+                                    object[] old = parameters;
+                                    parameters = new object[old.Length + 1];
+                                    parameters[0] = new MessageContext(connection, overhead, hs);
+                                    Array.Copy(old, 0, parameters, 1, old.Length);
+                                    lt.Task.TellCompleted(parameters, true);
+                                }
+
+                                localListeners.RemoveAt(l);
+                                break;
+                            }
+                        }
+                    }
+                }
+                else if ((overhead.Flags & MessageFlags.AcknowledgeResponse) == MessageFlags.AcknowledgeResponse)
+                {
+                    one = true;
+                    long rk = overhead.RequestKey;
+                    for (int l = 0; l < localAckRequests.Count; ++l)
+                    {
+                        if (localAckRequests[l].RequestId == rk)
+                        {
+                            Listener lt = localAckRequests[l];
+                            if (lt.Caller.ID == call.ID && lt.Caller.HighSpeed == hs)
+                            {
+                                int? errorCode = null;
+                                if (overhead.Size == sizeof(int))
+                                {
+                                    if (data.Length >= sizeof(int))
+                                        errorCode = BitConverter.ToInt32(data, 0);
+                                }
+
+                                if (lt.Task != null && !lt.Task.isCompleted)
+                                {
+                                    lt.Task.TellCompleted(new MessageContext(connection, overhead, hs), true,
+                                        errorCode);
+                                }
+
+                                localAckRequests.RemoveAt(l);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (one && (overhead.Flags & MessageFlags.RunOriginalMethodOnRequest) !=
+                MessageFlags.RunOriginalMethodOnRequest)
+                goto rtn;
+            for (int i = 0; i < registeredMethods.Count; ++i)
+            {
+                if (registeredMethods[i].Attribute.MethodID == call.ID &&
+                    registeredMethods[i].Attribute.HighSpeed == hs &&
+                    (verified || registeredMethods[i].Attribute.HighSpeedAllowUnverified))
+                {
+                    NetMethodInfo info = registeredMethods[i];
+                    if (parameters == null)
+                    {
+                        lock (call)
+                        {
+                            if (!call.Read(data, out parameters))
+                            {
+                                Logger.LogWarning(
+                                    $"Unable to read incoming message for message {overhead.Format()}\n.",
+                                    method: "NET FACTORY");
+                                goto rtn;
+                            }
+                        }
+
+                        object[] old = parameters;
+                        parameters = new object[old.Length + 1];
+                        parameters[0] = new MessageContext(connection, overhead, hs);
+                        Array.Copy(old, 0, parameters, 1, old.Length);
+                    }
+
+                    try
+                    {
+                        object res = info.Method.Invoke(null, parameters);
+                        if (res is int resp)
+                        {
+                            ((MessageContext)parameters[0]).Acknowledge(resp);
+                        }
+                        else if (res is StandardErrorCode resp1)
+                        {
+                            ((MessageContext)parameters[0]).Acknowledge(resp1);
+                        }
+                        else if (res is Task task)
+                        {
+                            if (!task.IsCompleted)
+                            {
+                                MessageOverhead ovh = overhead;
+                                Task.Run(async () =>
+                                {
+                                    try
+                                    {
+                                        await task.ConfigureAwait(false);
+                                        if (task is Task<int> ti)
+                                        {
+                                            ((MessageContext)parameters[0]).Acknowledge(ti.Result);
+                                        }
+                                        else if (task is Task<StandardErrorCode> ti2)
+                                        {
+                                            ((MessageContext)parameters[0]).Acknowledge(ti2.Result);
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Logger.LogError("Error running method " + info.Method.Format(),
+                                            method: "NET FACTORY");
+                                        Logger.LogError("Message: " + ovh.Format() + ".", method: "NET FACTORY");
+                                        Logger.LogError(ex);
+                                    }
+                                });
+                            }
+                            else if (task is Task<int> ti)
+                            {
+                                ((MessageContext)parameters[0]).Acknowledge(ti.Result);
+                            }
+                            else if (task is Task<StandardErrorCode> ti2)
+                            {
+                                ((MessageContext)parameters[0]).Acknowledge(ti2.Result);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        if (ex is TargetInvocationException { InnerException: { } t })
+                            ex = t;
+                        Logger.LogError("Error running method " + info.Method.Format(), method: "NET FACTORY");
+                        Logger.LogError("Message: " + overhead.Format() + ".", method: "NET FACTORY");
+                        Logger.LogError(ex);
+                    }
+                }
+            }
+        }
+
+        rtn:
+        RemoveExpiredListeners();
     }
     private static void RemoveExpiredListeners()
     {
@@ -698,16 +666,16 @@ public static class NetFactory
             }
         }
     }
-    public static void Reflect(Assembly assembly, NetCallSource search)
+    public static void Reflect(Assembly assembly, NetCallSource search, IList<NetMethodInfo>? outMethods = null, IList<NetInvokerInfo>? outCalls = null)
     {
         List<Type> types = Accessor.GetTypesSafe(removeIgnored: false);
         int before1 = registeredMethods.Count;
         int before2 = invokers.Count;
-        ReflectMethods(types, search);
-        ReflectInvokers(types);
+        ReflectMethods(types, search, outMethods);
+        ReflectInvokers(types, outCalls, outMethods);
         Logger.LogInfo("[NET FACTORY] " + assembly.GetName().Name.Format(false) + " registered " + (registeredMethods.Count - before1).Format() + " net-methods and " + (invokers.Count - before2).Format() + " invokers.");
     }
-    private static void ReflectMethods(List<Type> types, NetCallSource search)
+    private static void ReflectMethods(List<Type> types, NetCallSource search, IList<NetMethodInfo>? outMethods = null)
     {
         for (int i = 0; i < types.Count; ++i)
         {
@@ -715,25 +683,31 @@ public static class NetFactory
             for (int m = 0; m < methods.Length; ++m)
             {
                 MethodInfo method = methods[m];
-                if (Attribute.IsDefined(methods[m], typeof(IgnoreAttribute))) continue;
-                NetCallAttribute? attribute = method.GetCustomAttribute<NetCallAttribute>();
-                if (attribute is null || attribute.Type == NetCallSource.None || !(attribute.Type == NetCallSource.FromEither || search == NetCallSource.FromEither || search == attribute.Type)) continue;
+
+                if (Attribute.IsDefined(method, typeof(IgnoreAttribute)) ||
+                    Attribute.GetCustomAttribute(method, typeof(NetCallAttribute)) is not NetCallAttribute attribute ||
+                    attribute.Type == NetCallSource.None ||
+                    !(attribute.Type == NetCallSource.FromEither || search == NetCallSource.FromEither || search == attribute.Type))
+                    continue;
+
                 bool found = false;
-                for (int ifo = 0; ifo < registeredMethods.Count; ++ifo)
+                for (int j = 0; j < registeredMethods.Count; ++j)
                 {
-                    NetMethodInfo info = registeredMethods[ifo];
-                    if (info.Method.MethodHandle == method.MethodHandle)
+                    NetMethodInfo info = registeredMethods[j];
+                    if (info.Method == method)
                     {
                         found = true;
                         break;
                     }
                 }
                 if (found) continue;
-                registeredMethods.Add(new NetMethodInfo(method, attribute));
+                NetMethodInfo kvp = new NetMethodInfo(method, attribute);
+                registeredMethods.Add(kvp);
+                outMethods?.Add(kvp);
             }
         }
     }
-    private static void ReflectInvokers(List<Type> types)
+    private static void ReflectInvokers(List<Type> types, IList<NetInvokerInfo>? outCalls = null, IList<NetMethodInfo>? outMethods = null)
     {
         Type ctx = typeof(MessageContext);
         Assembly dka = Assembly.GetExecutingAssembly();
@@ -746,7 +720,7 @@ public static class NetFactory
                     continue;
                 
                 FieldInfo field = fields[f];
-                if (Attribute.GetCustomAttribute(field, typeof(IgnoreInvokerAttribute)) != null || field.GetValue(null) is not BaseNetCall call)
+                if (Attribute.GetCustomAttribute(field, typeof(IgnoreAttribute)) != null || field.GetValue(null) is not BaseNetCall call)
                     continue;
                 Type callType = call.GetType();
                 bool core = false;
@@ -790,6 +764,7 @@ public static class NetFactory
                     continue;
                 }
                 Type[] generics = callType.GetGenericArguments();
+                List<NetMethodInfo>? outList = outCalls == null ? null : new List<NetMethodInfo>(1);
                 for (int index = registeredMethods.Count - 1; index >= 0; --index)
                 {
                     NetMethodInfo info = registeredMethods[index];
@@ -816,6 +791,7 @@ public static class NetFactory
                                                   (ctx, "ctx")
                                               }, isStatic: true)}.", method: "NET REFLECT");
                             registeredMethods.RemoveAt(index);
+                            outMethods?.RemoveAll(x => x.Method == info.Method);
                         }
                     }
                     else if (typeof(NetCallCustom).IsAssignableFrom(callType))
@@ -832,6 +808,7 @@ public static class NetFactory
                                                   (typeof(ByteReader), "reader")
                                               }, isStatic: true)}.", method: "NET REFLECT");
                             registeredMethods.RemoveAt(index);
+                            outMethods?.RemoveAll(x => x.Method == info.Method);
                         }
                     }
                     else if (callType.IsSubclassOf(typeof(NetCallRaw)) || callType.IsSubclassOf(typeof(DynamicNetCall)))
@@ -861,8 +838,11 @@ public static class NetFactory
                                               $"Expected signature: {FormattingUtil.FormatMethod(typeof(void), info.Method.DeclaringType, info.Method.Name, parameters2, isStatic: true)}.",
                                 method: "NET REFLECT");
                             registeredMethods.RemoveAt(index);
+                            outMethods?.RemoveAll(x => x.Method == info.Method);
                         }
                     }
+
+                    outList?.Add(info);
                 }
 
                 call.Name = (core ? Permission.DevkitServerModuleCode : plugin!.PermissionPrefix) + "." + field.Name;
@@ -871,6 +851,8 @@ public static class NetFactory
                     (call.HighSpeed ? hsInvokers : invokers).Add(call.ID, call);
                 else
                     (call.HighSpeed ? guidHsInvokers : guidInvokers).Add(call.Guid, call);
+
+                outCalls?.Add(new NetInvokerInfo(field, call, outList?.ToArray() ?? Array.Empty<NetMethodInfo>()));
             }
         }
     }
@@ -907,16 +889,6 @@ public static class NetFactory
                     break;
                 }
             }
-        }
-    }
-    private readonly struct NetMethodInfo
-    {
-        public readonly MethodInfo Method;
-        public readonly NetCallAttribute Attribute;
-        public NetMethodInfo(MethodInfo method, NetCallAttribute attribute)
-        {
-            Method = method;
-            Attribute = attribute;
         }
     }
     public static void SendGeneric(DevkitMessage message,
@@ -1052,6 +1024,29 @@ public static class NetFactory
         }
     }
 }
+public readonly struct NetMethodInfo
+{
+    public readonly MethodInfo Method;
+    public readonly NetCallAttribute Attribute;
+    public NetMethodInfo(MethodInfo method, NetCallAttribute attribute)
+    {
+        Method = method;
+        Attribute = attribute;
+    }
+}
+
+public readonly struct NetInvokerInfo
+{
+    public readonly FieldInfo Field;
+    public readonly BaseNetCall Invoker;
+    public readonly NetMethodInfo[] Methods;
+    public NetInvokerInfo(FieldInfo field, BaseNetCall invoker, NetMethodInfo[] methods)
+    {
+        Field = field;
+        Invoker = invoker;
+        Methods = methods;
+    }
+}
 
 [MeansImplicitUse]
 [AttributeUsage(AttributeTargets.Method, Inherited = false)]
@@ -1077,15 +1072,23 @@ public sealed class NetCallAttribute : Attribute
     public bool HighSpeed { get; set; }
     public bool HighSpeedAllowUnverified { get; set; }
 }
-
-[AttributeUsage(AttributeTargets.Field)]
-public sealed class IgnoreInvokerAttribute : Attribute { }
 public enum NetCallSource : byte
 {
     FromServer = 0,
     FromClient = 1,
     FromEither = 2,
+    /// <summary>
+    /// Equivalent to using the <see cref="IgnoreAttribute"/>.
+    /// </summary>
     None = 3
+}
+public enum DevkitMessage
+{
+    InvokeMethod,
+    InvokeGuidMethod,
+    MovementRelay,
+    SendTileData,
+    ActionRelay
 }
 public delegate void SentMessage(ITransportConnection connection, in MessageOverhead overhead, byte[] message);
 public delegate void ReceivedMessage(ITransportConnection connection, in MessageOverhead overhead, byte[] message);

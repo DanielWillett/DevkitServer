@@ -232,7 +232,7 @@ public static class BuildableResponsibilities
                 }
             }
 
-            Logger.LogInfo($"[{Source}] Read {data.Length.Format()} responsiblities in table stored at {SavePath.Format()}.");
+            Logger.LogDebug($"[{Source}] Read {data.Length.Format()} responsiblities in table stored at {SavePath.Format()}.");
         }
         else
         {

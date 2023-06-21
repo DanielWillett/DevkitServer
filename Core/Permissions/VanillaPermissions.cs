@@ -72,4 +72,7 @@ public static class VanillaPermissions
     public static readonly Permission UsePlayerController = new Permission("controller.player", core: true);
     [Permission]
     public static readonly Permission UseEditorController = new Permission("controller.editor", core: true);
+
+    [Permission]
+    public static readonly Permission BypassObjectSelectionLimits = new Permission("hierarchy.objects.bypass_selection_limits", core: true);
 }

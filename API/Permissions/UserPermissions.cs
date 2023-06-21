@@ -78,7 +78,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         List<Permission> perms = new List<Permission>(64) { Permission.SuperuserPermission };
         Logger.LogDebug("Found superuser permission: " + perms[0].Format() + ".");
         Assembly asm = Assembly.GetExecutingAssembly();
-        foreach (Assembly assembly in new Assembly[] { asm }.Concat(PluginLoader.Plugins.Select(x => x.Assembly).Distinct()))
+        foreach (Assembly assembly in new Assembly[] { asm }.Concat(PluginLoader.Plugins.Select(x => x.Assembly.Assembly).Distinct()))
         {
             bool thisAssembly = asm == assembly;
 
@@ -95,7 +95,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
                         {
                             Permission? perm = (Permission?)field.GetValue(null);
                             if (perm == null) continue;
-                            if (!thisAssembly && (perm.Plugin == null || perm.Plugin.Assembly != assembly))
+                            if (!thisAssembly && (perm.Plugin == null || perm.Plugin.Assembly.Assembly != assembly))
                             {
                                 IDevkitServerPlugin? plugin2 = PluginLoader.FindPluginForMember(field);
 

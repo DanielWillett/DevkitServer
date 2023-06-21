@@ -61,8 +61,9 @@ public sealed class DevkitServerModule : IModuleNexus
 #if SERVER
     public static BackupManager? BackupManager { get; private set; }
 #endif
-    public static bool UnityLoaded { get; private set; }
-    public static bool UnturnedLoaded { get; private set; }
+    public static bool MonoLoaded { get; }
+    public static bool UnityLoaded { get; }
+    public static bool UnturnedLoaded { get; }
     public static string AssemblyPath => _asmPath ??= Accessor.DevkitServer.Location;
 
     private static readonly LocalDatDictionary DefaultMainLocalization = new LocalDatDictionary
@@ -102,32 +103,44 @@ public sealed class DevkitServerModule : IModuleNexus
     {
         BundleOrigin = new AssetOrigin { name = ModuleName, workshopFileId = 0ul };
         SetOverrideIDs?.Invoke(BundleOrigin, true);
+
+        MonoLoaded = Type.GetType("Mono.Runtime", false, false) != null;
+        if (!MonoLoaded)
+        {
+            LoadFaulted = true;
+            UnityLoaded = false;
+            UnturnedLoaded = false;
+            return;
+        }
+        try
+        {
+            _ = SceneManager.GetActiveScene();
+            UnityLoaded = true;
+        }
+        catch (SecurityException)
+        {
+            UnityLoaded = false;
+            UnturnedLoaded = false;
+            LoadFaulted = true;
+            return;
+        }
+        if (Type.GetType("SDG.Unturned.Provider, Assembly-CSharp", false, false) == null)
+        {
+            UnturnedLoaded = false;
+            LoadFaulted = true;
+            return;
+        }
+
+        UnturnedLoaded = true;
     }
     public void initialize()
     {
         Stopwatch watch = Stopwatch.StartNew();
         bool loggerInited = false;
-        LoadFaulted = false;
+        if (LoadFaulted)
+            goto fault;
         try
         {
-            try
-            {
-                _ = SceneManager.GetActiveScene();
-                UnityLoaded = true;
-            }
-            catch (SecurityException)
-            {
-                UnityLoaded = false;
-                UnturnedLoaded = false;
-                goto fault;
-            }
-            if (Type.GetType("SDG.Unturned.Provider, Assembly-CSharp", false, false) == null)
-            {
-                UnturnedLoaded = false;
-                goto fault;
-            }
-
-            UnturnedLoaded = true;
             GameObjectHost = new GameObject(ModuleName);
             ComponentHost = GameObjectHost.AddComponent<DevkitServerModuleComponent>();
             GameObjectHost.AddComponent<CachedTime>();
@@ -273,7 +286,8 @@ public sealed class DevkitServerModule : IModuleNexus
         }
         else
         {
-            Logger.LogInfo($"{ModuleName.Colorize(ModuleColor)} by {"BlazingFlame#0001".Colorize(new Color32(86, 98, 246, 255))} ({"https://github.com/DanielWillett".Format(false)}) initialized.");
+            Logger.LogInfo($"{ModuleName.Colorize(ModuleColor)} (by @{"blazingflame".Colorize(new Color32(86, 98, 246, 255))} on {"Discord".Colorize(new Color32(116, 131, 196, 255))} or " +
+                           $"{"https://github.com/DanielWillett".Format(false)}) initialized.");
             Logger.LogInfo($"Please create an Issue for any bugs at {(RepositoryUrl + "/issues").Format(false)} (one bug per issue please).");
             Logger.LogInfo($"Please give suggestions as a Discussion at {(RepositoryUrl + "/discussions/categories/ideas").Format(false)}.");
         }

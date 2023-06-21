@@ -101,8 +101,9 @@ public sealed class Permission
                 return true;
             }
         }
-
-        Logger.LogInfo("Unable to find pluign for permission " + str.Format() + ", this may not be an issue if the plugin is server-side only.");
+#if SERVER
+        Logger.LogWarning("Unable to find pluign for permission " + str.Format() + ".");
+#endif
         permission = new Permission(id, null, core: false, devkitServer: false);
         return false;
     }

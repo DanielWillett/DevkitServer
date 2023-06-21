@@ -247,7 +247,6 @@ internal sealed class EditorClothes : MonoBehaviour
     }
     public void Apply()
     {
-        Logger.LogInfo("Applying...");
         if (_skinColorDirty && _materialClothing != null)
         {
             _materialClothing.SetColor(GetSkinColorPropertyId?.Invoke() ?? Shader.PropertyToID("_SkinColor"), _skinColor);
@@ -373,7 +372,7 @@ internal sealed class EditorClothes : MonoBehaviour
     private void Awake()
     {
         _meshes = transform.gameObject.GetComponentsInChildren<Renderer>();
-        Logger.LogInfo("Found meshes: " + _meshes.Length);
+        Logger.LogDebug("Found meshes: " + _meshes.Length);
         _materialClothing = new Material(GetClothesShader?.Invoke() ?? Shader.Find("Standard/Clothes"))
         {
             hideFlags = HideFlags.HideAndDontSave

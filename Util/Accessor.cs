@@ -305,9 +305,9 @@ internal static class Accessor
                 yield return new CodeInstruction(OpCodes.Or);
                 yield return new CodeInstruction(OpCodes.Not);
                 if (__method != null)
-                    Logger.LogInfo("Inserted editor call to " + __method.Format() + ".");
+                    Logger.LogDebug("Inserted editor call to " + __method.Format() + ".");
                 else
-                    Logger.LogInfo("Inserted editor call to unknown method.");
+                    Logger.LogDebug("Inserted editor call to unknown method.");
             }
             else
                 yield return instr;

@@ -160,7 +160,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             Logger.LogError("Failed to read incoming action packet length.", method: "EDITOR ACTIONS");
             return;
         }
-        NetFactory.IncrementByteCount(false, NetFactory.DevkitMessage.ActionRelay, len + sizeof(ushort));
+        NetFactory.IncrementByteCount(false, DevkitMessage.ActionRelay, len + sizeof(ushort));
 
 #if SERVER
         EditorUser? user = UserManager.FromConnection(transportConnection);
@@ -205,7 +205,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             Logger.LogDebug("[EDITOR ACTIONS] Flushing " + _pendingActions.Count.Format() + " action(s).");
             WriteEditBuffer(Writer, 0, _pendingActions.Count);
             int len = Writer.Count;
-            NetFactory.SendGeneric(NetFactory.DevkitMessage.ActionRelay, Writer.FinishWrite(), 0, len, true);
+            NetFactory.SendGeneric(DevkitMessage.ActionRelay, Writer.FinishWrite(), 0, len, true);
         }
     }
 #endif
@@ -442,7 +442,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             {
                 WriteEditBuffer(Writer, stInd, _pendingActions.Count - stInd);
                 int len = Writer.Count;
-                NetFactory.SendGeneric(NetFactory.DevkitMessage.ActionRelay, Writer.FinishWrite(), list, 0, len, true);
+                NetFactory.SendGeneric(DevkitMessage.ActionRelay, Writer.FinishWrite(), list, 0, len, true);
             }
 
             // faster to just copy the array so do that when possible
@@ -451,7 +451,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 byte[] sendBytes = new byte[sizeof(ulong) + bufferLength];
                 Buffer.BlockCopy(buffer, offset, sendBytes, sizeof(ulong), bufferLength);
                 UnsafeBitConverter.GetBytes(sendBytes, User.SteamId.m_SteamID);
-                NetFactory.SendGeneric(NetFactory.DevkitMessage.ActionRelay, sendBytes, list, reliable: false);
+                NetFactory.SendGeneric(DevkitMessage.ActionRelay, sendBytes, list, reliable: false);
             }
         }
 #endif

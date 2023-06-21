@@ -399,7 +399,7 @@ public static class EditorLevel
             task = SendRequestLevel.RequestAck(3000);
             if (TemporaryEditorActions.Instance == null)
                 _ = new TemporaryEditorActions();
-            Logger.LogInfo("[RECEIVE LEVEL] Sent level request.", ConsoleColor.DarkCyan);
+            Logger.LogDebug("[RECEIVE LEVEL] Sent level request.", ConsoleColor.DarkCyan);
             yield return task;
         }
         if (!task.Parameters.Responded)
@@ -410,7 +410,7 @@ public static class EditorLevel
         }
         else
         {
-            Logger.LogInfo("[RECEIVE LEVEL] Received acknowledgement to level request.", ConsoleColor.DarkCyan);
+            Logger.LogDebug("[RECEIVE LEVEL] Received acknowledgement to level request.", ConsoleColor.DarkCyan);
             LoadingUI.SetDownloadFileName("Level | Server Compressing Level");
             LoadingUI.NotifyDownloadProgress(1f);
         }
@@ -548,7 +548,7 @@ public static class EditorLevel
         _pendingCancelKey = reqId;
         _pendingLevelStartTime = CachedTime.RealtimeSinceStartup;
         LoadingUI.SetDownloadFileName(_pendingLevelName);
-        Logger.LogInfo($"[RECEIVE LEVEL] Started receiving level data ({DevkitServerUtility.FormatBytes(length)}) for level {lvlName}.", ConsoleColor.DarkCyan);
+        Logger.LogDebug($"[RECEIVE LEVEL] Started receiving level data ({DevkitServerUtility.FormatBytes(length)}) for level {lvlName}.", ConsoleColor.DarkCyan);
         UpdateLoadingUI();
     }
 
@@ -589,12 +589,12 @@ public static class EditorLevel
         {
             if (_missingPackets > 0)
                 --_missingPackets;
-            Logger.LogInfo($"[RECEIVE LEVEL] Recovered ({DevkitServerUtility.FormatBytes(len)}) (#{packet + 1}) for level {_pendingLevelName}.", ConsoleColor.DarkCyan);
+            Logger.LogDebug($"[RECEIVE LEVEL] Recovered ({DevkitServerUtility.FormatBytes(len)}) (#{packet + 1}) for level {_pendingLevelName}.", ConsoleColor.DarkCyan);
         }
         else
         {
             _pendingLevelIndex += len;
-            Logger.LogInfo($"[RECEIVE LEVEL] Received ({DevkitServerUtility.FormatBytes(len)}) (#{packet + 1}) for level {_pendingLevelName}.", ConsoleColor.DarkCyan);
+            Logger.LogDebug($"[RECEIVE LEVEL] Received ({DevkitServerUtility.FormatBytes(len)}) (#{packet + 1}) for level {_pendingLevelName}.", ConsoleColor.DarkCyan);
         }
         UpdateLoadingUI();
         ctx.Acknowledge();
@@ -776,7 +776,7 @@ public static class EditorLevel
         LevelInfo? info = LoadLevelInfo(dir, false, 0ul);
         if (info == null)
         {
-            Logger.LogInfo("[RECEIVE LEVEL] Failed to read received level at: \"" + dir + "\".", ConsoleColor.DarkCyan);
+            Logger.LogWarning("[RECEIVE LEVEL] Failed to read received level at: \"" + dir + "\".", ConsoleColor.DarkCyan);
             DevkitServerUtility.CustomDisconnect("Failed to read received level.");
             return;
         }

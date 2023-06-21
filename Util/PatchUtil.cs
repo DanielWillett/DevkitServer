@@ -64,7 +64,6 @@ public static class PatchUtil
         if (instructions.Count > index)
             instructions[index].labels.Add(continueLbl);
     }
-    [Pure]
     public static int RemoveUntil(IList<CodeInstruction> instructions, int index, PatternMatch match, bool includeMatch = true)
     {
         int amt = 0;
@@ -72,7 +71,7 @@ public static class PatchUtil
         {
             if (match(instructions[i]))
             {
-                amt = index - i + (includeMatch ? 1 : 0);
+                amt = i - index + (includeMatch ? 1 : 0);
                 if (instructions is List<CodeInstruction> list)
                 {
                     list.RemoveRange(index, amt);
@@ -235,6 +234,7 @@ public static class PatchUtil
         return new CodeInstruction(GetLocalCode(builder != null ? builder.LocalIndex : index, set, byref), builder);
     }
 #if CLIENT
+    [Obsolete("Fix this it messes up OnKeyUp calls.")]
     /// <summary>Limits to 60 actions per second.</summary>
     public static void InsertActionRateLimiter(ref int offset, Label beginLabel, IList<CodeInstruction> ins)
     {

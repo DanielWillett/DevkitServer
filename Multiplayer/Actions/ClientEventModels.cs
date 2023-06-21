@@ -410,6 +410,63 @@ public readonly struct DeleteLevelObjectsProperties
     }
 }
 
+public delegate void MoveBuildablePreview(in MoveBuildablePreviewProperties properties);
+public readonly struct MoveBuildablePreviewProperties
+{
+    public readonly RegionIdentifier Identifier;
+    public readonly TransformationDelta Transformation;
+    public readonly Vector3 Pivot;
+    public readonly bool UseScale;
+    public readonly float DeltaTime;
+    public MoveBuildablePreviewProperties(RegionIdentifier identifier, TransformationDelta transformation, Vector3 pivot, bool useScale, float deltaTime)
+    {
+        Identifier = identifier;
+        Transformation = transformation;
+        Pivot = pivot;
+        UseScale = useScale;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void MoveObjectPreview(in MoveObjectPreviewProperties properties);
+public readonly struct MoveObjectPreviewProperties
+{
+    public readonly uint InstanceId;
+    public readonly TransformationDelta Transformation;
+    public readonly Vector3 Pivot;
+    public readonly bool UseScale;
+    public readonly float DeltaTime;
+    public MoveObjectPreviewProperties(uint instanceId, TransformationDelta transformation, Vector3 pivot, bool useScale, float deltaTime)
+    {
+        InstanceId = instanceId;
+        Transformation = transformation;
+        Pivot = pivot;
+        UseScale = useScale;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void MoveLevelObjectsPreview(in MoveLevelObjectsPreviewProperties properties);
+public readonly struct MoveLevelObjectsPreviewProperties
+{
+    public readonly uint[] InstanceIds;
+    public readonly TransformationDelta[] ObjectTransformations;
+    public readonly RegionIdentifier[] Buildables;
+    public readonly TransformationDelta[] BuildableTransformations;
+    public readonly Vector3 Pivot;
+    public readonly float DeltaTime;
+    public MoveLevelObjectsPreviewProperties(uint[] instanceIds, TransformationDelta[] objectTransformations,
+        RegionIdentifier[] buildables, TransformationDelta[] buildableTransformations, Vector3 pivot, float deltaTime)
+    {
+        InstanceIds = instanceIds;
+        ObjectTransformations = objectTransformations;
+        Buildables = buildables;
+        BuildableTransformations = buildableTransformations;
+        Pivot = pivot;
+        DeltaTime = deltaTime;
+    }
+}
+
 public delegate void MoveBuildableFinal(in MoveBuildableFinalProperties properties);
 public readonly struct MoveBuildableFinalProperties
 {

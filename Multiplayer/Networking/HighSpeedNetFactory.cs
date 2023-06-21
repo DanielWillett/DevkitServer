@@ -202,7 +202,7 @@ public static class HighSpeedNetFactory
         }
         catch (SocketException ex)
         {
-            Logger.LogInfo("Unable to connect to server: ");
+            Logger.LogError("Unable to connect to server: ");
             Logger.LogError(ex);
         }
         catch (Exception ex)
@@ -230,7 +230,7 @@ public static class HighSpeedNetFactory
             }
             catch (SocketException ex)
             {
-                Logger.LogInfo("Unable to connect to server: ");
+                Logger.LogError("Unable to connect to server: ");
                 Logger.LogError(ex);
             }
             catch (Exception ex)

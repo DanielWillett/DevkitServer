@@ -885,6 +885,21 @@ public static class DevkitServerUtility
 
         return ttl;
     }
+    public static int RemoveAll<T>(this IList<T> list, Predicate<T> selector)
+    {
+        int c = 0;
+        for (int i = list.Count - 1; i >= 0; --i)
+        {
+            if (selector(list[i]))
+            {
+                list.RemoveAt(i);
+                ++c;
+            }
+        }
+
+        return c;
+    }
+    public static T[] ToArrayFast<T>(this List<T> list) => list.Count == 0 ? Array.Empty<T>() : list.ToArray();
 }
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]

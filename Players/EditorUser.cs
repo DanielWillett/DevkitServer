@@ -2,13 +2,15 @@
 using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Actions;
-using DevkitServer.Multiplayer.Networking;
-using DevkitServer.Util.Comparers;
 using DevkitServer.Multiplayer.Sync;
+using JetBrains.Annotations;
 #if CLIENT
+using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players.UI;
 #endif
-using JetBrains.Annotations;
+#if SERVER
+using DevkitServer.Util.Comparers;
+#endif
 
 namespace DevkitServer.Players;
 public class EditorUser : MonoBehaviour, IComparable<EditorUser>
@@ -20,7 +22,6 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 #endif
     public CSteamID SteamId { get; private set; }
 #if SERVER
-    private HashSet<LevelObject> _lo = null!;
     private List<Permission> _perms = null!;
     private List<PermissionGroup> _permGrps = null!;
     public IReadOnlyList<Permission> Permissions { get; private set; } = null!;
@@ -54,6 +55,8 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     {
 #if CLIENT
         IsOwner = this == User;
+#else
+        IsOwner = false;
 #endif
         EditorObject = IsOwner ? Editor.editor.gameObject : new GameObject("Editor {" + SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture) + "}");
         DevkitServerGamemode.SetupEditorObject(EditorObject, this);
@@ -64,28 +67,19 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         IntlSyncs.Add(TileSync);
 #if SERVER
         ClientInfo = DevkitServerGamemode.GetClientInfo(this);
-        _lo = new HashSet<LevelObject>(32, LevelObjectComparer.Instance);
         _perms = ClientInfo.Permissions.ToList();
         _permGrps = ClientInfo.PermissionGroups.ToList();
         Permissions = _perms.AsReadOnly();
         PermissionGroups = _permGrps.AsReadOnly();
+        ClientInfo.ApplyServerSettings(ClientInfo, this);
+        ClientInfo.OnClientInfoReadyEvent.TryInvoke(this, ClientInfo);
         ClientInfo.SendClientInfo.Invoke(Connection, ClientInfo);
-        ClientInfo.TryInvokeOnClientInfoReady(this, ClientInfo);
         Logger.DumpJson(ClientInfo);
         TileSync.SendAuthority(Connection);
 #endif
         Logger.LogDebug("[USERS] Editor User initialized: " + SteamId.m_SteamID.Format() + " (" + DisplayName.Format() + ").");
     }
 #if SERVER
-    internal void AddPlacedLevelObject(LevelObject obj)
-    {
-        if (!_lo.Contains(obj))
-            _lo.Add(obj);
-    }
-    public bool PlacedLevelObjectRecently(LevelObject obj)
-    {
-        return _lo.Contains(obj);
-    }
     internal void AddPermission(Permission permission)
     {
         ThreadUtil.assertIsGameThread();
@@ -201,10 +195,6 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     {
         Player = null;
         IsOnline = false;
-#if SERVER
-        _lo.Clear();
-        _lo = null!;
-#endif
         if (!IsOwner && EditorObject != null) Destroy(EditorObject);
         Logger.LogDebug("[USERS] Editor User destroyed: " + SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture) + ".");
     }
@@ -305,7 +295,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         }
 
         bool nep = nn!.Equals(pn, StringComparison.Ordinal);
-        bool nec = nn!.Equals(cn, StringComparison.Ordinal);
+        bool nec = nn.Equals(cn, StringComparison.Ordinal);
         bool pec = nec && nep || pn!.Equals(cn, StringComparison.Ordinal);
         if (nep && nec)
             return s64 + " (" + nn + ")";

@@ -53,7 +53,7 @@ internal static class PatchesMain
             // if (info != null)
             //     Accessor.AddFunctionBreakpoints(info);
 
-            Logger.LogInfo("Patched");
+            Logger.LogInfo($"Finished patching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
         }
         catch (Exception ex)
         {
@@ -67,7 +67,7 @@ internal static class PatchesMain
         try
         {
             Patcher.UnpatchAll(HarmonyId);
-            Logger.LogInfo("Unpatched");
+            Logger.LogInfo($"Finished unpatching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
         }
         catch (Exception ex)
         {
@@ -131,13 +131,6 @@ internal static class PatchesMain
     private static void RulesReady(Dictionary<string, string> rulesmap)
     {
         Provider.provider.matchmakingService.onRulesQueryRefreshed -= RulesReady;
-#if DEBUG
-        Logger.LogInfo("Server rules: ");
-        foreach (KeyValuePair<string, string> kvp in rulesmap)
-        {
-            Logger.LogInfo($"{kvp.Key}: {kvp.Value}.");
-        }
-#endif
         if (rulesmap.TryGetValue(DevkitServerModule.ServerRule, out string val) && val.Equals("True", StringComparison.InvariantCultureIgnoreCase))
         {
             DevkitServerModule.IsEditing = true;

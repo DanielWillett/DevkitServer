@@ -60,7 +60,7 @@ public static class CommandEx
         Type exe = typeof(IExecutableCommand);
 
         Assembly local = Assembly.GetExecutingAssembly();
-        foreach (Assembly asm in new Assembly[] { local }.Concat(PluginLoader.Plugins.Select(x => x.Assembly).Distinct()))
+        foreach (Assembly asm in new Assembly[] { local }.Concat(PluginLoader.Plugins.Select(x => x.Assembly.Assembly).Distinct()))
         {
             foreach (Type type in Accessor.GetTypesSafe(asm))
             {

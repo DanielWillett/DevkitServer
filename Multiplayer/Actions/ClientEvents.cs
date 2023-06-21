@@ -81,6 +81,9 @@ public static class ClientEvents
     public static event DeleteObject? OnDeleteObject;
     public static event DeleteBuildable? OnDeleteBuildable;
     public static event DeleteLevelObjects? OnDeleteLevelObjects;
+    public static event MoveObjectPreview? OnMoveObjectPreview;
+    public static event MoveBuildablePreview? OnMoveBuildablePreview;
+    public static event MoveLevelObjectsPreview? OnMoveLevelObjectsPreview;
     public static event MoveObjectFinal? OnMoveObjectFinal;
     public static event MoveBuildableFinal? OnMoveBuildableFinal;
     public static event MoveLevelObjectsFinal? OnMoveLevelObjectsFinal;
@@ -120,6 +123,9 @@ public static class ClientEvents
     public static bool ListeningOnDeleteObject => OnDeleteObject != null;
     public static bool ListeningOnDeleteBuildable => OnDeleteBuildable != null;
     public static bool ListeningOnDeleteLevelObjects => OnDeleteLevelObjects != null;
+    public static bool ListeningOnMoveObjectPreview => OnMoveObjectPreview != null;
+    public static bool ListeningOnMoveBuildablePreview => OnMoveBuildablePreview != null;
+    public static bool ListeningOnMoveLevelObjectsPreview => OnMoveLevelObjectsPreview != null;
     public static bool ListeningOnMoveObjectFinal => OnMoveObjectFinal != null;
     public static bool ListeningOnMoveBuildableFinal => OnMoveBuildableFinal != null;
     public static bool ListeningOnMoveLevelObjectsFinal => OnMoveLevelObjectsFinal != null;
@@ -148,6 +154,9 @@ public static class ClientEvents
     internal static void InvokeOnDeleteObject(in DeleteObjectProperties properties) => OnDeleteObject?.Invoke(in properties);
     internal static void InvokeOnDeleteBuildable(in DeleteBuildableProperties properties) => OnDeleteBuildable?.Invoke(in properties);
     internal static void InvokeOnDeleteLevelObjects(in DeleteLevelObjectsProperties properties) => OnDeleteLevelObjects?.Invoke(in properties);
+    internal static void InvokeOnMoveObjectPreview(in MoveObjectPreviewProperties properties) => OnMoveObjectPreview?.Invoke(in properties);
+    internal static void InvokeOnMoveBuildablePreview(in MoveBuildablePreviewProperties properties) => OnMoveBuildablePreview?.Invoke(in properties);
+    internal static void InvokeOnMoveLevelObjectsPreview(in MoveLevelObjectsPreviewProperties properties) => OnMoveLevelObjectsPreview?.Invoke(in properties);
     internal static void InvokeOnMoveObjectFinal(in MoveObjectFinalProperties properties) => OnMoveObjectFinal?.Invoke(in properties);
     internal static void InvokeOnMoveBuildableFinal(in MoveBuildableFinalProperties properties) => OnMoveBuildableFinal?.Invoke(in properties);
     internal static void InvokeOnMoveLevelObjectsFinal(in MoveLevelObjectsFinalProperties properties) => OnMoveLevelObjectsFinal?.Invoke(in properties);

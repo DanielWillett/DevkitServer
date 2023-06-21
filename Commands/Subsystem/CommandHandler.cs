@@ -711,7 +711,7 @@ public class CommandHandler : ICommandHandler, IDisposable
 
         Color clr = new Color32(230, 77, 0, 255);
         if (command.Plugin != null)
-            command.LogInfo("Registered from assembly: ".Colorize(clr) + command.Plugin.Assembly.GetName().Name.Format() + ".".Colorize(clr), ConsoleColor.DarkGray);
+            command.LogInfo("Registered from assembly: ".Colorize(clr) + command.Plugin.Assembly.Assembly.GetName().Name.Format() + ".".Colorize(clr), ConsoleColor.DarkGray);
         else if (command is VanillaCommand)
             command.LogInfo("Registered from ".Colorize(clr) + "Unturned".Colorize(DevkitServerModule.UnturnedColor) + ".".Colorize(clr), ConsoleColor.DarkGray);
         else

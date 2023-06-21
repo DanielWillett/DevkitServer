@@ -5,6 +5,7 @@ using DevkitServer.Util.Encoding;
 using JetBrains.Annotations;
 #endif
 #if SERVER
+using DevkitServer.Configuration;
 using DevkitServer.Players;
 #endif
 
@@ -12,12 +13,26 @@ namespace DevkitServer.Multiplayer;
 public sealed class ClientInfo
 {
 #if CLIENT
-    public static event Action<ClientInfo>? OnClientInfoReady;
+    private static readonly CachedMulticastEvent<Action<ClientInfo>> OnClientInfoReadyEvent = new CachedMulticastEvent<Action<ClientInfo>>(typeof(ClientInfo), nameof(OnClientInfoReady));
+    /// <summary>
+    /// Called after permissions are applied.
+    /// </summary>
+    public static event Action<ClientInfo> OnClientInfoReady
 #else
-    public static event Action<EditorUser, ClientInfo>? OnClientInfoReady;
+    internal static readonly CachedMulticastEvent<Action<EditorUser, ClientInfo>> OnClientInfoReadyEvent = new CachedMulticastEvent<Action<EditorUser, ClientInfo>>(typeof(ClientInfo), nameof(OnClientInfoReady));
+    /// <summary>
+    /// Called before being sent to the client.
+    /// </summary>
+    public static event Action<EditorUser, ClientInfo> OnClientInfoReady
 #endif
+    {
+        add => OnClientInfoReadyEvent.Add(value);
+        remove => OnClientInfoReadyEvent.Remove(value);
+    }
+
     internal static readonly NetCallRaw<ClientInfo> SendClientInfo = new NetCallRaw<ClientInfo>((ushort)NetCalls.SendClientInfo, ReadInfo, WriteInfo);
-    public const ushort DataVersion = 1;
+
+    public const ushort DataVersion = 2;
 #if CLIENT
     public static ClientInfo? Info { get; private set; }
 
@@ -30,19 +45,8 @@ public sealed class ClientInfo
         Logger.LogDebug("Received client info.");
         Logger.DumpJson(info);
         ctx.Acknowledge();
-        if (OnClientInfoReady == null) return;
-        foreach (Action<ClientInfo> inv in OnClientInfoReady.GetInvocationList().Cast<Action<ClientInfo>>())
-        {
-            try
-            {
-                inv(info);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + typeof(ClientInfo).Format() + "." + nameof(OnClientInfoReady) + ".");
-                Logger.LogError(ex);
-            }
-        }
+
+        OnClientInfoReadyEvent.TryInvoke(info);
     }
     internal static void OnDisconnect()
     {
@@ -62,6 +66,9 @@ public sealed class ClientInfo
     /// This is not kept updated after initial connection. To access an updated list use <see cref="Permissions.PlayerHandler"/>.
     /// </remarks>
     public PermissionGroup[] PermissionGroups { get; internal set; }
+
+    public bool ServerRemovesCosmeticImprovements { get; internal set; }
+    public bool ServerUsesBypassingObjectSelectionLimitPermission { get; internal set; }
 #nullable restore
     internal ClientInfo() { }
 
@@ -87,7 +94,7 @@ public sealed class ClientInfo
                 Logger.LogInfo("Unable to find permission: " + str.Format() + ", usually not a problem.");
         }
 
-        Permissions = perms.ToArray();
+        Permissions = perms.ToArrayFast();
 
         PermissionGroups = new PermissionGroup[reader.ReadInt32()];
         for (int i = 0; i < PermissionGroups.Length; ++i)
@@ -95,6 +102,13 @@ public sealed class ClientInfo
 
         if (v < 1)
             reader.ReadBool();
+
+        if (v > 1)
+        {
+            byte flag = reader.ReadUInt8();
+            ServerRemovesCosmeticImprovements = (flag & 1) != 0;
+            ServerUsesBypassingObjectSelectionLimitPermission = (flag & 2) != 0;
+        }
     }
     public void Write(ByteWriter writer)
     {
@@ -110,24 +124,21 @@ public sealed class ClientInfo
         writer.Write(PermissionGroups == null ? 0 : PermissionGroups.Length);
         for (int i = 0; i < PermissionGroups!.Length; ++i)
             PermissionGroup.WritePermissionGroup(writer, PermissionGroups[i]);
-    }
 
+        byte flag = 0;
+        if (ServerRemovesCosmeticImprovements)
+            flag |= 1;
+        if (ServerUsesBypassingObjectSelectionLimitPermission)
+            flag |= 2;
+
+        writer.Write(flag);
+    }
 #if SERVER
-    internal static void TryInvokeOnClientInfoReady(EditorUser user, ClientInfo info)
+    internal static void ApplyServerSettings(ClientInfo info, EditorUser user)
     {
-        if (OnClientInfoReady == null) return;
-        foreach (Action<EditorUser, ClientInfo> inv in OnClientInfoReady.GetInvocationList().Cast<Action<EditorUser, ClientInfo>>())
-        {
-            try
-            {
-                inv(user, info);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + typeof(ClientInfo).Format() + "." + nameof(OnClientInfoReady) + " for " + user.Format() + ".");
-                Logger.LogError(ex);
-            }
-        }
+        SystemConfig systemConfig = DevkitServerConfig.Config;
+        info.ServerRemovesCosmeticImprovements = systemConfig.RemoveCosmeticImprovements;
+        info.ServerUsesBypassingObjectSelectionLimitPermission = systemConfig.UseBypassingObjectSelectionLimitPermission;
     }
 #endif
 }

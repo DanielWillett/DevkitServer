@@ -487,7 +487,7 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrush
             return;
         }
 
-        Logger.LogInfo("Reverse patched " + Accessor.GetMethodInfo(SampleHeightPixelSmooth)?.Format() + ".");
+        Logger.LogDebug("Reverse patched " + Accessor.GetMethodInfo(SampleHeightPixelSmooth)?.Format() + ".");
     }
     public void Apply()
     {
@@ -636,7 +636,7 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
         }
         catch (NullReferenceException)
         {
-            Logger.LogInfo("Reverse patched " + Accessor.GetMethodInfo(BlendSplatmapWeights)?.Format() + ".");
+            Logger.LogDebug("Reverse patched " + Accessor.GetMethodInfo(BlendSplatmapWeights)?.Format() + ".");
         }
 
         try
@@ -657,7 +657,7 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
         {
             int val = GetSplatmapTargetMaterialLayerIndex(null, null!, default); // invalid material returns -1
             if (val == -1)
-                Logger.LogInfo("Reverse patched " + Accessor.GetMethodInfo(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
+                Logger.LogDebug("Reverse patched " + Accessor.GetMethodInfo(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
         }
         catch (NotImplementedException)
         {
@@ -666,7 +666,7 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
         }
         catch (NullReferenceException)
         {
-            Logger.LogInfo("Reverse patched " + Accessor.GetMethodInfo(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
+            Logger.LogDebug("Reverse patched " + Accessor.GetMethodInfo(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
         }
     }
 

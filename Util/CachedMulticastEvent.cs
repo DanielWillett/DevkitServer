@@ -8,20 +8,18 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
     [UsedImplicitly]
     private TDelegate[] _delegates;
     private TDelegate? _multicast;
-
-    internal TDelegate[] Delegates
+    public string ErrorMessage { get; set; }
+    public string Name { get; }
+    public Type DeclaringType { get; }
+    public bool IsEmpty => Invocations.Length == 0;
+    public TDelegate TryInvoke { get; }
+    public bool IsCancellable { get; private set; }
+    public bool DefaultShouldAllow { get; }
+    public TDelegate[] Invocations
     {
         get => _delegates;
         private set => _delegates = value;
     }
-
-    public string ErrorMessage { get; set; }
-    public string Name { get; }
-    public Type DeclaringType { get; }
-    public bool IsEmpty => Delegates.Length == 0;
-    public TDelegate TryInvoke { get; }
-    public bool IsCancellable { get; private set; }
-    public bool DefaultShouldAllow { get; }
     public CachedMulticastEvent(Type declaringType, string name, bool shouldAllowDefault = true)
     {
         Name = name;
@@ -39,9 +37,9 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         {
             _multicast = (TDelegate)Delegate.Combine(_multicast, @delegate);
             Delegate[] dele = _multicast.GetInvocationList();
-            Delegates = new TDelegate[dele.Length];
+            Invocations = new TDelegate[dele.Length];
             for (int i = 0; i < dele.Length; ++i)
-                Delegates[i] = (TDelegate)dele[i];
+                Invocations[i] = (TDelegate)dele[i];
         }
     }
     public void Remove(TDelegate @delegate)
@@ -52,11 +50,11 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
             Delegate[]? dele = _multicast?.GetInvocationList();
             if (dele != null)
             {
-                Delegates = new TDelegate[dele.Length];
+                Invocations = new TDelegate[dele.Length];
                 for (int i = 0; i < dele.Length; ++i)
-                    Delegates[i] = (TDelegate)dele[i];
+                    Invocations[i] = (TDelegate)dele[i];
             }
-            else Delegates = Array.Empty<TDelegate>();
+            else Invocations = Array.Empty<TDelegate>();
         }
     }
     public static TDelegate GetInvokeMethod(CachedMulticastEvent<TDelegate> wrapper)
@@ -80,6 +78,8 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         cancellable = false;
         Type type = typeof(TDelegate);
         MethodInfo invoke = type.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
+        if (invoke.ReturnType != typeof(void))
+            throw new InvalidOperationException("Can't make a multicast event out of a non-void-returning delegate.");
         MethodInfo logErrorText = typeof(Logger).GetMethod(nameof(Logger.LogError), new Type[] { typeof(string), typeof(ConsoleColor), typeof(string) })!;
         MethodInfo logErrorEx = typeof(Logger).GetMethod(nameof(Logger.LogError), new Type[] { typeof(Exception), typeof(bool), typeof(string) })!;
 
@@ -95,10 +95,11 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         types[0] = wrapperType;
 
         int shouldAllowIndex = -1;
-        for (int i = expectedParameters.Length - 1; i >= 1; --i)
+        for (int i = expectedParameters.Length - 1; i >= 0; --i)
         {
             ParameterInfo info = expectedParameters[i];
-            if (info.Name.IndexOf("allow", StringComparison.InvariantCultureIgnoreCase) != -1 && types[i].IsByRef && types[i].GetElementType() == typeof(bool))
+            Type paramType = info.ParameterType;
+            if (info.Name.IndexOf("allow", StringComparison.InvariantCultureIgnoreCase) != -1 && paramType.IsByRef && paramType.GetElementType() == typeof(bool))
             {
                 shouldAllowIndex = i;
                 cancellable = true;
@@ -106,15 +107,14 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
             }
         }
 
-        FieldInfo field = wrapperType.GetField(nameof(_delegates), BindingFlags.FlattenHierarchy | BindingFlags.NonPublic | BindingFlags.Instance)!;
+        FieldInfo field = wrapperType.GetField(nameof(_delegates), BindingFlags.NonPublic | BindingFlags.Instance)!;
 
-        DynamicMethod method = new DynamicMethod("TryInvoke" + type.Name, MethodAttributes.Private, CallingConventions.HasThis, typeof(void), types, wrapperType, true);
-        DebuggableEmitter il = new DebuggableEmitter(method.GetILGenerator(), method) { DebugLog = true, Breakpointing = true };
+        DynamicMethod method = new DynamicMethod("TryInvoke" + type.Name, MethodAttributes.Public | MethodAttributes.Static, CallingConventions.Standard, typeof(void), types, wrapperType, true);
+        ILGenerator il = method.GetILGenerator();
         for (int i = 0; i < expectedParameters.Length; ++i)
-            method.DefineParameter(i + 1, expectedParameters[i].Attributes, expectedParameters[i].Name);
-        method.DefineParameter(0, ParameterAttributes.None, "this");
+            method.DefineParameter(i + 2, expectedParameters[i].Attributes, expectedParameters[i].Name);
+        method.DefineParameter(1, ParameterAttributes.None, "this");
         il.DeclareLocal(typeof(int));
-        il.DeclareLocal(type);
         il.DeclareLocal(type.MakeArrayType());
         il.DeclareLocal(typeof(string));
         Label loopStartLabel = il.DefineLabel();
@@ -124,7 +124,7 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         // TDelegate[] delegates = this._delegates;
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldfld, field);
-        il.Emit(OpCodes.Stloc_2);
+        il.Emit(OpCodes.Stloc_1);
 
         // goto check out of bounds;
         il.Emit(OpCodes.Br, checkLbl);
@@ -134,14 +134,13 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         il.BeginExceptionBlock();
 
         // delegates[i].Invoke(...);
-        il.Emit(OpCodes.Ldloc_2);
+        il.Emit(OpCodes.Ldloc_1);
         il.Emit(OpCodes.Ldloc_0);
         il.Emit(OpCodes.Ldelem_Ref);
         for (int i = 1; i < types.Length; ++i)
-            PatchUtil.EmitArgument(il, i, false, types[i].IsByRef);
+            PatchUtil.EmitArgument(il, i, false, false);
 
-        il.Emit(OpCodes.Call, invoke);
-        // crash
+        il.Emit(OpCodes.Callvirt, invoke);
 
         if (shouldAllowIndex > -1)
         {
@@ -151,30 +150,32 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
             il.Emit(OpCodes.Ret);
         }
 
-        il.Emit(OpCodes.Leave_S, incrLbl);
+        if (!DevkitServerModule.MonoLoaded)
+            il.Emit(OpCodes.Leave_S, incrLbl);
 
         il.BeginCatchBlock(typeof(Exception));
         
         // string method = this.DeclaringType.Name.ToUpperInvariant()
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Call, getDeclaringType);
-        il.Emit(OpCodes.Call, getTypeName);
+        il.Emit(OpCodes.Callvirt, getTypeName);
         il.Emit(OpCodes.Call, toUpperInvariant);
-        il.Emit(OpCodes.Stloc_3);
+        il.Emit(OpCodes.Stloc_2);
 
         // Logger.LogError(this.ErrorMessage, method: method);
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Call, getErrorMessage);
         PatchUtil.LoadConstantI4(il, (int)ConsoleColor.Red);
-        il.Emit(OpCodes.Ldloc_3);
+        il.Emit(OpCodes.Ldloc_2);
         il.Emit(OpCodes.Call, logErrorText);
 
         // Logger.LogError(ex, method: method);
         il.Emit(OpCodes.Ldc_I4_1);
-        il.Emit(OpCodes.Ldloc_3);
+        il.Emit(OpCodes.Ldloc_2);
         il.Emit(OpCodes.Call, logErrorEx);
 
-        il.Emit(OpCodes.Leave_S, incrLbl);
+        if (!DevkitServerModule.MonoLoaded)
+            il.Emit(OpCodes.Leave_S, incrLbl);
 
         il.EndExceptionBlock();
 
@@ -188,7 +189,7 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         // if (i < delegates.Length) return;
         il.MarkLabel(checkLbl);
         il.Emit(OpCodes.Ldloc_0);
-        il.Emit(OpCodes.Ldloc_2);
+        il.Emit(OpCodes.Ldloc_1);
         il.Emit(OpCodes.Ldlen);
         il.Emit(OpCodes.Conv_I4);
         il.Emit(OpCodes.Blt, loopStartLabel);

@@ -180,7 +180,7 @@ internal static class SelectionToolPatches
             }
 
             if (ClientEvents.ListeningOnMoveHierarchyObjectsPreview)
-                ClientEvents.InvokeOnMoveHierarchyObjectsPreview(new MoveHierarchyObjectsPreviewProperties(instanceIds.ToArray(), translations.ToArray(), pivotPosition, dt));
+                ClientEvents.InvokeOnMoveHierarchyObjectsPreview(new MoveHierarchyObjectsPreviewProperties(instanceIds.ToArrayFast(), translations.ToArrayFast(), pivotPosition, dt));
         }
         finally
         {
@@ -301,7 +301,7 @@ internal static class SelectionToolPatches
                     scales[i] = scale;
             }
             if (ClientEvents.ListeningOnMoveHierarchyObjectsFinal)
-                ClientEvents.InvokeOnMoveHierarchyObjectsFinal(new MoveHierarchyObjectsFinalProperties(instanceIds.ToArray(), translations.ToArray(), scales, originalScales?.ToArray(), dt));
+                ClientEvents.InvokeOnMoveHierarchyObjectsFinal(new MoveHierarchyObjectsFinalProperties(instanceIds.ToArrayFast(), translations.ToArrayFast(), scales, originalScales?.ToArrayFast(), dt));
         }
         finally
         {

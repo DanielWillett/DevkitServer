@@ -20,7 +20,6 @@ public static class HierarchyItemTypeIdentifierEx
 
         if (identifier == null)
         {
-            writer.Write(DataVersion);
             writer.Write((byte)255);
             return;
         }
@@ -187,7 +186,7 @@ public sealed class NodeItemTypeIdentifier : IHierarchyItemTypeIdentifier
                 Logger.LogWarning($"Unknown node type: {nodeType.Format()}.");
             else
             {
-                Logger.LogInfo($"Dynamically found system ({t.Format()}) from node: {nodeType.Format()}. This should be added to the cached list for performance.");
+                Logger.LogWarning($"Dynamically found system ({t.Format()}) from node: {nodeType.Format()}. This should be added to the cached list for performance.");
                 MethodInfo? getter = t.GetMethod("Get", BindingFlags.Static | BindingFlags.Public | BindingFlags.IgnoreCase);
                 if (getter == null || !getter.IsStatic || !t.IsAssignableFrom(getter.ReturnType) || getter.GetParameters().Length != 0)
                 {

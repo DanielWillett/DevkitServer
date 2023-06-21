@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
+﻿using DevkitServer.Plugins;
 
 namespace DevkitServer.API;
 public interface IDevkitServerPlugin<out TConfig> : IReloadableDevkitServerPlugin, IConfigProvider<TConfig> where TConfig : class, new() { }
@@ -38,9 +33,9 @@ public interface IDevkitServerPlugin
     string LocalizationDirectory { get; }
 
     /// <summary>
-    /// Assembly containing the plugin.
+    /// Information about the assembly containing the plugin.
     /// </summary>
-    Assembly Assembly { get; }
+    PluginAssembly Assembly { get; set; }
 
     /// <summary>
     /// Main translation file for the plugin.

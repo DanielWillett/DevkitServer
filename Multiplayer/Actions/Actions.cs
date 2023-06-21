@@ -42,7 +42,6 @@ public enum ActionType : byte
     HierarchyItemsTransforming,
     HierarchyItemsTransform,
     HierarchyItemsDelete,
-    HierarchyItemInstantiate,
     DeleteLevelObjects,
     MoveLevelObjectsFinal,
 

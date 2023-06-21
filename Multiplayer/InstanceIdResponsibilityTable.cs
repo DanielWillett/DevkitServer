@@ -46,11 +46,7 @@ internal sealed class InstanceIdResponsibilityTable
             Reader.LoadNew(stream);
             Reader.Skip(sizeof(ushort)); // version
             bool client = Reader.ReadBool();
-#if SERVER
-            if (client)
-#else
-            if (!client)
-#endif
+            if (client == Provider.isServer)
             {
                 Logger.LogWarning($"Invalid responsiblities file provided: {SavePath.Format(false)}. This file was created on the wrong platform (client vs. server).", method: Source);
                 return;
@@ -90,7 +86,7 @@ internal sealed class InstanceIdResponsibilityTable
                 else Responsibilities.Add(instanceId);
 #endif
             }
-            Logger.LogInfo($"[{Source}] Read {Responsibilities.Count.Format()} responsiblities in table stored at {SavePath.Format()}." + (save ? " Saving updates." : string.Empty));
+            Logger.LogDebug($"[{Source}] Read {Responsibilities.Count.Format()} responsiblities in table stored at {SavePath.Format()}." + (save ? " Saving updates." : string.Empty));
             if (save && resaveIfNeeded)
                 Save();
         }
@@ -144,6 +140,7 @@ internal sealed class InstanceIdResponsibilityTable
         using FileStream stream = new FileStream(SavePath, FileMode.Append, FileAccess.Write, FileShare.Read);
         Writer.Stream = stream;
         Writer.Write(instanceId);
+        Writer.Write(!Dedicator.IsDedicatedServer);
 #if SERVER
         Writer.Write(steam64);
 #endif

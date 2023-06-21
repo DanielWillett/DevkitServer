@@ -501,7 +501,7 @@ public class UserInput : MonoBehaviour
             Logger.LogError("Failed to read incoming movement packet length.");
             return;
         }
-        NetFactory.IncrementByteCount(false, NetFactory.DevkitMessage.MovementRelay, len + sizeof(ushort));
+        NetFactory.IncrementByteCount(false, DevkitMessage.MovementRelay, len + sizeof(ushort));
 
 #if SERVER
         EditorUser? user = UserManager.FromConnection(transportConnection);
@@ -543,7 +543,7 @@ public class UserInput : MonoBehaviour
                     list.Add(pl.transportConnection);
             }
 
-            NetFactory.SendGeneric(NetFactory.DevkitMessage.MovementRelay, sendBytes, list, reliable: false);
+            NetFactory.SendGeneric(DevkitMessage.MovementRelay, sendBytes, list, reliable: false);
         }
 #endif
     }
@@ -553,7 +553,7 @@ public class UserInput : MonoBehaviour
         if (_packets.Count < 1) return;
         HandleFlushPackets(Writer);
         int len = Writer.Count;
-        NetFactory.SendGeneric(NetFactory.DevkitMessage.MovementRelay, Writer.FinishWrite(), 0, len, _bufferHasStop);
+        NetFactory.SendGeneric(DevkitMessage.MovementRelay, Writer.FinishWrite(), 0, len, _bufferHasStop);
         _bufferHasStop = false;
     }
     private void HandleFlushPackets(ByteWriter writer)

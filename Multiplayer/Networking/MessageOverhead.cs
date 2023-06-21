@@ -35,7 +35,7 @@ public readonly struct MessageOverhead
                                                  MessageFlags.RequestResponseWithAcknowledgeRequest;
     // All flags that use a response key
     private const MessageFlags ResponseKeyMask = MessageFlags.RequestResponseWithAcknowledgeRequest;
-    public static unsafe void SetSize(ref MessageOverhead overhead, int size) => *(int*)((byte*)Unsafe.AsPointer(ref overhead) + 3) = size;
+    internal static unsafe void SetSize(ref MessageOverhead overhead, int size) => *(int*)((byte*)Unsafe.AsPointer(ref overhead) + 3) = size;
 
     /// <exception cref="IndexOutOfRangeException">If the pointer doesn't point to enough valid memory for the read.</exception>
     public unsafe MessageOverhead(byte[] bytes)

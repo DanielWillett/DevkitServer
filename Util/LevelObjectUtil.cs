@@ -236,25 +236,29 @@ public static class LevelObjectUtil
             return;
         }
 
-        if (!GetObjectOrBuildableAsset(asset, out ObjectAsset? @object, out ItemAsset? buildable))
+        if (!GetObjectOrBuildableAsset(asset, out ObjectAsset? objectAsset, out ItemAsset? buildableAsset))
         {
-            Logger.LogError("Unable to get user from level object instantiation request.", method: Source);
+            Logger.LogError($"Unable to get asset for level object instantiation request from {user.Format()}.", method: Source);
             UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", asset.ToString("N") + " Invalid Asset"));
             return;
         }
 
-        string displayName = @object != null ? @object.objectName : buildable!.itemName;
-        LevelObject? newObject = null;
-        LevelBuildableObject? newBuildable = null;
+        string displayName = objectAsset != null ? objectAsset.objectName : buildableAsset!.itemName;
+        LevelObject? levelObject = null;
+        LevelBuildableObject? buildable = null;
         RegionIdentifier id = RegionIdentifier.Invalid;
         try
         {
-            Transform lvlObject = LevelObjects.registerAddObject(position, rotation, scale, @object, buildable);
-
-            if (@object != null)
-                InitializeLevelObject(lvlObject, out newObject);
+            Transform transform = LevelObjects.registerAddObject(position, rotation, scale, objectAsset, buildableAsset);
+            if (transform == null)
+            {
+                Logger.LogError($"Failed to create object: {(objectAsset ?? (Asset?)buildableAsset).Format()}, registerAddObject returned {((object?)null).Format()}.");
+                return;
+            }
+            if (objectAsset != null)
+                InitializeLevelObject(transform, out levelObject);
             else
-                InitializeBuildable(lvlObject, out newBuildable, out id);
+                InitializeBuildable(transform, out buildable, out id);
         }
         catch (Exception ex)
         {
@@ -264,9 +268,9 @@ public static class LevelObjectUtil
             return;
         }
 
-        if (newObject != null)
+        if (levelObject != null)
         {
-            Transform? transform = newObject.transform;
+            Transform? transform = levelObject.transform;
             if (transform != null)
             {
                 position = transform.position;
@@ -274,21 +278,21 @@ public static class LevelObjectUtil
                 scale = transform.localScale;
             }
 
-            LevelObjectResponsibilities.Set(newObject.instanceID, user.SteamId.m_SteamID);
+            LevelObjectResponsibilities.Set(levelObject.instanceID, user.SteamId.m_SteamID);
 
             PooledTransportConnectionList list;
             if (ctx.IsRequest)
             {
-                ctx.ReplyLayered(SendObjectInstantiation, newObject.GUID, newObject.instanceID, position, rotation, scale, user.SteamId.m_SteamID);
+                ctx.ReplyLayered(SendObjectInstantiation, levelObject.GUID, levelObject.instanceID, position, rotation, scale, user.SteamId.m_SteamID);
                 list = DevkitServerUtility.GetAllConnections(ctx.Connection);
             }
             else list = DevkitServerUtility.GetAllConnections();
-            SendObjectInstantiation.Invoke(list, newObject.GUID, newObject.instanceID, position, rotation, scale, user.SteamId.m_SteamID);
-            Logger.LogDebug($"[{Source}] Granted request for instantiation of {displayName.Format(false)} {newObject.GUID.Format()}, instance ID: {newObject.instanceID.Format()} from {user.SteamId.Format()}.");
+            SendObjectInstantiation.Invoke(list, levelObject.GUID, levelObject.instanceID, position, rotation, scale, user.SteamId.m_SteamID);
+            Logger.LogDebug($"[{Source}] Granted request for instantiation of {displayName.Format(false)} {levelObject.GUID.Format()}, instance ID: {levelObject.instanceID.Format()} from {user.SteamId.Format()}.");
         }
-        else if (newBuildable != null)
+        else if (buildable != null)
         {
-            Transform? transform = newBuildable.transform;
+            Transform? transform = buildable.transform;
             if (transform != null)
             {
                 position = transform.position;
@@ -304,12 +308,12 @@ public static class LevelObjectUtil
             }
             if (ctx.IsRequest)
             {
-                ctx.ReplyLayered(SendBuildableInstantiation, newBuildable.asset.GUID, regionId, position, rotation, scale, user.SteamId.m_SteamID);
+                ctx.ReplyLayered(SendBuildableInstantiation, buildable.asset.GUID, regionId, position, rotation, scale, user.SteamId.m_SteamID);
                 list = DevkitServerUtility.GetAllConnections(ctx.Connection);
             }
             else list = DevkitServerUtility.GetAllConnections();
-            SendBuildableInstantiation.Invoke(list, newBuildable.asset.GUID, regionId, position, rotation, scale, user.SteamId.m_SteamID);
-            Logger.LogDebug($"[{Source}] Granted request for instantiation of buildable {displayName.Format(false)} {newBuildable.asset.GUID.Format()} from {user.SteamId.Format()}.");
+            SendBuildableInstantiation.Invoke(list, buildable.asset.GUID, regionId, position, rotation, scale, user.SteamId.m_SteamID);
+            Logger.LogDebug($"[{Source}] Granted request for instantiation of buildable {displayName.Format(false)} {buildable.asset.GUID.Format()} from {user.SteamId.Format()}.");
         }
         else
         {
@@ -318,12 +322,11 @@ public static class LevelObjectUtil
         }
     }
 #endif
-    private static void InitializeLevelObject(Transform transform, out LevelObject? @object)
+    private static void InitializeLevelObject(Transform transform, out LevelObject? levelObject)
     {
-        if (TryFindObject(transform, out RegionIdentifier id))
+        if (TryFindObject(transform, out RegionIdentifier id) &&
+            (levelObject = ObjectManager.getObject(id.X, id.Y, id.Index)) != null)
         {
-            @object = ObjectManager.getObject(id.X, id.Y, id.Index);
-
             if (GetRegularObjectNetIdImpl == null)
                 return;
 
@@ -334,15 +337,21 @@ public static class LevelObjectUtil
             NetIdRegistry.ReleaseTransform(NetId.INVALID, transform);
             NetIdRegistry.AssignTransform(netId, transform);
             Logger.LogDebug($"[{Source}] Assigned NetId: {netId.Format()}.");
+            return;
         }
-        else
-            @object = null;
+
+        levelObject = null;
+        Logger.LogWarning($"Did not find object of transform {transform.name.Format()}.", method: Source);
     }
     private static void InitializeBuildable(Transform transform, out LevelBuildableObject? buildable, out RegionIdentifier id)
     {
         if (TryFindBuildable(transform, out id))
-            buildable = GetBuildable(id);
-        else buildable = null;
+        {
+            if ((buildable = GetBuildable(id)) != null) return;
+        }
+
+        buildable = null;
+        Logger.LogWarning($"Did not find buildable of transform {transform.name.Format()}.", method: Source);
     }
     public static bool GetObjectOrBuildableAsset(Guid guid, out ObjectAsset? @object, out ItemAsset? buildable)
     {

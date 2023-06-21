@@ -209,8 +209,10 @@ public sealed class PermissionGroup : IReadOnlyList<GroupPermission>
             {
                 group._permissions.Add(new GroupPermission(perm, rem));
             }
+#if SERVER
             else
-                Logger.LogInfo("Unable to find permission: " + str.Format() + ", usually not a problem.");
+                Logger.LogWarning("Unable to find permission: " + str.Format() + ".");
+#endif
         }
 
         return group;
