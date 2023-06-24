@@ -32,7 +32,7 @@ public sealed class ClientInfo
 
     internal static readonly NetCallRaw<ClientInfo> SendClientInfo = new NetCallRaw<ClientInfo>((ushort)NetCalls.SendClientInfo, ReadInfo, WriteInfo);
 
-    public const ushort DataVersion = 2;
+    public const ushort DataVersion = 0;
 #if CLIENT
     public static ClientInfo? Info { get; private set; }
 
@@ -42,8 +42,12 @@ public sealed class ClientInfo
     {
         Info = info;
         UserPermissions.UserHandler.ReceivePermissions(info.Permissions, info.PermissionGroups);
-        Logger.LogDebug("Received client info.");
+        Logger.LogInfo("Received client info.");
+#if DEBUG
+        Logger.LogDebug("=======================================");
         Logger.DumpJson(info);
+        Logger.LogDebug("=======================================");
+#endif
         ctx.Acknowledge();
 
         OnClientInfoReadyEvent.TryInvoke(info);
@@ -68,7 +72,6 @@ public sealed class ClientInfo
     public PermissionGroup[] PermissionGroups { get; internal set; }
 
     public bool ServerRemovesCosmeticImprovements { get; internal set; }
-    public bool ServerUsesBypassingObjectSelectionLimitPermission { get; internal set; }
 #nullable restore
     internal ClientInfo() { }
 
@@ -82,7 +85,7 @@ public sealed class ClientInfo
     }
     public void Read(ByteReader reader)
     {
-        ushort v = reader.ReadUInt16();
+        _ = reader.ReadUInt16(); // version
         int len = reader.ReadInt32();
         List<Permission> perms = new List<Permission>(len);
         for (int i = 0; i < len; ++i)
@@ -100,15 +103,8 @@ public sealed class ClientInfo
         for (int i = 0; i < PermissionGroups.Length; ++i)
             PermissionGroups[i] = PermissionGroup.ReadPermissionGroup(reader);
 
-        if (v < 1)
-            reader.ReadBool();
-
-        if (v > 1)
-        {
-            byte flag = reader.ReadUInt8();
-            ServerRemovesCosmeticImprovements = (flag & 1) != 0;
-            ServerUsesBypassingObjectSelectionLimitPermission = (flag & 2) != 0;
-        }
+        byte flag = reader.ReadUInt8();
+        ServerRemovesCosmeticImprovements = (flag & 1) != 0;
     }
     public void Write(ByteWriter writer)
     {
@@ -128,8 +124,6 @@ public sealed class ClientInfo
         byte flag = 0;
         if (ServerRemovesCosmeticImprovements)
             flag |= 1;
-        if (ServerUsesBypassingObjectSelectionLimitPermission)
-            flag |= 2;
 
         writer.Write(flag);
     }
@@ -138,7 +132,6 @@ public sealed class ClientInfo
     {
         SystemConfig systemConfig = DevkitServerConfig.Config;
         info.ServerRemovesCosmeticImprovements = systemConfig.RemoveCosmeticImprovements;
-        info.ServerUsesBypassingObjectSelectionLimitPermission = systemConfig.UseBypassingObjectSelectionLimitPermission;
     }
 #endif
 }

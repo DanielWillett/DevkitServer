@@ -228,6 +228,7 @@ public sealed class DevkitServerModule : IModuleNexus
             Level.onPostLevelLoaded += OnPostLevelLoaded;
             Editor.onEditorCreated += OnEditorCreated;
             Level.onPrePreLevelLoaded += OnPrePreLevelLoaded;
+            SaveManager.onPostSave += OnSaved;
 #if SERVER
             Provider.onServerConnected += UserManager.AddUser;
             Provider.onEnemyConnected += UserManager.OnAccepted;
@@ -484,7 +485,13 @@ public sealed class DevkitServerModule : IModuleNexus
             _ = HighSpeedServer.Instance;
     }
 #endif
-    private void OnPrePreLevelLoaded(int level)
+    private static void OnSaved()
+    {
+        HierarchyResponsibilities.Save();
+        LevelObjectResponsibilities.Save();
+        BuildableResponsibilities.Save();
+    }
+    private static void OnPrePreLevelLoaded(int level)
     {
         if (level != Level.BUILD_INDEX_GAME)
             return;
@@ -502,9 +509,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public void shutdown()
     {
         /* SAVE DATA */
-        HierarchyResponsibilities.Save();
-        LevelObjectResponsibilities.Save();
-        BuildableResponsibilities.Save();
+        OnSaved();
 
         PluginLoader.Unload();
         _tknSrc?.Cancel();
@@ -521,6 +526,7 @@ public sealed class DevkitServerModule : IModuleNexus
         Editor.onEditorCreated -= OnEditorCreated;
         Level.onPostLevelLoaded -= OnPostLevelLoaded;
         Level.onPrePreLevelLoaded -= OnPrePreLevelLoaded;
+        SaveManager.onPostSave -= OnSaved;
 #if SERVER
         Provider.onServerConnected -= UserManager.AddUser;
         Provider.onEnemyConnected -= UserManager.OnAccepted;

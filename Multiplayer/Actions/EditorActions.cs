@@ -41,7 +41,9 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 
 
     internal static ushort ReadDataVersion;
-
+#if SERVER
+    private float _lastNoPermissionMessage;
+#endif
 #if CLIENT
     internal static TemporaryEditorActions? TemporaryEditorActions;
     internal static bool CanProcess;
@@ -54,10 +56,18 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 
     internal static Coroutine? CatchUpCoroutine;
     private bool _isRunningCatchUpCoroutine;
+    public static bool HasLargeQueue(EditorUser? user = null, int ct = 96)
+    {
+        user ??= EditorUser.User;
+        if (user == null || user.Actions == null)
+            return false;
+        EditorActions actions = user.Actions;
+        // if the number of actions that can fit in a packet is less than 50% of the total queued actions
+        return actions.CountNumActionsInPacket() / (float)actions._pendingActions.Count < 0.5;
+    }
 #endif
 
     private float _nextApply;
-    private float _lastNoPermissionMessage;
     public EditorUser User { get; internal set; } = null!;
     public bool IsOwner { get; private set; }
     public static IAction? ActiveAction { get; private set; }
@@ -275,19 +285,13 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             OnAppliedAction?.Invoke(listener, action);
         }
     }
-    private void WriteEditBuffer(ByteWriter writer, int index, int length)
+    private int CountNumActionsInPacket(int index = 0, int length = -1)
     {
-        if (!EditorActionsCodeGeneration.Init)
-            return;
-        ThreadUtil.assertIsGameThread();
-#if SERVER
-        writer.Write(User.SteamId.m_SteamID);
-#endif
-        writer.Write(DataVersion);
-        if (index + length > _pendingActions.Count)
+        if (length < 0)
             length = _pendingActions.Count - index;
         int ct = 0;
         int size = 0;
+        length += index;
         for (int i = index; i < length; ++i)
         {
             if (ct >= byte.MaxValue)
@@ -303,6 +307,21 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             size += val + settings;
             ++ct;
         }
+
+        return Math.Min(byte.MaxValue, ct);
+    }
+    private void WriteEditBuffer(ByteWriter writer, int index, int length)
+    {
+        if (!EditorActionsCodeGeneration.Init)
+            return;
+        ThreadUtil.assertIsGameThread();
+#if SERVER
+        writer.Write(User.SteamId.m_SteamID);
+#endif
+        writer.Write(DataVersion);
+        if (index + length > _pendingActions.Count)
+            length = _pendingActions.Count - index;
+        int ct = CountNumActionsInPacket(index, length);
         writer.Write((byte)ct);
         List<ActionSettingsCollection> c = ListPool<ActionSettingsCollection>.claim();
         int count2 = ct + index;

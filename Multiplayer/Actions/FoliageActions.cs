@@ -130,6 +130,19 @@ public sealed class AddFoliageToSurfaceAction : IAction, IAsset
         if (FoliageAsset.Find() is { } asset)
         {
             ExecuteAddFoliage(asset, Position, Rotation, Scale, ClearWhenBaked);
+#if SERVER
+            if (asset is FoliageObjectInfoAsset objAsset && Regions.tryGetCoordinate(Position, out byte x, out byte y) && LevelObjects.objects[x, y] is { Count: > 0 and <= ushort.MaxValue + 1 } region)
+            {
+                LevelObject obj = ObjectManager.getObject(x, y, (ushort)(region.Count - 1));
+                if (obj.asset.GUID != objAsset.obj.GUID)
+                {
+                    Logger.LogWarning($"Unable to find object placed by {Instigator.Format()} in add foliage action.");
+                    return;
+                }
+
+                LevelObjectResponsibilities.Set(obj.instanceID, Instigator.m_SteamID, false);
+            }
+#endif
         }
         else
         {
@@ -283,10 +296,8 @@ public sealed class RemoveResourceSpawnpointAction : IAction, IAsset
                         region.RemoveAt(i);
                         return;
                     }
-                    else
-                    {
-                        Logger.LogWarning("Found matching position but different GUID: " + (FoliageAsset.Find()?.FriendlyName ?? FoliageAsset.ToString()).Format() + " vs " + sp.asset.FriendlyName.Format() + ".");
-                    }
+
+                    Logger.LogWarning("Found matching position but different GUID: " + (FoliageAsset.Find()?.FriendlyName ?? FoliageAsset.ToString()).Format() + " vs " + sp.asset.FriendlyName.Format() + ".");
                 }
             }
 
@@ -371,7 +382,7 @@ public sealed class RemoveLevelObjectAction : IAction, ICoordinates
             if (obj.instanceID == InstanceId)
             {
                 _targetObject = obj;
-                return UserManager.FromId(Instigator.m_SteamID) is { } user && user.PlacedLevelObjectRecently(obj);
+                return LevelObjectResponsibilities.IsPlacer(obj.instanceID, Instigator.m_SteamID);
             }
         }
 

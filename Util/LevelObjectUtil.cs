@@ -18,8 +18,8 @@ public static class LevelObjectUtil
 {
     private const string Source = "LEVEL OBJECTS";
 
-    public static readonly int MaxSelectionSize = 64;
-    public static readonly int MaxMoveSelectionSize = 32;
+    public static readonly int MaxDeletePacketSize = 64;
+    public static readonly int MaxMovePacketSize = 32;
     public static readonly int MaxCopySelectionSize = 64;
 
 #if CLIENT

@@ -9,6 +9,7 @@ namespace DevkitServer.Multiplayer;
 internal sealed class InstanceIdResponsibilityTable
 {
     private const ushort DataVersion = 0;
+    private bool _dirty = false;
 #if SERVER
     private readonly Dictionary<uint, ulong> Responsibilities = new Dictionary<uint, ulong>(256);
 #else
@@ -94,11 +95,15 @@ internal sealed class InstanceIdResponsibilityTable
         {
             Logger.LogDebug($"[{Source}] Loaded new responsiblities table.");
         }
+
+        _dirty = false;
     }
     /// <summary>Remove <paramref name="instanceId"/> from save.</summary>
     public void Remove(uint instanceId, bool save = true)
     {
         ThreadUtil.assertIsGameThread();
+
+        _dirty = true;
 
         if (Responsibilities.Remove(instanceId) && save)
             Save();
@@ -111,6 +116,8 @@ internal sealed class InstanceIdResponsibilityTable
         , bool save = true)
     {
         ThreadUtil.assertIsGameThread();
+
+        _dirty = true;
 
 #if SERVER
         if (!steam64.UserSteam64())
@@ -151,7 +158,9 @@ internal sealed class InstanceIdResponsibilityTable
     public void Save()
     {
         ThreadUtil.assertIsGameThread();
-
+        if (!_dirty && File.Exists(SavePath))
+            return;
+        _dirty = false;
         if (Responsibilities.Count > 0)
         {
             DevkitServerUtility.CheckDirectory(false, Path.GetDirectoryName(SavePath)!);

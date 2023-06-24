@@ -1,13 +1,13 @@
 ﻿#if CLIENT
+using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Players;
 using HarmonyLib;
 using JetBrains.Annotations;
+using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Foliage;
-using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
-using SDG.Framework.Devkit.Tools;
 
 namespace DevkitServer.Patches;
 [HarmonyPatch]
@@ -213,7 +213,16 @@ internal static class FoliageEditorPatches
     private static void OnAddFoliage(FoliageInfoAsset asset, Vector3 position, Quaternion rotation, Vector3 scale, bool clearWhenBaked)
     {
         if (!DevkitServerModule.IsEditing) return;
-        
+
+        if (asset is FoliageObjectInfoAsset objAsset && Regions.tryGetCoordinate(position, out byte x, out byte y) && LevelObjects.objects[x, y] is { Count: > 0 and <= ushort.MaxValue + 1 } region)
+        {
+            LevelObject obj = ObjectManager.getObject(x, y, (ushort)(region.Count - 1));
+            if (obj.asset.GUID != objAsset.obj.GUID)
+                Logger.LogWarning("Unable to find recently placed foliage object.");
+            else
+                LevelObjectResponsibilities.Set(obj.instanceID, false);
+        }
+
         ClientEvents.InvokeOnAddFoliage(new AddFoliageProperties(asset, position, rotation, scale, clearWhenBaked, CachedTime.DeltaTime));
     }
 

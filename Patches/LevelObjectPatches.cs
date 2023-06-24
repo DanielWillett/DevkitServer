@@ -9,8 +9,6 @@ using SDG.Framework.Devkit.Transactions;
 using SDG.Framework.Utilities;
 using System.Reflection;
 using System.Reflection.Emit;
-using DevkitServer.API.Permissions;
-using DevkitServer.Multiplayer;
 using Action = System.Action;
 
 namespace DevkitServer.Patches;
@@ -24,7 +22,11 @@ internal static class LevelObjectPatches
     private static bool IsFinalTransform;
     private static RegionIdentifier? _lastDeleting;
     private static List<EditorSelection>? _selections;
+    private static TransformHandles? _handles;
     private static List<EditorCopy>? _copies;
+
+    private static readonly Action? CallCalculateHandleOffsets =
+        Accessor.GenerateInstanceCaller<EditorObjects, Action>("calculateHandleOffsets", Array.Empty<Type>());
 
     private static List<EditorCopy> EditorObjectCopies => _copies ??=
         (List<EditorCopy>?)typeof(EditorObjects).GetField("copies", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null)
@@ -32,6 +34,9 @@ internal static class LevelObjectPatches
     private static List<EditorSelection> EditorObjectSelection => _selections ??=
         (List<EditorSelection>?)typeof(EditorObjects).GetField("selection", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null)
         ?? throw new MemberAccessException("Unable to find field: EditorObjects.selection.");
+    private static TransformHandles EditorObjectHandles => _handles ??=
+        (TransformHandles?)typeof(EditorObjects).GetField("handles", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null)
+        ?? throw new MemberAccessException("Unable to find field: EditorObjects.handles.");
 
     [HarmonyPatch(typeof(EditorObjects), "Update")]
     [HarmonyTranspiler]
@@ -54,6 +59,12 @@ internal static class LevelObjectPatches
         if (selectedObjects == null)
         {
             Logger.LogWarning($"{method.Format()} - Unable to find field: EditorObjects.selection.", method: Source);
+            DevkitServerModule.Fault();
+        }
+        FieldInfo? handles = eo.GetField("handles", BindingFlags.Static | BindingFlags.NonPublic);
+        if (handles == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find field: EditorObjects.handles.", method: Source);
             DevkitServerModule.Fault();
         }
         MethodInfo? selectedObjectsCount = selectedObjects?.FieldType.GetProperty(nameof(List<object>.Count), BindingFlags.Instance | BindingFlags.Public)?.GetMethod;
@@ -136,6 +147,7 @@ internal static class LevelObjectPatches
         bool patchedCopy = false;
         bool patchedPaste = false;
         bool patchedDelete = false;
+        bool patchedHandleDown = false;
         bool patchedPasteTransform = false;
         bool patchedInstantiate = false;
 
@@ -153,6 +165,21 @@ internal static class LevelObjectPatches
                 ins[i] = new CodeInstruction(OpCodes.Call, invoker);
                 Logger.LogDebug($"[{Source}] Removed call to {original.Format()} in place of {invoker.Format()}.");
                 ++patchedReun;
+                continue;
+            }
+
+            // start using handle
+            if (PatchUtil.MatchPattern(ins, i,
+
+                    // EditorObjects.pointSelection()
+                    x => x.Calls(pointSelection),
+                    // EditorObjects.handles.[...]
+                    x => x.LoadsField(handles)
+                ))
+            {
+                Label? @goto = PatchUtil.GetNextBranchTarget(ins, i);
+                PatchUtil.ReturnIfFalse(ins, generator, ref i, CheckCanMove, @goto);
+                patchedHandleDown = true;
                 continue;
             }
 
@@ -306,6 +333,11 @@ internal static class LevelObjectPatches
             Logger.LogWarning($"Unable to patch instantiate (E) operations in {method.Format()}.", method: Source);
             DevkitServerModule.Fault();
         }
+        if (!patchedHandleDown)
+        {
+            Logger.LogWarning($"Unable to patch handle down operation in {method.Format()}.", method: Source);
+            DevkitServerModule.Fault();
+        }
         if (patchedReun < 2)
         {
             Logger.LogWarning($"Patched {patchedReun.Format()}/{2.Format()} undo/redo operations in {method.Format()}.", method: Source);
@@ -315,6 +347,39 @@ internal static class LevelObjectPatches
         return ins;
     }
 
+    [HarmonyPatch(typeof(EditorObjects), "releaseHandle")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    private static bool EditorObjectsOnReleaseHandlePrefix() => CheckCanMove();
+
+    [HarmonyPatch(typeof(EditorObjects), "releaseHandle")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void EditorObjectsOnReleaseHandlePostfix(bool __runOriginal, ref bool ___isUsingHandle)
+    {
+        if (!DevkitServerModule.IsEditing)
+            return;
+        if (__runOriginal)
+            MoveFinalSelection();
+        else
+        {
+            UndoMove();
+            ___isUsingHandle = false;
+        }
+    }
+    private static void UndoMove()
+    {
+        List<EditorSelection> selections = EditorObjectSelection;
+
+        for (int i = 0; i < selections.Count; ++i)
+        {
+            EditorSelection editorSelection = selections[i];
+            editorSelection.transform.SetPositionAndRotation(editorSelection.fromPosition, editorSelection.fromRotation);
+            editorSelection.transform.localScale = editorSelection.fromScale;
+        }
+        EditorObjectHandles.MouseUp();
+        CallCalculateHandleOffsets?.Invoke();
+    }
     [HarmonyPatch(typeof(EditorObjects), "OnHandleTranslatedAndRotated")]
     [HarmonyPostfix]
     [UsedImplicitly]
@@ -325,6 +390,12 @@ internal static class LevelObjectPatches
         if (!DevkitServerModule.IsEditing)
             return;
 
+        if (isFinal)
+        {
+            MoveFinalSelection();
+            return;
+        }
+
         List<EditorSelection> selections = EditorObjectSelection;
 
         Logger.LogDebug($"[CLIENT EVENTS] Move preview requested at: {string.Join(",", selections.Select(selection => selection.transform.gameObject.name.Format()))}: deltaPos: {worldPositionDelta.Format()}, deltaRot: {worldRotationDelta.eulerAngles.Format()}, pivotPos: {pivotPosition.Format()}, modifyRotation: {modifyRotation}.");
@@ -334,16 +405,11 @@ internal static class LevelObjectPatches
             flags |= TransformationDelta.TransformFlags.Position | TransformationDelta.TransformFlags.OriginalPosition;
         if (modifyRotation && !worldRotationDelta.IsNearlyIdentity())
             flags |= TransformationDelta.TransformFlags.Rotation | TransformationDelta.TransformFlags.OriginalRotation;
-
-        // no there's not enough lists
+        
         List<uint> instanceIds = ListPool<uint>.claim();
         List<RegionIdentifier> buildableIds = ListPool<RegionIdentifier>.claim();
         List<TransformationDelta> translations = ListPool<TransformationDelta>.claim();
         List<TransformationDelta> buildableTranslations = ListPool<TransformationDelta>.claim();
-        List<Vector3>? objScales = isFinal ? ListPool<Vector3>.claim() : null;
-        List<Vector3>? objOriginalScales = isFinal ? ListPool<Vector3>.claim() : null;
-        List<Vector3>? buildableScales = isFinal ? ListPool<Vector3>.claim() : null;
-        List<Vector3>? buildableOriginalScales = isFinal ? ListPool<Vector3>.claim() : null;
 
         float dt = CachedTime.DeltaTime;
         try
@@ -353,36 +419,17 @@ internal static class LevelObjectPatches
                 translations.Capacity = count;
             if (instanceIds.Capacity < count)
                 instanceIds.Capacity = count;
-            if (isFinal)
-            {
-                if (objScales!.Capacity < count)
-                    objScales.Capacity = count;
-                if (objOriginalScales!.Capacity < count)
-                    objOriginalScales.Capacity = count;
-            }
-
-            bool globalUseScale = false;
+            
             foreach (EditorSelection selection in selections)
             {
-                TransformationDelta t = isFinal
-                    ? new TransformationDelta(TransformationDelta.TransformFlags.All, selection.transform.position, selection.transform.rotation, selection.fromPosition, selection.fromRotation)
-                    : new TransformationDelta(flags, worldPositionDelta, worldRotationDelta, selection.fromPosition, selection.fromRotation);
-                bool useScale = isFinal && !selection.fromScale.IsNearlyEqual(selection.transform.localScale);
-                globalUseScale |= useScale;
+                TransformationDelta t = new TransformationDelta(flags, worldPositionDelta, worldRotationDelta, selection.fromPosition, selection.fromRotation);
                 if (LevelObjectUtil.TryFindObject(selection.transform, out RegionIdentifier id))
                 {
                     LevelObject? levelObject = ObjectManager.getObject(id.X, id.Y, id.Index);
                     if (levelObject == null) continue;
                     instanceIds.Add(levelObject.instanceID);
                     translations.Add(t);
-                    if (isFinal)
-                    {
-                        objScales!.Add(selection.transform.localScale);
-                        objOriginalScales!.Add(selection.fromScale);
-                        if (ClientEvents.ListeningOnMoveObjectFinal)
-                            ClientEvents.InvokeOnMoveObjectFinal(new MoveObjectFinalProperties(levelObject.instanceID, t, selection.transform.localScale, selection.fromScale, useScale, dt));
-                    }
-                    else if (ClientEvents.ListeningOnMoveObjectPreview)
+                    if (ClientEvents.ListeningOnMoveObjectPreview)
                         ClientEvents.InvokeOnMoveObjectPreview(new MoveObjectPreviewProperties(levelObject.instanceID, t, pivotPosition, false, dt));
                 }
                 else if (LevelObjectUtil.TryFindBuildable(selection.transform, out id))
@@ -391,33 +438,28 @@ internal static class LevelObjectPatches
                     if (buildable == null) continue;
                     buildableIds.Add(id);
                     buildableTranslations.Add(t);
-                    if (isFinal)
-                    {
-                        buildableScales!.Add(selection.transform.localScale);
-                        buildableOriginalScales!.Add(selection.fromScale);
-                        if (ClientEvents.ListeningOnMoveBuildableFinal)
-                            ClientEvents.InvokeOnMoveBuildableFinal(new MoveBuildableFinalProperties(id, t, selection.transform.localScale, selection.fromScale, useScale, dt));
-                    }
-                    else if (ClientEvents.ListeningOnMoveBuildablePreview)
+                    if (ClientEvents.ListeningOnMoveBuildablePreview)
                         ClientEvents.InvokeOnMoveBuildablePreview(new MoveBuildablePreviewProperties(id, t, pivotPosition, false, dt));
                 }
 
-                if (instanceIds.Count + buildableIds.Count >= LevelObjectUtil.MaxMoveSelectionSize && !HasPermissionToOverrideSelectionLimit())
-                    break;
+                int totalObjects = instanceIds.Count + buildableIds.Count;
+                if (totalObjects > 0 && totalObjects % LevelObjectUtil.MaxMovePacketSize == 0)
+                    Flush();
             }
 
-            if (isFinal)
+            Flush();
+
+            void Flush()
             {
-                ClientEvents.InvokeOnMoveLevelObjectsFinal(new MoveLevelObjectsFinalProperties(instanceIds.ToArrayFast(), translations.ToArrayFast(),
-                    globalUseScale ? objOriginalScales!.ToArrayFast() : null, globalUseScale ? objScales!.ToArrayFast() : null,
-                    buildableIds.ToArrayFast(), buildableTranslations.ToArrayFast(),
-                    globalUseScale ? buildableOriginalScales!.ToArrayFast() : null, globalUseScale ? buildableScales!.ToArrayFast() : null
-                    , dt));
-            }
-            else if (ClientEvents.ListeningOnMoveHierarchyObjectsPreview)
-            {
-                ClientEvents.InvokeOnMoveLevelObjectsPreview(new MoveLevelObjectsPreviewProperties(instanceIds.ToArrayFast(), translations.ToArrayFast(),
-                    buildableIds.ToArrayFast(), buildableTranslations.ToArrayFast(), pivotPosition, dt));
+                if (ClientEvents.ListeningOnMoveHierarchyObjectsPreview)
+                {
+                    ClientEvents.InvokeOnMoveLevelObjectsPreview(new MoveLevelObjectsPreviewProperties(instanceIds.ToArrayFast(), translations.ToArrayFast(),
+                        buildableIds.ToArrayFast(), buildableTranslations.ToArrayFast(), pivotPosition, dt));
+                }
+                instanceIds.Clear();
+                translations.Clear();
+                buildableIds.Clear();
+                buildableTranslations.Clear();
             }
         }
         finally
@@ -426,13 +468,107 @@ internal static class LevelObjectPatches
             ListPool<RegionIdentifier>.release(buildableIds);
             ListPool<TransformationDelta>.release(translations);
             ListPool<TransformationDelta>.release(buildableTranslations);
-            if (isFinal)
+        }
+    }
+    private static void MoveFinalSelection()
+    {
+        List<EditorSelection> selections = EditorObjectSelection;
+
+        Logger.LogDebug($"[CLIENT EVENTS] Move final requested at: {string.Join(",", selections.Select(selection => selection.transform.gameObject.name.Format()))}.");
+
+        const TransformationDelta.TransformFlags flags = TransformationDelta.TransformFlags.All;
+
+        // no there's not enough lists
+        List<uint> instanceIds = ListPool<uint>.claim();
+        List<RegionIdentifier> buildableIds = ListPool<RegionIdentifier>.claim();
+        List<TransformationDelta> translations = ListPool<TransformationDelta>.claim();
+        List<TransformationDelta> buildableTranslations = ListPool<TransformationDelta>.claim();
+        List<Vector3> objScales = ListPool<Vector3>.claim();
+        List<Vector3> objOriginalScales = ListPool<Vector3>.claim();
+        List<Vector3> buildableScales = ListPool<Vector3>.claim();
+        List<Vector3> buildableOriginalScales = ListPool<Vector3>.claim();
+
+        float dt = CachedTime.DeltaTime;
+        try
+        {
+            int count = selections.Count;
+            if (translations.Capacity < count)
+                translations.Capacity = count;
+            if (instanceIds.Capacity < count)
+                instanceIds.Capacity = count;
+            if (objScales.Capacity < count)
+                objScales.Capacity = count;
+            if (objOriginalScales.Capacity < count)
+                objOriginalScales.Capacity = count;
+
+            bool globalUseScale = false;
+            foreach (EditorSelection selection in selections)
             {
-                ListPool<Vector3>.release(objScales);
-                ListPool<Vector3>.release(objOriginalScales);
-                ListPool<Vector3>.release(buildableScales);
-                ListPool<Vector3>.release(buildableOriginalScales);
+                TransformationDelta t = new TransformationDelta(flags,
+                    selection.transform.position, selection.transform.rotation, selection.fromPosition, selection.fromRotation);
+                bool useScale = !selection.fromScale.IsNearlyEqual(selection.transform.localScale);
+                globalUseScale |= useScale;
+                if (LevelObjectUtil.TryFindObject(selection.transform, out RegionIdentifier id))
+                {
+                    LevelObject? levelObject = ObjectManager.getObject(id.X, id.Y, id.Index);
+                    if (levelObject == null) continue;
+                    instanceIds.Add(levelObject.instanceID);
+                    translations.Add(t);
+                    objScales.Add(selection.transform.localScale);
+                    objOriginalScales.Add(selection.fromScale);
+                    if (ClientEvents.ListeningOnMoveObjectFinal)
+                        ClientEvents.InvokeOnMoveObjectFinal(new MoveObjectFinalProperties(levelObject.instanceID, t, selection.transform.localScale, selection.fromScale, useScale, dt));
+                }
+                else if (LevelObjectUtil.TryFindBuildable(selection.transform, out id))
+                {
+                    LevelBuildableObject? buildable = LevelObjectUtil.GetBuildable(id);
+                    if (buildable == null) continue;
+                    buildableIds.Add(id);
+                    buildableTranslations.Add(t);
+                    buildableScales.Add(selection.transform.localScale);
+                    buildableOriginalScales.Add(selection.fromScale);
+                    if (ClientEvents.ListeningOnMoveBuildableFinal)
+                        ClientEvents.InvokeOnMoveBuildableFinal(new MoveBuildableFinalProperties(id, t, selection.transform.localScale, selection.fromScale, useScale, dt));
+                }
+
+                int totalObjects = instanceIds.Count + buildableIds.Count;
+                if (totalObjects > 0 && totalObjects % LevelObjectUtil.MaxMovePacketSize == 0)
+                    Flush();
             }
+
+            Flush();
+
+            void Flush()
+            {
+                if (ClientEvents.ListeningOnMoveLevelObjectsFinal)
+                {
+                    ClientEvents.InvokeOnMoveLevelObjectsFinal(new MoveLevelObjectsFinalProperties(instanceIds.ToArrayFast(), translations.ToArrayFast(),
+                        globalUseScale ? objOriginalScales.ToArrayFast() : null, globalUseScale ? objScales.ToArrayFast() : null,
+                        buildableIds.ToArrayFast(), buildableTranslations.ToArrayFast(),
+                        globalUseScale ? buildableOriginalScales.ToArrayFast() : null, globalUseScale ? buildableScales.ToArrayFast() : null
+                        , dt));
+                }
+                instanceIds.Clear();
+                translations.Clear();
+                objOriginalScales.Clear();
+                objScales.Clear();
+                buildableIds.Clear();
+                buildableTranslations.Clear();
+                buildableOriginalScales.Clear();
+                buildableScales.Clear();
+                globalUseScale = false;
+            }
+        }
+        finally
+        {
+            ListPool<uint>.release(instanceIds);
+            ListPool<RegionIdentifier>.release(buildableIds);
+            ListPool<TransformationDelta>.release(translations);
+            ListPool<TransformationDelta>.release(buildableTranslations);
+            ListPool<Vector3>.release(objScales);
+            ListPool<Vector3>.release(objOriginalScales);
+            ListPool<Vector3>.release(buildableScales);
+            ListPool<Vector3>.release(buildableOriginalScales);
         }
     }
     private static void OnInstantiate(Vector3 position, Quaternion rotation, Vector3 scale, ObjectAsset objectAsset, ItemAsset buildableAsset)
@@ -449,7 +585,7 @@ internal static class LevelObjectPatches
             return;
 
         Logger.LogDebug($"[{Source}] Checking instantiate.");
-        if (IsSyncing)
+        if (IsSyncing || EditorActions.HasLargeQueue())
         {
             UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return;
@@ -463,26 +599,17 @@ internal static class LevelObjectPatches
 
         LevelObjectUtil.RequestInstantiation(objectAsset == null ? buildableAsset.GUID : objectAsset.GUID, position, rotation, scale);
     }
-
-    private static bool HasPermissionToOverrideSelectionLimit()
-    {
-        return ClientInfo.Info != null && ClientInfo.Info.ServerUsesBypassingObjectSelectionLimitPermission && VanillaPermissions.BypassObjectSelectionLimits.Has(false);
-    }
+    
     private static bool OnDeleteSelection()
     {
         if (!DevkitServerModule.IsEditing)
             return true;
-        if (IsSyncing)
+        if (IsSyncing || EditorActions.HasLargeQueue())
         {
             UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
         List<EditorSelection> selection = EditorObjectSelection;
-        if (selection.Count > LevelObjectUtil.MaxSelectionSize && !HasPermissionToOverrideSelectionLimit())
-        {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("TooManySelections", selection.Count, LevelObjectUtil.MaxSelectionSize));
-            return false;
-        }
         Logger.LogDebug($"[{Source}] Deleting selection.");
         List<uint> objects = ListPool<uint>.claim();
         if (objects.Capacity < selection.Count)
@@ -504,6 +631,8 @@ internal static class LevelObjectPatches
                     }
 
                     buildables.Add(id);
+                    if (i > 0 && i % LevelObjectUtil.MaxDeletePacketSize == 0)
+                        Flush();
                     continue;
                 }
                 if (!LevelObjectUtil.CheckDeletePermission(obj.instanceID))
@@ -512,19 +641,30 @@ internal static class LevelObjectPatches
                     return false;
                 }
                 objects.Add(obj.instanceID);
+                if (i > 0 && i % LevelObjectUtil.MaxDeletePacketSize == 0)
+                    Flush();
             }
 
-            if (ClientEvents.ListeningOnDeleteLevelObjects)
-                ClientEvents.InvokeOnDeleteLevelObjects(new DeleteLevelObjectsProperties(objects.ToArrayFast(), buildables.ToArrayFast(), dt));
-            if (ClientEvents.ListeningOnDeleteObject)
+            Flush();
+
+            void Flush()
             {
-                for (int i = 0; i < objects.Count; ++i)
-                    ClientEvents.InvokeOnDeleteObject(new DeleteObjectProperties(objects[i], dt));
-            }
-            if (ClientEvents.ListeningOnDeleteBuildable)
-            {
-                for (int i = 0; i < buildables.Count; ++i)
-                    ClientEvents.InvokeOnDeleteBuildable(new DeleteBuildableProperties(buildables[i], dt));
+                if (ClientEvents.ListeningOnDeleteLevelObjects)
+                    ClientEvents.InvokeOnDeleteLevelObjects(new DeleteLevelObjectsProperties(objects.ToArrayFast(), buildables.ToArrayFast(), dt));
+
+                if (ClientEvents.ListeningOnDeleteObject)
+                {
+                    for (int i = 0; i < objects.Count; ++i)
+                        ClientEvents.InvokeOnDeleteObject(new DeleteObjectProperties(objects[i], dt));
+                }
+                if (ClientEvents.ListeningOnDeleteBuildable)
+                {
+                    for (int i = 0; i < buildables.Count; ++i)
+                        ClientEvents.InvokeOnDeleteBuildable(new DeleteBuildableProperties(buildables[i], dt));
+                }
+
+                objects.Clear();
+                buildables.Clear();
             }
         }
         finally
@@ -539,12 +679,12 @@ internal static class LevelObjectPatches
     {
         if (!DevkitServerModule.IsEditing)
             return true;
-        if (IsSyncing)
+        if (IsSyncing || EditorActions.HasLargeQueue())
         {
             UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
-        if (EditorObjectSelection.Count > LevelObjectUtil.MaxCopySelectionSize && !HasPermissionToOverrideSelectionLimit())
+        if (EditorObjectSelection.Count > LevelObjectUtil.MaxCopySelectionSize)
         {
             UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("TooManySelections", EditorObjectSelection.Count, LevelObjectUtil.MaxCopySelectionSize));
             return false;
@@ -565,12 +705,12 @@ internal static class LevelObjectPatches
         if (!DevkitServerModule.IsEditing)
             return true;
         Logger.LogDebug($"[{Source}] Checking paste.");
-        if (IsSyncing)
+        if (IsSyncing || EditorActions.HasLargeQueue())
         {
             UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
-        if (EditorObjectCopies.Count > LevelObjectUtil.MaxCopySelectionSize && !HasPermissionToOverrideSelectionLimit())
+        if (EditorObjectCopies.Count > LevelObjectUtil.MaxCopySelectionSize)
         {
             UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("TooManySelections", EditorObjectCopies.Count, LevelObjectUtil.MaxCopySelectionSize));
             return false;
@@ -584,17 +724,12 @@ internal static class LevelObjectPatches
     {
         if (!DevkitServerModule.IsEditing)
             return true;
-        if (IsSyncing)
+        if (IsSyncing || EditorActions.HasLargeQueue())
         {
             UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
         List<EditorSelection> selection = EditorObjectSelection;
-        if (selection.Count > LevelObjectUtil.MaxMoveSelectionSize && !HasPermissionToOverrideSelectionLimit())
-        {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("TooManySelections", selection.Count, LevelObjectUtil.MaxMoveSelectionSize));
-            return false;
-        }
         Logger.LogDebug($"[{Source}] Checking move.");
 
         for (int i = 0; i < selection.Count; ++i)
