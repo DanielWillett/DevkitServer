@@ -53,6 +53,11 @@ public static class EditorLevel
 #if SERVER
     private static bool _isCompressingLevel;
     private static LevelData? _lvl;
+    private static int _compressionWaiters;
+
+    // i used an exit flag here because the finally block is not executed when calling StopCoroutine (Dispose is not called)
+    private static bool _exitCoroutine;
+
     private static readonly ByteWriter LevelWriter = new ByteWriter(false, 134217728); // 128 MiB
 
     [NetCall(NetCallSource.FromClient, (ushort)NetCalls.RequestLevel)]
@@ -68,20 +73,25 @@ public static class EditorLevel
     }
     private static IEnumerator GatherAndCompressLevel(ITransportConnection connection)
     {
+        _exitCoroutine = false;
+        PendingToReceiveActions.Add(connection);
+        ++_compressionWaiters;
         if (_isCompressingLevel)
         {
-            while (_isCompressingLevel)
+            while (_isCompressingLevel && !_exitCoroutine)
                 yield return null;
+            _exitCoroutine = false;
+            --_compressionWaiters;
             yield break;
         }
         _isCompressingLevel = true;
         try
         {
             _lvl = LevelData.GatherLevelData();
-            PendingToReceiveActions.Add(connection);
             Folder folder = _lvl.LevelFolderContent;
             Folder.Write(LevelWriter, in folder);
             byte[] data = LevelWriter.ToArray();
+            _lvl.Data = data;
             LevelWriter.FinishWrite();
             int size1 = data.Length;
             _lvl.Compressed = false;
@@ -89,6 +99,11 @@ public static class EditorLevel
             using (MemoryStream mem = new MemoryStream(data.Length))
             using (DeflateStream stream = new DeflateStream(mem, CompressionLevel.Optimal))
             {
+                if (_exitCoroutine)
+                {
+                    _exitCoroutine = false;
+                    yield break;
+                }
                 IAsyncResult writeTask = stream.BeginWrite(data, 0, data.Length, null, null);
                 while (!writeTask.IsCompleted)
                     yield return null;
@@ -108,6 +123,7 @@ public static class EditorLevel
         }
         finally
         {
+            --_compressionWaiters;
             _isCompressingLevel = false;
         }
     }
@@ -116,6 +132,10 @@ public static class EditorLevel
         bool overrideSlow = false;
         bool lowSpeedDownload = true;
         HighSpeedConnection? hsConn = null;
+        bool local = false;
+        string ip = connection.GetAddressString(false);
+        if (ip != null && ip.Equals("127.0.0.1", StringComparison.Ordinal)) // local can download much faster
+            local = true;
         slowRedo:
         try
         {
@@ -133,7 +153,7 @@ public static class EditorLevel
             const int firstCheckupPosition = 25 - 1;
             float startTime = CachedTime.RealtimeSinceStartup;
             string lvlName = Level.info.name;
-            Coroutine compress = DevkitServerModule.ComponentHost.StartCoroutine(GatherAndCompressLevel(connection));
+            DevkitServerModule.ComponentHost.StartCoroutine(GatherAndCompressLevel(connection));
             NetTask task2 = EndSendLevel.Listen();
 
             float avgPing = 0;
@@ -151,7 +171,6 @@ public static class EditorLevel
                     if (!task4.Parameters.Responded)
                     {
                         Logger.LogInfo($"[SEND LEVEL] User failed to respond to ping check #{i + 1}.", ConsoleColor.DarkCyan);
-                        DevkitServerModule.ComponentHost.StopCoroutine(compress);
                         yield break;
                     }
 
@@ -166,13 +185,22 @@ public static class EditorLevel
                 Logger.LogDebug($"[SEND LEVEL] Average ping: {avgPing * 1000:F2} ms (n = {pingCt}, t = {pingSpacing * 1000:0.##} ms).");
             }
 
-            while (_isCompressingLevel)
-                yield return null;
+            bool noCompress = _isCompressingLevel && local && !lowSpeedDownload;
+            if (!noCompress) // local high speed download is so fast it's not worth waiting.
+            {
+                while (_isCompressingLevel)
+                    yield return null;
+            }
+            else
+            {
+                Logger.LogInfo("[SEND LEVEL] Skipping compressing for local high-speed connection.");
+                if (_compressionWaiters <= 1 && _isCompressingLevel)
+                    _exitCoroutine = true;
+            }
             LevelData? levelDataAtTimeOfRequest = _lvl;
             if (levelDataAtTimeOfRequest == null)
             {
-                Logger.LogInfo("[SEND LEVEL] Failed to compress level.", ConsoleColor.DarkCyan);
-                DevkitServerModule.ComponentHost.StopCoroutine(compress);
+                Logger.LogInfo("[SEND LEVEL] Failed to gather level data.", ConsoleColor.DarkCyan);
                 yield break;
             }
 
@@ -241,8 +269,7 @@ public static class EditorLevel
                 if (!connection.TryGetPort(out _))
                     yield break;
                 float packetDelay = avgPing;
-                string ip = connection.GetAddressString(false);
-                if (ip.Equals("127.0.0.1", StringComparison.Ordinal)) // local can download much faster
+                if (local) // local can download much faster
                     packetDelay = 0.05f;
                 int checkup = firstCheckupPosition;
                 int lastCheckup = 0;

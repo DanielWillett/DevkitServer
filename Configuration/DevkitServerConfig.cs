@@ -1,9 +1,7 @@
-﻿using System.Text.Encodings.Web;
+﻿using DevkitServer.API.Permissions;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using DevkitServer.API.Permissions;
-using DevkitServer.Core.Permissions;
-using JetBrains.Annotations;
 
 namespace DevkitServer.Configuration;
 [EarlyTypeInit(-1)]
@@ -62,15 +60,18 @@ public class DevkitServerConfig
     }
 
 #if CLIENT
+    internal static string? SeverFolderIntl;
     [CreateDirectory]
     public static readonly string Directory = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer");
     public static readonly string ConfigFilePath = Path.Combine(Directory, "client_config.json");
+    public static string ServerFolder => SeverFolderIntl ??= Path.Combine(Directory, Parser.getIPFromUInt32(Provider.currentServerInfo.ip) + "_" + Provider.currentServerInfo.connectionPort);
 #else
     [CreateDirectory]
     public static readonly string Directory = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer", Provider.serverID);
 
     public static readonly string ConfigFilePath = Path.Combine(Directory, "server_config.json");
     public static readonly string PermissionGroupsPath = Path.Combine(Directory, "permission_groups.json");
+    public static string ServerFolder = Directory;
 #endif
     private static string? _lvl;
     private static LevelInfo? _lvlInfo;
@@ -82,7 +83,13 @@ public class DevkitServerConfig
             if (_lvl != null && _lvlInfo == lvl) return _lvl;
             _lvlInfo = lvl;
             if (lvl != null)
+            {
+#if SERVER
                 return _lvl = Path.Combine(Directory, "Levels", lvl.name);
+#else
+                return _lvl = Path.Combine(ServerFolder, "Levels", lvl.name);
+#endif
+            }
 
             throw new NotSupportedException("Level not loaded");
         }

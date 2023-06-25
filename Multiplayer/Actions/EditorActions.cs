@@ -43,6 +43,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     internal static ushort ReadDataVersion;
 #if SERVER
     private float _lastNoPermissionMessage;
+    public void DontSendPermissionMesssage() => _lastNoPermissionMessage = CachedTime.RealtimeSinceStartup;
 #endif
 #if CLIENT
     internal static TemporaryEditorActions? TemporaryEditorActions;
@@ -63,7 +64,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             return false;
         EditorActions actions = user.Actions;
         // if the number of actions that can fit in a packet is less than 50% of the total queued actions
-        return actions.CountNumActionsInPacket() / (float)actions._pendingActions.Count < 0.5;
+        return actions.CountNumActionsInPacket(out _) / (float)actions._pendingActions.Count < 0.5;
     }
 #endif
 
@@ -75,6 +76,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     public TerrainActions TerrainActions { get; }
     public FoliageActions FoliageActions { get; }
     public HierarchyActions HierarchyActions { get; }
+    public ObjectActions ObjectActions { get; }
 
     private EditorActions()
     {
@@ -82,6 +84,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         TerrainActions = new TerrainActions(this);
         FoliageActions = new FoliageActions(this);
         HierarchyActions = new HierarchyActions(this);
+        ObjectActions = new ObjectActions(this);
     }
 
     [UsedImplicitly]
@@ -146,15 +149,18 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 #endif
     }
 #if CLIENT
-    internal void QueueAction(IAction action)
+    internal void QueueAction(IAction action, bool space = false)
     {
         action.Instigator = Provider.client;
         if (IsOwner)
             LocalLastAction = CachedTime.RealtimeSinceStartup;
-        if (_queuedThisFrame)
-            action.DeltaTime = 0f;
-        else
-            _queuedThisFrame = true;
+        if (!space)
+        {
+            if (_queuedThisFrame)
+                action.DeltaTime = 0f;
+            else
+                _queuedThisFrame = true;
+        }
         _pendingActions.Add(action);
     }
 #endif
@@ -261,6 +267,8 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             finally
             {
                 _pendingActions.RemoveAt(_pendingActions.Count - 1);
+                if (action is IDisposable d)
+                    d.Dispose();
             }
         }
     }
@@ -285,8 +293,9 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             OnAppliedAction?.Invoke(listener, action);
         }
     }
-    private int CountNumActionsInPacket(int index = 0, int length = -1)
+    private int CountNumActionsInPacket(out int skipped, int index = 0, int length = -1)
     {
+        skipped = 0;
         if (length < 0)
             length = _pendingActions.Count - index;
         int ct = 0;
@@ -296,7 +305,15 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         {
             if (ct >= byte.MaxValue)
                 break;
-            (int val, int settings) = GetMaxSizes(_pendingActions[i]);
+            IAction pendingAction = _pendingActions[i];
+#if SERVER
+            if (pendingAction is IServersideAction)
+            {
+                ++skipped;
+                continue;
+            }
+#endif
+            (int val, int settings) = GetMaxSizes(pendingAction);
             val += settings;
             if (size + settings > MaxPacketSize)
             {
@@ -321,13 +338,17 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         writer.Write(DataVersion);
         if (index + length > _pendingActions.Count)
             length = _pendingActions.Count - index;
-        int ct = CountNumActionsInPacket(index, length);
+        int ct = CountNumActionsInPacket(out int skipped, index, length);
         writer.Write((byte)ct);
         List<ActionSettingsCollection> c = ListPool<ActionSettingsCollection>.claim();
-        int count2 = ct + index;
+        int count2 = ct + index + skipped;
         for (int i = index; i < count2; ++i)
         {
             IAction action = _pendingActions[i];
+#if SERVER
+            if (action is IServersideAction)
+                continue;
+#endif
             Logger.LogDebug("[EDITOR ACTIONS] Queued action at index " + (i - index).Format() + ": " + action.Format() + ".");
             ActionSettingsCollection? toAdd = null;
 
@@ -357,13 +378,20 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         for (int i = index; i < count2; ++i)
         {
             IAction action = _pendingActions[i];
+#if SERVER
+            if (action is IServersideAction)
+                continue;
+#endif
             writer.Write(action.Type);
             action.Write(writer);
+#if CLIENT
             if (action is IDisposable disposable)
                 disposable.Dispose();
+#endif
         }
-
+#if CLIENT
         _pendingActions.RemoveRange(0, ct);
+#endif
     }
 
     private void HandleReadPackets(ByteReader reader
@@ -414,7 +442,12 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 EditorActionsCodeGeneration.OnReadingAction!(this, action);
                 action.Read(reader);
 #if SERVER
-                if (action.CheckCanApply())
+                if (action is IServersideAction)
+                {
+                    _pendingActions.Add(action);
+                    anyInvalid = true;
+                }
+                else if (action.CheckCanApply())
                     _pendingActions.Add(action);
                 else
                 {
@@ -494,6 +527,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         TerrainActions.Subscribe();
         FoliageActions.Subscribe();
         HierarchyActions.Subscribe();
+        ObjectActions.Subscribe();
     }
 
     public void Unsubscribe()
@@ -501,6 +535,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         TerrainActions.Unsubscribe();
         FoliageActions.Unsubscribe();
         HierarchyActions.Unsubscribe();
+        ObjectActions.Unsubscribe();
     }
 }
 public interface IActionListener

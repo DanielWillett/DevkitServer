@@ -1,6 +1,6 @@
-﻿using System.Globalization;
+﻿using DevkitServer.Models;
+using System.Globalization;
 using System.Reflection;
-using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 
 // ReSharper disable AssignNullToNotNullAttribute
@@ -11,8 +11,15 @@ public class ByteReader
 {
     private const int MinStreamBufferSize = 32;
     private const int GuidSize = 16;
+
     private static readonly bool IsBigEndian = !BitConverter.IsLittleEndian;
-    private static readonly Type[] Parameters = { typeof(ByteReader) };
+    private static Dictionary<Type, MethodInfo>? _nonNullableReaders;
+    private static Dictionary<Type, MethodInfo>? _nullableReaders;
+    private static readonly MethodInfo ReadEnumMethod = typeof(ByteReader).GetMethod(nameof(ReadEnum), BindingFlags.Instance | BindingFlags.Public)
+                                                         ?? throw new MemberAccessException("Unable to find read enum method.");
+    private static readonly MethodInfo ReadNullableEnumMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableEnum), BindingFlags.Instance | BindingFlags.Public)
+                                                                 ?? throw new MemberAccessException("Unable to find read nullable enum method.");
+
     public delegate T Reader<out T>(ByteReader reader);
     private byte[]? _buffer;
     private Stream? _stream;
@@ -39,6 +46,110 @@ public class ByteReader
     public bool ThrowOnError { get; set; }
     public bool LogOnError { get; set; } = true;
     public int StreamBufferSize { get; set; } = 128;
+
+    private static void PrepareMethods()
+    {
+        _nonNullableReaders ??= new Dictionary<Type, MethodInfo>(45)
+        {
+            { typeof(int), GetMethod(nameof(ReadInt32)) },
+            { typeof(uint), GetMethod(nameof(ReadUInt32)) },
+            { typeof(byte), GetMethod(nameof(ReadUInt8)) },
+            { typeof(sbyte), GetMethod(nameof(ReadInt8)) },
+            { typeof(bool), GetMethod(nameof(ReadBool)) },
+            { typeof(long), GetMethod(nameof(ReadInt64)) },
+            { typeof(ulong), GetMethod(nameof(ReadUInt64)) },
+            { typeof(short), GetMethod(nameof(ReadInt16)) },
+            { typeof(ushort), GetMethod(nameof(ReadUInt16)) },
+            { typeof(float), GetMethod(nameof(ReadFloat)) },
+            { typeof(decimal), GetMethod(nameof(ReadDecimal)) },
+            { typeof(double), GetMethod(nameof(ReadDouble)) },
+            { typeof(char), GetMethod(nameof(ReadChar)) },
+            { typeof(string), GetMethod(nameof(ReadString)) },
+            { typeof(Type), GetMethod(nameof(ReadType)) },
+            { typeof(Type[]), GetMethod(nameof(ReadTypeArray)) },
+            { typeof(RegionIdentifier), typeof(RegionIdentifier).GetMethod(nameof(RegionIdentifier.Read), BindingFlags.Static | BindingFlags.Public) },
+            { typeof(DateTime), GetMethod(nameof(ReadDateTime)) },
+            { typeof(DateTimeOffset), GetMethod(nameof(ReadDateTimeOffset)) },
+            { typeof(TimeSpan), GetMethod(nameof(ReadTimeSpan)) },
+            { typeof(Guid), GetMethod(nameof(ReadGuid)) },
+            { typeof(Vector2), GetMethod(nameof(ReadVector2)) },
+            { typeof(Vector3), GetMethod(nameof(ReadVector3)) },
+            { typeof(Vector4), GetMethod(nameof(ReadVector4)) },
+            { typeof(Bounds), GetMethod(nameof(ReadBounds)) },
+            { typeof(Quaternion), GetMethod(nameof(ReadQuaternion)) },
+            { typeof(Color), GetMethod(nameof(ReadColor)) },
+            { typeof(Color32), GetMethod(nameof(ReadColor32)) },
+            { typeof(Guid[]), GetMethod(nameof(ReadGuidArray)) },
+            { typeof(DateTime[]), GetMethod(nameof(ReadDateTimeArray)) },
+            { typeof(DateTimeOffset[]), GetMethod(nameof(ReadDateTimeOffsetArray)) },
+            { typeof(byte[]), GetMethod(nameof(ReadUInt8Array)) },
+            { typeof(sbyte[]), GetMethod(nameof(ReadInt8Array)) },
+            { typeof(int[]), GetMethod(nameof(ReadInt32Array)) },
+            { typeof(uint[]), GetMethod(nameof(ReadUInt32Array)) },
+            { typeof(bool[]), GetMethod(nameof(ReadBoolArray)) },
+            { typeof(long[]), GetMethod(nameof(ReadInt64Array)) },
+            { typeof(ulong[]), GetMethod(nameof(ReadUInt64Array)) },
+            { typeof(short[]), GetMethod(nameof(ReadInt16Array)) },
+            { typeof(ushort[]), GetMethod(nameof(ReadUInt16Array)) },
+            { typeof(float[]), GetMethod(nameof(ReadFloatArray)) },
+            { typeof(double[]), GetMethod(nameof(ReadDoubleArray)) },
+            { typeof(decimal[]), GetMethod(nameof(ReadDecimalArray)) },
+            { typeof(char[]), GetMethod(nameof(ReadCharArray)) },
+            { typeof(string[]), GetMethod(nameof(ReadStringArray)) },
+        };
+
+        _nullableReaders ??= new Dictionary<Type, MethodInfo>(44)
+        {
+            { typeof(int), GetMethod(nameof(ReadNullableInt32)) },
+            { typeof(uint), GetMethod(nameof(ReadNullableUInt32)) },
+            { typeof(byte), GetMethod(nameof(ReadNullableUInt8)) },
+            { typeof(sbyte), GetMethod(nameof(ReadNullableInt8)) },
+            { typeof(bool), GetMethod(nameof(ReadNullableBool)) },
+            { typeof(long), GetMethod(nameof(ReadNullableInt64)) },
+            { typeof(ulong), GetMethod(nameof(ReadNullableUInt64)) },
+            { typeof(short), GetMethod(nameof(ReadNullableInt16)) },
+            { typeof(ushort), GetMethod(nameof(ReadNullableUInt16)) },
+            { typeof(float), GetMethod(nameof(ReadNullableFloat)) },
+            { typeof(decimal), GetMethod(nameof(ReadNullableDecimal)) },
+            { typeof(double), GetMethod(nameof(ReadNullableDouble)) },
+            { typeof(char), GetMethod(nameof(ReadNullableChar)) },
+            { typeof(string), GetMethod(nameof(ReadNullableString)) },
+            { typeof(Type), GetMethod(nameof(ReadType)) },
+            { typeof(Type[]), GetMethod(nameof(ReadTypeArray)) },
+            { typeof(DateTime), GetMethod(nameof(ReadNullableDateTime)) },
+            { typeof(DateTimeOffset), GetMethod(nameof(ReadNullableDateTimeOffset)) },
+            { typeof(TimeSpan), GetMethod(nameof(ReadNullableTimeSpan)) },
+            { typeof(Guid), GetMethod(nameof(ReadNullableGuid)) },
+            { typeof(Vector2), GetMethod(nameof(ReadNullableVector2)) },
+            { typeof(Vector3), GetMethod(nameof(ReadNullableVector3)) },
+            { typeof(Vector4), GetMethod(nameof(ReadNullableVector4)) },
+            { typeof(Bounds), GetMethod(nameof(ReadNullableBounds)) },
+            { typeof(Quaternion), GetMethod(nameof(ReadNullableQuaternion)) },
+            { typeof(Color), GetMethod(nameof(ReadNullableColor)) },
+            { typeof(Color32), GetMethod(nameof(ReadNullableColor32)) },
+            { typeof(Guid[]), GetMethod(nameof(ReadNullableGuidArray)) },
+            { typeof(DateTime[]), GetMethod(nameof(ReadNullableDateTimeArray)) },
+            { typeof(DateTimeOffset[]), GetMethod(nameof(ReadNullableDateTimeOffsetArray)) },
+            { typeof(byte[]), GetMethod(nameof(ReadNullableUInt8Array)) },
+            { typeof(sbyte[]), GetMethod(nameof(ReadNullableInt8Array)) },
+            { typeof(int[]), GetMethod(nameof(ReadNullableInt32Array)) },
+            { typeof(uint[]), GetMethod(nameof(ReadNullableUInt32Array)) },
+            { typeof(bool[]), GetMethod(nameof(ReadNullableBoolArray)) },
+            { typeof(long[]), GetMethod(nameof(ReadNullableInt64Array)) },
+            { typeof(ulong[]), GetMethod(nameof(ReadNullableUInt64Array)) },
+            { typeof(short[]), GetMethod(nameof(ReadNullableInt16Array)) },
+            { typeof(ushort[]), GetMethod(nameof(ReadNullableUInt16Array)) },
+            { typeof(float[]), GetMethod(nameof(ReadNullableFloatArray)) },
+            { typeof(double[]), GetMethod(nameof(ReadNullableDoubleArray)) },
+            { typeof(decimal[]), GetMethod(nameof(ReadNullableDecimalArray)) },
+            { typeof(char[]), GetMethod(nameof(ReadNullableCharArray)) },
+            { typeof(string[]), GetMethod(nameof(ReadNullableStringArray)) }
+        };
+
+        MethodInfo GetMethod(string name) => typeof(ByteReader).GetMethod(name, BindingFlags.Instance | BindingFlags.Public)
+                                                ?? throw new MemberAccessException("Unable to find read method: " + name + ".");
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private int GetStreamBufferLength() => !_streamLengthSupport
         ? StreamBufferSize
@@ -124,7 +235,6 @@ public class ByteReader
         _index += size;
         return rtn;
     }
-
     public unsafe bool EnsureMoreLength(int byteCt)
     {
         if (_streamMode)
@@ -134,6 +244,8 @@ public class ByteReader
                 if (_length == 0)
                 {
                     _length = _stream!.Read(_buffer, 0, _buffer.Length - _length);
+                    if (_length == 0)
+                        goto fail;
                     _position += _length;
                 }
                 return _length >= _index + byteCt - 1;
@@ -209,9 +321,6 @@ public class ByteReader
     {
         return !EnsureMoreLength(sizeof(T)) ? default(T) : Read<T>();
     }
-    
-
-    private static readonly MethodInfo ReadByteArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadUInt8Array), BindingFlags.Instance | BindingFlags.Public);
     public byte[] ReadUInt8Array()
     {
         ushort length = ReadUInt16();
@@ -256,8 +365,6 @@ public class ByteReader
             _index = toPosition;
         }
     }
-
-    private static readonly MethodInfo ReadNullableByteArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableUInt8Array), BindingFlags.Instance | BindingFlags.Public);
     public byte[]? ReadNullableUInt8Array()
     {
         if (!ReadBool()) return null;
@@ -279,32 +386,18 @@ public class ByteReader
         if (!ReadBool()) return null;
         return ReadLongUInt8Array();
     }
-
-    private static readonly MethodInfo ReadInt32Method = typeof(ByteReader).GetMethod(nameof(ReadInt32), BindingFlags.Instance | BindingFlags.Public);
     public int ReadInt32() => !EnsureMoreLength(sizeof(int)) ? default : Read<int>();
-
-
-    private static readonly MethodInfo ReadNullableInt32Method = typeof(ByteReader).GetMethod(nameof(ReadNullableInt32), BindingFlags.Instance | BindingFlags.Public);
     public int? ReadNullableInt32()
     {
         if (!ReadBool()) return null;
         return ReadInt32();
     }
-
-
-    private static readonly MethodInfo ReadUInt32Method = typeof(ByteReader).GetMethod(nameof(ReadUInt32), BindingFlags.Instance | BindingFlags.Public);
     public uint ReadUInt32() => !EnsureMoreLength(sizeof(uint)) ? default : Read<uint>();
-
-
-    private static readonly MethodInfo ReadNullableUInt32Method = typeof(ByteReader).GetMethod(nameof(ReadNullableUInt32), BindingFlags.Instance | BindingFlags.Public);
     public uint? ReadNullableUInt32()
     {
         if (!ReadBool()) return null;
         return ReadUInt32();
     }
-
-
-    private static readonly MethodInfo ReadUInt8Method = typeof(ByteReader).GetMethod(nameof(ReadUInt8), BindingFlags.Instance | BindingFlags.Public);
     public byte ReadUInt8()
     {
         if (!EnsureMoreLength(1))
@@ -313,17 +406,11 @@ public class ByteReader
         ++_index;
         return rtn;
     }
-
-
-    private static readonly MethodInfo ReadNullableUInt8Method = typeof(ByteReader).GetMethod(nameof(ReadNullableUInt8), BindingFlags.Instance | BindingFlags.Public);
     public byte? ReadNullableUInt8()
     {
         if (!ReadBool()) return null;
         return ReadUInt8();
     }
-
-
-    private static readonly MethodInfo ReadInt8Method = typeof(ByteReader).GetMethod(nameof(ReadInt8), BindingFlags.Instance | BindingFlags.Public);
     public sbyte ReadInt8()
     {
         if (!EnsureMoreLength(1))
@@ -332,17 +419,11 @@ public class ByteReader
         ++_index;
         return rtn;
     }
-
-
-    private static readonly MethodInfo ReadNullableInt8Method = typeof(ByteReader).GetMethod(nameof(ReadNullableInt8), BindingFlags.Instance | BindingFlags.Public);
     public sbyte? ReadNullableInt8()
     {
         if (!ReadBool()) return null;
         return ReadInt8();
     }
-
-
-    private static readonly MethodInfo ReadBoolMethod = typeof(ByteReader).GetMethod(nameof(ReadBool), BindingFlags.Instance | BindingFlags.Public);
     public bool ReadBool()
     {
         if (!EnsureMoreLength(1))
@@ -351,43 +432,24 @@ public class ByteReader
         ++_index;
         return rtn;
     }
-
-
-    private static readonly MethodInfo ReadNullableBoolMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableBool), BindingFlags.Instance | BindingFlags.Public);
     public bool? ReadNullableBool()
     {
         if (!ReadBool()) return null;
         return ReadBool();
     }
-
-
-    private static readonly MethodInfo ReadInt64Method = typeof(ByteReader).GetMethod(nameof(ReadInt64), BindingFlags.Instance | BindingFlags.Public);
     public long ReadInt64() => !EnsureMoreLength(sizeof(long)) ? default : Read<long>();
-
-
-    private static readonly MethodInfo ReadNullableInt64Method = typeof(ByteReader).GetMethod(nameof(ReadNullableInt64), BindingFlags.Instance | BindingFlags.Public);
     public long? ReadNullableInt64()
     {
         if (!ReadBool()) return null;
         return ReadInt64();
     }
-
-
-    private static readonly MethodInfo ReadUInt64Method = typeof(ByteReader).GetMethod(nameof(ReadUInt64), BindingFlags.Instance | BindingFlags.Public);
     public ulong ReadUInt64() => !EnsureMoreLength(sizeof(ulong)) ? default : Read<ulong>();
-
-
-    private static readonly MethodInfo ReadNullableUInt64Method = typeof(ByteReader).GetMethod(nameof(ReadNullableUInt64), BindingFlags.Instance | BindingFlags.Public);
     public ulong? ReadNullableUInt64()
     {
         if (!ReadBool()) return null;
         return ReadUInt64();
     }
-
-
-    private static readonly MethodInfo ReadInt16Method = typeof(ByteReader).GetMethod(nameof(ReadInt16), BindingFlags.Instance | BindingFlags.Public);
     public short ReadInt16() => !EnsureMoreLength(sizeof(short)) ? default : Read<short>();
-    
     public int ReadInt24()
     {
         if (!EnsureMoreLength(3))
@@ -397,7 +459,6 @@ public class ByteReader
         ++_index;
         return (sh | (bt << 16)) - DevkitServerUtility.Int24MaxValue;
     }
-
     public uint ReadUInt24()
     {
         int i = ReadInt24();
@@ -405,82 +466,47 @@ public class ByteReader
             return (uint)-(i - DevkitServerUtility.Int24MaxValue);
         return (uint)i;
     }
-
     public int? ReadNullableInt24()
     {
         if (!ReadBool()) return null;
         return ReadInt24();
     }
-
-    private static readonly MethodInfo ReadNullableInt16Method = typeof(ByteReader).GetMethod(nameof(ReadNullableInt16), BindingFlags.Instance | BindingFlags.Public);
     public short? ReadNullableInt16()
     {
         if (!ReadBool()) return null;
         return ReadInt16();
     }
-
-
-    private static readonly MethodInfo ReadUInt16Method = typeof(ByteReader).GetMethod(nameof(ReadUInt16), BindingFlags.Instance | BindingFlags.Public);
     public ushort ReadUInt16() => !EnsureMoreLength(sizeof(ushort)) ? default : Read<ushort>();
-
-
-    private static readonly MethodInfo ReadNullableUInt16Method = typeof(ByteReader).GetMethod(nameof(ReadNullableUInt16), BindingFlags.Instance | BindingFlags.Public);
     public ushort? ReadNullableUInt16()
     {
         if (!ReadBool()) return null;
         return ReadUInt16();
     }
-
-
-    private static readonly MethodInfo ReadFloatMethod = typeof(ByteReader).GetMethod(nameof(ReadFloat), BindingFlags.Instance | BindingFlags.Public);
     public float ReadFloat() => !EnsureMoreLength(sizeof(float)) ? default : Read<float>();
-
-
-    private static readonly MethodInfo ReadNullableFloatMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableFloat), BindingFlags.Instance | BindingFlags.Public);
+    public float ReadHalfPrecisionFloat() => !EnsureMoreLength(sizeof(ushort)) ? default : Mathf.HalfToFloat(Read<ushort>());
     public float? ReadNullableFloat()
     {
         if (!ReadBool()) return null;
         return ReadFloat();
     }
-
-
-    private static readonly MethodInfo ReadDecimalMethod = typeof(ByteReader).GetMethod(nameof(ReadDecimal), BindingFlags.Instance | BindingFlags.Public);
     public decimal ReadDecimal() => !EnsureMoreLength(sizeof(decimal)) ? default : Read<decimal>();
-
-
-    private static readonly MethodInfo ReadNullableDecimalMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableDecimal), BindingFlags.Instance | BindingFlags.Public);
     public decimal? ReadNullableDecimal()
     {
         if (!ReadBool()) return null;
         return ReadDecimal();
     }
-
-
-    private static readonly MethodInfo ReadDoubleMethod = typeof(ByteReader).GetMethod(nameof(ReadDouble), BindingFlags.Instance | BindingFlags.Public);
     public double ReadDouble() => !EnsureMoreLength(sizeof(double)) ? default : Read<double>();
-
-
-    private static readonly MethodInfo ReadNullableDoubleMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableDouble), BindingFlags.Instance | BindingFlags.Public);
     public double? ReadNullableDouble()
     {
         if (!ReadBool()) return null;
         return ReadDouble();
     }
-
-
-    private static readonly MethodInfo ReadCharMethod = typeof(ByteReader).GetMethod(nameof(ReadChar), BindingFlags.Instance | BindingFlags.Public);
     public char ReadChar() => !EnsureMoreLength(sizeof(char)) ? default : Read<char>();
-
-
-    private static readonly MethodInfo ReadNullableCharMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableChar), BindingFlags.Instance | BindingFlags.Public);
     public char? ReadNullableChar()
     {
         if (!ReadBool()) return null;
         return ReadChar();
     }
-
-
-    private static readonly MethodInfo ReadStringMethod = typeof(ByteReader).GetMethod(nameof(ReadString), BindingFlags.Instance | BindingFlags.Public);
     public string ReadString()
     {
         ushort length = ReadUInt16();
@@ -502,14 +528,11 @@ public class ByteReader
 
         return null!;
     }
-
     public string? ReadNullableAsciiSmall()
     {
         if (!ReadBool()) return null;
         return ReadAsciiSmall();
     }
-
-    private static readonly MethodInfo ReadTypeArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadTypeArray), BindingFlags.Instance | BindingFlags.Public);
     public Type?[] ReadTypeArray()
     {
         int len = ReadUInt16();
@@ -521,8 +544,6 @@ public class ByteReader
 
         return rtn;
     }
-
-    private static readonly MethodInfo ReadTypeMethod = typeof(ByteReader).GetMethod(nameof(ReadType), BindingFlags.Instance | BindingFlags.Public);
     public string? ReadTypeInfo() => ReadTypeInfo(out _);
     public string? ReadTypeInfo(out byte flag)
     {
@@ -611,7 +632,6 @@ public class ByteReader
         _index += length;
         return str;
     }
-    private static readonly MethodInfo ReadNullableStringMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableString), BindingFlags.Instance | BindingFlags.Public);
     public string? ReadNullableString()
     {
         return !ReadBool() ? null : ReadString();
@@ -620,19 +640,12 @@ public class ByteReader
     {
         return !ReadBool() ? null : ReadShortString();
     }
-    private static readonly MethodInfo ReadDateTimeMethod = typeof(ByteReader).GetMethod(nameof(ReadDateTime), BindingFlags.Instance | BindingFlags.Public);
     public DateTime ReadDateTime() => !EnsureMoreLength(sizeof(long)) ? default : DateTime.FromBinary(Read<long>());
-
-
-    private static readonly MethodInfo ReadNullableDateTimeMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableDateTime), BindingFlags.Instance | BindingFlags.Public);
     public DateTime? ReadNullableDateTime()
     {
         if (!ReadBool()) return null;
         return ReadDateTime();
     }
-
-
-    private static readonly MethodInfo ReadDateTimeOffsetMethod = typeof(ByteReader).GetMethod(nameof(ReadDateTimeOffset), BindingFlags.Instance | BindingFlags.Public);
     public unsafe DateTimeOffset ReadDateTimeOffset()
     {
         if (!EnsureMoreLength(sizeof(long) + sizeof(short)))
@@ -644,17 +657,11 @@ public class ByteReader
             return new DateTimeOffset(DateTime.FromBinary(v), *(TimeSpan*)&offset);
         }
     }
-
-
-    private static readonly MethodInfo ReadNullableDateTimeOffsetMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableDateTimeOffset), BindingFlags.Instance | BindingFlags.Public);
     public DateTimeOffset? ReadNullableDateTimeOffset()
     {
         if (!ReadBool()) return null;
         return ReadDateTimeOffset();
     }
-
-
-    private static readonly MethodInfo ReadTimeSpanMethod = typeof(ByteReader).GetMethod(nameof(ReadTimeSpan), BindingFlags.Instance | BindingFlags.Public);
     public unsafe TimeSpan ReadTimeSpan()
     {
         if (!EnsureMoreLength(sizeof(long)))
@@ -662,115 +669,78 @@ public class ByteReader
         long ticks = Read<long>();
         return *(TimeSpan*)&ticks;
     }
-
-
-    private static readonly MethodInfo ReadNullableTimeSpanMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableTimeSpan), BindingFlags.Instance | BindingFlags.Public);
     public TimeSpan? ReadNullableTimeSpan()
     {
         if (!ReadBool()) return null;
         return ReadTimeSpan();
     }
-
-
-    private static readonly MethodInfo ReadGuidMethod = typeof(ByteReader).GetMethod(nameof(ReadGuid), BindingFlags.Instance | BindingFlags.Public);
     public Guid ReadGuid() => !EnsureMoreLength(GuidSize) ? default : Read<Guid>();
-
-
-    private static readonly MethodInfo ReadNullableGuidMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableGuid), BindingFlags.Instance | BindingFlags.Public);
     public Guid? ReadNullableGuid() => !ReadBool() ? null : ReadGuid();
 
-    
     private static readonly Vector2 V2NaN = new Vector2(float.NaN, float.NaN);
     private static readonly Vector3 V3NaN = new Vector3(float.NaN, float.NaN, float.NaN);
     private static readonly Vector4 V4NaN = new Vector4(float.NaN, float.NaN, float.NaN, float.NaN);
     private static readonly Bounds BoundsNaN = new Bounds(V3NaN, V3NaN);
     private static readonly Color32 C32NaN = new Color32(byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue);
-
-    private static readonly MethodInfo ReadVector2Method = typeof(ByteReader).GetMethod(nameof(ReadVector2), BindingFlags.Instance | BindingFlags.Public);
     public Vector2 ReadVector2() => !EnsureMoreLength(sizeof(float) * 2) ? V2NaN : new Vector2(Read<float>(), Read<float>());
-
-
-    private static readonly MethodInfo ReadNullableVector2Method = typeof(ByteReader).GetMethod(nameof(ReadNullableVector2), BindingFlags.Instance | BindingFlags.Public);
+    public Vector2 ReadHalfPrecisionVector2() => !EnsureMoreLength(sizeof(ushort) * 2) ? V2NaN : new Vector2(Mathf.HalfToFloat(Read<ushort>()), Mathf.HalfToFloat(Read<ushort>()));
     public Vector2? ReadNullableVector2()
     {
         if (!ReadBool()) return null;
         return ReadVector2();
     }
-
-
-    private static readonly MethodInfo ReadVector3Method = typeof(ByteReader).GetMethod(nameof(ReadVector3), BindingFlags.Instance | BindingFlags.Public);
     public Vector3 ReadVector3() => !EnsureMoreLength(sizeof(float) * 3) ? V3NaN : new Vector3(Read<float>(), Read<float>(), Read<float>());
-
-
-    private static readonly MethodInfo ReadNullableVector3Method = typeof(ByteReader).GetMethod(nameof(ReadNullableVector3), BindingFlags.Instance | BindingFlags.Public);
+    public Vector3 ReadHalfPrecisionVector3() => !EnsureMoreLength(sizeof(ushort) * 3)
+        ? V3NaN
+        : new Vector3(Mathf.HalfToFloat(Read<ushort>()), Mathf.HalfToFloat(Read<ushort>()), Mathf.HalfToFloat(Read<ushort>()));
     public Vector3? ReadNullableVector3()
     {
         if (!ReadBool()) return null;
         return ReadVector3();
     }
-
-
-    private static readonly MethodInfo ReadVector4Method = typeof(ByteReader).GetMethod(nameof(ReadVector4), BindingFlags.Instance | BindingFlags.Public);
     public Vector4 ReadVector4() => !EnsureMoreLength(sizeof(float) * 4) ? V4NaN : new Vector4(Read<float>(), Read<float>(), Read<float>(), Read<float>());
-
-
-    private static readonly MethodInfo ReadNullableVector4Method = typeof(ByteReader).GetMethod(nameof(ReadNullableVector4), BindingFlags.Instance | BindingFlags.Public);
+    public Vector4 ReadHalfPrecisionVector4() => !EnsureMoreLength(sizeof(ushort) * 4)
+        ? V4NaN
+        : new Vector4(Mathf.HalfToFloat(Read<ushort>()), Mathf.HalfToFloat(Read<ushort>()), Mathf.HalfToFloat(Read<ushort>()), Mathf.HalfToFloat(Read<ushort>()));
     public Vector4? ReadNullableVector4()
     {
         if (!ReadBool()) return null;
         return ReadVector4();
     }
-
-
-    private static readonly MethodInfo ReadBoundsMethod = typeof(ByteReader).GetMethod(nameof(ReadBounds), BindingFlags.Instance | BindingFlags.Public);
     public Bounds ReadBounds() =>
         !EnsureMoreLength(sizeof(float) * 6)
             ? BoundsNaN
             : new Bounds(new Vector3(Read<float>(), Read<float>(), Read<float>()), new Vector3(Read<float>(), Read<float>(), Read<float>()));
-
-
-    private static readonly MethodInfo ReadNullableBoundsMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableBounds), BindingFlags.Instance | BindingFlags.Public);
     public Bounds? ReadNullableBounds()
     {
         if (!ReadBool()) return null;
         return ReadBounds();
     }
-
-
-    private static readonly MethodInfo ReadQuaternionMethod = typeof(ByteReader).GetMethod(nameof(ReadQuaternion), BindingFlags.Instance | BindingFlags.Public);
-
     public Quaternion ReadQuaternion()
     {
         Vector4 f = ReadVector4();
         return new Quaternion(f.x, f.y, f.z, f.w);
     }
-
-
-    private static readonly MethodInfo ReadNullableQuaternionMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableQuaternion), BindingFlags.Instance | BindingFlags.Public);
+    public Quaternion ReadHalfPrecisionQuaternion()
+    {
+        Vector4 f = ReadHalfPrecisionVector4();
+        return new Quaternion(f.x, f.y, f.z, f.w);
+    }
     public Quaternion? ReadNullableQuaternion()
     {
         if (!ReadBool()) return null;
         return ReadQuaternion();
     }
-
-
-    private static readonly MethodInfo ReadColorMethod = typeof(ByteReader).GetMethod(nameof(ReadColor), BindingFlags.Instance | BindingFlags.Public);
     public Color ReadColor()
     {
         Vector4 f = ReadVector4();
         return new Color(f.y, f.z, f.w, f.x);
     }
-
-
-    private static readonly MethodInfo ReadNullableColorMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableColor), BindingFlags.Instance | BindingFlags.Public);
     public Color? ReadNullableColor()
     {
         if (!ReadBool()) return null;
         return ReadColor();
     }
-
-
-    private static readonly MethodInfo ReadColor32Method = typeof(ByteReader).GetMethod(nameof(ReadColor32), BindingFlags.Instance | BindingFlags.Public);
     public Color32 ReadColor32()
     {
         if (!EnsureMoreLength(4))
@@ -781,24 +751,12 @@ public class ByteReader
         _index += 4;
         return q;
     }
-
-
-    private static readonly MethodInfo ReadNullableColor32Method = typeof(ByteReader).GetMethod(nameof(ReadNullableColor32), BindingFlags.Instance | BindingFlags.Public);
     public Color32? ReadNullableColor32()
     {
         return !ReadBool() ? null : ReadColor32();
     }
-
-    
-    private static readonly MethodInfo ReadEnumMethod = typeof(ByteReader).GetMethod(nameof(ReadEnum), BindingFlags.Instance | BindingFlags.Public);
     public unsafe TEnum ReadEnum<TEnum>() where TEnum : unmanaged, Enum => !EnsureMoreLength(sizeof(TEnum)) ? default : Read<TEnum>();
-
-
-    private static readonly MethodInfo ReadNullableEnumMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableEnum), BindingFlags.Instance | BindingFlags.Public);
     public TEnum? ReadNullableEnum<TEnum>() where TEnum : unmanaged, Enum => !ReadBool() ? null : ReadEnum<TEnum>();
-
-
-    private static readonly MethodInfo ReadInt32ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadInt32Array), BindingFlags.Instance | BindingFlags.Public);
     public int[] ReadInt32Array()
     {
         int len = ReadUInt16();
@@ -829,13 +787,7 @@ public class ByteReader
         }
         return output;
     }
-
-
-    private static readonly MethodInfo ReadNullableInt32ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableInt32Array), BindingFlags.Instance | BindingFlags.Public);
     public int[]? ReadNullableInt32Array() => !ReadBool() ? null : ReadInt32Array();
-
-
-    private static readonly MethodInfo ReadGuidArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadGuidArray), BindingFlags.Instance | BindingFlags.Public);
     public unsafe Guid[] ReadGuidArray()
     {
         ushort len = ReadUInt16();
@@ -856,13 +808,7 @@ public class ByteReader
         _index += size;
         return rtn;
     }
-
-
-    private static readonly MethodInfo ReadNullableGuidArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableGuidArray), BindingFlags.Instance | BindingFlags.Public);
     public Guid[]? ReadNullableGuidArray() => !ReadBool() ? null : ReadGuidArray();
-
-
-    private static readonly MethodInfo ReadDateTimeArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadDateTimeArray), BindingFlags.Instance | BindingFlags.Public);
     public unsafe DateTime[] ReadDateTimeArray()
     {
         ushort len = ReadUInt16();
@@ -880,13 +826,7 @@ public class ByteReader
         }
         return rtn;
     }
-
-
-    private static readonly MethodInfo ReadNullableDateTimeArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableDateTimeArray), BindingFlags.Instance | BindingFlags.Public);
     public DateTime[]? ReadNullableDateTimeArray() => !ReadBool() ? null : ReadDateTimeArray();
-
-
-    private static readonly MethodInfo ReadDateTimeOffsetArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadDateTimeOffsetArray), BindingFlags.Instance | BindingFlags.Public);
     public unsafe DateTimeOffset[] ReadDateTimeOffsetArray()
     {
         ushort len = ReadUInt16();
@@ -906,12 +846,7 @@ public class ByteReader
         }
         return rtn;
     }
-
-
-    private static readonly MethodInfo ReadNullableDateTimeOffsetArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableDateTimeOffsetArray), BindingFlags.Instance | BindingFlags.Public);
     public DateTimeOffset[]? ReadNullableDateTimeOffsetArray() => !ReadBool() ? null : ReadDateTimeOffsetArray();
-
-    private static readonly MethodInfo ReadUInt32ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadUInt32Array), BindingFlags.Instance | BindingFlags.Public);
     public uint[] ReadUInt32Array()
     {
         ushort len = ReadUInt16();
@@ -942,13 +877,7 @@ public class ByteReader
         }
         return output;
     }
-
-
-    private static readonly MethodInfo ReadNullableUInt32ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableUInt32Array), BindingFlags.Instance | BindingFlags.Public);
     public uint[]? ReadNullableUInt32Array() => !ReadBool() ? null : ReadUInt32Array();
-
-
-    private static readonly MethodInfo ReadInt8ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadInt8Array), BindingFlags.Instance | BindingFlags.Public);
     public sbyte[] ReadInt8Array()
     {
         ushort len = ReadUInt16();
@@ -978,13 +907,7 @@ public class ByteReader
         }
         return output;
     }
-
-
-    private static readonly MethodInfo ReadNullableInt8ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableInt8Array), BindingFlags.Instance | BindingFlags.Public);
     public sbyte[]? ReadNullableInt8Array() => !ReadBool() ? null : ReadInt8Array();
-
-
-    private static readonly MethodInfo ReadBoolArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadBoolArray), BindingFlags.Instance | BindingFlags.Public);
     public unsafe bool[] ReadBoolArray()
     {
         ushort len = ReadUInt16();
@@ -1039,13 +962,7 @@ public class ByteReader
         _index += blen;
         return rtn;
     }
-
-
-    private static readonly MethodInfo ReadNullableBoolArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableBoolArray), BindingFlags.Instance | BindingFlags.Public);
     public bool[]? ReadNullableBoolArray() => !ReadBool() ? null : ReadBoolArray();
-
-
-    private static readonly MethodInfo ReadInt64ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadInt64Array), BindingFlags.Instance | BindingFlags.Public);
     public long[] ReadInt64Array()
     {
         ushort len = ReadUInt16();
@@ -1076,13 +993,7 @@ public class ByteReader
         }
         return output;
     }
-
-
-    private static readonly MethodInfo ReadNullableInt64ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableInt64Array), BindingFlags.Instance | BindingFlags.Public);
     public long[]? ReadNullableInt64Array() => !ReadBool() ? null : ReadInt64Array();
-
-
-    private static readonly MethodInfo ReadUInt64ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadUInt64Array), BindingFlags.Instance | BindingFlags.Public);
     public ulong[] ReadUInt64Array()
     {
         ushort len = ReadUInt16();
@@ -1113,12 +1024,7 @@ public class ByteReader
         }
         return output;
     }
-
-    private static readonly MethodInfo ReadNullableUInt64ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableUInt64Array), BindingFlags.Instance | BindingFlags.Public);
     public ulong[]? ReadNullableUInt64Array() => !ReadBool() ? null : ReadUInt64Array();
-
-
-    private static readonly MethodInfo ReadInt16ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadInt16Array), BindingFlags.Instance | BindingFlags.Public);
     public short[] ReadInt16Array()
     {
         ushort len = ReadUInt16();
@@ -1149,13 +1055,7 @@ public class ByteReader
         }
         return output;
     }
-
-
-    private static readonly MethodInfo ReadNullableInt16ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableInt16Array), BindingFlags.Instance | BindingFlags.Public);
     public short[]? ReadNullableInt16Array() => !ReadBool() ? null : ReadInt16Array();
-
-
-    private static readonly MethodInfo ReadUInt16ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadUInt16Array), BindingFlags.Instance | BindingFlags.Public);
     public ushort[] ReadUInt16Array()
     {
         ushort len = ReadUInt16();
@@ -1186,13 +1086,7 @@ public class ByteReader
         }
         return output;
     }
-
-
-    private static readonly MethodInfo ReadNullableUInt16ArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableUInt16Array), BindingFlags.Instance | BindingFlags.Public);
     public ushort[]? ReadNullableUInt16Array() => !ReadBool() ? null : ReadUInt16Array();
-
-
-    private static readonly MethodInfo ReadFloatArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadFloatArray), BindingFlags.Instance | BindingFlags.Public);
     public float[] ReadFloatArray()
     {
         ushort len = ReadUInt16();
@@ -1206,13 +1100,7 @@ public class ByteReader
         _index += size;
         return rtn;
     }
-
-
-    private static readonly MethodInfo ReadNullableFloatArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableFloatArray), BindingFlags.Instance | BindingFlags.Public);
     public float[]? ReadNullableFloatArray() => !ReadBool() ? null : ReadFloatArray();
-
-
-    private static readonly MethodInfo ReadDecimalArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadDecimalArray), BindingFlags.Instance | BindingFlags.Public);
     public unsafe decimal[] ReadDecimalArray()
     {
         ushort len = ReadUInt16();
@@ -1234,13 +1122,7 @@ public class ByteReader
         _index += size;
         return rtn;
     }
-
-
-    private static readonly MethodInfo ReadNullableDecimalArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableDecimalArray), BindingFlags.Instance | BindingFlags.Public);
     public decimal[]? ReadNullableDecimalArray() => !ReadBool() ? null : ReadDecimalArray();
-
-
-    private static readonly MethodInfo ReadDoubleArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadDoubleArray), BindingFlags.Instance | BindingFlags.Public);
     public double[] ReadDoubleArray()
     {
         ushort len = ReadUInt16();
@@ -1254,13 +1136,7 @@ public class ByteReader
         _index += size;
         return rtn;
     }
-
-
-    private static readonly MethodInfo ReadNullableDoubleArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableDoubleArray), BindingFlags.Instance | BindingFlags.Public);
     public double[]? ReadNullableDoubleArray() => !ReadBool() ? null : ReadDoubleArray();
-
-
-    private static readonly MethodInfo ReadCharArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadCharArray), BindingFlags.Instance | BindingFlags.Public);
     public char[] ReadCharArray()
     {
         ushort length = ReadUInt16();
@@ -1271,13 +1147,7 @@ public class ByteReader
         _index += length;
         return rtn;
     }
-
-
-    private static readonly MethodInfo ReadNullableCharArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableCharArray), BindingFlags.Instance | BindingFlags.Public);
     public char[]? ReadNullableCharArray() => !ReadBool() ? null : ReadCharArray();
-
-
-    private static readonly MethodInfo ReadStringArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadStringArray), BindingFlags.Instance | BindingFlags.Public);
     public string[] ReadStringArray()
     {
         string[] rtn = new string[ReadUInt16()];
@@ -1285,9 +1155,6 @@ public class ByteReader
             rtn[i] = ReadString();
         return rtn;
     }
-
-
-    private static readonly MethodInfo ReadNullableStringArrayMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableStringArray), BindingFlags.Instance | BindingFlags.Public);
     public string[] ReadNullableStringArray() => !ReadBool() ? null! : ReadStringArray();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1297,281 +1164,47 @@ public class ByteReader
         if (!EncodingEx.IsValidAutoType(type))
             throw new InvalidDynamicTypeException(type, typeIndex, true);
     }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public T InvokeReader<T>(Reader<T> reader) => reader.Invoke(this);
     public static Reader<T1>? GetReader<T1>(bool isNullable = false) => (Reader<T1>?)GetReader(typeof(T1), isNullable);
-    
     public static Delegate? GetReader(Type type, bool isNullable = false)
     {
         if (type == null) throw new ArgumentNullException(nameof(type));
-        Type origType = type;
-        DynamicMethod method = new DynamicMethod("Read" + type.Name, type, Parameters, typeof(ByteReader).Module, false);
-        ILGenerator il = method.GetILGenerator();
-        method.DefineParameter(1, ParameterAttributes.None, "value");
-
-        il.Emit(OpCodes.Ldarg_0);
-    redo:
-        if (type.IsPrimitive)
-        {
-            if (type == typeof(ulong))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableUInt64Method : ReadUInt64Method, null);
-            else if (type == typeof(float))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableFloatMethod : ReadFloatMethod, null);
-            else if (type == typeof(long))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableInt64Method : ReadInt64Method, null);
-            else if (type == typeof(ushort))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableUInt16Method : ReadUInt16Method, null);
-            else if (type == typeof(short))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableInt16Method : ReadInt16Method, null);
-            else if (type == typeof(byte))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableUInt8Method : ReadUInt8Method, null);
-            else if (type == typeof(int))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableInt32Method : ReadInt32Method, null);
-            else if (type == typeof(uint))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableUInt32Method : ReadUInt32Method, null);
-            else if (type == typeof(bool))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableBoolMethod : ReadBoolMethod, null);
-            else if (type == typeof(char))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableCharMethod : ReadCharMethod, null);
-            else if (type == typeof(sbyte))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableInt8Method : ReadInt8Method, null);
-            else if (type == typeof(double))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableDoubleMethod : ReadDoubleMethod, null);
-            else throw new ArgumentException($"Can not convert that type ({type.Name})!", nameof(type));
-        }
-        else if (type == typeof(string))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? ReadNullableStringMethod : ReadStringMethod, null);
-        }
-        else if (type.IsEnum)
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? ReadNullableEnumMethod.MakeGenericMethod(origType) : ReadEnumMethod.MakeGenericMethod(origType), null);
-        }
-        else if (!isNullable && type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
-        {
-            type = type.GenericTypeArguments[0];
-            isNullable = true;
-            goto redo;
-        }
-        else if (type == typeof(decimal))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? ReadNullableDecimalMethod : ReadDecimalMethod, null);
-        }
-        else if (type == typeof(DateTime))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? ReadNullableDateTimeMethod : ReadDateTimeMethod, null);
-        }
-        else if (typeof(Type).IsAssignableFrom(type))
-        {
-            il.EmitCall(OpCodes.Call, ReadTypeMethod, null);
-        }
-        else if (type == typeof(DateTimeOffset))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? ReadNullableDateTimeOffsetMethod : ReadDateTimeOffsetMethod, null);
-        }
-        else if (type == typeof(TimeSpan))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? ReadNullableTimeSpanMethod : ReadTimeSpanMethod, null);
-        }
-        else if (type == typeof(Guid))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? ReadNullableGuidMethod : ReadGuidMethod, null);
-        }
-        else if (type == typeof(Vector2))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? ReadNullableVector2Method : ReadVector2Method, null);
-        }
-        else if (type == typeof(Vector3))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? ReadNullableVector3Method : ReadVector3Method, null);
-        }
-        else if (type == typeof(Vector4))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? ReadNullableVector4Method : ReadVector4Method, null);
-        }
-        else if (type == typeof(Bounds))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? ReadNullableBoundsMethod : ReadBoundsMethod, null);
-        }
-        else if (type == typeof(Quaternion))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? ReadNullableQuaternionMethod : ReadQuaternionMethod, null);
-        }
-        else if (type == typeof(Color))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? ReadNullableColorMethod : ReadColorMethod, null);
-        }
-        else if (type == typeof(Color32))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? ReadNullableColor32Method : ReadColor32Method, null);
-        }
-        else if (type.IsArray)
-        {
-            Type elemType = type.GetElementType();
-            if (elemType == typeof(ulong))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableUInt64ArrayMethod : ReadUInt64ArrayMethod, null);
-            else if (elemType == typeof(float))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableFloatArrayMethod : ReadFloatArrayMethod, null);
-            else if (elemType == typeof(long))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableInt64ArrayMethod : ReadInt64ArrayMethod, null);
-            else if (elemType == typeof(ushort))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableUInt16ArrayMethod : ReadUInt16ArrayMethod, null);
-            else if (elemType == typeof(short))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableInt16ArrayMethod : ReadInt16ArrayMethod, null);
-            else if (elemType == typeof(byte))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableByteArrayMethod : ReadByteArrayMethod, null);
-            else if (elemType == typeof(int))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableInt32ArrayMethod : ReadInt32ArrayMethod, null);
-            else if (elemType == typeof(uint))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableUInt32ArrayMethod : ReadUInt32ArrayMethod, null);
-            else if (elemType == typeof(bool))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableBoolArrayMethod : ReadBoolArrayMethod, null);
-            else if (elemType == typeof(sbyte))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableInt8ArrayMethod : ReadInt8ArrayMethod, null);
-            else if (elemType == typeof(decimal))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableDecimalArrayMethod : ReadDecimalArrayMethod, null);
-            else if (elemType == typeof(char))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableCharArrayMethod : ReadCharArrayMethod, null);
-            else if (elemType == typeof(double))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableDoubleArrayMethod : ReadDoubleArrayMethod, null);
-            else if (elemType == typeof(string))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableStringArrayMethod : ReadStringArrayMethod, null);
-            else if (elemType == typeof(Guid))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableGuidArrayMethod : ReadGuidArrayMethod, null);
-            else if (elemType == typeof(DateTime))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableDateTimeArrayMethod : ReadDateTimeArrayMethod, null);
-            else if (elemType == typeof(DateTimeOffset))
-                il.EmitCall(OpCodes.Call, isNullable ? ReadNullableDateTimeOffsetArrayMethod : ReadDateTimeOffsetArrayMethod, null);
-            else throw new ArgumentException($"Can not convert that array type ({type.Name})!", nameof(type));
-        }
-        else throw new ArgumentException($"Can not convert that type ({type.Name})!", nameof(type));
-        il.Emit(OpCodes.Ret);
+        MethodInfo? method = GetReadMethod(type, isNullable);
+        if (method == null)
+            throw new InvalidDynamicTypeException(type, -1, true);
         try
         {
-            return method.CreateDelegate(typeof(Reader<>).MakeGenericType(origType));
-        }
-        catch (InvalidProgramException ex)
-        {
-            Logger.LogError(ex);
-            return null;
+            return method.CreateDelegate(typeof(Reader<>).MakeGenericType(type));
         }
         catch (ArgumentException ex)
         {
-            Logger.LogError("Failed to create reader delegate for type " + origType.FullName);
+            Logger.LogError("Failed to create reader delegate for type " + type.FullName);
             Logger.LogError(ex);
             return null;
         }
     }
     public static MethodInfo? GetReadMethod(Type type, bool isNullable = false)
     {
-    redo:
-        if (type.IsPrimitive)
-        {
-            if (type == typeof(ulong))
-                return isNullable ? ReadNullableUInt64Method : ReadUInt64Method;
-            if (type == typeof(float))
-                return isNullable ? ReadNullableFloatMethod : ReadFloatMethod;
-            if (type == typeof(long))
-                return isNullable ? ReadNullableInt64Method : ReadInt64Method;
-            if (type == typeof(ushort))
-                return isNullable ? ReadNullableUInt16Method : ReadUInt16Method;
-            if (type == typeof(short))
-                return isNullable ? ReadNullableInt16Method : ReadInt16Method;
-            if (type == typeof(byte))
-                return isNullable ? ReadNullableUInt8Method : ReadUInt8Method;
-            if (type == typeof(int))
-                return isNullable ? ReadNullableInt32Method : ReadInt32Method;
-            if (type == typeof(uint))
-                return isNullable ? ReadNullableUInt32Method : ReadUInt32Method;
-            if (type == typeof(bool))
-                return isNullable ? ReadNullableBoolMethod : ReadBoolMethod;
-            if (type == typeof(char))
-                return isNullable ? ReadNullableCharMethod : ReadCharMethod;
-            if (type == typeof(sbyte))
-                return isNullable ? ReadNullableInt8Method : ReadInt8Method;
-            if (type == typeof(double))
-                return isNullable ? ReadNullableDoubleMethod : ReadDoubleMethod;
-        }
-
-        if (type == typeof(string))
-            return isNullable ? ReadNullableStringMethod : ReadStringMethod;
+        MethodInfo? method;
         if (type.IsEnum)
-            return isNullable ? ReadNullableEnumMethod.MakeGenericMethod(type) : ReadEnumMethod.MakeGenericMethod(type);
-        
-        if (!isNullable && type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
         {
-            type = type.GenericTypeArguments[0];
-            isNullable = true;
-            goto redo;
+            method = (isNullable ? ReadNullableEnumMethod : ReadEnumMethod).MakeGenericMethod(type);
         }
-        if (type == typeof(decimal))
-            return isNullable ? ReadNullableDecimalMethod : ReadDecimalMethod;
-        if (type == typeof(DateTime))
-            return isNullable ? ReadNullableDateTimeMethod : ReadDateTimeMethod;
-        if (type == typeof(DateTimeOffset))
-            return isNullable ? ReadNullableDateTimeOffsetMethod : ReadDateTimeOffsetMethod;
-        if (type == typeof(TimeSpan))
-            return isNullable ? ReadNullableTimeSpanMethod : ReadTimeSpanMethod;
-        if (type == typeof(Guid))
-            return isNullable ? ReadNullableGuidMethod : ReadGuidMethod;
-        if (type == typeof(Vector2))
-            return isNullable ? ReadNullableVector2Method : ReadVector2Method;
-        if (type == typeof(Vector3))
-            return isNullable ? ReadNullableVector3Method : ReadVector3Method;
-        if (type == typeof(Vector4))
-            return isNullable ? ReadNullableVector4Method : ReadVector4Method;
-        if (type == typeof(Bounds))
-            return isNullable ? ReadNullableBoundsMethod : ReadBoundsMethod;
-        if (type == typeof(Quaternion))
-            return isNullable ? ReadNullableQuaternionMethod : ReadQuaternionMethod;
-        if (type == typeof(Color))
-            return isNullable ? ReadNullableColorMethod : ReadColorMethod;
-        if (type == typeof(Color32))
-            return isNullable ? ReadNullableColor32Method : ReadColor32Method;
-        if (typeof(Type).IsAssignableFrom(type))
-            return ReadTypeMethod;
-        if (type.IsArray)
+        else
         {
-            Type elemType = type.GetElementType();
-            if (elemType == typeof(ulong))
-                return isNullable ? ReadNullableUInt64ArrayMethod : ReadUInt64ArrayMethod;
-            if (elemType == typeof(float))
-                return isNullable ? ReadNullableFloatArrayMethod : ReadFloatArrayMethod;
-            if (elemType == typeof(long))
-                return isNullable ? ReadNullableInt64ArrayMethod : ReadInt64ArrayMethod;
-            if (elemType == typeof(ushort))
-                return isNullable ? ReadNullableUInt16ArrayMethod : ReadUInt16ArrayMethod;
-            if (elemType == typeof(short))
-                return isNullable ? ReadNullableInt16ArrayMethod : ReadInt16ArrayMethod;
-            if (elemType == typeof(byte))
-                return isNullable ? ReadNullableByteArrayMethod : ReadByteArrayMethod;
-            if (elemType == typeof(int))
-                return isNullable ? ReadNullableInt32ArrayMethod : ReadInt32ArrayMethod;
-            if (elemType == typeof(uint))
-                return isNullable ? ReadNullableUInt32ArrayMethod : ReadUInt32ArrayMethod;
-            if (elemType == typeof(bool))
-                return isNullable ? ReadNullableBoolArrayMethod : ReadBoolArrayMethod;
-            if (elemType == typeof(sbyte))
-                return isNullable ? ReadNullableInt8ArrayMethod : ReadInt8ArrayMethod;
-            if (elemType == typeof(decimal))
-                return isNullable ? ReadNullableDecimalArrayMethod : ReadDecimalArrayMethod;
-            if (elemType == typeof(char))
-                return isNullable ? ReadNullableCharArrayMethod : ReadCharArrayMethod;
-            if (elemType == typeof(double))
-                return isNullable ? ReadNullableDoubleArrayMethod : ReadDoubleArrayMethod;
-            if (elemType == typeof(string))
-                return isNullable ? ReadNullableStringArrayMethod : ReadStringArrayMethod;
-            if (elemType == typeof(Guid))
-                return isNullable ? ReadNullableGuidArrayMethod : ReadGuidArrayMethod;
-            if (elemType == typeof(DateTime))
-                return isNullable ? ReadNullableDateTimeArrayMethod : ReadDateTimeArrayMethod;
-            if (elemType == typeof(DateTimeOffset))
-                return isNullable ? ReadNullableDateTimeOffsetArrayMethod : ReadDateTimeOffsetArrayMethod;
-            if (typeof(Type).IsAssignableFrom(elemType))
-                return ReadTypeArrayMethod;
+            if (_nullableReaders == null || _nonNullableReaders == null)
+                PrepareMethods();
+            if (isNullable)
+            {
+                _nullableReaders!.TryGetValue(type, out method);
+            }
+            else if (!_nonNullableReaders!.TryGetValue(type, out method) && type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
+                _nullableReaders!.TryGetValue(type, out method);
         }
 
-        return null;
+        return method;
     }
     public static class ReaderHelper<T>
     {

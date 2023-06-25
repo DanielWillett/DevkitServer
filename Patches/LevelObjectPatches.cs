@@ -1,6 +1,8 @@
 ﻿#if CLIENT
+using DevkitServer.Configuration;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Models;
+using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Players.UI;
 using HarmonyLib;
@@ -20,23 +22,10 @@ internal static class LevelObjectPatches
 
     internal static bool IsSyncing;
     private static bool IsFinalTransform;
-    private static RegionIdentifier? _lastDeleting;
-    private static List<EditorSelection>? _selections;
-    private static TransformHandles? _handles;
-    private static List<EditorCopy>? _copies;
 
     private static readonly Action? CallCalculateHandleOffsets =
-        Accessor.GenerateInstanceCaller<EditorObjects, Action>("calculateHandleOffsets", Array.Empty<Type>());
+        Accessor.GenerateStaticCaller<EditorObjects, Action>("calculateHandleOffsets", Array.Empty<Type>());
 
-    private static List<EditorCopy> EditorObjectCopies => _copies ??=
-        (List<EditorCopy>?)typeof(EditorObjects).GetField("copies", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null)
-        ?? throw new MemberAccessException("Unable to find field: EditorObjects.copies.");
-    private static List<EditorSelection> EditorObjectSelection => _selections ??=
-        (List<EditorSelection>?)typeof(EditorObjects).GetField("selection", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null)
-        ?? throw new MemberAccessException("Unable to find field: EditorObjects.selection.");
-    private static TransformHandles EditorObjectHandles => _handles ??=
-        (TransformHandles?)typeof(EditorObjects).GetField("handles", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null)
-        ?? throw new MemberAccessException("Unable to find field: EditorObjects.handles.");
 
     [HarmonyPatch(typeof(EditorObjects), "Update")]
     [HarmonyTranspiler]
@@ -141,7 +130,7 @@ internal static class LevelObjectPatches
             DevkitServerModule.Fault();
         }
 
-        Label stLbl = generator.DefineLabel();
+        // Label stLbl = generator.DefineLabel();
 
         int patchedReun = 0;
         bool patchedCopy = false;
@@ -153,7 +142,7 @@ internal static class LevelObjectPatches
 
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
         int i = 0;
-        PatchUtil.InsertActionRateLimiter(ref i, stLbl, ins);
+        // PatchUtil.InsertActionRateLimiter(ref i, stLbl, ins);
         for (; i < ins.Count; ++i)
         {
             // cancel reun operation
@@ -275,14 +264,19 @@ internal static class LevelObjectPatches
             {
                 Label? @goto = PatchUtil.GetNextBranchTarget(ins, i - 1);
                 PatchUtil.ReturnIfFalse(ins, generator, ref i, CheckCanMove, @goto);
-                ins.Insert(i, new CodeInstruction(OpCodes.Call, new Action(SaveOneSelectedId).Method));
                 ins[i].labels.AddRange(ins[i + 1].labels);
                 ins[i + 1].labels.Clear();
                 i += 6;
-                PatchUtil.ContinueUntil(ins, ref i, x => x.Calls(calculateHandleOffsets), true);
-                ins.Insert(i++, new CodeInstruction(OpCodes.Call, new Action(OnMoveOneObject).Method));
-                PatchUtil.ContinueUntil(ins, ref i, x => x.opcode.IsBrAny(), true);
-                ins.Insert(i++, new CodeInstruction(OpCodes.Call, new Action(PreIsPasteingTransform).Method));
+                PatchUtil.ContinueUntil(ins, ref i, x => x.Calls(calculateHandleOffsets), false);
+                CodeInstruction instr = new CodeInstruction(OpCodes.Call, new Action(OnMoveOneObject).Method);
+                ins.Insert(i++, instr);
+                instr.labels.AddRange(ins[i].labels);
+                ins[i].labels.Clear();
+                PatchUtil.ContinueUntil(ins, ref i, x => x.opcode.IsBrAny(), false);
+                instr = new CodeInstruction(OpCodes.Call, new Action(PreIsPasteingTransform).Method);
+                ins.Insert(i++, instr);
+                instr.labels.AddRange(ins[i].labels);
+                ins[i].labels.Clear();
                 Logger.LogDebug($"[{Source}] Patched pasteing transform.");
                 patchedPasteTransform = true;
                 continue;
@@ -304,7 +298,6 @@ internal static class LevelObjectPatches
                     PatchUtil.RemoveUntil(ins, i, x => x.Calls(addSelection), true);
                 
                 patchedInstantiate = true;
-                // continue; todo
             }
         }
 
@@ -369,7 +362,7 @@ internal static class LevelObjectPatches
     }
     private static void UndoMove()
     {
-        List<EditorSelection> selections = EditorObjectSelection;
+        List<EditorSelection> selections = LevelObjectUtil.EditorObjectSelection;
 
         for (int i = 0; i < selections.Count; ++i)
         {
@@ -377,7 +370,7 @@ internal static class LevelObjectPatches
             editorSelection.transform.SetPositionAndRotation(editorSelection.fromPosition, editorSelection.fromRotation);
             editorSelection.transform.localScale = editorSelection.fromScale;
         }
-        EditorObjectHandles.MouseUp();
+        LevelObjectUtil.EditorObjectHandles.MouseUp();
         CallCalculateHandleOffsets?.Invoke();
     }
     [HarmonyPatch(typeof(EditorObjects), "OnHandleTranslatedAndRotated")]
@@ -396,7 +389,10 @@ internal static class LevelObjectPatches
             return;
         }
 
-        List<EditorSelection> selections = EditorObjectSelection;
+        if (ClientInfo.Info is not { ServerRemovesCosmeticImprovements: false } || DevkitServerConfig.Config.RemoveCosmeticImprovements)
+            return;
+
+        List<EditorSelection> selections = LevelObjectUtil.EditorObjectSelection;
 
         Logger.LogDebug($"[CLIENT EVENTS] Move preview requested at: {string.Join(",", selections.Select(selection => selection.transform.gameObject.name.Format()))}: deltaPos: {worldPositionDelta.Format()}, deltaRot: {worldRotationDelta.eulerAngles.Format()}, pivotPos: {pivotPosition.Format()}, modifyRotation: {modifyRotation}.");
 
@@ -472,7 +468,12 @@ internal static class LevelObjectPatches
     }
     private static void MoveFinalSelection()
     {
-        List<EditorSelection> selections = EditorObjectSelection;
+        List<EditorSelection> selections = LevelObjectUtil.EditorObjectSelection;
+        if (selections.Count == 1)
+        {
+            OnMoveOneObject();
+            return;
+        }
 
         Logger.LogDebug($"[CLIENT EVENTS] Move final requested at: {string.Join(",", selections.Select(selection => selection.transform.gameObject.name.Format()))}.");
 
@@ -487,6 +488,7 @@ internal static class LevelObjectPatches
         List<Vector3> objOriginalScales = ListPool<Vector3>.claim();
         List<Vector3> buildableScales = ListPool<Vector3>.claim();
         List<Vector3> buildableOriginalScales = ListPool<Vector3>.claim();
+        List<(RegionIdentifier id, Transform transform, EditorCopy transformation)>? replaces = null;
 
         float dt = CachedTime.DeltaTime;
         try
@@ -518,11 +520,22 @@ internal static class LevelObjectPatches
                     objOriginalScales.Add(selection.fromScale);
                     if (ClientEvents.ListeningOnMoveObjectFinal)
                         ClientEvents.InvokeOnMoveObjectFinal(new MoveObjectFinalProperties(levelObject.instanceID, t, selection.transform.localScale, selection.fromScale, useScale, dt));
+                    if (levelObject.isSpeciallyCulled)
+                        LevelObjectUtil.UpdateContainingCullingVolumesForMove(selection.fromPosition, t.Position);
+                    else
+                        LevelObjectUtil.UpdateContainingCullingVolumes(t.Position);
                 }
-                else if (LevelObjectUtil.TryFindBuildable(selection.transform, out id))
+                else if (LevelObjectUtil.TryFindBuildable(selection.transform, selection.fromPosition, out id))
                 {
                     LevelBuildableObject? buildable = LevelObjectUtil.GetBuildable(id);
                     if (buildable == null) continue;
+                    bool needsReplaced = !Regions.tryGetCoordinate(t.Position, out byte x, out byte y) || !id.IsSameRegionAs(x, y);
+                    if (needsReplaced)
+                    {
+                        (replaces ??= new List<(RegionIdentifier, Transform, EditorCopy)>(2)).Add((id, selection.transform, new EditorCopy(t.Position, t.Rotation,
+                            selection.transform.localScale, null, buildable.asset)));
+                        continue;
+                    }
                     buildableIds.Add(id);
                     buildableTranslations.Add(t);
                     buildableScales.Add(selection.transform.localScale);
@@ -531,7 +544,7 @@ internal static class LevelObjectPatches
                         ClientEvents.InvokeOnMoveBuildableFinal(new MoveBuildableFinalProperties(id, t, selection.transform.localScale, selection.fromScale, useScale, dt));
                 }
 
-                int totalObjects = instanceIds.Count + buildableIds.Count;
+                int totalObjects = instanceIds.Count + buildableIds.Count - (replaces != null ? replaces.Count : 0);
                 if (totalObjects > 0 && totalObjects % LevelObjectUtil.MaxMovePacketSize == 0)
                     Flush();
             }
@@ -557,6 +570,21 @@ internal static class LevelObjectPatches
                 buildableOriginalScales.Clear();
                 buildableScales.Clear();
                 globalUseScale = false;
+            }
+            if (replaces != null)
+            {
+                RegionIdentifier[] ids = new RegionIdentifier[replaces.Count];
+                EditorCopy[] copies = new EditorCopy[replaces.Count];
+                for (int i = 0; i < replaces.Count; ++i)
+                {
+                    EditorObjects.removeSelection(replaces[i].transform);
+                    LevelObjects.registerRemoveObject(replaces[i].transform);
+                    copies[i] = replaces[i].transformation;
+                    ids[i] = replaces[i].id;
+                }
+                ClientEvents.InvokeOnDeleteLevelObjects(new DeleteLevelObjectsProperties(Array.Empty<uint>(), ids, dt));
+                LevelObjectUtil.ClientInstantiateObjectsAndLock(copies);
+                Logger.LogDebug($"[CLIENT EVENTS] Replacing {replaces.Count.Format()} buildable{replaces.Count.S()} that got moved into a different region.");
             }
         }
         finally
@@ -609,7 +637,7 @@ internal static class LevelObjectPatches
             UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
-        List<EditorSelection> selection = EditorObjectSelection;
+        List<EditorSelection> selection = LevelObjectUtil.EditorObjectSelection;
         Logger.LogDebug($"[{Source}] Deleting selection.");
         List<uint> objects = ListPool<uint>.claim();
         if (objects.Capacity < selection.Count)
@@ -684,9 +712,9 @@ internal static class LevelObjectPatches
             UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
-        if (EditorObjectSelection.Count > LevelObjectUtil.MaxCopySelectionSize)
+        if (LevelObjectUtil.EditorObjectSelection.Count > LevelObjectUtil.MaxCopySelectionSize)
         {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("TooManySelections", EditorObjectSelection.Count, LevelObjectUtil.MaxCopySelectionSize));
+            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("TooManySelections", LevelObjectUtil.EditorObjectSelection.Count, LevelObjectUtil.MaxCopySelectionSize));
             return false;
         }
         Logger.LogDebug($"[{Source}] Copying.");
@@ -698,7 +726,8 @@ internal static class LevelObjectPatches
         if (!DevkitServerModule.IsEditing || IsSyncing)
             return;
         Logger.LogDebug($"[{Source}] Pasteing.");
-        LevelObjectUtil.ClientInstantiateObjectsAndLock(EditorObjectCopies.ToArrayFast());
+        LevelObjectUtil.ClearSelection();
+        LevelObjectUtil.ClientInstantiateObjectsAndLock(LevelObjectUtil.EditorObjectCopies.ToArrayFast());
     }
     private static bool CheckCanPaste()
     {
@@ -710,9 +739,11 @@ internal static class LevelObjectPatches
             UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
-        if (EditorObjectCopies.Count > LevelObjectUtil.MaxCopySelectionSize)
+
+        List<EditorCopy> copies = LevelObjectUtil.EditorObjectCopies;
+        if (copies.Count > LevelObjectUtil.MaxCopySelectionSize)
         {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("TooManySelections", EditorObjectCopies.Count, LevelObjectUtil.MaxCopySelectionSize));
+            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("TooManySelections", copies.Count, LevelObjectUtil.MaxCopySelectionSize));
             return false;
         }
 
@@ -729,7 +760,7 @@ internal static class LevelObjectPatches
             UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
-        List<EditorSelection> selection = EditorObjectSelection;
+        List<EditorSelection> selection = LevelObjectUtil.EditorObjectSelection;
         Logger.LogDebug($"[{Source}] Checking move.");
 
         for (int i = 0; i < selection.Count; ++i)
@@ -755,20 +786,9 @@ internal static class LevelObjectPatches
         Logger.LogDebug($"[{Source}] Can move.");
         return true;
     }
-    private static void SaveOneSelectedId()
-    {
-        Logger.LogDebug($"[{Source}] Pre-moving single.");
-        if (!DevkitServerModule.IsEditing || EditorObjectSelection.Count != 1)
-            return;
-        EditorSelection selection = EditorObjectSelection[0];
-        Transform transform = selection.transform;
-        if (!LevelObjectUtil.TryFindBuildable(transform, out RegionIdentifier id))
-            return;
-        _lastDeleting = id;
-    }
     private static void PreIsPasteingTransform()
     {
-        if (!DevkitServerModule.IsEditing || EditorObjectSelection.Count <= 1)
+        if (!DevkitServerModule.IsEditing || LevelObjectUtil.EditorObjectSelection.Count <= 1)
             return;
         Logger.LogDebug($"[{Source}] Pasteing transform for more than one.");
 
@@ -776,11 +796,11 @@ internal static class LevelObjectPatches
     }
     private static void OnMoveOneObject()
     {
-        if (!DevkitServerModule.IsEditing || EditorObjectSelection.Count != 1)
+        if (!DevkitServerModule.IsEditing || LevelObjectUtil.EditorObjectSelection.Count != 1)
             return;
         Logger.LogDebug($"[{Source}] Moving single.");
 
-        EditorSelection selection = EditorObjectSelection[0];
+        EditorSelection selection = LevelObjectUtil.EditorObjectSelection[0];
         Transform transform = selection.transform;
         LevelObject? obj = LevelObjectUtil.FindObject(transform);
         TransformationDelta delta = new TransformationDelta(TransformationDelta.TransformFlags.All, transform.position, transform.rotation, selection.fromPosition, selection.fromRotation);
@@ -789,42 +809,29 @@ internal static class LevelObjectPatches
         float dt = CachedTime.DeltaTime;
         if (obj == null)
         {
-            if (!LevelObjectUtil.TryFindBuildable(transform, out RegionIdentifier id) || LevelObjectUtil.GetBuildable(id) is not { } buildable)
+            if (!LevelObjectUtil.TryFindBuildable(transform, delta.OriginalPosition, out RegionIdentifier id) || LevelObjectUtil.GetBuildable(id) is not { } buildable)
                 return;
             
-            if (Regions.tryGetCoordinate(delta.OriginalPosition, out byte x, out byte y) && (id.X != x || id.Y != y))
+            if (Regions.tryGetCoordinate(delta.OriginalPosition, out byte x, out byte y) &&
+                !id.IsSameRegionAs(x, y) && ClientEvents.ListeningOnDeleteLevelObjects)
             {
-                /*
-                 * Replace the buildable if it was put in a different region.
-                 * This is much simpler and more reliable than hoping two people
-                 * don't move something into the same region at the same time.
-                 *
-                 * plz instance ids for buildables
-                 */
-                if (_lastDeleting.HasValue && ClientEvents.ListeningOnDeleteLevelObjects)
-                {
-                    EditorObjects.removeSelection(transform);
-                    LevelObjects.registerRemoveObject(transform);
-                    ClientEvents.InvokeOnDeleteLevelObjects(new DeleteLevelObjectsProperties(Array.Empty<uint>(), new RegionIdentifier[]
-                    {
-                        _lastDeleting.Value
-                    }, dt));
-                    LevelObjectUtil.ClientInstantiateObjectsAndLock(new EditorCopy[] { new EditorCopy(delta.Position, delta.Rotation, transform.localScale, null, buildable.asset) });
-                    _lastDeleting = null;
-                }
+                EditorObjects.removeSelection(transform);
+                LevelObjects.registerRemoveObject(transform);
+                ClientEvents.InvokeOnDeleteLevelObjects(new DeleteLevelObjectsProperties(Array.Empty<uint>(), new RegionIdentifier[] { id }, dt));
+                LevelObjectUtil.ClientInstantiateObjectsAndLock(new EditorCopy[] { new EditorCopy(delta.Position, delta.Rotation, transform.localScale, null, buildable.asset) });
+                Logger.LogDebug("[CLIENT EVENTS] Replacing a buildable that was moved into a different region.");
+                return;
             }
-            else
+
+            if (ClientEvents.ListeningOnMoveBuildableFinal)
             {
-                if (ClientEvents.ListeningOnMoveBuildableFinal)
-                {
-                    ClientEvents.InvokeOnMoveBuildableFinal(new MoveBuildableFinalProperties(id, delta, scale, selection.fromScale, useScale, dt));
-                }
-                if (ClientEvents.ListeningOnMoveLevelObjectsFinal)
-                {
-                    ClientEvents.InvokeOnMoveLevelObjectsFinal(new MoveLevelObjectsFinalProperties(Array.Empty<uint>(), Array.Empty<TransformationDelta>(), null, null,
-                        new RegionIdentifier[] { id }, new TransformationDelta[] { delta },
-                        useScale ? new Vector3[] { scale } : null, useScale ? new Vector3[] { selection.fromScale } : null, dt));
-                }
+                ClientEvents.InvokeOnMoveBuildableFinal(new MoveBuildableFinalProperties(id, delta, scale, selection.fromScale, useScale, dt));
+            }
+            if (ClientEvents.ListeningOnMoveLevelObjectsFinal)
+            {
+                ClientEvents.InvokeOnMoveLevelObjectsFinal(new MoveLevelObjectsFinalProperties(Array.Empty<uint>(), Array.Empty<TransformationDelta>(), null, null,
+                    new RegionIdentifier[] { id }, new TransformationDelta[] { delta },
+                    useScale ? new Vector3[] { scale } : null, useScale ? new Vector3[] { selection.fromScale } : null, dt));
             }
             return;
         }

@@ -1,7 +1,11 @@
 ﻿using DevkitServer.Util.Encoding;
 using DevkitServer.Models;
+using DevkitServer.Multiplayer.Networking;
 #if SERVER
 using DevkitServer.API.Permissions;
+using DevkitServer.Configuration;
+using DevkitServer.Players;
+using JetBrains.Annotations;
 #endif
 
 namespace DevkitServer.Multiplayer.Actions;
@@ -19,6 +23,7 @@ public sealed class ObjectActions
         {
             ClientEvents.OnDeleteLevelObjects += OnDeleteLevelObjects;
             ClientEvents.OnMoveLevelObjectsFinal += OnMoveLevelObjectsFinal;
+            ClientEvents.OnMoveLevelObjectsPreview += OnMoveLevelObjectsPreview;
         }
 #endif
     }
@@ -30,6 +35,7 @@ public sealed class ObjectActions
         {
             ClientEvents.OnDeleteLevelObjects -= OnDeleteLevelObjects;
             ClientEvents.OnMoveLevelObjectsFinal -= OnMoveLevelObjectsFinal;
+            ClientEvents.OnMoveLevelObjectsPreview -= OnMoveLevelObjectsPreview;
         }
 #endif
     }
@@ -41,11 +47,11 @@ public sealed class ObjectActions
             Buildables = properties.Buildables,
             Objects = properties.Objects,
             DeltaTime = properties.DeltaTime
-        });
+        }, true);
     }
     private void OnMoveLevelObjectsFinal(in MoveLevelObjectsFinalProperties properties)
     {
-        EditorActions.QueueAction(new MoveLevelObjectsFinalAction
+        EditorActions.QueueAction(new MoveLevelObjectsAction
         {
             Objects = properties.InstanceIds,
             ObjectTransformations = properties.ObjectTransformations,
@@ -57,8 +63,22 @@ public sealed class ObjectActions
             OriginalBuildableScales = properties.OriginalBuildableScales,
             UseScale = properties.ObjectScales != null && properties.BuildableScales != null &&
                        properties.OriginalObjectScales != null && properties.OriginalBuildableScales != null,
-            DeltaTime = properties.DeltaTime
-        });
+            DeltaTime = properties.DeltaTime,
+            IsFinal = true
+        }, true);
+    }
+    private void OnMoveLevelObjectsPreview(in MoveLevelObjectsPreviewProperties properties)
+    {
+        EditorActions.QueueAction(new MoveLevelObjectsAction
+        {
+            Objects = properties.InstanceIds,
+            ObjectTransformations = properties.ObjectTransformations,
+            Buildables = properties.Buildables,
+            BuildableTransformations = properties.BuildableTransformations,
+            UseScale = false,
+            DeltaTime = properties.DeltaTime,
+            IsFinal = false
+        }, true);
     }
 #endif
 }
@@ -88,12 +108,15 @@ public sealed class DeleteLevelObjectsAction : IAction
         if (objs == null)
         {
             objs = Objects.Length == 0 ? Array.Empty<LevelObject>() : new LevelObject[Objects.Length];
+            Vector3 last = Vector3.zero;
             for (int i = 0; i < Objects.Length; ++i)
             {
-                LevelObject? obj = LevelObjectUtil.FindObject(Objects[i]);
+                LevelObject? obj = i == 0 ? LevelObjectUtil.FindObject(Objects[i]) : LevelObjectUtil.FindObject(last, Objects[i]);
                 objs[i] = obj;
                 if (obj == null)
                     Logger.LogWarning($"Unknown object: # {Objects[i]}.");
+                else
+                    last = obj.transform.position;
             }
         }
         if (buildables == null)
@@ -129,9 +152,10 @@ public sealed class DeleteLevelObjectsAction : IAction
             return false;
         _objects = Objects.Length == 0 ? Array.Empty<LevelObject>() : new LevelObject[Objects.Length];
         _buildables = Buildables.Length == 0 ? Array.Empty<LevelBuildableObject>() : new LevelBuildableObject[Objects.Length];
+        Vector3 last = Vector3.zero;
         for (int i = 0; i < Objects.Length; ++i)
         {
-            LevelObject? obj = LevelObjectUtil.FindObject(Objects[i]);
+            LevelObject? obj = i == 0 ? LevelObjectUtil.FindObject(Objects[i]) : LevelObjectUtil.FindObject(last, Objects[i]);
             _objects[i] = obj;
             if (obj == null)
             {
@@ -140,6 +164,7 @@ public sealed class DeleteLevelObjectsAction : IAction
             }
             if (!LevelObjectUtil.CheckDeletePermission(obj.instanceID, Instigator.m_SteamID))
                 return false;
+            last = obj.transform.position;
         }
         for (int i = 0; i < Buildables.Length; ++i)
         {
@@ -164,7 +189,7 @@ public sealed class DeleteLevelObjectsAction : IAction
         int buildableCount = reader.ReadUInt8();
 
         Objects = objectCount == 0 ? Array.Empty<uint>() : new uint[objectCount];
-        Buildables = objectCount == 0 ? Array.Empty<RegionIdentifier>() : new RegionIdentifier[buildableCount];
+        Buildables = buildableCount == 0 ? Array.Empty<RegionIdentifier>() : new RegionIdentifier[buildableCount];
 
         for (int i = 0; i < objectCount; ++i)
             Objects[i] = reader.ReadUInt32();
@@ -184,14 +209,14 @@ public sealed class DeleteLevelObjectsAction : IAction
         for (int i = 0; i < objectCount; ++i)
             writer.Write(Objects[i]);
 
-        for (int i = 0; i < objectCount; ++i)
+        for (int i = 0; i < buildableCount; ++i)
             RegionIdentifier.Write(writer, Buildables[i]);
     }
 }
 
 [Action(ActionType.MoveLevelObjectsFinal, 262, 0)]
 [EarlyTypeInit]
-public class MoveLevelObjectsFinalAction : IAction
+public class MoveLevelObjectsAction : IAction
 {
     public ActionType Type => ActionType.MoveLevelObjectsFinal;
     public CSteamID Instigator { get; set; }
@@ -204,6 +229,7 @@ public class MoveLevelObjectsFinalAction : IAction
     public Vector3[]? OriginalBuildableScales { get; set; }
     public Vector3[]? BuildableScales { get; set; }
     public bool UseScale { get; set; }
+    public bool IsFinal { get; set; }
     public float DeltaTime { get; set; }
     public void Apply()
     {
@@ -243,54 +269,28 @@ public class MoveLevelObjectsFinalAction : IAction
         {
             if (objs[i] is not { } obj) continue;
             ref TransformationDelta t = ref ObjectTransformations[i];
-            LevelObjects.registerTransformObject(obj.transform, t.Position, t.Rotation, UseScale ? ObjectScales![i] : obj.transform.localScale, 
-                t.OriginalPosition, t.OriginalRotation, UseScale ? OriginalObjectScales![i] : obj.transform.localScale);
+            if (IsFinal)
+            {
+                Vector3 lclScale = !UseScale ? obj.transform.localScale : default;
+                LevelObjects.registerTransformObject(obj.transform, t.Position, t.Rotation, UseScale ? ObjectScales![i] : lclScale,
+                    t.OriginalPosition, t.OriginalRotation, UseScale ? OriginalObjectScales![i] : lclScale);
+            }
+            else
+                t.ApplyTo(obj.transform, true);
         }
         for (int i = 0; i < buildables.Length; ++i)
         {
             if (buildables[i] is not { } buildable) continue;
             ref TransformationDelta t = ref BuildableTransformations[i];
-            LevelObjects.registerTransformObject(buildable.transform, t.Position, t.Rotation, UseScale ? ObjectScales![i] : buildable.transform.localScale,
-                t.OriginalPosition, t.OriginalRotation, UseScale ? OriginalObjectScales![i] : buildable.transform.localScale);
-        }
-    }
-    public void Read(ByteReader reader)
-    {
-        DeltaTime = reader.ReadFloat();
-        int objectCount = reader.ReadUInt8();
-        int buildableCount = reader.ReadUInt8();
-        bool useScale = reader.ReadBool();
-
-        Objects = objectCount == 0 ? Array.Empty<uint>() : new uint[objectCount];
-        Buildables = objectCount == 0 ? Array.Empty<RegionIdentifier>() : new RegionIdentifier[buildableCount];
-        ObjectTransformations = objectCount == 0 ? Array.Empty<TransformationDelta>() : new TransformationDelta[objectCount];
-        BuildableTransformations = objectCount == 0 ? Array.Empty<TransformationDelta>() : new TransformationDelta[buildableCount];
-
-        if (useScale)
-        {
-            ObjectScales = objectCount == 0 ? Array.Empty<Vector3>() : new Vector3[objectCount];
-            OriginalObjectScales = objectCount == 0 ? Array.Empty<Vector3>() : new Vector3[objectCount];
-            BuildableScales = buildableCount == 0 ? Array.Empty<Vector3>() : new Vector3[buildableCount];
-            OriginalBuildableScales = buildableCount == 0 ? Array.Empty<Vector3>() : new Vector3[buildableCount];
-        }
-        for (int i = 0; i < objectCount; ++i)
-        {
-            Objects[i] = reader.ReadUInt32();
-            ObjectTransformations[i] = new TransformationDelta(reader);
-            if (useScale)
+            if (IsFinal)
             {
-                ObjectScales![i] = reader.ReadVector3();
-                OriginalObjectScales![i] = reader.ReadVector3();
+                Vector3 lclScale = !UseScale ? buildable.transform.localScale : default;
+                LevelObjects.registerTransformObject(buildable.transform, t.Position, t.Rotation, UseScale ? ObjectScales![i] : lclScale,
+                    t.OriginalPosition, t.OriginalRotation, UseScale ? OriginalObjectScales![i] : lclScale);
             }
-        }
-        for (int i = 0; i < buildableCount; ++i)
-        {
-            Buildables[i] = RegionIdentifier.Read(reader);
-            BuildableTransformations[i] = new TransformationDelta(reader);
-            if (useScale)
+            else
             {
-                BuildableScales![i] = reader.ReadVector3();
-                OriginalBuildableScales![i] = reader.ReadVector3();
+                t.ApplyTo(buildable.transform, true);
             }
         }
     }
@@ -299,6 +299,8 @@ public class MoveLevelObjectsFinalAction : IAction
     private LevelBuildableObject?[]? _buildables;
     public bool CheckCanApply()
     {
+        if (!IsFinal && DevkitServerConfig.Config.RemoveCosmeticImprovements)
+            return false;
         if (Permission.SuperuserPermission.Has(Instigator.m_SteamID, false))
             return true;
         if (Objects.Length > byte.MaxValue || Buildables.Length > byte.MaxValue)
@@ -333,6 +335,48 @@ public class MoveLevelObjectsFinalAction : IAction
         return true;
     }
 #endif
+    public void Read(ByteReader reader)
+    {
+        DeltaTime = reader.ReadFloat();
+        int objectCount = reader.ReadUInt8();
+        int buildableCount = reader.ReadUInt8();
+        byte flag = reader.ReadUInt8();
+        UseScale = (flag & 1) != 0;
+        IsFinal = (flag & 2) != 0;
+
+        Objects = objectCount == 0 ? Array.Empty<uint>() : new uint[objectCount];
+        Buildables = buildableCount == 0 ? Array.Empty<RegionIdentifier>() : new RegionIdentifier[buildableCount];
+        ObjectTransformations = objectCount == 0 ? Array.Empty<TransformationDelta>() : new TransformationDelta[objectCount];
+        BuildableTransformations = buildableCount == 0 ? Array.Empty<TransformationDelta>() : new TransformationDelta[buildableCount];
+
+        if (UseScale)
+        {
+            ObjectScales = objectCount == 0 ? Array.Empty<Vector3>() : new Vector3[objectCount];
+            BuildableScales = buildableCount == 0 ? Array.Empty<Vector3>() : new Vector3[buildableCount];
+            OriginalObjectScales = objectCount == 0 ? Array.Empty<Vector3>() : new Vector3[objectCount];
+            OriginalBuildableScales = buildableCount == 0 ? Array.Empty<Vector3>() : new Vector3[buildableCount];
+        }
+        for (int i = 0; i < objectCount; ++i)
+        {
+            Objects[i] = reader.ReadUInt32();
+            ObjectTransformations[i] = new TransformationDelta(reader, !IsFinal);
+            if (UseScale)
+            {
+                ObjectScales![i] = IsFinal ? reader.ReadVector3() : reader.ReadHalfPrecisionVector3();
+                OriginalObjectScales![i] = IsFinal ? reader.ReadVector3() : reader.ReadHalfPrecisionVector3();
+            }
+        }
+        for (int i = 0; i < buildableCount; ++i)
+        {
+            Buildables[i] = RegionIdentifier.Read(reader);
+            BuildableTransformations[i] = new TransformationDelta(reader, !IsFinal);
+            if (UseScale)
+            {
+                BuildableScales![i] = IsFinal ? reader.ReadVector3() : reader.ReadHalfPrecisionVector3();
+                OriginalBuildableScales![i] = IsFinal ? reader.ReadVector3() : reader.ReadHalfPrecisionVector3();
+            }
+        }
+    }
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
@@ -341,27 +385,103 @@ public class MoveLevelObjectsFinalAction : IAction
 
         writer.Write((byte)objectCount);
         writer.Write((byte)buildableCount);
-        writer.Write(UseScale);
+        writer.Write((byte)((UseScale ? 1 : 0) | (IsFinal ? 2 : 0)));
 
         for (int i = 0; i < objectCount; ++i)
         {
             writer.Write(Objects[i]);
-            ObjectTransformations[i].Write(writer);
+            if (IsFinal)
+                ObjectTransformations[i].Write(writer);
+            else
+                ObjectTransformations[i].WriteHalfPrecision(writer);
             if (UseScale)
             {
-                writer.Write(ObjectScales![i]);
-                writer.Write(OriginalObjectScales![i]);
+                if (IsFinal)
+                {
+                    writer.Write(ObjectScales![i]);
+                    writer.Write(OriginalObjectScales![i]);
+                }
+                else
+                {
+                    writer.WriteHalfPrecision(ObjectScales![i]);
+                    writer.WriteHalfPrecision(OriginalObjectScales![i]);
+                }
             }
         }
         for (int i = 0; i < buildableCount; ++i)
         {
             RegionIdentifier.Write(writer, Buildables[i]);
-            BuildableTransformations[i].Write(writer);
+            if (IsFinal)
+                BuildableTransformations[i].Write(writer);
+            else
+                BuildableTransformations[i].WriteHalfPrecision(writer);
             if (UseScale)
             {
-                writer.Write(BuildableScales![i]);
-                writer.Write(OriginalBuildableScales![i]);
+                if (IsFinal)
+                {
+                    writer.Write(BuildableScales![i]);
+                    writer.Write(OriginalBuildableScales![i]);
+                }
+                else
+                {
+                    writer.WriteHalfPrecision(BuildableScales![i]);
+                    writer.WriteHalfPrecision(OriginalBuildableScales![i]);
+                }
             }
         }
+    }
+}
+
+[Action(ActionType.InstantiateLevelObject, 47, 0)]
+public class InstantiateLevelObjectAction : IServersideAction
+{
+    public ActionType Type => ActionType.InstantiateLevelObject;
+    public float DeltaTime { get; set; }
+    public CSteamID Instigator { get; set; }
+    public Guid Asset { get; set; }
+    public Vector3 Position { get; set; }
+    public Quaternion Rotation { get; set; }
+    public Vector3 Scale { get; set; }
+    public long RequestKey { get; set; }
+    public void Apply()
+    {
+#if SERVER
+        EditorUser? user = UserManager.FromId(Instigator);
+        if (user != null)
+        {
+            LevelObjectUtil.ReceiveLevelObjectInstantiation(
+                new MessageContext(user.Connection, new MessageOverhead(MessageFlags.Request, 0, 0, RequestKey, 0), false),
+                Asset, Position, Rotation, Scale);
+        }
+#endif
+    }
+#if SERVER
+    public bool CheckCanApply()
+    {
+        EditorUser? user = UserManager.FromId(Instigator);
+        if (user != null && user.Actions != null)
+            user.Actions.DontSendPermissionMesssage();
+        return false;
+    }
+#endif
+
+    public void Read(ByteReader reader)
+    {
+        Asset = reader.ReadGuid();
+        Position = reader.ReadVector3();
+        Rotation = reader.ReadQuaternion();
+        Scale = reader.ReadVector3();
+        RequestKey = reader.ReadInt64();
+        DeltaTime = reader.ReadFloat();
+    }
+
+    public void Write(ByteWriter writer)
+    {
+        writer.Write(Asset);
+        writer.Write(Position);
+        writer.Write(Rotation);
+        writer.Write(Scale);
+        writer.Write(RequestKey);
+        writer.Write(DeltaTime);
     }
 }

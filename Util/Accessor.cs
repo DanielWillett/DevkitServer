@@ -513,6 +513,20 @@ internal static class Accessor
             paramTypes[i] = p[i - 1].ParameterType;
         try
         {
+            // try to create a delegate without allocating a method first
+            Delegate? rtn = method.CreateDelegate(delegateType);
+            if (rtn != null)
+            {
+                Logger.LogDebug("Created instance calling delegate for " + method.Format() + " of type " + delegateType.Format() + ".");
+                return rtn;
+            }
+        }
+        catch
+        {
+            // ignored
+        }
+        try
+        {
             DynamicMethod dm = new DynamicMethod("Invoke" + method.Name, method.ReturnType, paramTypes, method.DeclaringType?.Module ?? typeof(Accessor).Module, true);
             ILGenerator generator = dm.GetILGenerator();
             for (int i = 0; i < paramTypes.Length; ++i)
@@ -758,7 +772,7 @@ internal static class Accessor
 
     /// <returns>Every type defined in the calling assembly.</returns>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static List<Type> GetTypesSafe(bool removeIgnored = false) => GetTypesSafe(DevkitServer, removeIgnored);
+    public static List<Type> GetTypesSafe(bool removeIgnored = false) => GetTypesSafe(Assembly.GetCallingAssembly(), removeIgnored);
 
     /// <returns>Every type defined in <paramref name="assembly"/>.</returns>
     public static List<Type> GetTypesSafe(Assembly assembly, bool removeIgnored = false)

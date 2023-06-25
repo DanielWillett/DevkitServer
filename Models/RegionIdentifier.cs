@@ -30,9 +30,10 @@ public readonly struct RegionIdentifier : IEquatable<RegionIdentifier>, ICompara
             throw new ArgumentOutOfRangeException(nameof(Y), "Must be below " + Regions.WORLD_SIZE + ".");
     }
 
-    public RegionIdentifier(byte x, byte y, ushort index) : this((x << 24) & (y << 16) & index) { }
+    public RegionIdentifier(byte x, byte y, ushort index) : this((x << 24) | (y << 16) | index) { }
 
     public bool IsSameRegionAs(RegionIdentifier other) => (other._data & unchecked((int)0xFFFF0000)) == (_data & unchecked((int)0xFFFF0000));
+    public bool IsSameRegionAs(byte x, byte y) => X == x && Y == y;
     public override bool Equals(object other) => other is RegionIdentifier id && Equals(id);
     public bool Equals(RegionIdentifier other) => other._data == _data;
     public override int GetHashCode() => _data;

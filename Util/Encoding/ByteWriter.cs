@@ -1,10 +1,8 @@
 ﻿using DevkitServer.Multiplayer.Networking;
 using System.Reflection;
-using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-
-// ReSharper disable AssignNullToNotNullAttribute
+using DevkitServer.Models;
 
 namespace DevkitServer.Util.Encoding;
 
@@ -12,6 +10,12 @@ public class ByteWriter
 {
     public delegate void Writer<in T>(ByteWriter writer, T arg1);
     private static readonly bool IsBigEndian = !BitConverter.IsLittleEndian;
+    private static Dictionary<Type, MethodInfo>? _nonNullableWriters;
+    private static Dictionary<Type, MethodInfo>? _nullableWriters;
+    private static readonly MethodInfo WriteEnumMethod = typeof(ByteWriter).GetMethod(nameof(WriteEnum), BindingFlags.Instance | BindingFlags.NonPublic)
+                                                            ?? throw new MemberAccessException("Unable to find write enum method.");
+    private static readonly MethodInfo WriteNullableEnumMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullableEnum), BindingFlags.Instance | BindingFlags.NonPublic)
+                                                                 ?? throw new MemberAccessException("Unable to find write nullable enum method.");
     private int _size;
     private byte[] _buffer;
     private bool _streamMode;
@@ -47,6 +51,111 @@ public class ByteWriter
         BaseCapacity = capacity;
         _buffer = BaseCapacity < 1 ? Array.Empty<byte>() : new byte[BaseCapacity];
         ShouldPrepend = shouldPrepend;
+    }
+    private static void PrepareMethods()
+    {
+        _nonNullableWriters ??= new Dictionary<Type, MethodInfo>(44)
+        {
+            { typeof(int), GetMethod(typeof(int)) },
+            { typeof(uint), GetMethod(typeof(uint)) },
+            { typeof(byte), GetMethod(typeof(byte)) },
+            { typeof(sbyte), GetMethod(typeof(sbyte)) },
+            { typeof(bool), GetMethod(typeof(bool)) },
+            { typeof(long), GetMethod(typeof(long)) },
+            { typeof(ulong), GetMethod(typeof(ulong)) },
+            { typeof(short), GetMethod(typeof(short)) },
+            { typeof(ushort), GetMethod(typeof(ushort)) },
+            { typeof(float), GetMethod(typeof(float)) },
+            { typeof(decimal), GetMethod(typeof(decimal)) },
+            { typeof(double), GetMethod(typeof(double)) },
+            { typeof(char), GetMethod(typeof(char)) },
+            { typeof(string), GetMethod(typeof(string)) },
+            { typeof(Type), GetMethod(typeof(Type)) },
+            { typeof(Type[]), GetMethod(typeof(Type[])) },
+            { typeof(RegionIdentifier), typeof(RegionIdentifier).GetMethod(nameof(RegionIdentifier.Write), BindingFlags.Static | BindingFlags.Public) },
+            { typeof(DateTime), GetMethod(typeof(DateTime)) },
+            { typeof(DateTimeOffset), GetMethod(typeof(DateTimeOffset)) },
+            { typeof(TimeSpan), GetMethod(typeof(TimeSpan)) },
+            { typeof(Guid), GetMethod(typeof(Guid)) },
+            { typeof(Vector2), GetMethod(typeof(Vector2)) },
+            { typeof(Vector3), GetMethod(typeof(Vector3)) },
+            { typeof(Vector4), GetMethod(typeof(Vector4)) },
+            { typeof(Bounds), GetMethod(typeof(Bounds)) },
+            { typeof(Quaternion), GetMethod(typeof(Quaternion)) },
+            { typeof(Color), GetMethod(typeof(Color)) },
+            { typeof(Color32), GetMethod(typeof(Color32)) },
+            { typeof(Guid[]), GetMethod(typeof(Guid[])) },
+            { typeof(DateTime[]), GetMethod(typeof(DateTime[])) },
+            { typeof(DateTimeOffset[]), GetMethod(typeof(DateTimeOffset[])) },
+            { typeof(byte[]), GetMethod(typeof(byte[])) },
+            { typeof(sbyte[]), GetMethod(typeof(sbyte[])) },
+            { typeof(int[]), GetMethod(typeof(int[])) },
+            { typeof(uint[]), GetMethod(typeof(uint[])) },
+            { typeof(bool[]), GetMethod(typeof(bool[])) },
+            { typeof(long[]), GetMethod(typeof(long[])) },
+            { typeof(ulong[]), GetMethod(typeof(ulong[])) },
+            { typeof(short[]), GetMethod(typeof(short[])) },
+            { typeof(ushort[]), GetMethod(typeof(ushort[])) },
+            { typeof(float[]), GetMethod(typeof(float[])) },
+            { typeof(double[]), GetMethod(typeof(double[])) },
+            { typeof(decimal[]), GetMethod(typeof(decimal[])) },
+            { typeof(char[]), GetMethod(typeof(char[])) },
+            { typeof(string[]), GetMethod(typeof(string[])) },
+        };
+
+        _nullableWriters ??= new Dictionary<Type, MethodInfo>(44)
+        {
+            { typeof(int?), GetNullableMethod(typeof(int?)) },
+            { typeof(uint?), GetNullableMethod(typeof(uint?)) },
+            { typeof(byte?), GetNullableMethod(typeof(byte?)) },
+            { typeof(sbyte?), GetNullableMethod(typeof(sbyte?)) },
+            { typeof(bool?), GetNullableMethod(typeof(bool?)) },
+            { typeof(long?), GetNullableMethod(typeof(long?)) },
+            { typeof(ulong?), GetNullableMethod(typeof(ulong?)) },
+            { typeof(short?), GetNullableMethod(typeof(short?)) },
+            { typeof(ushort?), GetNullableMethod(typeof(ushort?)) },
+            { typeof(float?), GetNullableMethod(typeof(float?)) },
+            { typeof(decimal?), GetNullableMethod(typeof(decimal?)) },
+            { typeof(double?), GetNullableMethod(typeof(double?)) },
+            { typeof(char?), GetNullableMethod(typeof(char?)) },
+            { typeof(string), GetNullableMethod(typeof(string)) },
+            { typeof(Type), GetMethod(typeof(Type)) },
+            { typeof(Type[]), GetMethod(typeof(Type[])) },
+            { typeof(DateTime?), GetNullableMethod(typeof(DateTime?)) },
+            { typeof(DateTimeOffset?), GetNullableMethod(typeof(DateTimeOffset?)) },
+            { typeof(TimeSpan?), GetNullableMethod(typeof(TimeSpan?)) },
+            { typeof(Guid?), GetNullableMethod(typeof(Guid?)) },
+            { typeof(Vector2?), GetNullableMethod(typeof(Vector2?)) },
+            { typeof(Vector3?), GetNullableMethod(typeof(Vector3?)) },
+            { typeof(Vector4?), GetNullableMethod(typeof(Vector4?)) },
+            { typeof(Bounds?), GetNullableMethod(typeof(Bounds?)) },
+            { typeof(Quaternion?), GetNullableMethod(typeof(Quaternion?)) },
+            { typeof(Color?), GetNullableMethod(typeof(Color?)) },
+            { typeof(Color32?), GetNullableMethod(typeof(Color32?)) },
+            { typeof(Guid[]), GetNullableMethod(typeof(Guid[])) },
+            { typeof(DateTime[]), GetNullableMethod(typeof(DateTime[])) },
+            { typeof(DateTimeOffset[]), GetNullableMethod(typeof(DateTimeOffset[])) },
+            { typeof(byte[]), GetNullableMethod(typeof(byte[])) },
+            { typeof(sbyte[]), GetNullableMethod(typeof(sbyte[])) },
+            { typeof(int[]), GetNullableMethod(typeof(int[])) },
+            { typeof(uint[]), GetNullableMethod(typeof(uint[])) },
+            { typeof(bool[]), GetNullableMethod(typeof(bool[])) },
+            { typeof(long[]), GetNullableMethod(typeof(long[])) },
+            { typeof(ulong[]), GetNullableMethod(typeof(ulong[])) },
+            { typeof(short[]), GetNullableMethod(typeof(short[])) },
+            { typeof(ushort[]), GetNullableMethod(typeof(ushort[])) },
+            { typeof(float[]), GetNullableMethod(typeof(float[])) },
+            { typeof(double[]), GetNullableMethod(typeof(double[])) },
+            { typeof(decimal[]), GetNullableMethod(typeof(decimal[])) },
+            { typeof(char[]), GetNullableMethod(typeof(char[])) },
+            { typeof(string[]), GetNullableMethod(typeof(string[])) },
+        };
+
+        MethodInfo GetMethod(Type writeType) => typeof(ByteWriter).GetMethod("Write", BindingFlags.Instance | BindingFlags.Public, null, new Type[] { writeType }, null)
+                                                ?? throw new MemberAccessException("Unable to find write method for " + writeType.Name + ".");
+
+        MethodInfo GetNullableMethod(Type writeType) => typeof(ByteWriter).GetMethod("WriteNullable", BindingFlags.Instance | BindingFlags.Public, null, new Type[] { writeType }, null)
+                                                        ?? throw new MemberAccessException("Unable to find nullable write method for " + writeType.Name + ".");
     }
     /// <summary>The value of <paramref name="overhead"/>.<see cref="MessageOverhead.Size">Size</see> will be overwritten.</summary>
     public unsafe void PrependData(ref MessageOverhead overhead)
@@ -101,9 +210,32 @@ public class ByteWriter
             System.Buffer.BlockCopy(old, 0, _buffer, 0, _size);
         }
     }
-    public void WriteStruct<T>(in T value) where T : unmanaged
+    /// <summary>Use with caution, may not be consistant with structs that do not have an explicit layout.</summary>
+    public unsafe void WriteStruct<T>(in T value) where T : unmanaged
     {
-        WriteInternal(in value);
+        if (_streamMode)
+        {
+            int size = sizeof(T);
+            if (_buffer.Length < size)
+                _buffer = new byte[size];
+            fixed (byte* ptr = _buffer)
+            {
+                *(T*)ptr = value;
+                EndianCheck(ptr, sizeof(T));
+            }
+            _stream!.Write(_buffer, 0, size);
+            _size += size;
+            return;
+        }
+        int newsize = _size + sizeof(T);
+        if (newsize > _buffer.Length)
+            ExtendBufferIntl(newsize);
+        fixed (byte* ptr = &_buffer[_size])
+        {
+            *(T*)ptr = value;
+            EndianCheck(ptr, sizeof(T));
+        }
+        _size = newsize;
     }
     private static unsafe void Reverse(byte* litEndStrt, int size)
     {
@@ -183,38 +315,7 @@ public class ByteWriter
         }
         _size = newsize;
     }
-    private unsafe void WriteInternal<T>(in T value) where T : unmanaged
-    {
-        if (_streamMode)
-        {
-            int size = sizeof(T);
-            if (_buffer.Length < size)
-                _buffer = new byte[size];
-            fixed (byte* ptr = _buffer)
-            {
-                *(T*)ptr = value;
-                EndianCheck(ptr, sizeof(T));
-            }
-            _stream!.Write(_buffer, 0, size);
-            _size += size;
-            return;
-        }
-        int newsize = _size + sizeof(T);
-        if (newsize > _buffer.Length)
-            ExtendBufferIntl(newsize);
-        fixed (byte* ptr = &_buffer[_size])
-        {
-            *(T*)ptr = value;
-            EndianCheck(ptr, sizeof(T));
-        }
-        _size = newsize;
-    }
-
-    private static readonly MethodInfo WriteInt32Method = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int) }, null);
     public void Write(int n) => WriteInternal(n);
-
-
-    private static readonly MethodInfo WriteNullableInt32Method = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int?) }, null);
     public void WriteNullable(int? n)
     {
         if (n.HasValue)
@@ -224,12 +325,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-    private static readonly MethodInfo WriteUInt32Method = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(uint) }, null);
     public void Write(uint n) => WriteInternal(n);
-
-
-    private static readonly MethodInfo WriteNullableUInt32Method = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(uint?) }, null);
     public void WriteNullable(uint? n)
     {
         if (n.HasValue)
@@ -239,13 +335,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteUInt8Method = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(byte) }, null);
     public void Write(byte n) => WriteInternal(n);
-
-
-    private static readonly MethodInfo WriteNullableUInt8Method = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(byte?) }, null);
     public void WriteNullable(byte? n)
     {
         if (n.HasValue)
@@ -255,13 +345,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteInt8Method = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(sbyte) }, null);
     public void Write(sbyte n) => WriteInternal(unchecked((byte)n));
-
-
-    private static readonly MethodInfo WriteNullableInt8Method = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(sbyte?) }, null);
     public void WriteNullable(sbyte? n)
     {
         if (n.HasValue)
@@ -271,13 +355,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteBooleanMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(bool) }, null);
     public void Write(bool n) => WriteInternal((byte)(n ? 1 : 0));
-
-
-    private static readonly MethodInfo WriteNullableBooleanMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(bool?) }, null);
     public void WriteNullable(bool? n)
     {
         if (n.HasValue)
@@ -287,13 +365,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteInt64Method = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(long) }, null);
     public void Write(long n) => WriteInternal(n);
-
-
-    private static readonly MethodInfo WriteNullableInt64Method = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(long?) }, null);
     public void WriteNullable(long? n)
     {
         if (n.HasValue)
@@ -303,13 +375,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteUInt64Method = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(ulong) }, null);
     public void Write(ulong n) => WriteInternal(n);
-
-
-    private static readonly MethodInfo WriteNullableUInt64Method = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(ulong?) }, null);
     public void WriteNullable(ulong? n)
     {
         if (n.HasValue)
@@ -319,13 +385,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteInt16Method = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(short) }, null);
     public void Write(short n) => WriteInternal(n);
-
-
-    private static readonly MethodInfo WriteNullableInt16Method = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(short?) }, null);
     public void WriteNullable(short? n)
     {
         if (n.HasValue)
@@ -335,11 +395,16 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteUInt16Method = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(ushort) }, null);
     public void Write(ushort n) => WriteInternal(n);
-
+    public void WriteNullable(ushort? n)
+    {
+        if (n.HasValue)
+        {
+            Write(true);
+            WriteInternal(n.Value);
+        }
+        else Write(false);
+    }
     public void WriteInt24(int n)
     {
         if (n > DevkitServerUtility.Int24MaxValue)
@@ -352,7 +417,6 @@ public class ByteWriter
         WriteInternal((ushort)(n & 0xFFFF));
         WriteInternal(b);
     }
-
     public void WriteUInt24(uint n)
     {
         if (n > DevkitServerUtility.Int24MaxValue)
@@ -361,24 +425,8 @@ public class ByteWriter
         }
         else WriteInt24((int)n);
     }
-
-    private static readonly MethodInfo WriteNullableUInt16Method = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(ushort?) }, null);
-    public void WriteNullable(ushort? n)
-    {
-        if (n.HasValue)
-        {
-            Write(true);
-            WriteInternal(n.Value);
-        }
-        else Write(false);
-    }
-
-
-    private static readonly MethodInfo WriteFloatMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(float) }, null);
     public void Write(float n) => WriteInternal(n);
-
-
-    private static readonly MethodInfo WriteNullableFloatMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(float?) }, null);
+    public void WriteHalfPrecision(float n) => WriteInternal(Mathf.FloatToHalf(n));
     public void WriteNullable(float? n)
     {
         if (n.HasValue)
@@ -388,13 +436,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteDecimalMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(decimal) }, null);
     public void Write(decimal n) => WriteInternal(n);
-
-
-    private static readonly MethodInfo WriteNullableDecimalMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(decimal?) }, null);
     public void WriteNullable(decimal? n)
     {
         if (n.HasValue)
@@ -404,13 +446,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteDoubleMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(double) }, null);
     public void Write(double n) => WriteInternal(n);
-
-
-    private static readonly MethodInfo WriteNullableDoubleMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(double?) }, null);
     public void WriteNullable(double? n)
     {
         if (n.HasValue)
@@ -420,13 +456,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteCharMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(char) }, null);
     public void Write(char n) => WriteInternal(n);
-
-
-    private static readonly MethodInfo WriteNullableCharMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(char?) }, null);
     public void WriteNullable(char? n)
     {
         if (n.HasValue)
@@ -436,9 +466,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteStringMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(string) }, null);
     public void Write(string n)
     {
         byte[] str = System.Text.Encoding.UTF8.GetBytes(n);
@@ -457,8 +484,15 @@ public class ByteWriter
         System.Buffer.BlockCopy(str, 0, _buffer, _size, l);
         _size = newsize;
     }
-
-    private static readonly MethodInfo WriteTypeArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Type[]) }, null);
+    public void WriteNullable(string? n)
+    {
+        if (n is not null)
+        {
+            Write(true);
+            Write(n);
+        }
+        else Write(false);
+    }
     public void Write(Type?[] types)
     {
         ushort len = (ushort)Math.Min(types.Length, ushort.MaxValue);
@@ -466,9 +500,6 @@ public class ByteWriter
         for (int i = 0; i < len; ++i)
             Write(types[i]);
     }
-
-
-    private static readonly MethodInfo WriteTypeMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Type) }, null);
     public void Write(Type? type)
     {
         const string nsSdgUnturned = "SDG.Unturned";
@@ -528,19 +559,6 @@ public class ByteWriter
             str += ", " + type.Assembly.GetName().Name;
         Write(str);
     }
-
-
-    private static readonly MethodInfo WriteNullableStringMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(string) }, null);
-    public void WriteNullable(string? n)
-    {
-        if (n is not null)
-        {
-            Write(true);
-            Write(n);
-        }
-        else Write(false);
-    }
-
     public void WriteShort(string n)
     {
         byte[] str = System.Text.Encoding.UTF8.GetBytes(n);
@@ -559,8 +577,6 @@ public class ByteWriter
         System.Buffer.BlockCopy(str, 0, _buffer, _size, l);
         _size = newsize;
     }
-
-
     public void WriteNullableShort(string? n)
     {
         if (n is not null)
@@ -570,7 +586,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
     public void WriteAsciiSmall(string n)
     {
         byte[] str = System.Text.Encoding.ASCII.GetBytes(n);
@@ -589,7 +604,6 @@ public class ByteWriter
         System.Buffer.BlockCopy(str, 0, _buffer, _size, l);
         _size = newsize;
     }
-
     public void WriteNullableAsciiSmall(string? n)
     {
         if (n is not null)
@@ -599,12 +613,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteDateTimeMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(DateTime) }, null);
     public void Write(DateTime n) => WriteInternal(n.ToBinary());
-
-    private static readonly MethodInfo WriteNullableDateTimeMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(DateTime?) }, null);
     public void WriteNullable(DateTime? n)
     {
         if (n.HasValue)
@@ -614,15 +623,11 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-    private static readonly MethodInfo WriteDateTimeOffsetMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(DateTimeOffset) }, null);
     public void Write(DateTimeOffset n)
     {
         Write(n.DateTime);
         Write((short)Math.Round(n.Offset.TotalMinutes));
     }
-
-    private static readonly MethodInfo WriteNullableDateTimeOffsetMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(DateTimeOffset?) }, null);
     public void WriteNullable(DateTimeOffset? n)
     {
         if (n.HasValue)
@@ -632,13 +637,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteTimeSpanMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(TimeSpan) }, null);
     public void Write(TimeSpan n) => WriteInternal(n.Ticks);
-
-
-    private static readonly MethodInfo WriteNullableTimeSpanMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(TimeSpan?) }, null);
     public void WriteNullable(TimeSpan? n)
     {
         if (n.HasValue)
@@ -648,12 +647,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-    private static readonly MethodInfo WriteGUIDMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Guid) }, null);
     public void Write(Guid n) => WriteInternal(n);
-
-
-    private static readonly MethodInfo WriteNullableGUIDMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Guid?) }, null);
     public void WriteNullable(Guid? n)
     {
         if (n.HasValue)
@@ -663,8 +657,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-    private static readonly MethodInfo WriteVector2Method = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Vector2) }, null);
     public void Write(Vector2 n)
     {
         if (!_streamMode)
@@ -676,9 +668,17 @@ public class ByteWriter
         WriteInternal(n.x);
         WriteInternal(n.y);
     }
-
-
-    private static readonly MethodInfo WriteNullableVector2Method = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Vector2?) }, null);
+    public void WriteHalfPrecision(Vector2 n)
+    {
+        if (!_streamMode)
+        {
+            int newsize = _size + sizeof(ushort) * 2;
+            if (newsize > _buffer.Length)
+                ExtendBufferIntl(newsize);
+        }
+        WriteInternal(Mathf.FloatToHalf(n.x));
+        WriteInternal(Mathf.FloatToHalf(n.y));
+    }
     public void WriteNullable(Vector2? n)
     {
         if (n.HasValue)
@@ -688,9 +688,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteVector3Method = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Vector3) }, null);
     public void Write(Vector3 n)
     {
         if (!_streamMode)
@@ -703,9 +700,18 @@ public class ByteWriter
         WriteInternal(n.y);
         WriteInternal(n.z);
     }
-
-
-    private static readonly MethodInfo WriteNullableVector3Method = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Vector3?) }, null);
+    public void WriteHalfPrecision(Vector3 n)
+    {
+        if (!_streamMode)
+        {
+            int newsize = _size + sizeof(ushort) * 3;
+            if (newsize > _buffer.Length)
+                ExtendBufferIntl(newsize);
+        }
+        WriteInternal(Mathf.FloatToHalf(n.x));
+        WriteInternal(Mathf.FloatToHalf(n.y));
+        WriteInternal(Mathf.FloatToHalf(n.z));
+    }
     public void WriteNullable(Vector3? n)
     {
         if (n.HasValue)
@@ -715,9 +721,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteVector4Method = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Vector4) }, null);
     public void Write(Vector4 n)
     {
         if (!_streamMode)
@@ -731,9 +734,19 @@ public class ByteWriter
         WriteInternal(n.z);
         WriteInternal(n.w);
     }
-
-
-    private static readonly MethodInfo WriteNullableVector4Method = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Vector4?) }, null);
+    public void WriteHalfPrecision(Vector4 n)
+    {
+        if (!_streamMode)
+        {
+            int newsize = _size + sizeof(ushort) * 4;
+            if (newsize > _buffer.Length)
+                ExtendBufferIntl(newsize);
+        }
+        WriteInternal(Mathf.FloatToHalf(n.x));
+        WriteInternal(Mathf.FloatToHalf(n.y));
+        WriteInternal(Mathf.FloatToHalf(n.z));
+        WriteInternal(Mathf.FloatToHalf(n.w));
+    }
     public void WriteNullable(Vector4? n)
     {
         if (n.HasValue)
@@ -743,10 +756,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-    
-
-
-    private static readonly MethodInfo WriteBoundsMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Bounds) }, null);
     public void Write(Bounds n)
     {
         if (!_streamMode)
@@ -764,9 +773,6 @@ public class ByteWriter
         WriteInternal(s.y);
         WriteInternal(s.z);
     }
-
-
-    private static readonly MethodInfo WriteNullableBoundsMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Bounds?) }, null);
     public void WriteNullable(Bounds? n)
     {
         if (n.HasValue)
@@ -776,9 +782,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteQuaternionMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Quaternion) }, null);
     public void Write(Quaternion n)
     {
         if (!_streamMode)
@@ -792,9 +795,19 @@ public class ByteWriter
         WriteInternal(n.z);
         WriteInternal(n.w);
     }
-
-
-    private static readonly MethodInfo WriteNullableQuaternionMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Quaternion?) }, null);
+    public void WriteHalfPrecision(Quaternion n)
+    {
+        if (!_streamMode)
+        {
+            int newsize = _size + sizeof(ushort) * 4;
+            if (newsize > _buffer.Length)
+                ExtendBufferIntl(newsize);
+        }
+        WriteInternal(Mathf.FloatToHalf(n.x));
+        WriteInternal(Mathf.FloatToHalf(n.y));
+        WriteInternal(Mathf.FloatToHalf(n.z));
+        WriteInternal(Mathf.FloatToHalf(n.w));
+    }
     public void WriteNullable(Quaternion? n)
     {
         if (n.HasValue)
@@ -804,9 +817,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteColorMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Color) }, null);
     public void Write(Color n)
     {
         if (!_streamMode)
@@ -820,9 +830,6 @@ public class ByteWriter
         WriteInternal(n.g);
         WriteInternal(n.b);
     }
-
-
-    private static readonly MethodInfo WriteNullableColorMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Color?) }, null);
     public void WriteNullable(Color? n)
     {
         if (n.HasValue)
@@ -832,9 +839,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteColor32Method = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Color32) }, null);
     public void Write(Color32 n)
     {
         if (!_streamMode)
@@ -848,9 +852,6 @@ public class ByteWriter
         WriteInternal(n.b);
         WriteInternal(n.a);
     }
-
-
-    private static readonly MethodInfo WriteNullableColor32Method = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Color32?) }, null);
     public void WriteNullable(Color32? n)
     {
         if (n.HasValue)
@@ -860,12 +861,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-    
-    private static readonly MethodInfo WriteGuidArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Guid[]) }, null);
     public void Write(Guid[] n) => WriteInternal(n);
-
-
-    private static readonly MethodInfo WriteNullableGuidArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(Guid[]) }, null);
     public void WriteNullable(Guid[]? n)
     {
         if (n is not null)
@@ -875,7 +871,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-    private static readonly MethodInfo WriteDateTimeArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(DateTime[]) }, null);
     public unsafe void Write(DateTime[] n)
     {
         const int objSize = sizeof(long);
@@ -916,9 +911,6 @@ public class ByteWriter
         }
         _size = newsize;
     }
-
-
-    private static readonly MethodInfo WriteNullableDateTimeArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(DateTime[]) }, null);
     public void WriteNullable(DateTime[]? n)
     {
         if (n is not null)
@@ -928,7 +920,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-    private static readonly MethodInfo WriteDateTimeOffsetArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(DateTimeOffset[]) }, null);
     public unsafe void Write(DateTimeOffset[] n)
     {
         const int objSize = sizeof(long) + sizeof(short);
@@ -975,9 +966,6 @@ public class ByteWriter
         }
         _size = newsize;
     }
-
-
-    private static readonly MethodInfo WriteNullableDateTimeOffsetArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(DateTimeOffset[]) }, null);
     public void WriteNullable(DateTimeOffset[]? n)
     {
         if (n is not null)
@@ -987,16 +975,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-    private static readonly MethodInfo WriteEnumMethod = typeof(ByteWriter).GetMethod(nameof(WriteEnum), BindingFlags.Instance | BindingFlags.NonPublic);
     private void WriteEnum<TEnum>(TEnum o) where TEnum : unmanaged, Enum => WriteInternal(o);
-
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Write<TEnum>(TEnum o) where TEnum : unmanaged, Enum => WriteEnum(o);
-
-
-    private static readonly MethodInfo WriteNullableEnumMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullableEnum), BindingFlags.Instance | BindingFlags.NonPublic);
     private void WriteNullableEnum<TEnum>(TEnum? o) where TEnum : unmanaged, Enum
     {
         if (o.HasValue)
@@ -1007,12 +986,11 @@ public class ByteWriter
         else Write(false);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void Write<TEnum>(TEnum o) where TEnum : unmanaged, Enum => WriteEnum(o);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteNullable<TEnum>(TEnum? n) where TEnum : unmanaged, Enum => WriteNullableEnum(n);
-
-
-    private static readonly MethodInfo WriteByteArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(byte[]) }, null);
     public unsafe void Write(byte[] n)
     {
         ushort len = (ushort)Math.Min(n.Length, ushort.MaxValue);
@@ -1085,9 +1063,6 @@ public class ByteWriter
             --valuesWriting;
         }
     }
-
-
-    private static readonly MethodInfo WriteNullableUInt8ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(byte[]) }, null);
     public void WriteNullable(byte[]? n)
     {
         if (n is not null)
@@ -1097,7 +1072,9 @@ public class ByteWriter
         }
         else Write(false);
     }
-
+    /// <summary>
+    /// Does not write length.
+    /// </summary>
     public void WriteBlock(byte[] n)
     {
         if (_streamMode)
@@ -1112,7 +1089,6 @@ public class ByteWriter
         System.Buffer.BlockCopy(n, 0, _buffer, _size, n.Length);
         _size = newsize;
     }
-
     public unsafe void WriteLong(byte[] n)
     {
         int len = n.Length;
@@ -1134,7 +1110,6 @@ public class ByteWriter
         System.Buffer.BlockCopy(n, 0, _buffer, _size + sizeof(int), len);
         _size = newsize;
     }
-
     public void WriteNullableLong(byte[]? n)
     {
         if (n is not null)
@@ -1144,8 +1119,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
     public void Flush()
     {
         if (_streamMode)
@@ -1158,9 +1131,6 @@ public class ByteWriter
             _size = 0;
         }
     }
-
-
-    private static readonly MethodInfo WriteInt32ArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int[]) }, null);
     public void Write(int[] n) => WriteInternal(n);
     public void WriteZeroCompressed(int[] n, bool @long = false)
     {
@@ -1213,9 +1183,6 @@ public class ByteWriter
             --valuesWriting;
         }
     }
-
-
-    private static readonly MethodInfo WriteNullableInt32ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int[]) }, null);
     public void WriteNullable(int[]? n)
     {
         if (n is not null)
@@ -1225,9 +1192,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteUInt32ArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(uint[]) }, null);
     public void Write(uint[] n) => WriteInternal(n);
     public void WriteZeroCompressed(uint[] n, bool @long = false)
     {
@@ -1280,9 +1244,6 @@ public class ByteWriter
             --valuesWriting;
         }
     }
-
-
-    private static readonly MethodInfo WriteNullableUInt32ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(uint[]) }, null);
     public void WriteNullable(uint[]? n)
     {
         if (n is not null)
@@ -1292,9 +1253,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteInt8ArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(sbyte[]) }, null);
     public void Write(sbyte[] n) => WriteInternal(n);
     public void WriteZeroCompressed(sbyte[] n, bool @long = false)
     {
@@ -1347,9 +1305,6 @@ public class ByteWriter
             --valuesWriting;
         }
     }
-
-
-    private static readonly MethodInfo WriteNullableInt8ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(sbyte[]) }, null);
     public void WriteNullable(sbyte[]? n)
     {
         if (n is not null)
@@ -1359,9 +1314,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteBooleanArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(bool[]) }, null);
     public unsafe void Write(bool[] n)
     {
         if (n.Length > ushort.MaxValue)
@@ -1417,7 +1369,6 @@ public class ByteWriter
             _size += size;
         }
     }
-    
     public unsafe void WriteLong(bool[] n)
     {
         int size;
@@ -1466,9 +1417,6 @@ public class ByteWriter
             _size += size;
         }
     }
-
-
-    private static readonly MethodInfo WriteNullableBooleanArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(bool[]) }, null);
     public void WriteNullable(bool[]? n)
     {
         if (n is not null)
@@ -1478,9 +1426,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteInt64ArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(long[]) }, null);
     public void Write(long[] n) => WriteInternal(n);
     public void WriteZeroCompressed(long[] n, bool @long = false)
     {
@@ -1533,9 +1478,6 @@ public class ByteWriter
             --valuesWriting;
         }
     }
-
-
-    private static readonly MethodInfo WriteNullableInt64ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(long[]) }, null);
     public void WriteNullable(long[]? n)
     {
         if (n is not null)
@@ -1545,9 +1487,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteUInt64ArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(ulong[]) }, null);
     public void Write(ulong[] n) => WriteInternal(n);
     public void WriteZeroCompressed(ulong[] n, bool @long = false)
     {
@@ -1600,9 +1539,6 @@ public class ByteWriter
             --valuesWriting;
         }
     }
-
-
-    private static readonly MethodInfo WriteNullableUInt64ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(ulong[]) }, null);
     public void WriteNullable(ulong[]? n)
     {
         if (n is not null)
@@ -1612,9 +1548,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteInt16ArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(short[]) }, null);
     public void Write(short[] n) => WriteInternal(n);
     public void WriteZeroCompressed(short[] n, bool @long)
     {
@@ -1667,9 +1600,6 @@ public class ByteWriter
             --valuesWriting;
         }
     }
-
-
-    private static readonly MethodInfo WriteNullableInt16ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(short[]) }, null);
     public void WriteNullable(short[]? n)
     {
         if (n is not null)
@@ -1679,9 +1609,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteUInt16ArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(ushort[]) }, null);
     public void Write(ushort[] n) => WriteInternal(n);
     public void WriteZeroCompressed(ushort[] n, bool @long)
     {
@@ -1734,9 +1661,6 @@ public class ByteWriter
             --valuesWriting;
         }
     }
-
-
-    private static readonly MethodInfo WriteNullableUInt16ArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(ushort[]) }, null);
     public void WriteNullable(ushort[]? n)
     {
         if (n is not null)
@@ -1746,13 +1670,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteFloatArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(float[]) }, null);
     public void Write(float[] n) => WriteInternal(n);
-
-
-    private static readonly MethodInfo WriteNullableFloatArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(float[]) }, null);
     public void WriteNullable(float[]? n)
     {
         if (n is not null)
@@ -1762,13 +1680,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteDecimalArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(decimal[]) }, null);
     public void Write(decimal[] n) => WriteInternal(n);
-
-
-    private static readonly MethodInfo WriteNullableDecimalArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(decimal[]) }, null);
     public void WriteNullable(decimal[]? n)
     {
         if (n is not null)
@@ -1778,13 +1690,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteDoubleArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(double[]) }, null);
     public void Write(double[] n) => WriteInternal(n);
-
-
-    private static readonly MethodInfo WriteNullableDoubleArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(double[]) }, null);
     public void WriteNullable(double[]? n)
     {
         if (n is not null)
@@ -1794,10 +1700,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-    
-
-
-    private static readonly MethodInfo WriteCharArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(char[]) }, null);
     public unsafe void Write(char[] n)
     {
         byte[] str = System.Text.Encoding.UTF8.GetBytes(n);
@@ -1820,9 +1722,6 @@ public class ByteWriter
         System.Buffer.BlockCopy(str, 0, _buffer, _size + sizeof(ushort), len);
         _size = newsize;
     }
-
-
-    private static readonly MethodInfo WriteNullableCharArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(char[]) }, null);
     public void WriteNullable(char[]? n)
     {
         if (n is not null)
@@ -1832,9 +1731,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
-
-    private static readonly MethodInfo WriteStringArrayMethod = typeof(ByteWriter).GetMethod(nameof(Write), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(string[]) }, null);
     public void Write(string[] n)
     {
         ushort len = (ushort)Math.Min(n.Length, ushort.MaxValue);
@@ -1858,9 +1754,6 @@ public class ByteWriter
             _size = newsize;
         }
     }
-
-
-    private static readonly MethodInfo WriteNullableStringArrayMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullable), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(string[]) }, null);
     public void WriteNullable(string[]? n)
     {
         if (n is not null)
@@ -1870,7 +1763,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-
     public byte[] FinishWrite()
     {
         byte[] rtn = _buffer;
@@ -1891,281 +1783,49 @@ public class ByteWriter
     }
     public static Delegate? GetWriter(Type type, bool isNullable = false)
     {
-        Type origType = type;
-        Type[] parameters = new Type[] { typeof(ByteWriter), type ?? throw new ArgumentNullException(nameof(type)) };
-        DynamicMethod method = new DynamicMethod("Write" + type.Name, typeof(void), parameters, typeof(ByteWriter), false);
-        ILGenerator il = method.GetILGenerator();
-        method.DefineParameter(1, ParameterAttributes.None, "writer");
-        method.DefineParameter(2, ParameterAttributes.None, "value");
-
-    redo:
-        il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Ldarg_1);
-        if (type.IsPrimitive)
-        {
-            if (type == typeof(ulong))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableUInt64Method : WriteUInt64Method, null);
-            else if (type == typeof(float))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableFloatMethod : WriteFloatMethod, null);
-            else if (type == typeof(long))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableInt64Method : WriteInt64Method, null);
-            else if (type == typeof(ushort))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableUInt16Method : WriteUInt16Method, null);
-            else if (type == typeof(short))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableInt16Method : WriteInt16Method, null);
-            else if (type == typeof(byte))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableUInt8Method : WriteUInt8Method, null);
-            else if (type == typeof(int))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableInt32Method : WriteInt32Method, null);
-            else if (type == typeof(uint))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableUInt32Method : WriteUInt32Method, null);
-            else if (type == typeof(bool))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableBooleanMethod : WriteBooleanMethod, null);
-            else if (type == typeof(char))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableCharMethod : WriteCharMethod, null);
-            else if (type == typeof(sbyte))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableInt8Method : WriteInt8Method, null);
-            else if (type == typeof(double))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableDoubleMethod : WriteDoubleMethod, null);
-            else throw new ArgumentException($"Can not convert that type ({type.Name})!", nameof(type));
-        }
-        else if (type == typeof(string))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? WriteNullableStringMethod : WriteStringMethod, null);
-        }
-        else if (type.IsEnum)
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? WriteNullableEnumMethod.MakeGenericMethod(origType) : WriteEnumMethod.MakeGenericMethod(origType), null);
-        }
-        else if (!isNullable && type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
-        {
-            type = type.GenericTypeArguments[0];
-            isNullable = true;
-            goto redo;
-        }
-        else if (type == typeof(decimal))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? WriteNullableDecimalMethod : WriteDecimalMethod, null);
-        }
-        else if (typeof(Type).IsAssignableFrom(type))
-        {
-            il.EmitCall(OpCodes.Call, WriteTypeMethod, null);
-        }
-        else if (type == typeof(DateTime))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? WriteNullableDateTimeMethod : WriteDateTimeMethod, null);
-        }
-        else if (type == typeof(DateTimeOffset))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? WriteNullableDateTimeOffsetMethod : WriteDateTimeOffsetMethod, null);
-        }
-        else if (type == typeof(TimeSpan))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? WriteNullableTimeSpanMethod : WriteTimeSpanMethod, null);
-        }
-        else if (type == typeof(Guid))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? WriteNullableGUIDMethod : WriteGUIDMethod, null);
-        }
-        else if (type == typeof(Vector2))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? WriteNullableVector2Method : WriteVector2Method, null);
-        }
-        else if (type == typeof(Vector3))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? WriteNullableVector3Method : WriteVector3Method, null);
-        }
-        else if (type == typeof(Vector4))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? WriteNullableVector4Method : WriteVector4Method, null);
-        }
-        else if (type == typeof(Bounds))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? WriteNullableBoundsMethod : WriteBoundsMethod, null);
-        }
-        else if (type == typeof(Quaternion))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? WriteNullableQuaternionMethod : WriteQuaternionMethod, null);
-        }
-        else if (type == typeof(Color))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? WriteNullableColorMethod : WriteColorMethod, null);
-        }
-        else if (type == typeof(Color32))
-        {
-            il.EmitCall(OpCodes.Call, isNullable ? WriteNullableColor32Method : WriteColor32Method, null);
-        }
-        else if (type.IsArray)
-        {
-            Type elemType = type.GetElementType();
-            if (elemType == typeof(ulong))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableUInt64ArrayMethod : WriteUInt64ArrayMethod, null);
-            else if (elemType == typeof(float))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableFloatArrayMethod : WriteFloatArrayMethod, null);
-            else if (elemType == typeof(long))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableInt64ArrayMethod : WriteInt64ArrayMethod, null);
-            else if (elemType == typeof(ushort))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableUInt16ArrayMethod : WriteUInt16ArrayMethod, null);
-            else if (elemType == typeof(short))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableInt16ArrayMethod : WriteInt16ArrayMethod, null);
-            else if (elemType == typeof(byte))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableUInt8ArrayMethod : WriteByteArrayMethod, null);
-            else if (elemType == typeof(int))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableInt32ArrayMethod : WriteInt32ArrayMethod, null);
-            else if (elemType == typeof(uint))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableUInt32ArrayMethod : WriteUInt32ArrayMethod, null);
-            else if (elemType == typeof(bool))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableBooleanArrayMethod : WriteBooleanArrayMethod, null);
-            else if (elemType == typeof(sbyte))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableInt8ArrayMethod : WriteInt8ArrayMethod, null);
-            else if (elemType == typeof(decimal))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableDecimalArrayMethod : WriteDecimalArrayMethod, null);
-            else if (elemType == typeof(char))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableCharArrayMethod : WriteCharArrayMethod, null);
-            else if (elemType == typeof(double))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableDoubleArrayMethod : WriteDoubleArrayMethod, null);
-            else if (elemType == typeof(string))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableStringArrayMethod : WriteStringArrayMethod, null);
-            else if (typeof(Type).IsAssignableFrom(elemType))
-                il.EmitCall(OpCodes.Call, WriteTypeArrayMethod, null);
-            else if (elemType == typeof(Guid))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableGuidArrayMethod : WriteGuidArrayMethod, null);
-            else if (elemType == typeof(DateTime))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableDateTimeArrayMethod : WriteDateTimeArrayMethod, null);
-            else if (elemType == typeof(DateTimeOffset))
-                il.EmitCall(OpCodes.Call, isNullable ? WriteNullableDateTimeOffsetArrayMethod : WriteDateTimeOffsetArrayMethod, null);
-            else throw new ArgumentException($"Can not convert that array type ({type.Name})!", nameof(type));
-        }
-        else throw new ArgumentException($"Can not convert that type ({type.Name})!", nameof(type));
-        il.Emit(OpCodes.Ret);
+        if (type == null) throw new ArgumentNullException(nameof(type));
+        MethodInfo? method = GetWriteMethod(type, isNullable);
+        if (method == null)
+            throw new InvalidDynamicTypeException(type, -1, false);
         try
         {
-            return method.CreateDelegate(typeof(Writer<>).MakeGenericType(origType));
-        }
-        catch (InvalidProgramException ex)
-        {
-            Logger.LogError(ex);
-            return null;
+            return method.CreateDelegate(typeof(Writer<>).MakeGenericType(type));
         }
         catch (ArgumentException ex)
         {
-            Logger.LogError("Failed to create writer delegate for type " + origType.FullName);
+            Logger.LogError("Failed to create writer delegate for type " + type.FullName);
             Logger.LogError(ex);
             return null;
         }
     }
     public static MethodInfo? GetWriteMethod(Type type, bool isNullable = false)
     {
-    redo:
-        if (type.IsPrimitive)
-        {
-            if (type == typeof(ulong))
-                return isNullable ? WriteNullableUInt64Method : WriteUInt64Method;
-            if (type == typeof(float))
-                return isNullable ? WriteNullableFloatMethod : WriteFloatMethod;
-            if (type == typeof(long))
-                return isNullable ? WriteNullableInt64Method : WriteInt64Method;
-            if (type == typeof(ushort))
-                return isNullable ? WriteNullableUInt16Method : WriteUInt16Method;
-            if (type == typeof(short))
-                return isNullable ? WriteNullableInt16Method : WriteInt16Method;
-            if (type == typeof(byte))
-                return isNullable ? WriteNullableUInt8Method : WriteUInt8Method;
-            if (type == typeof(int))
-                return isNullable ? WriteNullableInt32Method : WriteInt32Method;
-            if (type == typeof(uint))
-                return isNullable ? WriteNullableUInt32Method : WriteUInt32Method;
-            if (type == typeof(bool))
-                return isNullable ? WriteNullableBooleanMethod : WriteBooleanMethod;
-            if (type == typeof(char))
-                return isNullable ? WriteNullableCharMethod : WriteCharMethod;
-            if (type == typeof(sbyte))
-                return isNullable ? WriteNullableInt8Method : WriteInt8Method;
-            if (type == typeof(double))
-                return isNullable ? WriteNullableDoubleMethod : WriteDoubleMethod;
-        }
-
-        if (type == typeof(string))
-            return isNullable ? WriteNullableStringMethod : WriteStringMethod;
+        MethodInfo? method;
         if (type.IsEnum)
-            return isNullable ? WriteNullableEnumMethod.MakeGenericMethod(type) : WriteEnumMethod.MakeGenericMethod(type);
-        if (!isNullable && type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
         {
-            type = type.GenericTypeArguments[0];
-            isNullable = true;
-            goto redo;
+            method = (isNullable ? WriteNullableEnumMethod : WriteEnumMethod).MakeGenericMethod(type);
         }
-        if (type == typeof(decimal))
-            return isNullable ? WriteNullableDecimalMethod : WriteDecimalMethod;
-        if (type == typeof(DateTime))
-            return isNullable ? WriteNullableDateTimeMethod : WriteDateTimeMethod;
-        if (type == typeof(DateTimeOffset))
-            return isNullable ? WriteNullableDateTimeOffsetMethod : WriteDateTimeOffsetMethod;
-        if (type == typeof(TimeSpan))
-            return isNullable ? WriteNullableTimeSpanMethod : WriteTimeSpanMethod;
-        if (type == typeof(Guid))
-            return isNullable ? WriteNullableGUIDMethod : WriteGUIDMethod;
-        if (type == typeof(Vector2))
-            return isNullable ? WriteNullableVector2Method : WriteVector2Method;
-        if (type == typeof(Vector3))
-            return isNullable ? WriteNullableVector3Method : WriteVector3Method;
-        if (type == typeof(Vector4))
-            return isNullable ? WriteNullableVector4Method : WriteVector4Method;
-        if (type == typeof(Bounds))
-            return isNullable ? WriteNullableBoundsMethod : WriteBoundsMethod;
-        if (type == typeof(Quaternion))
-            return isNullable ? WriteNullableQuaternionMethod : WriteQuaternionMethod;
-        if (type == typeof(Color))
-            return isNullable ? WriteNullableColorMethod : WriteColorMethod;
-        if (type == typeof(Color32)) 
-                return isNullable ? WriteNullableColor32Method : WriteColor32Method;
-        if (type.IsArray)
+        else
         {
-            Type elemType = type.GetElementType();
-            if (elemType == typeof(ulong))
-                return isNullable ? WriteNullableUInt64ArrayMethod : WriteUInt64ArrayMethod;
-            if (elemType == typeof(float))
-                return isNullable ? WriteNullableFloatArrayMethod : WriteFloatArrayMethod;
-            if (elemType == typeof(long))
-                return isNullable ? WriteNullableInt64ArrayMethod : WriteInt64ArrayMethod;
-            if (elemType == typeof(ushort))
-                return isNullable ? WriteNullableUInt16ArrayMethod : WriteUInt16ArrayMethod;
-            if (elemType == typeof(short))
-                return isNullable ? WriteNullableInt16ArrayMethod : WriteInt16ArrayMethod;
-            if (elemType == typeof(byte))
-                return isNullable ? WriteNullableUInt8ArrayMethod : WriteByteArrayMethod;
-            if (elemType == typeof(int))
-                return isNullable ? WriteNullableInt32ArrayMethod : WriteInt32ArrayMethod;
-            if (elemType == typeof(uint))
-                return isNullable ? WriteNullableUInt32ArrayMethod : WriteUInt32ArrayMethod;
-            if (elemType == typeof(bool))
-                return isNullable ? WriteNullableBooleanArrayMethod : WriteBooleanArrayMethod;
-            if (elemType == typeof(sbyte))
-                return isNullable ? WriteNullableInt8ArrayMethod : WriteInt8ArrayMethod;
-            if (elemType == typeof(decimal))
-                return isNullable ? WriteNullableDecimalArrayMethod : WriteDecimalArrayMethod;
-            if (elemType == typeof(char))
-                return isNullable ? WriteNullableCharArrayMethod : WriteCharArrayMethod;
-            if (elemType == typeof(double))
-                return isNullable ? WriteNullableDoubleArrayMethod : WriteDoubleArrayMethod;
-            if (elemType == typeof(string))
-                return isNullable ? WriteNullableStringArrayMethod : WriteStringArrayMethod;
-            if (elemType == typeof(Guid))
-                return isNullable ? WriteNullableGuidArrayMethod : WriteGuidArrayMethod;
-            if (elemType == typeof(DateTime))
-                return isNullable ? WriteNullableDateTimeArrayMethod : WriteDateTimeArrayMethod;
-            if (elemType == typeof(DateTimeOffset))
-                return isNullable ? WriteNullableDateTimeOffsetArrayMethod : WriteDateTimeOffsetArrayMethod;
+            if (_nullableWriters == null || _nonNullableWriters == null)
+                PrepareMethods();
+            if (isNullable)
+            {
+                _nullableWriters!.TryGetValue(type, out method);
+            }
+            else if (!_nonNullableWriters!.TryGetValue(type, out method) && type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
+                _nullableWriters!.TryGetValue(type, out method);
         }
 
-        return null;
-
+        return method;
     }
     public static Writer<T1> GetWriter<T1>(bool isNullable = false) => (Writer<T1>)GetWriter(typeof(T1), isNullable)!;
     public static int GetMinimumSize(Type type)
     {
         if (type.IsPointer) return IntPtr.Size;
-        else if (type.IsArray || type == typeof(string)) return sizeof(ushort);
+        
+        if (type.IsArray || type == typeof(string)) return sizeof(ushort);
+        
         try
         {
             return Marshal.SizeOf(type);

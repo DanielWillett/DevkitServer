@@ -174,4 +174,19 @@ public readonly struct RequestResponse
         parameter = default!;
         return false;
     }
+
+    public override string ToString()
+    {
+        if (ErrorCode.HasValue)
+        {
+            if (ErrorCode.Value <= (int)StandardErrorCode.NoPermissions)
+                return "{ " + (StandardErrorCode)ErrorCode.Value + " (" + ErrorCode.Value.ToString("X8", CultureInfo.InvariantCulture) + ") }";
+            return "{ " + ErrorCode.Value.ToString("X8", CultureInfo.InvariantCulture) + " }";
+        }
+
+        if (Responded)
+            return "{ " + nameof(StandardErrorCode.Success) + " (0x????????) }";
+
+        return "{ No Response (0x????????) }";
+    }
 }

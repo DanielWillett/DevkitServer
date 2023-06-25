@@ -175,6 +175,11 @@ public static class BuildableResponsibilities
             for (int y = 0; y < worldSize; ++y)
             {
                 List<bool> region = Table[x, y];
+                if (counts.Length <= x * worldSize + y)
+                {
+                    region.Clear();
+                    continue;
+                }
                 int ct = counts[x * worldSize + y];
 
                 if (region.Capacity < ct)
@@ -219,6 +224,11 @@ public static class BuildableResponsibilities
 #elif CLIENT
                     List<bool> region = Table[x, y] ??= new List<bool>(8);
 #endif
+                    if (counts.Length <= x * worldSize + y)
+                    {
+                        region.Clear();
+                        continue;
+                    }
                     int ct = counts[x * worldSize + y];
 
                     if (region.Capacity < ct)
@@ -283,7 +293,7 @@ public static class BuildableResponsibilities
                     int max = LevelObjects.buildables[x, y].Count;
                     if (region.Count > max)
                     {
-                        int len = region.Count - max + 1;
+                        int len = region.Count - max;
                         removed += len;
                         region.RemoveRange(max, len);
                     }

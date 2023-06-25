@@ -5,6 +5,7 @@ using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Sync;
 using JetBrains.Annotations;
 #if CLIENT
+using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players.UI;
 #endif
@@ -201,6 +202,8 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 #if CLIENT
     internal static void OnClientConnected()
     {
+        DevkitServerConfig.SeverFolderIntl = null;
+        DevkitServerUtility.CheckDirectory(false, DevkitServerConfig.ServerFolder);
         TileSync.CreateServersideAuthority();
         if (!DevkitServerModule.IsEditing)
             return;

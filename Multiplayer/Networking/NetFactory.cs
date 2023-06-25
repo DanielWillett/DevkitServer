@@ -668,7 +668,7 @@ public static class NetFactory
     }
     public static void Reflect(Assembly assembly, NetCallSource search, IList<NetMethodInfo>? outMethods = null, IList<NetInvokerInfo>? outCalls = null)
     {
-        List<Type> types = Accessor.GetTypesSafe(removeIgnored: false);
+        List<Type> types = Accessor.GetTypesSafe(assembly, removeIgnored: false);
         int before1 = registeredMethods.Count;
         int before2 = invokers.Count;
         ReflectMethods(types, search, outMethods);

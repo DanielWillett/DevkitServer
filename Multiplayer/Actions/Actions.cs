@@ -44,6 +44,7 @@ public enum ActionType : byte
     HierarchyItemsDelete,
     DeleteLevelObjects,
     MoveLevelObjectsFinal,
+    InstantiateLevelObject,
 
 
     // for future use
@@ -54,6 +55,10 @@ public interface IReflectableAction : IAction
     void SendUndo(ITransportConnection sender);
 }
 
+public interface IServersideAction : IAction
+{
+
+}
 public interface IAction
 {
     [JsonConverter(typeof(JsonStringEnumConverter))]

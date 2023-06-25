@@ -10,6 +10,13 @@ public sealed class LevelData
     public bool Compressed { get; internal set; }
 #nullable restore
     private LevelData() { }
+
+    public LevelData(LevelData other)
+    {
+        LevelFolderContent = other.LevelFolderContent;
+        Data = other.Data;
+        Compressed = other.Compressed;
+    }
     public static LevelData GatherLevelData()
     {
         ThreadUtil.assertIsGameThread();

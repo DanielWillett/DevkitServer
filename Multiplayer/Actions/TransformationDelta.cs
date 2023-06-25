@@ -22,24 +22,24 @@ public readonly struct TransformationDelta
             OriginalRotation = reader.ReadQuaternion();
         else OriginalRotation = Quaternion.identity;
     }
-    public TransformationDelta(ByteReader reader)
+    public TransformationDelta(ByteReader reader, bool halfPrecision = false)
     {
         TransformFlags flags = reader.ReadEnum<TransformFlags>();
         Flags = flags & ~(TransformFlags)8;
         if ((flags & TransformFlags.Position) != 0)
-            Position = reader.ReadVector3();
+            Position = halfPrecision ? reader.ReadHalfPrecisionVector3() : reader.ReadVector3();
         else
             Position = Vector3.zero;
         if ((flags & TransformFlags.OriginalPosition) != 0)
-            OriginalPosition = reader.ReadVector3();
+            OriginalPosition = halfPrecision ? reader.ReadHalfPrecisionVector3() : reader.ReadVector3();
         else
             OriginalPosition = Vector3.zero;
         if ((flags & TransformFlags.Rotation) != 0)
-            Rotation = reader.ReadQuaternion();
+            Rotation = halfPrecision ? reader.ReadHalfPrecisionQuaternion() : reader.ReadQuaternion();
         else
             Rotation = Quaternion.identity;
         if ((flags & TransformFlags.OriginalRotation) != 0)
-            OriginalRotation = reader.ReadQuaternion();
+            OriginalRotation = halfPrecision ? reader.ReadHalfPrecisionQuaternion() : reader.ReadQuaternion();
         else
             OriginalRotation = Quaternion.identity;
     }
@@ -75,12 +75,39 @@ public readonly struct TransformationDelta
         if ((Flags & TransformFlags.OriginalRotation) != 0)
             writer.Write(OriginalRotation);
     }
+    public void WriteHalfPrecision(ByteWriter writer)
+    {
+        writer.Write(Flags);
+        if ((Flags & TransformFlags.Position) != 0)
+            writer.WriteHalfPrecision(Position);
+        if ((Flags & TransformFlags.OriginalPosition) != 0)
+            writer.WriteHalfPrecision(OriginalPosition);
+        if ((Flags & TransformFlags.Rotation) != 0)
+            writer.WriteHalfPrecision(Rotation);
+        if ((Flags & TransformFlags.OriginalRotation) != 0)
+            writer.WriteHalfPrecision(OriginalRotation);
+    }
     public void WritePartial(ByteWriter writer, TransformFlags flags)
     {
         if ((flags & TransformFlags.OriginalPosition) != 0)
             writer.Write(OriginalPosition);
         if ((flags & TransformFlags.OriginalRotation) != 0)
             writer.Write(OriginalRotation);
+    }
+    public void ApplyTo(Transform transform, bool additive)
+    {
+        if ((Flags & TransformFlags.Rotation) == 0)
+        {
+            if ((Flags & TransformFlags.Position) != 0)
+                transform.position = additive ? OriginalPosition + Position : Position;
+        }
+        else
+        {
+            if ((Flags & TransformFlags.Position) != 0)
+                transform.SetPositionAndRotation(additive ? OriginalPosition + Position : Position, additive ? OriginalRotation * Rotation : Rotation);
+            else
+                transform.rotation = additive ? OriginalRotation * Rotation : Rotation;
+        }
     }
 
     public override string ToString() => $"Moved: {Flags.Format()} (pos: {Position.Format()}, rot: {Rotation.eulerAngles.Format()}) from (pos: {OriginalRotation.Format()}, rot: {OriginalRotation.eulerAngles.Format()}).";

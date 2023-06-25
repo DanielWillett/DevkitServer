@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using DevkitServer.Util.Encoding;
+﻿using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.Multiplayer;
 internal sealed class InstanceIdResponsibilityTable
@@ -16,7 +11,7 @@ internal sealed class InstanceIdResponsibilityTable
     private readonly HashSet<uint> Responsibilities = new HashSet<uint>(32);
 #endif
     private static readonly ByteWriter Writer = new ByteWriter(false);
-    private static readonly ByteReader Reader = new ByteReader { LogOnError = false };
+    private static readonly ByteReader Reader = new ByteReader { LogOnError = true };
     
     public string SavePath { get; }
     public string Source { get; }
@@ -47,12 +42,12 @@ internal sealed class InstanceIdResponsibilityTable
             Reader.LoadNew(stream);
             Reader.Skip(sizeof(ushort)); // version
             bool client = Reader.ReadBool();
-            if (client == Provider.isServer)
+            if (client == Dedicator.IsDedicatedServer)
             {
                 Logger.LogWarning($"Invalid responsiblities file provided: {SavePath.Format(false)}. This file was created on the wrong platform (client vs. server).", method: Source);
                 return;
             }
-            while (!Reader.HasFailed)
+            while (Reader.BytesLeft > 0)
             {
                 uint instanceId = Reader.ReadUInt32();
 #if SERVER
@@ -65,14 +60,9 @@ internal sealed class InstanceIdResponsibilityTable
                     )
                 {
                     save = !Reader.HasFailed;
-                    continue;
-                }
-
-                if (HierarchyUtil.FindItemIndex(instanceId) < 0)
-                {
-                    Logger.LogInfo($"[{Source}] Unable to find saved item: {instanceId}.");
-                    save = true;
-                    continue;
+                    if (save)
+                        continue;
+                    break;
                 }
 #if SERVER
                 if (Responsibilities.ContainsKey(instanceId))
@@ -144,15 +134,20 @@ internal sealed class InstanceIdResponsibilityTable
         Responsibilities.Add(instanceId);
 #endif
         if (!save) return;
+        if (!File.Exists(SavePath))
+        {
+            Save();
+            return;
+        }
         using FileStream stream = new FileStream(SavePath, FileMode.Append, FileAccess.Write, FileShare.Read);
         Writer.Stream = stream;
         Writer.Write(instanceId);
-        Writer.Write(!Dedicator.IsDedicatedServer);
 #if SERVER
         Writer.Write(steam64);
 #endif
         Writer.Flush();
         Writer.Stream = null;
+        _dirty = false;
     }
     /// <summary>Save all responsibilities.</summary>
     public void Save()
@@ -170,6 +165,7 @@ internal sealed class InstanceIdResponsibilityTable
                 using FileStream stream = new FileStream(SavePath, FileMode.Create, FileAccess.Write, FileShare.Read);
                 Writer.Stream = stream;
                 Writer.Write(DataVersion);
+                Writer.Write(!Dedicator.IsDedicatedServer);
 #if SERVER
                 foreach (KeyValuePair<uint, ulong> pair in Responsibilities)
                 {

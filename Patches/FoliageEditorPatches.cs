@@ -34,7 +34,7 @@ internal static class FoliageEditorPatches
         MethodInfo resourceSpawnpointDestroyedInvoker = fep.GetMethod(nameof(OnResourceSpawnpointDestroyed), BindingFlags.Static | BindingFlags.NonPublic)!;
         MethodInfo levelObjectRemovedInvoker = fep.GetMethod(nameof(OnLevelObjectRemovedInvoker), BindingFlags.Static | BindingFlags.NonPublic)!;
         MethodInfo findLevelObjectUtil = typeof(LevelObjectUtil).GetMethod(nameof(LevelObjectUtil.FindObject),
-            BindingFlags.Static | BindingFlags.Public, null, CallingConventions.Any, new Type[] { typeof(Transform) }, null)!;
+            BindingFlags.Static | BindingFlags.Public, null, CallingConventions.Any, new Type[] { typeof(Transform), typeof(bool) }, null)!;
 
         MethodInfo? removeInstances = FoliageEditor.GetMethod("removeInstances",
             BindingFlags.NonPublic | BindingFlags.Instance);
@@ -128,6 +128,7 @@ internal static class FoliageEditorPatches
             {
                 Label lbl = generator.DefineLabel();
                 yield return new CodeInstruction(OpCodes.Dup);
+                yield return new CodeInstruction(OpCodes.Ldc_I4_0);
                 yield return new CodeInstruction(OpCodes.Call, findLevelObjectUtil);
                 yield return new CodeInstruction(OpCodes.Brfalse, lbl);
                 yield return new CodeInstruction(OpCodes.Dup);
