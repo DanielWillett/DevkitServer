@@ -3,6 +3,7 @@ using DevkitServer.API.Permissions;
 #elif CLIENT
 #endif
 using DevkitServer.API.Abstractions;
+using DevkitServer.Models;
 using DevkitServer.Util.Encoding;
 using SDG.Framework.Devkit;
 

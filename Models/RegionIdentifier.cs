@@ -31,6 +31,7 @@ public readonly struct RegionIdentifier : IEquatable<RegionIdentifier>, ICompara
     }
 
     public RegionIdentifier(byte x, byte y, ushort index) : this((x << 24) | (y << 16) | index) { }
+    public RegionIdentifier(int x, int y, int index) : this(((byte)x << 24) | ((byte)y << 16) | (ushort)index) { }
 
     public bool IsSameRegionAs(RegionIdentifier other) => (other._data & unchecked((int)0xFFFF0000)) == (_data & unchecked((int)0xFFFF0000));
     public bool IsSameRegionAs(byte x, byte y) => X == x && Y == y;

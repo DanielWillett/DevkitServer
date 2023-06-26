@@ -4,6 +4,7 @@ using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.Multiplayer;
+// todo convert to NetIds on client-side, and just dont save this at all
 public static class BuildableResponsibilities
 {
     private const string Source = "BUILDABLE RESPONSIBILITIES";

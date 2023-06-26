@@ -1,10 +1,11 @@
 ﻿using DevkitServer.Util.Encoding;
 
-namespace DevkitServer.Multiplayer.Actions;
+namespace DevkitServer.Models;
 
 public readonly struct TransformationDelta
 {
-    public const int Capacity = 15;
+    public const int Capacity = 57;
+    public const int CapacityHalfPrecision = 29;
     public TransformFlags Flags { get; }
     public Vector3 Position { get; }
     public Quaternion Rotation { get; }

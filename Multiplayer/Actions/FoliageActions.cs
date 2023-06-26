@@ -371,7 +371,7 @@ public sealed class RemoveLevelObjectAction : IAction, ICoordinates
                    VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
 
         if (VanillaPermissions.EditObjects.Has(Instigator.m_SteamID) ||
-            VanillaPermissions.RemoveSavedObjects.Has(Instigator.m_SteamID))
+            VanillaPermissions.RemoveUnownedObjects.Has(Instigator.m_SteamID))
             return true;
             
         // check if the user is the one that placed the object (recently).

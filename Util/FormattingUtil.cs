@@ -538,7 +538,7 @@ public static class FormattingUtil
     }
     public static string Format(this object? obj, string? format = null)
     {
-        if (obj == null)
+        if (obj == null || obj.Equals(null))
         {
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
                 return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) + "null" + ANSIForegroundReset;

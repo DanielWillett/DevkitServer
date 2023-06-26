@@ -48,6 +48,8 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 #if CLIENT
     internal static TemporaryEditorActions? TemporaryEditorActions;
     internal static bool CanProcess;
+    internal static bool HasProcessedPendingHierarchyObjects;
+    internal static bool HasProcessedPendingLevelObjects;
     private float _lastFlush;
     private bool _queuedThisFrame;
     /// <summary>
@@ -106,7 +108,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 #if CLIENT
         if (IsOwner)
         {
-            if (TemporaryEditorActions is { QueueSize: > 0 })
+            if (TemporaryEditorActions is { NeedsToFlush: true })
             {
                 IsPlayingCatchUp = true;
                 CanProcess = false;
@@ -121,6 +123,8 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             else
             {
                 CanProcess = true;
+                HasProcessedPendingHierarchyObjects = true;
+                HasProcessedPendingLevelObjects = true;
                 if (TemporaryEditorActions != null)
                 {
                     TemporaryEditorActions.Dispose();
@@ -204,6 +208,12 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         if (user == null)
         {
             Logger.LogError("Failed to find user for action packet from a steam id: " + s64.Format() + ".", method: "EDITOR ACTIONS");
+            return;
+        }
+
+        if (user.IsOwner)
+        {
+            Logger.LogError("Received action packet relay back from self.", method: "EDITOR ACTIONS");
             return;
         }
 #endif
@@ -479,8 +489,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             Logger.LogDebug("[EDITOR ACTIONS] Relaying " + (_pendingActions.Count - stInd).Format() + " action(s).");
             int capacity = Provider.clients.Count - 1 + EditorLevel.PendingToReceiveActions.Count;
             PooledTransportConnectionList list = NetFactory.GetPooledTransportConnectionList(capacity);
-            if (list.Capacity < capacity)
-                list.Capacity = capacity;
+            list.IncreaseCapacity(capacity);
             for (int i = 0; i < Provider.clients.Count; ++i)
             {
                 SteamPlayer pl = Provider.clients[i];
@@ -551,6 +560,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     private readonly List<IAction> _actions = new List<IAction>();
     public ActionSettings Settings { get; }
     public int QueueSize => _actions.Count;
+    internal bool NeedsToFlush => _actions.Count > 0 || _hierarchyInstantiations.Count > 0 || _lvlObjectInstantiations.Count > 0;
     public TemporaryEditorActions()
     {
         Settings = new ActionSettings(this);
@@ -560,14 +570,17 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     public void QueueInstantiation(IHierarchyItemTypeIdentifier type, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner)
     {
         if (type == null) throw new ArgumentNullException(nameof(type));
-        _hierarchyInstantiations.Add(new PendingHierarchyInstantiation(type, instanceId, position, rotation, scale, owner));
-    }
-    public void QueueInstantiation(Asset objectAsset, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner)
-    {
-        if (objectAsset is not ObjectAsset && objectAsset is not ItemBarricadeAsset and not ItemStructureAsset)
-            throw new ArgumentException("Must be either ObjectAsset (LevelObject) or ItemAsset (LevelBuildableObject).", nameof(objectAsset));
 
-        _lvlObjectInstantiations.Add(new PendingLevelObjectInstantiation(objectAsset.getReferenceTo<Asset>(), instanceId, position, rotation, scale, owner));
+        _hierarchyInstantiations.Add(new PendingHierarchyInstantiation(type, instanceId, position, rotation, scale, owner));
+        Logger.LogDebug($"Queued hierarchy item instantiation for {type.Format()} when the level loads.");
+    }
+    public void QueueInstantiation(Asset asset, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
+    {
+        if (asset is not ObjectAsset && asset is not ItemBarricadeAsset and not ItemStructureAsset)
+            throw new ArgumentException("Must be either ObjectAsset (LevelObject) or ItemAsset (LevelBuildableObject).", nameof(asset));
+
+        _lvlObjectInstantiations.Add(new PendingLevelObjectInstantiation(asset.getReferenceTo<Asset>(), position, rotation, scale, owner, netId));
+        Logger.LogDebug($"Queued level object instantiation for {asset.Format()} when the level loads.");
     }
     internal void HandleReadPackets(CSteamID user, ByteReader reader)
     {
@@ -615,16 +628,25 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     }
     internal IEnumerator Flush()
     {
-        foreach (PendingHierarchyInstantiation hierarchyItemInstantiation in _hierarchyInstantiations)
+        for (int i = 0; i < _hierarchyInstantiations.Count; i++)
         {
-            HierarchyUtil.ReceiveHierarchyInstantiation(MessageContext.Nil, hierarchyItemInstantiation.Type, hierarchyItemInstantiation.InstanceId, hierarchyItemInstantiation.Position, hierarchyItemInstantiation.Rotation, hierarchyItemInstantiation.Scale, hierarchyItemInstantiation.Owner);
+            PendingHierarchyInstantiation hierarchyItemInstantiation = _hierarchyInstantiations[i];
+            HierarchyUtil.ReceiveHierarchyInstantiation(MessageContext.Nil, hierarchyItemInstantiation.Type, hierarchyItemInstantiation.InstanceId,
+                hierarchyItemInstantiation.Position, hierarchyItemInstantiation.Rotation, hierarchyItemInstantiation.Scale, hierarchyItemInstantiation.Owner);
         }
+
+        EditorActions.HasProcessedPendingHierarchyObjects = true;
+
         if (_hierarchyInstantiations.Count > 20)
             yield return null;
-        foreach (PendingLevelObjectInstantiation lvlObjectInstantiation in _lvlObjectInstantiations)
+        for (int i = 0; i < _lvlObjectInstantiations.Count; i++)
         {
-            LevelObjectUtil.ReceiveInstantiation(MessageContext.Nil, lvlObjectInstantiation.Asset.GUID, lvlObjectInstantiation.InstanceId, lvlObjectInstantiation.Position, lvlObjectInstantiation.Rotation, lvlObjectInstantiation.Scale, lvlObjectInstantiation.Owner);
+            PendingLevelObjectInstantiation lvlObjectInstantiation = _lvlObjectInstantiations[i];
+            LevelObjectUtil.ReceiveInstantiation(MessageContext.Nil, lvlObjectInstantiation.Asset.GUID, lvlObjectInstantiation.Position, lvlObjectInstantiation.Rotation,
+                lvlObjectInstantiation.Scale, lvlObjectInstantiation.Owner, lvlObjectInstantiation.NetId);
         }
+
+        EditorActions.HasProcessedPendingLevelObjects = true;
         if (_lvlObjectInstantiations.Count > 10)
             yield return null;
         for (int i = 0; i < _actions.Count; ++i)
@@ -670,19 +692,19 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     private readonly struct PendingLevelObjectInstantiation
     {
         public readonly AssetReference<Asset> Asset;
-        public readonly uint InstanceId;
         public readonly Vector3 Position;
         public readonly Quaternion Rotation;
         public readonly Vector3 Scale;
         public readonly ulong Owner;
-        public PendingLevelObjectInstantiation(AssetReference<Asset> assetAsset, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner)
+        public readonly NetId NetId;
+        public PendingLevelObjectInstantiation(AssetReference<Asset> assetAsset, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
         {
             Asset = assetAsset;
-            InstanceId = instanceId;
             Position = position;
             Rotation = rotation;
             Scale = scale;
             Owner = owner;
+            NetId = netId;
         }
     }
 }

@@ -96,37 +96,38 @@ public class ByteReader
             { typeof(decimal[]), GetMethod(nameof(ReadDecimalArray)) },
             { typeof(char[]), GetMethod(nameof(ReadCharArray)) },
             { typeof(string[]), GetMethod(nameof(ReadStringArray)) },
+            { typeof(NetId), GetMethod(nameof(ReadNetId)) },
         };
 
         _nullableReaders ??= new Dictionary<Type, MethodInfo>(44)
         {
-            { typeof(int), GetMethod(nameof(ReadNullableInt32)) },
-            { typeof(uint), GetMethod(nameof(ReadNullableUInt32)) },
-            { typeof(byte), GetMethod(nameof(ReadNullableUInt8)) },
-            { typeof(sbyte), GetMethod(nameof(ReadNullableInt8)) },
-            { typeof(bool), GetMethod(nameof(ReadNullableBool)) },
-            { typeof(long), GetMethod(nameof(ReadNullableInt64)) },
-            { typeof(ulong), GetMethod(nameof(ReadNullableUInt64)) },
-            { typeof(short), GetMethod(nameof(ReadNullableInt16)) },
-            { typeof(ushort), GetMethod(nameof(ReadNullableUInt16)) },
-            { typeof(float), GetMethod(nameof(ReadNullableFloat)) },
-            { typeof(decimal), GetMethod(nameof(ReadNullableDecimal)) },
-            { typeof(double), GetMethod(nameof(ReadNullableDouble)) },
-            { typeof(char), GetMethod(nameof(ReadNullableChar)) },
+            { typeof(int?), GetMethod(nameof(ReadNullableInt32)) },
+            { typeof(uint?), GetMethod(nameof(ReadNullableUInt32)) },
+            { typeof(byte?), GetMethod(nameof(ReadNullableUInt8)) },
+            { typeof(sbyte?), GetMethod(nameof(ReadNullableInt8)) },
+            { typeof(bool?), GetMethod(nameof(ReadNullableBool)) },
+            { typeof(long?), GetMethod(nameof(ReadNullableInt64)) },
+            { typeof(ulong?), GetMethod(nameof(ReadNullableUInt64)) },
+            { typeof(short?), GetMethod(nameof(ReadNullableInt16)) },
+            { typeof(ushort?), GetMethod(nameof(ReadNullableUInt16)) },
+            { typeof(float?), GetMethod(nameof(ReadNullableFloat)) },
+            { typeof(decimal?), GetMethod(nameof(ReadNullableDecimal)) },
+            { typeof(double?), GetMethod(nameof(ReadNullableDouble)) },
+            { typeof(char?), GetMethod(nameof(ReadNullableChar)) },
             { typeof(string), GetMethod(nameof(ReadNullableString)) },
             { typeof(Type), GetMethod(nameof(ReadType)) },
             { typeof(Type[]), GetMethod(nameof(ReadTypeArray)) },
-            { typeof(DateTime), GetMethod(nameof(ReadNullableDateTime)) },
-            { typeof(DateTimeOffset), GetMethod(nameof(ReadNullableDateTimeOffset)) },
-            { typeof(TimeSpan), GetMethod(nameof(ReadNullableTimeSpan)) },
-            { typeof(Guid), GetMethod(nameof(ReadNullableGuid)) },
-            { typeof(Vector2), GetMethod(nameof(ReadNullableVector2)) },
-            { typeof(Vector3), GetMethod(nameof(ReadNullableVector3)) },
-            { typeof(Vector4), GetMethod(nameof(ReadNullableVector4)) },
-            { typeof(Bounds), GetMethod(nameof(ReadNullableBounds)) },
-            { typeof(Quaternion), GetMethod(nameof(ReadNullableQuaternion)) },
-            { typeof(Color), GetMethod(nameof(ReadNullableColor)) },
-            { typeof(Color32), GetMethod(nameof(ReadNullableColor32)) },
+            { typeof(DateTime?), GetMethod(nameof(ReadNullableDateTime)) },
+            { typeof(DateTimeOffset?), GetMethod(nameof(ReadNullableDateTimeOffset)) },
+            { typeof(TimeSpan?), GetMethod(nameof(ReadNullableTimeSpan)) },
+            { typeof(Guid?), GetMethod(nameof(ReadNullableGuid)) },
+            { typeof(Vector2?), GetMethod(nameof(ReadNullableVector2)) },
+            { typeof(Vector3?), GetMethod(nameof(ReadNullableVector3)) },
+            { typeof(Vector4?), GetMethod(nameof(ReadNullableVector4)) },
+            { typeof(Bounds?), GetMethod(nameof(ReadNullableBounds)) },
+            { typeof(Quaternion?), GetMethod(nameof(ReadNullableQuaternion)) },
+            { typeof(Color?), GetMethod(nameof(ReadNullableColor)) },
+            { typeof(Color32?), GetMethod(nameof(ReadNullableColor32)) },
             { typeof(Guid[]), GetMethod(nameof(ReadNullableGuidArray)) },
             { typeof(DateTime[]), GetMethod(nameof(ReadNullableDateTimeArray)) },
             { typeof(DateTimeOffset[]), GetMethod(nameof(ReadNullableDateTimeOffsetArray)) },
@@ -143,7 +144,8 @@ public class ByteReader
             { typeof(double[]), GetMethod(nameof(ReadNullableDoubleArray)) },
             { typeof(decimal[]), GetMethod(nameof(ReadNullableDecimalArray)) },
             { typeof(char[]), GetMethod(nameof(ReadNullableCharArray)) },
-            { typeof(string[]), GetMethod(nameof(ReadNullableStringArray)) }
+            { typeof(string[]), GetMethod(nameof(ReadNullableStringArray)) },
+            { typeof(NetId?), GetMethod(nameof(ReadNullableNetId)) }
         };
 
         MethodInfo GetMethod(string name) => typeof(ByteReader).GetMethod(name, BindingFlags.Instance | BindingFlags.Public)
@@ -397,6 +399,12 @@ public class ByteReader
     {
         if (!ReadBool()) return null;
         return ReadUInt32();
+    }
+    public NetId ReadNetId() => !EnsureMoreLength(sizeof(uint)) ? default : new NetId(Read<uint>());
+    public NetId? ReadNullableNetId()
+    {
+        if (!ReadBool()) return null;
+        return new NetId(ReadUInt32());
     }
     public byte ReadUInt8()
     {

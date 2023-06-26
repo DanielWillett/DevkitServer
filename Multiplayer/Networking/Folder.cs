@@ -174,13 +174,28 @@ public struct Folder
     public static void Write(ByteWriter writer, Folder folder) => Write(writer, in folder);
     public static void Write(ByteWriter writer, in Folder folder)
     {
+        // with very large files copying can take a bit so do this first.
+        File[] fls = folder.Files;
+        int totalSize = writer.Buffer.Length + folder.FolderName.Length * 2 + sizeof(ushort) * 2;
+
+        for (int i = 0; i < folder.Folders.Length; ++i)
+            totalSize += sizeof(ushort) + folder.Folders[i].Length * 2;
+
+        for (int i = 0; i < fls.Length; ++i)
+        {
+            ref File file = ref fls[i];
+            totalSize += file.Path.Length * 2 + sizeof(ushort) + file.Content.Length + sizeof(int);
+        }
+
+        writer.ExtendBuffer(totalSize);
+
         writer.Write(folder.FolderName);
         writer.Write(folder.Folders.Length);
         for (int i = 0; i < folder.Folders.Length; ++i)
             writer.Write(FormatPath(folder.Folders[i]));
         
-        File[] fls = folder.Files;
         writer.Write(fls.Length);
+
         for (int i = 0; i < fls.Length; ++i)
         {
             ref File file = ref fls[i];

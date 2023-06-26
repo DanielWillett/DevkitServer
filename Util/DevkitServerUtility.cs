@@ -900,6 +900,11 @@ public static class DevkitServerUtility
         return c;
     }
     public static T[] ToArrayFast<T>(this List<T> list) => list.Count == 0 ? Array.Empty<T>() : list.ToArray();
+    public static void IncreaseCapacity<T>(this List<T> list, int amount)
+    {
+        if (list.Capacity < amount)
+            list.Capacity = amount;
+    }
 }
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]

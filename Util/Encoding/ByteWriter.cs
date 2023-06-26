@@ -101,6 +101,7 @@ public class ByteWriter
             { typeof(decimal[]), GetMethod(typeof(decimal[])) },
             { typeof(char[]), GetMethod(typeof(char[])) },
             { typeof(string[]), GetMethod(typeof(string[])) },
+            { typeof(NetId), GetMethod(typeof(NetId)) }
         };
 
         _nullableWriters ??= new Dictionary<Type, MethodInfo>(44)
@@ -149,6 +150,7 @@ public class ByteWriter
             { typeof(decimal[]), GetNullableMethod(typeof(decimal[])) },
             { typeof(char[]), GetNullableMethod(typeof(char[])) },
             { typeof(string[]), GetNullableMethod(typeof(string[])) },
+            { typeof(NetId?), GetNullableMethod(typeof(NetId?)) }
         };
 
         MethodInfo GetMethod(Type writeType) => typeof(ByteWriter).GetMethod("Write", BindingFlags.Instance | BindingFlags.Public, null, new Type[] { writeType }, null)
@@ -335,6 +337,8 @@ public class ByteWriter
         }
         else Write(false);
     }
+    public void Write(NetId n) => WriteInternal(n.id);
+    public void WriteNullable(NetId? n) => WriteNullable(n?.id);
     public void Write(byte n) => WriteInternal(n);
     public void WriteNullable(byte? n)
     {
@@ -1763,6 +1767,7 @@ public class ByteWriter
         }
         else Write(false);
     }
+    /// <returns>The buffer without copying it to a correctly sized array. Save <see cref="Count"/> before running this method to get the amount of bytes of actual data.</returns>
     public byte[] FinishWrite()
     {
         byte[] rtn = _buffer;

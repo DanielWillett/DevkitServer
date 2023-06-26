@@ -533,7 +533,7 @@ internal static class TerrainEditorPatches
     {
         if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
 
-        ClientEvents.InvokeOnPaintHoles(new PaintHolesProperties(bounds, GetTerrainBrushWorldPosition(editor), editor.splatmapBrushRadius, InputEx.GetKey(KeyCode.LeftShift), Time.deltaTime));
+        ClientEvents.InvokeOnPaintHoles(new PaintHolesProperties(bounds, GetTerrainBrushWorldPosition(editor), editor.splatmapBrushRadius, InputEx.GetKey(KeyCode.LeftShift), CachedTime.DeltaTime));
     }
     [UsedImplicitly]
     private static void OnAddTile(LandscapeTile tile)

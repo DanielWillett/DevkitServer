@@ -1,6 +1,7 @@
 ﻿#if CLIENT
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
+using DevkitServer.Models;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Players;
 using DevkitServer.Players.UI;

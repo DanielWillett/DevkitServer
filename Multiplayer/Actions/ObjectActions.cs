@@ -1,11 +1,10 @@
 ﻿using DevkitServer.Util.Encoding;
 using DevkitServer.Models;
-using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Multiplayer.Levels;
 #if SERVER
+using DevkitServer.Multiplayer.Networking;
 using DevkitServer.API.Permissions;
-using DevkitServer.Configuration;
 using DevkitServer.Players;
-using JetBrains.Annotations;
 #endif
 
 namespace DevkitServer.Multiplayer.Actions;
@@ -44,140 +43,98 @@ public sealed class ObjectActions
     {
         EditorActions.QueueAction(new DeleteLevelObjectsAction
         {
-            Buildables = properties.Buildables,
-            Objects = properties.Objects,
+            NetIds = properties.NetIds,
             DeltaTime = properties.DeltaTime
         }, true);
     }
     private void OnMoveLevelObjectsFinal(in MoveLevelObjectsFinalProperties properties)
     {
-        EditorActions.QueueAction(new MoveLevelObjectsAction
+        EditorActions.QueueAction(new MoveLevelObjectsFinalAction
         {
-            Objects = properties.InstanceIds,
-            ObjectTransformations = properties.ObjectTransformations,
-            ObjectScales = properties.ObjectScales,
-            OriginalObjectScales = properties.OriginalObjectScales,
-            Buildables = properties.Buildables,
-            BuildableTransformations = properties.BuildableTransformations,
-            BuildableScales = properties.BuildableScales,
-            OriginalBuildableScales = properties.OriginalBuildableScales,
-            UseScale = properties.ObjectScales != null && properties.BuildableScales != null &&
-                       properties.OriginalObjectScales != null && properties.OriginalBuildableScales != null,
-            DeltaTime = properties.DeltaTime,
-            IsFinal = true
+            Transformations = properties.Transformations,
+            UseScale = properties.UseScale,
+            DeltaTime = properties.DeltaTime
         }, true);
     }
     private void OnMoveLevelObjectsPreview(in MoveLevelObjectsPreviewProperties properties)
     {
-        EditorActions.QueueAction(new MoveLevelObjectsAction
+        if (properties.Transformations.Length > LevelObjectUtil.MaxMovePreviewSelectionSize || DevkitServerModuleComponent.Ticks % 4 != 0)
+            return;
+        EditorActions.QueueAction(new MoveLevelObjectsPreviewAction
         {
-            Objects = properties.InstanceIds,
-            ObjectTransformations = properties.ObjectTransformations,
-            Buildables = properties.Buildables,
-            BuildableTransformations = properties.BuildableTransformations,
-            UseScale = false,
-            DeltaTime = properties.DeltaTime,
-            IsFinal = false
+            Transformations = properties.Transformations,
+            DeltaTime = properties.DeltaTime
         }, true);
     }
 #endif
 }
 
 
-[Action(ActionType.DeleteLevelObjects, 262, 0)]
+[Action(ActionType.DeleteLevelObjects, 64 * 4 + 5, 0)]
 [EarlyTypeInit]
 public sealed class DeleteLevelObjectsAction : IAction
 {
     public ActionType Type => ActionType.DeleteLevelObjects;
     public CSteamID Instigator { get; set; }
-    public uint[] Objects { get; set; } = Array.Empty<uint>();
-    public RegionIdentifier[] Buildables { get; set; } = Array.Empty<RegionIdentifier>();
+    public NetId[] NetIds { get; set; } = Array.Empty<NetId>();
     public float DeltaTime { get; set; }
     public void Apply()
     {
 #if SERVER
-        LevelObject?[]? objs = _objects;
+        Transform?[]? objs = _objects;
 #else
-        LevelObject?[]? objs = null;
-#endif
-#if SERVER
-        LevelBuildableObject?[]? buildables = _buildables;
-#else
-        LevelBuildableObject?[]? buildables = null;
+        Transform?[]? objs = null;
 #endif
         if (objs == null)
         {
-            objs = Objects.Length == 0 ? Array.Empty<LevelObject>() : new LevelObject[Objects.Length];
-            Vector3 last = Vector3.zero;
-            for (int i = 0; i < Objects.Length; ++i)
+            objs = new Transform[NetIds.Length];
+            for (int i = 0; i < objs.Length; ++i)
             {
-                LevelObject? obj = i == 0 ? LevelObjectUtil.FindObject(Objects[i]) : LevelObjectUtil.FindObject(last, Objects[i]);
-                objs[i] = obj;
-                if (obj == null)
-                    Logger.LogWarning($"Unknown object: # {Objects[i]}.");
-                else
-                    last = obj.transform.position;
-            }
-        }
-        if (buildables == null)
-        {
-            buildables = Buildables.Length == 0 ? Array.Empty<LevelBuildableObject>() : new LevelBuildableObject[Buildables.Length];
-            for (int i = 0; i < Buildables.Length; ++i)
-            {
-                LevelBuildableObject? buildable = LevelObjectUtil.GetBuildable(Buildables[i]);
-                buildables[i] = buildable;
-                if (buildable == null)
-                    Logger.LogWarning($"Unknown buildable: {Buildables[i]}.");
+                NetId netId = NetIds[i];
+                if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out LevelBuildableObject? buildable, out _))
+                {
+                    Logger.LogWarning($"Unknown object or buildable with NetId: {netId.Format()}.");
+                    continue;
+                }
+                objs[i] = levelObject == null ? buildable!.transform : levelObject.transform;
             }
         }
         for (int i = 0; i < objs.Length; ++i)
         {
-            if (objs[i] is not { } obj) continue;
-            LevelObjects.registerRemoveObject(obj.transform);
-        }
-        for (int i = 0; i < buildables.Length; ++i)
-        {
-            if (buildables[i] is not { } buildable) continue;
-            LevelObjects.registerRemoveObject(buildable.transform);
+            Transform? transform = objs[i];
+            if (transform == null)
+                continue;
+            LevelObjects.registerRemoveObject(transform);
         }
     }
 #if SERVER
-    private LevelObject?[]? _objects;
-    private LevelBuildableObject?[]? _buildables;
+    private Transform?[]? _objects;
     public bool CheckCanApply()
     {
         if (Permission.SuperuserPermission.Has(Instigator.m_SteamID, false))
             return true;
-        if (Objects.Length > byte.MaxValue || Buildables.Length > byte.MaxValue)
-            return false;
-        _objects = Objects.Length == 0 ? Array.Empty<LevelObject>() : new LevelObject[Objects.Length];
-        _buildables = Buildables.Length == 0 ? Array.Empty<LevelBuildableObject>() : new LevelBuildableObject[Objects.Length];
-        Vector3 last = Vector3.zero;
-        for (int i = 0; i < Objects.Length; ++i)
+        _objects = new Transform[NetIds.Length];
+        for (int i = 0; i < NetIds.Length; ++i)
         {
-            LevelObject? obj = i == 0 ? LevelObjectUtil.FindObject(Objects[i]) : LevelObjectUtil.FindObject(last, Objects[i]);
-            _objects[i] = obj;
-            if (obj == null)
+            NetId netId = NetIds[i];
+            if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out LevelBuildableObject? buildable, out RegionIdentifier buildableId))
             {
-                Logger.LogWarning($"Unknown object: # {Objects[i]}.");
-                return false;
+                Logger.LogWarning($"Unknown object or buildable with NetId: {netId.Format()}.");
+                continue;
             }
-            if (!LevelObjectUtil.CheckDeletePermission(obj.instanceID, Instigator.m_SteamID))
-                return false;
-            last = obj.transform.position;
-        }
-        for (int i = 0; i < Buildables.Length; ++i)
-        {
-            RegionIdentifier identifier = Buildables[i];
-            LevelBuildableObject? obj = LevelObjectUtil.GetBuildable(identifier);
-            _buildables[i] = obj;
-            if (obj == null)
+
+            if (levelObject != null)
             {
-                Logger.LogWarning($"Unknown buildable: {Buildables[i]}.");
-                return false;
+                if (!LevelObjectUtil.CheckDeletePermission(levelObject.instanceID, Instigator.m_SteamID))
+                    return false;
+                _objects[i] = levelObject.transform;
             }
-            if (!LevelObjectUtil.CheckDeleteBuildablePermission(identifier, Instigator.m_SteamID))
-                return false;
+            else
+            {
+                if (!LevelObjectUtil.CheckDeleteBuildablePermission(buildableId, Instigator.m_SteamID))
+                    return false;
+                _objects[i] = buildable!.transform;
+            }
         }
         return true;
     }
@@ -186,151 +143,92 @@ public sealed class DeleteLevelObjectsAction : IAction
     {
         DeltaTime = reader.ReadFloat();
         int objectCount = reader.ReadUInt8();
-        int buildableCount = reader.ReadUInt8();
 
-        Objects = objectCount == 0 ? Array.Empty<uint>() : new uint[objectCount];
-        Buildables = buildableCount == 0 ? Array.Empty<RegionIdentifier>() : new RegionIdentifier[buildableCount];
+        NetIds = new NetId[objectCount];
 
         for (int i = 0; i < objectCount; ++i)
-            Objects[i] = reader.ReadUInt32();
-
-        for (int i = 0; i < buildableCount; ++i)
-            Buildables[i] = RegionIdentifier.Read(reader);
+            NetIds[i] = reader.ReadNetId();
     }
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
-        int objectCount = Math.Min(byte.MaxValue, Objects.Length);
-        int buildableCount = Math.Min(byte.MaxValue, Buildables.Length);
+        int objectCount = Math.Min(byte.MaxValue, NetIds.Length);
 
         writer.Write((byte)objectCount);
-        writer.Write((byte)buildableCount);
 
         for (int i = 0; i < objectCount; ++i)
-            writer.Write(Objects[i]);
-
-        for (int i = 0; i < buildableCount; ++i)
-            RegionIdentifier.Write(writer, Buildables[i]);
+            writer.Write(NetIds[i]);
     }
 }
 
-[Action(ActionType.MoveLevelObjectsFinal, 262, 0)]
+[Action(ActionType.MoveLevelObjectsPreview, PreviewTransformation.Capacity * 32 + 6, 0)]
 [EarlyTypeInit]
-public class MoveLevelObjectsAction : IAction
+public class MoveLevelObjectsPreviewAction : IAction
 {
-    public ActionType Type => ActionType.MoveLevelObjectsFinal;
+    public ActionType Type => ActionType.MoveLevelObjectsPreview;
     public CSteamID Instigator { get; set; }
-    public uint[] Objects { get; set; } = Array.Empty<uint>();
-    public RegionIdentifier[] Buildables { get; set; } = Array.Empty<RegionIdentifier>();
-    public TransformationDelta[] ObjectTransformations { get; set; } = Array.Empty<TransformationDelta>();
-    public TransformationDelta[] BuildableTransformations { get; set; } = Array.Empty<TransformationDelta>();
-    public Vector3[]? OriginalObjectScales { get; set; }
-    public Vector3[]? ObjectScales { get; set; }
-    public Vector3[]? OriginalBuildableScales { get; set; }
-    public Vector3[]? BuildableScales { get; set; }
-    public bool UseScale { get; set; }
-    public bool IsFinal { get; set; }
+    public PreviewTransformation[] Transformations { get; set; } = Array.Empty<PreviewTransformation>();
     public float DeltaTime { get; set; }
     public void Apply()
     {
 #if SERVER
-        LevelObject?[]? objs = _objects;
+        Transform?[]? objs = _objects;
 #else
-        LevelObject?[]? objs = null;
-#endif
-#if SERVER
-        LevelBuildableObject?[]? buildables = _buildables;
-#else
-        LevelBuildableObject?[]? buildables = null;
+        Transform?[]? objs = null;
 #endif
         if (objs == null)
         {
-            objs = Objects.Length == 0 ? Array.Empty<LevelObject>() : new LevelObject[Objects.Length];
-            for (int i = 0; i < Objects.Length; ++i)
+            objs = new Transform[Transformations.Length];
+            for (int i = 0; i < objs.Length; ++i)
             {
-                LevelObject? obj = LevelObjectUtil.FindObject(Objects[i]);
-                objs[i] = obj;
-                if (obj == null)
-                    Logger.LogWarning($"Unknown object: # {Objects[i]}.");
-            }
-        }
-        if (buildables == null)
-        {
-            buildables = Buildables.Length == 0 ? Array.Empty<LevelBuildableObject>() : new LevelBuildableObject[Buildables.Length];
-            for (int i = 0; i < Buildables.Length; ++i)
-            {
-                LevelBuildableObject? buildable = LevelObjectUtil.GetBuildable(Buildables[i]);
-                buildables[i] = buildable;
-                if (buildable == null)
-                    Logger.LogWarning($"Unknown buildable: {Buildables[i]}.");
+                NetId netId = Transformations[i].NetId;
+                if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out LevelBuildableObject? buildable, out _))
+                {
+                    Logger.LogWarning($"Unknown object or buildable with NetId: {netId.Format()}.");
+                    continue;
+                }
+                objs[i] = levelObject == null ? buildable!.transform : levelObject.transform;
             }
         }
         for (int i = 0; i < objs.Length; ++i)
         {
-            if (objs[i] is not { } obj) continue;
-            ref TransformationDelta t = ref ObjectTransformations[i];
-            if (IsFinal)
-            {
-                Vector3 lclScale = !UseScale ? obj.transform.localScale : default;
-                LevelObjects.registerTransformObject(obj.transform, t.Position, t.Rotation, UseScale ? ObjectScales![i] : lclScale,
-                    t.OriginalPosition, t.OriginalRotation, UseScale ? OriginalObjectScales![i] : lclScale);
-            }
-            else
-                t.ApplyTo(obj.transform, true);
-        }
-        for (int i = 0; i < buildables.Length; ++i)
-        {
-            if (buildables[i] is not { } buildable) continue;
-            ref TransformationDelta t = ref BuildableTransformations[i];
-            if (IsFinal)
-            {
-                Vector3 lclScale = !UseScale ? buildable.transform.localScale : default;
-                LevelObjects.registerTransformObject(buildable.transform, t.Position, t.Rotation, UseScale ? ObjectScales![i] : lclScale,
-                    t.OriginalPosition, t.OriginalRotation, UseScale ? OriginalObjectScales![i] : lclScale);
-            }
-            else
-            {
-                t.ApplyTo(buildable.transform, true);
-            }
+            Transform? transform = objs[i];
+            if (transform == null)
+                continue;
+            ref PreviewTransformation transformation = ref Transformations[i];
+            transformation.Transformation.ApplyTo(transform, true);
         }
     }
 #if SERVER
-    private LevelObject?[]? _objects;
-    private LevelBuildableObject?[]? _buildables;
+    private Transform?[]? _objects;
     public bool CheckCanApply()
     {
-        if (!IsFinal && DevkitServerConfig.Config.RemoveCosmeticImprovements)
+        if (Transformations.Length > LevelObjectUtil.MaxMovePreviewSelectionSize)
             return false;
         if (Permission.SuperuserPermission.Has(Instigator.m_SteamID, false))
             return true;
-        if (Objects.Length > byte.MaxValue || Buildables.Length > byte.MaxValue)
-            return false;
-        _objects = Objects.Length == 0 ? Array.Empty<LevelObject>() : new LevelObject[Objects.Length];
-        _buildables = Buildables.Length == 0 ? Array.Empty<LevelBuildableObject>() : new LevelBuildableObject[Objects.Length];
-        for (int i = 0; i < Objects.Length; ++i)
+        _objects = new Transform[Transformations.Length];
+        for (int i = 0; i < Transformations.Length; ++i)
         {
-            LevelObject? obj = LevelObjectUtil.FindObject(Objects[i]);
-            _objects[i] = obj;
-            if (obj == null)
+            NetId netId = Transformations[i].NetId;
+            if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out LevelBuildableObject? buildable, out RegionIdentifier buildableId))
             {
-                Logger.LogWarning($"Unknown object: # {Objects[i]}.");
-                return false;
+                Logger.LogWarning($"Unknown object or buildable with NetId: {netId.Format()}.");
+                continue;
             }
-            if (!LevelObjectUtil.CheckMovePermission(obj.instanceID, Instigator.m_SteamID))
-                return false;
-        }
-        for (int i = 0; i < Buildables.Length; ++i)
-        {
-            RegionIdentifier identifier = Buildables[i];
-            LevelBuildableObject? obj = LevelObjectUtil.GetBuildable(identifier);
-            _buildables[i] = obj;
-            if (obj == null)
+
+            if (levelObject != null)
             {
-                Logger.LogWarning($"Unknown buildable: {Buildables[i]}.");
-                return false;
+                if (!LevelObjectUtil.CheckMovePermission(levelObject.instanceID, Instigator.m_SteamID))
+                    return false;
+                _objects[i] = levelObject.transform;
             }
-            if (!LevelObjectUtil.CheckMoveBuildablePermission(identifier, Instigator.m_SteamID))
-                return false;
+            else
+            {
+                if (!LevelObjectUtil.CheckMoveBuildablePermission(buildableId, Instigator.m_SteamID))
+                    return false;
+                _objects[i] = buildable!.transform;
+            }
         }
         return true;
     }
@@ -339,96 +237,119 @@ public class MoveLevelObjectsAction : IAction
     {
         DeltaTime = reader.ReadFloat();
         int objectCount = reader.ReadUInt8();
-        int buildableCount = reader.ReadUInt8();
-        byte flag = reader.ReadUInt8();
-        UseScale = (flag & 1) != 0;
-        IsFinal = (flag & 2) != 0;
 
-        Objects = objectCount == 0 ? Array.Empty<uint>() : new uint[objectCount];
-        Buildables = buildableCount == 0 ? Array.Empty<RegionIdentifier>() : new RegionIdentifier[buildableCount];
-        ObjectTransformations = objectCount == 0 ? Array.Empty<TransformationDelta>() : new TransformationDelta[objectCount];
-        BuildableTransformations = buildableCount == 0 ? Array.Empty<TransformationDelta>() : new TransformationDelta[buildableCount];
+        Transformations = new PreviewTransformation[objectCount];
 
-        if (UseScale)
-        {
-            ObjectScales = objectCount == 0 ? Array.Empty<Vector3>() : new Vector3[objectCount];
-            BuildableScales = buildableCount == 0 ? Array.Empty<Vector3>() : new Vector3[buildableCount];
-            OriginalObjectScales = objectCount == 0 ? Array.Empty<Vector3>() : new Vector3[objectCount];
-            OriginalBuildableScales = buildableCount == 0 ? Array.Empty<Vector3>() : new Vector3[buildableCount];
-        }
         for (int i = 0; i < objectCount; ++i)
-        {
-            Objects[i] = reader.ReadUInt32();
-            ObjectTransformations[i] = new TransformationDelta(reader, !IsFinal);
-            if (UseScale)
-            {
-                ObjectScales![i] = IsFinal ? reader.ReadVector3() : reader.ReadHalfPrecisionVector3();
-                OriginalObjectScales![i] = IsFinal ? reader.ReadVector3() : reader.ReadHalfPrecisionVector3();
-            }
-        }
-        for (int i = 0; i < buildableCount; ++i)
-        {
-            Buildables[i] = RegionIdentifier.Read(reader);
-            BuildableTransformations[i] = new TransformationDelta(reader, !IsFinal);
-            if (UseScale)
-            {
-                BuildableScales![i] = IsFinal ? reader.ReadVector3() : reader.ReadHalfPrecisionVector3();
-                OriginalBuildableScales![i] = IsFinal ? reader.ReadVector3() : reader.ReadHalfPrecisionVector3();
-            }
-        }
+            Transformations[i] = new PreviewTransformation(reader, false);
     }
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
-        int objectCount = Math.Min(byte.MaxValue, Objects.Length);
-        int buildableCount = Math.Min(byte.MaxValue, Buildables.Length);
+        int objectCount = Math.Min(byte.MaxValue, Transformations.Length);
 
         writer.Write((byte)objectCount);
-        writer.Write((byte)buildableCount);
-        writer.Write((byte)((UseScale ? 1 : 0) | (IsFinal ? 2 : 0)));
 
         for (int i = 0; i < objectCount; ++i)
+            Transformations[i].Write(writer, false);
+    }
+}
+
+[Action(ActionType.MoveLevelObjectsFinal, FinalTransformation.Capacity * 32 + 7, 0)]
+[EarlyTypeInit]
+public class MoveLevelObjectsFinalAction : IAction
+{
+    public ActionType Type => ActionType.MoveLevelObjectsFinal;
+    public CSteamID Instigator { get; set; }
+    public FinalTransformation[] Transformations { get; set; } = Array.Empty<FinalTransformation>();
+    public bool UseScale { get; set; }
+    public float DeltaTime { get; set; }
+    public void Apply()
+    {
+#if SERVER
+        Transform?[]? objs = _objects;
+#else
+        Transform?[]? objs = null;
+#endif
+        if (objs == null)
         {
-            writer.Write(Objects[i]);
-            if (IsFinal)
-                ObjectTransformations[i].Write(writer);
-            else
-                ObjectTransformations[i].WriteHalfPrecision(writer);
-            if (UseScale)
+            objs = new Transform[Transformations.Length];
+            for (int i = 0; i < objs.Length; ++i)
             {
-                if (IsFinal)
+                NetId netId = Transformations[i].NetId;
+                if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out LevelBuildableObject? buildable, out _))
                 {
-                    writer.Write(ObjectScales![i]);
-                    writer.Write(OriginalObjectScales![i]);
+                    Logger.LogWarning($"Unknown object or buildable with NetId: {netId.Format()}.");
+                    continue;
                 }
-                else
-                {
-                    writer.WriteHalfPrecision(ObjectScales![i]);
-                    writer.WriteHalfPrecision(OriginalObjectScales![i]);
-                }
+                objs[i] = levelObject == null ? buildable!.transform : levelObject.transform;
             }
         }
-        for (int i = 0; i < buildableCount; ++i)
+        for (int i = 0; i < objs.Length; ++i)
         {
-            RegionIdentifier.Write(writer, Buildables[i]);
-            if (IsFinal)
-                BuildableTransformations[i].Write(writer);
-            else
-                BuildableTransformations[i].WriteHalfPrecision(writer);
-            if (UseScale)
+            Transform? transform = objs[i];
+            if (transform == null)
+                continue;
+            ref FinalTransformation transformation = ref Transformations[i];
+            Vector3 lclScale = !UseScale ? transform.localScale : default;
+            LevelObjects.registerTransformObject(transform, transformation.Transformation.Position, transformation.Transformation.Rotation, UseScale ? transformation.Scale : lclScale,
+                transformation.Transformation.OriginalPosition, transformation.Transformation.OriginalRotation, UseScale ? transformation.OriginalScale : lclScale);
+        }
+    }
+#if SERVER
+    private Transform?[]? _objects;
+    public bool CheckCanApply()
+    {
+        if (Permission.SuperuserPermission.Has(Instigator.m_SteamID, false))
+            return true;
+        _objects = new Transform[Transformations.Length];
+        for (int i = 0; i < Transformations.Length; ++i)
+        {
+            NetId netId = Transformations[i].NetId;
+            if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out LevelBuildableObject? buildable, out RegionIdentifier buildableId))
             {
-                if (IsFinal)
-                {
-                    writer.Write(BuildableScales![i]);
-                    writer.Write(OriginalBuildableScales![i]);
-                }
-                else
-                {
-                    writer.WriteHalfPrecision(BuildableScales![i]);
-                    writer.WriteHalfPrecision(OriginalBuildableScales![i]);
-                }
+                Logger.LogWarning($"Unknown object or buildable with NetId: {netId.Format()}.");
+                continue;
+            }
+
+            if (levelObject != null)
+            {
+                if (!LevelObjectUtil.CheckMovePermission(levelObject.instanceID, Instigator.m_SteamID))
+                    return false;
+                _objects[i] = levelObject.transform;
+            }
+            else
+            {
+                if (!LevelObjectUtil.CheckMoveBuildablePermission(buildableId, Instigator.m_SteamID))
+                    return false;
+                _objects[i] = buildable!.transform;
             }
         }
+        return true;
+    }
+#endif
+    public void Read(ByteReader reader)
+    {
+        DeltaTime = reader.ReadFloat();
+        int objectCount = reader.ReadUInt8();
+        byte flag = reader.ReadUInt8();
+        UseScale = (flag & 1) != 0;
+
+        Transformations = new FinalTransformation[objectCount];
+        
+        for (int i = 0; i < objectCount; ++i)
+            Transformations[i] = new FinalTransformation(reader, UseScale);
+    }
+    public void Write(ByteWriter writer)
+    {
+        writer.Write(DeltaTime);
+        int objectCount = Math.Min(byte.MaxValue, Transformations.Length);
+
+        writer.Write((byte)objectCount);
+        writer.Write((byte)(UseScale ? 1 : 0));
+
+        for (int i = 0; i < objectCount; ++i)
+            Transformations[i].Write(writer, UseScale);
     }
 }
 
@@ -456,13 +377,7 @@ public class InstantiateLevelObjectAction : IServersideAction
 #endif
     }
 #if SERVER
-    public bool CheckCanApply()
-    {
-        EditorUser? user = UserManager.FromId(Instigator);
-        if (user != null && user.Actions != null)
-            user.Actions.DontSendPermissionMesssage();
-        return false;
-    }
+    public bool CheckCanApply() => throw new NotImplementedException();
 #endif
 
     public void Read(ByteReader reader)

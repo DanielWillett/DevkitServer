@@ -1,17 +1,18 @@
-﻿#if CLIENT
+﻿using DevkitServer.Models;
+using HarmonyLib;
+using JetBrains.Annotations;
+using System.Reflection;
+using System.Reflection.Emit;
+#if CLIENT
 using DevkitServer.Configuration;
 using DevkitServer.Core.Permissions;
-using DevkitServer.Models;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Players.UI;
-using HarmonyLib;
-using JetBrains.Annotations;
 using SDG.Framework.Devkit.Transactions;
 using SDG.Framework.Utilities;
-using System.Reflection;
-using System.Reflection.Emit;
 using Action = System.Action;
+#endif
 
 namespace DevkitServer.Patches;
 
@@ -19,6 +20,7 @@ namespace DevkitServer.Patches;
 internal static class LevelObjectPatches
 {
     private const string Source = "OBJECT PATCHES";
+#if CLIENT
 
     internal static bool IsSyncing;
     private static bool IsFinalTransform;
@@ -139,6 +141,7 @@ internal static class LevelObjectPatches
         bool patchedHandleDown = false;
         bool patchedPasteTransform = false;
         bool patchedInstantiate = false;
+        bool patchedTranslate = false;
 
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
         int i = 0;
@@ -158,10 +161,10 @@ internal static class LevelObjectPatches
             }
 
             // start using handle
-            if (PatchUtil.MatchPattern(ins, i,
+            if (!patchedHandleDown && PatchUtil.MatchPattern(ins, i,
 
                     // EditorObjects.pointSelection()
-                    x => x.Calls(pointSelection),
+                    x => pointSelection != null && x.Calls(pointSelection),
                     // EditorObjects.handles.[...]
                     x => x.LoadsField(handles)
                 ))
@@ -172,8 +175,15 @@ internal static class LevelObjectPatches
                 continue;
             }
 
+            // translate with E
+            if (!patchedTranslate && patchedHandleDown && patchedPasteTransform && pointSelection != null && ins[i].Calls(pointSelection))
+            {
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Call, new Action(PreIsFinalExternallyTransforming).Method));
+                patchedTranslate = true;
+            }
+
             // delete selection
-            if (PatchUtil.FollowPattern(ins, ref i,
+            if (!patchedDelete && PatchUtil.FollowPattern(ins, ref i,
 
                     // ( if pressed delete
                     x => x.LoadsConstant(KeyCode.Delete),
@@ -199,7 +209,7 @@ internal static class LevelObjectPatches
             }
 
             // copy
-            if (PatchUtil.MatchPattern(ins, i,
+            if (!patchedCopy && PatchUtil.MatchPattern(ins, i,
                     x => x.LoadsField(copiedObjects),
                     x => x.Calls(clearCopiedObjects)
                 ))
@@ -212,7 +222,7 @@ internal static class LevelObjectPatches
             }
 
             // paste
-            if (PatchUtil.FollowPattern(ins, ref i,
+            if (!patchedPaste && PatchUtil.FollowPattern(ins, ref i,
 
                     // if pressed v
                     x => x.LoadsConstant(KeyCode.V),
@@ -250,7 +260,7 @@ internal static class LevelObjectPatches
             }
 
             // ctrl n (paste transform)
-            if (PatchUtil.MatchPattern(ins, i,
+            if (!patchedPasteTransform && PatchUtil.MatchPattern(ins, i,
 
                     // pointSelection()
                     x => pointSelection != null && x.Calls(pointSelection),
@@ -273,7 +283,7 @@ internal static class LevelObjectPatches
                 instr.labels.AddRange(ins[i].labels);
                 ins[i].labels.Clear();
                 PatchUtil.ContinueUntil(ins, ref i, x => x.opcode.IsBrAny(), false);
-                instr = new CodeInstruction(OpCodes.Call, new Action(PreIsPasteingTransform).Method);
+                instr = new CodeInstruction(OpCodes.Call, new Action(PreIsFinalExternallyTransforming).Method);
                 ins.Insert(i++, instr);
                 instr.labels.AddRange(ins[i].labels);
                 ins[i].labels.Clear();
@@ -283,7 +293,7 @@ internal static class LevelObjectPatches
             }
 
             // instantiate object
-            if (PatchUtil.MatchPattern(ins, i,
+            if (!patchedInstantiate && PatchUtil.MatchPattern(ins, i,
                     x => registerAddObject != null && x.Calls(registerAddObject),
                     x => x.opcode.IsStLoc()
                     ))
@@ -331,6 +341,11 @@ internal static class LevelObjectPatches
             Logger.LogWarning($"Unable to patch handle down operation in {method.Format()}.", method: Source);
             DevkitServerModule.Fault();
         }
+        if (!patchedTranslate)
+        {
+            Logger.LogWarning($"Unable to patch translate (E) operation in {method.Format()}.", method: Source);
+            DevkitServerModule.Fault();
+        }
         if (patchedReun < 2)
         {
             Logger.LogWarning($"Patched {patchedReun.Format()}/{2.Format()} undo/redo operations in {method.Format()}.", method: Source);
@@ -356,11 +371,11 @@ internal static class LevelObjectPatches
             MoveFinalSelection();
         else
         {
-            UndoMove();
+            CancelMove();
             ___isUsingHandle = false;
         }
     }
-    private static void UndoMove()
+    private static void CancelMove()
     {
         List<EditorSelection> selections = LevelObjectUtil.EditorObjectSelection;
 
@@ -393,6 +408,7 @@ internal static class LevelObjectPatches
             return;
 
         List<EditorSelection> selections = LevelObjectUtil.EditorObjectSelection;
+        if (selections.Count > LevelObjectUtil.MaxMovePreviewSelectionSize) return;
 
         Logger.LogDebug($"[CLIENT EVENTS] Move preview requested at: {string.Join(",", selections.Select(selection => selection.transform.gameObject.name.Format()))}: deltaPos: {worldPositionDelta.Format()}, deltaRot: {worldRotationDelta.eulerAngles.Format()}, pivotPos: {pivotPosition.Format()}, modifyRotation: {modifyRotation}.");
 
@@ -402,44 +418,23 @@ internal static class LevelObjectPatches
         if (modifyRotation && !worldRotationDelta.IsNearlyIdentity())
             flags |= TransformationDelta.TransformFlags.Rotation | TransformationDelta.TransformFlags.OriginalRotation;
         
-        List<uint> instanceIds = ListPool<uint>.claim();
-        List<RegionIdentifier> buildableIds = ListPool<RegionIdentifier>.claim();
-        List<TransformationDelta> translations = ListPool<TransformationDelta>.claim();
-        List<TransformationDelta> buildableTranslations = ListPool<TransformationDelta>.claim();
+        List<PreviewTransformation> transformations = ListPool<PreviewTransformation>.claim();
 
         float dt = CachedTime.DeltaTime;
         try
         {
             int count = selections.Count;
-            if (translations.Capacity < count)
-                translations.Capacity = count;
-            if (instanceIds.Capacity < count)
-                instanceIds.Capacity = count;
-            
-            foreach (EditorSelection selection in selections)
-            {
-                TransformationDelta t = new TransformationDelta(flags, worldPositionDelta, worldRotationDelta, selection.fromPosition, selection.fromRotation);
-                if (LevelObjectUtil.TryFindObject(selection.transform, out RegionIdentifier id))
-                {
-                    LevelObject? levelObject = ObjectManager.getObject(id.X, id.Y, id.Index);
-                    if (levelObject == null) continue;
-                    instanceIds.Add(levelObject.instanceID);
-                    translations.Add(t);
-                    if (ClientEvents.ListeningOnMoveObjectPreview)
-                        ClientEvents.InvokeOnMoveObjectPreview(new MoveObjectPreviewProperties(levelObject.instanceID, t, pivotPosition, false, dt));
-                }
-                else if (LevelObjectUtil.TryFindBuildable(selection.transform, out id))
-                {
-                    LevelBuildableObject? buildable = LevelObjectUtil.GetBuildable(id);
-                    if (buildable == null) continue;
-                    buildableIds.Add(id);
-                    buildableTranslations.Add(t);
-                    if (ClientEvents.ListeningOnMoveBuildablePreview)
-                        ClientEvents.InvokeOnMoveBuildablePreview(new MoveBuildablePreviewProperties(id, t, pivotPosition, false, dt));
-                }
+            transformations.IncreaseCapacity(Math.Min(count, LevelObjectUtil.MaxMovePacketSize));
 
-                int totalObjects = instanceIds.Count + buildableIds.Count;
-                if (totalObjects > 0 && totalObjects % LevelObjectUtil.MaxMovePacketSize == 0)
+            for (int i = 0; i < selections.Count; i++)
+            {
+                EditorSelection selection = selections[i];
+                if (!NetIdRegistry.GetTransformNetId(selection.transform, out NetId netId, out _))
+                    continue;
+                
+                transformations.Add(new PreviewTransformation(netId, new TransformationDelta(flags, worldPositionDelta, worldRotationDelta, selection.fromPosition, selection.fromRotation)));
+
+                if (transformations.Count % LevelObjectUtil.MaxMovePacketSize == 0)
                     Flush();
             }
 
@@ -449,21 +444,14 @@ internal static class LevelObjectPatches
             {
                 if (ClientEvents.ListeningOnMoveHierarchyObjectsPreview)
                 {
-                    ClientEvents.InvokeOnMoveLevelObjectsPreview(new MoveLevelObjectsPreviewProperties(instanceIds.ToArrayFast(), translations.ToArrayFast(),
-                        buildableIds.ToArrayFast(), buildableTranslations.ToArrayFast(), pivotPosition, dt));
+                    ClientEvents.InvokeOnMoveLevelObjectsPreview(new MoveLevelObjectsPreviewProperties(transformations.ToArrayFast(), dt));
                 }
-                instanceIds.Clear();
-                translations.Clear();
-                buildableIds.Clear();
-                buildableTranslations.Clear();
+                transformations.Clear();
             }
         }
         finally
         {
-            ListPool<uint>.release(instanceIds);
-            ListPool<RegionIdentifier>.release(buildableIds);
-            ListPool<TransformationDelta>.release(translations);
-            ListPool<TransformationDelta>.release(buildableTranslations);
+            ListPool<PreviewTransformation>.release(transformations);
         }
     }
     private static void MoveFinalSelection()
@@ -478,74 +466,47 @@ internal static class LevelObjectPatches
         Logger.LogDebug($"[CLIENT EVENTS] Move final requested at: {string.Join(",", selections.Select(selection => selection.transform.gameObject.name.Format()))}.");
 
         const TransformationDelta.TransformFlags flags = TransformationDelta.TransformFlags.All;
-
-        // no there's not enough lists
-        List<uint> instanceIds = ListPool<uint>.claim();
-        List<RegionIdentifier> buildableIds = ListPool<RegionIdentifier>.claim();
-        List<TransformationDelta> translations = ListPool<TransformationDelta>.claim();
-        List<TransformationDelta> buildableTranslations = ListPool<TransformationDelta>.claim();
-        List<Vector3> objScales = ListPool<Vector3>.claim();
-        List<Vector3> objOriginalScales = ListPool<Vector3>.claim();
-        List<Vector3> buildableScales = ListPool<Vector3>.claim();
-        List<Vector3> buildableOriginalScales = ListPool<Vector3>.claim();
-        List<(RegionIdentifier id, Transform transform, EditorCopy transformation)>? replaces = null;
+        
+        List<FinalTransformation> transformations = ListPool<FinalTransformation>.claim();
 
         float dt = CachedTime.DeltaTime;
         try
         {
             int count = selections.Count;
-            if (translations.Capacity < count)
-                translations.Capacity = count;
-            if (instanceIds.Capacity < count)
-                instanceIds.Capacity = count;
-            if (objScales.Capacity < count)
-                objScales.Capacity = count;
-            if (objOriginalScales.Capacity < count)
-                objOriginalScales.Capacity = count;
+            transformations.IncreaseCapacity(Math.Min(count, LevelObjectUtil.MaxMovePacketSize));
 
             bool globalUseScale = false;
-            foreach (EditorSelection selection in selections)
+            for (int i = 0; i < selections.Count; i++)
             {
-                TransformationDelta t = new TransformationDelta(flags,
-                    selection.transform.position, selection.transform.rotation, selection.fromPosition, selection.fromRotation);
-                bool useScale = !selection.fromScale.IsNearlyEqual(selection.transform.localScale);
+                EditorSelection selection = selections[i];
+                if (!NetIdRegistry.GetTransformNetId(selection.transform, out NetId netId, out _))
+                    continue;
+
+                Vector3 scale = selection.transform.localScale;
+                bool useScale = !selection.fromScale.IsNearlyEqual(scale);
                 globalUseScale |= useScale;
+
+                FinalTransformation transformation = new FinalTransformation(netId,
+                    new TransformationDelta(flags, selection.transform.position, selection.transform.rotation,
+                        selection.fromPosition, selection.fromRotation),
+                    scale, selection.fromScale);
+
+                transformations.Add(transformation);
+
+                if (ClientEvents.ListeningOnMoveLevelObjectFinal)
+                    ClientEvents.InvokeOnMoveLevelObjectFinal(
+                        new MoveLevelObjectFinalProperties(transformation, useScale, dt));
+
                 if (LevelObjectUtil.TryFindObject(selection.transform, out RegionIdentifier id))
                 {
-                    LevelObject? levelObject = ObjectManager.getObject(id.X, id.Y, id.Index);
-                    if (levelObject == null) continue;
-                    instanceIds.Add(levelObject.instanceID);
-                    translations.Add(t);
-                    objScales.Add(selection.transform.localScale);
-                    objOriginalScales.Add(selection.fromScale);
-                    if (ClientEvents.ListeningOnMoveObjectFinal)
-                        ClientEvents.InvokeOnMoveObjectFinal(new MoveObjectFinalProperties(levelObject.instanceID, t, selection.transform.localScale, selection.fromScale, useScale, dt));
-                    if (levelObject.isSpeciallyCulled)
-                        LevelObjectUtil.UpdateContainingCullingVolumesForMove(selection.fromPosition, t.Position);
+                    if (LevelObjectUtil.GetObjectUnsafe(id) is { isSpeciallyCulled: true })
+                        LevelObjectUtil.UpdateContainingCullingVolumesForMove(selection.fromPosition,
+                            transformation.Transformation.Position);
                     else
-                        LevelObjectUtil.UpdateContainingCullingVolumes(t.Position);
-                }
-                else if (LevelObjectUtil.TryFindBuildable(selection.transform, selection.fromPosition, out id))
-                {
-                    LevelBuildableObject? buildable = LevelObjectUtil.GetBuildable(id);
-                    if (buildable == null) continue;
-                    bool needsReplaced = !Regions.tryGetCoordinate(t.Position, out byte x, out byte y) || !id.IsSameRegionAs(x, y);
-                    if (needsReplaced)
-                    {
-                        (replaces ??= new List<(RegionIdentifier, Transform, EditorCopy)>(2)).Add((id, selection.transform, new EditorCopy(t.Position, t.Rotation,
-                            selection.transform.localScale, null, buildable.asset)));
-                        continue;
-                    }
-                    buildableIds.Add(id);
-                    buildableTranslations.Add(t);
-                    buildableScales.Add(selection.transform.localScale);
-                    buildableOriginalScales.Add(selection.fromScale);
-                    if (ClientEvents.ListeningOnMoveBuildableFinal)
-                        ClientEvents.InvokeOnMoveBuildableFinal(new MoveBuildableFinalProperties(id, t, selection.transform.localScale, selection.fromScale, useScale, dt));
+                        LevelObjectUtil.UpdateContainingCullingVolumes(transformation.Transformation.Position);
                 }
 
-                int totalObjects = instanceIds.Count + buildableIds.Count - (replaces != null ? replaces.Count : 0);
-                if (totalObjects > 0 && totalObjects % LevelObjectUtil.MaxMovePacketSize == 0)
+                if (transformations.Count % LevelObjectUtil.MaxMovePacketSize == 0)
                     Flush();
             }
 
@@ -554,49 +515,15 @@ internal static class LevelObjectPatches
             void Flush()
             {
                 if (ClientEvents.ListeningOnMoveLevelObjectsFinal)
-                {
-                    ClientEvents.InvokeOnMoveLevelObjectsFinal(new MoveLevelObjectsFinalProperties(instanceIds.ToArrayFast(), translations.ToArrayFast(),
-                        globalUseScale ? objOriginalScales.ToArrayFast() : null, globalUseScale ? objScales.ToArrayFast() : null,
-                        buildableIds.ToArrayFast(), buildableTranslations.ToArrayFast(),
-                        globalUseScale ? buildableOriginalScales.ToArrayFast() : null, globalUseScale ? buildableScales.ToArrayFast() : null
-                        , dt));
-                }
-                instanceIds.Clear();
-                translations.Clear();
-                objOriginalScales.Clear();
-                objScales.Clear();
-                buildableIds.Clear();
-                buildableTranslations.Clear();
-                buildableOriginalScales.Clear();
-                buildableScales.Clear();
+                    ClientEvents.InvokeOnMoveLevelObjectsFinal(new MoveLevelObjectsFinalProperties(transformations.ToArrayFast(), globalUseScale, dt));
+
+                transformations.Clear();
                 globalUseScale = false;
-            }
-            if (replaces != null)
-            {
-                RegionIdentifier[] ids = new RegionIdentifier[replaces.Count];
-                EditorCopy[] copies = new EditorCopy[replaces.Count];
-                for (int i = 0; i < replaces.Count; ++i)
-                {
-                    EditorObjects.removeSelection(replaces[i].transform);
-                    LevelObjects.registerRemoveObject(replaces[i].transform);
-                    copies[i] = replaces[i].transformation;
-                    ids[i] = replaces[i].id;
-                }
-                ClientEvents.InvokeOnDeleteLevelObjects(new DeleteLevelObjectsProperties(Array.Empty<uint>(), ids, dt));
-                LevelObjectUtil.ClientInstantiateObjectsAndLock(copies);
-                Logger.LogDebug($"[CLIENT EVENTS] Replacing {replaces.Count.Format()} buildable{replaces.Count.S()} that got moved into a different region.");
             }
         }
         finally
         {
-            ListPool<uint>.release(instanceIds);
-            ListPool<RegionIdentifier>.release(buildableIds);
-            ListPool<TransformationDelta>.release(translations);
-            ListPool<TransformationDelta>.release(buildableTranslations);
-            ListPool<Vector3>.release(objScales);
-            ListPool<Vector3>.release(objOriginalScales);
-            ListPool<Vector3>.release(buildableScales);
-            ListPool<Vector3>.release(buildableOriginalScales);
+            ListPool<FinalTransformation>.release(transformations);
         }
     }
     private static void OnInstantiate(Vector3 position, Quaternion rotation, Vector3 scale, ObjectAsset objectAsset, ItemAsset buildableAsset)
@@ -637,39 +564,40 @@ internal static class LevelObjectPatches
             UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
-        List<EditorSelection> selection = LevelObjectUtil.EditorObjectSelection;
+        List<EditorSelection> selections = LevelObjectUtil.EditorObjectSelection;
         Logger.LogDebug($"[{Source}] Deleting selection.");
-        List<uint> objects = ListPool<uint>.claim();
-        if (objects.Capacity < selection.Count)
-            objects.Capacity = selection.Count;
-        List<RegionIdentifier> buildables = ListPool<RegionIdentifier>.claim();
+
+        List<NetId> netIds = ListPool<NetId>.claim();
+        netIds.IncreaseCapacity(selections.Count);
+        
         float dt = CachedTime.DeltaTime;
         try
         {
-            for (int i = 0; i < selection.Count; ++i)
+            for (int i = 0; i < selections.Count; ++i)
             {
-                LevelObject? obj = LevelObjectUtil.FindObject(selection[i].transform);
-                if (obj == null)
+                EditorSelection selection = selections[i];
+                if (!NetIdRegistry.GetTransformNetId(selection.transform, out NetId netId, out _))
+                    continue;
+                
+                // check permissions
+                if (!LevelObjectUtil.TryFindObject(selection.transform, out RegionIdentifier id))
                 {
-                    if (!LevelObjectUtil.TryFindBuildable(selection[i].transform, out RegionIdentifier id) ||
-                        !LevelObjectUtil.CheckDeleteBuildablePermission(id))
+                    if (!LevelObjectUtil.TryFindBuildable(selection.transform, out id))
+                        continue;
+                    if (!LevelObjectUtil.CheckDeleteBuildablePermission(id))
                     {
-                        UIMessage.SendNoPermissionMessage(VanillaPermissions.RemoveSavedObjects);
+                        UIMessage.SendNoPermissionMessage(VanillaPermissions.RemoveUnownedObjects);
                         return false;
                     }
-
-                    buildables.Add(id);
-                    if (i > 0 && i % LevelObjectUtil.MaxDeletePacketSize == 0)
-                        Flush();
-                    continue;
                 }
-                if (!LevelObjectUtil.CheckDeletePermission(obj.instanceID))
+                else if (!LevelObjectUtil.CheckDeletePermission(LevelObjectUtil.GetObjectUnsafe(id).instanceID))
                 {
-                    UIMessage.SendNoPermissionMessage(VanillaPermissions.RemoveSavedObjects);
+                    UIMessage.SendNoPermissionMessage(VanillaPermissions.RemoveUnownedObjects);
                     return false;
                 }
-                objects.Add(obj.instanceID);
-                if (i > 0 && i % LevelObjectUtil.MaxDeletePacketSize == 0)
+
+                netIds.Add(netId);
+                if (netIds.Count % LevelObjectUtil.MaxDeletePacketSize == 0)
                     Flush();
             }
 
@@ -678,27 +606,20 @@ internal static class LevelObjectPatches
             void Flush()
             {
                 if (ClientEvents.ListeningOnDeleteLevelObjects)
-                    ClientEvents.InvokeOnDeleteLevelObjects(new DeleteLevelObjectsProperties(objects.ToArrayFast(), buildables.ToArrayFast(), dt));
+                    ClientEvents.InvokeOnDeleteLevelObjects(new DeleteLevelObjectsProperties(netIds.ToArrayFast(), dt));
 
-                if (ClientEvents.ListeningOnDeleteObject)
+                if (ClientEvents.ListeningOnDeleteLevelObject)
                 {
-                    for (int i = 0; i < objects.Count; ++i)
-                        ClientEvents.InvokeOnDeleteObject(new DeleteObjectProperties(objects[i], dt));
-                }
-                if (ClientEvents.ListeningOnDeleteBuildable)
-                {
-                    for (int i = 0; i < buildables.Count; ++i)
-                        ClientEvents.InvokeOnDeleteBuildable(new DeleteBuildableProperties(buildables[i], dt));
+                    for (int i = 0; i < netIds.Count; ++i)
+                        ClientEvents.InvokeOnDeleteLevelObject(new DeleteLevelObjectProperties(netIds[i], dt));
                 }
 
-                objects.Clear();
-                buildables.Clear();
+                netIds.Clear();
             }
         }
         finally
         {
-            ListPool<RegionIdentifier>.release(buildables);
-            ListPool<uint>.release(objects);
+            ListPool<NetId>.release(netIds);
         }
 
         return true;
@@ -771,14 +692,14 @@ internal static class LevelObjectPatches
                 if (!LevelObjectUtil.TryFindBuildable(selection[i].transform, out RegionIdentifier id) ||
                     !LevelObjectUtil.CheckMoveBuildablePermission(id))
                 {
-                    UIMessage.SendNoPermissionMessage(VanillaPermissions.RemoveSavedObjects);
+                    UIMessage.SendNoPermissionMessage(VanillaPermissions.RemoveUnownedObjects);
                     return false;
                 }
                 continue;
             }
             if (!LevelObjectUtil.CheckMovePermission(obj.instanceID))
             {
-                UIMessage.SendNoPermissionMessage(VanillaPermissions.RemoveSavedObjects);
+                UIMessage.SendNoPermissionMessage(VanillaPermissions.RemoveUnownedObjects);
                 return false;
             }
         }
@@ -786,7 +707,7 @@ internal static class LevelObjectPatches
         Logger.LogDebug($"[{Source}] Can move.");
         return true;
     }
-    private static void PreIsPasteingTransform()
+    private static void PreIsFinalExternallyTransforming()
     {
         if (!DevkitServerModule.IsEditing || LevelObjectUtil.EditorObjectSelection.Count <= 1)
             return;
@@ -802,50 +723,190 @@ internal static class LevelObjectPatches
 
         EditorSelection selection = LevelObjectUtil.EditorObjectSelection[0];
         Transform transform = selection.transform;
-        LevelObject? obj = LevelObjectUtil.FindObject(transform);
-        TransformationDelta delta = new TransformationDelta(TransformationDelta.TransformFlags.All, transform.position, transform.rotation, selection.fromPosition, selection.fromRotation);
+
+        if (!NetIdRegistry.GetTransformNetId(transform, out NetId netId, out _))
+            return;
+
         Vector3 scale = transform.localScale;
         bool useScale = scale.IsNearlyEqual(selection.fromScale);
+
+        FinalTransformation transformation = new FinalTransformation(netId,
+            new TransformationDelta(TransformationDelta.TransformFlags.All, transform.position, transform.rotation,
+                selection.fromPosition, selection.fromRotation), scale, selection.fromScale);
+
         float dt = CachedTime.DeltaTime;
-        if (obj == null)
+
+        if (ClientEvents.ListeningOnMoveLevelObjectsFinal)
+            ClientEvents.InvokeOnMoveLevelObjectsFinal(new MoveLevelObjectsFinalProperties(new FinalTransformation[] { transformation }, useScale, dt));
+
+        if (ClientEvents.ListeningOnMoveLevelObjectFinal)
+            ClientEvents.InvokeOnMoveLevelObjectFinal(new MoveLevelObjectFinalProperties(transformation, useScale, dt));
+    }
+#endif
+    [HarmonyPatch(typeof(LevelObjects), nameof(LevelObjects.transformObject))]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    private static bool LevelObjectsTransformObjectPrefix(Transform select,
+        Vector3 toPosition, Quaternion toRotation, Vector3 toScale,
+        Vector3 fromPosition, Quaternion fromRotation, Vector3 fromScale,
+        out RegionIdentifier __state)
+    {
+        if (!LevelObjectUtil.TryFindObject(select, out __state) && !LevelObjectUtil.TryFindBuildable(select, out __state))
         {
-            if (!LevelObjectUtil.TryFindBuildable(transform, delta.OriginalPosition, out RegionIdentifier id) || LevelObjectUtil.GetBuildable(id) is not { } buildable)
-                return;
-            
-            if (Regions.tryGetCoordinate(delta.OriginalPosition, out byte x, out byte y) &&
-                !id.IsSameRegionAs(x, y) && ClientEvents.ListeningOnDeleteLevelObjects)
+            __state = RegionIdentifier.Invalid;
+            return false;
+        }
+
+        return true;
+    }
+
+    [HarmonyPatch(typeof(LevelObjects), nameof(LevelObjects.transformObject))]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void LevelObjectsTransformObjectPostfix(Transform select,
+        Vector3 toPosition, Quaternion toRotation, Vector3 toScale,
+        Vector3 fromPosition, Quaternion fromRotation, Vector3 fromScale,
+        RegionIdentifier __state)
+    {
+        if (__state.IsInvalid)
+            return;
+        if (!Regions.tryGetCoordinate(fromPosition, out byte fromX, out byte fromY) || !Regions.tryGetCoordinate(toPosition, out byte toX, out byte toY))
+            return;
+
+        if (!LevelObjectUtil.TryFindObject(select, out RegionIdentifier toId))
+        {
+            if (LevelObjectUtil.TryFindBuildable(select, out toId))
             {
-                EditorObjects.removeSelection(transform);
-                LevelObjects.registerRemoveObject(transform);
-                ClientEvents.InvokeOnDeleteLevelObjects(new DeleteLevelObjectsProperties(Array.Empty<uint>(), new RegionIdentifier[] { id }, dt));
-                LevelObjectUtil.ClientInstantiateObjectsAndLock(new EditorCopy[] { new EditorCopy(delta.Position, delta.Rotation, transform.localScale, null, buildable.asset) });
-                Logger.LogDebug("[CLIENT EVENTS] Replacing a buildable that was moved into a different region.");
-                return;
+                LevelBuildableObject buildable = LevelObjectUtil.GetBuildableUnsafe(toId);
+                if (toX != fromX || toY != fromY)
+                {
+                    Logger.LogDebug($"Buildable moved regions: {__state.Format()} -> {toId.Format()}.");
+                    LevelObjectUtil.EventOnBuildableRegionUpdated.TryInvoke(buildable, __state, toId);
+                }
+
+                LevelObjectUtil.EventOnBuildableMoved.TryInvoke(buildable, fromPosition, fromRotation, fromScale, toPosition, toRotation, toScale);
             }
 
-            if (ClientEvents.ListeningOnMoveBuildableFinal)
-            {
-                ClientEvents.InvokeOnMoveBuildableFinal(new MoveBuildableFinalProperties(id, delta, scale, selection.fromScale, useScale, dt));
-            }
-            if (ClientEvents.ListeningOnMoveLevelObjectsFinal)
-            {
-                ClientEvents.InvokeOnMoveLevelObjectsFinal(new MoveLevelObjectsFinalProperties(Array.Empty<uint>(), Array.Empty<TransformationDelta>(), null, null,
-                    new RegionIdentifier[] { id }, new TransformationDelta[] { delta },
-                    useScale ? new Vector3[] { scale } : null, useScale ? new Vector3[] { selection.fromScale } : null, dt));
-            }
             return;
         }
 
-        if (ClientEvents.ListeningOnMoveObjectFinal)
+        LevelObject obj = LevelObjectUtil.GetObjectUnsafe(toId);
+        if (toX != fromX || toY != fromY)
         {
-            ClientEvents.InvokeOnMoveObjectFinal(new MoveObjectFinalProperties(obj.instanceID, delta, scale, selection.fromScale, useScale, dt));
+            Logger.LogDebug($"Object moved regions: {__state.Format()} -> {toId.Format()}.");
+            LevelObjectUtil.EventOnLevelObjectRegionUpdated.TryInvoke(obj, __state, toId);
         }
-        if (ClientEvents.ListeningOnMoveLevelObjectsFinal)
+
+        LevelObjectUtil.EventOnLevelObjectMoved.TryInvoke(obj, fromPosition, fromRotation, fromScale, toPosition, toRotation, toScale);
+    }
+    [HarmonyPatch(typeof(LevelObjects), nameof(LevelObjects.removeBuildable))]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    private static IEnumerable<CodeInstruction> LevelObjectsRemoveBuildableTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
+    {
+        MethodInfo? destroyMethod = typeof(LevelBuildableObject).GetMethod(nameof(LevelBuildableObject.destroy), BindingFlags.Instance | BindingFlags.Public, null, Array.Empty<Type>(), null);
+        if (destroyMethod == null)
         {
-            ClientEvents.InvokeOnMoveLevelObjectsFinal(new MoveLevelObjectsFinalProperties(new uint[] { obj.instanceID }, new TransformationDelta[] { delta },
-                useScale ? new Vector3[] { scale } : null, useScale ? new Vector3[] { selection.fromScale } : null,
-                Array.Empty<RegionIdentifier>(), Array.Empty<TransformationDelta>(), null, null, dt));
+            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelBuildableObject.destroy.", method: Source);
+            DevkitServerModule.Fault();
+        }
+        MethodInfo? removeAtMethod = typeof(List<LevelBuildableObject>).GetMethod(nameof(List<LevelBuildableObject>.RemoveAt), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int) }, null);
+        if (removeAtMethod == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find method: List<LevelBuildableObject>.RemoveAt.", method: Source);
+            DevkitServerModule.Fault();
+        }
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        TranspileRemoveObject(ins, generator, method, destroyMethod, removeAtMethod, new Action<LevelBuildableObject, byte, byte, int>(BuildableRemovedInvoker).Method);
+        return ins;
+    }
+    [HarmonyPatch(typeof(LevelObjects), nameof(LevelObjects.removeObject))]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    private static IEnumerable<CodeInstruction> LevelObjectsRemoveObjectsTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
+    {
+        MethodInfo? destroyMethod = typeof(LevelObject).GetMethod(nameof(LevelObject.destroy), BindingFlags.Instance | BindingFlags.Public, null, Array.Empty<Type>(), null);
+        if (destroyMethod == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelObject.destroy.", method: Source);
+            DevkitServerModule.Fault();
+        }
+        MethodInfo? removeAtMethod = typeof(List<LevelObject>).GetMethod(nameof(List<LevelObject>.RemoveAt), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int) }, null);
+        if (removeAtMethod == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find method: List<LevelObject>.RemoveAt.", method: Source);
+            DevkitServerModule.Fault();
+        }
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        TranspileRemoveObject(ins, generator, method, destroyMethod, removeAtMethod, new Action<LevelObject, byte, byte, int>(ObjectRemovedInvoker).Method);
+        return ins;
+    }
+    private static void TranspileRemoveObject(List<CodeInstruction> ins, ILGenerator generator, MethodBase method, MethodInfo? destroyMethod, MethodInfo? removeAtMethod, MethodInfo invoker)
+    {
+        LocalBuilder lcl = generator.DeclareLocal(typeof(LevelBuildableObject));
+        bool destroyPatch = false;
+        bool removePatch = false;
+        for (int i = 0; i < ins.Count; ++i)
+        {
+            if (destroyMethod != null && ins[i].Calls(destroyMethod))
+            {
+                ins.Insert(i, new CodeInstruction(OpCodes.Dup));
+                ins.Insert(i + 1, PatchUtil.GetLocalCodeInstruction(lcl, -1, true, false));
+                i += 2;
+                destroyPatch = true;
+            }
+            else if (destroyPatch && removeAtMethod != null && ins[i].Calls(removeAtMethod))
+            {
+                int lclIndex = -1, lclX = -1, lclY = -1, ct = -1;
+                LocalBuilder? lclIndexB = null, lclXB = null, lclYB = null;
+                for (int j = i - 1; j >= 0; --j)
+                {
+                    int index = PatchUtil.GetLocalIndex(ins[j], false);
+                    if (index == -1) continue;
+                    switch (++ct)
+                    {
+                        case 0:
+                            lclIndex = index;
+                            lclIndexB = ins[j].operand as LocalBuilder;
+                            break;
+                        case 1:
+                            lclY = index;
+                            lclYB = ins[j].operand as LocalBuilder;
+                            break;
+                        case 2:
+                            lclX = index;
+                            lclXB = ins[j].operand as LocalBuilder;
+                            break;
+                    }
+
+                    if (ct >= 2)
+                        break;
+                }
+                ins.Insert(i + 1, PatchUtil.GetLocalCodeInstruction(lcl, -1, false, false));
+                ins.Insert(i + 2, PatchUtil.GetLocalCodeInstruction(lclXB, lclX, false, false));
+                ins.Insert(i + 3, PatchUtil.GetLocalCodeInstruction(lclYB, lclY, false, false));
+                ins.Insert(i + 4, PatchUtil.GetLocalCodeInstruction(lclIndexB, lclIndex, false, false));
+                ins.Insert(i + 5, new CodeInstruction(OpCodes.Call, invoker));
+                removePatch = true;
+                break;
+            }
+        }
+        if (!removePatch)
+        {
+            Logger.LogWarning($"Unable to patch in an event in {method.Format()}.", method: Source);
+            DevkitServerModule.Fault();
         }
     }
+    private static void BuildableRemovedInvoker(LevelBuildableObject buildable, byte x, byte y, int index)
+    {
+        RegionIdentifier id = new RegionIdentifier(x, y, index);
+        LevelObjectUtil.EventOnBuildableRemoved.TryInvoke(buildable, id);
+        Logger.LogDebug($"Buildable removed: {id.Format()}.");
+    }
+    private static void ObjectRemovedInvoker(LevelObject levelObject, byte x, byte y, int index)
+    {
+        RegionIdentifier id = new RegionIdentifier(x, y, index);
+        LevelObjectUtil.EventOnLevelObjectRemoved.TryInvoke(levelObject, id);
+        Logger.LogDebug($"Object removed: {id.Format()}.");
+    }
 }
-#endif

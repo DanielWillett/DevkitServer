@@ -38,15 +38,15 @@ public static class VanillaPermissions
     [Permission]
     public static readonly Permission PlaceObjects = new Permission("hierarchy.objects.place", core: true);
     [Permission]
-    public static readonly Permission RemoveSavedObjects = new Permission("hierarchy.objects.remove", core: true);
+    public static readonly Permission RemoveUnownedObjects = new Permission("hierarchy.objects.remove", core: true);
     [Permission]
-    public static readonly Permission MoveSavedObjects = new Permission("hierarchy.objects.transform", core: true);
+    public static readonly Permission MoveUnownedObjects = new Permission("hierarchy.objects.transform", core: true);
     [Permission]
     public static readonly Permission PlaceVolumes = new Permission("hierarchy.volumes.place", core: true);
     [Permission]
-    public static readonly Permission RemoveSavedVolumes = new Permission("hierarchy.volumes.remove", core: true);
+    public static readonly Permission RemoveUnownedVolumes = new Permission("hierarchy.volumes.remove", core: true);
     [Permission]
-    public static readonly Permission MoveSavedVolumes = new Permission("hierarchy.volumes.transform", core: true);
+    public static readonly Permission MoveUnownedVolumes = new Permission("hierarchy.volumes.transform", core: true);
     [Permission]
     public static readonly Permission EditVolumes = new Permission("hierarchy.volumes.*", core: true);
     [Permission]
@@ -54,17 +54,17 @@ public static class VanillaPermissions
     [Permission]
     public static readonly Permission PlaceCartographyVolumes = new Permission("hierarchy.cartography.volumes.place", core: true);
     [Permission]
-    public static readonly Permission RemoveSavedCartographyVolumes = new Permission("hierarchy.cartography.remove", core: true);
+    public static readonly Permission RemoveUnownedCartographyVolumes = new Permission("hierarchy.cartography.remove", core: true);
     [Permission]
-    public static readonly Permission MoveSavedCartographyVolumes = new Permission("hierarchy.cartography.transform", core: true);
+    public static readonly Permission MoveUnownedCartographyVolumes = new Permission("hierarchy.cartography.transform", core: true);
     [Permission]
     public static readonly Permission EditCartographyVolumes = new Permission("hierarchy.cartography.*", core: true);
     [Permission]
     public static readonly Permission PlaceNodes = new Permission("hierarchy.nodes.place", core: true);
     [Permission]
-    public static readonly Permission RemoveSavedNodes = new Permission("hierarchy.nodes.remove", core: true);
+    public static readonly Permission RemoveUnownedNodes = new Permission("hierarchy.nodes.remove", core: true);
     [Permission]
-    public static readonly Permission MoveSavedNodes = new Permission("hierarchy.nodes.transform", core: true);
+    public static readonly Permission MoveUnownedNodes = new Permission("hierarchy.nodes.transform", core: true);
     [Permission]
     public static readonly Permission EditNodes = new Permission("hierarchy.nodes.*", core: true);
 

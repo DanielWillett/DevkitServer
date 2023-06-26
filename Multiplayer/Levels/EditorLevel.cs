@@ -58,8 +58,6 @@ public static class EditorLevel
     // i used an exit flag here because the finally block is not executed when calling StopCoroutine (Dispose is not called)
     private static bool _exitCoroutine;
 
-    private static readonly ByteWriter LevelWriter = new ByteWriter(false, 134217728); // 128 MiB
-
     [NetCall(NetCallSource.FromClient, (ushort)NetCalls.RequestLevel)]
     private static StandardErrorCode ReceiveLevelRequest(MessageContext ctx)
     {
@@ -88,11 +86,8 @@ public static class EditorLevel
         try
         {
             _lvl = LevelData.GatherLevelData();
-            Folder folder = _lvl.LevelFolderContent;
-            Folder.Write(LevelWriter, in folder);
-            byte[] data = LevelWriter.ToArray();
-            _lvl.Data = data;
-            LevelWriter.FinishWrite();
+            _lvl.WriteToData();
+            byte[] data = _lvl.Data;
             int size1 = data.Length;
             _lvl.Compressed = false;
 
@@ -397,9 +392,10 @@ public static class EditorLevel
     }
 #endif
 #if CLIENT
-    private static readonly ByteReader LevelReader = new ByteReader { ThrowOnError = true };
     private static readonly Func<string, bool, ulong, LevelInfo?> LoadLevelInfo =
         Accessor.GenerateStaticCaller<Level, Func<string, bool, ulong, LevelInfo?>>("loadLevelInfo", new Type[] { typeof(string), typeof(bool), typeof(ulong) }, true)!;
+
+    internal static LevelData? ServerPendingLevelData;
 
     private static byte[][]? _pendingLevel;
     private static bool _hs;
@@ -425,7 +421,11 @@ public static class EditorLevel
             yield return new WaitForSeconds(0.1f);
             task = SendRequestLevel.RequestAck(3000);
             if (TemporaryEditorActions.Instance == null)
+            {
                 _ = new TemporaryEditorActions();
+                EditorActions.HasProcessedPendingHierarchyObjects = false;
+                EditorActions.HasProcessedPendingLevelObjects = false;
+            }
             Logger.LogDebug("[RECEIVE LEVEL] Sent level request.", ConsoleColor.DarkCyan);
             yield return task;
         }
@@ -715,8 +715,8 @@ public static class EditorLevel
         yield return null;
 #endif
         Logger.LogDebug("[RECEIVE LEVEL] Reading level folder.");
-        LevelReader.LoadNew(payload);
-        Folder folder = Folder.Read(LevelReader);
+        ServerPendingLevelData = LevelData.Read(payload);
+        Folder folder = ServerPendingLevelData.LevelFolderContent;
         Logger.LogDebug("[RECEIVE LEVEL] Writing level folder.");
         folder.WriteContentsToDisk(dir);
         LoadingUI.NotifyDownloadProgress(1f);

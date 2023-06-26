@@ -3,13 +3,14 @@ using DevkitServer.Core.Permissions;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
-using JetBrains.Annotations;
-using System.Reflection;
+using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Players.UI;
+using JetBrains.Annotations;
 #if CLIENT
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Patches;
 using DevkitServer.Players;
+using System.Reflection;
 using Action = System.Action;
 #endif
 #if SERVER
@@ -23,11 +24,50 @@ public static class LevelObjectUtil
 
     public static readonly int MaxDeletePacketSize = 64;
     public static readonly int MaxMovePacketSize = 32;
+    public static readonly int MaxMovePreviewSelectionSize = 8;
     public static readonly int MaxCopySelectionSize = 64;
 
+    internal static CachedMulticastEvent<BuildableRegionUpdated> EventOnBuildableRegionUpdated = new CachedMulticastEvent<BuildableRegionUpdated>(typeof(LevelObjectUtil), nameof(OnBuildableRegionUpdated));
+    internal static CachedMulticastEvent<LevelObjectRegionUpdated> EventOnLevelObjectRegionUpdated = new CachedMulticastEvent<LevelObjectRegionUpdated>(typeof(LevelObjectUtil), nameof(OnLevelObjectRegionUpdated));
+    
+    internal static CachedMulticastEvent<BuildableMoved> EventOnBuildableMoved = new CachedMulticastEvent<BuildableMoved>(typeof(LevelObjectUtil), nameof(OnBuildableMoved));
+    internal static CachedMulticastEvent<LevelObjectMoved> EventOnLevelObjectMoved = new CachedMulticastEvent<LevelObjectMoved>(typeof(LevelObjectUtil), nameof(OnLevelObjectMoved));
+    
+    internal static CachedMulticastEvent<BuildableRemoved> EventOnBuildableRemoved = new CachedMulticastEvent<BuildableRemoved>(typeof(LevelObjectUtil), nameof(OnBuildableRemoved));
+    internal static CachedMulticastEvent<LevelObjectRemoved> EventOnLevelObjectRemoved = new CachedMulticastEvent<LevelObjectRemoved>(typeof(LevelObjectUtil), nameof(OnLevelObjectRemoved));
+
+    public static event BuildableRegionUpdated OnBuildableRegionUpdated
+    {
+        add => EventOnBuildableRegionUpdated.Add(value);
+        remove => EventOnBuildableRegionUpdated.Remove(value);
+    }
+    public static event LevelObjectRegionUpdated OnLevelObjectRegionUpdated
+    {
+        add => EventOnLevelObjectRegionUpdated.Add(value);
+        remove => EventOnLevelObjectRegionUpdated.Remove(value);
+    }
+    public static event BuildableMoved OnBuildableMoved
+    {
+        add => EventOnBuildableMoved.Add(value);
+        remove => EventOnBuildableMoved.Remove(value);
+    }
+    public static event LevelObjectMoved OnLevelObjectMoved
+    {
+        add => EventOnLevelObjectMoved.Add(value);
+        remove => EventOnLevelObjectMoved.Remove(value);
+    }
+    public static event BuildableRemoved OnBuildableRemoved
+    {
+        add => EventOnBuildableRemoved.Add(value);
+        remove => EventOnBuildableRemoved.Remove(value);
+    }
+    public static event LevelObjectRemoved OnLevelObjectRemoved
+    {
+        add => EventOnLevelObjectRemoved.Add(value);
+        remove => EventOnLevelObjectRemoved.Remove(value);
+    }
+
 #if CLIENT
-    private static readonly StaticSetter<uint>? SetNextInstanceId = Accessor.GenerateStaticSetter<LevelObjects, uint>("availableInstanceID");
-    private static readonly StaticGetter<uint>? GetNextInstanceId = Accessor.GenerateStaticGetter<LevelObjects, uint>("availableInstanceID");
     private static readonly Action? CallClearSelection = Accessor.GenerateStaticCaller<EditorObjects, Action>("clearSelection");
 #endif
 
@@ -35,26 +75,8 @@ public static class LevelObjectUtil
     private static readonly NetCall<Guid, Vector3, Quaternion, Vector3> SendRequestInstantiation = new NetCall<Guid, Vector3, Quaternion, Vector3>(NetCalls.RequestLevelObjectInstantiation);
 
     [UsedImplicitly]
-    private static readonly NetCall<Guid, uint, Vector3, Quaternion, Vector3, ulong> SendObjectInstantiation = new NetCall<Guid, uint, Vector3, Quaternion, Vector3, ulong>(NetCalls.SendLevelObjectInstantiation);
+    private static readonly NetCall<Guid, Vector3, Quaternion, Vector3, ulong, NetId> SendLevelObjectInstantiation = new NetCall<Guid, Vector3, Quaternion, Vector3, ulong, NetId>(NetCalls.SendLevelObjectInstantiation);
 
-    [UsedImplicitly]
-    private static readonly NetCall<Guid, RegionIdentifier, Vector3, Quaternion, Vector3, ulong> SendBuildableInstantiation = new NetCall<Guid, RegionIdentifier, Vector3, Quaternion, Vector3, ulong>(NetCalls.SendLevelBuildableObjectInstantiation);
-
-
-    private static readonly Func<byte, byte, ushort, NetId>? GetTreeNetIdImpl =
-        Accessor.GenerateStaticCaller<Func<byte, byte, ushort, NetId>>(Accessor.AssemblyCSharp
-            .GetType("SDG.Unturned.LevelNetIdRegistry", false, false)?
-            .GetMethod("GetTreeNetId", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!);
-
-    private static readonly Func<byte, byte, ushort, NetId>? GetRegularObjectNetIdImpl =
-        Accessor.GenerateStaticCaller<Func<byte, byte, ushort, NetId>>(Accessor.AssemblyCSharp
-            .GetType("SDG.Unturned.LevelNetIdRegistry", false, false)?
-            .GetMethod("GetRegularObjectNetId", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!);
-
-    private static readonly Func<uint, NetId>? GetDevkitObjectNetIdImpl =
-        Accessor.GenerateStaticCaller<Func<uint, NetId>>(Accessor.AssemblyCSharp
-            .GetType("SDG.Unturned.LevelNetIdRegistry", false, false)?
-            .GetMethod("GetDevkitObjectNetId", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!);
 
 #if CLIENT
     private static readonly Action<CullingVolume>? ClearCullingVolumeObjects =
@@ -81,171 +103,70 @@ public static class LevelObjectUtil
     {
         SendRequestInstantiation.Invoke(asset, position, rotation, scale);
     }
-    // todo queue in TemporaryActions if joining
+
     [NetCall(NetCallSource.FromServer, NetCalls.SendLevelObjectInstantiation)]
-    internal static StandardErrorCode ReceiveInstantiation(MessageContext ctx, Guid asset, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner)
+    internal static StandardErrorCode ReceiveInstantiation(MessageContext ctx, Guid asset, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
     {
         if (Assets.find(asset) is not ObjectAsset objAsset)
         {
-            Logger.LogError($"Asset not found for incoming object: {asset.Format()}.", method: Source);
-            if (SetNextInstanceId != null && GetNextInstanceId != null)
+            if (Assets.find(asset) is not ItemAsset itemAsset || itemAsset is not ItemBarricadeAsset and not ItemStructureAsset)
             {
-                // make sure nothing will take this instance ID.
-                if (GetNextInstanceId() <= instanceId)
-                    SetNextInstanceId(instanceId + 1);
+                Logger.LogError($"Asset not found for incoming object: {asset.Format()}.", method: Source);
+                return StandardErrorCode.InvalidData;
+            }
+            if (!EditorActions.HasProcessedPendingLevelObjects)
+            {
+                EditorActions.TemporaryEditorActions?.QueueInstantiation(itemAsset, position, rotation, scale, owner, netId);
+                return StandardErrorCode.Success;
             }
 
-            return StandardErrorCode.InvalidData;
-        }
+            try
+            {
+                Transform? newBuildable = LevelObjects.addBuildable(position, rotation, itemAsset.id);
+                if (newBuildable == null)
+                    return StandardErrorCode.GenericError;
 
-        uint revertInstanceId = uint.MaxValue;
-        if (SetNextInstanceId != null && GetNextInstanceId != null)
+                InitializeBuildable(newBuildable, out RegionIdentifier id, netId);
+
+                if (owner == Provider.client.m_SteamID)
+                    BuildableResponsibilities.Set(id, true, false);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to initialize buildable: {asset.Format()}.", method: Source);
+                Logger.LogError(ex, method: Source);
+                return StandardErrorCode.GenericError;
+            }
+
+            return StandardErrorCode.Success;
+        }
+        if (!EditorActions.HasProcessedPendingLevelObjects)
         {
-            uint nextInstanceId = GetNextInstanceId();
-            if (nextInstanceId < instanceId)
-                SetNextInstanceId(instanceId);
-            else if (nextInstanceId > instanceId)
-            {
-                if (nextInstanceId != instanceId + 1)
-                    revertInstanceId = nextInstanceId;
-                SetNextInstanceId(instanceId);
-                LevelObject? existing = FindObject(position, instanceId);
-                if (existing != null)
-                {
-                    LevelObjects.removeObject(existing.transform);
-                    Logger.LogWarning($"Instance ID taken by {existing.asset.objectName.Format()}: {instanceId.Format()}, replacing existing object.", method: Source);
-                }
-            }
+            EditorActions.TemporaryEditorActions?.QueueInstantiation(objAsset, position, rotation, scale, owner, netId);
+            return StandardErrorCode.Success;
         }
 
-        LevelObject? lvlObject;
         try
         {
             Transform newObject = LevelObjects.registerAddObject(position, rotation, scale, objAsset, null);
             if (newObject == null)
                 return StandardErrorCode.GenericError;
-            
-            InitializeLevelObject(newObject, out lvlObject);
+
+            InitializeLevelObject(newObject, out LevelObject? lvlObject, netId);
             if (lvlObject == null)
                 return StandardErrorCode.GenericError;
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Failed to initialize object: {objAsset.objectName.Format()} {asset.Format()}.", method: Source);
-            Logger.LogError(ex, method: Source);
-            return StandardErrorCode.GenericError;
-        }
-        finally
-        {
-            if (revertInstanceId != uint.MaxValue)
-                SetNextInstanceId!(revertInstanceId);
-        }
-
-        if (owner == Provider.client.m_SteamID)
-            LevelObjectResponsibilities.Set(lvlObject.instanceID);
-
-        return StandardErrorCode.Success;
-    }
-    [NetCall(NetCallSource.FromServer, NetCalls.SendLevelBuildableObjectInstantiation)]
-    private static StandardErrorCode ReceiveBuildableInstantiation(MessageContext ctx, Guid asset, RegionIdentifier regionIdentifier, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner)
-    {
-        if (Assets.find(asset) is not ItemAsset buildableAsset || buildableAsset is not ItemBarricadeAsset and not ItemStructureAsset)
-        {
-            Logger.LogError($"Asset not found for incoming buildable: {asset.Format()}.", method: Source);
-            return StandardErrorCode.InvalidData;
-        }
-
-        try
-        {
-            Transform? newBuildable = LevelObjects.addBuildable(position, rotation, buildableAsset.id);
-            if (newBuildable == null)
-                return StandardErrorCode.GenericError;
-
-            InitializeBuildable(newBuildable, out LevelBuildableObject? buildable, out RegionIdentifier id);
-            if (buildable != null && regionIdentifier != id)
-            {
-                if (regionIdentifier.IsSameRegionAs(id))
-                {
-                    List<LevelBuildableObject> buildables = LevelObjects.buildables[id.X, id.Y];
-                    LevelBuildableObject newObj = buildables[id.Index];
-                    buildables.RemoveAt(id.Index);
-                    Logger.LogWarning($"Inconsistant region index, expected: # {regionIdentifier.Index.Format()}, actual: # {id.Index.Format()}.", method: Source);
-                    if (id.Index < regionIdentifier.Index)
-                    {
-                        Logger.LogWarning($"Index not occupied: {regionIdentifier.Index.Format()}.", method: Source);
-                        Vector3 pos = new Vector3(0f, -1024f, 0f);
-                        for (int i = id.Index; i < regionIdentifier.Index; ++i)
-                        {
-                            Logger.LogWarning($" Adding filler buildable @ {pos.Format()}.", method: Source);
-                            LevelObjects.addBuildable(pos, Quaternion.identity, 0);
-                        }
-
-                        if (buildables.Count != regionIdentifier.Index)
-                            Logger.LogError($" Unable to fill to index: {regionIdentifier.Index.Format()}.", method: Source);
-                        
-                        buildables.Add(newObj);
-                    }
-                    else
-                    {
-                        LevelObjects.removeBuildable(GetBuildable(regionIdentifier)!.transform);
-                        LevelBuildableObject oldObj = buildables[regionIdentifier.Index];
-                        buildables[regionIdentifier.Index] = newObj;
-                        Logger.LogWarning($"Index taken by {oldObj.asset.itemName.Format()}: {regionIdentifier.Index.Format()}, replacing existing object.", method: Source);
-                        buildables.Add(oldObj);
-                        RegionIdentifier oldId = new RegionIdentifier(regionIdentifier.X, regionIdentifier.Y, (ushort)(buildables.Count - 1));
-                        BuildableResponsibilities.Set(oldId, BuildableResponsibilities.IsPlacer(oldId));
-                    }
-                }
-                else
-                {
-                    List<LevelBuildableObject> buildables = LevelObjects.buildables[id.X, id.Y];
-                    LevelBuildableObject newObj = buildables[id.Index];
-                    buildables.RemoveAt(id.Index);
-                    buildables = LevelObjects.buildables[regionIdentifier.X, regionIdentifier.Y];
-                    Logger.LogWarning($"Inconsistant region identifier, expected: {regionIdentifier.Format()}, actual: {id.Format()}.", method: Source);
-                    if (buildables.Count == regionIdentifier.Index)
-                    {
-                        buildables.Add(newObj);
-                        Logger.LogInfo($"[{Source}]  Moved to new region successfully");
-                    }
-                    else if (id.Index < regionIdentifier.Index)
-                    {
-                        Logger.LogWarning($" Index not occupied: {regionIdentifier.Index.Format()}.", method: Source);
-                        Vector3 pos = new Vector3(0f, -1024f, 0f);
-                        for (int i = id.Index; i < regionIdentifier.Index; ++i)
-                        {
-                            Logger.LogWarning($"  Adding filler buildable @ {pos.Format()}.", method: Source);
-                            LevelObjects.addBuildable(pos, Quaternion.identity, 0);
-                        }
-
-                        if (buildables.Count != regionIdentifier.Index)
-                            Logger.LogError($"  Unable to fill to index: {regionIdentifier.Index.Format()}.", method: Source);
-
-                        buildables.Add(newObj);
-                    }
-                    else
-                    {
-                        LevelObjects.removeBuildable(GetBuildable(regionIdentifier)!.transform);
-                        LevelBuildableObject oldObj = buildables[regionIdentifier.Index];
-                        buildables[regionIdentifier.Index] = newObj;
-                        Logger.LogWarning($" Index taken by {oldObj.asset.itemName.Format()}: {regionIdentifier.Index.Format()}, replacing existing object.", method: Source);
-                        buildables.Add(oldObj);
-                        RegionIdentifier oldId = new RegionIdentifier(regionIdentifier.X, regionIdentifier.Y, (ushort)(buildables.Count - 1));
-                        BuildableResponsibilities.Set(oldId, BuildableResponsibilities.IsPlacer(oldId));
-                    }
-                }
-            }
 
             if (owner == Provider.client.m_SteamID)
-                BuildableResponsibilities.Set(regionIdentifier, true);
-            return buildable != null ? StandardErrorCode.Success : StandardErrorCode.GenericError;
+                LevelObjectResponsibilities.Set(lvlObject.instanceID);
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Failed to initialize buildable: {buildableAsset.itemName.Format()} {asset.Format()}.", method: Source);
+            Logger.LogError($"Failed to initialize object: {asset.Format()}.", method: Source);
             Logger.LogError(ex, method: Source);
             return StandardErrorCode.GenericError;
         }
+
+        return StandardErrorCode.Success;
     }
     public static void ClearSelection()
     {
@@ -263,7 +184,7 @@ public static class LevelObjectUtil
     }
 #elif SERVER
     [NetCall(NetCallSource.FromClient, NetCalls.RequestLevelObjectInstantiation)]
-    public static void ReceiveLevelObjectInstantiation(MessageContext ctx, Guid asset, Vector3 position, Quaternion rotation, Vector3 scale)
+    public static void ReceiveLevelObjectInstantiation(MessageContext ctx, Guid guid, Vector3 position, Quaternion rotation, Vector3 scale)
     {
         EditorUser? user = ctx.GetCaller();
         if (user == null || !user.IsOnline)
@@ -272,20 +193,21 @@ public static class LevelObjectUtil
             return;
         }
 
-        if (!GetObjectOrBuildableAsset(asset, out ObjectAsset? objectAsset, out ItemAsset? buildableAsset))
+        if (!GetObjectOrBuildableAsset(guid, out ObjectAsset? objectAsset, out ItemAsset? buildableAsset))
         {
             Logger.LogError($"Unable to get asset for level object instantiation request from {user.Format()}.", method: Source);
-            UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", asset.ToString("N") + " Invalid Asset"));
+            UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", guid.ToString("N") + " Unknown Asset"));
             return;
         }
+        Asset asset = objectAsset ?? (Asset)buildableAsset!;
 
-        string displayName = objectAsset != null ? objectAsset.objectName : buildableAsset!.itemName;
         LevelObject? levelObject = null;
-        LevelBuildableObject? buildable = null;
-        RegionIdentifier id = RegionIdentifier.Invalid;
+        Transform transform;
+        RegionIdentifier id;
+        NetId netId;
         try
         {
-            Transform transform = LevelObjects.registerAddObject(position, rotation, scale, objectAsset, buildableAsset);
+            transform = LevelObjects.registerAddObject(position, rotation, scale, objectAsset, buildableAsset);
             if (transform == null)
             {
                 Logger.LogError($"Failed to create object: {(objectAsset ?? (Asset?)buildableAsset).Format()}, registerAddObject returned {((object?)null).Format()}.");
@@ -293,96 +215,96 @@ public static class LevelObjectUtil
             }
             
             if (objectAsset != null)
-                InitializeLevelObject(transform, out levelObject);
+            {
+                id = default;
+                InitializeLevelObject(transform, out levelObject, out netId);
+            }
             else
-                InitializeBuildable(transform, out buildable, out id);
+            {
+                InitializeBuildable(transform, out id, out netId);
+            }
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error instantiating {displayName.Format(false)}.", method: Source);
+            Logger.LogError($"Error instantiating {asset.Format()}.", method: Source);
             Logger.LogError(ex, method: Source);
             UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", ex.Message));
             return;
         }
+        
+        position = transform.position;
+        rotation = transform.rotation;
+        scale = transform.localScale;
+
+        PooledTransportConnectionList list;
+        if (!ctx.IsRequest)
+            list = DevkitServerUtility.GetAllConnections();
+        else
+        {
+            ctx.ReplyLayered(SendLevelObjectInstantiation, asset.GUID, position, rotation, scale, user.SteamId.m_SteamID, netId);
+            list = DevkitServerUtility.GetAllConnections(ctx.Connection);
+        }
+
+        SendLevelObjectInstantiation.Invoke(list, asset.GUID, position, rotation, scale, user.SteamId.m_SteamID, netId);
 
         if (levelObject != null)
         {
-            Transform? transform = levelObject.transform;
-            if (transform != null)
-            {
-                position = transform.position;
-                rotation = transform.rotation;
-                scale = transform.localScale;
-            }
-
             LevelObjectResponsibilities.Set(levelObject.instanceID, user.SteamId.m_SteamID);
-
-            PooledTransportConnectionList list;
-            if (ctx.IsRequest)
-            {
-                ctx.ReplyLayered(SendObjectInstantiation, levelObject.GUID, levelObject.instanceID, position, rotation, scale, user.SteamId.m_SteamID);
-                list = DevkitServerUtility.GetAllConnections(ctx.Connection);
-            }
-            else list = DevkitServerUtility.GetAllConnections();
-            SendObjectInstantiation.Invoke(list, levelObject.GUID, levelObject.instanceID, position, rotation, scale, user.SteamId.m_SteamID);
-            Logger.LogDebug($"[{Source}] Granted request for instantiation of {displayName.Format(false)} {levelObject.GUID.Format()}, instance ID: {levelObject.instanceID.Format()} from {user.SteamId.Format()}.");
+            Logger.LogDebug($"[{Source}] Granted request for instantiation of object {asset.Format()}, instance ID: {levelObject.instanceID.Format()} from {user.SteamId.Format()}.");
         }
-        else if (buildable != null)
+        else 
         {
-            Transform? transform = buildable.transform;
-            if (transform != null)
-            {
-                position = transform.position;
-                rotation = transform.rotation;
-                scale = transform.localScale;
-            }
-
-            PooledTransportConnectionList list;
-            if (ctx.IsRequest)
-            {
-                ctx.ReplyLayered(SendBuildableInstantiation, buildable.asset.GUID, id, position, rotation, scale, user.SteamId.m_SteamID);
-                list = DevkitServerUtility.GetAllConnections(ctx.Connection);
-            }
-            else list = DevkitServerUtility.GetAllConnections();
-            SendBuildableInstantiation.Invoke(list, buildable.asset.GUID, id, position, rotation, scale, user.SteamId.m_SteamID);
-            Logger.LogDebug($"[{Source}] Granted request for instantiation of buildable {displayName.Format(false)} {buildable.asset.GUID.Format()} from {user.SteamId.Format()}.");
-        }
-        else
-        {
-            Logger.LogError($"Failed to create {displayName.Format(false)} {asset.Format()}.", method: Source);
-            UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+            BuildableResponsibilities.Set(id, user.SteamId.m_SteamID);
+            Logger.LogDebug($"[{Source}] Granted request for instantiation of buildable {asset.Format()} {id.Format()} from {user.SteamId.Format()}.");
         }
     }
 #endif
-    private static void InitializeLevelObject(Transform transform, out LevelObject? levelObject)
+    private static void InitializeLevelObject(Transform transform, out LevelObject? levelObject,
+#if SERVER
+        out
+#endif
+            NetId netId)
     {
-        if (TryFindObject(transform, out RegionIdentifier id)
-            && (levelObject = ObjectManager.getObject(id.X, id.Y, id.Index)) != null)
+#if SERVER
+        netId = NetId.INVALID;
+#endif
+        if (TryFindObject(transform, out RegionIdentifier id))
         {
-            if (GetRegularObjectNetIdImpl == null)
-                return;
-
-            NetId netId = GetRegularObjectNetId(id);
-            if (netId.IsNull())
-                return;
-
-            NetIdRegistry.ReleaseTransform(NetId.INVALID, transform);
-            NetIdRegistry.AssignTransform(netId, transform);
-            Logger.LogDebug($"[{Source}] Assigned NetId: {netId.Format()}.");
+            levelObject = GetObjectUnsafe(id);
+#if SERVER
+            netId = LevelObjectNetIdDatabase.AddObject(levelObject);
+#else
+            LevelObjectNetIdDatabase.RegisterObject(levelObject, netId);
+#endif
+            Logger.LogDebug($"[{Source}] Assigned object NetId: {netId.Format()}.");
             return;
         }
 
         levelObject = null;
         Logger.LogWarning($"Did not find object of transform {transform.name.Format()}.", method: Source);
     }
-    private static void InitializeBuildable(Transform transform, out LevelBuildableObject? buildable, out RegionIdentifier id)
+    private static void InitializeBuildable(Transform transform, out RegionIdentifier id,
+#if SERVER
+        out
+#endif
+            NetId netId)
     {
+#if SERVER
+        netId = NetId.INVALID;
+#endif
         if (TryFindBuildable(transform, out id))
         {
-            if ((buildable = GetBuildable(id)) != null) return;
+            LevelBuildableObject buildable = GetBuildableUnsafe(id);
+#if SERVER
+            netId = LevelObjectNetIdDatabase.AddBuildable(buildable, id);
+#else
+            LevelObjectNetIdDatabase.RegisterBuildable(buildable, id, netId);
+#endif
+            Logger.LogDebug($"[{Source}] Assigned buildable NetId: {netId.Format()}.");
+            return;
         }
-
-        buildable = null;
+        
+        id = RegionIdentifier.Invalid;
         Logger.LogWarning($"Did not find buildable of transform {transform.name.Format()}.", method: Source);
     }
     public static bool GetObjectOrBuildableAsset(Guid guid, out ObjectAsset? @object, out ItemAsset? buildable)
@@ -810,7 +732,7 @@ public static class LevelObjectUtil
     public static bool CheckMovePermission(uint instanceId, ulong user)
     {
         return VanillaPermissions.EditObjects.Has(user, true) ||
-               VanillaPermissions.MoveSavedObjects.Has(user, false) ||
+               VanillaPermissions.MoveUnownedObjects.Has(user, false) ||
                VanillaPermissions.PlaceObjects.Has(user, false) &&
                LevelObjectResponsibilities.IsPlacer(instanceId, user);
     }
@@ -824,14 +746,14 @@ public static class LevelObjectUtil
     public static bool CheckDeletePermission(uint instanceId, ulong user)
     {
         return VanillaPermissions.EditObjects.Has(user, true) ||
-               VanillaPermissions.RemoveSavedObjects.Has(user, false) ||
+               VanillaPermissions.RemoveUnownedObjects.Has(user, false) ||
                VanillaPermissions.PlaceObjects.Has(user, false) && HierarchyResponsibilities.IsPlacer(instanceId, user);
     }
     [Pure]
     public static bool CheckMoveBuildablePermission(RegionIdentifier id, ulong user)
     {
         return VanillaPermissions.EditObjects.Has(user, true) ||
-               VanillaPermissions.MoveSavedObjects.Has(user, false) ||
+               VanillaPermissions.MoveUnownedObjects.Has(user, false) ||
                VanillaPermissions.PlaceObjects.Has(user, false) &&
                BuildableResponsibilities.IsPlacer(id, user);
     }
@@ -839,7 +761,7 @@ public static class LevelObjectUtil
     public static bool CheckDeleteBuildablePermission(RegionIdentifier id, ulong user)
     {
         return VanillaPermissions.EditObjects.Has(user, true) ||
-               VanillaPermissions.RemoveSavedObjects.Has(user, false) ||
+               VanillaPermissions.RemoveUnownedObjects.Has(user, false) ||
                VanillaPermissions.PlaceObjects.Has(user, false) &&
                BuildableResponsibilities.IsPlacer(id, user);
     }
@@ -848,7 +770,7 @@ public static class LevelObjectUtil
     public static bool CheckMovePermission(uint instanceId)
     {
         return VanillaPermissions.EditObjects.Has(true) ||
-               VanillaPermissions.MoveSavedObjects.Has(false) ||
+               VanillaPermissions.MoveUnownedObjects.Has(false) ||
                VanillaPermissions.PlaceObjects.Has(false) &&
                LevelObjectResponsibilities.IsPlacer(instanceId);
     }
@@ -862,14 +784,14 @@ public static class LevelObjectUtil
     public static bool CheckDeletePermission(uint instanceId)
     {
         return VanillaPermissions.EditObjects.Has(true) ||
-               VanillaPermissions.RemoveSavedObjects.Has(false) ||
+               VanillaPermissions.RemoveUnownedObjects.Has(false) ||
                VanillaPermissions.PlaceObjects.Has(false) && HierarchyResponsibilities.IsPlacer(instanceId);
     }
     [Pure]
     public static bool CheckMoveBuildablePermission(RegionIdentifier id)
     {
         return VanillaPermissions.EditObjects.Has(true) ||
-               VanillaPermissions.MoveSavedObjects.Has(false) ||
+               VanillaPermissions.MoveUnownedObjects.Has(false) ||
                VanillaPermissions.PlaceObjects.Has(false) &&
                BuildableResponsibilities.IsPlacer(id);
     }
@@ -877,19 +799,11 @@ public static class LevelObjectUtil
     public static bool CheckDeleteBuildablePermission(RegionIdentifier id)
     {
         return VanillaPermissions.EditObjects.Has(true) ||
-               VanillaPermissions.RemoveSavedObjects.Has(false) ||
+               VanillaPermissions.RemoveUnownedObjects.Has(false) ||
                VanillaPermissions.PlaceObjects.Has(false) &&
                BuildableResponsibilities.IsPlacer(id);
     }
 #endif
-    [Pure]
-    public static NetId GetTreeNetId(RegionIdentifier id) => GetTreeNetIdImpl == null ? NetId.INVALID : GetTreeNetIdImpl(id.X, id.Y, id.Index);
-    [Pure]
-    public static NetId GetRegularObjectNetId(RegionIdentifier id) => GetRegularObjectNetIdImpl == null ? NetId.INVALID : GetRegularObjectNetIdImpl(id.X, id.Y, id.Index);
-
-    [Pure]
-    [Obsolete("Devkit Objects are no longer used.")]
-    public static NetId GetDevkitObjectNetId(uint instanceId) => GetDevkitObjectNetIdImpl == null ? NetId.INVALID : GetDevkitObjectNetIdImpl(instanceId);
     [Pure]
     public static LevelBuildableObject? GetBuildable(RegionIdentifier id)
     {
@@ -898,6 +812,18 @@ public static class LevelObjectUtil
         List<LevelBuildableObject> buildables = LevelObjects.buildables[id.X, id.Y];
         return buildables.Count > id.Index ? buildables[id.Index] : null;
     }
+    [Pure]
+    public static LevelBuildableObject GetBuildableUnsafe(RegionIdentifier id) => LevelObjects.buildables[id.X, id.Y][id.Index];
+    [Pure]
+    public static LevelObject? GetObject(RegionIdentifier id)
+    {
+        if (id.X >= Regions.WORLD_SIZE || id.Y >= Regions.WORLD_SIZE)
+            return null;
+        List<LevelObject> objects = LevelObjects.objects[id.X, id.Y];
+        return objects.Count > id.Index ? objects[id.Index] : null;
+    }
+    [Pure]
+    public static LevelObject GetObjectUnsafe(RegionIdentifier id) => LevelObjects.objects[id.X, id.Y][id.Index];
     public static bool TryGetObjectOrBuildable(Transform transform, out LevelObject? @object, out LevelBuildableObject? buildable)
     {
         @object = null;
@@ -952,77 +878,40 @@ public static class LevelObjectUtil
         try
         {
             EditorUser? user = EditorUser.User;
-            if (user == null || user.Actions == null)
+            if (user == null)
                 yield break;
             for (int i = 0; i < copies.Length && DevkitServerModule.IsEditing && Level.isEditor; ++i)
             {
                 if (!user.IsOnline)
                     break;
                 EditorCopy copy = copies[i];
-                bool retry = false;
-                doRetry:
-                NetTask instantiateRequest;
-                bool buildable = false;
-                
-                if (copy.objectAsset != null)
-                {
-                    instantiateRequest = SendRequestInstantiation.Request(SendObjectInstantiation, copy.objectAsset.GUID, copy.position, copy.rotation, copy.scale, 5000);
-                    yield return instantiateRequest;
-                }
-                else if (copy.itemAsset != null)
-                {
-                    buildable = true;
-                    instantiateRequest = SendBuildableInstantiation.Listen(15000);
-                    // keeps in order with delete operations.
-                    user.Actions.QueueAction(new InstantiateLevelObjectAction
-                    {
-                        Asset = copy.itemAsset.GUID,
-                        Position = copy.position,
-                        Rotation = copy.rotation,
-                        Scale = copy.scale,
-                        DeltaTime = Time.deltaTime,
-                        RequestKey = instantiateRequest.requestId
-                    });
-                    yield return instantiateRequest;
-                }
-                else continue;
+                if (copy.itemAsset == null && copy.objectAsset == null)
+                    continue;
+                NetTask instantiateRequest = SendRequestInstantiation.Request(SendLevelObjectInstantiation,
+                    copy.objectAsset != null ? copy.objectAsset.GUID : copy.itemAsset!.GUID,
+                    copy.position, copy.rotation, copy.scale, 5000);
+
+                yield return instantiateRequest;
+
                 if (!user.IsOnline)
                     break;
+
                 if (!instantiateRequest.Parameters.Success)
                 {
-                    Logger.LogWarning($"Failed to instantiate {copy.GetAsset().Format()} at {copy.position.Format()} (#{i.Format()}). Retried yet: {retry.Format()} {instantiateRequest.Parameters}.");
-                    if (!instantiateRequest.Parameters.Responded && !retry)
-                    {
-                        retry = true;
-                        goto doRetry;
-                    }
+                    Logger.LogWarning($"Failed to instantiate {copy.GetAsset().Format()} at {copy.position.Format()} (#{i.Format()}). {instantiateRequest.Parameters}.");
                     continue;
                 }
 
-                if (buildable)
-                {
-                    if (!instantiateRequest.Parameters.TryGetParameter(1, out RegionIdentifier id))
-                        continue;
-                    if (GetBuildable(id) is not { } placedBuildable)
-                    {
-                        Logger.LogWarning($"Failed to find instantiated buildable {copy.GetAsset().Format()} at {copy.position.Format()} (#{i.Format()}).");
-                        continue;
-                    }
-                    EditorObjects.addSelection(placedBuildable.transform);
-                    Logger.LogDebug($"Pasted buildable: {placedBuildable.asset.itemName}.");
-                }
-                else
-                {
-                    if (!instantiateRequest.Parameters.TryGetParameter(1, out uint instanceId))
-                        continue;
-                    if (FindObject(instanceId) is not { } placedObject)
-                    {
-                        Logger.LogWarning($"Failed to find instantiated object {copy.GetAsset().Format()} at {copy.position.Format()} (#{i.Format()}).");
-                        continue;
-                    }
-                    EditorObjects.addSelection(placedObject.transform);
-                    Logger.LogDebug($"Pasted object: {placedObject.asset.objectName}.");
-                }
+                if (!instantiateRequest.Parameters.TryGetParameter(5, out NetId netId))
+                    continue;
+
+                if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out LevelBuildableObject? buildable, out _))
+                    continue;
+
+                Transform pasted = levelObject == null ? buildable!.transform : levelObject.transform;
+
+                EditorObjects.addSelection(pasted);
+                Logger.LogDebug(buildable != null ? $"Pasted buildable: {buildable.asset.itemName}." : $"Pasted object: {levelObject!.asset.objectName}.");
             }
         }
         finally
@@ -1032,3 +921,10 @@ public static class LevelObjectUtil
     }
 #endif
 }
+
+public delegate void BuildableRegionUpdated(LevelBuildableObject buildable, RegionIdentifier from, RegionIdentifier to);
+public delegate void LevelObjectRegionUpdated(LevelObject levelObject, RegionIdentifier from, RegionIdentifier to);
+public delegate void BuildableMoved(LevelBuildableObject buildable, Vector3 fromPos, Quaternion fromRot, Vector3 fromScale, Vector3 toPos, Quaternion toRot, Vector3 toScale);
+public delegate void LevelObjectMoved(LevelObject levelObject, Vector3 fromPos, Quaternion fromRot, Vector3 fromScale, Vector3 toPos, Quaternion toRot, Vector3 toScale);
+public delegate void BuildableRemoved(LevelBuildableObject buildable, RegionIdentifier id);
+public delegate void LevelObjectRemoved(LevelObject levelObject, RegionIdentifier id);

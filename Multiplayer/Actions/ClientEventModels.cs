@@ -372,26 +372,14 @@ public readonly struct InstantiateHierarchyObjectProperties
     }
 }
 
-public delegate void DeleteObject(in DeleteObjectProperties properties);
-public readonly struct DeleteObjectProperties
+public delegate void DeleteLevelObject(in DeleteLevelObjectProperties properties);
+public readonly struct DeleteLevelObjectProperties
 {
-    public readonly uint InstanceId;
+    public readonly NetId NetId;
     public readonly float DeltaTime;
-    public DeleteObjectProperties(uint instanceId, float deltaTime)
+    public DeleteLevelObjectProperties(NetId netId, float deltaTime)
     {
-        InstanceId = instanceId;
-        DeltaTime = deltaTime;
-    }
-}
-
-public delegate void DeleteBuildable(in DeleteBuildableProperties properties);
-public readonly struct DeleteBuildableProperties
-{
-    public readonly RegionIdentifier Identifier;
-    public readonly float DeltaTime;
-    public DeleteBuildableProperties(RegionIdentifier identifier, float deltaTime)
-    {
-        Identifier = identifier;
+        NetId = netId;
         DeltaTime = deltaTime;
     }
 }
@@ -399,49 +387,11 @@ public readonly struct DeleteBuildableProperties
 public delegate void DeleteLevelObjects(in DeleteLevelObjectsProperties properties);
 public readonly struct DeleteLevelObjectsProperties
 {
-    public readonly uint[] Objects;
-    public readonly RegionIdentifier[] Buildables;
+    public readonly NetId[] NetIds;
     public readonly float DeltaTime;
-    public DeleteLevelObjectsProperties(uint[] objects, RegionIdentifier[] buildables, float deltaTime)
+    public DeleteLevelObjectsProperties(NetId[] netIds, float deltaTime)
     {
-        Objects = objects;
-        Buildables = buildables;
-        DeltaTime = deltaTime;
-    }
-}
-
-public delegate void MoveBuildablePreview(in MoveBuildablePreviewProperties properties);
-public readonly struct MoveBuildablePreviewProperties
-{
-    public readonly RegionIdentifier Identifier;
-    public readonly TransformationDelta Transformation;
-    public readonly Vector3 Pivot;
-    public readonly bool UseScale;
-    public readonly float DeltaTime;
-    public MoveBuildablePreviewProperties(RegionIdentifier identifier, TransformationDelta transformation, Vector3 pivot, bool useScale, float deltaTime)
-    {
-        Identifier = identifier;
-        Transformation = transformation;
-        Pivot = pivot;
-        UseScale = useScale;
-        DeltaTime = deltaTime;
-    }
-}
-
-public delegate void MoveObjectPreview(in MoveObjectPreviewProperties properties);
-public readonly struct MoveObjectPreviewProperties
-{
-    public readonly uint InstanceId;
-    public readonly TransformationDelta Transformation;
-    public readonly Vector3 Pivot;
-    public readonly bool UseScale;
-    public readonly float DeltaTime;
-    public MoveObjectPreviewProperties(uint instanceId, TransformationDelta transformation, Vector3 pivot, bool useScale, float deltaTime)
-    {
-        InstanceId = instanceId;
-        Transformation = transformation;
-        Pivot = pivot;
-        UseScale = useScale;
+        NetIds = netIds;
         DeltaTime = deltaTime;
     }
 }
@@ -449,59 +399,24 @@ public readonly struct MoveObjectPreviewProperties
 public delegate void MoveLevelObjectsPreview(in MoveLevelObjectsPreviewProperties properties);
 public readonly struct MoveLevelObjectsPreviewProperties
 {
-    public readonly uint[] InstanceIds;
-    public readonly TransformationDelta[] ObjectTransformations;
-    public readonly RegionIdentifier[] Buildables;
-    public readonly TransformationDelta[] BuildableTransformations;
-    public readonly Vector3 Pivot;
+    public readonly PreviewTransformation[] Transformations;
     public readonly float DeltaTime;
-    public MoveLevelObjectsPreviewProperties(uint[] instanceIds, TransformationDelta[] objectTransformations,
-        RegionIdentifier[] buildables, TransformationDelta[] buildableTransformations, Vector3 pivot, float deltaTime)
+    public MoveLevelObjectsPreviewProperties(PreviewTransformation[] transformations, float deltaTime)
     {
-        InstanceIds = instanceIds;
-        ObjectTransformations = objectTransformations;
-        Buildables = buildables;
-        BuildableTransformations = buildableTransformations;
-        Pivot = pivot;
+        Transformations = transformations;
         DeltaTime = deltaTime;
     }
 }
 
-public delegate void MoveBuildableFinal(in MoveBuildableFinalProperties properties);
-public readonly struct MoveBuildableFinalProperties
+public delegate void MoveLevelObjectFinal(in MoveLevelObjectFinalProperties properties);
+public readonly struct MoveLevelObjectFinalProperties
 {
-    public readonly RegionIdentifier Identifier;
-    public readonly TransformationDelta Transformation;
-    public readonly Vector3 OriginalScale;
-    public readonly Vector3 Scale;
+    public readonly FinalTransformation Transformation;
     public readonly bool UseScale;
     public readonly float DeltaTime;
-    public MoveBuildableFinalProperties(RegionIdentifier identifier, TransformationDelta transformation, Vector3 scale, Vector3 originalScale, bool useScale, float deltaTime)
+    public MoveLevelObjectFinalProperties(FinalTransformation transformation, bool useScale, float deltaTime)
     {
-        Identifier = identifier;
         Transformation = transformation;
-        OriginalScale = originalScale;
-        Scale = scale;
-        UseScale = useScale;
-        DeltaTime = deltaTime;
-    }
-}
-
-public delegate void MoveObjectFinal(in MoveObjectFinalProperties properties);
-public readonly struct MoveObjectFinalProperties
-{
-    public readonly uint InstanceId;
-    public readonly TransformationDelta Transformation;
-    public readonly Vector3 OriginalScale;
-    public readonly Vector3 Scale;
-    public readonly bool UseScale;
-    public readonly float DeltaTime;
-    public MoveObjectFinalProperties(uint instanceId, TransformationDelta transformation, Vector3 scale, Vector3 originalScale, bool useScale, float deltaTime)
-    {
-        InstanceId = instanceId;
-        Transformation = transformation;
-        OriginalScale = originalScale;
-        Scale = scale;
         UseScale = useScale;
         DeltaTime = deltaTime;
     }
@@ -510,26 +425,13 @@ public readonly struct MoveObjectFinalProperties
 public delegate void MoveLevelObjectsFinal(in MoveLevelObjectsFinalProperties properties);
 public readonly struct MoveLevelObjectsFinalProperties
 {
-    public readonly uint[] InstanceIds;
-    public readonly TransformationDelta[] ObjectTransformations;
-    public readonly Vector3[]? OriginalObjectScales;
-    public readonly Vector3[]? ObjectScales;
-    public readonly RegionIdentifier[] Buildables;
-    public readonly TransformationDelta[] BuildableTransformations;
-    public readonly Vector3[]? OriginalBuildableScales;
-    public readonly Vector3[]? BuildableScales;
+    public readonly FinalTransformation[] Transformations;
+    public readonly bool UseScale;
     public readonly float DeltaTime;
-    public MoveLevelObjectsFinalProperties(uint[] instanceIds, TransformationDelta[] objectTransformations, Vector3[]? originalObjectScales, Vector3[]? objectScales,
-        RegionIdentifier[] buildables, TransformationDelta[] buildableTransformations, Vector3[]? originalBuildableScales, Vector3[]? buildableScales, float deltaTime)
+    public MoveLevelObjectsFinalProperties(FinalTransformation[] transformations, bool useScale, float deltaTime)
     {
-        InstanceIds = instanceIds;
-        ObjectTransformations = objectTransformations;
-        OriginalObjectScales = originalObjectScales;
-        ObjectScales = objectScales;
-        Buildables = buildables;
-        BuildableTransformations = buildableTransformations;
-        OriginalBuildableScales = originalBuildableScales;
-        BuildableScales = buildableScales;
+        Transformations = transformations;
+        UseScale = useScale;
         DeltaTime = deltaTime;
     }
 }

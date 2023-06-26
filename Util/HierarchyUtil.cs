@@ -2,6 +2,7 @@
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer;
+using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Networking;
 #if SERVER
 using DevkitServer.Players;
@@ -45,6 +46,11 @@ public static class HierarchyUtil
     {
         if (type == null)
             return StandardErrorCode.InvalidData;
+        if (!EditorActions.HasProcessedPendingHierarchyObjects)
+        {
+            EditorActions.TemporaryEditorActions?.QueueInstantiation(type, instanceId, position, rotation, scale, owner);
+            return StandardErrorCode.Success;
+        }
         uint lastInstanceId = uint.MaxValue;
         if (GetAvailableInstanceId != null && SetAvailableInstanceId != null)
         {
@@ -212,15 +218,15 @@ public static class HierarchyUtil
         return item switch
         {
             TempNodeBase => VanillaPermissions.EditNodes.Has(user, false) ||
-                            VanillaPermissions.MoveSavedNodes.Has(user, false) ||
+                            VanillaPermissions.MoveUnownedNodes.Has(user, false) ||
                             VanillaPermissions.PlaceNodes.Has(user, false) && HierarchyResponsibilities.IsPlacer(item.instanceID, user),
 
             CartographyVolume => VanillaPermissions.EditCartographyVolumes.Has(user, false) ||
-                                 VanillaPermissions.MoveSavedCartographyVolumes.Has(user, false) ||
+                                 VanillaPermissions.MoveUnownedCartographyVolumes.Has(user, false) ||
                                  VanillaPermissions.PlaceCartographyVolumes.Has(user, false) && HierarchyResponsibilities.IsPlacer(item.instanceID, user),
 
             VolumeBase =>   VanillaPermissions.EditVolumes.Has(user, false) ||
-                            VanillaPermissions.MoveSavedVolumes.Has(user, false) ||
+                            VanillaPermissions.MoveUnownedVolumes.Has(user, false) ||
                             VanillaPermissions.PlaceVolumes.Has(user, false) && HierarchyResponsibilities.IsPlacer(item.instanceID, user),
 
             _ => false
@@ -255,15 +261,15 @@ public static class HierarchyUtil
         return item switch
         {
             TempNodeBase => VanillaPermissions.EditNodes.Has(user, false) ||
-                            VanillaPermissions.RemoveSavedNodes.Has(user, false) ||
+                            VanillaPermissions.RemoveUnownedNodes.Has(user, false) ||
                             VanillaPermissions.PlaceNodes.Has(user, false) && HierarchyResponsibilities.IsPlacer(item.instanceID, user),
 
             CartographyVolume => VanillaPermissions.EditCartographyVolumes.Has(user, false) ||
-                                 VanillaPermissions.RemoveSavedCartographyVolumes.Has(user, false) ||
+                                 VanillaPermissions.RemoveUnownedCartographyVolumes.Has(user, false) ||
                                  VanillaPermissions.PlaceCartographyVolumes.Has(user, false) && HierarchyResponsibilities.IsPlacer(item.instanceID, user),
 
             VolumeBase => VanillaPermissions.EditVolumes.Has(user, false) ||
-                          VanillaPermissions.RemoveSavedVolumes.Has(user, false) ||
+                          VanillaPermissions.RemoveUnownedVolumes.Has(user, false) ||
                           VanillaPermissions.PlaceVolumes.Has(user, false) && HierarchyResponsibilities.IsPlacer(item.instanceID, user),
 
             _ => false
@@ -279,15 +285,15 @@ public static class HierarchyUtil
         return item switch
         {
             TempNodeBase => VanillaPermissions.EditNodes.Has(false) ||
-                            VanillaPermissions.MoveSavedNodes.Has(false) ||
+                            VanillaPermissions.MoveUnownedNodes.Has(false) ||
                             VanillaPermissions.PlaceNodes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
 
             CartographyVolume => VanillaPermissions.EditCartographyVolumes.Has(false) ||
-                                 VanillaPermissions.MoveSavedCartographyVolumes.Has(false) ||
+                                 VanillaPermissions.MoveUnownedCartographyVolumes.Has(false) ||
                                  VanillaPermissions.PlaceCartographyVolumes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
 
             VolumeBase => VanillaPermissions.EditVolumes.Has(false) ||
-                            VanillaPermissions.MoveSavedVolumes.Has(false) ||
+                            VanillaPermissions.MoveUnownedVolumes.Has(false) ||
                             VanillaPermissions.PlaceVolumes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
 
             _ => false
@@ -336,15 +342,15 @@ public static class HierarchyUtil
         return item switch
         {
             TempNodeBase => VanillaPermissions.EditNodes.Has(false) ||
-                            VanillaPermissions.RemoveSavedNodes.Has(false) ||
+                            VanillaPermissions.RemoveUnownedNodes.Has(false) ||
                             VanillaPermissions.PlaceNodes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
 
             CartographyVolume => VanillaPermissions.EditCartographyVolumes.Has(false) ||
-                                 VanillaPermissions.RemoveSavedCartographyVolumes.Has(false) ||
+                                 VanillaPermissions.RemoveUnownedCartographyVolumes.Has(false) ||
                                  VanillaPermissions.PlaceCartographyVolumes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
 
             VolumeBase => VanillaPermissions.EditVolumes.Has(false) ||
-                          VanillaPermissions.RemoveSavedVolumes.Has(false) ||
+                          VanillaPermissions.RemoveUnownedVolumes.Has(false) ||
                           VanillaPermissions.PlaceVolumes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
 
             _ => false

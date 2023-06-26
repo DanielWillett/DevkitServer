@@ -18,6 +18,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security;
+using DevkitServer.Multiplayer.Levels;
 using UnityEngine.SceneManagement;
 using Module = SDG.Framework.Modules.Module;
 #if CLIENT
@@ -250,6 +251,8 @@ public sealed class DevkitServerModule : IModuleNexus
             UserTPVControl.Init();
             UIAccessTools.EditorUIReady += EditorUIReady;
 #endif
+            LevelObjectNetIdDatabase.Init();
+
             PluginLoader.Load();
             CreateDirectoryAttribute.DisposeLoadList();
         }
@@ -296,9 +299,10 @@ public sealed class DevkitServerModule : IModuleNexus
     }
 
 #if CLIENT
-    private void EditorUIReady()
+    private static void EditorUIReady()
     {
-        DevkitEditorHUD.Open();
+        if (IsEditing)
+            DevkitEditorHUD.Open();
     }
 
     private static void OnChatMessageReceived()
@@ -331,6 +335,10 @@ public sealed class DevkitServerModule : IModuleNexus
         }
 
         ComponentHost.StartCoroutine(ClearLoggingErrorsIn1Second());
+#if CLIENT
+        EditorLevel.ServerPendingLevelData = null;
+        GC.Collect();
+#endif
     }
     private static IEnumerator<WaitForSeconds> ClearLoggingErrorsIn1Second()
     {
@@ -499,11 +507,15 @@ public sealed class DevkitServerModule : IModuleNexus
 #if SERVER
         DevkitServerUtility.CheckDirectory(false, false, DevkitServerConfig.LevelDirectory, typeof(DevkitServerConfig).GetProperty(nameof(DevkitServerConfig.LevelDirectory), BindingFlags.Public | BindingFlags.Static));
         BackupManager = GameObjectHost.AddComponent<BackupManager>();
+        LevelObjectNetIdDatabase.AssignExisting();
 #endif
         BuildableResponsibilities.Init();
         HierarchyResponsibilities.Init();
         LevelObjectResponsibilities.Init();
         CartographyUtil.Reset();
+#if CLIENT
+        LevelObjectNetIdDatabase.LoadFromLevelData();
+#endif
     }
 
     public void shutdown()
@@ -543,6 +555,7 @@ public sealed class DevkitServerModule : IModuleNexus
         UserTPVControl.Deinit();
         UIAccessTools.EditorUIReady -= EditorUIReady;
 #endif
+        LevelObjectNetIdDatabase.Shutdown();
 
         Instance = null!;
         GameObjectHost = null!;
