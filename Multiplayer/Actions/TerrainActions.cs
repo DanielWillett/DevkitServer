@@ -297,6 +297,8 @@ public sealed class HeightmapRampAction : ITerrainAction, IBrushRadius, IBrushFa
         writer.Write(EndPosition);
         writer.Write(DeltaTime);
     }
+
+    public int CalculateSize() => EncodingEx.MaxHeightmapBoundsSize + 28;
     private float IntlHandleHeightmapWriteRamp(LandscapeCoord tileCoord, HeightmapCoord heightmapCoord, Vector3 worldPosition, float currentHeight)
     {
         Vector2 difference = new Vector2(EndPosition.x - StartPosition.x, EndPosition.z - StartPosition.z);
@@ -362,6 +364,7 @@ public sealed class HeightmapAdjustAction : ITerrainAction, IBrushRadius, IBrush
         writer.Write(BrushPosition);
         writer.Write(DeltaTime);
     }
+    public int CalculateSize() => EncodingEx.MaxHeightmapBoundsSize + 12;
     private float IntlHandleHeightmapWriteAdjust(LandscapeCoord tileCoord, HeightmapCoord heightmapCoord, Vector3 worldPosition, float currentHeight)
     {
         float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
@@ -420,6 +423,7 @@ public sealed class HeightmapFlattenAction : ITerrainAction, IBrushRadius, IBrus
         writer.Write(BrushPosition);
         writer.Write(DeltaTime);
     }
+    public int CalculateSize() => EncodingEx.MaxHeightmapBoundsSize + 13;
     private float IntlHandleHeightmapWriteFlatten(LandscapeCoord tileCoord, HeightmapCoord heightmapCoord, Vector3 worldPosition, float currentHeight)
     {
         float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
@@ -526,6 +530,7 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrush
         if (SmoothMethod != EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE)
             writer.Write(SmoothTarget);
     }
+    public int CalculateSize() => EncodingEx.MaxHeightmapBoundsSize + 12 + (SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE ? 4 : 0);
     private static void SampleHeightPixelSmooth(object? instance, Vector3 worldPosition, ref int sampleCount, ref float sampleAverage)
     {
         IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
@@ -739,6 +744,7 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
         writer.Write(BrushPosition);
         writer.Write(DeltaTime);
     }
+    public int CalculateSize() => EncodingEx.MaxHeightmapBoundsSize + 12 + (!IsAuto ? 1 : 0);
     private void IntlHandleSplatmapWritePaint(LandscapeCoord tileCoord, SplatmapCoord splatmapCoord, Vector3 worldPosition, float[] currentWeights)
     {
         if (_assetFound && _asset == null)
@@ -953,6 +959,8 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushF
         writer.Write(BrushPosition);
         writer.Write(DeltaTime);
     }
+
+    public int CalculateSize() => EncodingEx.MaxHeightmapBoundsSize + 12;
     private void IntlHandleSplatmapReadBrushAverage(LandscapeCoord tileCoord, SplatmapCoord splatmapCoord, Vector3 worldPosition, float[] currentWeights)
     {
         float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
@@ -1074,6 +1082,7 @@ public sealed class HolemapPaintAction : ITerrainAction, IBrushRadius
         writer.Write(BrushPosition);
         writer.Write(DeltaTime);
     }
+    public int CalculateSize() => EncodingEx.MaxHeightmapBoundsSize + 12;
     public void Apply()
     {
         LandscapeUtil.WriteHolesNoTransactions(Bounds, IntlHandleHolesWriteCut);
@@ -1152,6 +1161,7 @@ public sealed class TileModifyAction : IAction, ICoordinates
         IsDelete = reader.ReadBool();
         DeltaTime = reader.ReadFloat();
     }
+    public int CalculateSize() => 5;
 
     [UsedImplicitly]
     private static TileModifyAction CreateDeleteTile() => new TileModifyAction { IsDelete = true };
@@ -1162,9 +1172,9 @@ public sealed class TileModifyAction : IAction, ICoordinates
 public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinates
 {
 #if CLIENT
-    private static readonly Func<Array?>? GetUILayers = UIAccessTools.CreateUIFieldGetterReturn<Array>(UI.EditorTerrainTiles, "layers", false);
-    private static readonly Func<int>? GetSelectedLayer = UIAccessTools.CreateUIFieldGetterReturn<int>(UI.EditorTerrainTiles, "selectedLayerIndex", false);
-    private static readonly Action<int>? SetSelectedLayerIndex = UIAccessTools.GenerateUICaller<Action<int>>(UI.EditorTerrainTiles, "SetSelectedLayerIndex", throwOnFailure: false);
+    private static readonly Func<Array?>? GetUILayers = UIAccessTools.CreateUIFieldGetterReturn<Array>(UIAccessTools.EditorTerrainTilesUIType, "layers", false);
+    private static readonly Func<int>? GetSelectedLayer = UIAccessTools.CreateUIFieldGetterReturn<int>(UIAccessTools.EditorTerrainTilesUIType, "selectedLayerIndex", false);
+    private static readonly Action<int>? SetSelectedLayerIndex = UIAccessTools.GenerateUICaller<Action<int>>(UIAccessTools.EditorTerrainTilesUIType, "SetSelectedLayerIndex", throwOnFailure: false);
     private static readonly Action<object>? CallUpdateSelectedTile =
         Accessor.GenerateInstanceCaller<Action<object>>(
             Accessor.AssemblyCSharp
@@ -1258,4 +1268,5 @@ public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinates
         for (int i = 0; i < amt; ++i)
             Layers[i] = new AssetReference<LandscapeMaterialAsset>(reader.ReadGuid());
     }
+    public int CalculateSize() => 5 + Math.Min(byte.MaxValue, Layers == null ? 0 : Layers.Length) * 16;
 }

@@ -171,7 +171,7 @@ public sealed class MovingHierarchyItemsAction : IAction
         writer.Write(DeltaTime);
         byte flag = (byte)((InstanceIds.Length > ushort.MaxValue ? 2 : 0) | (InstanceIds.Length > byte.MaxValue ? 1 : 0));
         writer.Write(flag);
-        if (InstanceIds.Length <= 1)
+        if (InstanceIds.Length < 1)
         {
             writer.Write((byte)0);
             return;
@@ -231,6 +231,24 @@ public sealed class MovingHierarchyItemsAction : IAction
             InstanceIds = Array.Empty<uint>();
             TransformDeltas = Array.Empty<TransformationDelta>();
         }
+    }
+    public int CalculateSize()
+    {
+        int size = 4 + 1;
+        if (InstanceIds.Length < 1)
+            return size + 1;
+        size += 12;
+        if (InstanceIds.Length > ushort.MaxValue)
+            size += 4;
+        else if (InstanceIds.Length > byte.MaxValue)
+            size += 2;
+        else ++size;
+        size += InstanceIds.Length * 4;
+        ref TransformationDelta t = ref TransformDeltas[0];
+        size += t.CalculateSize();
+        TransformationDelta.TransformFlags flags = t.Flags;
+        size += TransformationDelta.CalculatePartialSize(flags) * (TransformDeltas.Length - 1);
+        return size;
     }
 }
 [Action(ActionType.HierarchyItemsTransform, 65 + TransformationDelta.Capacity * 16 + sizeof(float) * 3 * 16 * 2, 0)]
@@ -364,6 +382,26 @@ public sealed class MovedHierarchyObjectsAction : IAction
             }
         }
     }
+    public int CalculateSize()
+    {
+        int size = 4 + 1;
+        if (InstanceIds.Length < 1)
+            return size + 1;
+        size += 12;
+        if (InstanceIds.Length > ushort.MaxValue)
+            size += 4;
+        else if (InstanceIds.Length > byte.MaxValue)
+            size += 2;
+        else ++size;
+        size += InstanceIds.Length * 4;
+        ref TransformationDelta t = ref TransformDeltas[0];
+        size += t.CalculateSize();
+        TransformationDelta.TransformFlags flags = t.Flags;
+        size += TransformationDelta.CalculatePartialSize(flags) * (TransformDeltas.Length - 1);
+        if (UseScale)
+            size += 24 * InstanceIds.Length;
+        return size;
+    }
 }
 [Action(ActionType.HierarchyItemsDelete, 68, 0)]
 [EarlyTypeInit]
@@ -414,4 +452,5 @@ public sealed class DeleteHierarchyItemsAction : IAction
         for (int i = 0; i < len; ++i)
             InstanceIds[i] = reader.ReadUInt32();
     }
+    public int CalculateSize() => 8 + InstanceIds.Length * 4;
 }

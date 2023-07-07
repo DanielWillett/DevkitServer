@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace DevkitServer.Util;
+﻿namespace DevkitServer.Util;
 internal static class CommonErrors
 {
     public static void LogPlayerSavedataAccessError(string fullPath)

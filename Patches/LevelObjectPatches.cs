@@ -676,7 +676,7 @@ internal static class LevelObjectPatches
     {
         if (!DevkitServerModule.IsEditing)
             return true;
-        if (IsSyncing || EditorActions.HasLargeQueue())
+        if (IsSyncing)
         {
             UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;

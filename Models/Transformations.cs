@@ -25,6 +25,8 @@ public readonly struct PreviewTransformation
         else
             Transformation.Write(writer);
     }
+
+    public int CalculateSize(bool halfPrecision = true) => 4 + Transformation.CalculateSize(halfPrecision);
 }
 
 public readonly struct FinalTransformation
@@ -89,5 +91,12 @@ public readonly struct FinalTransformation
             writer.Write(Scale);
             writer.Write(OriginalScale);
         }
+    }
+    public int CalculateSize(bool useScale, bool halfPrecision = false)
+    {
+        int size = 4 + Transformation.CalculateSize(halfPrecision);
+        if (useScale)
+            size += halfPrecision ? 12 : 24;
+        return size;
     }
 }

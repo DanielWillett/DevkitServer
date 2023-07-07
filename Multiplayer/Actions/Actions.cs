@@ -37,8 +37,6 @@ public enum ActionType : byte
     AddFoliageToSurface,
     RemoveFoliageInstances,
     RemoveResourceSpawnpoint,
-    RemoveFoliageLevelObject,
-    RemoveLevelObject,
     HierarchyItemsTransforming,
     HierarchyItemsTransform,
     HierarchyItemsDelete,
@@ -55,7 +53,6 @@ public interface IReflectableAction : IAction
 {
     void SendUndo(ITransportConnection sender);
 }
-
 public interface IServersideAction : IAction
 {
 
@@ -72,6 +69,7 @@ public interface IAction
 #endif
     void Read(ByteReader reader);
     void Write(ByteWriter writer);
+    int CalculateSize();
 }
 
 [ActionSetting(ActionSetting.Asset)]

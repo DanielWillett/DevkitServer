@@ -47,6 +47,9 @@ internal static class PatchesMain
 #endif
             Patcher = new Harmony(HarmonyId);
             Patcher.PatchAll();
+#if SERVER
+            ServerGizmoPatches.Patch();
+#endif
 
             // Accessor.AddFunctionBreakpoints(AccessTools.Method(typeof(ObjectManager), "ReceiveObjects"));
             // ConstructorInfo? info = typeof(MenuConfigurationOptionsUI).GetConstructors(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
@@ -67,6 +70,9 @@ internal static class PatchesMain
         try
         {
             Patcher.UnpatchAll(HarmonyId);
+#if SERVER
+            ServerGizmoPatches.Unpatch();
+#endif
             Logger.LogInfo($"Finished unpatching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
         }
         catch (Exception ex)

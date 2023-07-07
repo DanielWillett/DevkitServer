@@ -6,11 +6,11 @@ using DevkitServer.Players.UI;
 #if CLIENT
 using System.Reflection;
 using DevkitServer.API.Abstractions;
+using Action = System.Action;
 #endif
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
-using JetBrains.Annotations;
 using SDG.Framework.Utilities;
 using SDG.NetPak;
 
@@ -111,7 +111,6 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             if (TemporaryEditorActions is { NeedsToFlush: true })
             {
                 IsPlayingCatchUp = true;
-                CanProcess = false;
                 CatchUpCoroutine = StartCoroutine(TemporaryEditorActions.Flush());
                 _isRunningCatchUpCoroutine = true;
                 if (CanProcess)
@@ -226,13 +225,13 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 #if CLIENT
     internal void FlushEdits()
     {
-        if (_pendingActions.Count > 0)
-        {
-            Logger.LogDebug("[EDITOR ACTIONS] Flushing " + _pendingActions.Count.Format() + " action(s).");
-            WriteEditBuffer(Writer, 0, _pendingActions.Count);
-            int len = Writer.Count;
-            NetFactory.SendGeneric(DevkitMessage.ActionRelay, Writer.FinishWrite(), 0, len, true);
-        }
+        if (_pendingActions.Count < 1)
+            return;
+
+        Logger.LogDebug("[EDITOR ACTIONS] Flushing " + _pendingActions.Count.Format() + " action(s).");
+        WriteEditBuffer(Writer, 0, _pendingActions.Count);
+        int len = Writer.Count;
+        NetFactory.SendGeneric(DevkitMessage.ActionRelay, Writer.FinishWrite(), 0, len, true);
     }
 #endif
     public static (int Data, int Settings) GetMaxSizes(IAction action) =>
@@ -323,15 +322,14 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 continue;
             }
 #endif
-            (int val, int settings) = GetMaxSizes(pendingAction);
-            val += settings;
-            if (size + settings > MaxPacketSize)
+            int s2 = pendingAction.CalculateSize();
+            if (size + s2 > MaxPacketSize)
             {
                 if (ct == 0)
                     ++ct;
                 break;
             }
-            size += val + settings;
+            size += s2;
             ++ct;
         }
 
@@ -458,7 +456,9 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                     anyInvalid = true;
                 }
                 else if (action.CheckCanApply())
+                {
                     _pendingActions.Add(action);
+                }
                 else
                 {
                     anyInvalid = true;
@@ -499,6 +499,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 
             // also send to pending users
             list.AddRange(EditorLevel.PendingToReceiveActions);
+            Logger.LogDebug($"Sending to {string.Join(",", list.Select(x => x.Format()))}.");
             if (anyInvalid)
             {
                 WriteEditBuffer(Writer, stInd, _pendingActions.Count - stInd);
@@ -554,6 +555,18 @@ public interface IActionListener
 #if CLIENT
 public class TemporaryEditorActions : IActionListener, IDisposable
 {
+    private static readonly CachedMulticastEvent<Action> EventOnStartListening = new CachedMulticastEvent<Action>(typeof(TemporaryEditorActions), nameof(OnStartListening));
+    private static readonly CachedMulticastEvent<Action> EventOnStopListening = new CachedMulticastEvent<Action>(typeof(TemporaryEditorActions), nameof(OnStopListening));
+    public static event Action OnStartListening
+    {
+        add => EventOnStartListening.Add(value);
+        remove => EventOnStartListening.Remove(value);
+    }
+    public static event Action OnStopListening
+    {
+        add => EventOnStopListening.Add(value);
+        remove => EventOnStopListening.Remove(value);
+    }
     public static TemporaryEditorActions? Instance { get; private set; }
     private readonly List<PendingHierarchyInstantiation> _hierarchyInstantiations = new List<PendingHierarchyInstantiation>();
     private readonly List<PendingLevelObjectInstantiation> _lvlObjectInstantiations = new List<PendingLevelObjectInstantiation>();
@@ -561,7 +574,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     public ActionSettings Settings { get; }
     public int QueueSize => _actions.Count;
     internal bool NeedsToFlush => _actions.Count > 0 || _hierarchyInstantiations.Count > 0 || _lvlObjectInstantiations.Count > 0;
-    public TemporaryEditorActions()
+    private TemporaryEditorActions()
     {
         Settings = new ActionSettings(this);
         Instance = this;
@@ -572,7 +585,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         if (type == null) throw new ArgumentNullException(nameof(type));
 
         _hierarchyInstantiations.Add(new PendingHierarchyInstantiation(type, instanceId, position, rotation, scale, owner));
-        Logger.LogDebug($"Queued hierarchy item instantiation for {type.Format()} when the level loads.");
+        Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued hierarchy item instantiation for {type.Format()} when the level loads.");
     }
     public void QueueInstantiation(Asset asset, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
     {
@@ -580,7 +593,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
             throw new ArgumentException("Must be either ObjectAsset (LevelObject) or ItemAsset (LevelBuildableObject).", nameof(asset));
 
         _lvlObjectInstantiations.Add(new PendingLevelObjectInstantiation(asset.getReferenceTo<Asset>(), position, rotation, scale, owner, netId));
-        Logger.LogDebug($"Queued level object instantiation for {asset.Format()} when the level loads.");
+        Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued level object instantiation for {asset.Format()} when the level loads.");
     }
     internal void HandleReadPackets(CSteamID user, ByteReader reader)
     {
@@ -651,7 +664,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
             yield return null;
         for (int i = 0; i < _actions.Count; ++i)
         {
-            if (i != 0 && i % 30 == 0)
+            if (i % 30 == 0 && i > 0)
                 yield return null;
             IAction action = _actions[i];
             EditorActions.ApplyAction(action, this);
@@ -662,6 +675,15 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         if (EditorActions.TemporaryEditorActions == this)
             EditorActions.TemporaryEditorActions = null;
         EditorActions.CatchUpCoroutine = null;
+        EventOnStopListening.TryInvoke();
+    }
+    internal static void BeginListening()
+    {
+        _ = new TemporaryEditorActions();
+        EditorActions.CanProcess = false;
+        EditorActions.HasProcessedPendingHierarchyObjects = false;
+        EditorActions.HasProcessedPendingLevelObjects = false;
+        EventOnStartListening.TryInvoke();
     }
     public void Dispose()
     {

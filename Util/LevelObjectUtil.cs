@@ -22,10 +22,10 @@ public static class LevelObjectUtil
 {
     private const string Source = "LEVEL OBJECTS";
 
-    public static readonly int MaxDeletePacketSize = 64;
-    public static readonly int MaxMovePacketSize = 32;
-    public static readonly int MaxMovePreviewSelectionSize = 8;
-    public static readonly int MaxCopySelectionSize = 64;
+    public const int MaxDeletePacketSize = 64;
+    public const int MaxMovePacketSize = 32;
+    public const int MaxMovePreviewSelectionSize = 8;
+    public const int MaxCopySelectionSize = 64;
 
     internal static CachedMulticastEvent<BuildableRegionUpdated> EventOnBuildableRegionUpdated = new CachedMulticastEvent<BuildableRegionUpdated>(typeof(LevelObjectUtil), nameof(OnBuildableRegionUpdated));
     internal static CachedMulticastEvent<LevelObjectRegionUpdated> EventOnLevelObjectRegionUpdated = new CachedMulticastEvent<LevelObjectRegionUpdated>(typeof(LevelObjectUtil), nameof(OnLevelObjectRegionUpdated));

@@ -1,5 +1,7 @@
 ﻿using DevkitServer.Levels;
 using DevkitServer.Models;
+using DevkitServer.Multiplayer.Networking;
+using JetBrains.Annotations;
 
 namespace DevkitServer.Multiplayer.Levels;
 [EarlyTypeInit]
@@ -8,6 +10,8 @@ public static class LevelObjectNetIdDatabase
     private const string Source = "OBJECT NET IDS";
     private static readonly Dictionary<RegionIdentifier, NetId> BuildableAssignments = new Dictionary<RegionIdentifier, NetId>(128);
     private static readonly Dictionary<uint, NetId> LevelObjectAssignments = new Dictionary<uint, NetId>(1024);
+    [UsedImplicitly]
+    internal static NetCall<uint, NetId> SendBindObject = new NetCall<uint, NetId>(NetCalls.SendBindObject);
     internal static void Init()
     {
         LevelObjectUtil.OnBuildableRegionUpdated += OnBuildableRegionUpdated;
@@ -18,6 +22,20 @@ public static class LevelObjectNetIdDatabase
         LevelObjectUtil.OnBuildableRegionUpdated -= OnBuildableRegionUpdated;
         LevelObjectUtil.OnBuildableRemoved -= OnBuildableRemoved;
     }
+#if CLIENT
+    [NetCall(NetCallSource.FromServer, NetCalls.SendBindObject)]
+    private static void ReceiveBindObject(MessageContext ctx, uint instanceId, NetId netId)
+    {
+        if (LevelObjectUtil.TryFindObjectCoordinates(instanceId, out RegionIdentifier id))
+        {
+            LevelObject obj = LevelObjectUtil.GetObjectUnsafe(id);
+            RegisterObject(obj, netId);
+            ctx.Acknowledge(StandardErrorCode.Success);
+        }
+        else
+            ctx.Acknowledge(StandardErrorCode.NotFound);
+    }
+#endif
     private static void OnBuildableRemoved(LevelBuildableObject buildable, RegionIdentifier id)
     {
         RemoveIdentifier(id, buildable, true);

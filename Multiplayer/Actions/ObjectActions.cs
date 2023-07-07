@@ -152,16 +152,17 @@ public sealed class DeleteLevelObjectsAction : IAction
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
-        int objectCount = Math.Min(byte.MaxValue, NetIds.Length);
+        int objectCount = Math.Min(byte.MaxValue, NetIds == null ? 0 : NetIds.Length);
 
         writer.Write((byte)objectCount);
 
         for (int i = 0; i < objectCount; ++i)
-            writer.Write(NetIds[i]);
+            writer.Write(NetIds![i]);
     }
+    public int CalculateSize() => 5 + Math.Min(byte.MaxValue, NetIds == null ? 0 : NetIds.Length) * 4;
 }
 
-[Action(ActionType.MoveLevelObjectsPreview, PreviewTransformation.Capacity * 32 + 6, 0)]
+[Action(ActionType.MoveLevelObjectsPreview, PreviewTransformation.Capacity * LevelObjectUtil.MaxMovePreviewSelectionSize + 6, 0)]
 [EarlyTypeInit]
 public class MoveLevelObjectsPreviewAction : IAction
 {
@@ -252,6 +253,14 @@ public class MoveLevelObjectsPreviewAction : IAction
 
         for (int i = 0; i < objectCount; ++i)
             Transformations[i].Write(writer, false);
+    }
+    public int CalculateSize()
+    {
+        int size = 5;
+        int objectCount = Math.Min(byte.MaxValue, Transformations.Length);
+        for (int i = 0; i < objectCount; ++i)
+            size += Transformations[i].CalculateSize(false);
+        return size;
     }
 }
 
@@ -351,9 +360,17 @@ public class MoveLevelObjectsFinalAction : IAction
         for (int i = 0; i < objectCount; ++i)
             Transformations[i].Write(writer, UseScale);
     }
+    public int CalculateSize()
+    {
+        int size = 5;
+        int objectCount = Math.Min(byte.MaxValue, Transformations.Length);
+        for (int i = 0; i < objectCount; ++i)
+            size += Transformations[i].CalculateSize(false);
+        return size;
+    }
 }
 
-[Action(ActionType.InstantiateLevelObject, 47, 0)]
+[Action(ActionType.InstantiateLevelObject, 68, 0)]
 public class InstantiateLevelObjectAction : IServersideAction
 {
     public ActionType Type => ActionType.InstantiateLevelObject;
@@ -399,4 +416,6 @@ public class InstantiateLevelObjectAction : IServersideAction
         writer.Write(RequestKey);
         writer.Write(DeltaTime);
     }
+
+    public int CalculateSize() => 68;
 }

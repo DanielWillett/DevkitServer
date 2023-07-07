@@ -1,5 +1,4 @@
 ﻿using DevkitServer.Configuration;
-using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Terminals;
 using StackCleaner;
 using System.Diagnostics;
@@ -309,6 +308,10 @@ internal static class Logger
             DumpGameObject(go.transform.GetChild(i).gameObject, color);
         }
     }
+    private static string? GetErrorMessage(Exception ex)
+    {
+        return ex.Message != null && ex is BadImageFormatException && ex.Message.Equals("Method has zero rva", StringComparison.Ordinal) ? "Method has no body (Method has zero rva)" : ex.Message;
+    }
     public static void LogError(Exception ex, bool cleanStack = true, [CallerMemberName] string method = "") => WriteExceptionIntl(ex, cleanStack, 0, DateTime.UtcNow, method);
     private static void WriteExceptionIntl(Exception ex, bool cleanStack, int indent, DateTime timestamp, string? method = null)
     {
@@ -325,7 +328,7 @@ internal static class Logger
                     ? "Inner Exception: "
                     : ("[" + timestamp.ToString(TimeFormat) + "]" + (string.IsNullOrEmpty(method) ? string.Empty : (" [" + method!.ToUpper() + "] "))) + "Exception: ")
                                + ex.GetType().Format() + FormattingUtil.GetANSIString(ConsoleColor.Red, false) + ".", ConsoleColor.Red, true, Severity.Error);
-            Terminal.Write(ind + (ex.Message ?? "No message"), ConsoleColor.DarkRed, true, Severity.Error);
+            Terminal.Write(ind + (GetErrorMessage(ex) ?? "No message"), ConsoleColor.DarkRed, true, Severity.Error);
             if (ex is TypeLoadException t)
             {
                 Terminal.Write(ind + "Type: " + t.TypeName, ConsoleColor.DarkRed, true, Severity.Error);

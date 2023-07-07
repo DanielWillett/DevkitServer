@@ -10,12 +10,13 @@ public class HighSpeedConnection : ITransportConnection
 #endif
 {
 #if CLIENT
-    public static HighSpeedConnection? Instance { get; private set; }
+    public static HighSpeedConnection? Instance => _instance;
 #endif
     private readonly byte[] _buffer = new byte[HighSpeedNetFactory.BufferSize];
     private readonly NetworkBuffer _netBuffer;
     public event NetworkBufferProgressUpdate? BufferProgressUpdated;
     private bool _disposed;
+    private static HighSpeedConnection? _instance;
     public bool Verified { get; internal set; }
     public Guid SteamToken { get; internal set; }
     public TcpClient Client { get; }
@@ -53,8 +54,8 @@ public class HighSpeedConnection : ITransportConnection
         Server = server;
 #else
         SteamConnection = NetFactory.GetPlayerTransportConnection();
-        Instance?.Dispose();
-        Instance = this;
+        HighSpeedConnection? old = Interlocked.Exchange(ref _instance, this);
+        old?.Dispose();
         Steam64 = steam64;
 #endif
         _netBuffer = new NetworkBuffer(MessageReady, this, _buffer);
@@ -69,14 +70,11 @@ public class HighSpeedConnection : ITransportConnection
         Logger.LogDebug("[HIGH SPEED CONNECTION] Closing high-speed connection.");
 #if SERVER
         if (Server != null)
-        {
             Server.Disconnect(this);
-        }
 #endif
 
 #if CLIENT
-        if (Instance == this)
-            Instance = null;
+        Interlocked.CompareExchange(ref _instance, null, this);
 #endif
         _netBuffer.BufferProgressUpdated -= OnBufferProgressUpdatedIntl;
         _netBuffer.Buffer = Array.Empty<byte>();

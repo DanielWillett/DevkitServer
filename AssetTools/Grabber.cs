@@ -335,7 +335,7 @@ public static class Grabber
 
     public static byte[] EncodeOrBlitTexturePNG(this Texture2D texture, bool destroy)
     {
-        Texture2D useableTexture = ConvertToReadable(texture, destroy);
+        Texture2D useableTexture = ConvertToReadable(texture);
 
         byte[] bytes = useableTexture.EncodeToPNG();
 
@@ -347,7 +347,7 @@ public static class Grabber
 
         return bytes ?? Array.Empty<byte>();
     }
-    public static Texture2D ConvertToReadable(Texture2D texture, bool destroy = false)
+    public static Texture2D ConvertToReadable(Texture2D texture)
     {
         if (texture.isReadable)
             return texture;
@@ -364,8 +364,6 @@ public static class Grabber
         outTexture.Apply(false);
         RenderTexture.active = active;
         RenderTexture.ReleaseTemporary(rt);
-        if (destroy)
-            Object.Destroy(texture);
         return outTexture;
     }
 }

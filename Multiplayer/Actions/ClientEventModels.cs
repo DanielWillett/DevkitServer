@@ -46,7 +46,8 @@ public readonly struct AddFoliageProperties
     public readonly Vector3 Scale;
     public readonly bool ClearWhenBaked;
     public readonly float DeltaTime;
-    public AddFoliageProperties(FoliageInfoAsset asset, Vector3 position, Quaternion rotation, Vector3 scale, bool clearWhenBaked, float deltaTime)
+    public readonly uint? ObjectInstanceId;
+    public AddFoliageProperties(FoliageInfoAsset asset, Vector3 position, Quaternion rotation, Vector3 scale, bool clearWhenBaked, float deltaTime, uint? objectInstanceId)
     {
         Asset = asset;
         Position = position;
@@ -54,6 +55,7 @@ public readonly struct AddFoliageProperties
         Scale = scale;
         ClearWhenBaked = clearWhenBaked;
         DeltaTime = deltaTime;
+        ObjectInstanceId = objectInstanceId;
     }
 }
 

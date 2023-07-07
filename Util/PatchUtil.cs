@@ -8,6 +8,55 @@ namespace DevkitServer.Util;
 public static class PatchUtil
 {
     [Pure]
+    public static IEnumerable<CodeInstruction> Throw<TException>(string? message = null) where TException : Exception
+    {
+        ConstructorInfo[] ctors = typeof(TException).GetConstructors(BindingFlags.Instance | BindingFlags.Public);
+        
+        ConstructorInfo? info = message == null
+            ? ctors.FirstOrDefault(x => x.GetParameters().Length == 0)
+            : (ctors.FirstOrDefault(x => x.GetParameters().Length == 1 && x.GetParameters()[0].ParameterType == typeof(string)) ??
+               ctors.FirstOrDefault(x => x.GetParameters().Length == 0));
+
+        if (info == null)
+            throw new MemberAccessException("Unable to find any constructors for that exception.");
+        
+        if (info.GetParameters().Length == 1)
+        {
+            return new CodeInstruction[]
+            {
+                new CodeInstruction(OpCodes.Ldstr, message),
+                new CodeInstruction(OpCodes.Newobj, info),
+                new CodeInstruction(OpCodes.Throw)
+            };
+        }
+
+        return new CodeInstruction[]
+        {
+            new CodeInstruction(OpCodes.Newobj, info),
+            new CodeInstruction(OpCodes.Throw)
+        };
+    }
+    [Pure]
+    public static Type? GetMemberType(this MemberInfo member) => member switch
+    {
+        MethodInfo a => a.ReturnType,
+        FieldInfo a => a.FieldType,
+        PropertyInfo a => a.PropertyType,
+        ConstructorInfo a => a.DeclaringType,
+        EventInfo a => a.EventHandlerType,
+        _ => throw new ArgumentException($"Member type {member.GetType().Name} does not have a member type.", nameof(member))
+    };
+    [Pure]
+    public static bool GetIsStatic(this MemberInfo member) => member switch
+    {
+        MethodBase a => a.IsStatic,
+        FieldInfo a => a.IsStatic,
+        PropertyInfo a => a.GetGetMethod(true) is { } getter ? getter.IsStatic : (a.GetSetMethod(true) is { } setter && setter.IsStatic),
+        EventInfo a => a.GetAddMethod(true) is { } adder ? adder.IsStatic : (a.GetRemoveMethod(true) is { } remover ? remover.IsStatic : (a.GetRaiseMethod(true) is { } raiser && raiser.IsStatic)),
+        Type a => (a.Attributes & (TypeAttributes.Abstract | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit | TypeAttributes.Class)) != 0,
+        _ => throw new ArgumentException($"Member type {member.GetType().Name} is not static-able.", nameof(member))
+    };
+    [Pure]
     public static bool FollowPattern(IList<CodeInstruction> instructions, ref int index, params PatternMatch?[] matches)
     {
         if (MatchPattern(instructions, index, matches))
@@ -467,6 +516,27 @@ public static class PatchUtil
             _ => new CodeInstruction(OpCodes.Ldarg, index)
         };
     }
+    public static void LoadParameter(this DebuggableEmitter generator, int index, bool byref = false)
+    {
+        if (byref)
+        {
+            generator.Emit(index > ushort.MaxValue ? OpCodes.Ldarga : OpCodes.Ldarga_S, index);
+            return;
+        }
+        OpCode code = index switch
+        {
+            0 => OpCodes.Ldarg_0,
+            1 => OpCodes.Ldarg_1,
+            2 => OpCodes.Ldarg_2,
+            3 => OpCodes.Ldarg_3,
+            <= ushort.MaxValue => OpCodes.Ldarg_S,
+            _ => OpCodes.Ldarg
+        };
+        if (index > 3)
+            generator.Emit(code, index);
+        else
+            generator.Emit(code);
+    }
     public static void LoadParameter(this ILGenerator generator, int index, bool byref = false)
     {
         if (byref)
@@ -739,12 +809,12 @@ public static class PatchUtil
         return false;
     }
     [Pure]
-    public static bool ShouldCallvirt(this MethodInfo method)
+    public static bool ShouldCallvirt(this MethodBase method)
     {
-        return method.DeclaringType is { IsInterface: true } || method.IsVirtual || method.IsAbstract;
+        return !method.IsStatic && (method.DeclaringType is { IsInterface: true } || method.IsVirtual || method.IsAbstract);
     }
     [Pure]
-    public static OpCode GetCall(this MethodInfo method)
+    public static OpCode GetCall(this MethodBase method)
     {
         return method.ShouldCallvirt() ? OpCodes.Callvirt : OpCodes.Call;
     }

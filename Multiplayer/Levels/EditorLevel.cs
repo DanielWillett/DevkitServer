@@ -72,7 +72,8 @@ public static class EditorLevel
     private static IEnumerator GatherAndCompressLevel(ITransportConnection connection)
     {
         _exitCoroutine = false;
-        PendingToReceiveActions.Add(connection);
+        if (!PendingToReceiveActions.Contains(connection))
+            PendingToReceiveActions.Add(connection);
         ++_compressionWaiters;
         if (_isCompressingLevel)
         {
@@ -419,13 +420,10 @@ public static class EditorLevel
         if (task.Parameters.Responded)
         {
             yield return new WaitForSeconds(0.1f);
-            task = SendRequestLevel.RequestAck(3000);
             if (TemporaryEditorActions.Instance == null)
-            {
-                _ = new TemporaryEditorActions();
-                EditorActions.HasProcessedPendingHierarchyObjects = false;
-                EditorActions.HasProcessedPendingLevelObjects = false;
-            }
+                TemporaryEditorActions.BeginListening();
+            
+            task = SendRequestLevel.RequestAck(3000);
             Logger.LogDebug("[RECEIVE LEVEL] Sent level request.", ConsoleColor.DarkCyan);
             yield return task;
         }

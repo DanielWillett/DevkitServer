@@ -153,6 +153,7 @@
         <Using Include="System.Collections" />
         <Using Include="UnityEngine" />
         <Using Include="DevkitServer.Util" />
+        <Using Include="JetBrains.Annotations" />
         <Using Include="UnityEngine.Object">
             <Alias>Object</Alias>
         </Using>

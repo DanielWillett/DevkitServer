@@ -8,22 +8,30 @@ using StackCleaner;
 namespace DevkitServer.Util;
 public class DebuggableEmitter
 {
-#if DEBUG
     private bool _init;
+    private bool _lastWasPrefix;
     public MethodBase Method { get; }
-#endif
     public ILGenerator Generator { get; }
     public int ILOffset => Generator.ILOffset;
     public int LogIndent { get; private set; }
     public bool DebugLog { get; set; }
     public bool Breakpointing { get; set; }
-    private bool _lastWasPrefix;
+    public bool IsTranspileMode { get; set; }
+    public int TranspileIndex { get; set; }
+    public List<CodeInstruction>? TranspileInstructions { get; }
+    public int Index { get; private set; }
+    public DebuggableEmitter(ILGenerator generator, MethodBase method, List<CodeInstruction> instructions, int index = -1)
+    {
+        Generator = generator;
+        Method = method;
+        IsTranspileMode = true;
+        TranspileInstructions = instructions;
+        Index = index == -1 ? instructions.Count : index;
+    }
     public DebuggableEmitter(ILGenerator generator, MethodBase method)
     {
         Generator = generator;
-#if DEBUG
         Method = method;
-#endif
     }
     public DebuggableEmitter(DynamicMethod method) : this (method.GetILGenerator(), method) { }
     
@@ -59,6 +67,25 @@ public class DebuggableEmitter
 #endif
     }
 
+    public void GotoIndex(int index)
+    {
+        if (!IsTranspileMode)
+            throw new InvalidOperationException("Not in transpile mode");
+
+        if (index > TranspileInstructions!.Count)
+            throw new ArgumentOutOfRangeException(nameof(index), "Index is higher than instruction count.");
+
+        if (index < 0)
+            index = TranspileInstructions.Count;
+        Index = index;
+    }
+    public CodeInstruction GetCurrentCodeInstruction()
+    {
+        if (Index >= TranspileInstructions!.Count)
+            throw new InvalidOperationException("Index is too high to add a label or block instruction.");
+        return TranspileInstructions[Index];
+    }
+    
     [Conditional("DEBUG")]
     public void Comment(string comment)
     {
@@ -72,25 +99,57 @@ public class DebuggableEmitter
         Log("}");
         Log(".catch (" + type.Format() + ") {");
         ++LogIndent;
-        Generator.BeginCatchBlock(type);
+        if (IsTranspileMode)
+        {
+            CodeInstruction ins = GetCurrentCodeInstruction();
+            ins.blocks.Add(new ExceptionBlock(ExceptionBlockType.BeginCatchBlock, type));
+        }
+        else
+        {
+            Generator.BeginCatchBlock(type);
+        }
     }
     public void BeginExceptFilterBlock()
     {
         Log(".try (filter) {");
         ++LogIndent;
-        Generator.BeginExceptFilterBlock();
+        if (IsTranspileMode)
+        {
+            CodeInstruction ins = GetCurrentCodeInstruction();
+            ins.blocks.Add(new ExceptionBlock(ExceptionBlockType.BeginExceptFilterBlock));
+        }
+        else
+        {
+            Generator.BeginExceptFilterBlock();
+        }
     }
     public void BeginExceptionBlock()
     {
         Log(".try {");
         ++LogIndent;
-        Generator.BeginExceptionBlock();
+        if (IsTranspileMode)
+        {
+            CodeInstruction ins = GetCurrentCodeInstruction();
+            ins.blocks.Add(new ExceptionBlock(ExceptionBlockType.BeginExceptionBlock));
+        }
+        else
+        {
+            Generator.BeginExceptionBlock();
+        }
     }
     public void BeginFaultBlock()
     {
         Log(".fault {");
         ++LogIndent;
-        Generator.BeginFaultBlock();
+        if (IsTranspileMode)
+        {
+            CodeInstruction ins = GetCurrentCodeInstruction();
+            ins.blocks.Add(new ExceptionBlock(ExceptionBlockType.BeginFaultBlock));
+        }
+        else
+        {
+            Generator.BeginFaultBlock();
+        }
     }
     public void BeginFinallyBlock()
     {
@@ -98,12 +157,25 @@ public class DebuggableEmitter
         Log("}");
         Log(".finally {");
         ++LogIndent;
-        Generator.BeginFinallyBlock();
+        if (IsTranspileMode)
+        {
+            CodeInstruction ins = GetCurrentCodeInstruction();
+            ins.blocks.Add(new ExceptionBlock(ExceptionBlockType.BeginFinallyBlock));
+        }
+        else
+        {
+            Generator.BeginFinallyBlock();
+        }
     }
     public void BeginScope()
     {
+        if (IsTranspileMode)
+        {
+            throw new NotSupportedException("Scope blocks are not supported in Transpile mode.");
+        }
         Log(".scope {");
         ++LogIndent;
+
         Generator.BeginScope();
     }
     public LocalBuilder DeclareLocal(Type type) => DeclareLocal(type, false);
@@ -122,147 +194,347 @@ public class DebuggableEmitter
     public void Emit(OpCode opcode)
     {
         Log(opcode, null);
-        Generator.Emit(opcode);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode);
+        }
     }
     public void Emit(OpCode opcode, byte arg)
     {
         Log(opcode, arg);
-        Generator.Emit(opcode, arg);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, arg));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, arg);
+        }
     }
     public void Emit(OpCode opcode, double arg)
     {
         Log(opcode, arg);
-        Generator.Emit(opcode, arg);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, arg));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, arg);
+        }
     }
     public void Emit(OpCode opcode, float arg)
     {
         Log(opcode, arg);
-        Generator.Emit(opcode, arg);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, arg));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, arg);
+        }
     }
     public void Emit(OpCode opcode, int arg)
     {
         Log(opcode, arg);
-        Generator.Emit(opcode, arg);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, arg));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, arg);
+        }
     }
     public void Emit(OpCode opcode, long arg)
     {
         Log(opcode, arg);
-        Generator.Emit(opcode, arg);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, arg));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, arg);
+        }
     }
     public void Emit(OpCode opcode, sbyte arg)
     {
         Log(opcode, arg);
-        Generator.Emit(opcode, arg);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, arg));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, arg);
+        }
     }
     public void Emit(OpCode opcode, short arg)
     {
         Log(opcode, arg);
-        Generator.Emit(opcode, arg);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, arg));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, arg);
+        }
     }
     public void Emit(OpCode opcode, string arg)
     {
         Log(opcode, arg);
-        Generator.Emit(opcode, arg);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, arg));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, arg);
+        }
     }
     public void Emit(OpCode opcode, ConstructorInfo con)
     {
         Log(opcode, con);
-        Generator.Emit(opcode, con);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, con));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, con);
+        }
     }
     public void Emit(OpCode opcode, Label label)
     {
         Log(opcode, label);
-        Generator.Emit(opcode, label);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, label));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, label);
+        }
     }
     public void Emit(OpCode opcode, Label[] labels)
     {
         Log(opcode, labels);
-        Generator.Emit(opcode, labels);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, labels));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, labels);
+        }
     }
     public void Emit(OpCode opcode, LocalBuilder local)
     {
         Log(opcode, local);
-        Generator.Emit(opcode, local);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, local));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, local);
+        }
     }
     public void Emit(OpCode opcode, SignatureHelper signature)
     {
         Log(opcode, signature);
-        Generator.Emit(opcode, signature);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, signature));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, signature);
+        }
     }
     public void Emit(OpCode opcode, FieldInfo field)
     {
         Log(opcode, field);
-        Generator.Emit(opcode, field);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, field));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, field);
+        }
     }
     public void Emit(OpCode opcode, MethodInfo meth)
     {
         Log(opcode, meth);
-        Generator.Emit(opcode, meth);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, meth));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, meth);
+        }
     }
     public void Emit(OpCode opcode, Type cls)
     {
         Log(opcode, cls);
-        Generator.Emit(opcode, cls);
+        if (IsTranspileMode)
+        {
+            TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, cls));
+            ++Index;
+        }
+        else
+        {
+            Generator.Emit(opcode, cls);
+        }
     }
     public void EmitCall(OpCode opcode, MethodInfo methodInfo, Type[] optionalParameterTypes)
     {
+        if (IsTranspileMode)
+        {
+            throw new NotSupportedException("EmitCall is not supported in Transpile mode.");
+        }
         Log(opcode, methodInfo);
+
         Generator.EmitCall(opcode, methodInfo, optionalParameterTypes);
     }
     public void EmitCalli(OpCode opcode, CallingConventions callingConvention, Type returnType, Type[] parameterTypes, Type[] optionalParameterTypes)
     {
+        if (IsTranspileMode)
+        {
+            throw new NotSupportedException("EmitCalli is not supported in Transpile mode.");
+        }
         Log(opcode, null);
+
         Generator.EmitCalli(opcode, callingConvention, returnType, parameterTypes, optionalParameterTypes);
     }
     public void EmitCalli(OpCode opcode, System.Runtime.InteropServices.CallingConvention unmanagedCallConv, Type returnType, Type[] parameterTypes)
     {
+        if (IsTranspileMode)
+        {
+            throw new NotSupportedException("EmitCalli is not supported in Transpile mode.");
+        }
         Log(opcode, null);
+
         Generator.EmitCalli(opcode, unmanagedCallConv, returnType, parameterTypes);
     }
     public void EmitWriteLine(string str)
     {
+        if (IsTranspileMode)
+        {
+            throw new NotSupportedException("EmitWriteLine is not supported in Transpile mode.");
+        }
         Log("// Write Line: " + str.Format(true));
+
         Generator.EmitWriteLine(str);
     }
     public void EmitWriteLine(LocalBuilder local)
     {
+        if (IsTranspileMode)
+        {
+            throw new NotSupportedException("EmitWriteLine is not supported in Transpile mode.");
+        }
         Log("// Write Line: Local #" + local.LocalIndex.Format());
+
         Generator.EmitWriteLine(local);
     }
     public void EmitWriteLine(FieldInfo field)
     {
+        if (IsTranspileMode)
+        {
+            throw new NotSupportedException("EmitWriteLine is not supported in Transpile mode.");
+        }
         Log("// Write Line: Field " + field.Format());
+
         Generator.EmitWriteLine(field);
     }
     public void EndExceptionBlock()
     {
         --LogIndent;
         Log("}");
-        Generator.EndExceptionBlock();
+        if (IsTranspileMode)
+        {
+            CodeInstruction ins = GetCurrentCodeInstruction();
+            ins.blocks.Add(new ExceptionBlock(ExceptionBlockType.EndExceptionBlock));
+        }
+        else
+        {
+            Generator.EndExceptionBlock();
+        }
     }
     public void EndScope()
     {
+        if (IsTranspileMode)
+        {
+            throw new NotSupportedException("Scope blocks are not supported in Transpile mode.");
+        }
         --LogIndent;
         Log("}");
+
         Generator.EndScope();
     }
     public void MarkLabel(Label label)
     {
         Log(".label " + label.Format() + ": @ IL" + ILOffset.ToString("X").Format(false) + ".");
-        Generator.MarkLabel(label);
+        if (IsTranspileMode)
+        {
+            CodeInstruction ins = GetCurrentCodeInstruction();
+            if (!ins.labels.Contains(label))
+                ins.labels.Add(label);
+        }
+        else
+        {
+            Generator.MarkLabel(label);
+        }
     }
     public void MarkSequencePoint(ISymbolDocumentWriter document, int startLine, int startColumn, int endLine, int endColumn)
     {
+        if (IsTranspileMode)
+        {
+            throw new NotSupportedException("Sequence points are not supported in Transpile mode.");
+        }
         Log($"// Sequence Point: (line, column) Start: {startLine.Format()}, {startColumn.Format()}, End: {endLine.Format()}, {endColumn.Format()}.");
         Generator.MarkSequencePoint(document, startLine, startColumn, endLine, endColumn);
     }
     public void ThrowException(Type type)
     {
+        if (IsTranspileMode)
+        {
+            throw new NotSupportedException("ThrowException is not supported in Transpile mode.");
+        }
         Log($"// Throw Exception {type.Format()}.");
         Generator.ThrowException(type);
     }
     public void UsingNamespace(string usingNamespace)
     {
+        if (IsTranspileMode)
+        {
+            throw new NotSupportedException("UsingNamespace is not supported in Transpile mode.");
+        }
         Log($".using {usingNamespace.Format(false)};");
         Generator.UsingNamespace(usingNamespace);
     }

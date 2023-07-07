@@ -76,6 +76,30 @@ public readonly struct TransformationDelta
         if ((Flags & TransformFlags.OriginalRotation) != 0)
             writer.Write(OriginalRotation);
     }
+    public int CalculateSize(bool halfPrecision = false)
+    {
+        int size = 0;
+        if ((Flags & TransformFlags.Position) != 0)
+            size += 12;
+        if ((Flags & TransformFlags.OriginalPosition) != 0)
+            size += 12;
+        if ((Flags & TransformFlags.Rotation) != 0)
+            size += 16;
+        if ((Flags & TransformFlags.OriginalRotation) != 0)
+            size += 16;
+        if (halfPrecision) size /= 2;
+        return size + 1;
+    }
+    public static int CalculatePartialSize(TransformFlags flags, bool halfPrecision = false)
+    {
+        int size = 0;
+        if ((flags & TransformFlags.Position) != 0)
+            size += 12;
+        if ((flags & TransformFlags.Rotation) != 0)
+            size += 16;
+        if (halfPrecision) size /= 2;
+        return size;
+    }
     public void WriteHalfPrecision(ByteWriter writer)
     {
         writer.Write(Flags);

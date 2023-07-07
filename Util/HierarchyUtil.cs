@@ -40,7 +40,7 @@ public static class HierarchyUtil
     {
         SendRequestInstantiation.Invoke(type, position, rotation, scale);
     }
-    // todo queue in TemporaryActions if joining
+
     [NetCall(NetCallSource.FromServer, NetCalls.SendHierarchyInstantiation)]
     public static StandardErrorCode ReceiveHierarchyInstantiation(MessageContext ctx, IHierarchyItemTypeIdentifier? type, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner)
     {
@@ -192,7 +192,7 @@ public static class HierarchyUtil
         // binary search because it should be mostly in order.
         while (min <= max)
         {
-            int index = min + (max - min >> 1);
+            int index = min + (max - min) / 2;
             int comparison = items[index].instanceID.CompareTo(instanceId);
             if (comparison == 0)
                 return index;

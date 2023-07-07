@@ -7,6 +7,7 @@ using DevkitServer.API;
 using DevkitServer.Patches;
 using HarmonyLib;
 using StackCleaner;
+using Action = System.Action;
 
 namespace DevkitServer.Util;
 internal static class Accessor
@@ -76,7 +77,7 @@ internal static class Accessor
             flags |= BindingFlags.Instance;
             flags &= ~BindingFlags.Static;
             FieldInfo? field = typeof(TInstance).GetField(fieldName, flags);
-            if (field is null || field.IsStatic || !field.FieldType.IsAssignableFrom(typeof(TValue)))
+            if (field is null || field.IsStatic || !typeof(TValue).IsAssignableFrom(field.FieldType))
                 throw new FieldAccessException("Field not found or invalid.");
             const MethodAttributes attr = MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig;
             DynamicMethod method = new DynamicMethod("get_" + fieldName, attr, CallingConventions.HasThis, typeof(TValue), new Type[] { typeof(TInstance) }, typeof(TInstance), true);
@@ -169,7 +170,7 @@ internal static class Accessor
             flags |= BindingFlags.Instance;
             flags &= ~BindingFlags.Static;
             FieldInfo? field = instance.GetField(fieldName, flags);
-            if (field is null || field.IsStatic || !field.FieldType.IsAssignableFrom(typeof(TValue)))
+            if (field is null || field.IsStatic || !typeof(TValue).IsAssignableFrom(field.FieldType))
                 throw new FieldAccessException("Field not found or invalid.");
             const MethodAttributes attr = MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig;
             DynamicMethod method = new DynamicMethod("get_" + fieldName, attr, CallingConventions.HasThis, typeof(TValue), new Type[] { typeof(object) }, instance, true);
@@ -258,7 +259,7 @@ internal static class Accessor
             flags |= BindingFlags.Static;
             flags &= ~BindingFlags.Instance;
             FieldInfo? field = instance.GetField(fieldName, flags);
-            if (field is null || !field.IsStatic || !field.FieldType.IsAssignableFrom(typeof(TValue)))
+            if (field is null || !field.IsStatic || !typeof(TValue).IsAssignableFrom(field.FieldType))
                 throw new FieldAccessException("Field not found or invalid.");
             const MethodAttributes attr = MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig;
             DynamicMethod method = new DynamicMethod("get_" + fieldName, attr, CallingConventions.Standard, typeof(TValue), Array.Empty<Type>(), instance, true);
@@ -384,7 +385,51 @@ internal static class Accessor
             typeof(Action<,,,,,,,,,,,,,,,>)
         };
     }
+    public static bool IsExtern(this MethodBase method) => (method.Attributes & MethodAttributes.PinvokeImpl) != 0;
+    public static bool IsExtern(this FieldInfo field) => field.IsPinvokeImpl;
+    public static bool IsExtern(this PropertyInfo property, bool checkGetterFirst = true)
+    {
+        MethodInfo? method = checkGetterFirst ? property.GetGetMethod(true) : property.GetSetMethod(true);
+        if (method == null)
+        {
+            method = checkGetterFirst ? property.GetSetMethod(true) : property.GetGetMethod(true);
+            if (method == null)
+                return false;
+        }
+
+        if ((method.Attributes & MethodAttributes.PinvokeImpl) != 0)
+            return true;
+        if (method.IsAbstract || method.IsVirtual || method.DeclaringType!.IsInterface)
+            return false;
+        try
+        {
+            method.GetMethodBody();
+            return false;
+        }
+        catch (BadImageFormatException)
+        {
+            return true;
+        }
+    }
+    public static bool IsIgnored(this Type type) => Attribute.IsDefined(type, typeof(IgnoreAttribute));
+    public static bool IsIgnored(this MemberInfo member) => Attribute.IsDefined(member, typeof(IgnoreAttribute));
+    public static bool IsIgnored(this Assembly assembly) => Attribute.IsDefined(assembly, typeof(IgnoreAttribute));
+    public static bool IsIgnored(this ParameterInfo parameter) => Attribute.IsDefined(parameter, typeof(IgnoreAttribute));
+    public static bool IsIgnored(this Module module) => Attribute.IsDefined(module, typeof(IgnoreAttribute));
+    public static int GetPriority(this Type type) => Attribute.GetCustomAttribute(type, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr ? attr.Priority : 0;
+    public static int GetPriority(this MemberInfo member) => Attribute.GetCustomAttribute(member, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr ? attr.Priority : 0;
+    public static int GetPriority(this Assembly assembly) => Attribute.GetCustomAttribute(assembly, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr ? attr.Priority : 0;
+    public static int GetPriority(this ParameterInfo parameter) => Attribute.GetCustomAttribute(parameter, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr ? attr.Priority : 0;
+    public static int GetPriority(this Module module) => Attribute.GetCustomAttribute(module, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr ? attr.Priority : 0;
     public static int SortTypesByPriorityHandler(Type a, Type b)
+    {
+        return (Attribute.GetCustomAttribute(b, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute pB
+            ? pB.Priority
+            : 0).CompareTo(Attribute.GetCustomAttribute(a, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute pA
+            ? pA.Priority
+            : 0);
+    }
+    public static int SortMembersByPriorityHandler(MemberInfo a, MemberInfo b)
     {
         return (Attribute.GetCustomAttribute(b, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute pB
             ? pB.Priority
@@ -511,19 +556,22 @@ internal static class Accessor
         paramTypes[0] = method.DeclaringType!;
         for (int i = 1; i < paramTypes.Length; ++i)
             paramTypes[i] = p[i - 1].ParameterType;
-        try
+        if (!method.ShouldCallvirt())
         {
-            // try to create a delegate without allocating a method first
-            Delegate? rtn = method.CreateDelegate(delegateType);
-            if (rtn != null)
+            try
             {
-                Logger.LogDebug("Created instance calling delegate for " + method.Format() + " of type " + delegateType.Format() + ".");
-                return rtn;
+                // try to create a delegate without allocating a method first
+                Delegate? rtn = method.CreateDelegate(delegateType);
+                if (rtn != null)
+                {
+                    Logger.LogDebug("Created instance calling delegate for " + method.Format() + " of type " + delegateType.Format() + ".");
+                    return rtn;
+                }
             }
-        }
-        catch
-        {
-            // ignored
+            catch
+            {
+                // ignored
+            }
         }
         try
         {

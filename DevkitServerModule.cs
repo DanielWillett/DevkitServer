@@ -187,15 +187,14 @@ public sealed class DevkitServerModule : IModuleNexus
             if (LoadFaulted)
             {
                 Provider.shutdown(1, "Failed to load config.");
-                return;
+                goto fault;
             }
 
             if (!NetFactory.Init())
             {
                 Fault();
-                Logger.LogError(
-                    "Failed to load! Loading cancelled. Check for updates on https://github.com/DanielWillett/DevkitServer.");
-                return;
+                Logger.LogError("Failed to load! Loading cancelled. Check for updates on https://github.com/DanielWillett/DevkitServer.");
+                goto fault;
             }
             
             foreach (Type type in Assembly.GetExecutingAssembly()
@@ -223,8 +222,14 @@ public sealed class DevkitServerModule : IModuleNexus
             }
 
             if (LoadFaulted)
-                return;
+                goto fault;
+
             CreateDirectoryAttribute.CreateInAssembly(Assembly, true);
+#if CLIENT
+            UIExtensionManager.Reflect(Accessor.DevkitServer);
+#endif
+            if (LoadFaulted)
+                goto fault;
 
             Level.onPostLevelLoaded += OnPostLevelLoaded;
             Editor.onEditorCreated += OnEditorCreated;
@@ -501,6 +506,16 @@ public sealed class DevkitServerModule : IModuleNexus
     }
     private static void OnPrePreLevelLoaded(int level)
     {
+#if CLIENT
+        if (level == Level.BUILD_INDEX_MENU)
+        {
+            LoadingUI? loadingUI = UIAccessTools.LoadingUI;
+            if (loadingUI == null)
+            {
+                Logger.LogWarning("Unable to find LoadingUI.");
+            }
+        }
+#endif
         if (level != Level.BUILD_INDEX_GAME)
             return;
 

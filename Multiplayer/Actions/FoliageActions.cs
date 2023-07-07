@@ -1,10 +1,11 @@
-﻿using DevkitServer.Util.Encoding;
-using JetBrains.Annotations;
+﻿using DevkitServer.Multiplayer.Levels;
+using DevkitServer.Util.Encoding;
 using SDG.Framework.Devkit;
 using SDG.Framework.Foliage;
 #if SERVER
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;
+using DevkitServer.Players;
 #endif
 
 namespace DevkitServer.Multiplayer.Actions;
@@ -81,14 +82,11 @@ public sealed class FoliageActions
     }
     private void OnRemoveLevelObjectFoliage(in RemoveLevelObjectFoliageProperties properties)
     {
-        if (Regions.tryGetCoordinate(properties.Position, out byte x, out byte y))
+        if (LevelObjectNetIdDatabase.TryGetObjectNetId(properties.LevelObject, out NetId netId))
         {
-            EditorActions.QueueAction(new RemoveLevelObjectAction
+            EditorActions.QueueAction(new DeleteLevelObjectsAction
             {
-                CoordinateX = x,
-                CoordinateY = y,
-                InstanceId = properties.LevelObject.instanceID,
-                IsFoliage = true,
+                NetIds = new NetId[] { netId },
                 DeltaTime = properties.DeltaTime
             });
         }
@@ -103,7 +101,7 @@ public sealed class FoliageActions
 
 [Action(ActionType.AddFoliageToSurface, 45, 16)]
 [EarlyTypeInit]
-public sealed class AddFoliageToSurfaceAction : IAction, IAsset
+public sealed class AddFoliageToSurfaceAction : IServersideAction, IAsset
 {
     private static readonly Action<FoliageInfoAsset, Vector3, Quaternion, Vector3, bool>? ExecuteAddFoliage
         = Accessor.GenerateInstanceCaller<FoliageInfoAsset, Action<FoliageInfoAsset, Vector3, Quaternion, Vector3, bool>>("addFoliage", throwOnError: false);
@@ -120,6 +118,11 @@ public sealed class AddFoliageToSurfaceAction : IAction, IAsset
     public Quaternion Rotation { get; set; }
     public Vector3 Scale { get; set; }
     public bool ClearWhenBaked { get; set; }
+    public uint SendBackInstanceId { get; set; }
+    public NetId NetId { get; set; }
+#if SERVER
+    public bool IsObject { get; set; }
+#endif
     public void Apply()
     {
         if (ExecuteAddFoliage == null)
@@ -130,19 +133,27 @@ public sealed class AddFoliageToSurfaceAction : IAction, IAsset
         if (FoliageAsset.Find() is { } asset)
         {
             ExecuteAddFoliage(asset, Position, Rotation, Scale, ClearWhenBaked);
-#if SERVER
-            if (asset is FoliageObjectInfoAsset objAsset && Regions.tryGetCoordinate(Position, out byte x, out byte y) && LevelObjects.objects[x, y] is { Count: > 0 and <= ushort.MaxValue + 1 } region)
+            if (asset is FoliageObjectInfoAsset objAsset
+                && Regions.tryGetCoordinate(Position, out byte x, out byte y)
+                && LevelObjects.objects[x, y] is { Count: > 0 and <= ushort.MaxValue + 1 } region)
             {
                 LevelObject obj = ObjectManager.getObject(x, y, (ushort)(region.Count - 1));
-                if (obj.asset.GUID != objAsset.obj.GUID)
+                if (obj == null || obj.asset.GUID != objAsset.obj.GUID)
                 {
                     Logger.LogWarning($"Unable to find object placed by {Instigator.Format()} in add foliage action.");
                     return;
                 }
-
-                LevelObjectResponsibilities.Set(obj.instanceID, Instigator.m_SteamID, false);
-            }
+                if (!NetId.IsNull())
+                {
+#if CLIENT
+                    if (Instigator.m_SteamID == Provider.client.m_SteamID)
+                        LevelObjectResponsibilities.Set(obj.instanceID, false);
+#else
+                    LevelObjectResponsibilities.Set(obj.instanceID, Instigator.m_SteamID, false);
 #endif
+                    LevelObjectNetIdDatabase.RegisterObject(obj, NetId);
+                }
+            }
         }
         else
         {
@@ -152,20 +163,42 @@ public sealed class AddFoliageToSurfaceAction : IAction, IAsset
 #if SERVER
     public bool CheckCanApply()
     {
-        return VanillaPermissions.EditFoliage.Has(Instigator.m_SteamID) ||
-               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+        if (!VanillaPermissions.EditFoliage.Has(Instigator.m_SteamID) ||
+            VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID))
+        {
+            return false;
+        }
+        if (FoliageAsset.Find() is { } asset && asset is FoliageObjectInfoAsset)
+        {
+            IsObject = true;
+            NetId = NetIdRegistry.Claim();
+            EditorUser? user = UserManager.FromId(Instigator.m_SteamID);
+            if (user != null)
+                LevelObjectNetIdDatabase.SendBindObject.Invoke(user.Connection, SendBackInstanceId, NetId);
+        }
+        return true;
     }
 #endif
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
-        bool nonUniformScale = Scale == Vector3.one;
+        bool nonUniformScale = Scale != Vector3.one;
         byte flag = (byte)((nonUniformScale ? 2 : 0) | (ClearWhenBaked ? 1 : 0));
+#if SERVER
+        if (IsObject) flag |= 4;
+#endif
         writer.Write(flag);
         writer.Write(Position);
         writer.Write(Rotation);
         if (nonUniformScale)
             writer.Write(Scale);
+#if CLIENT
+        writer.Write(SendBackInstanceId);
+#endif
+#if SERVER
+        if (IsObject)
+            writer.Write(NetId);
+#endif
     }
     public void Read(ByteReader reader)
     {
@@ -176,7 +209,20 @@ public sealed class AddFoliageToSurfaceAction : IAction, IAsset
         Position = reader.ReadVector3();
         Rotation = reader.ReadQuaternion();
         Scale = nonUniformScale ? reader.ReadVector3() : Vector3.one;
+#if SERVER
+        SendBackInstanceId = reader.ReadUInt32();
+#endif
+#if CLIENT
+        bool isObject = (flag & 4) != 0;
+        NetId = isObject ? reader.ReadNetId() : NetId.INVALID;
+#endif
     }
+
+    public int CalculateSize() => 37 + (Scale != Vector3.one ? 12 : 0)
+#if SERVER
+      + (IsObject ? 4 : 0)
+#endif
+    ;
 }
 
 [Action(ActionType.RemoveFoliageInstances, 16, 36)]
@@ -213,7 +259,7 @@ public sealed class RemoveFoliageInstancesAction : IAction, ICoordinates, IBrush
             Logger.LogWarning("Tile missing foliage " + (FoliageAsset.Find()?.FriendlyName ?? "NULL") + ": (" + CoordinateX.Format() + ", " + CoordinateY.Format() + ").");
             return;
         }
-        bool flag1 = false;
+        bool hierarchyIsDirty = false;
         float sqrBrushRadius = BrushRadius * BrushRadius;
         float sqrBrushFalloffRadius = sqrBrushRadius * BrushFalloff * BrushFalloff;
         int sampleCount = SampleCount;
@@ -236,15 +282,14 @@ public sealed class RemoveFoliageInstancesAction : IAction, ICoordinates, IBrush
                         {
                             tile.removeInstance(list, index1, index2);
                             --sampleCount;
-                            flag1 = true;
+                            hierarchyIsDirty = true;
                         }
                     }
                 }
             }
         }
-        if (!flag1)
-            return;
-        LevelHierarchy.MarkDirty();
+        if (hierarchyIsDirty)
+            LevelHierarchy.MarkDirty();
     }
 #if SERVER
     public bool CheckCanApply()
@@ -263,6 +308,7 @@ public sealed class RemoveFoliageInstancesAction : IAction, ICoordinates, IBrush
         DeltaTime = reader.ReadFloat();
         BrushPosition = reader.ReadVector3();
     }
+    public int CalculateSize() => 16;
 }
 
 [Action(ActionType.RemoveResourceSpawnpoint, 16, 16)]
@@ -325,81 +371,5 @@ public sealed class RemoveResourceSpawnpointAction : IAction, IAsset
         DeltaTime = reader.ReadFloat();
         ResourcePosition = reader.ReadVector3();
     }
-}
-
-[Action(ActionType.RemoveFoliageLevelObject, 8, 8, CreateMethod = nameof(CreateRemoveFoliageLevelObject))]
-[Action(ActionType.RemoveLevelObject, 8, 8)]
-[EarlyTypeInit]
-public sealed class RemoveLevelObjectAction : IAction, ICoordinates
-{
-    private LevelObject? _targetObject;
-    public ActionType Type => IsFoliage ? ActionType.RemoveFoliageLevelObject : ActionType.RemoveLevelObject;
-    public CSteamID Instigator { get; set; }
-    public float DeltaTime { get; set; }
-    public uint InstanceId { get; set; }
-    public int CoordinateX { get; set; }
-    public int CoordinateY { get; set; }
-    public bool IsFoliage { get; set; }
-    public void Apply()
-    {
-        if (_targetObject == null)
-        {
-            List<LevelObject> region = LevelObjects.objects[CoordinateX, CoordinateY];
-            for (int i = 0; i < region.Count; ++i)
-            {
-                LevelObject obj = region[i];
-                if (obj.instanceID == InstanceId)
-                {
-                    _targetObject = obj;
-                    break;
-                }
-            }
-
-            if (_targetObject == null)
-            {
-                Logger.LogWarning("Object not found: #" + InstanceId.Format() + " (" + CoordinateX.Format() + ", " + CoordinateY.Format() + ").");
-                return;
-            }
-        }
-        LevelObjects.removeObject(_targetObject.transform);
-    }
-#if SERVER
-    public bool CheckCanApply()
-    {
-        if (IsFoliage)
-            return VanillaPermissions.EditFoliage.Has(Instigator.m_SteamID) ||
-                   VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
-
-        if (VanillaPermissions.EditObjects.Has(Instigator.m_SteamID) ||
-            VanillaPermissions.RemoveUnownedObjects.Has(Instigator.m_SteamID))
-            return true;
-            
-        // check if the user is the one that placed the object (recently).
-        List<LevelObject> region = LevelObjects.objects[CoordinateX, CoordinateY];
-        for (int i = 0; i < region.Count; ++i)
-        {
-            LevelObject obj = region[i];
-            if (obj.instanceID == InstanceId)
-            {
-                _targetObject = obj;
-                return LevelObjectResponsibilities.IsPlacer(obj.instanceID, Instigator.m_SteamID);
-            }
-        }
-
-        return false;
-    }
-#endif
-    public void Write(ByteWriter writer)
-    {
-        writer.Write(DeltaTime);
-        writer.Write(InstanceId);
-    }
-    public void Read(ByteReader reader)
-    {
-        DeltaTime = reader.ReadFloat();
-        InstanceId = reader.ReadUInt32();
-    }
-
-    [UsedImplicitly]
-    private static RemoveLevelObjectAction CreateRemoveFoliageLevelObject() => new RemoveLevelObjectAction { IsFoliage = true };
+    public int CalculateSize() => 16;
 }

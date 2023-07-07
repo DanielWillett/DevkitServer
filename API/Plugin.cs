@@ -1,6 +1,7 @@
 ﻿using DevkitServer.API.Permissions;
 using DevkitServer.Plugins;
 using System.Reflection;
+using DevkitServer.Players.UI;
 
 namespace DevkitServer.API;
 public abstract class Plugin : IDevkitServerColorPlugin
@@ -104,6 +105,16 @@ public abstract class Plugin : IDevkitServerColorPlugin
     /// <inheritdoc/>
     public void LogError(Exception ex) =>
         Logger.LogError(ex, method: Name.ToUpperInvariant().Colorize(Color));
+#if CLIENT
+    public void RegisterUIExtension(Type implementationType, Type parentUIType, int priority)
+    {
+        UIExtensionManager.RegisterExtension(new UIExtensionInfo(implementationType, parentUIType, priority, this));
+    }
+    public void DeregisterUIExtension(Type implementationType)
+    {
+        UIExtensionManager.DeregisterExtension(implementationType);
+    }
+#endif
 }
 
 public abstract class Plugin<TConfig> : Plugin, IDevkitServerPlugin<TConfig> where TConfig : class, new()

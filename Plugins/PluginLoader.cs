@@ -5,6 +5,7 @@ using DevkitServer.Configuration;
 using System.Reflection;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Patches;
+using DevkitServer.Players.UI;
 using HarmonyLib;
 using Action = System.Action;
 
@@ -428,7 +429,7 @@ public static class PluginLoader
 
         // check if the assembly just has one plugin
         Assembly asm = relaventType.Assembly;
-        if (asm == Assembly.GetExecutingAssembly()) return null;
+        if (asm == Accessor.DevkitServer) return null;
         for (int i = 0; i < AssembliesIntl.Count; ++i)
         {
             if (AssembliesIntl[i].Assembly == asm)
@@ -553,6 +554,9 @@ public class PluginAssembly
         {
             HasReflected = true;
             CreateDirectoryAttribute.CreateInAssembly(Assembly);
+#if CLIENT
+            UIExtensionManager.Reflect(Assembly);
+#endif
             _netMethods.Clear();
             _netCalls.Clear();
             NetFactory.Reflect(Assembly,
