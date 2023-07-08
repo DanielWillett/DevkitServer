@@ -1,9 +1,8 @@
 ﻿#if CLIENT
-using System.Globalization;
 using DevkitServer.Players;
-using JetBrains.Annotations;
 using SDG.Framework.Landscapes;
 using SDG.Framework.Rendering;
+using System.Globalization;
 
 namespace DevkitServer.Util.Debugging;
 internal sealed class RegionDebug : MonoBehaviour
@@ -32,8 +31,8 @@ internal sealed class RegionDebug : MonoBehaviour
         stretchWidth = true,
         richText = true
     };
-    private static bool _tilesEnabled = true;
-    private static bool _regionsEnabled = true;
+    private static bool _tilesEnabled;
+    private static bool _regionsEnabled;
     private static Vector3[,]? _tileCorners;
     private static float _avgLineHeight;
     internal static bool TilesEnabled

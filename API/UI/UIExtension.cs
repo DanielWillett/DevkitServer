@@ -1,10 +1,11 @@
-﻿using DevkitServer.Players.UI;
+﻿#if CLIENT
+using DevkitServer.Players.UI;
 using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
 using Action = System.Action;
 
-namespace DevkitServer.API.Extensions.UI;
+namespace DevkitServer.API.UI;
 public abstract class UIExtension
 {
     public object? Instance { get; internal set; }
@@ -14,6 +15,10 @@ public abstract class UIExtension
 
     internal void InvokeOnOpened() => OnOpened?.Invoke();
     internal void InvokeOnClosed() => OnClosed?.Invoke();
+}
+public abstract class UIExtension<T> : UIExtension where T : class
+{
+    public new T? Instance => (T?)base.Instance;
 }
 
 public class UIExtensionParentTypeInfo
@@ -146,6 +151,7 @@ public class UIExtensionInfo
     public IReadOnlyList<UIExtensionPatch> Patches { get; }
     public IReadOnlyList<UIExistingMemberInfo> ExistingMembers { get; }
     public bool IsEmittable { get; internal set; }
+    public bool SuppressUIExtensionParentWarning { get; internal set; }
 #nullable disable
     public UITypeInfo TypeInfo { get; internal set; }
     internal CreateUIExtension CreateCallback { get; set; }
@@ -171,13 +177,18 @@ public class UIExtensionInfo
 public sealed class UIExtensionAttribute : Attribute
 {
     public Type ParentType { get; }
+    public bool SuppressUIExtensionParentWarning { get; set; }
     public UIExtensionAttribute(Type parentType)
     {
         ParentType = parentType;
     }
+    /// <summary>
+    /// Add type by name, mainly for internal types.<br/>
+    /// Use assembly qualified name if the type is not from SDG (Assembly-CSharp.dll).
+    /// </summary>
     public UIExtensionAttribute(string parentType)
     {
-        ParentType = Type.GetType(parentType, false, true) ?? Accessor.AssemblyCSharp.GetType(parentType, true, true);
+        ParentType = Type.GetType(parentType, false, true) ?? Accessor.AssemblyCSharp.GetType(parentType, false, true) ?? Accessor.AssemblyCSharp.GetType("SDG.Unturned." + parentType, true, true);
     }
 }
 
@@ -214,3 +225,4 @@ public enum ExistingMemberInitializeMode
     /// </summary>
     PatchGetter
 }
+#endif

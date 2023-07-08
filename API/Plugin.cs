@@ -1,7 +1,9 @@
 ﻿using DevkitServer.API.Permissions;
 using DevkitServer.Plugins;
-using System.Reflection;
+#if CLIENT
 using DevkitServer.Players.UI;
+using DevkitServer.API.UI;
+#endif
 
 namespace DevkitServer.API;
 public abstract class Plugin : IDevkitServerColorPlugin

@@ -1,4 +1,6 @@
 ﻿#if CLIENT
+using DevkitServer.API.UI;
+using DevkitServer.Players.UI.Handlers;
 using HarmonyLib;
 using System.Collections.ObjectModel;
 using System.Reflection;
@@ -165,9 +167,33 @@ public static class UIAccessTools
     private static readonly Func<object?>? GetItemStoreCartMenu;
     private static readonly Func<object?>? GetItemStoreDetailsMenu;
 
-    public static EditorUI? EditorUI => GetEditorUIInstance();
-    public static PlayerUI? PlayerUI => GetPlayerUIInstance();
-    public static MenuUI? MenuUI => GetMenuUIInstance?.Invoke();
+    public static EditorUI? EditorUI
+    {
+        get
+        {
+            EditorUI? editorUI = GetEditorUIInstance();
+            return editorUI == null ? null : editorUI;
+        }
+    }
+
+    public static PlayerUI? PlayerUI
+    {
+        get
+        {
+            PlayerUI? playerUI = GetPlayerUIInstance();
+            return playerUI == null ? null : playerUI;
+        }
+    }
+
+    public static MenuUI? MenuUI
+    {
+        get
+        {
+            MenuUI? menuUi = GetMenuUIInstance?.Invoke();
+            return menuUi == null ? null : menuUi;
+        }
+    }
+
     public static LoadingUI? LoadingUI
     {
         get
@@ -1197,23 +1223,25 @@ public static class UIAccessTools
         }
         finally
         {
+            MethodBase[] emptyMethods = Array.Empty<MethodBase>();
             Dictionary<Type, UITypeInfo> typeInfo = new Dictionary<Type, UITypeInfo>(32)
             {
                 {
                     typeof(EditorDashboardUI),
-                    new UITypeInfo(typeof(EditorDashboardUI), Array.Empty<MethodBase>(), Array.Empty<MethodBase>())
+                    new UITypeInfo(typeof(EditorDashboardUI), emptyMethods, emptyMethods, hasActiveMember: false)
                     {
                         Parent = typeof(EditorUI),
                         Scene = UIScene.Editor,
                         EmitProperty = nameof(EditorDashboardUI),
                         OpenOnInitialize = true,
                         DefaultOpenState = true,
-                        CloseOnDestroy = true
+                        CloseOnDestroy = true,
+                        DestroyedByParent = true
                     }
                 },
                 {
                     typeof(EditorEnvironmentLightingUI),
-                    new UITypeInfo(typeof(EditorEnvironmentLightingUI))
+                    new UITypeInfo(typeof(EditorEnvironmentLightingUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(EditorEnvironmentUI),
                         Scene = UIScene.Editor,
@@ -1222,7 +1250,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(EditorEnvironmentNavigationUI),
-                    new UITypeInfo(typeof(EditorEnvironmentNavigationUI))
+                    new UITypeInfo(typeof(EditorEnvironmentNavigationUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(EditorEnvironmentUI),
                         Scene = UIScene.Editor,
@@ -1231,7 +1259,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(EditorEnvironmentRoadsUI),
-                    new UITypeInfo(typeof(EditorEnvironmentRoadsUI))
+                    new UITypeInfo(typeof(EditorEnvironmentRoadsUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(EditorEnvironmentUI),
                         Scene = UIScene.Editor,
@@ -1258,7 +1286,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(EditorLevelPlayersUI),
-                    new UITypeInfo(typeof(EditorLevelPlayersUI))
+                    new UITypeInfo(typeof(EditorLevelPlayersUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(EditorLevelUI),
                         Scene = UIScene.Editor,
@@ -1276,7 +1304,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(EditorLevelVisibilityUI),
-                    new UITypeInfo(typeof(EditorLevelVisibilityUI))
+                    new UITypeInfo(typeof(EditorLevelVisibilityUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(EditorLevelUI),
                         Scene = UIScene.Editor,
@@ -1285,7 +1313,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(EditorPauseUI),
-                    new UITypeInfo(typeof(EditorPauseUI))
+                    new UITypeInfo(typeof(EditorPauseUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(EditorDashboardUI),
                         Scene = UIScene.Editor,
@@ -1294,7 +1322,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(EditorSpawnsAnimalsUI),
-                    new UITypeInfo(typeof(EditorSpawnsAnimalsUI))
+                    new UITypeInfo(typeof(EditorSpawnsAnimalsUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(EditorSpawnsUI),
                         Scene = UIScene.Editor,
@@ -1303,7 +1331,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(EditorSpawnsItemsUI),
-                    new UITypeInfo(typeof(EditorSpawnsItemsUI))
+                    new UITypeInfo(typeof(EditorSpawnsItemsUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(EditorSpawnsUI),
                         Scene = UIScene.Editor,
@@ -1312,7 +1340,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(EditorSpawnsUI),
-                    new UITypeInfo(typeof(EditorSpawnsUI))
+                    new UITypeInfo(typeof(EditorSpawnsUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(EditorDashboardUI),
                         Scene = UIScene.Editor,
@@ -1321,7 +1349,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(EditorSpawnsVehiclesUI),
-                    new UITypeInfo(typeof(EditorSpawnsVehiclesUI))
+                    new UITypeInfo(typeof(EditorSpawnsVehiclesUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(EditorSpawnsUI),
                         Scene = UIScene.Editor,
@@ -1330,7 +1358,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(EditorSpawnsZombiesUI),
-                    new UITypeInfo(typeof(EditorSpawnsZombiesUI))
+                    new UITypeInfo(typeof(EditorSpawnsZombiesUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(EditorSpawnsUI),
                         Scene = UIScene.Editor,
@@ -1339,7 +1367,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(EditorTerrainUI),
-                    new UITypeInfo(typeof(EditorTerrainUI))
+                    new UITypeInfo(typeof(EditorTerrainUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(EditorDashboardUI),
                         Scene = UIScene.Editor,
@@ -1348,29 +1376,31 @@ public static class UIAccessTools
                 },
                 {
                     typeof(EditorUI),
-                    new UITypeInfo(typeof(EditorUI), Array.Empty<MethodBase>(), Array.Empty<MethodBase>())
+                    new UITypeInfo(typeof(EditorUI), emptyMethods, emptyMethods, hasActiveMember: false)
                     {
                         Scene = UIScene.Editor,
                         EmitProperty = nameof(EditorUI),
                         OpenOnInitialize = true,
                         DefaultOpenState = true,
-                        CloseOnDestroy = true
+                        CloseOnDestroy = true,
+                        IsActiveMember = typeof(EditorUI).GetProperty(nameof(EditorUI.window), BindingFlags.Static | BindingFlags.Public)
                     }
                 },
                 {
                     typeof(LoadingUI),
-                    new UITypeInfo(typeof(LoadingUI), Array.Empty<MethodBase>(), Array.Empty<MethodBase>())
+                    new UITypeInfo(typeof(LoadingUI), emptyMethods, emptyMethods, hasActiveMember: false)
                     {
                         Scene = UIScene.Loading,
                         EmitProperty = nameof(LoadingUI),
                         OpenOnInitialize = true,
                         DefaultOpenState = true,
-                        CloseOnDestroy = true
+                        CloseOnDestroy = true,
+                        IsActiveMember = typeof(LoadingUI).GetProperty(nameof(LoadingUI.isBlocked), BindingFlags.Static | BindingFlags.Public)
                     }
                 },
                 {
                     typeof(MenuConfigurationControlsUI),
-                    new UITypeInfo(typeof(MenuConfigurationControlsUI))
+                    new UITypeInfo(typeof(MenuConfigurationControlsUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuConfigurationUI),
                         Scene = UIScene.Menu,
@@ -1379,7 +1409,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuConfigurationDisplayUI),
-                    new UITypeInfo(typeof(MenuConfigurationDisplayUI))
+                    new UITypeInfo(typeof(MenuConfigurationDisplayUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuConfigurationUI),
                         Scene = UIScene.Menu,
@@ -1388,7 +1418,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuConfigurationGraphicsUI),
-                    new UITypeInfo(typeof(MenuConfigurationGraphicsUI))
+                    new UITypeInfo(typeof(MenuConfigurationGraphicsUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuConfigurationUI),
                         Scene = UIScene.Menu,
@@ -1397,7 +1427,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuConfigurationOptionsUI),
-                    new UITypeInfo(typeof(MenuConfigurationOptionsUI))
+                    new UITypeInfo(typeof(MenuConfigurationOptionsUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuConfigurationUI),
                         Scene = UIScene.Menu,
@@ -1406,7 +1436,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuConfigurationUI),
-                    new UITypeInfo(typeof(MenuConfigurationUI))
+                    new UITypeInfo(typeof(MenuConfigurationUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuDashboardUI),
                         Scene = UIScene.Menu,
@@ -1415,7 +1445,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuCreditsUI),
-                    new UITypeInfo(typeof(MenuCreditsUI))
+                    new UITypeInfo(typeof(MenuCreditsUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuDashboardUI),
                         Scene = UIScene.Menu,
@@ -1433,7 +1463,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuPauseUI),
-                    new UITypeInfo(typeof(MenuPauseUI))
+                    new UITypeInfo(typeof(MenuPauseUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuDashboardUI),
                         Scene = UIScene.Menu,
@@ -1442,7 +1472,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuPlayConfigUI),
-                    new UITypeInfo(typeof(MenuPlayConfigUI))
+                    new UITypeInfo(typeof(MenuPlayConfigUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuDashboardUI),
                         Scene = UIScene.Menu,
@@ -1514,7 +1544,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuServerPasswordUI),
-                    new UITypeInfo(typeof(MenuServerPasswordUI))
+                    new UITypeInfo(typeof(MenuServerPasswordUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuPlayServerInfoUI),
                         Scene = UIScene.Menu,
@@ -1550,7 +1580,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuSurvivorsClothingDeleteUI),
-                    new UITypeInfo(typeof(MenuSurvivorsClothingDeleteUI))
+                    new UITypeInfo(typeof(MenuSurvivorsClothingDeleteUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuSurvivorsClothingUI),
                         Scene = UIScene.Menu,
@@ -1559,7 +1589,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuSurvivorsClothingInspectUI),
-                    new UITypeInfo(typeof(MenuSurvivorsClothingInspectUI))
+                    new UITypeInfo(typeof(MenuSurvivorsClothingInspectUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuSurvivorsClothingUI),
                         Scene = UIScene.Menu,
@@ -1568,7 +1598,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuSurvivorsClothingItemUI),
-                    new UITypeInfo(typeof(MenuSurvivorsClothingItemUI))
+                    new UITypeInfo(typeof(MenuSurvivorsClothingItemUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuSurvivorsClothingUI),
                         Scene = UIScene.Menu,
@@ -1604,7 +1634,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuTitleUI),
-                    new UITypeInfo(typeof(MenuTitleUI))
+                    new UITypeInfo(typeof(MenuTitleUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuDashboardUI),
                         Scene = UIScene.Menu,
@@ -1613,13 +1643,14 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuUI),
-                    new UITypeInfo(typeof(MenuUI), Array.Empty<MethodBase>(), Array.Empty<MethodBase>())
+                    new UITypeInfo(typeof(MenuUI), emptyMethods, emptyMethods, hasActiveMember: false)
                     {
                         Scene = UIScene.Menu,
                         EmitProperty = nameof(MenuUI),
                         OpenOnInitialize = true,
                         DefaultOpenState = true,
-                        CloseOnDestroy = true
+                        CloseOnDestroy = true,
+                        IsActiveMember = typeof(MenuUI).GetProperty(nameof(MenuUI.window), BindingFlags.Static | BindingFlags.Public)
                     }
                 },
                 {
@@ -1633,7 +1664,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuWorkshopErrorUI),
-                    new UITypeInfo(typeof(MenuWorkshopErrorUI))
+                    new UITypeInfo(typeof(MenuWorkshopErrorUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuWorkshopUI),
                         Scene = UIScene.Menu,
@@ -1642,7 +1673,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuWorkshopLocalizationUI),
-                    new UITypeInfo(typeof(MenuWorkshopLocalizationUI))
+                    new UITypeInfo(typeof(MenuWorkshopLocalizationUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuWorkshopUI),
                         Scene = UIScene.Menu,
@@ -1651,7 +1682,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuWorkshopSpawnsUI),
-                    new UITypeInfo(typeof(MenuWorkshopSpawnsUI))
+                    new UITypeInfo(typeof(MenuWorkshopSpawnsUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuWorkshopUI),
                         Scene = UIScene.Menu,
@@ -1669,7 +1700,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(MenuWorkshopSubscriptionsUI),
-                    new UITypeInfo(typeof(MenuWorkshopSubscriptionsUI))
+                    new UITypeInfo(typeof(MenuWorkshopSubscriptionsUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(MenuWorkshopUI),
                         Scene = UIScene.Menu,
@@ -1687,7 +1718,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(PlayerBarricadeLibraryUI),
-                    new UITypeInfo(typeof(PlayerBarricadeLibraryUI))
+                    new UITypeInfo(typeof(PlayerBarricadeLibraryUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(PlayerUI),
                         Scene = UIScene.Player,
@@ -1705,7 +1736,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(PlayerBarricadeSignUI),
-                    new UITypeInfo(typeof(PlayerBarricadeSignUI))
+                    new UITypeInfo(typeof(PlayerBarricadeSignUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(PlayerUI),
                         Scene = UIScene.Player,
@@ -1723,7 +1754,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(PlayerDashboardCraftingUI),
-                    new UITypeInfo(typeof(PlayerDashboardCraftingUI))
+                    new UITypeInfo(typeof(PlayerDashboardCraftingUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(PlayerDashboardUI),
                         Scene = UIScene.Player,
@@ -1741,7 +1772,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(PlayerDashboardInventoryUI),
-                    new UITypeInfo(typeof(PlayerDashboardInventoryUI))
+                    new UITypeInfo(typeof(PlayerDashboardInventoryUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(PlayerDashboardUI),
                         Scene = UIScene.Player,
@@ -1750,7 +1781,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(PlayerDashboardSkillsUI),
-                    new UITypeInfo(typeof(PlayerDashboardSkillsUI))
+                    new UITypeInfo(typeof(PlayerDashboardSkillsUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(PlayerDashboardUI),
                         Scene = UIScene.Player,
@@ -1768,7 +1799,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(PlayerDeathUI),
-                    new UITypeInfo(typeof(PlayerDeathUI))
+                    new UITypeInfo(typeof(PlayerDeathUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(PlayerUI),
                         Scene = UIScene.Player,
@@ -1786,7 +1817,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(PlayerNPCDialogueUI),
-                    new UITypeInfo(typeof(PlayerNPCDialogueUI))
+                    new UITypeInfo(typeof(PlayerNPCDialogueUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(PlayerUI),
                         Scene = UIScene.Player,
@@ -1795,7 +1826,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(PlayerNPCQuestUI),
-                    new UITypeInfo(typeof(PlayerNPCQuestUI))
+                    new UITypeInfo(typeof(PlayerNPCQuestUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(PlayerUI),
                         Scene = UIScene.Player,
@@ -1804,7 +1835,7 @@ public static class UIAccessTools
                 },
                 {
                     typeof(PlayerNPCVendorUI),
-                    new UITypeInfo(typeof(PlayerNPCVendorUI))
+                    new UITypeInfo(typeof(PlayerNPCVendorUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(PlayerUI),
                         Scene = UIScene.Player,
@@ -1822,18 +1853,19 @@ public static class UIAccessTools
                 },
                 {
                     typeof(PlayerUI),
-                    new UITypeInfo(typeof(PlayerUI), Array.Empty<MethodBase>(), Array.Empty<MethodBase>())
+                    new UITypeInfo(typeof(PlayerUI), emptyMethods, emptyMethods, hasActiveMember: false)
                     {
                         Scene = UIScene.Player,
                         EmitProperty = nameof(PlayerUI),
                         OpenOnInitialize = true,
                         DefaultOpenState = true,
-                        CloseOnDestroy = true
+                        CloseOnDestroy = true,
+                        IsActiveMember = typeof(PlayerUI).GetProperty(nameof(PlayerUI.window), BindingFlags.Static | BindingFlags.Public)
                     }
                 },
                 {
                     typeof(PlayerWorkzoneUI),
-                    new UITypeInfo(typeof(PlayerWorkzoneUI))
+                    new UITypeInfo(typeof(PlayerWorkzoneUI), destroyMethods: emptyMethods)
                     {
                         Parent = typeof(PlayerUI),
                         Scene = UIScene.Player,
@@ -1845,55 +1877,60 @@ public static class UIAccessTools
             {
                 typeInfo.Add(
                     EditorEnvironmentNodesUIType, 
-                    new UITypeInfo(EditorEnvironmentNodesUIType)
+                    new UITypeInfo(EditorEnvironmentNodesUIType, hasActiveMember: false)
                     {
                         Parent = typeof(EditorEnvironmentUI),
                         Scene = UIScene.Editor,
-                        EmitProperty = nameof(EditorEnvironmentNodesUI)
+                        EmitProperty = nameof(EditorEnvironmentNodesUI),
+                        DestroyedByParent = true
                     });
             }
             if (EditorVolumesUIType != null)
             {
                 typeInfo.Add(
                     EditorVolumesUIType,
-                    new UITypeInfo(EditorVolumesUIType)
+                    new UITypeInfo(EditorVolumesUIType, hasActiveMember: false)
                     {
                         Parent = typeof(EditorLevelUI),
                         Scene = UIScene.Editor,
-                        EmitProperty = nameof(EditorVolumesUI)
+                        EmitProperty = nameof(EditorVolumesUI),
+                        DestroyedByParent = true
                     });
             }
             if (EditorTerrainDetailsUIType != null)
             {
                 typeInfo.Add(
                     EditorTerrainDetailsUIType,
-                    new UITypeInfo(EditorTerrainDetailsUIType)
+                    new UITypeInfo(EditorTerrainDetailsUIType, hasActiveMember: false)
                     {
                         Parent = typeof(EditorTerrainUI),
                         Scene = UIScene.Editor,
-                        EmitProperty = nameof(EditorTerrainDetailsUI)
+                        EmitProperty = nameof(EditorTerrainDetailsUI),
+                        DestroyedByParent = true
                     });
             }
             if (EditorTerrainHeightUIType != null)
             {
                 typeInfo.Add(
                     EditorTerrainHeightUIType,
-                    new UITypeInfo(EditorTerrainHeightUIType)
+                    new UITypeInfo(EditorTerrainHeightUIType, hasActiveMember: false)
                     {
                         Parent = typeof(EditorTerrainUI),
                         Scene = UIScene.Editor,
-                        EmitProperty = nameof(EditorTerrainHeightUI)
+                        EmitProperty = nameof(EditorTerrainHeightUI),
+                        DestroyedByParent = true
                     });
             }
             if (EditorTerrainTilesUIType != null)
             {
                 typeInfo.Add(
                     EditorTerrainTilesUIType,
-                    new UITypeInfo(EditorTerrainTilesUIType)
+                    new UITypeInfo(EditorTerrainTilesUIType, hasActiveMember: false)
                     {
                         Parent = typeof(EditorTerrainUI),
                         Scene = UIScene.Editor,
-                        EmitProperty = nameof(EditorTerrainTilesUI)
+                        EmitProperty = nameof(EditorTerrainTilesUI),
+                        DestroyedByParent = true
                     });
             }
             if (PlayerBrowserRequestUIType != null)
@@ -1913,14 +1950,15 @@ public static class UIAccessTools
             {
                 typeInfo.Add(
                     PlayerGroupUIType,
-                    new UITypeInfo(PlayerGroupUIType, Array.Empty<MethodBase>(), Array.Empty<MethodBase>())
+                    new UITypeInfo(PlayerGroupUIType, emptyMethods, emptyMethods, hasActiveMember: false)
                     {
                         Parent = typeof(PlayerUI),
                         Scene = UIScene.Player,
                         EmitProperty = nameof(PlayerGroupUI),
                         OpenOnInitialize = true,
                         DefaultOpenState = true,
-                        CloseOnDestroy = true
+                        CloseOnDestroy = true,
+                        DestroyedByParent = true
                     });
             }
             else
@@ -1929,11 +1967,12 @@ public static class UIAccessTools
             {
                 typeInfo.Add(
                     ItemStoreMenuType,
-                    new UITypeInfo(ItemStoreMenuType)
+                    new UITypeInfo(ItemStoreMenuType, hasActiveMember: false)
                     {
                         Parent = typeof(MenuSurvivorsClothingUI),
                         Scene = UIScene.Menu,
-                        EmitProperty = nameof(ItemStoreMenu)
+                        EmitProperty = nameof(ItemStoreMenu),
+                        DestroyedByParent = true
                     });
             }
             else
@@ -1942,11 +1981,12 @@ public static class UIAccessTools
             {
                 typeInfo.Add(
                     ItemStoreCartMenuType,
-                    new UITypeInfo(ItemStoreCartMenuType)
+                    new UITypeInfo(ItemStoreCartMenuType, hasActiveMember: false)
                     {
                         Parent = ItemStoreMenuType,
                         Scene = UIScene.Menu,
-                        EmitProperty = nameof(ItemStoreCartMenu)
+                        EmitProperty = nameof(ItemStoreCartMenu),
+                        DestroyedByParent = true
                     });
             }
             else
@@ -1955,11 +1995,12 @@ public static class UIAccessTools
             {
                 typeInfo.Add(
                     ItemStoreDetailsMenuType,
-                    new UITypeInfo(ItemStoreDetailsMenuType)
+                    new UITypeInfo(ItemStoreDetailsMenuType, hasActiveMember: false)
                     {
                         Parent = ItemStoreMenuType,
                         Scene = UIScene.Menu,
-                        EmitProperty = nameof(ItemStoreDetailsMenu)
+                        EmitProperty = nameof(ItemStoreDetailsMenu),
+                        DestroyedByParent = true
                     });
             }
             else
@@ -1967,6 +2008,9 @@ public static class UIAccessTools
             
             try
             {
+                CustomVolumeMenuHandler volumeHandler = new CustomVolumeMenuHandler();
+                CustomNodeMenuHandler nodeHandler = new CustomNodeMenuHandler();
+                CustomSleekWrapperDestroyHandler sleekWrapperHandler = new CustomSleekWrapperDestroyHandler();
                 List<Type> types = Accessor.GetTypesSafe(Accessor.AssemblyCSharp);
                 foreach (Type menuType in types
                              .Where(x =>
@@ -1977,32 +2021,28 @@ public static class UIAccessTools
                     MenuTypes[menuType.DeclaringType] = menuType;
                     if (typeof(VolumeBase).IsAssignableFrom(menuType.DeclaringType))
                     {
-                        typeInfo[menuType] = new UITypeInfo(menuType, Array.Empty<MethodBase>(), Array.Empty<MethodBase>(), destroyMethods: Array.Empty<MethodBase>())
+                        typeInfo[menuType] = new UITypeInfo(menuType, emptyMethods, emptyMethods, destroyMethods: emptyMethods, hasActiveMember: false)
                         {
                             Parent = EditorVolumesUIType,
                             Scene = UIScene.Editor,
                             CustomEmitter = EmitVolumeMenu,
-                            DefaultOpenState = true,
-                            OpenOnInitialize = true,
-                            /* todo
-                            CustomOnClose = true,
-                            CustomOnOpen = true,
-                            CustomOnDestroy = true */
+                            CustomOnClose = volumeHandler,
+                            CustomOnOpen = volumeHandler,
+                            CustomOnDestroy = sleekWrapperHandler
                         };
                     }
                     else if (typeof(TempNodeBase).IsAssignableFrom(menuType.DeclaringType))
                     {
-                        typeInfo[menuType] = new UITypeInfo(menuType, Array.Empty<MethodBase>(), Array.Empty<MethodBase>())
+                        typeInfo[menuType] = new UITypeInfo(menuType, emptyMethods, emptyMethods, hasActiveMember: false)
                         {
                             Parent = EditorEnvironmentNodesUIType,
                             Scene = UIScene.Editor,
                             CustomEmitter = EmitNodeMenu,
                             DefaultOpenState = true,
                             OpenOnInitialize = true,
-                            /* todo
-                            CustomOnClose = true,
-                            CustomOnOpen = true,
-                            CustomOnDestroy = true */
+                            CustomOnClose = nodeHandler,
+                            CustomOnOpen = nodeHandler,
+                            CustomOnDestroy = sleekWrapperHandler
                         };
                     }
                 }
@@ -2013,21 +2053,19 @@ public static class UIAccessTools
                     if (typeInfo.ContainsKey(sleekWrapper))
                         continue;
 
-                    typeInfo.Add(sleekWrapper, new UITypeInfo(sleekWrapper, Array.Empty<MethodBase>(), Array.Empty<MethodBase>())
+                    typeInfo.Add(sleekWrapper, new UITypeInfo(sleekWrapper, emptyMethods, emptyMethods, hasActiveMember: false)
                     {
                         Parent = null,
                         Scene = UIScene.Global,
                         IsInstanceUI = false,
                         DefaultOpenState = true,
                         OpenOnInitialize = true,
-                        /* todo
-                        CustomOnClose = true,
-                        CustomOnOpen = true,
-                        CustomOnDestroy = true */
+                        CustomOnDestroy = sleekWrapperHandler
                     });
                 }
                 Logger.LogDebug($"[{Source}] Discovered {typeInfo.Count - c} UI wrapper type(s).");
                 c = typeInfo.Count;
+                CustomUseableHandler useableHandler = new CustomUseableHandler();
                 foreach (Type useable in types.Where(x => typeof(Useable).IsAssignableFrom(x)))
                 {
                     if (typeInfo.ContainsKey(useable))
@@ -2037,15 +2075,15 @@ public static class UIAccessTools
                     if (!fields.Any(x => typeof(ISleekElement).IsAssignableFrom(x.FieldType) && !properties.Any(x => typeof(ISleekElement).IsAssignableFrom(x.PropertyType))))
                         continue;
 
-                    typeInfo.Add(useable, new UITypeInfo(useable, Array.Empty<MethodBase>(), Array.Empty<MethodBase>())
+                    typeInfo.Add(useable, new UITypeInfo(useable, emptyMethods, emptyMethods, emptyMethods, hasActiveMember: false)
                     {
                         Parent = typeof(PlayerUI),
                         Scene = UIScene.Player,
                         CustomEmitter = EmitUseable,
-                        /* todo
-                        CustomOnClose = true,
-                        CustomOnOpen = true,
-                        CustomOnDestroy = true */
+                        CloseOnDestroy = true,
+                        OpenOnInitialize = true,
+                        CustomOnInitialize = useableHandler,
+                        CustomOnDestroy = useableHandler
                     });
                 }
                 Logger.LogDebug($"[{Source}] Discovered {typeInfo.Count - c} useable UI type(s).");
@@ -2131,6 +2169,7 @@ public class UITypeInfo
     public bool IsInstanceUI { get; internal set; } = true;
     public UIScene Scene { get; internal set; }
     public string? EmitProperty { get; internal set; }
+    public MemberInfo? IsActiveMember { get; internal set; }
     public Action<UITypeInfo, DebuggableEmitter>? CustomEmitter { get; internal set; }
     public UIVisibilityMethodInfo[] OpenMethods { get; }
     public UIVisibilityMethodInfo[] CloseMethods { get; }
@@ -2144,8 +2183,9 @@ public class UITypeInfo
     public bool OpenOnInitialize { get; internal set; }
     public bool CloseOnDestroy { get; internal set; }
     public bool DestroyOnClose { get; internal set; }
+    public bool DestroyedByParent { get; internal set; }
     
-    internal UITypeInfo(Type type, MethodBase[]? closeMethods = null, MethodBase[]? openMethods = null, MethodBase[]? initializeMethods = null, MethodBase[]? destroyMethods = null)
+    internal UITypeInfo(Type type, MethodBase[]? closeMethods = null, MethodBase[]? openMethods = null, MethodBase[]? initializeMethods = null, MethodBase[]? destroyMethods = null, bool hasActiveMember = true)
     {
         Type = type;
         MethodInfo[]? methods = closeMethods != null && openMethods != null && destroyMethods != null ? null : type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
@@ -2217,40 +2257,26 @@ public class UITypeInfo
         }
         if (initializeMethods == null)
         {
-            Thread.BeginCriticalRegion();
             try
             {
                 ConstructorInfo[] constructors = type.GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-                Logger.LogDebug($"[{UIAccessTools.Source}] Found constructors for UI type: {type.Format()}, {constructors.Length.Format()} ctor(s).");
-
                 InitializeMethods = new UIVisibilityMethodInfo[constructors.Length];
-                Logger.LogDebug($"[{UIAccessTools.Source}] Made array: {InitializeMethods.Length.Format()}.");
 
                 for (int i = 0; i < constructors.Length; ++i)
                 {
                     ConstructorInfo ctor = constructors[i];
-                    Logger.LogDebug($"[{UIAccessTools.Source}] #{(i + 1).Format()}, Found constructor {ctor.Format()}.");
 
                     InitializeMethods[i] = new UIVisibilityMethodInfo(ctor, ctor.GetParameters().Length > 0, ctor.IsStatic);
                 }
-
-                int length = InitializeMethods.Length;
-                Logger.LogDebug($"[{UIAccessTools.Source}] Array: {length.Format()}.");
-
-                if (length == 0)
-                {
+                
+                if (InitializeMethods.Length == 0)
                     Logger.LogWarning($"Failed to find any initialize constructors for UI: {type.Format()}.", method: UIAccessTools.Source);
-                }
             }
             catch (Exception ex)
             {
                 Logger.LogWarning($"Error finding any initialize constructors for UI: {type.Format()}.", method: UIAccessTools.Source);
                 Logger.LogError(ex, method: UIAccessTools.Source);
                 InitializeMethods = Array.Empty<UIVisibilityMethodInfo>();
-            }
-            finally
-            {
-                Thread.EndCriticalRegion();
             }
         }
         else
@@ -2276,11 +2302,11 @@ public class UITypeInfo
                 }
 
                 if (DestroyMethods.Length == 0)
-                    Logger.LogWarning($"Failed to find any initialize constructors for UI: {type.Format()}.", method: UIAccessTools.Source);
+                    Logger.LogWarning($"Failed to find any destroy methods for UI: {type.Format()}.", method: UIAccessTools.Source);
             }
             catch (Exception ex)
             {
-                Logger.LogWarning($"Error finding any initialize constructors for UI: {type.Format()}.", method: UIAccessTools.Source);
+                Logger.LogWarning($"Error finding any destroy methods for UI: {type.Format()}.", method: UIAccessTools.Source);
                 Logger.LogError(ex, method: UIAccessTools.Source);
                 DestroyMethods = Array.Empty<UIVisibilityMethodInfo>();
             }
@@ -2294,6 +2320,30 @@ public class UITypeInfo
                 DestroyMethods[i] = new UIVisibilityMethodInfo(method, method.GetParameters().Length > 0, method.IsStatic);
             }
         }
+        if (hasActiveMember)
+        {
+            try
+            {
+                IsActiveMember = type
+                    .GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
+                    .Where(x => x.FieldType == typeof(bool)).SingleOrDefaultSafe(x =>
+                        x.Name.Equals("active", StringComparison.InvariantCultureIgnoreCase) || x.Name.Equals("isActive", StringComparison.InvariantCultureIgnoreCase));
+                IsActiveMember ??= type
+                    .GetProperties(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
+                    .Where(x => x.PropertyType == typeof(bool) && x.GetGetMethod(true) != null).SingleOrDefaultSafe(x =>
+                        x.Name.Equals("active", StringComparison.InvariantCultureIgnoreCase) || x.Name.Equals("isActive", StringComparison.InvariantCultureIgnoreCase))?
+                    .GetGetMethod(true);
+                if (IsActiveMember == null)
+                    Logger.LogWarning($"Failed to find any 'active' or 'isActive' member for {type.Format()}.", method: UIAccessTools.Source);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning($"Error finding any destroy methods for UI: {type.Format()}.", method: UIAccessTools.Source);
+                Logger.LogError(ex, method: UIAccessTools.Source);
+                IsActiveMember = null;
+            }
+        }
+
         // ReSharper restore CoVariantArrayConversion
     }
     private static void RemoveMatchesFromBaseClasses(Type type, List<MethodInfo> matches)

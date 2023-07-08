@@ -1,10 +1,21 @@
-﻿#if CLIENT
+﻿
+#if CLIENT
+#if DEBUG
+
+/*
+ * Uncomment this to enable UI Extension Debug Logging.
+ */
+
+#define UI_EXT_DEBUG
+#endif
+
 using DevkitServer.API;
-using DevkitServer.API.Extensions.UI;
+using DevkitServer.API.UI;
 using DevkitServer.Patches;
 using DevkitServer.Plugins;
 using HarmonyLib;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
@@ -20,6 +31,17 @@ public static class UIExtensionManager
     private static readonly Dictionary<MethodBase, UIExtensionExistingMemberPatchInfo> PatchInfo = new Dictionary<MethodBase, UIExtensionExistingMemberPatchInfo>(64);
     public static IReadOnlyList<UIExtensionInfo> Extensions { get; } = ExtensionsIntl.AsReadOnly();
     public static IReadOnlyDictionary<Type, UIExtensionParentTypeInfo> ParentTypeInfo { get; } = new ReadOnlyDictionary<Type, UIExtensionParentTypeInfo>(ParentTypeInfoIntl);
+    
+    [Conditional("UI_EXT_DEBUG")]
+    internal static void LogDebug(string message, IDevkitServerPlugin? plugin = null)
+    {
+        message = $"[{Source}] " + message;
+        if (plugin == null)
+            Logger.LogDebug(message);
+        else
+            plugin.LogDebug(message);
+    }
+
     internal static void Reflect(Assembly assembly)
     {
         ThreadUtil.assertIsGameThread();
@@ -44,7 +66,10 @@ public static class UIExtensionManager
                 }
             }
 
-            UIExtensionInfo info = new UIExtensionInfo(type, attribute.ParentType, priority == null ? 0 : priority.Priority, plugin);
+            UIExtensionInfo info = new UIExtensionInfo(type, attribute.ParentType, priority == null ? 0 : priority.Priority, plugin)
+            {
+                SuppressUIExtensionParentWarning = attribute.SuppressUIExtensionParentWarning
+            };
 
             try
             {
@@ -66,16 +91,15 @@ public static class UIExtensionManager
                 continue;
             }
 
-            if (plugin != null)
-                plugin.LogDebug($"Registered UI extension: {type.Format()}.");
-            else
-                Logger.LogDebug($"[{Source}] Registered UI extension: {type.Format()}.");
+            LogDebug($"Registered UI extension: {type.Format()}.", plugin);
         }
     }
+
     private static void OnOpened(Type? type, object? instance)
     {
         if (instance != null)
             type = instance.GetType();
+        LogDebug($"Opened: {type.Format()}.");
         for (int i = 0; i < ExtensionsIntl.Count; i++)
         {
             UIExtensionInfo info = ExtensionsIntl[i];
@@ -97,13 +121,14 @@ public static class UIExtensionManager
                     }
                 }
             }
-            Logger.LogDebug($"[{Source}] Opened: {info.ImplementationType.Format()}");
+            LogDebug($"* Invoked Opened: {info.ImplementationType.Format()}.", info.Plugin);
         }
     }
     private static void OnClosed(Type? type, object? instance)
     {
         if (instance != null)
             type = instance.GetType();
+        LogDebug($"Closed: {type.Format()}.");
         for (int i = 0; i < ExtensionsIntl.Count; i++)
         {
             UIExtensionInfo info = ExtensionsIntl[i];
@@ -125,13 +150,14 @@ public static class UIExtensionManager
                     }
                 }
             }
-            Logger.LogDebug($"[{Source}] Closed: {info.ImplementationType.Format()}");
+            LogDebug($"* Invoked Closed: {info.ImplementationType.Format()}.", info.Plugin);
         }
     }
     private static void OnInitialized(Type? type, object? instance)
     {
         if (instance != null)
             type = instance.GetType();
+        LogDebug($"Initialized: {type.Format()}.");
         for (int i = 0; i < ExtensionsIntl.Count; i++)
         {
             UIExtensionInfo info = ExtensionsIntl[i];
@@ -139,13 +165,36 @@ public static class UIExtensionManager
             object? ext = CreateExtension(info, instance);
             if (ext == null) continue;
             info.InstantiationsIntl.Add(ext);
-            Logger.LogDebug($"[{Source}] Initialized: {info.ImplementationType.Format()}");
+            LogDebug($"* Initialized: {info.ImplementationType.Format()}.", info.Plugin);
+            if ((info.TypeInfo.OpenOnInitialize || info.TypeInfo.DefaultOpenState) && instance is UIExtension ext2)
+            {
+                try
+                {
+                    ext2.InvokeOnOpened();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Error invoking OnOpened from {ext.GetType().Format()}.", method: Source);
+                    Logger.LogError(ex, method: Source);
+                }
+            }
         }
     }
     private static void OnDestroy(Type? type, object? instance)
     {
         if (instance != null)
             type = instance.GetType();
+        
+        LogDebug($"Destroyed: {type.Format()}.");
+        foreach (UITypeInfo otherTypeInfo in UIAccessTools.TypeInfo.Values)
+        {
+            if (otherTypeInfo.DestroyedByParent && otherTypeInfo.Parent == type)
+            {
+                LogDebug($"* Destroying child: {otherTypeInfo.Type.Format()}.");
+                OnDestroy(otherTypeInfo.Type, null);
+            }
+        }
+
         for (int i = 0; i < ExtensionsIntl.Count; i++)
         {
             UIExtensionInfo info = ExtensionsIntl[i];
@@ -179,7 +228,7 @@ public static class UIExtensionManager
                 }
             }
             info.InstantiationsIntl.Clear();
-            Logger.LogDebug($"[{Source}] Destroyed: {info.ImplementationType.Format()}");
+            LogDebug($"* Invoked Destroyed: {info.ImplementationType.Format()}.", info.Plugin);
         }
     }
     internal static bool RegisterExtension(UIExtensionInfo info)
@@ -206,10 +255,7 @@ public static class UIExtensionManager
             return false;
         }
 
-        if (info.Plugin != null)
-            info.Plugin.LogDebug($"Registered UI extension: {info.ImplementationType.Format()}.");
-        else
-            Logger.LogDebug($"[{Source}] Registered UI extension: {info.ImplementationType.Format()}.");
+        LogDebug($"Registered UI extension: {info.ImplementationType.Format()}.", info.Plugin);
         return true;
     }
 
@@ -235,10 +281,7 @@ public static class UIExtensionManager
                     }
                 }
             }
-            if (extInfo.Plugin != null)
-                extInfo.Plugin.LogDebug($"Deregistered UI extension: {implementation.Format()}.");
-            else
-                Logger.LogDebug($"[{Source}] Deregistered UI extension: {implementation.Format()}.");
+            LogDebug($"Deregistered UI extension: {implementation.Format()}.", extInfo.Plugin);
         }
 
         return true;
@@ -257,6 +300,14 @@ public static class UIExtensionManager
     /// <exception cref="AggregateException"></exception>
     private static void InitializeExtension(UIExtensionInfo info)
     {
+        if (!info.SuppressUIExtensionParentWarning && !typeof(UIExtension).IsAssignableFrom(info.ImplementationType))
+        {
+            if (info.Plugin != null)
+                info.Plugin.LogWarning($"It's recommended to derive UI extensions from the {typeof(UIExtension).Format()} class (unlike {info.ImplementationType.Format()}).");
+            else
+                Logger.LogWarning($"It's recommended to derive UI extensions from the {typeof(UIExtension).Format()} class (unlike {info.ImplementationType.Format()}).", method: Source);
+        }
+
         if (!UIAccessTools.TryGetUITypeInfo(info.ParentType, out UITypeInfo? typeInfo))
         {
             if (info.Plugin != null)
@@ -450,12 +501,29 @@ public static class UIExtensionManager
     }
     internal static object? CreateExtension(UIExtensionInfo info, object? uiInstance)
     {
-        object? instance = info.CreateCallback(uiInstance);
-        if ((info.TypeInfo.OpenOnInitialize || info.TypeInfo.DefaultOpenState) && instance is UIExtension ext)
-            ext.InvokeOnOpened();
-        
-        Logger.LogDebug($"[{Source}] Created {instance.Format()} for {info.ParentType.Format()}.");
-        return instance;
+        try
+        {
+            object? instance = info.CreateCallback(uiInstance);
+
+            LogDebug($"Created {instance.Format()} for {info.ParentType.Format()}.", info.Plugin);
+
+            return instance;
+        }
+        catch (Exception ex)
+        {
+            if (info.Plugin == null)
+            {
+                Logger.LogError($"Error initializing {info.ImplementationType.Format()}.", method: Source);
+                Logger.LogError(ex, method: Source);
+            }
+            else
+            {
+                info.Plugin.LogError($"Error initializing {info.ImplementationType.Format()}.");
+                info.Plugin.LogError(ex);
+            }
+
+            return null;
+        }
     }
 
     private static void TryInitializeMember(UIExtensionInfo info, MemberInfo member)
@@ -542,7 +610,7 @@ public static class UIExtensionManager
                 Logger.LogWarning($"Parameterless methods can not be initialized (as indicated for {method.Format()}).", method: Source);
                 initialized = false;
             }
-            Logger.LogDebug($"[{Source}] Set initialized setting for existing member: {member.Format()}: {initialized.Format()}.");
+            LogDebug($"Set initialized setting for existing member: {member.Format()}: {initialized.Format()}.", info.Plugin);
         }
         else
         {
@@ -554,7 +622,7 @@ public static class UIExtensionManager
                 initialized = true;
             else
                 initialized = false;
-            Logger.LogDebug($"[{Source}] Assumed initialized setting for existing member: {member.Format()}: {initialized.Format()}.");
+            LogDebug($"Assumed initialized setting for existing member: {member.Format()}: {initialized.Format()}.", info.Plugin);
         }
 
         if (!initialized && existingProperty != null && existingProperty.GetSetMethod(true) != null)
@@ -569,7 +637,7 @@ public static class UIExtensionManager
             UIExistingMemberInfo member = info.ExistingMembersIntl[i];
             if (member.IsInitialized || member.Member is not PropertyInfo property)
             {
-                Logger.LogDebug($"[{Source}] Skipping initialized member: {member.Member.Format()}.");
+                LogDebug($"Skipping initialized member: {member.Member.Format()}.", info.Plugin);
                 continue;
             }
             MethodInfo? getter = property.GetGetMethod(true);
@@ -580,17 +648,16 @@ public static class UIExtensionManager
                 continue;
             }
             if (setter == null)
-                Logger.LogDebug($"[{Source}] Unable to find setter for {property.Format()}, not an issue.");
+                LogDebug($"Unable to find setter for {property.Format()}, not an issue.", info.Plugin);
             if (Patches.ContainsKey(getter))
             {
-                Logger.LogDebug($"[{Source}] {getter.Format()} has already been transpiled.");
+                LogDebug($"{getter.Format()} has already been transpiled.", info.Plugin);
             }
             else
             {
                 UIExtensionExistingMemberPatchInfo patchInfo = new UIExtensionExistingMemberPatchInfo(info, member);
                 PatchInfo[getter] = patchInfo;
                 MethodInfo transpiler = TranspileGetterPropertyMethod;
-                Logger.LogDebug($"{transpiler.Format()}.");
                 PatchesMain.Patcher.Patch(getter, transpiler: new HarmonyMethod(transpiler));
                 Patches.Add(getter, new UIExtensionPatch(getter, transpiler, HarmonyPatchType.Transpiler));
             }
@@ -599,7 +666,7 @@ public static class UIExtensionManager
             {
                 if (Patches.ContainsKey(setter))
                 {
-                    Logger.LogDebug($"[{Source}] {setter.Format()} has already been transpiled.");
+                    LogDebug($"{setter.Format()} has already been transpiled.", info.Plugin);
                 }
                 else
                 {
@@ -612,24 +679,37 @@ public static class UIExtensionManager
             }
         }
     }
-    
-    private static void InitializeParentPatches(UIExtensionInfo info)
+    private static UIExtensionParentTypeInfo GetOrAddParentTypeInfo(Type parentType)
     {
-        UITypeInfo typeInfo = info.TypeInfo;
-        Harmony harmonyInstance = PatchesMain.Patcher;
-        Type parentType = info.ParentType;
         if (!ParentTypeInfoIntl.TryGetValue(parentType, out UIExtensionParentTypeInfo parentTypeInfo))
         {
             parentTypeInfo = new UIExtensionParentTypeInfo(parentType);
             ParentTypeInfoIntl.Add(parentType, parentTypeInfo);
         }
+        return parentTypeInfo;
+    }
+    private static void InitializeParentPatches(UIExtensionInfo info)
+    {
+        UIExtensionParentTypeInfo parentTypeInfo = GetOrAddParentTypeInfo(info.ParentType);
 
+        PatchParentOnOpen(info.TypeInfo, parentTypeInfo, info.Plugin);
+        PatchParentOnClose(info.TypeInfo, parentTypeInfo, info.Plugin);
+        PatchParentOnInitialize(info.TypeInfo, parentTypeInfo, info.Plugin);
+        PatchParentOnDestroy(info.TypeInfo, parentTypeInfo, info.Plugin);
+    }
+    private static void PatchParentOnOpen(UITypeInfo typeInfo, UIExtensionParentTypeInfo parentTypeInfo, IDevkitServerPlugin? plugin)
+    {
         if (typeInfo.CustomOnOpen != null)
         {
             if (!typeInfo.CustomOnOpen.HasBeenInitialized)
             {
-                typeInfo.CustomOnOpen.Patch(typeInfo, parentTypeInfo);
+                typeInfo.CustomOnOpen.Patch();
                 typeInfo.CustomOnOpen.HasBeenInitialized = true;
+            }
+            if (!typeInfo.CustomOnOpen.HasOnOpenBeenInitialized)
+            {
+                typeInfo.CustomOnOpen.OnOpened += OnOpened;
+                typeInfo.CustomOnOpen.HasOnOpenBeenInitialized = true;
             }
         }
         else if (!typeInfo.OpenOnInitialize)
@@ -638,27 +718,27 @@ public static class UIExtensionManager
             {
                 if (parentTypeInfo.OpenPatchesIntl.Any(x => x.Original == openMethod.Method))
                 {
-                    Logger.LogDebug($"[{Source}] Skipped finalizer for {openMethod.Method.Format()}, already done from this extension.");
+                    LogDebug($"Skipped finalizer for {openMethod.Method.Format()}, already done from this extension.", plugin);
                     continue;
                 }
 
                 if (Patches.TryGetValue(openMethod.Method, out UIExtensionPatch patchInfo))
                 {
-                    Logger.LogDebug($"[{Source}] Skipped finalizer for {openMethod.Method.Format()}, already done from another extension.");
+                    LogDebug($"Skipped finalizer for {openMethod.Method.Format()}, already done from another extension.", plugin);
                     parentTypeInfo.OpenPatchesIntl.Add(patchInfo);
                     continue;
                 }
 
-                if (openMethod.Method.DeclaringType == parentType)
+                if (openMethod.Method.DeclaringType == typeInfo.Type)
                 {
                     MethodInfo finalizer = openMethod.IsStatic
                         ? StaticOpenMethodFinalizerMethod
                         : InstanceOpenMethodFinalizerMethod;
-                    harmonyInstance.Patch(openMethod.Method, finalizer: new HarmonyMethod(finalizer));
+                    PatchesMain.Patcher.Patch(openMethod.Method, finalizer: new HarmonyMethod(finalizer));
                     patchInfo = new UIExtensionPatch(openMethod.Method, finalizer, HarmonyPatchType.Finalizer);
                     parentTypeInfo.OpenPatchesIntl.Add(patchInfo);
                     Patches.Add(openMethod.Method, patchInfo);
-                    Logger.LogDebug($"[{Source}] Added finalizer for {openMethod.Method.Format()}: {finalizer.Format()}.");
+                    LogDebug($"Added finalizer for {openMethod.Method.Format()}: {finalizer.Format()}.", plugin);
                 }
                 else if (openMethod.Method.IsStatic)
                 {
@@ -666,13 +746,20 @@ public static class UIExtensionManager
                 }
             }
         }
-
+    }
+    private static void PatchParentOnClose(UITypeInfo typeInfo, UIExtensionParentTypeInfo parentTypeInfo, IDevkitServerPlugin? plugin)
+    {
         if (typeInfo.CustomOnClose != null)
         {
             if (!typeInfo.CustomOnClose.HasBeenInitialized)
             {
-                typeInfo.CustomOnClose.Patch(typeInfo, parentTypeInfo);
+                typeInfo.CustomOnClose.Patch();
                 typeInfo.CustomOnClose.HasBeenInitialized = true;
+            }
+            if (!typeInfo.CustomOnClose.HasOnCloseBeenInitialized)
+            {
+                typeInfo.CustomOnClose.OnClose += OnClosed;
+                typeInfo.CustomOnClose.HasOnCloseBeenInitialized = true;
             }
         }
         else if (!typeInfo.CloseOnDestroy)
@@ -681,27 +768,27 @@ public static class UIExtensionManager
             {
                 if (parentTypeInfo.ClosePatchesIntl.Any(x => x.Original == closeMethod.Method))
                 {
-                    Logger.LogDebug($"[{Source}] Skipped finalizer for {closeMethod.Method.Format()}, already done from this extension.");
+                    LogDebug($"Skipped finalizer for {closeMethod.Method.Format()}, already done from this extension.", plugin);
                     continue;
                 }
 
                 if (Patches.TryGetValue(closeMethod.Method, out UIExtensionPatch patchInfo))
                 {
-                    Logger.LogDebug($"[{Source}] Skipped finalizer for {closeMethod.Method.Format()}, already done from another extension.");
+                    LogDebug($"Skipped finalizer for {closeMethod.Method.Format()}, already done from another extension.", plugin);
                     parentTypeInfo.ClosePatchesIntl.Add(patchInfo);
                     continue;
                 }
 
-                if (closeMethod.Method.DeclaringType == parentType)
+                if (closeMethod.Method.DeclaringType == typeInfo.Type)
                 {
                     MethodInfo finalizer = closeMethod.IsStatic
                         ? StaticCloseMethodFinalizerMethod
                         : InstanceCloseMethodFinalizerMethod;
-                    harmonyInstance.Patch(closeMethod.Method, finalizer: new HarmonyMethod(finalizer));
+                    PatchesMain.Patcher.Patch(closeMethod.Method, finalizer: new HarmonyMethod(finalizer));
                     patchInfo = new UIExtensionPatch(closeMethod.Method, finalizer, HarmonyPatchType.Finalizer);
                     parentTypeInfo.ClosePatchesIntl.Add(patchInfo);
                     Patches.Add(closeMethod.Method, patchInfo);
-                    Logger.LogDebug($"[{Source}] Added finalizer for {closeMethod.Method.Format()}: {finalizer.Format()}.");
+                    LogDebug($"Added finalizer for {closeMethod.Method.Format()}: {finalizer.Format()}.", plugin);
                 }
                 else if (closeMethod.Method.IsStatic)
                 {
@@ -709,13 +796,20 @@ public static class UIExtensionManager
                 }
             }
         }
-
+    }
+    private static void PatchParentOnInitialize(UITypeInfo typeInfo, UIExtensionParentTypeInfo parentTypeInfo, IDevkitServerPlugin? plugin)
+    {
         if (typeInfo.CustomOnInitialize != null)
         {
             if (!typeInfo.CustomOnInitialize.HasBeenInitialized)
             {
-                typeInfo.CustomOnInitialize.Patch(typeInfo, parentTypeInfo);
+                typeInfo.CustomOnInitialize.Patch();
                 typeInfo.CustomOnInitialize.HasBeenInitialized = true;
+            }
+            if (!typeInfo.CustomOnInitialize.HasOnInitializeBeenInitialized)
+            {
+                typeInfo.CustomOnInitialize.OnInitialize += OnInitialized;
+                typeInfo.CustomOnInitialize.HasOnInitializeBeenInitialized = true;
             }
         }
         else
@@ -724,25 +818,25 @@ public static class UIExtensionManager
             {
                 if (parentTypeInfo.InitializePatchesIntl.Any(x => x.Original == initializeMethod.Method))
                 {
-                    Logger.LogDebug($"[{Source}] Skipped finalizer for {initializeMethod.Method.Format()}, already done from this extension.");
+                    LogDebug($"Skipped finalizer for {initializeMethod.Method.Format()}, already done from this extension.", plugin);
                     continue;
                 }
 
                 if (Patches.TryGetValue(initializeMethod.Method, out UIExtensionPatch patchInfo))
                 {
-                    Logger.LogDebug($"[{Source}] Skipped finalizer for {initializeMethod.Method.Format()}, already done from another extension.");
+                    LogDebug($"Skipped finalizer for {initializeMethod.Method.Format()}, already done from another extension.", plugin);
                     parentTypeInfo.InitializePatchesIntl.Add(patchInfo);
                     continue;
                 }
 
-                if (initializeMethod.Method.DeclaringType == parentType)
+                if (initializeMethod.Method.DeclaringType == typeInfo.Type)
                 {
                     MethodInfo finalizer = InstanceInitializeMethodFinalizerMethod;
-                    harmonyInstance.Patch(initializeMethod.Method, finalizer: new HarmonyMethod(finalizer));
+                    PatchesMain.Patcher.Patch(initializeMethod.Method, finalizer: new HarmonyMethod(finalizer));
                     patchInfo = new UIExtensionPatch(initializeMethod.Method, finalizer, HarmonyPatchType.Finalizer);
                     parentTypeInfo.InitializePatchesIntl.Add(patchInfo);
                     Patches.Add(initializeMethod.Method, patchInfo);
-                    Logger.LogDebug($"[{Source}] Added finalizer for {initializeMethod.Method.Format()}: {finalizer.Format()}.");
+                    LogDebug($"Added finalizer for {initializeMethod.Method.Format()}: {finalizer.Format()}.", plugin);
                 }
                 else if (initializeMethod.Method.IsStatic)
                 {
@@ -750,13 +844,23 @@ public static class UIExtensionManager
                 }
             }
         }
-
+    }
+    private static void PatchParentOnDestroy(UITypeInfo typeInfo, UIExtensionParentTypeInfo parentTypeInfo, IDevkitServerPlugin? plugin)
+    {
+        if (typeInfo.DestroyedByParent && typeInfo.Parent != null && UIAccessTools.TryGetUITypeInfo(typeInfo.Parent, out UITypeInfo parentUITypeInfo))
+            PatchParentOnDestroy(parentUITypeInfo, GetOrAddParentTypeInfo(parentUITypeInfo.Type), plugin);
+        
         if (typeInfo.CustomOnDestroy != null)
         {
             if (!typeInfo.CustomOnDestroy.HasBeenInitialized)
             {
-                typeInfo.CustomOnDestroy.Patch(typeInfo, parentTypeInfo);
+                typeInfo.CustomOnDestroy.Patch();
                 typeInfo.CustomOnDestroy.HasBeenInitialized = true;
+            }
+            if (!typeInfo.CustomOnDestroy.HasOnDestroyBeenInitialized)
+            {
+                typeInfo.CustomOnDestroy.OnDestroy += OnDestroy;
+                typeInfo.CustomOnDestroy.HasOnDestroyBeenInitialized = true;
             }
         }
         else if (typeInfo is not { DestroyOnClose: true, CloseOnDestroy: false })
@@ -765,36 +869,36 @@ public static class UIExtensionManager
             {
                 if (parentTypeInfo.DestroyPatchesIntl.Any(x => x.Original == destroyMethod.Method))
                 {
-                    Logger.LogDebug($"[{Source}] Skipped finalizer for {destroyMethod.Method.Format()}, already done from this extension.");
+                    LogDebug($"[{Source}] Skipped finalizer for {destroyMethod.Method.Format()}, already done from this extension.", plugin);
                     continue;
                 }
 
                 if (Patches.TryGetValue(destroyMethod.Method, out UIExtensionPatch patchInfo))
                 {
-                    Logger.LogDebug($"[{Source}] Skipped finalizer for {destroyMethod.Method.Format()}, already done from another extension.");
+                    LogDebug($"[{Source}] Skipped finalizer for {destroyMethod.Method.Format()}, already done from another extension.", plugin);
                     parentTypeInfo.DestroyPatchesIntl.Add(patchInfo);
                     continue;
                 }
 
-                if (destroyMethod.Method.DeclaringType == parentType)
+                if (destroyMethod.Method.DeclaringType == typeInfo.Type)
                 {
                     if (destroyMethod.Method.GetParameters().Length == 0)
                     {
                         MethodInfo prefix = destroyMethod.IsStatic
                             ? StaticDestroyMethodPrefixMethod
                             : InstanceDestroyMethodPrefixMethod;
-                        harmonyInstance.Patch(destroyMethod.Method, prefix: new HarmonyMethod(prefix));
+                        PatchesMain.Patcher.Patch(destroyMethod.Method, prefix: new HarmonyMethod(prefix));
                         patchInfo = new UIExtensionPatch(destroyMethod.Method, prefix, HarmonyPatchType.Prefix);
-                        Logger.LogDebug($"[{Source}] Added prefix for {destroyMethod.Method.Format()}: {prefix.Format()}.");
+                        LogDebug($"[{Source}] Added prefix for {destroyMethod.Method.Format()}: {prefix.Format()}.", plugin);
                     }
                     else
                     {
                         MethodInfo finalizer = destroyMethod.IsStatic
                             ? StaticDestroyMethodFinalizerMethod
                             : InstanceDestroyMethodFinalizerMethod;
-                        harmonyInstance.Patch(destroyMethod.Method, finalizer: new HarmonyMethod(finalizer));
+                        PatchesMain.Patcher.Patch(destroyMethod.Method, finalizer: new HarmonyMethod(finalizer));
                         patchInfo = new UIExtensionPatch(destroyMethod.Method, finalizer, HarmonyPatchType.Finalizer);
-                        Logger.LogDebug($"[{Source}] Added finalizer for {destroyMethod.Method.Format()}: {finalizer.Format()}.");
+                        LogDebug($"[{Source}] Added finalizer for {destroyMethod.Method.Format()}: {finalizer.Format()}.", plugin);
                     }
                     parentTypeInfo.DestroyPatchesIntl.Add(patchInfo);
                     Patches.Add(destroyMethod.Method, patchInfo);
@@ -913,7 +1017,7 @@ public static class UIExtensionManager
         info.MemberInfo.EmitGet(il, true);
 
         il.Emit(OpCodes.Ret);
-        Logger.LogDebug($"[{Source}] Transpiled {method.Format()} for extension for {info.Extension.ParentType.Format()}.");
+        LogDebug($"[{Source}] Transpiled {method.Format()} for extension for {info.Extension.ParentType.Format()}.", info.Extension.Plugin);
         return inst;
     }
     private static readonly MethodInfo TranspileSetterPropertyMethod = typeof(UIExtensionManager).GetMethod(nameof(TranspileSetterProperty), BindingFlags.NonPublic | BindingFlags.Static)!;

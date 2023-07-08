@@ -500,9 +500,12 @@ public sealed class DevkitServerModule : IModuleNexus
 #endif
     private static void OnSaved()
     {
-        HierarchyResponsibilities.Save();
-        LevelObjectResponsibilities.Save();
-        BuildableResponsibilities.Save();
+        if (IsEditing)
+        {
+            HierarchyResponsibilities.Save();
+            LevelObjectResponsibilities.Save();
+            BuildableResponsibilities.Save();
+        }
     }
     private static void OnPrePreLevelLoaded(int level)
     {
@@ -524,12 +527,16 @@ public sealed class DevkitServerModule : IModuleNexus
         BackupManager = GameObjectHost.AddComponent<BackupManager>();
         LevelObjectNetIdDatabase.AssignExisting();
 #endif
-        BuildableResponsibilities.Init();
-        HierarchyResponsibilities.Init();
-        LevelObjectResponsibilities.Init();
+        if (IsEditing)
+        {
+            BuildableResponsibilities.Init();
+            HierarchyResponsibilities.Init();
+            LevelObjectResponsibilities.Init();
+        }
         CartographyUtil.Reset();
 #if CLIENT
-        LevelObjectNetIdDatabase.LoadFromLevelData();
+        if (IsEditing)
+            LevelObjectNetIdDatabase.LoadFromLevelData();
 #endif
     }
 
