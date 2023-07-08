@@ -22,6 +22,8 @@ public static class LevelObjectUtil
 {
     private const string Source = "LEVEL OBJECTS";
 
+    public static readonly Quaternion DefaultObjectRotation = Quaternion.Euler(-90f, 0.0f, 0.0f);
+
     public const int MaxDeletePacketSize = 64;
     public const int MaxMovePacketSize = 32;
     public const int MaxMovePreviewSelectionSize = 8;

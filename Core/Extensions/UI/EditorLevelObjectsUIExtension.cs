@@ -1,14 +1,16 @@
 ﻿#if CLIENT
-using System.Reflection;
 using DevkitServer.API.UI;
+using DevkitServer.Configuration;
 using DevkitServer.Patches;
 using DevkitServer.Players.UI;
 using HarmonyLib;
+using System.Reflection;
 
 namespace DevkitServer.Core.Extensions.UI;
 [UIExtension(typeof(EditorLevelObjectsUI))]
 internal class EditorLevelObjectsUIExtension : UIExtension
 {
+    private const int Size = 158;
     private static bool _patched;
 #nullable disable
     [ExistingUIMember("container")]
@@ -18,62 +20,118 @@ internal class EditorLevelObjectsUIExtension : UIExtension
     private readonly SleekList<Asset> _assetsScrollBox;
 
     private readonly ISleekBox _displayBox;
+    private readonly ISleekBox _displayTitle;
     private readonly ISleekImage _preview;
     internal EditorLevelObjectsUIExtension()
     {
-        _displayBox = Glazier.Get().CreateBox();
-        _displayBox.positionScale_X = 1f;
-        _displayBox.positionScale_Y = 1f;
-        _displayBox.positionOffset_X = _assetsScrollBox.positionOffset_X - 148;
-        _displayBox.positionOffset_Y = -138;
-        _displayBox.sizeOffset_X = 138;
-        _displayBox.sizeOffset_Y = 138;
-        _container.AddChild(_displayBox);
+        if (DevkitServerConfig.Config.EnableObjectUIExtension)
+        {
+            _displayBox = Glazier.Get().CreateBox();
+            _displayBox.positionScale_X = 1f;
+            _displayBox.positionScale_Y = 1f;
+            _displayBox.positionOffset_X = _assetsScrollBox.positionOffset_X - (Size + 30);
+            _displayBox.positionOffset_Y = -Size - 20;
+            _displayBox.sizeOffset_X = Size + 20;
+            _displayBox.sizeOffset_Y = Size + 20;
+            _container.AddChild(_displayBox);
 
-        _preview = Glazier.Get().CreateImage();
-        _preview.sizeScale_X = 1f;
-        _preview.sizeScale_Y = 1f;
-        _preview.positionOffset_X = 5;
-        _preview.positionOffset_Y = 5;
-        _preview.sizeOffset_X = -10;
-        _preview.sizeOffset_Y = -10;
+            _displayTitle = Glazier.Get().CreateBox();
+            _displayTitle.positionScale_X = 1f;
+            _displayTitle.positionScale_Y = 1f;
+            _displayTitle.positionOffset_X = _assetsScrollBox.positionOffset_X - (Size + 30);
+            _displayTitle.positionOffset_Y = -Size - 60;
+            _displayTitle.sizeOffset_X = Size + 20;
+            _displayTitle.sizeOffset_Y = 30;
+            _displayTitle.text = DevkitServerModule.MainLocalization.Translate("No_Asset_Selected");
 
-        UpdateSelectedObject();
+            _container.AddChild(_displayTitle);
 
-        _displayBox.AddChild(_preview);
+            _preview = Glazier.Get().CreateImage();
+            _preview.sizeScale_X = 0f;
+            _preview.sizeScale_Y = 0f;
+            _preview.positionScale_X = 0.5f;
+            _preview.positionScale_Y = 0.5f;
+            _preview.sizeOffset_X = Size;
+            _preview.sizeOffset_Y = Size;
+            _preview.shouldDestroyTexture = true;
 
-        if (!_patched)
-            Patch();
+            UpdateSelectedObject();
+
+            _displayBox.AddChild(_preview);
+
+            if (!_patched)
+                Patch();
+        }
     }
 #nullable restore
 
     internal void UpdateSelectedObject()
     {
         _preview.texture = null;
-        ItemAsset? buildable = EditorObjects.selectedItemAsset;
-        if (buildable != null)
+        Asset? asset = (Asset?)EditorObjects.selectedObjectAsset ?? EditorObjects.selectedItemAsset;
+        if (asset != null)
         {
-            ItemTool.getIcon(buildable.id, 0, 100, buildable.getState(true), buildable, null, string.Empty, string.Empty, 128, 128, true, false, texture => OnBuildableIconReady(texture, buildable));
+            IconGenerator.GetIcon(asset, Size, Size, OnIconReady);
+            string text = asset.FriendlyName;
+            if (asset is ObjectAsset obj)
+                text += " (" + obj.type switch
+                {
+                    EObjectType.LARGE => "Large",
+                    EObjectType.MEDIUM => "Medium",
+                    EObjectType.SMALL => "Small",
+                    EObjectType.DECAL => "Decal",
+                    EObjectType.NPC => "NPC",
+                    _ => "Object"
+                };
+            else if (asset is ItemStructureAsset)
+                text += " (Structure)";
+            else if (asset is ItemBarricadeAsset)
+                text += " (Barricade)";
+            _displayTitle.text = text;
+            Color rarityColor = asset is ItemAsset item ? ItemTool.getRarityColorUI(item.rarity) : Color.white;
+            _displayTitle.backgroundColor = SleekColor.BackgroundIfLight(rarityColor);
+            _displayTitle.textColor = rarityColor;
+        }
+        else
+        {
+            _displayTitle.textColor = ESleekTint.FOREGROUND;
+            _displayTitle.text = DevkitServerModule.MainLocalization.Translate("No_Asset_Selected");
+        }
+    }
+
+    private void OnIconReady(Asset asset, Texture? texture, bool destroy)
+    {
+        if (EditorObjects.selectedItemAsset != asset && EditorObjects.selectedObjectAsset != asset)
             return;
+        _preview.texture = texture;
+        _preview.shouldDestroyTexture = destroy;
+        if (texture != null)
+        {
+            float aspect = (float)texture.width / texture.height;
+            if (Mathf.Approximately(aspect, 1f))
+            {
+                _preview.sizeOffset_X = Size;
+                _preview.sizeOffset_Y = Size;
+            }
+            else if (aspect > 1f)
+            {
+                _preview.sizeOffset_X = Size;
+                _preview.sizeOffset_Y = Mathf.RoundToInt(Size / aspect);
+            }
+            else
+            {
+                _preview.sizeOffset_X = Mathf.RoundToInt(Size * aspect);
+                _preview.sizeOffset_Y = Size;
+            }
+        }
+        else
+        {
+            _preview.sizeOffset_X = Size;
+            _preview.sizeOffset_Y = Size;
         }
 
-        ObjectAsset? levelObject = EditorObjects.selectedObjectAsset;
-
-        if (levelObject == null)
-            return;
-    }
-
-    private void OnBuildableIconReady(Texture texture, ItemAsset asset)
-    {
-        if (EditorObjects.selectedItemAsset != asset)
-            return;
-        _preview.texture = texture;
-    }
-    private void OnObjectIconReady(Texture texture, ObjectAsset asset)
-    {
-        if (EditorObjects.selectedObjectAsset != asset)
-            return;
-        _preview.texture = texture;
+        _preview.positionOffset_X = -Size / 2;
+        _preview.positionOffset_Y = -Size / 2;
     }
     private static void Patch()
     {
@@ -96,9 +154,8 @@ internal class EditorLevelObjectsUIExtension : UIExtension
 
         if (info == null)
             return;
-
-        foreach (EditorLevelObjectsUIExtension inst in info.Instantiations.OfType<EditorLevelObjectsUIExtension>())
-            inst.UpdateSelectedObject();
+        EditorLevelObjectsUIExtension? inst = info.Instantiations.OfType<EditorLevelObjectsUIExtension>().LastOrDefault();
+        inst?.UpdateSelectedObject();
     }
 }
 #endif

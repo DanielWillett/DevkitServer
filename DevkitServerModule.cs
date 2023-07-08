@@ -70,7 +70,8 @@ public sealed class DevkitServerModule : IModuleNexus
     private static readonly LocalDatDictionary DefaultMainLocalization = new LocalDatDictionary
     {
         { "Name", "Devkit Server" },
-        { "Help", "help" }
+        { "Help", "help" },
+        { "No_Asset_Selected", "No Asset Selected" }
     };
     public static Local CommandLocalization { get; private set; } = null!;
 
@@ -145,8 +146,15 @@ public sealed class DevkitServerModule : IModuleNexus
             GameObjectHost = new GameObject(ModuleName);
             ComponentHost = GameObjectHost.AddComponent<DevkitServerModuleComponent>();
             GameObjectHost.AddComponent<CachedTime>();
+            GameObjectHost.hideFlags = HideFlags.DontSave;
             Provider.gameMode = new DevkitServerGamemode();
             Object.DontDestroyOnLoad(GameObjectHost);
+#if CLIENT
+            GameObject objectItemGeneratorHost = new GameObject("ObjectIconGenerator", typeof(Light), typeof(IconGenerator), typeof(Camera));
+            objectItemGeneratorHost.transform.SetParent(GameObjectHost.transform, true);
+            objectItemGeneratorHost.hideFlags = HideFlags.DontSave;
+            Object.DontDestroyOnLoad(objectItemGeneratorHost);
+#endif
 
             Logger.InitLogger();
             loggerInited = true;

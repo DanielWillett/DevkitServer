@@ -1,8 +1,7 @@
 ﻿#if CLIENT
 #nullable disable
-using System.Diagnostics;
 using DevkitServer.API.UI;
-using DevkitServer.Players.UI;
+using System.Diagnostics;
 
 namespace DevkitServer.Core.Extensions.UI;
 

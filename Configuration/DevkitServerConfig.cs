@@ -226,6 +226,11 @@ public class SystemConfig
     [JsonPropertyName("walmart_pc_support")]
     public bool RemoveCosmeticImprovements { get; set; }
 
+#if CLIENT
+    [JsonPropertyName("enable_object_ui_extension")]
+    public bool EnableObjectUIExtension { get; set; }
+#endif
+
 #if SERVER
     [JsonPropertyName("disable_map_download")]
     public bool DisableMapDownload { get; set; }
@@ -259,6 +264,9 @@ public class SystemConfig
         ConsoleExtendedVisualANSISupport = true;
         ConsoleVisualANSISupport = true;
         RemoveCosmeticImprovements = false;
+#if CLIENT
+        EnableObjectUIExtension = true;
+#endif
 #if SERVER
         DisableMapDownload = false;
         TcpSettings = new TcpServerInfo { EnableHighSpeedSupport = false, HighSpeedPort = (ushort)(Provider.port + 2) };
