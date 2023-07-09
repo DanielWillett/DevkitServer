@@ -10,7 +10,6 @@ using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Patches;
 using DevkitServer.Plugins;
-using JetBrains.Annotations;
 using SDG.Framework.Modules;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -332,14 +331,18 @@ public sealed class DevkitServerModule : IModuleNexus
 
     private void OnPostLevelLoaded(int level)
     {
-#if SERVER
         if (IsEditing && level == Level.BUILD_INDEX_GAME)
         {
             TileSync.CreateServersideAuthority();
+            ObjectSync.CreateServersideAuthority();
         }
-        else if (GameObjectHost.TryGetComponent(out TileSync sync))
-            Object.Destroy(sync);
-#endif
+        else
+        {
+            if (GameObjectHost.TryGetComponent(out TileSync tileSync))
+                Object.Destroy(tileSync);
+            if (GameObjectHost.TryGetComponent(out ObjectSync objectSync))
+                Object.Destroy(objectSync);
+        }
 
         if (!BitConverter.IsLittleEndian)
         {

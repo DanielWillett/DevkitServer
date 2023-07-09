@@ -7,6 +7,7 @@ using DevkitServer.Commands.Subsystem;
 using System.Reflection;
 using DevkitServer.AssetTools;
 using DevkitServer.Configuration;
+using DevkitServer.Models;
 using DevkitServer.Multiplayer.Sync;
 #if CLIENT
 using DevkitServer.Players.UI;
@@ -165,20 +166,46 @@ internal static class CommandTests
 #endif
     private static void syncall(CommandContext ctx)
     {
-        TileSync? auth = TileSync.GetAuthority();
+        TileSync? tileSyncAuth = TileSync.GetAuthority();
 #if CLIENT
-        if (auth == null || !auth.IsOwner)
+        if (tileSyncAuth == null || !tileSyncAuth.IsOwner)
             ctx.BreakAndRunOnServer();
 #endif
-        if (auth == null)
+        if (tileSyncAuth == null)
             throw ctx.SendUnknownError();
         float t = CachedTime.RealtimeSinceStartup;
         if (!ctx.HasArg(0) || ctx.MatchParameter(0, "hm", "heightmap", "heights"))
-            auth.InvalidateBounds(CartographyUtil.CaptureBounds, TileSync.DataType.Heightmap, t);
+            tileSyncAuth.InvalidateBounds(CartographyUtil.CaptureBounds, TileSync.DataType.Heightmap, t);
         if (!ctx.HasArg(0) || ctx.MatchParameter(0, "sm", "splatmap", "materials"))
-            auth.InvalidateBounds(CartographyUtil.CaptureBounds, TileSync.DataType.Splatmap, t);
+            tileSyncAuth.InvalidateBounds(CartographyUtil.CaptureBounds, TileSync.DataType.Splatmap, t);
         if (!ctx.HasArg(0) || ctx.MatchParameter(0, "holes", "holemap"))
-            auth.InvalidateBounds(CartographyUtil.CaptureBounds, TileSync.DataType.Holes, t);
+            tileSyncAuth.InvalidateBounds(CartographyUtil.CaptureBounds, TileSync.DataType.Holes, t);
+
+        ObjectSync? objectSyncAuth = ObjectSync.GetAuthority();
+#if CLIENT
+        if (objectSyncAuth == null || !objectSyncAuth.IsOwner)
+            ctx.BreakAndRunOnServer();
+#endif
+
+        if (objectSyncAuth == null)
+            throw ctx.SendUnknownError();
+        for (int x = 0; x < Regions.WORLD_SIZE; ++x)
+        {
+            for (int y = 0; y < Regions.WORLD_SIZE; ++y)
+            {
+                List<LevelObject> objects = LevelObjects.objects[x, y];
+                for (int i = 0; i < objects.Count; ++i)
+                {
+                    objectSyncAuth.EnqueueSync(objects[i]);
+                }
+                List<LevelBuildableObject> buildables = LevelObjects.buildables[x, y];
+                for (int i = 0; i < buildables.Count; ++i)
+                {
+                    objectSyncAuth.EnqueueSync(new RegionIdentifier(x, y, i));
+                }
+            }
+        }
+
         ctx.ReplyString("<#7bbc5f>Syncing...");
     }
 

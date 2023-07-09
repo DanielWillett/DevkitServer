@@ -1,12 +1,10 @@
 ﻿using DevkitServer.Models;
 using HarmonyLib;
-using JetBrains.Annotations;
 using System.Reflection;
 using System.Reflection.Emit;
+using DevkitServer.Multiplayer.Levels;
 #if CLIENT
-using DevkitServer.Configuration;
 using DevkitServer.Core.Permissions;
-using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Players.UI;
 using SDG.Framework.Devkit.Transactions;
@@ -256,6 +254,9 @@ internal static class LevelObjectPatches
                 i += 2;
                 Logger.LogDebug($"[{Source}] Patched pasteing objects.");
                 patchedPaste = true;
+                int index2 = PatchUtil.FindLabelDestinationIndex(ins, @goto.Value, i);
+                if (index2 >= 0)
+                    i = index2;
                 continue;
             }
 
@@ -399,60 +400,7 @@ internal static class LevelObjectPatches
             return;
 
         if (isFinal)
-        {
             MoveFinalSelection();
-            return;
-        }
-
-        if (ClientInfo.Info is not { ServerRemovesCosmeticImprovements: false } || DevkitServerConfig.Config.RemoveCosmeticImprovements)
-            return;
-
-        List<EditorSelection> selections = LevelObjectUtil.EditorObjectSelection;
-        if (selections.Count > LevelObjectUtil.MaxMovePreviewSelectionSize) return;
-
-        Logger.LogDebug($"[CLIENT EVENTS] Move preview requested at: {string.Join(",", selections.Select(selection => selection.transform.gameObject.name.Format()))}: deltaPos: {worldPositionDelta.Format()}, deltaRot: {worldRotationDelta.eulerAngles.Format()}, pivotPos: {pivotPosition.Format()}, modifyRotation: {modifyRotation}.");
-
-        TransformationDelta.TransformFlags flags = 0;
-        if (!worldPositionDelta.IsNearlyZero())
-            flags |= TransformationDelta.TransformFlags.Position | TransformationDelta.TransformFlags.OriginalPosition;
-        if (modifyRotation && !worldRotationDelta.IsNearlyIdentity())
-            flags |= TransformationDelta.TransformFlags.Rotation | TransformationDelta.TransformFlags.OriginalRotation;
-        
-        List<PreviewTransformation> transformations = ListPool<PreviewTransformation>.claim();
-
-        float dt = CachedTime.DeltaTime;
-        try
-        {
-            int count = selections.Count;
-            transformations.IncreaseCapacity(Math.Min(count, LevelObjectUtil.MaxMovePacketSize));
-
-            for (int i = 0; i < selections.Count; i++)
-            {
-                EditorSelection selection = selections[i];
-                if (!NetIdRegistry.GetTransformNetId(selection.transform, out NetId netId, out _))
-                    continue;
-                
-                transformations.Add(new PreviewTransformation(netId, new TransformationDelta(flags, worldPositionDelta, worldRotationDelta, selection.fromPosition, selection.fromRotation)));
-
-                if (transformations.Count % LevelObjectUtil.MaxMovePacketSize == 0)
-                    Flush();
-            }
-
-            Flush();
-
-            void Flush()
-            {
-                if (ClientEvents.ListeningOnMoveHierarchyObjectsPreview)
-                {
-                    ClientEvents.InvokeOnMoveLevelObjectsPreview(new MoveLevelObjectsPreviewProperties(transformations.ToArrayFast(), dt));
-                }
-                transformations.Clear();
-            }
-        }
-        finally
-        {
-            ListPool<PreviewTransformation>.release(transformations);
-        }
     }
     private static void MoveFinalSelection()
     {
@@ -508,6 +456,8 @@ internal static class LevelObjectPatches
 
                 if (transformations.Count % LevelObjectUtil.MaxMovePacketSize == 0)
                     Flush();
+
+                LevelObjectUtil.SyncIfAuthority(netId);
             }
 
             Flush();
@@ -599,6 +549,8 @@ internal static class LevelObjectPatches
                 netIds.Add(netId);
                 if (netIds.Count % LevelObjectUtil.MaxDeletePacketSize == 0)
                     Flush();
+
+                LevelObjectUtil.SyncIfAuthority(netId);
             }
 
             Flush();
@@ -692,14 +644,14 @@ internal static class LevelObjectPatches
                 if (!LevelObjectUtil.TryFindBuildable(selection[i].transform, out RegionIdentifier id) ||
                     !LevelObjectUtil.CheckMoveBuildablePermission(id))
                 {
-                    UIMessage.SendNoPermissionMessage(VanillaPermissions.RemoveUnownedObjects);
+                    UIMessage.SendNoPermissionMessage(VanillaPermissions.MoveUnownedObjects);
                     return false;
                 }
                 continue;
             }
             if (!LevelObjectUtil.CheckMovePermission(obj.instanceID))
             {
-                UIMessage.SendNoPermissionMessage(VanillaPermissions.RemoveUnownedObjects);
+                UIMessage.SendNoPermissionMessage(VanillaPermissions.MoveUnownedObjects);
                 return false;
             }
         }
@@ -709,9 +661,9 @@ internal static class LevelObjectPatches
     }
     private static void PreIsFinalExternallyTransforming()
     {
-        if (!DevkitServerModule.IsEditing || LevelObjectUtil.EditorObjectSelection.Count <= 1)
+        if (!DevkitServerModule.IsEditing)
             return;
-        Logger.LogDebug($"[{Source}] Pasteing transform for more than one.");
+        Logger.LogDebug($"[{Source}] Setting next ExternallyTransformPoint to final.");
 
         IsFinalTransform = true;
     }
@@ -741,6 +693,8 @@ internal static class LevelObjectPatches
 
         if (ClientEvents.ListeningOnMoveLevelObjectFinal)
             ClientEvents.InvokeOnMoveLevelObjectFinal(new MoveLevelObjectFinalProperties(transformation, useScale, dt));
+
+        LevelObjectUtil.SyncIfAuthority(netId);
     }
 #endif
     [HarmonyPatch(typeof(LevelObjects), nameof(LevelObjects.transformObject))]
@@ -772,12 +726,13 @@ internal static class LevelObjectPatches
             return;
         if (!Regions.tryGetCoordinate(fromPosition, out byte fromX, out byte fromY) || !Regions.tryGetCoordinate(toPosition, out byte toX, out byte toY))
             return;
-
+        NetId netId;
         if (!LevelObjectUtil.TryFindObject(select, out RegionIdentifier toId))
         {
             if (LevelObjectUtil.TryFindBuildable(select, out toId))
             {
                 LevelBuildableObject buildable = LevelObjectUtil.GetBuildableUnsafe(toId);
+                LevelObjectNetIdDatabase.TryGetBuildableNetId(__state, out netId);
                 if (toX != fromX || toY != fromY)
                 {
                     Logger.LogDebug($"Buildable moved regions: {__state.Format()} -> {toId.Format()}.");
@@ -785,12 +740,15 @@ internal static class LevelObjectPatches
                 }
 
                 LevelObjectUtil.EventOnBuildableMoved.TryInvoke(buildable, fromPosition, fromRotation, fromScale, toPosition, toRotation, toScale);
+                if (!netId.IsNull())
+                    LevelObjectUtil.SyncIfAuthority(netId);
             }
 
             return;
         }
 
         LevelObject obj = LevelObjectUtil.GetObjectUnsafe(toId);
+        LevelObjectNetIdDatabase.TryGetObjectNetId(obj, out netId);
         if (toX != fromX || toY != fromY)
         {
             Logger.LogDebug($"Object moved regions: {__state.Format()} -> {toId.Format()}.");
@@ -798,6 +756,8 @@ internal static class LevelObjectPatches
         }
 
         LevelObjectUtil.EventOnLevelObjectMoved.TryInvoke(obj, fromPosition, fromRotation, fromScale, toPosition, toRotation, toScale);
+        if (!netId.IsNull())
+            LevelObjectUtil.SyncIfAuthority(netId);
     }
     [HarmonyPatch(typeof(LevelObjects), nameof(LevelObjects.removeBuildable))]
     [HarmonyTranspiler]
@@ -900,13 +860,21 @@ internal static class LevelObjectPatches
     private static void BuildableRemovedInvoker(LevelBuildableObject buildable, byte x, byte y, int index)
     {
         RegionIdentifier id = new RegionIdentifier(x, y, index);
+        LevelObjectNetIdDatabase.TryGetBuildableNetId(buildable, out NetId netId);
         LevelObjectUtil.EventOnBuildableRemoved.TryInvoke(buildable, id);
         Logger.LogDebug($"Buildable removed: {id.Format()}.");
+
+        if (!netId.IsNull())
+            LevelObjectUtil.SyncIfAuthority(netId);
     }
     private static void ObjectRemovedInvoker(LevelObject levelObject, byte x, byte y, int index)
     {
         RegionIdentifier id = new RegionIdentifier(x, y, index);
+        LevelObjectNetIdDatabase.TryGetObjectNetId(levelObject, out NetId netId);
         LevelObjectUtil.EventOnLevelObjectRemoved.TryInvoke(levelObject, id);
         Logger.LogDebug($"Object removed: {id.Format()}.");
+
+        if (!netId.IsNull())
+            LevelObjectUtil.SyncIfAuthority(netId);
     }
 }

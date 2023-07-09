@@ -82,7 +82,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
                     EObjectType.DECAL => "Decal",
                     EObjectType.NPC => "NPC",
                     _ => "Object"
-                };
+                } + ")";
             else if (asset is ItemStructureAsset)
                 text += " (Structure)";
             else if (asset is ItemBarricadeAsset)

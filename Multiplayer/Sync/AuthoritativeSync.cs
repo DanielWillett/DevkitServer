@@ -1,6 +1,6 @@
-﻿using DevkitServer.Multiplayer.Networking;
+﻿using DevkitServer.API;
+using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
-using JetBrains.Annotations;
 #if CLIENT
 using System.Reflection;
 #endif
@@ -9,6 +9,8 @@ namespace DevkitServer.Multiplayer.Sync;
 public abstract class AuthoritativeSync : MonoBehaviour
 {
     protected static readonly NetCall<ulong, Type> SendAuthoritativeSyncAuthority = new NetCall<ulong, Type>((ushort)NetCalls.TileSyncAuthority);
+    protected static readonly Color AuthColor = new Color32(102, 255, 255, 255);
+    protected static readonly Color NoAuthColor = new Color32(255, 80, 80, 255);
     protected bool HasAuthorityIntl;
 
     /// <remarks><see langword="null"/> for the server-side authority instance.</remarks>
@@ -40,7 +42,7 @@ public abstract class AuthoritativeSync : MonoBehaviour
 #endif
 }
 
-public abstract class AuthoritativeSync<TSync> : AuthoritativeSync where TSync : AuthoritativeSync<TSync>
+public abstract class AuthoritativeSync<TSync> : AuthoritativeSync, ITerminalFormattable where TSync : AuthoritativeSync<TSync>
 {
     public static TSync? Authority { get; private set; }
     public static TSync? ServersideAuthority { get; private set; }
@@ -162,5 +164,8 @@ public abstract class AuthoritativeSync<TSync> : AuthoritativeSync where TSync :
             ServersideAuthority.HasAuthority = true;
         }
 #endif
+        Logger.LogDebug(this.Format() + " destroyed.");
     }
+    public override string ToString() => GetType().Name + " (" + (HasAuthority ? "Authority" : "Non-Authority") + ") (" + (User == null ? "Serverside" : User.SteamId.m_SteamID.ToString()) + ")";
+    public string Format(ITerminalFormatProvider provider) => GetType().Format() + " (" + (HasAuthority ? "Authority".Colorize(AuthColor) : "Non-Authority".Colorize(NoAuthColor)) + ") (" + (User == null ? "Serverside" : User.SteamId.m_SteamID.Format()) + ")";
 }

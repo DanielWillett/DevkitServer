@@ -4,8 +4,8 @@ using DevkitServer.Models;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Multiplayer.Levels;
+using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players.UI;
-using JetBrains.Annotations;
 #if CLIENT
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Patches;
@@ -83,9 +83,25 @@ public static class LevelObjectUtil
 #if CLIENT
     private static readonly Action<CullingVolume>? ClearCullingVolumeObjects =
         Accessor.GenerateInstanceCaller<CullingVolume, Action<CullingVolume>>("ClearObjects", Array.Empty<Type>());
+
     private static readonly Action<CullingVolume>? FindCullingVolumeObjects =
         Accessor.GenerateInstanceCaller<CullingVolume, Action<CullingVolume>>("FindObjectsInsideVolume", Array.Empty<Type>());
 #endif
+
+    private static readonly InstanceGetter<LevelObject, AssetReference<MaterialPaletteAsset>>? GetCustomMaterialOverrideIntl =
+        Accessor.GenerateInstanceGetter<LevelObject, AssetReference<MaterialPaletteAsset>>("customMaterialOverride");
+
+    private static readonly InstanceGetter<LevelObject, int>? GetMaterialIndexOverrideIntl =
+        Accessor.GenerateInstanceGetter<LevelObject, int>("materialIndexOverride");
+
+    private static readonly InstanceSetter<LevelObject, AssetReference<MaterialPaletteAsset>>? SetCustomMaterialOverrideIntl =
+        Accessor.GenerateInstanceSetter<LevelObject, AssetReference<MaterialPaletteAsset>>("customMaterialOverride");
+
+    private static readonly InstanceSetter<LevelObject, int>? SetMaterialIndexOverrideIntl =
+        Accessor.GenerateInstanceSetter<LevelObject, int>("materialIndexOverride");
+
+    private static readonly Action<LevelObject>? CallReapplyMaterialOverridesIntl =
+        Accessor.GenerateInstanceCaller<LevelObject, Action<LevelObject>>("ReapplyMaterialOverrides");
 
 
 #if CLIENT
@@ -121,6 +137,8 @@ public static class LevelObjectUtil
                 EditorActions.TemporaryEditorActions?.QueueInstantiation(itemAsset, position, rotation, scale, owner, netId);
                 return StandardErrorCode.Success;
             }
+
+            SyncIfAuthority(netId);
 
             try
             {
@@ -259,6 +277,8 @@ public static class LevelObjectUtil
             BuildableResponsibilities.Set(id, user.SteamId.m_SteamID);
             Logger.LogDebug($"[{Source}] Granted request for instantiation of buildable {asset.Format()} {id.Format()} from {user.SteamId.Format()}.");
         }
+
+        SyncIfAuthority(netId);
     }
 #endif
     private static void InitializeLevelObject(Transform transform, out LevelObject? levelObject,
@@ -309,12 +329,91 @@ public static class LevelObjectUtil
         id = RegionIdentifier.Invalid;
         Logger.LogWarning($"Did not find buildable of transform {transform.name.Format()}.", method: Source);
     }
+    [Pure]
+    public static int GetMaterialIndexOverride(this LevelObject levelObject)
+    {
+        return GetMaterialIndexOverrideIntl == null ? -1 : GetMaterialIndexOverrideIntl(levelObject);
+    }
+    [Pure]
+    public static AssetReference<MaterialPaletteAsset> GetCustomMaterialOverride(this LevelObject levelObject)
+    {
+        return GetCustomMaterialOverrideIntl == null ? AssetReference<MaterialPaletteAsset>.invalid : GetCustomMaterialOverrideIntl(levelObject);
+    }
+    public static bool SetMaterialIndexOverride(this LevelObject levelObject, int materialIndexOverride, bool reapply = true)
+    {
+        if (SetMaterialIndexOverrideIntl == null || reapply && CallReapplyMaterialOverridesIntl == null)
+            return false;
+        if (materialIndexOverride < -1)
+            materialIndexOverride = -1;
+        SetMaterialIndexOverrideIntl(levelObject, materialIndexOverride);
+        if (reapply)
+            CallReapplyMaterialOverridesIntl!(levelObject);
+        return true;
+    }
+    public static bool SetCustomMaterialOverride(this LevelObject levelObject, AssetReference<MaterialPaletteAsset> customMaterialOverride, bool reapply = true)
+    {
+        if (SetCustomMaterialOverrideIntl == null || reapply && CallReapplyMaterialOverridesIntl == null)
+            return false;
+        SetCustomMaterialOverrideIntl(levelObject, customMaterialOverride);
+        if (reapply)
+            CallReapplyMaterialOverridesIntl!(levelObject);
+        return true;
+    }
+    public static bool ReapplyMaterialOverrides(this LevelObject levelObject)
+    {
+        if (CallReapplyMaterialOverridesIntl == null)
+            return false;
+        CallReapplyMaterialOverridesIntl(levelObject);
+        return true;
+    }
     public static bool GetObjectOrBuildableAsset(Guid guid, out ObjectAsset? @object, out ItemAsset? buildable)
     {
         Asset asset = Assets.find(guid);
         @object = asset as ObjectAsset;
         buildable = asset as ItemAsset;
         return @object != null || buildable is ItemStructureAsset or ItemBarricadeAsset;
+    }
+    private static bool CheckSync(out ObjectSync sync)
+    {
+        sync = null!;
+#if CLIENT
+        if (!DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.ObjectSync == null || !EditorUser.User.ObjectSync.HasAuthority)
+            return false;
+        sync = EditorUser.User.ObjectSync;
+#elif SERVER
+        if (!DevkitServerModule.IsEditing || ObjectSync.ServersideAuthority == null || !ObjectSync.ServersideAuthority.HasAuthority)
+            return false;
+        sync = ObjectSync.ServersideAuthority;
+#endif
+        return true;
+    }
+    public static bool SyncIfAuthority(LevelObject levelObject)
+    {
+        if (!CheckSync(out ObjectSync sync))
+            return false;
+        sync.EnqueueSync(levelObject);
+        return true;
+    }
+    public static bool SyncIfAuthority(LevelBuildableObject buildable)
+    {
+        if (!CheckSync(out ObjectSync sync))
+            return false;
+        sync.EnqueueSync(buildable);
+        return true;
+    }
+    public static bool SyncIfAuthority(RegionIdentifier buildable)
+    {
+        if (!CheckSync(out ObjectSync sync))
+            return false;
+        sync.EnqueueSync(buildable);
+        return true;
+    }
+    public static bool SyncIfAuthority(NetId buildableOrObject)
+    {
+        if (!CheckSync(out ObjectSync sync))
+            return false;
+        sync.EnqueueSync(buildableOrObject);
+        return true;
     }
     [Pure]
     public static Transform? GetTransform(this LevelObject obj)
@@ -914,6 +1013,8 @@ public static class LevelObjectUtil
 
                 EditorObjects.addSelection(pasted);
                 Logger.LogDebug(buildable != null ? $"Pasted buildable: {buildable.asset.itemName}." : $"Pasted object: {levelObject!.asset.objectName}.");
+
+                SyncIfAuthority(netId);
             }
         }
         finally

@@ -534,7 +534,7 @@ public class CommandHandler : ICommandHandler, IDisposable
 #else
             // run as server command or send chat
             if (Provider.isConnected)
-                ChatManager.sendChat(EChatMode.LOCAL, inputmessage[0] == '/' ? inputmessage : ("/" + inputmessage));
+                ChatManager.sendChat(EChatMode.GLOBAL, inputmessage[0] == '/' ? inputmessage : ("/" + inputmessage));
             else
                 SendHelpMessage(true);
 #endif

@@ -80,7 +80,6 @@ public static class ClientEvents
     public static event DeleteHierarchyObjects? OnDeleteHierarchyObjects;
     public static event DeleteLevelObject? OnDeleteLevelObject;
     public static event DeleteLevelObjects? OnDeleteLevelObjects;
-    public static event MoveLevelObjectsPreview? OnMoveLevelObjectsPreview;
     public static event MoveLevelObjectFinal? OnMoveLevelObjectFinal;
     public static event MoveLevelObjectsFinal? OnMoveLevelObjectsFinal;
 
@@ -118,7 +117,6 @@ public static class ClientEvents
     public static bool ListeningOnDeleteHierarchyObjects => OnDeleteHierarchyObjects != null;
     public static bool ListeningOnDeleteLevelObject => OnDeleteLevelObject != null;
     public static bool ListeningOnDeleteLevelObjects => OnDeleteLevelObjects != null;
-    public static bool ListeningOnMoveLevelObjectsPreview => OnMoveLevelObjectsPreview != null;
     public static bool ListeningOnMoveLevelObjectFinal => OnMoveLevelObjectFinal != null;
     public static bool ListeningOnMoveLevelObjectsFinal => OnMoveLevelObjectsFinal != null;
     
@@ -145,7 +143,6 @@ public static class ClientEvents
     internal static void InvokeOnDeleteHierarchyObjects(in DeleteHierarchyObjectsProperties properties) => OnDeleteHierarchyObjects?.Invoke(in properties);
     internal static void InvokeOnDeleteLevelObject(in DeleteLevelObjectProperties properties) => OnDeleteLevelObject?.Invoke(in properties);
     internal static void InvokeOnDeleteLevelObjects(in DeleteLevelObjectsProperties properties) => OnDeleteLevelObjects?.Invoke(in properties);
-    internal static void InvokeOnMoveLevelObjectsPreview(in MoveLevelObjectsPreviewProperties properties) => OnMoveLevelObjectsPreview?.Invoke(in properties);
     internal static void InvokeOnMoveLevelObjectFinal(in MoveLevelObjectFinalProperties properties) => OnMoveLevelObjectFinal?.Invoke(in properties);
     internal static void InvokeOnMoveLevelObjectsFinal(in MoveLevelObjectsFinalProperties properties) => OnMoveLevelObjectsFinal?.Invoke(in properties);
 }

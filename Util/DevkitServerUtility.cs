@@ -103,6 +103,15 @@ public static class DevkitServerUtility
     public static Vector3 ToVector3(this in Vector2 v2) => new Vector3(v2.x, 0f, v2.y);
     [Pure]
     public static Vector3 ToVector3(this in Vector2 v2, float y) => new Vector3(v2.x, y, v2.y);
+    [Pure]
+    public static bool IsNearlyEqual(this in Quaternion quaternion, in Quaternion other, float tolerance = 0.001f)
+    {
+        return
+            Mathf.Abs(quaternion.x - other.x) < tolerance &&
+            Mathf.Abs(quaternion.y - other.y) < tolerance &&
+            Mathf.Abs(quaternion.z - other.z) < tolerance &&
+            Mathf.Abs(quaternion.w - other.w) < tolerance;
+    }
     public static bool TryParseSteamId(string str, out CSteamID steamId)
     {
         if (str.Equals("Nil", StringComparison.InvariantCultureIgnoreCase) ||

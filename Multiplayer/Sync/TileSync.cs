@@ -5,7 +5,6 @@ using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
-using JetBrains.Annotations;
 using SDG.Framework.Landscapes;
 using SDG.NetPak;
 #if CLIENT

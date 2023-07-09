@@ -129,9 +129,9 @@ public readonly struct TransformationDelta
         else
         {
             if ((Flags & TransformFlags.Position) != 0)
-                transform.SetPositionAndRotation(additive ? OriginalPosition + Position : Position, additive ? OriginalRotation * Rotation : Rotation);
+                transform.SetPositionAndRotation(additive ? OriginalPosition + Position : Position, additive ? OriginalRotation * Rotation * LevelObjectUtil.DefaultObjectRotation : Rotation);
             else
-                transform.rotation = additive ? OriginalRotation * Rotation : Rotation;
+                transform.rotation = additive ? OriginalRotation * Rotation * LevelObjectUtil.DefaultObjectRotation : Rotation;
         }
     }
 

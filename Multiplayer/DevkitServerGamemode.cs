@@ -18,6 +18,7 @@ public class DevkitServerGamemode : GameMode
         editor.AddComponent<UserInput>().User = user;
         editor.AddComponent<UserTransactions>().User = user;
         editor.AddComponent<TileSync>().User = user;
+        editor.AddComponent<ObjectSync>().User = user;
 #if CLIENT
         bool isOwner = user.IsOwner;
         if (!isOwner)

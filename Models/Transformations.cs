@@ -7,26 +7,49 @@ public readonly struct PreviewTransformation
     public const int Capacity = 4 + TransformationDelta.Capacity;
     public NetId NetId { get; }
     public TransformationDelta Transformation { get; }
-    public PreviewTransformation(NetId netId, TransformationDelta transformation)
+    public Vector3 Pivot { get; }
+    public PreviewTransformation(NetId netId, TransformationDelta transformation, Vector3 pivot)
     {
         NetId = netId;
         Transformation = transformation;
+        Pivot = pivot;
     }
     public PreviewTransformation(ByteReader reader, bool halfPrecision = true)
     {
         NetId = reader.ReadNetId();
         Transformation = new TransformationDelta(reader, halfPrecision);
+        Pivot = halfPrecision ? reader.ReadHalfPrecisionVector3() : reader.ReadVector3();
     }
     public void Write(ByteWriter writer, bool halfPrecision = true)
     {
         writer.Write(NetId);
         if (halfPrecision)
+        {
             Transformation.WriteHalfPrecision(writer);
+            writer.WriteHalfPrecision(Pivot);
+        }
         else
+        {
             Transformation.Write(writer);
+            writer.Write(Pivot);
+        }
     }
-
-    public int CalculateSize(bool halfPrecision = true) => 4 + Transformation.CalculateSize(halfPrecision);
+    public void Apply(Transform transform)
+    {
+        TransformationDelta transformationDelta = Transformation;
+        if ((transformationDelta.Flags & TransformationDelta.TransformFlags.Position) != 0 && (transformationDelta.Flags & TransformationDelta.TransformFlags.Rotation) != 0)
+        {
+            Vector3 deltaPos = transformationDelta.OriginalPosition - Pivot;
+            Vector3 position = deltaPos.IsNearlyZero() ? transformationDelta.OriginalPosition + transformationDelta.Position : Pivot + transformationDelta.Rotation * deltaPos + transformationDelta.Position;
+            Quaternion rotation = Transformation.Rotation * Transformation.OriginalRotation;
+            transform.SetPositionAndRotation(position, rotation);
+        }
+        else if ((transformationDelta.Flags & TransformationDelta.TransformFlags.Position) != 0)
+            transform.position = transformationDelta.OriginalPosition + transformationDelta.Position;
+        else if ((transformationDelta.Flags & TransformationDelta.TransformFlags.Rotation) != 0)
+            transform.rotation = Transformation.Rotation * Transformation.OriginalRotation;
+    }
+    public int CalculateSize(bool halfPrecision = true) => 4 + Transformation.CalculateSize(halfPrecision) + (halfPrecision ? 6 : 12);
 }
 
 public readonly struct FinalTransformation

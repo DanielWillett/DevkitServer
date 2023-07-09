@@ -367,7 +367,7 @@ public static class UIExtensionManager
                 MethodAttributes.Static | MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName, CallingConventions.Standard, typeof(object),
                 new Type[] { typeof(object) }, info.ImplementationType, true);
             dynMethod.DefineParameter(0, ParameterAttributes.None, "uiInstance");
-            DebuggableEmitter il = new DebuggableEmitter(dynMethod) { DebugLog = true };
+            DebuggableEmitter il = new DebuggableEmitter(dynMethod);
 
             il.Comment("Type: " + info.ImplementationType.Format() + ".");
 
@@ -997,7 +997,7 @@ public static class UIExtensionManager
         }
         List<CodeInstruction> inst = new List<CodeInstruction>();
 
-        DebuggableEmitter il = new DebuggableEmitter(generator, method, inst) { DebugLog = true };
+        DebuggableEmitter il = new DebuggableEmitter(generator, method, inst);
 
         if (!info.MemberInfo.ExistingIsStatic)
         {

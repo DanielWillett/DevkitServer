@@ -35,6 +35,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     public UserTransactions Transactions { get; private set; } = null!;
     public EditorActions Actions { get; private set; } = null!;
     public TileSync TileSync { get; private set; } = null!;
+    public ObjectSync ObjectSync { get; private set; } = null!;
     public string DisplayName { get; private set; } = null!;
     public SteamPlayer? Player { get; internal set; }
     public IReadOnlyList<AuthoritativeSync> Syncs { get; }
@@ -65,6 +66,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         Transactions = EditorObject.GetComponent<UserTransactions>();
         Actions = EditorObject.GetComponent<EditorActions>();
         TileSync = EditorObject.GetComponent<TileSync>();
+        ObjectSync = EditorObject.GetComponent<ObjectSync>();
         IntlSyncs.Add(TileSync);
 #if SERVER
         ClientInfo = DevkitServerGamemode.GetClientInfo(this);
@@ -204,7 +206,6 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     {
         DevkitServerConfig.SeverFolderIntl = null;
         DevkitServerUtility.CheckDirectory(false, DevkitServerConfig.ServerFolder);
-        TileSync.CreateServersideAuthority();
         if (!DevkitServerModule.IsEditing)
             return;
         Commander.init();

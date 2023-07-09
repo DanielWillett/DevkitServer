@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
-using JetBrains.Annotations;
 
 namespace DevkitServer.Util;
 public static class FormattingUtil
@@ -551,6 +550,10 @@ public static class FormattingUtil
                 return GetColor(ToArgb(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor)) + plugin.Name + ANSIForegroundReset;
             return "null";
         }
+
+        if (obj is ITerminalFormattable formattable)
+            return formattable.Format(FormatProvider);
+
         if (obj is Guid guid)
         {
             if (format != null)
@@ -1461,11 +1464,6 @@ public static class FormattingUtil
               NoParse | PageBreak | Position | Quad | Rotate | Strikethrough | Size | Smallcaps | Space | Sprite |
               Style | Subscript | Superscript | Underline | Uppercase | VerticalOffset | TextWidth
     }
-}
-
-internal interface ITerminalFormatProvider
-{
-    public StackTraceCleaner StackCleaner { get; }
 }
 
 internal class LoggerFormatProvider : ITerminalFormatProvider
