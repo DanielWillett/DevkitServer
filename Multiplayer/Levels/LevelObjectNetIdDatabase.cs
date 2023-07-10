@@ -26,7 +26,7 @@ public static class LevelObjectNetIdDatabase
     [NetCall(NetCallSource.FromServer, NetCalls.SendBindObject)]
     private static void ReceiveBindObject(MessageContext ctx, uint instanceId, NetId netId)
     {
-        if (LevelObjectUtil.TryFindObjectCoordinates(instanceId, out RegionIdentifier id))
+        if (LevelObjectUtil.TryFindObject(instanceId, out RegionIdentifier id))
         {
             LevelObject obj = LevelObjectUtil.GetObjectUnsafe(id);
             RegisterObject(obj, netId);
@@ -203,8 +203,8 @@ public static class LevelObjectNetIdDatabase
         {
             uint instanceId = objects[i];
             if (!(any
-                    ? LevelObjectUtil.TryFindObjectCoordinates(last, instanceId, out RegionIdentifier id)
-                    : LevelObjectUtil.TryFindObjectCoordinates(instanceId, out id)))
+                    ? LevelObjectUtil.TryFindObject(last, instanceId, out RegionIdentifier id)
+                    : LevelObjectUtil.TryFindObject(instanceId, out id)))
             {
                 Logger.LogWarning($"Unable to find object in level data info: {id.Format()}.");
                 continue;

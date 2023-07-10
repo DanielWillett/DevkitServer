@@ -30,6 +30,8 @@ public readonly struct RegionIdentifier : IEquatable<RegionIdentifier>, ICompara
             throw new ArgumentOutOfRangeException(nameof(Y), "Must be below " + Regions.WORLD_SIZE + ".");
     }
 
+    public RegionIdentifier(RegionCoord coord, ushort index) : this((coord.x << 24) | (coord.y << 16) | index) { }
+    public RegionIdentifier(RegionCoord coord, int index) : this((coord.x << 24) | (coord.y << 16) | (ushort)index) { }
     public RegionIdentifier(byte x, byte y, ushort index) : this((x << 24) | (y << 16) | index) { }
     public RegionIdentifier(int x, int y, int index) : this(((byte)x << 24) | ((byte)y << 16) | (ushort)index) { }
 

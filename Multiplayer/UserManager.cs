@@ -1,6 +1,5 @@
 ﻿using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Players;
-using Action = System.Action;
 #if SERVER
 using DevkitServer.Levels;
 #endif
@@ -28,37 +27,49 @@ public static class UserManager
     public static IReadOnlyList<EditorUser> Users { get; } = UsersIntl.AsReadOnly();
     public static EditorUser? FromId(ulong id)
     {
-        List<EditorUser> users = UsersIntl;
-
-        int min = 0;
-        int max = users.Count - 1;
-        while (min <= max)
+        lock (UsersIntl)
         {
-            int index = min + (max - min) / 2;
-            int comparison = users[index].SteamId.m_SteamID.CompareTo(id);
-            if (comparison == 0)
-                return users[index];
-            if (comparison < 0)
-                min = index + 1;
-            else
-                max = index - 1;
-        }
+            List<EditorUser> users = UsersIntl;
 
-        return null;
+            int min = 0;
+            int max = users.Count - 1;
+            while (min <= max)
+            {
+                int index = min + (max - min) / 2;
+                int comparison = users[index].SteamId.m_SteamID.CompareTo(id);
+                if (comparison == 0)
+                    return users[index];
+                if (comparison < 0)
+                    min = index + 1;
+                else
+                    max = index - 1;
+            }
+
+            return null;
+        }
+    }
+    
+    public static void ForEach(Action<EditorUser> action)
+    {
+        lock (UsersIntl)
+            UsersIntl.ForEach(action);
     }
 #if SERVER
     public static EditorUser? FromConnection(ITransportConnection connection)
     {
         if (connection == null) return null;
 
-        List<EditorUser> users = UsersIntl;
-        for (int i = 0; i < users.Count; ++i)
+        lock (UsersIntl)
         {
-            if (connection.Equals(users[i].Connection))
-                return users[i];
-        }
+            List<EditorUser> users = UsersIntl;
+            for (int i = 0; i < users.Count; ++i)
+            {
+                if (connection.Equals(users[i].Connection))
+                    return users[i];
+            }
 
-        return null;
+            return null;
+        }
     }
 #endif
     public static EditorUser? FromId(CSteamID id) => FromId(id.m_SteamID);
@@ -66,17 +77,20 @@ public static class UserManager
     public static EditorUser? FromPlayer(Player player) => player == null ? null : FromId(player.channel.owner.playerID.steamID.m_SteamID);
     internal static void AddUser(CSteamID player)
     {
-#if SERVER
-        BackupManager.PlayerHasJoinedSinceLastBackup = true;
-#endif
-        for (int i = 0; i < Provider.clients.Count; ++i)
+        lock (UsersIntl)
         {
-            SteamPlayer pl = Provider.clients[i];
-            if (pl.playerID.steamID.m_SteamID == player.m_SteamID)
+#if SERVER
+            BackupManager.PlayerHasJoinedSinceLastBackup = true;
+#endif
+            for (int i = 0; i < Provider.clients.Count; ++i)
             {
-                if (AddUser(pl))
-                    return;
-                break;
+                SteamPlayer pl = Provider.clients[i];
+                if (pl.playerID.steamID.m_SteamID == player.m_SteamID)
+                {
+                    if (AddUser(pl))
+                        return;
+                    break;
+                }
             }
         }
 
@@ -89,74 +103,83 @@ public static class UserManager
     }
     internal static bool AddUser(SteamPlayer pl)
     {
-        if (pl.player.gameObject.TryGetComponent(out EditorUser user))
+        lock (UsersIntl)
         {
-            user.IsOnline = true;
-            bool added = false;
-            ulong s64 = pl.playerID.steamID.m_SteamID;
-            for (int j = 0; j < UsersIntl.Count; ++j)
+            if (pl.player.gameObject.TryGetComponent(out EditorUser user))
             {
-                EditorUser u = UsersIntl[j];
-                if (u.SteamId.m_SteamID > s64)
+                user.IsOnline = true;
+                bool added = false;
+                ulong s64 = pl.playerID.steamID.m_SteamID;
+                for (int j = 0; j < UsersIntl.Count; ++j)
                 {
-                    UsersIntl.Insert(j, user);
-                    added = true;
-                    break;
+                    EditorUser u = UsersIntl[j];
+                    if (u.SteamId.m_SteamID > s64)
+                    {
+                        UsersIntl.Insert(j, user);
+                        added = true;
+                        break;
+                    }
+                    if (u.SteamId.m_SteamID == user.SteamId.m_SteamID)
+                    {
+                        Logger.LogWarning("User {" + user.SteamId.m_SteamID.Format() + "} was already online.", method: "USERS");
+                        RemoveUser(u);
+                        UsersIntl[j] = user;
+                        added = true;
+                        break;
+                    }
                 }
-                if (u.SteamId.m_SteamID == user.SteamId.m_SteamID)
-                {
-                    Logger.LogWarning("User {" + user.SteamId.m_SteamID.Format() + "} was already online.", method: "USERS");
-                    RemoveUser(u.SteamId);
-                    UsersIntl[j] = user;
-                    added = true;
-                    break;
-                }
-            }
-            if (!added) UsersIntl.Add(user);
+                if (!added) UsersIntl.Add(user);
 
-            user.Player = pl;
-            user.IsOnline = true;
+                user.Player = pl;
+                user.IsOnline = true;
 #if SERVER
-            user.Connection = pl.transportConnection;
+                user.Connection = pl.transportConnection;
 #endif
-            user.Init();
-            EventOnUserConnected.TryInvoke(user);
+                user.Init();
+                EventOnUserConnected.TryInvoke(user);
 #if SERVER
-            Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + user.Connection.Format() + ".");
+                Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + user.Connection.Format() + ".");
 #else
-            Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + (user.Connection != null ? "Current Session" : "Remote Session") + ".");
+                Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + (user.Connection != null ? "Current Session" : "Remote Session") + ".");
 #endif
-            return true;
-        }
+                return true;
+            }
 
-        return false;
+            return false;
+        }
     }
 #if CLIENT
     internal static void Disconnect()
     {
-        if (EditorUser.User != null)
+        lock (UsersIntl)
         {
-            RemoveUser(EditorUser.User);
-            EditorUser.User = null;
-        }
-        for (int i = Users.Count - 1; i >= 0; --i)
-        {
-            RemoveUser(Users[i]);
-        }
+            if (EditorUser.User != null)
+            {
+                RemoveUser(EditorUser.User);
+                EditorUser.User = null;
+            }
+            for (int i = Users.Count - 1; i >= 0; --i)
+            {
+                RemoveUser(Users[i]);
+            }
 
-        if (Users.Count > 0)
-        {
-            Logger.LogWarning("Unable to properly remove all users.", method: "USERS");
-            UsersIntl.Clear();
+            if (Users.Count > 0)
+            {
+                Logger.LogWarning("Unable to properly remove all users.", method: "USERS");
+                UsersIntl.Clear();
+            }
         }
     }
 #endif
     internal static void RemoveUser(CSteamID player)
     {
-        EditorUser? user = FromId(player);
-        if (user == null)
-            return;
-        RemoveUser(user);
+        lock (UsersIntl)
+        {
+            EditorUser? user = FromId(player);
+            if (user == null)
+                return;
+            RemoveUser(user);
+        }
     }
     private static void RemoveUser(EditorUser user)
     {
@@ -178,71 +201,74 @@ public static class UserManager
         Object.Destroy(user);
     }
 
-    public static EditorUser? FromName(string name, NameSearchType type) => FromName(name, type, Users);
+    public static EditorUser? FromName(string name, NameSearchType type) => FromName(name, type, UsersIntl);
     public static EditorUser? FromName(string name, NameSearchType type, IEnumerable<EditorUser> selection)
     {
-        IEnumerable<EditorUser> editorUsers = selection as EditorUser[] ?? selection.ToArray();
-        if (type == NameSearchType.CharacterName)
+        lock (UsersIntl)
         {
-            foreach (EditorUser current in editorUsers.OrderBy(SelectCharacterName))
+            IEnumerable<EditorUser> editorUsers = selection as EditorUser[] ?? selection.ToArray();
+            if (type == NameSearchType.CharacterName)
             {
-                if (current.Player!.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
-                    return current;
+                foreach (EditorUser current in editorUsers.OrderBy(SelectCharacterName))
+                {
+                    if (current.Player!.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                        return current;
+                }
+                foreach (EditorUser current in editorUsers.OrderBy(SelectNickName))
+                {
+                    if (current.Player!.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                        return current;
+                }
+                foreach (EditorUser current in editorUsers.OrderBy(SelectPlayerName))
+                {
+                    if (current.Player!.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                        return current;
+                }
+                return null;
             }
-            foreach (EditorUser current in editorUsers.OrderBy(SelectNickName))
+
+            if (type == NameSearchType.NickName)
             {
-                if (current.Player!.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
-                    return current;
+                foreach (EditorUser current in editorUsers.OrderBy(SelectNickName))
+                {
+                    if (current.Player!.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                        return current;
+                }
+                foreach (EditorUser current in editorUsers.OrderBy(SelectCharacterName))
+                {
+                    if (current.Player!.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                        return current;
+                }
+                foreach (EditorUser current in editorUsers.OrderBy(SelectPlayerName))
+                {
+                    if (current.Player!.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                        return current;
+                }
+                return null;
             }
-            foreach (EditorUser current in editorUsers.OrderBy(SelectPlayerName))
+
+            if (type == NameSearchType.PlayerName)
             {
-                if (current.Player!.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
-                    return current;
+                foreach (EditorUser current in editorUsers.OrderBy(SelectPlayerName))
+                {
+                    if (current.Player!.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                        return current;
+                }
+                foreach (EditorUser current in editorUsers.OrderBy(SelectNickName))
+                {
+                    if (current.Player!.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                        return current;
+                }
+                foreach (EditorUser current in editorUsers.OrderBy(SelectCharacterName))
+                {
+                    if (current.Player!.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                        return current;
+                }
+                return null;
             }
-            return null;
+
+            return FromName(name, NameSearchType.CharacterName, editorUsers);
         }
-        
-        if (type == NameSearchType.NickName)
-        {
-            foreach (EditorUser current in editorUsers.OrderBy(SelectNickName))
-            {
-                if (current.Player!.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
-                    return current;
-            }
-            foreach (EditorUser current in editorUsers.OrderBy(SelectCharacterName))
-            {
-                if (current.Player!.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
-                    return current;
-            }
-            foreach (EditorUser current in editorUsers.OrderBy(SelectPlayerName))
-            {
-                if (current.Player!.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
-                    return current;
-            }
-            return null;
-        }
-        
-        if (type == NameSearchType.PlayerName)
-        {
-            foreach (EditorUser current in editorUsers.OrderBy(SelectPlayerName))
-            {
-                if (current.Player!.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
-                    return current;
-            }
-            foreach (EditorUser current in editorUsers.OrderBy(SelectNickName))
-            {
-                if (current.Player!.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
-                    return current;
-            }
-            foreach (EditorUser current in editorUsers.OrderBy(SelectCharacterName))
-            {
-                if (current.Player!.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
-                    return current;
-            }
-            return null;
-        }
-        
-        return FromName(name, NameSearchType.CharacterName, editorUsers);
         
         int SelectPlayerName(EditorUser u) => u.Player!.playerID.playerName.Length;
         int SelectNickName(EditorUser u) => u.Player!.playerID.nickName.Length;

@@ -6,6 +6,7 @@ using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players.UI;
+using DevkitServer.Util.Region;
 #if CLIENT
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Patches;
@@ -429,404 +430,228 @@ public static class LevelObjectUtil
 
         return null;
     }
-
-    [Pure]
-    public static LevelObject? FindObject(Transform transform, bool checkSkyboxAndPlaceholder = false)
+    public static LevelObject? FindObject(Transform transform, bool checkSkyboxAndPlaceholder = false) => TryFindObject(transform, out LevelObject obj, checkSkyboxAndPlaceholder) ? obj : null;
+    public static LevelObject? FindObject(uint instanceId) => TryFindObject(instanceId, out LevelObject obj) ? obj : null;
+    public static LevelObject? FindObject(Vector3 expectedPosition, uint instanceId) => TryFindObject(expectedPosition, instanceId, out LevelObject obj) ? obj : null;
+    public static LevelBuildableObject? FindBuildable(Transform transform) => TryFindBuildable(transform, out LevelBuildableObject obj) ? obj : null;
+    public static RegionIdentifier FindObjectCoordinates(Transform transform, bool checkSkyboxAndPlaceholder = false) => TryFindObject(transform, out RegionIdentifier regionId, checkSkyboxAndPlaceholder) ? regionId : RegionIdentifier.Invalid;
+    public static RegionIdentifier FindObjectCoordinates(uint instanceId) => TryFindObject(instanceId, out RegionIdentifier regionId) ? regionId : RegionIdentifier.Invalid;
+    public static RegionIdentifier FindObjectCoordinates(Vector3 expectedPosition, uint instanceId) => TryFindObject(expectedPosition, instanceId, out RegionIdentifier regionId) ? regionId : RegionIdentifier.Invalid;
+    public static RegionIdentifier FindBuildableCoordinates(Transform transform) => TryFindBuildable(transform, out RegionIdentifier regionId) ? regionId : RegionIdentifier.Invalid;
+    public static bool TryFindObject(Transform transform, out LevelObject levelObject, bool checkSkyboxAndPlaceholder = false)
     {
-        ThreadUtil.assertIsGameThread();
-        if (transform == null)
-            return null;
-
-        bool r = false;
-        if (Regions.tryGetCoordinate(transform.position, out byte x, out byte y))
-        {
-            LevelObject? obj =
-                SearchInRegion(transform, x, y, checkSkyboxAndPlaceholder) ??
-                SearchInRegion(transform, x + 1, y, checkSkyboxAndPlaceholder) ??
-                SearchInRegion(transform, x - 1, y, checkSkyboxAndPlaceholder) ??
-                SearchInRegion(transform, x, y + 1, checkSkyboxAndPlaceholder) ??
-                SearchInRegion(transform, x + 1, y + 1, checkSkyboxAndPlaceholder) ??
-                SearchInRegion(transform, x + 1, y - 1, checkSkyboxAndPlaceholder) ??
-                SearchInRegion(transform, x - 1, y - 1, checkSkyboxAndPlaceholder) ??
-                SearchInRegion(transform, x - 1, y + 1, checkSkyboxAndPlaceholder);
-
-            if (obj != null)
-                return obj;
-
-            r = true;
-        }
-
-        for (int x2 = 0; x2 < Regions.WORLD_SIZE; ++x2)
-        {
-            for (int y2 = 0; y2 < Regions.WORLD_SIZE; ++y2)
-            {
-                if (r && x2 <= x + 1 && x2 >= x - 1 && y2 <= y + 1 && y2 >= y - 1)
-                    continue;
-                LevelObject? obj = SearchInRegion(transform, x2, y2, checkSkyboxAndPlaceholder);
-                if (obj != null)
-                    return obj;
-            }
-        }
-
-        return null;
+        LevelObject? found = null;
+        RegionUtil.ForEach(transform.position, coord => !TryFindObject(transform, coord, out found, checkSkyboxAndPlaceholder));
+        levelObject = found!;
+        return found != null;
     }
-    public static bool TryFindObject(Transform transform, out RegionIdentifier id, bool checkSkyboxAndPlaceholder = false)
+    public static bool TryFindObject(Transform transform, out RegionIdentifier regionId, bool checkSkyboxAndPlaceholder = false)
     {
-        ThreadUtil.assertIsGameThread();
-        if (transform != null)
-        {
-            bool r = false;
-            if (Regions.tryGetCoordinate(transform.position, out byte x, out byte y))
-            {
-                int[] offsets = LandscapeUtil.SurroundingOffsets;
-                for (int i = 0; i < offsets.Length; i += 2)
-                {
-                    if (SearchInRegion(transform, x + offsets[i], y + offsets[i + 1], ref x, ref y, out ushort index, checkSkyboxAndPlaceholder))
-                    {
-                        id = new RegionIdentifier(x, y, index);
-                        return true;
-                    }
-                }
-
-                r = true;
-            }
-
-            for (int x2 = 0; x2 < Regions.WORLD_SIZE; ++x2)
-            {
-                for (int y2 = 0; y2 < Regions.WORLD_SIZE; ++y2)
-                {
-                    if (r && x2 <= x + 1 && x2 >= x - 1 && y2 <= y + 1 && y2 >= y - 1)
-                        continue;
-                    if (SearchInRegion(transform, x2, y2, ref x, ref y, out ushort index, checkSkyboxAndPlaceholder))
-                    {
-                        id = new RegionIdentifier(x, y, index);
-                        return true;
-                    }
-                }
-            }
-        }
-        
-        id = RegionIdentifier.Invalid;
-        return false;
+        RegionIdentifier r = RegionIdentifier.Invalid;
+        RegionUtil.ForEach(transform.position, coord => !TryFindObject(transform, coord, out r, checkSkyboxAndPlaceholder));
+        regionId = r;
+        return !r.IsInvalid;
     }
-    [Pure]
-    public static LevelObject? FindObject(uint instanceId)
+    public static bool TryFindObject(uint instanceId, out LevelObject levelObject)
     {
-        if (TryFindObjectCoordinates(instanceId, out RegionIdentifier id))
-            return LevelObjects.objects[id.X, id.Y][id.Index];
-
-        return null;
+        LevelObject? found = null;
+        RegionUtil.ForEach(coord => !TryFindObject(instanceId, coord, out found));
+        levelObject = found!;
+        return found != null;
     }
-    [Pure]
-    public static LevelObject? FindObject(Vector3 pos, uint instanceId)
+    public static bool TryFindObject(uint instanceId, out RegionIdentifier regionId)
     {
-        if (TryFindObjectCoordinates(pos, instanceId, out RegionIdentifier id))
-            return LevelObjects.objects[id.X, id.Y][id.Index];
-
-        return null;
+        RegionIdentifier r = RegionIdentifier.Invalid;
+        RegionUtil.ForEach(coord => !TryFindObject(instanceId, coord, out r));
+        regionId = r;
+        return !r.IsInvalid;
     }
-
-    public static bool TryFindObjectCoordinates(uint instanceId, out RegionIdentifier id)
+    public static bool TryFindObject(Vector3 expectedPosition, uint instanceId, out LevelObject levelObject)
     {
-        ThreadUtil.assertIsGameThread();
-
-        for (int x2 = 0; x2 < Regions.WORLD_SIZE; ++x2)
-        {
-            for (int y2 = 0; y2 < Regions.WORLD_SIZE; ++y2)
-            {
-                List<LevelObject> region = LevelObjects.objects[x2, y2];
-                int c = Math.Min(region.Count, ushort.MaxValue);
-                for (int i = 0; i < c; ++i)
-                {
-                    if (region[i].instanceID == instanceId)
-                    {
-                        id = new RegionIdentifier((byte)x2, (byte)y2, (ushort)i);
-                        return true;
-                    }
-                }
-            }
-        }
-
-        id = RegionIdentifier.Invalid;
-        return false;
+        LevelObject? found = null;
+        RegionUtil.ForEach(expectedPosition, coord => !TryFindObject(instanceId, coord, out found));
+        levelObject = found!;
+        return found != null;
     }
-
-    public static bool TryFindObjectCoordinates(Vector3 expectedPosition, uint instanceId, out RegionIdentifier id)
+    public static bool TryFindObject(Vector3 expectedPosition, uint instanceId, out RegionIdentifier regionId)
     {
-        ThreadUtil.assertIsGameThread();
-
-        bool r = false;
-        if (Regions.tryGetCoordinate(expectedPosition, out byte x, out byte y))
-        {
-            int[] offsets = LandscapeUtil.SurroundingOffsets;
-            for (int i = 0; i < offsets.Length; i += 2)
-            {
-                if (SearchInRegion(x + offsets[i], y + offsets[i + 1], instanceId, ref x, ref y, out ushort index))
-                {
-                    id = new RegionIdentifier(x, y, index);
-                    return true;
-                }
-            }
-
-            r = true;
-        }
-
-        for (int x2 = 0; x2 < Regions.WORLD_SIZE; ++x2)
-        {
-            for (int y2 = 0; y2 < Regions.WORLD_SIZE; ++y2)
-            {
-                if (r && x2 <= x + 1 && x2 >= x - 1 && y2 <= y + 1 && y2 >= y - 1)
-                    continue;
-                List<LevelObject> region = LevelObjects.objects[x2, y2];
-                int c = Math.Min(region.Count, ushort.MaxValue);
-                for (int i = 0; i < c; ++i)
-                {
-                    if (region[i].instanceID == instanceId)
-                    {
-                        id = new RegionIdentifier((byte)x2, (byte)y2, (ushort)i);
-                        return true;
-                    }
-                }
-            }
-        }
-
-        id = RegionIdentifier.Invalid;
-        return false;
+        RegionIdentifier r = RegionIdentifier.Invalid;
+        RegionUtil.ForEach(expectedPosition, coord => !TryFindObject(instanceId, coord, out r));
+        regionId = r;
+        return !r.IsInvalid;
     }
-    private static bool SearchInRegion(int regionX, int regionY, uint instanceId, ref byte x, ref byte y, out ushort index)
+    public static bool TryFindObject(Transform transform, RegionCoord region, out LevelObject levelObject, bool checkSkyboxAndPlaceholder = false)
     {
-        if (regionX < 0 || regionY < 0 || regionX > Regions.WORLD_SIZE || regionY > Regions.WORLD_SIZE)
+        List<LevelObject> objRegion = LevelObjects.objects[region.x, region.y];
+        int ct = objRegion.Count;
+        for (int i = 0; i < ct; ++i)
         {
-            index = ushort.MaxValue;
-            return false;
-        }
-        if (SearchInRegion((byte)regionX, (byte)regionY, instanceId, out index))
-        {
-            x = (byte)regionX;
-            y = (byte)regionY;
-            return true;
-        }
-
-        return false;
-    }
-    [Pure]
-    private static LevelObject? SearchInRegion(Transform transform, int regionX, int regionY, bool checkSkyboxAndPlaceholder)
-    {
-        if (regionX < 0 || regionY < 0 || regionX > Regions.WORLD_SIZE || regionY > Regions.WORLD_SIZE)
-            return null;
-        List<LevelObject> region = LevelObjects.objects[regionX, regionY];
-        for (int i = 0; i < region.Count; ++i)
-        {
-            if (ReferenceEquals(region[i].transform, transform))
-                return region[i];
-        }
-        if (checkSkyboxAndPlaceholder)
-        {
-            for (int i = 0; i < region.Count; ++i)
+            if (ReferenceEquals(objRegion[i].transform, transform))
             {
-                if (ReferenceEquals(region[i].skybox, transform))
-                    return region[i];
-            }
-            for (int i = 0; i < region.Count; ++i)
-            {
-                if (ReferenceEquals(region[i].placeholderTransform, transform))
-                    return region[i];
-            }
-        }
-
-        return null;
-    }
-    private static bool SearchInRegion(Transform transform, int regionX, int regionY, ref byte x, ref byte y, out ushort index, bool checkSkyboxAndPlaceholder)
-    {
-        if (regionX < 0 || regionY < 0 || regionX > Regions.WORLD_SIZE || regionY > Regions.WORLD_SIZE)
-        {
-            index = ushort.MaxValue;
-            return false;
-        }
-        List<LevelObject> region = LevelObjects.objects[regionX, regionY];
-        int c = Math.Min(ushort.MaxValue, region.Count);
-        for (int i = 0; i < c; ++i)
-        {
-            if (ReferenceEquals(region[i].transform, transform))
-            {
-                x = (byte)regionX;
-                y = (byte)regionY;
-                index = (ushort)i;
+                levelObject = objRegion[i];
                 return true;
             }
         }
         if (checkSkyboxAndPlaceholder)
         {
-            for (int i = 0; i < c; ++i)
+            for (int i = 0; i < ct; ++i)
             {
-                if (ReferenceEquals(region[i].skybox, transform))
+                if (ReferenceEquals(objRegion[i].skybox, transform))
                 {
-                    x = (byte)regionX;
-                    y = (byte)regionY;
-                    index = (ushort)i;
+                    levelObject = objRegion[i];
                     return true;
                 }
             }
-            for (int i = 0; i < c; ++i)
+            for (int i = 0; i < ct; ++i)
             {
-                if (ReferenceEquals(region[i].placeholderTransform, transform))
+                if (ReferenceEquals(objRegion[i].placeholderTransform, transform))
                 {
-                    x = (byte)regionX;
-                    y = (byte)regionY;
-                    index = (ushort)i;
+                    levelObject = objRegion[i];
                     return true;
                 }
             }
         }
 
-        index = ushort.MaxValue;
+        levelObject = null!;
         return false;
     }
-    private static bool SearchInRegion(byte regionX, byte regionY, uint instanceId, out ushort index)
+    public static bool TryFindObject(Transform transform, RegionCoord region, out RegionIdentifier regionId, bool checkSkyboxAndPlaceholder = false)
     {
-        if (regionX > Regions.WORLD_SIZE || regionY > Regions.WORLD_SIZE)
+        List<LevelObject> objRegion = LevelObjects.objects[region.x, region.y];
+        int ct = objRegion.Count;
+        for (int i = 0; i < ct; ++i)
         {
-            index = ushort.MaxValue;
-            return false;
-        }
-        List<LevelObject> region = LevelObjects.objects[regionX, regionY];
-        int c = Math.Min(region.Count, ushort.MaxValue - 1);
-        for (int i = 0; i < c; ++i)
-        {
-            if (region[i].instanceID == instanceId)
+            if (ReferenceEquals(objRegion[i].transform, transform))
             {
-                index = (ushort)i;
+                regionId = new RegionIdentifier(region, i);
+                return true;
+            }
+        }
+        if (checkSkyboxAndPlaceholder)
+        {
+            for (int i = 0; i < ct; ++i)
+            {
+                if (ReferenceEquals(objRegion[i].skybox, transform))
+                {
+                    regionId = new RegionIdentifier(region, i);
+                    return true;
+                }
+            }
+            for (int i = 0; i < ct; ++i)
+            {
+                if (ReferenceEquals(objRegion[i].placeholderTransform, transform))
+                {
+                    regionId = new RegionIdentifier(region, i);
+                    return true;
+                }
+            }
+        }
+
+        regionId = RegionIdentifier.Invalid;
+        return false;
+    }
+    public static bool TryFindObject(uint instanceId, RegionCoord region, out RegionIdentifier regionId)
+    {
+        List<LevelObject> objRegion = LevelObjects.objects[region.x, region.y];
+        int ct = objRegion.Count;
+        for (int i = 0; i < ct; ++i)
+        {
+            if (objRegion[i].instanceID == instanceId)
+            {
+                regionId = new RegionIdentifier(region, i);
                 return true;
             }
         }
 
-        index = ushort.MaxValue;
+        regionId = RegionIdentifier.Invalid;
         return false;
     }
-    [Pure]
-    public static LevelBuildableObject? FindBuildable(Transform transform)
+    public static bool TryFindObject(uint instanceId, RegionCoord region, out LevelObject levelObject)
     {
-        ThreadUtil.assertIsGameThread();
-        if (transform == null)
-            return null;
-
-        bool r = false;
-        if (Regions.tryGetCoordinate(transform.position, out byte x, out byte y))
+        List<LevelObject> objRegion = LevelObjects.objects[region.x, region.y];
+        int ct = objRegion.Count;
+        for (int i = 0; i < ct; ++i)
         {
-            LevelBuildableObject? obj =
-                SearchInBuildableRegion(transform, x, y) ??
-                SearchInBuildableRegion(transform, x + 1, y) ??
-                SearchInBuildableRegion(transform, x - 1, y) ??
-                SearchInBuildableRegion(transform, x, y + 1) ??
-                SearchInBuildableRegion(transform, x + 1, y + 1) ??
-                SearchInBuildableRegion(transform, x + 1, y - 1) ??
-                SearchInBuildableRegion(transform, x - 1, y - 1) ??
-                SearchInBuildableRegion(transform, x - 1, y + 1);
-
-            if (obj != null)
-                return obj;
-
-            r = true;
-        }
-
-        for (int x2 = 0; x2 < Regions.WORLD_SIZE; ++x2)
-        {
-            for (int y2 = 0; y2 < Regions.WORLD_SIZE; ++y2)
+            if (objRegion[i].instanceID == instanceId)
             {
-                if (r && x2 <= x + 1 && x2 >= x - 1 && y2 <= y + 1 && y2 >= y - 1)
-                    continue;
-                List<LevelBuildableObject> region = LevelObjects.buildables[x2, y2];
-                int c = Math.Min(region.Count, ushort.MaxValue);
-                for (int i = 0; i < c; ++i)
-                {
-                    if (ReferenceEquals(region[i].transform, transform))
-                        return region[i];
-                }
-            }
-        }
-
-        return null;
-    }
-    public static bool TryFindBuildable(Transform transform, out RegionIdentifier id) => TryFindBuildable(transform, transform.position, out id);
-    public static bool TryFindBuildable(Transform transform, Vector3 savedPosition, out RegionIdentifier id)
-    {
-        ThreadUtil.assertIsGameThread();
-        if (transform != null)
-        {
-            bool r = false;
-            if (Regions.tryGetCoordinate(savedPosition, out byte x, out byte y))
-            {
-                int[] offsets = LandscapeUtil.SurroundingOffsets;
-                for (int i = 0; i < offsets.Length; i += 2)
-                {
-                    if (SearchInBuildableRegion(transform, x + offsets[i], y + offsets[i + 1], ref x, ref y, out ushort index))
-                    {
-                        id = new RegionIdentifier(x, y, index);
-                        return true;
-                    }
-                }
-
-                r = true;
-            }
-
-            for (int x2 = 0; x2 < Regions.WORLD_SIZE; ++x2)
-            {
-                for (int y2 = 0; y2 < Regions.WORLD_SIZE; ++y2)
-                {
-                    if (r && x2 <= x + 1 && x2 >= x - 1 && y2 <= y + 1 && y2 >= y - 1)
-                        continue;
-                    List<LevelBuildableObject> region = LevelObjects.buildables[x2, y2];
-                    int c = Math.Min(region.Count, ushort.MaxValue);
-                    for (int i = 0; i < c; ++i)
-                    {
-                        if (ReferenceEquals(region[i].transform, transform))
-                        {
-                            id = new RegionIdentifier((byte)x2, (byte)y2, (ushort)i);
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-        
-        id = RegionIdentifier.Invalid;
-        return false;
-    }
-    [Pure]
-    private static LevelBuildableObject? SearchInBuildableRegion(Transform transform, int regionX, int regionY)
-    {
-        if (regionX < 0 || regionY < 0 || regionX > Regions.WORLD_SIZE || regionY > Regions.WORLD_SIZE)
-            return null;
-        List<LevelBuildableObject> region = LevelObjects.buildables[regionX, regionY];
-        for (int i = 0; i < region.Count; ++i)
-        {
-            if (ReferenceEquals(region[i].transform, transform))
-                return region[i];
-        }
-
-        return null;
-    }
-    private static bool SearchInBuildableRegion(Transform transform, int regionX, int regionY, ref byte x, ref byte y, out ushort index)
-    {
-        if (regionX < 0 || regionY < 0 || regionX > Regions.WORLD_SIZE || regionY > Regions.WORLD_SIZE)
-        {
-            index = ushort.MaxValue;
-            return false;
-        }
-        List<LevelBuildableObject> region = LevelObjects.buildables[regionX, regionY];
-        for (int i = 0; i < region.Count; ++i)
-        {
-            if (ReferenceEquals(region[i].transform, transform))
-            {
-                x = (byte)regionX;
-                y = (byte)regionY;
-                index = (ushort)i;
+                levelObject = objRegion[i];
                 return true;
             }
         }
 
-        index = ushort.MaxValue;
+        levelObject = null!;
         return false;
+    }
+    public static bool TryFindBuildable(Transform transform, out LevelBuildableObject buildable)
+    {
+        LevelBuildableObject? found = null;
+        RegionUtil.ForEach(transform.position, coord => !TryFindBuildable(transform, coord, out found));
+        buildable = found!;
+        return found != null;
+    }
+    public static bool TryFindBuildable(Transform transform, out RegionIdentifier regionId)
+    {
+        RegionIdentifier r = RegionIdentifier.Invalid;
+        RegionUtil.ForEach(transform.position, coord => !TryFindBuildable(transform, coord, out r));
+        regionId = r;
+        return !r.IsInvalid;
+    }
+    public static bool TryFindBuildable(Transform transform, RegionCoord region, out LevelBuildableObject buildable)
+    {
+        List<LevelBuildableObject> buildableRegion = LevelObjects.buildables[region.x, region.y];
+        int ct = buildableRegion.Count;
+        for (int i = 0; i < ct; ++i)
+        {
+            if (ReferenceEquals(buildableRegion[i].transform, transform))
+            {
+                buildable = buildableRegion[i];
+                return true;
+            }
+        }
+
+        buildable = null!;
+        return false;
+    }
+    public static bool TryFindBuildable(Transform transform, RegionCoord region, out RegionIdentifier regionId)
+    {
+        List<LevelBuildableObject> buildableRegion = LevelObjects.buildables[region.x, region.y];
+        int ct = buildableRegion.Count;
+        for (int i = 0; i < ct; ++i)
+        {
+            if (ReferenceEquals(buildableRegion[i].transform, transform))
+            {
+                regionId = new RegionIdentifier(region, i);
+                return true;
+            }
+        }
+
+        regionId = RegionIdentifier.Invalid;
+        return false;
+    }
+    public static bool TryFindObjectOrBuildable(Transform transform, out LevelObject? @object, out LevelBuildableObject? buildable)
+    {
+        RegionIdentifier r = RegionIdentifier.Invalid;
+        bool isBuildable = false;
+        RegionUtil.ForEach(transform.position, coord =>
+        {
+            if (!TryFindObject(transform, coord, out r, false))
+            {
+                if (!TryFindBuildable(transform, coord, out r))
+                    return true;
+                isBuildable = true;
+            }
+
+            return false;
+        });
+        if (r.IsInvalid)
+        {
+            @object = null;
+            buildable = null;
+            return false;
+        }
+        @object = isBuildable ? null : GetObjectUnsafe(r);
+        buildable = isBuildable ? GetBuildableUnsafe(r) : null;
+        return @object != null || buildable != null;
     }
 #if SERVER
     [Pure]
@@ -925,22 +750,6 @@ public static class LevelObjectUtil
     }
     [Pure]
     public static LevelObject GetObjectUnsafe(RegionIdentifier id) => LevelObjects.objects[id.X, id.Y][id.Index];
-    public static bool TryGetObjectOrBuildable(Transform transform, out LevelObject? @object, out LevelBuildableObject? buildable)
-    {
-        @object = null;
-        buildable = null;
-        if (TryFindObject(transform, out RegionIdentifier id))
-        {
-            @object = ObjectManager.getObject(id.X, id.Y, id.Index);
-        }
-        if (@object == null)
-        {
-            if (TryFindBuildable(transform, out id))
-                buildable = GetBuildable(id);
-        }
-
-        return @object != null || buildable != null;
-    }
     public static Asset? GetAsset(this EditorCopy copy) => copy.objectAsset ?? (Asset)copy.itemAsset;
 #if CLIENT
     public static bool UpdateCulledObjects(CullingVolume volume)
