@@ -2,6 +2,7 @@
 using DevkitServer.Core.Permissions;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer;
+using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Sync;
@@ -29,6 +30,7 @@ public static class LevelObjectUtil
     public const int MaxMovePacketSize = 32;
     public const int MaxMovePreviewSelectionSize = 8;
     public const int MaxCopySelectionSize = 64;
+    public const int MaxUpdateObjectsPacketSize = 64;
 
     internal static CachedMulticastEvent<BuildableRegionUpdated> EventOnBuildableRegionUpdated = new CachedMulticastEvent<BuildableRegionUpdated>(typeof(LevelObjectUtil), nameof(OnBuildableRegionUpdated));
     internal static CachedMulticastEvent<LevelObjectRegionUpdated> EventOnLevelObjectRegionUpdated = new CachedMulticastEvent<LevelObjectRegionUpdated>(typeof(LevelObjectUtil), nameof(OnLevelObjectRegionUpdated));
@@ -340,28 +342,77 @@ public static class LevelObjectUtil
     {
         return GetCustomMaterialOverrideIntl == null ? AssetReference<MaterialPaletteAsset>.invalid : GetCustomMaterialOverrideIntl(levelObject);
     }
-    public static bool SetMaterialIndexOverride(this LevelObject levelObject, int materialIndexOverride, bool reapply = true)
+    internal static bool SetMaterialIndexOverrideLocal(LevelObject levelObject, int materialIndexOverride, bool reapply = true)
     {
-        if (SetMaterialIndexOverrideIntl == null || reapply && CallReapplyMaterialOverridesIntl == null)
+        ThreadUtil.assertIsGameThread();
+
+        if (SetMaterialIndexOverrideIntl == null || reapply && !Dedicator.IsDedicatedServer && CallReapplyMaterialOverridesIntl == null)
             return false;
         if (materialIndexOverride < -1)
             materialIndexOverride = -1;
         SetMaterialIndexOverrideIntl(levelObject, materialIndexOverride);
-        if (reapply)
+        if (reapply && !Dedicator.IsDedicatedServer)
             CallReapplyMaterialOverridesIntl!(levelObject);
         return true;
     }
-    public static bool SetCustomMaterialOverride(this LevelObject levelObject, AssetReference<MaterialPaletteAsset> customMaterialOverride, bool reapply = true)
+    internal static bool SetCustomMaterialPaletteOverrideLocal(LevelObject levelObject, AssetReference<MaterialPaletteAsset> customMaterialOverride, bool reapply = true)
     {
-        if (SetCustomMaterialOverrideIntl == null || reapply && CallReapplyMaterialOverridesIntl == null)
+        ThreadUtil.assertIsGameThread();
+
+        if (SetCustomMaterialOverrideIntl == null || reapply && !Dedicator.IsDedicatedServer && CallReapplyMaterialOverridesIntl == null)
             return false;
         SetCustomMaterialOverrideIntl(levelObject, customMaterialOverride);
-        if (reapply)
+        if (reapply && !Dedicator.IsDedicatedServer)
             CallReapplyMaterialOverridesIntl!(levelObject);
+        return true;
+    }
+    public static bool SetMaterialIndexOverride(this LevelObject levelObject, int materialIndexOverride, bool reapply = true)
+    {
+        if (!SetMaterialIndexOverrideLocal(levelObject, materialIndexOverride, reapply))
+            return false;
+#if CLIENT
+        if (DevkitServerModule.IsEditing && LevelObjectNetIdDatabase.TryGetObjectNetId(levelObject, out NetId netId))
+            ClientEvents.InvokeOnUpdateObjectsMaterialIndexOverride(new UpdateObjectsMaterialIndexOverrideProperties(new NetId[] { netId }, materialIndexOverride, CachedTime.DeltaTime));
+#else
+        if (LevelObjectNetIdDatabase.TryGetObjectNetId(levelObject, out NetId netId))
+        {
+            EditorActions.QueueServerAction(new UpdateObjectsMaterialIndexOverrideAction
+            {
+                DeltaTime = CachedTime.DeltaTime,
+                Value = materialIndexOverride,
+                NetIds = new NetId[] { netId }
+            });
+        }
+#endif
+        return true;
+    }
+    public static bool SetCustomMaterialPaletteOverride(this LevelObject levelObject, AssetReference<MaterialPaletteAsset> customMaterialPaletteOverride, bool reapply = true)
+    {
+        if (!SetCustomMaterialPaletteOverrideLocal(levelObject, customMaterialPaletteOverride, reapply))
+            return false;
+#if CLIENT
+        if (DevkitServerModule.IsEditing && LevelObjectNetIdDatabase.TryGetObjectNetId(levelObject, out NetId netId))
+            ClientEvents.InvokeOnUpdateObjectsCustomMaterialPaletteOverride(new UpdateObjectsCustomMaterialPaletteOverrideProperties(new NetId[] { netId }, customMaterialPaletteOverride, CachedTime.DeltaTime));
+#else
+        if (LevelObjectNetIdDatabase.TryGetObjectNetId(levelObject, out NetId netId))
+        {
+            EditorActions.QueueServerAction(new UpdateObjectsCustomMaterialPaletteOverrideAction
+            {
+                DeltaTime = CachedTime.DeltaTime,
+                Value = customMaterialPaletteOverride,
+                NetIds = new NetId[] { netId }
+            });
+        }
+#endif
         return true;
     }
     public static bool ReapplyMaterialOverrides(this LevelObject levelObject)
     {
+        ThreadUtil.assertIsGameThread();
+
+        if (!Dedicator.IsDedicatedServer)
+            return true;
+
         if (CallReapplyMaterialOverridesIntl == null)
             return false;
         CallReapplyMaterialOverridesIntl(levelObject);
@@ -440,6 +491,11 @@ public static class LevelObjectUtil
     public static RegionIdentifier FindBuildableCoordinates(Transform transform) => TryFindBuildable(transform, out RegionIdentifier regionId) ? regionId : RegionIdentifier.Invalid;
     public static bool TryFindObject(Transform transform, out LevelObject levelObject, bool checkSkyboxAndPlaceholder = false)
     {
+        if (transform == null)
+        {
+            levelObject = null!;
+            return false;
+        }
         LevelObject? found = null;
         RegionUtil.ForEach(transform.position, coord => !TryFindObject(transform, coord, out found, checkSkyboxAndPlaceholder));
         levelObject = found!;
@@ -447,6 +503,11 @@ public static class LevelObjectUtil
     }
     public static bool TryFindObject(Transform transform, out RegionIdentifier regionId, bool checkSkyboxAndPlaceholder = false)
     {
+        if (transform == null)
+        {
+            regionId = RegionIdentifier.Invalid;
+            return false;
+        }
         RegionIdentifier r = RegionIdentifier.Invalid;
         RegionUtil.ForEach(transform.position, coord => !TryFindObject(transform, coord, out r, checkSkyboxAndPlaceholder));
         regionId = r;

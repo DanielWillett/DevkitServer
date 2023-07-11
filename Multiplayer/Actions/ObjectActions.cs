@@ -1,8 +1,6 @@
 ﻿using DevkitServer.Util.Encoding;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Levels;
-using DevkitServer.Multiplayer.Sync;
-using DevkitServer.Players;
 #if SERVER
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.API.Permissions;
@@ -24,6 +22,8 @@ public sealed class ObjectActions
         {
             ClientEvents.OnDeleteLevelObjects += OnDeleteLevelObjects;
             ClientEvents.OnMoveLevelObjectsFinal += OnMoveLevelObjectsFinal;
+            ClientEvents.OnUpdateObjectsCustomMaterialPaletteOverride += OnUpdateObjectsCustomMaterialPaletteOverride;
+            ClientEvents.OnUpdateObjectsMaterialIndexOverride += OnUpdateObjectsMaterialIndexOverride;
         }
 #endif
     }
@@ -35,6 +35,8 @@ public sealed class ObjectActions
         {
             ClientEvents.OnDeleteLevelObjects -= OnDeleteLevelObjects;
             ClientEvents.OnMoveLevelObjectsFinal -= OnMoveLevelObjectsFinal;
+            ClientEvents.OnUpdateObjectsCustomMaterialPaletteOverride -= OnUpdateObjectsCustomMaterialPaletteOverride;
+            ClientEvents.OnUpdateObjectsMaterialIndexOverride -= OnUpdateObjectsMaterialIndexOverride;
         }
 #endif
     }
@@ -55,6 +57,24 @@ public sealed class ObjectActions
             UseScale = properties.UseScale,
             DeltaTime = properties.DeltaTime
         }, true);
+    }
+    private void OnUpdateObjectsCustomMaterialPaletteOverride(in UpdateObjectsCustomMaterialPaletteOverrideProperties properties)
+    {
+        EditorActions.QueueAction(new UpdateObjectsCustomMaterialPaletteOverrideAction
+        {
+            NetIds = properties.NetIds,
+            Value = properties.Material,
+            DeltaTime = properties.DeltaTime
+        });
+    }
+    private void OnUpdateObjectsMaterialIndexOverride(in UpdateObjectsMaterialIndexOverrideProperties properties)
+    {
+        EditorActions.QueueAction(new UpdateObjectsMaterialIndexOverrideAction
+        {
+            NetIds = properties.NetIds,
+            Value = properties.Index,
+            DeltaTime = properties.DeltaTime
+        });
     }
 #endif
 }
@@ -311,4 +331,186 @@ public class InstantiateLevelObjectAction : IServersideAction
     }
 
     public int CalculateSize() => 68;
+}
+
+[Action(ActionType.UpdateObjectsCustomMaterialPaletteOverride, 64 * 4 + 21, 0)]
+[EarlyTypeInit]
+public sealed class UpdateObjectsCustomMaterialPaletteOverrideAction : IAction
+{
+    public ActionType Type => ActionType.UpdateObjectsCustomMaterialPaletteOverride;
+    public CSteamID Instigator { get; set; }
+    public NetId[] NetIds { get; set; } = Array.Empty<NetId>();
+    public float DeltaTime { get; set; }
+    public AssetReference<MaterialPaletteAsset> Value { get; set; }
+    public void Apply()
+    {
+#if SERVER
+        LevelObject?[]? objs = _objects;
+#else
+        LevelObject?[]? objs = null;
+#endif
+        if (objs == null)
+        {
+            objs = new LevelObject[NetIds.Length];
+            for (int i = 0; i < objs.Length; ++i)
+            {
+                NetId netId = NetIds[i];
+                if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out _, out _) || levelObject == null)
+                {
+                    Logger.LogWarning($"Unknown object with NetId: {netId.Format()}.");
+                    continue;
+                }
+                objs[i] = levelObject;
+            }
+        }
+        for (int i = 0; i < objs.Length; ++i)
+        {
+            LevelObject? obj = objs[i];
+            if (obj == null)
+                continue;
+
+            LevelObjectUtil.SetCustomMaterialPaletteOverrideLocal(obj, Value);
+
+            LevelObjectUtil.SyncIfAuthority(NetIds[i]);
+        }
+    }
+#if SERVER
+    private LevelObject?[]? _objects;
+    public bool CheckCanApply()
+    {
+        if (Permission.SuperuserPermission.Has(Instigator.m_SteamID, false))
+            return true;
+        _objects = new LevelObject[NetIds.Length];
+        for (int i = 0; i < NetIds.Length; ++i)
+        {
+            NetId netId = NetIds[i];
+            if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out _, out _) || levelObject == null)
+            {
+                Logger.LogWarning($"Unknown object with NetId: {netId.Format()}.");
+                continue;
+            }
+            
+            if (!LevelObjectUtil.CheckMovePermission(levelObject.instanceID, Instigator.m_SteamID))
+                return false;
+            _objects[i] = levelObject;
+        }
+        return true;
+    }
+#endif
+    public void Read(ByteReader reader)
+    {
+        DeltaTime = reader.ReadFloat();
+        Value = new AssetReference<MaterialPaletteAsset>(reader.ReadGuid());
+
+        int objectCount = reader.ReadUInt8();
+
+        NetIds = new NetId[objectCount];
+
+        for (int i = 0; i < objectCount; ++i)
+            NetIds[i] = reader.ReadNetId();
+    }
+    public void Write(ByteWriter writer)
+    {
+        writer.Write(DeltaTime);
+        writer.Write(Value.GUID);
+
+        int objectCount = Math.Min(byte.MaxValue, NetIds == null ? 0 : NetIds.Length);
+
+        writer.Write((byte)objectCount);
+
+        for (int i = 0; i < objectCount; ++i)
+            writer.Write(NetIds![i]);
+    }
+    public int CalculateSize() => 21 + Math.Min(byte.MaxValue, NetIds == null ? 0 : NetIds.Length) * 4;
+}
+
+[Action(ActionType.UpdateObjectsMaterialIndexOverride, 64 * 4 + 9, 0)]
+[EarlyTypeInit]
+public sealed class UpdateObjectsMaterialIndexOverrideAction : IAction
+{
+    public ActionType Type => ActionType.UpdateObjectsMaterialIndexOverride;
+    public CSteamID Instigator { get; set; }
+    public NetId[] NetIds { get; set; } = Array.Empty<NetId>();
+    public float DeltaTime { get; set; }
+    public int Value { get; set; }
+    public void Apply()
+    {
+#if SERVER
+        LevelObject?[]? objs = _objects;
+#else
+        LevelObject?[]? objs = null;
+#endif
+        if (objs == null)
+        {
+            objs = new LevelObject[NetIds.Length];
+            for (int i = 0; i < objs.Length; ++i)
+            {
+                NetId netId = NetIds[i];
+                if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out _, out _) || levelObject == null)
+                {
+                    Logger.LogWarning($"Unknown object with NetId: {netId.Format()}.");
+                    continue;
+                }
+                objs[i] = levelObject;
+            }
+        }
+        for (int i = 0; i < objs.Length; ++i)
+        {
+            LevelObject? obj = objs[i];
+            if (obj == null)
+                continue;
+
+            LevelObjectUtil.SetMaterialIndexOverrideLocal(obj, Value);
+
+            LevelObjectUtil.SyncIfAuthority(NetIds[i]);
+        }
+    }
+#if SERVER
+    private LevelObject?[]? _objects;
+    public bool CheckCanApply()
+    {
+        if (Permission.SuperuserPermission.Has(Instigator.m_SteamID, false))
+            return true;
+        _objects = new LevelObject[NetIds.Length];
+        for (int i = 0; i < NetIds.Length; ++i)
+        {
+            NetId netId = NetIds[i];
+            if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out _, out _) || levelObject == null)
+            {
+                Logger.LogWarning($"Unknown object with NetId: {netId.Format()}.");
+                continue;
+            }
+            
+            if (!LevelObjectUtil.CheckMovePermission(levelObject.instanceID, Instigator.m_SteamID))
+                return false;
+            _objects[i] = levelObject;
+        }
+        return true;
+    }
+#endif
+    public void Read(ByteReader reader)
+    {
+        DeltaTime = reader.ReadFloat();
+        Value = reader.ReadInt32();
+
+        int objectCount = reader.ReadUInt8();
+
+        NetIds = new NetId[objectCount];
+
+        for (int i = 0; i < objectCount; ++i)
+            NetIds[i] = reader.ReadNetId();
+    }
+    public void Write(ByteWriter writer)
+    {
+        writer.Write(DeltaTime);
+        writer.Write(Value);
+
+        int objectCount = Math.Min(byte.MaxValue, NetIds == null ? 0 : NetIds.Length);
+
+        writer.Write((byte)objectCount);
+
+        for (int i = 0; i < objectCount; ++i)
+            writer.Write(NetIds![i]);
+    }
+    public int CalculateSize() => 9 + Math.Min(byte.MaxValue, NetIds == null ? 0 : NetIds.Length) * 4;
 }

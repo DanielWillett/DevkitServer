@@ -13,7 +13,6 @@ public class UserTPVControl : MonoBehaviour
     private static readonly Vector3 TPVScale = new Vector3(2.5f, 2.5f, 2.5f);
     private static readonly Quaternion TPVRotation = Quaternion.Euler(90f, 0f, 0f);
     private static GameObject? _objectPrefab;
-    private static bool _init;
     private EditorClothes _editorClothes = null!;
     public EditorUser User { get; internal set; } = null!;
     public GameObject Model { get; private set; } = null!;
@@ -27,24 +26,23 @@ public class UserTPVControl : MonoBehaviour
             Logger.LogError("Invalid UserTPVControl setup; EditorUser not found!");
             return;
         }
-        if (!_init)
+        if (_objectPrefab == null)
         {
-            _init = true;
             if (DevkitServerModule.Bundle == null)
             {
                 Logger.LogError("Unable to set up UserTPVControl object, " + "devkitserver.masterbundle".Format() + " not loaded.");
                 return;
             }
 
-            _objectPrefab = DevkitServerModule.Bundle.load<GameObject>("resources/tpv_char_server");
+            _objectPrefab = Instantiate(DevkitServerModule.Bundle.load<GameObject>("resources/tpv_char_server"));
             if (_objectPrefab != null)
                 DontDestroyOnLoad(_objectPrefab);
-        }
 
-        if (_objectPrefab == null)
-        {
-            Logger.LogError("Unable to set up UserTPVControl object, " + "Resources/TPV_Char_Server".Format() + " not found in " + "devkitserver.masterbundle".Format() + " (or it was not loaded).");
-            return;
+            if (_objectPrefab == null)
+            {
+                Logger.LogError("Unable to set up UserTPVControl object, " + "Resources/TPV_Char_Server".Format() + " not found in " + "devkitserver.masterbundle".Format() + " (or it was not loaded).");
+                return;
+            }
         }
 
         Model = Instantiate(_objectPrefab, transform, false);
@@ -81,7 +79,6 @@ public class UserTPVControl : MonoBehaviour
     }
     private static void OnClientDisconnected()
     {
-        _init = false;
         Destroy(_objectPrefab);
         _objectPrefab = null;
     }

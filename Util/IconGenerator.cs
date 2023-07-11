@@ -32,7 +32,6 @@ public sealed class IconGenerator : MonoBehaviour
         _light.enabled = false;
 
         Instance = this;
-        Logger.LogInfo("IconGenerator awake.");
     }
     public static void GetIcon(Asset asset, int width, int height, Action<Asset, Texture2D?, bool> onIconReady)
     {

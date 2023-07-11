@@ -236,22 +236,21 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         }
         UserManager.Disconnect();
 
-        if (User != null)
+        if (User is not null)
         {
             if (User.isActiveAndEnabled)
                 Destroy(User);
 
             User = null;
             Logger.LogDebug("Deregistered client-side editor user.");
-            return;
         }
         if (DevkitServerModule.IsEditing)
         {
-            Logger.LogWarning("Unable to find Editor user in client-side player.");
             DevkitServerModule.RegisterDisconnectFromEditingServer();
         }
 
-        DevkitEditorHUD.Close(true);
+        DevkitServerModule.Instance.UnloadBundle();
+        
         ClientInfo.OnDisconnect();
         UserInput.CleaningUpController = 0;
     }

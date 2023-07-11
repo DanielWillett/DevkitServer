@@ -23,13 +23,5 @@ internal static class ServerGizmoPatches
         }
     }
     private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> old) => new CodeInstruction[] { new CodeInstruction(OpCodes.Ret) }.Concat(old);
-    internal static void Unpatch()
-    {
-        foreach (MethodInfo method in Patched)
-            PatchesMain.Patcher.Unpatch(method, TranspilerMethod);
-
-        Logger.LogDebug($"Unpatched {typeof(RuntimeGizmos).Format()} patches.");
-        Patched.Clear();
-    }
 }
 #endif

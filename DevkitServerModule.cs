@@ -17,6 +17,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security;
+using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Levels;
 using UnityEngine.SceneManagement;
 using Module = SDG.Framework.Modules.Module;
@@ -29,6 +30,7 @@ using DevkitServer.Players.UI;
 #endif
 #if SERVER
 using DevkitServer.Levels;
+using DevkitServer.Multiplayer.Actions;
 #endif
 
 namespace DevkitServer;
@@ -38,6 +40,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static readonly string RepositoryUrl = "https://github.com/DanielWillett/DevkitServer"; // don't suffix this with '/'
     private static StaticGetter<Assets>? GetAssetsInstance;
     private static InstanceSetter<AssetOrigin, bool>? SetOverrideIDs;
+    private static StaticGetter<bool>? GetIsShuttingDown;
     public const string ModuleName = "DevkitServer";
     public static readonly string ServerRule = "DevkitServer";
     private static CancellationTokenSource? _tknSrc;
@@ -241,6 +244,7 @@ public sealed class DevkitServerModule : IModuleNexus
             Level.onPostLevelLoaded += OnPostLevelLoaded;
             Editor.onEditorCreated += OnEditorCreated;
             Level.onPrePreLevelLoaded += OnPrePreLevelLoaded;
+            SaveManager.onPreSave += OnPreSaved;
             SaveManager.onPostSave += OnSaved;
 #if SERVER
             Provider.onServerConnected += UserManager.AddUser;
@@ -261,7 +265,6 @@ public sealed class DevkitServerModule : IModuleNexus
             Provider.onEnemyDisconnected += EditorUser.OnEnemyDisconnected;
             ChatManager.onChatMessageReceived += OnChatMessageReceived;
             UserTPVControl.Init();
-            UIAccessTools.EditorUIReady += EditorUIReady;
 #endif
             LevelObjectNetIdDatabase.Init();
 
@@ -311,12 +314,6 @@ public sealed class DevkitServerModule : IModuleNexus
     }
 
 #if CLIENT
-    private static void EditorUIReady()
-    {
-        if (IsEditing)
-            DevkitEditorHUD.Open();
-    }
-
     private static void OnChatMessageReceived()
     {
         if (ChatManager.receivedChatHistory.Count > 0)
@@ -386,11 +383,6 @@ public sealed class DevkitServerModule : IModuleNexus
     internal IEnumerator TryLoadBundle(System.Action? callback)
     {
         ThreadUtil.assertIsGameThread();
-        if (HasLoadedBundle)
-        {
-            callback?.Invoke();
-            yield break;
-        }
 
         while (Assets.isLoading)
             yield return null;
@@ -449,7 +441,7 @@ public sealed class DevkitServerModule : IModuleNexus
         BundleConfig = bundle;
         Logger.LogInfo("Loaded bundle: " + bundle.assetBundleNameWithoutExtension.Format() + " from " + path.Format() + ".");
         HasLoadedBundle = true;
-#if false
+#if true
         Logger.LogDebug("Assets:");
         foreach (string asset in Bundle.cfg.assetBundle.GetAllAssetNames())
             Logger.LogDebug("Asset: " + asset.Format() + ".");
@@ -509,14 +501,29 @@ public sealed class DevkitServerModule : IModuleNexus
             _ = HighSpeedServer.Instance;
     }
 #endif
-    private static void OnSaved()
+    private static void OnPreSaved()
     {
+        Logger.LogInfo("Saving...");
         if (IsEditing)
         {
-            HierarchyResponsibilities.Save();
-            LevelObjectResponsibilities.Save();
-            BuildableResponsibilities.Save();
+            Thread.BeginCriticalRegion();
+            try
+            {
+                Level.save();
+
+                HierarchyResponsibilities.Save();
+                LevelObjectResponsibilities.Save();
+                BuildableResponsibilities.Save();
+            }
+            finally
+            {
+                Thread.EndCriticalRegion();
+            }
         }
+    }
+    private static void OnSaved()
+    {
+        Logger.LogInfo("Saved");
     }
     private static void OnPrePreLevelLoaded(int level)
     {
@@ -531,7 +538,11 @@ public sealed class DevkitServerModule : IModuleNexus
         }
 #endif
         if (level != Level.BUILD_INDEX_GAME)
+        {
+            if (GameObjectHost.TryGetComponent(out EditorActions actions))
+                Object.Destroy(actions);
             return;
+        }
 
 #if SERVER
         DevkitServerUtility.CheckDirectory(false, false, DevkitServerConfig.LevelDirectory, typeof(DevkitServerConfig).GetProperty(nameof(DevkitServerConfig.LevelDirectory), BindingFlags.Public | BindingFlags.Static));
@@ -543,6 +554,12 @@ public sealed class DevkitServerModule : IModuleNexus
             BuildableResponsibilities.Init();
             HierarchyResponsibilities.Init();
             LevelObjectResponsibilities.Init();
+            if (GameObjectHost.TryGetComponent(out EditorActions actions))
+                Object.Destroy(actions);
+            EditorActions.ServerActions = GameObjectHost.AddComponent<EditorActions>();
+#if SERVER
+            EditorActions.ServerActions.IsOwner = true;
+#endif
         }
         CartographyUtil.Reset();
 #if CLIENT
@@ -586,7 +603,6 @@ public sealed class DevkitServerModule : IModuleNexus
         Provider.onEnemyDisconnected -= EditorUser.OnEnemyDisconnected;
         ChatManager.onChatMessageReceived -= OnChatMessageReceived;
         UserTPVControl.Deinit();
-        UIAccessTools.EditorUIReady -= EditorUIReady;
 #endif
         LevelObjectNetIdDatabase.Shutdown();
 

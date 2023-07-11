@@ -437,3 +437,29 @@ public readonly struct MoveLevelObjectsFinalProperties
         DeltaTime = deltaTime;
     }
 }
+public delegate void UpdateObjectsCustomMaterialPaletteOverride(in UpdateObjectsCustomMaterialPaletteOverrideProperties properties);
+public readonly struct UpdateObjectsCustomMaterialPaletteOverrideProperties
+{
+    public readonly NetId[] NetIds;
+    public readonly AssetReference<MaterialPaletteAsset> Material;
+    public readonly float DeltaTime;
+    public UpdateObjectsCustomMaterialPaletteOverrideProperties(NetId[] netIds, AssetReference<MaterialPaletteAsset> material, float deltaTime)
+    {
+        NetIds = netIds;
+        Material = material;
+        DeltaTime = deltaTime;
+    }
+}
+public delegate void UpdateObjectsMaterialIndexOverride(in UpdateObjectsMaterialIndexOverrideProperties properties);
+public readonly struct UpdateObjectsMaterialIndexOverrideProperties
+{
+    public readonly NetId[] NetIds;
+    public readonly int Index;
+    public readonly float DeltaTime;
+    public UpdateObjectsMaterialIndexOverrideProperties(NetId[] netIds, int index, float deltaTime)
+    {
+        NetIds = netIds;
+        Index = index;
+        DeltaTime = deltaTime;
+    }
+}

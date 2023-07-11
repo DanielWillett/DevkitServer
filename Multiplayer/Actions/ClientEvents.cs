@@ -82,6 +82,8 @@ public static class ClientEvents
     public static event DeleteLevelObjects? OnDeleteLevelObjects;
     public static event MoveLevelObjectFinal? OnMoveLevelObjectFinal;
     public static event MoveLevelObjectsFinal? OnMoveLevelObjectsFinal;
+    public static event UpdateObjectsCustomMaterialPaletteOverride? OnUpdateObjectsCustomMaterialPaletteOverride;
+    public static event UpdateObjectsMaterialIndexOverride? OnUpdateObjectsMaterialIndexOverride;
 
     public static bool ListeningOnEditHeightmapPermissionDenied => !EventOnEditHeightmapPermissionDenied.IsEmpty;
     public static bool ListeningOnEditSplatmapPermissionDenied => !EventOnEditSplatmapPermissionDenied.IsEmpty;
@@ -119,6 +121,8 @@ public static class ClientEvents
     public static bool ListeningOnDeleteLevelObjects => OnDeleteLevelObjects != null;
     public static bool ListeningOnMoveLevelObjectFinal => OnMoveLevelObjectFinal != null;
     public static bool ListeningOnMoveLevelObjectsFinal => OnMoveLevelObjectsFinal != null;
+    public static bool ListeningOnUpdateObjectsCustomMaterialPaletteOverride => OnUpdateObjectsCustomMaterialPaletteOverride != null;
+    public static bool ListeningOnUpdateObjectsMaterialIndexOverride => OnUpdateObjectsMaterialIndexOverride != null;
     
     internal static void InvokeOnPaintRamp(in PaintRampProperties properties) => OnPaintRamp?.Invoke(in properties);
     internal static void InvokeOnAdjustHeightmap(in AdjustHeightmapProperties properties) => OnAdjustHeightmap?.Invoke(in properties);
@@ -145,6 +149,8 @@ public static class ClientEvents
     internal static void InvokeOnDeleteLevelObjects(in DeleteLevelObjectsProperties properties) => OnDeleteLevelObjects?.Invoke(in properties);
     internal static void InvokeOnMoveLevelObjectFinal(in MoveLevelObjectFinalProperties properties) => OnMoveLevelObjectFinal?.Invoke(in properties);
     internal static void InvokeOnMoveLevelObjectsFinal(in MoveLevelObjectsFinalProperties properties) => OnMoveLevelObjectsFinal?.Invoke(in properties);
+    internal static void InvokeOnUpdateObjectsCustomMaterialPaletteOverride(in UpdateObjectsCustomMaterialPaletteOverrideProperties properties) => OnUpdateObjectsCustomMaterialPaletteOverride?.Invoke(in properties);
+    internal static void InvokeOnUpdateObjectsMaterialIndexOverride(in UpdateObjectsMaterialIndexOverrideProperties properties) => OnUpdateObjectsMaterialIndexOverride?.Invoke(in properties);
 }
 
 public delegate void TryInstantiateHierarchyObject(ref InstantiateHierarchyObjectProperties properties, ref bool shouldAllow);

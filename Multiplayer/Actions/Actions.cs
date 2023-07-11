@@ -43,6 +43,8 @@ public enum ActionType : byte
     DeleteLevelObjects,
     MoveLevelObjectsFinal,
     InstantiateLevelObject,
+    UpdateObjectsCustomMaterialPaletteOverride,
+    UpdateObjectsMaterialIndexOverride,
 
 
     // for future use

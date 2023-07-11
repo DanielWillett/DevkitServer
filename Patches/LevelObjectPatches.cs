@@ -22,10 +22,47 @@ internal static class LevelObjectPatches
 
     internal static bool IsSyncing;
     private static bool IsFinalTransform;
-
     private static readonly Action? CallCalculateHandleOffsets =
         Accessor.GenerateStaticCaller<EditorObjects, Action>("calculateHandleOffsets", Array.Empty<Type>());
 
+    private static readonly List<LevelObject> PendingMaterialUpdates = new List<LevelObject>(LevelObjectUtil.MaxUpdateObjectsPacketSize);
+
+
+    internal static void OptionalPatches()
+    {
+        try
+        {
+            MethodInfo? onTypedMaterialPalletteOverride = typeof(EditorLevelObjectsUI).GetMethod(
+                "OnTypedMaterialPaletteOverride", BindingFlags.NonPublic | BindingFlags.Static, null,
+                CallingConventions.Any, new Type[] { typeof(ISleekField), typeof(string) }, null);
+            if (onTypedMaterialPalletteOverride == null || !onTypedMaterialPalletteOverride.IsStatic)
+            {
+                Logger.LogWarning("Method not found: static EditorLevelObjectsUI.OnTypedMaterialPaletteOverride. Custom material palettes will not replicate.", method: Source);
+            }
+            else
+            {
+                PatchesMain.Patcher.Patch(onTypedMaterialPalletteOverride, transpiler: 
+                    new HarmonyMethod(new Func<IEnumerable<CodeInstruction>, ILGenerator, MethodBase, IEnumerable<CodeInstruction>>(OnTypedCustomMaterialPaletteOverridePrefix).Method));
+            }
+            MethodInfo? onTypedMaterialIndexOverride = typeof(EditorLevelObjectsUI).GetMethod(
+                "OnTypedMaterialIndexOverride", BindingFlags.NonPublic | BindingFlags.Static, null,
+                CallingConventions.Any, new Type[] { typeof(ISleekInt32Field), typeof(int) }, null);
+            if (onTypedMaterialIndexOverride == null || !onTypedMaterialIndexOverride.IsStatic)
+            {
+                Logger.LogWarning("Method not found: static EditorLevelObjectsUI.OnTypedMaterialIndexOverride. Material index overrides will not replicate.", method: Source);
+            }
+            else
+            {
+                PatchesMain.Patcher.Patch(onTypedMaterialIndexOverride, transpiler: 
+                    new HarmonyMethod(new Func<IEnumerable<CodeInstruction>, ILGenerator, MethodBase, IEnumerable<CodeInstruction>>(OnTypedMaterialIndexOverridePrefix).Method));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("Failed to patch recommended patches for Level Objects.", method: Source);
+            Logger.LogError(ex, method: Source);
+        }
+    }
 
     [HarmonyPatch(typeof(EditorObjects), "Update")]
     [HarmonyTranspiler]
@@ -696,6 +733,212 @@ internal static class LevelObjectPatches
 
         LevelObjectUtil.SyncIfAuthority(netId);
     }
+
+    private static IEnumerable<CodeInstruction> OnTypedCustomMaterialPaletteOverridePrefix(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
+    {
+        FieldInfo? field = typeof(LevelObject).GetField("customMaterialOverride", BindingFlags.NonPublic | BindingFlags.Instance);
+        if (field == null || !typeof(AssetReference<MaterialPaletteAsset>).IsAssignableFrom(field.FieldType))
+        {
+            Logger.LogWarning($"Field not found: LevelObject.customMaterialOverride in method {method.Format()}. Custom material palettes will not replicate.", method: Source);
+            return instructions;
+        }
+
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        bool patchedInner = false;
+        bool patchedOuter = false;
+        LocalBuilder lcl = generator.DeclareLocal(typeof(AssetReference<MaterialPaletteAsset>));
+        int indexRangeSt = -1;
+        LocalBuilder? valueLcl = null;
+        int valueLclIndex = -1;
+        for (int i = 2; i < ins.Count; i++)
+        {
+            if (!patchedInner && ins[i].StoresField(field))
+            {
+                indexRangeSt = i;
+                ins.Insert(i, ins[i - 2].CopyWithoutSpecial());
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldfld, field));
+                ins.Insert(i + 2, PatchUtil.GetLocalCodeInstruction(lcl, -1, true, false));
+                ins.Insert(i + 4, ins[i - 2].CopyWithoutSpecial());
+                ins.Insert(i + 5, ins[i - 1].CopyWithoutSpecial());
+                valueLcl = PatchUtil.GetLocal(ins[i - 1], out valueLclIndex, false);
+                ins.Insert(i + 6, PatchUtil.GetLocalCodeInstruction(lcl, -1, false, false));
+                ins.Insert(i + 7, new CodeInstruction(OpCodes.Call, new Action<LevelObject, AssetReference<MaterialPaletteAsset>, AssetReference<MaterialPaletteAsset>>(OnCustomMaterialPaletteOverrideUpdated).Method));
+                i += 7;
+                patchedInner = true;
+                Logger.LogDebug($"[{Source}] Patched {method.Format()}.");
+            }
+            else if (patchedInner && !patchedOuter && ins[i].opcode == OpCodes.Endfinally)
+            {
+                ins.Insert(i, PatchUtil.GetLocalCodeInstruction(valueLcl, valueLclIndex, false));
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Call, new Action<AssetReference<MaterialPaletteAsset>>(EndCustomMaterialPaletteOverrideChangeGroup).Method));
+                i += 2;
+                patchedOuter = true;
+            }
+        }
+        if (patchedInner && !patchedOuter)
+        {
+            ins.RemoveRange(indexRangeSt + 4, 4);
+            ins.RemoveRange(indexRangeSt, 3);
+            Logger.LogWarning($"[{Source}] Unpatched {method.Format()} to avoid a memory leak because patch was not successful.");
+        }
+        else if (!patchedInner)
+            Logger.LogWarning($"Failed to patch {method.Format()} loop. Custom material palettes will not replicate.", method: Source);
+        if (!patchedOuter)
+            Logger.LogWarning($"Failed to patch {method.Format()} finally. Custom material palettes will not replicate.", method: Source);
+
+        return ins;
+    }
+    private static void OnCustomMaterialPaletteOverrideUpdated(LevelObject obj, AssetReference<MaterialPaletteAsset> @new, AssetReference<MaterialPaletteAsset> old)
+    {
+        if (@new.GUID == old.GUID || !DevkitServerModule.IsEditing)
+            return;
+        if (!LevelObjectUtil.CheckMovePermission(obj.instanceID))
+        {
+            UIMessage.SendNoPermissionMessage(VanillaPermissions.MoveUnownedObjects);
+            obj.SetCustomMaterialPaletteOverride(old);
+            return;
+        }
+
+        Logger.LogDebug($"Custom material updated: {obj.asset.Format()}, {old.GUID.Format()} -> {@new.GUID.Format()}");
+        PendingMaterialUpdates.Add(obj);
+    }
+    private static void EndCustomMaterialPaletteOverrideChangeGroup(AssetReference<MaterialPaletteAsset> value)
+    {
+        if (PendingMaterialUpdates.Count == 0 || !DevkitServerModule.IsEditing)
+            return;
+        List<NetId> netIds = ListPool<NetId>.claim();
+        try
+        {
+            netIds.IncreaseCapacity(PendingMaterialUpdates.Count);
+            for (int i = 0; i < PendingMaterialUpdates.Count; i++)
+            {
+                LevelObject obj = PendingMaterialUpdates[i];
+                if (LevelObjectNetIdDatabase.TryGetObjectNetId(obj, out NetId netId))
+                {
+                    netIds.Add(netId);
+
+                    if (netIds.Count % LevelObjectUtil.MaxUpdateObjectsPacketSize == 0)
+                        Flush();
+                }
+            }
+
+            Flush();
+
+            void Flush()
+            {
+                if (ClientEvents.ListeningOnUpdateObjectsCustomMaterialPaletteOverride)
+                    ClientEvents.InvokeOnUpdateObjectsCustomMaterialPaletteOverride(new UpdateObjectsCustomMaterialPaletteOverrideProperties(netIds.ToArrayFast(), value, CachedTime.DeltaTime));
+
+                netIds.Clear();
+            }
+        }
+        finally
+        {
+            ListPool<NetId>.release(netIds);
+            PendingMaterialUpdates.Clear();
+        }
+    }
+    private static IEnumerable<CodeInstruction> OnTypedMaterialIndexOverridePrefix(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
+    {
+        FieldInfo? field = typeof(LevelObject).GetField("materialIndexOverride", BindingFlags.NonPublic | BindingFlags.Instance);
+        if (field == null || !typeof(int).IsAssignableFrom(field.FieldType))
+        {
+            Logger.LogWarning($"Field not found: LevelObject.materialIndexOverride in method {method.Format()}. Material index overrides will not replicate.", method: Source);
+            return instructions;
+        }
+
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        bool patchedInner = false;
+        bool patchedOuter = false;
+        LocalBuilder lcl = generator.DeclareLocal(typeof(int));
+        int indexRangeSt = -1;
+        for (int i = 2; i < ins.Count; i++)
+        {
+            if (!patchedInner && ins[i].StoresField(field))
+            {
+                indexRangeSt = i;
+                ins.Insert(i, ins[i - 2].CopyWithoutSpecial());
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldfld, field));
+                ins.Insert(i + 2, PatchUtil.GetLocalCodeInstruction(lcl, -1, true, false));
+                ins.Insert(i + 4, ins[i - 2].CopyWithoutSpecial());
+                ins.Insert(i + 5, ins[i - 1].CopyWithoutSpecial());
+                ins.Insert(i + 6, PatchUtil.GetLocalCodeInstruction(lcl, -1, false, false));
+                ins.Insert(i + 7, new CodeInstruction(OpCodes.Call, new Action<LevelObject, int, int>(OnMaterialIndexOverrideUpdated).Method));
+                i += 7;
+                patchedInner = true;
+                Logger.LogDebug($"[{Source}] Patched {method.Format()}.");
+            }
+            else if (patchedInner && !patchedOuter && ins[i].opcode == OpCodes.Endfinally)
+            {
+                ins.Insert(i, new CodeInstruction(OpCodes.Ldarg_1));
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Call, new Action<int>(EndMaterialIndexOverrideChangeGroup).Method));
+                i += 2;
+                patchedOuter = true;
+            }
+        }
+        if (patchedInner && !patchedOuter)
+        {
+            ins.RemoveRange(indexRangeSt + 4, 4);
+            ins.RemoveRange(indexRangeSt, 3);
+            Logger.LogWarning($"[{Source}] Unpatched {method.Format()} to avoid a memory leak because patch was not successful.");
+        }
+        else if (!patchedInner)
+            Logger.LogWarning($"Failed to patch {method.Format()} loop. Material index overrides will not replicate.", method: Source);
+        if (!patchedOuter)
+            Logger.LogWarning($"Failed to patch {method.Format()} finally. Material index overrides will not replicate.", method: Source);
+
+        return ins;
+    }
+    private static void OnMaterialIndexOverrideUpdated(LevelObject obj, int @new, int old)
+    {
+        if (@new == old || !DevkitServerModule.IsEditing)
+            return;
+        if (!LevelObjectUtil.CheckMovePermission(obj.instanceID))
+        {
+            UIMessage.SendNoPermissionMessage(VanillaPermissions.MoveUnownedObjects);
+            obj.SetMaterialIndexOverride(old);
+            return;
+        }
+
+        Logger.LogDebug($"Material index updated: {obj.asset.Format()}, {old.Format()} -> {@new.Format()}");
+        PendingMaterialUpdates.Add(obj);
+    }
+    private static void EndMaterialIndexOverrideChangeGroup(int value)
+    {
+        if (PendingMaterialUpdates.Count == 0 || !DevkitServerModule.IsEditing)
+            return;
+        List<NetId> netIds = ListPool<NetId>.claim();
+        try
+        {
+            netIds.IncreaseCapacity(PendingMaterialUpdates.Count);
+            for (int i = 0; i < PendingMaterialUpdates.Count; i++)
+            {
+                LevelObject obj = PendingMaterialUpdates[i];
+                if (LevelObjectNetIdDatabase.TryGetObjectNetId(obj, out NetId netId))
+                {
+                    netIds.Add(netId);
+
+                    if (netIds.Count % LevelObjectUtil.MaxUpdateObjectsPacketSize == 0)
+                        Flush();
+                }
+            }
+
+            Flush();
+
+            void Flush()
+            {
+                if (ClientEvents.ListeningOnUpdateObjectsMaterialIndexOverride)
+                    ClientEvents.InvokeOnUpdateObjectsMaterialIndexOverride(new UpdateObjectsMaterialIndexOverrideProperties(netIds.ToArrayFast(), value, CachedTime.DeltaTime));
+
+                netIds.Clear();
+            }
+        }
+        finally
+        {
+            ListPool<NetId>.release(netIds);
+            PendingMaterialUpdates.Clear();
+        }
+    }
 #endif
     [HarmonyPatch(typeof(LevelObjects), nameof(LevelObjects.transformObject))]
     [HarmonyPrefix]
@@ -866,6 +1109,11 @@ internal static class LevelObjectPatches
 
         if (!netId.IsNull())
             LevelObjectUtil.SyncIfAuthority(netId);
+
+#if CLIENT
+        LevelObjectUtil.EditorObjectSelection.RemoveAll(x => x.transform == null);
+        CallCalculateHandleOffsets?.Invoke();
+#endif
     }
     private static void ObjectRemovedInvoker(LevelObject levelObject, byte x, byte y, int index)
     {
@@ -876,5 +1124,10 @@ internal static class LevelObjectPatches
 
         if (!netId.IsNull())
             LevelObjectUtil.SyncIfAuthority(netId);
+
+#if CLIENT
+        LevelObjectUtil.EditorObjectSelection.RemoveAll(x => x.transform == null);
+        CallCalculateHandleOffsets?.Invoke();
+#endif
     }
 }

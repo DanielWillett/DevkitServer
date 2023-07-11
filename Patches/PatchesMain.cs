@@ -50,8 +50,11 @@ internal static class PatchesMain
 #if SERVER
             ServerGizmoPatches.Patch();
 #endif
+#if CLIENT
+            LevelObjectPatches.OptionalPatches();
+#endif
 
-            // Accessor.AddFunctionBreakpoints(AccessTools.Method(typeof(ObjectManager), "ReceiveObjects"));
+            Accessor.AddFunctionBreakpoints(AccessTools.Method(typeof(EditorObjects), "save"));
             // ConstructorInfo? info = typeof(MenuConfigurationOptionsUI).GetConstructors(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
             // if (info != null)
             //     Accessor.AddFunctionBreakpoints(info);
@@ -70,9 +73,6 @@ internal static class PatchesMain
         try
         {
             Patcher.UnpatchAll(HarmonyId);
-#if SERVER
-            ServerGizmoPatches.Unpatch();
-#endif
             Logger.LogInfo($"Finished unpatching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
         }
         catch (Exception ex)

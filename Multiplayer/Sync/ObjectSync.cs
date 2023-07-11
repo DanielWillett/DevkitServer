@@ -126,19 +126,19 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
                 !transform.rotation.IsNearlyEqual(obj.Rotation) ||
                 !transform.localScale.IsNearlyEqual(obj.Scale))
             {
-                LevelObjects.registerTransformObject(transform, obj.Position, obj.Rotation, obj.Scale, transform.position, transform.rotation, transform.localScale);
                 Logger.LogDebug($"[{Source}] Transforming invalid object: {levelObject.asset.Format()}.");
+                LevelObjects.registerTransformObject(transform, obj.Position, obj.Rotation, obj.Scale, transform.position, transform.rotation, transform.localScale);
             }
 
             bool reapply = false;
             if (levelObject.GetCustomMaterialOverride().GUID != obj.MaterialPaletteGuid)
             {
-                levelObject.SetCustomMaterialOverride(new AssetReference<MaterialPaletteAsset>(obj.MaterialPaletteGuid), false);
+                LevelObjectUtil.SetCustomMaterialPaletteOverrideLocal(levelObject, new AssetReference<MaterialPaletteAsset>(obj.MaterialPaletteGuid), false);
                 reapply = true;
             }
             if (levelObject.GetMaterialIndexOverride() != obj.MaterialIndex)
             {
-                levelObject.SetMaterialIndexOverride(obj.MaterialIndex, false);
+                LevelObjectUtil.SetMaterialIndexOverrideLocal(levelObject, obj.MaterialIndex, false);
                 reapply = true;
             }
 
@@ -153,8 +153,8 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
                                       !transform.rotation.IsNearlyEqual(obj.Rotation) ||
                                       !transform.localScale.IsNearlyEqual(obj.Scale)))
             {
-                LevelObjects.registerTransformObject(transform, obj.Position, obj.Rotation, obj.Scale, transform.position, transform.rotation, transform.localScale);
                 Logger.LogDebug($"[{Source}] Transforming invalid buildable: {buildable.asset.Format()}.");
+                LevelObjects.registerTransformObject(transform, obj.Position, obj.Rotation, obj.Scale, transform.position, transform.rotation, transform.localScale);
             }
         }
     }

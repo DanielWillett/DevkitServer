@@ -314,9 +314,14 @@ internal static class Accessor
                 yield return instr;
         }
     }
-    public static void AddFunctionBreakpoints(MethodBase method) => PatchesMain.Patcher.Patch(method,
-        transpiler: new HarmonyMethod(typeof(Accessor).GetMethod(nameof(AddFunctionBreakpointsTranspiler),
-            BindingFlags.NonPublic | BindingFlags.Static)));
+    public static void AddFunctionBreakpoints(MethodBase method)
+    {
+        PatchesMain.Patcher.Patch(method,
+            transpiler: new HarmonyMethod(typeof(Accessor).GetMethod(nameof(AddFunctionBreakpointsTranspiler),
+                BindingFlags.NonPublic | BindingFlags.Static)));
+        Logger.LogInfo($"Added breakpoints to: {method.Format()}.");
+    }
+
     private static IEnumerable<CodeInstruction> AddFunctionBreakpointsTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
         yield return new CodeInstruction(OpCodes.Ldstr, "Breakpointing Method: " + method.Format() + ":");

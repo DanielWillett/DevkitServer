@@ -4,10 +4,10 @@ using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players.UI;
 #endif
 #if CLIENT
-using System.Reflection;
 using DevkitServer.API.Abstractions;
 using Action = System.Action;
 #endif
+using System.Reflection;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
@@ -19,10 +19,8 @@ namespace DevkitServer.Multiplayer.Actions;
 [EarlyTypeInit]
 public sealed class EditorActions : MonoBehaviour, IActionListener
 {
-#if CLIENT
     internal static readonly FieldInfo LocalLastActionField = typeof(EditorActions).GetField(nameof(LocalLastAction), BindingFlags.NonPublic | BindingFlags.Static)!;
     internal static float LocalLastAction;
-#endif
     public const ushort DataVersion = 1;
     public const ushort ActionBaseSize = 1;
     public const int MaxPacketSize = 16384;
@@ -45,13 +43,14 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     private float _lastNoPermissionMessage;
     public void DontSendPermissionMesssage() => _lastNoPermissionMessage = CachedTime.RealtimeSinceStartup;
 #endif
+    public static EditorActions? ServerActions { get; internal set; }
+    private float _lastFlush;
+    private bool _queuedThisFrame;
 #if CLIENT
     internal static TemporaryEditorActions? TemporaryEditorActions;
     internal static bool CanProcess;
     internal static bool HasProcessedPendingHierarchyObjects;
     internal static bool HasProcessedPendingLevelObjects;
-    private float _lastFlush;
-    private bool _queuedThisFrame;
     /// <summary>
     /// Is the player catching up after downloading the map.
     /// </summary>
@@ -71,8 +70,8 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 #endif
 
     private float _nextApply;
-    public EditorUser User { get; internal set; } = null!;
-    public bool IsOwner { get; private set; }
+    public EditorUser? User { get; internal set; }
+    public bool IsOwner { get; internal set; }
     public static IAction? ActiveAction { get; private set; }
     public ActionSettings Settings { get; }
     public TerrainActions TerrainActions { get; }
@@ -92,19 +91,16 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     [UsedImplicitly]
     private void Start()
     {
-        if (User == null)
+        if (User == null && ServerActions != this)
         {
             Destroy(this);
             Logger.LogError("Invalid EditorActions setup; EditorUser not found!", method: "EDITOR ACTIONS");
             return;
         }
-
-#if CLIENT
-        IsOwner = User == EditorUser.User;
-#endif
+        
         Subscribe();
-        Logger.LogDebug("[EDITOR ACTIONS] Editor actions module created for " + User.SteamId.m_SteamID + " ( owner: " + IsOwner + " ).");
-
+        Logger.LogDebug($"[EDITOR ACTIONS] Editor actions module created for {(User == null ? "Server".Colorize(Color.cyan) : User.SteamId.Format())} ( owner: {IsOwner.Format()} ).");
+        
 #if CLIENT
         if (IsOwner)
         {
@@ -151,13 +147,12 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         }
 #endif
     }
-#if CLIENT
-    internal void QueueAction(IAction action, bool space = false)
+    internal void QueueAction(IAction action, bool delayWithDeltaTime = false)
     {
         action.Instigator = Provider.client;
         if (IsOwner)
             LocalLastAction = CachedTime.RealtimeSinceStartup;
-        if (!space)
+        if (!delayWithDeltaTime)
         {
             if (_queuedThisFrame)
                 action.DeltaTime = 0f;
@@ -166,7 +161,6 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         }
         _pendingActions.Add(action);
     }
-#endif
 
     internal static void ReceiveActionRelay(
 #if SERVER
@@ -206,6 +200,10 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         EditorUser? user = UserManager.FromId(s64);
         if (user == null)
         {
+            if (s64 == 0ul && ServerActions != null)
+            {
+                ServerActions.HandleReadPackets(Reader);
+            }
             Logger.LogError("Failed to find user for action packet from a steam id: " + s64.Format() + ".", method: "EDITOR ACTIONS");
             return;
         }
@@ -222,7 +220,6 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 #endif
             );
     }
-#if CLIENT
     internal void FlushEdits()
     {
         if (_pendingActions.Count < 1)
@@ -231,9 +228,12 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         Logger.LogDebug("[EDITOR ACTIONS] Flushing " + _pendingActions.Count.Format() + " action(s).");
         WriteEditBuffer(Writer, 0, _pendingActions.Count);
         int len = Writer.Count;
+#if CLIENT
         NetFactory.SendGeneric(DevkitMessage.ActionRelay, Writer.FinishWrite(), 0, len, true);
-    }
+#else
+        NetFactory.SendGeneric(DevkitMessage.ActionRelay, Writer.FinishWrite(), DevkitServerUtility.GetAllConnections(), 0, len, true);
 #endif
+    }
     public static (int Data, int Settings) GetMaxSizes(IAction action) =>
         EditorActionsCodeGeneration.Attributes.TryGetValue(action.Type, out ActionAttribute attr)
             ? (attr.Capacity + ActionBaseSize, attr.OptionCapacity + ActionSettingsCollection.BaseSize)
@@ -247,7 +247,6 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             return;
 #endif
         float t = CachedTime.RealtimeSinceStartup;
-#if CLIENT
         _queuedThisFrame = false;
         if (IsOwner)
         {
@@ -256,15 +255,15 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 _lastFlush = t;
                 FlushEdits();
             }
-
+#if CLIENT
             if (IsPlayingCatchUp)
             {
                 IsPlayingCatchUp = false;
                 Logger.LogDebug("[EDITOR ACTIONS] Done playing catch-up.");
             }
+#endif
             return;
         }
-#endif
         while (_pendingActions.Count > 0 && t >= _nextApply)
         {
             IAction action = _pendingActions[_pendingActions.Count - 1];
@@ -341,7 +340,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             return;
         ThreadUtil.assertIsGameThread();
 #if SERVER
-        writer.Write(User.SteamId.m_SteamID);
+        writer.Write(User == null ? 0ul : User.SteamId.m_SteamID);
 #endif
         writer.Write(DataVersion);
         if (index + length > _pendingActions.Count)
@@ -446,7 +445,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             Logger.LogDebug($"[EDITOR ACTIONS] Loading action #{i.Format()} {action.Format()}, collection index: {collIndex.Format()}.");
             if (action != null)
             {
-                action.Instigator = User.SteamId;
+                action.Instigator = User == null ? Provider.server : User.SteamId;
                 EditorActionsCodeGeneration.OnReadingAction!(this, action);
                 action.Read(reader);
 #if SERVER
@@ -474,7 +473,8 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                     }
                     if (CachedTime.RealtimeSinceStartup - _lastNoPermissionMessage > 5f)
                     {
-                        UIMessage.SendNoPermissionMessage(User);
+                        if (User != null)
+                            UIMessage.SendNoPermissionMessage(User);
                         _lastNoPermissionMessage = CachedTime.RealtimeSinceStartup;
                     }
                 }
@@ -493,13 +493,12 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             for (int i = 0; i < Provider.clients.Count; ++i)
             {
                 SteamPlayer pl = Provider.clients[i];
-                if (pl.playerID.steamID.m_SteamID != User.SteamId.m_SteamID)
+                if (User == null || pl.playerID.steamID.m_SteamID != User.SteamId.m_SteamID)
                     list.Add(pl.transportConnection);
             }
 
             // also send to pending users
             list.AddRange(EditorLevel.PendingToReceiveActions);
-            Logger.LogDebug($"Sending to {string.Join(",", list.Select(x => x.Format()))}.");
             if (anyInvalid)
             {
                 WriteEditBuffer(Writer, stInd, _pendingActions.Count - stInd);
@@ -512,7 +511,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             {
                 byte[] sendBytes = new byte[sizeof(ulong) + bufferLength];
                 Buffer.BlockCopy(buffer, offset, sendBytes, sizeof(ulong), bufferLength);
-                UnsafeBitConverter.GetBytes(sendBytes, User.SteamId.m_SteamID);
+                UnsafeBitConverter.GetBytes(sendBytes, User == null ? 0ul : User.SteamId.m_SteamID);
                 NetFactory.SendGeneric(DevkitMessage.ActionRelay, sendBytes, list, reliable: false);
             }
         }
@@ -531,6 +530,18 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 
         ListPool<ActionSettingsCollection>.release(c);
     }
+
+#if SERVER
+    public static bool QueueServerAction(IAction action, bool delayWithDeltaTime = false)
+    {
+        action.Instigator = Provider.server;
+        if (ServerActions == null)
+            return false;
+
+        ServerActions.QueueAction(action, delayWithDeltaTime);
+        return true;
+    }
+#endif
 
     public void Subscribe()
     {

@@ -1,17 +1,15 @@
-﻿using System.Diagnostics;
-using System.Globalization;
-using DevkitServer.API;
+﻿using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
 using DevkitServer.Commands.Subsystem;
-using System.Reflection;
-using DevkitServer.AssetTools;
-using DevkitServer.Configuration;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Sync;
+using System.Reflection;
 #if CLIENT
-using DevkitServer.Players.UI;
+using DevkitServer.AssetTools;
+using DevkitServer.Configuration;
 using DevkitServer.Util.Debugging;
+using System.Diagnostics;
 #endif
 
 namespace DevkitServer.Core.Commands;
@@ -100,22 +98,6 @@ internal static class CommandTests
 {
     public static readonly Action<CommandContext>[] Commands;
 #if CLIENT
-    private static void ui(CommandContext ctx)
-    {
-        ctx.AssertRanByPlayer();
-        ctx.AssertHelpCheck(0, "/test ui <open|close> - Show or hide ui.");
-        if (ctx.MatchParameter(0, "open", "show"))
-        {
-            DevkitEditorHUD.Open();
-            ctx.ReplyString("<#7bbc5f>Opened DevkitEditorHUD.");
-        }
-        else if (ctx.MatchParameter(0, "close", "hide"))
-        {
-            DevkitEditorHUD.Close(false);
-            ctx.ReplyString("<#7bbc5f>Closed DevkitEditorHUD.");
-        }
-        else ctx.SendCorrectUsage("/test ui <open|close>");
-    }
     private static void grab(CommandContext ctx)
     {
         if (ctx.HasArgsExact(1) && ctx.TryGet(0, out string resourcePath))

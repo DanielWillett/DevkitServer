@@ -14,13 +14,15 @@ public class DevkitServerGamemode : GameMode
 {
     public static void SetupEditorObject(GameObject editor, EditorUser user)
     {
-        editor.AddComponent<EditorActions>().User = user;
+        EditorActions actions = editor.AddComponent<EditorActions>();
+        actions.User = user;
         editor.AddComponent<UserInput>().User = user;
         editor.AddComponent<UserTransactions>().User = user;
         editor.AddComponent<TileSync>().User = user;
         editor.AddComponent<ObjectSync>().User = user;
 #if CLIENT
         bool isOwner = user.IsOwner;
+        actions.IsOwner = isOwner;
         if (!isOwner)
             editor.AddComponent<UserTPVControl>().User = user;
 #endif

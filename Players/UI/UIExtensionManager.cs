@@ -219,6 +219,7 @@ public static class UIExtensionManager
                     try
                     {
                         disposable.Dispose();
+                        LogDebug($"* Disposed: {info.ImplementationType.Format()}.", info.Plugin);
                     }
                     catch (Exception ex)
                     {
@@ -228,7 +229,7 @@ public static class UIExtensionManager
                 }
             }
             info.InstantiationsIntl.Clear();
-            LogDebug($"* Invoked Destroyed: {info.ImplementationType.Format()}.", info.Plugin);
+            LogDebug($"* Destroyed Instances: {info.ImplementationType.Format()}.", info.Plugin);
         }
     }
     internal static bool RegisterExtension(UIExtensionInfo info)

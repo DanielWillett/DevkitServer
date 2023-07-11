@@ -1,7 +1,6 @@
 ﻿using DevkitServer.Levels;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Networking;
-using JetBrains.Annotations;
 
 namespace DevkitServer.Multiplayer.Levels;
 [EarlyTypeInit]
@@ -206,12 +205,14 @@ public static class LevelObjectNetIdDatabase
                     ? LevelObjectUtil.TryFindObject(last, instanceId, out RegionIdentifier id)
                     : LevelObjectUtil.TryFindObject(instanceId, out id)))
             {
-                Logger.LogWarning($"Unable to find object in level data info: {id.Format()}.");
+                Logger.LogWarning($"Unable to find object in level data info: {instanceId.Format()}.");
                 continue;
             }
 
             LevelObject obj = ObjectManager.getObject(id.X, id.Y, id.Index);
-            last = obj.transform.position;
+            Transform? t = obj.GetTransform();
+            if (t != null)
+                last = t.position;
             any = true;
             RegisterObject(obj, netIds[i + offset]);
         }

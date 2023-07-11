@@ -1376,7 +1376,10 @@ public static class UIAccessTools
                 },
                 {
                     typeof(EditorUI),
-                    new UITypeInfo(typeof(EditorUI), emptyMethods, emptyMethods, hasActiveMember: false)
+                    new UITypeInfo(typeof(EditorUI), emptyMethods, emptyMethods,
+                        typeof(EditorUI).GetMethod("Start", BindingFlags.NonPublic | BindingFlags.Instance) is { } method1 ? new MethodBase[] { method1 } : emptyMethods,
+                        typeof(EditorUI).GetMethod("OnDestroy", BindingFlags.NonPublic | BindingFlags.Instance) is { } method2 ? new MethodBase[] { method2 } : emptyMethods,
+                        hasActiveMember: false)
                     {
                         Scene = UIScene.Editor,
                         EmitProperty = nameof(EditorUI),
@@ -1853,7 +1856,10 @@ public static class UIAccessTools
                 },
                 {
                     typeof(PlayerUI),
-                    new UITypeInfo(typeof(PlayerUI), emptyMethods, emptyMethods, hasActiveMember: false)
+                    new UITypeInfo(typeof(PlayerUI), emptyMethods, emptyMethods,
+                        typeof(PlayerUI).GetMethod("InitializePlayer", BindingFlags.NonPublic | BindingFlags.Instance) is { } method3 ? new MethodBase[] { method3 } : emptyMethods,
+                        typeof(EditorUI).GetMethod("OnDestroy", BindingFlags.NonPublic | BindingFlags.Instance) is { } method4 ? new MethodBase[] { method4 } : emptyMethods
+                        , hasActiveMember: false)
                     {
                         Scene = UIScene.Player,
                         EmitProperty = nameof(PlayerUI),

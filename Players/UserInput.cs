@@ -1,7 +1,6 @@
 ﻿using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
-using JetBrains.Annotations;
 using SDG.Framework.Devkit;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -392,7 +391,6 @@ public class UserInput : MonoBehaviour
                     Logger.LogError(ex);
                 }
                 Logger.LogInfo("Restarted PlayerUI.");
-                DevkitEditorHUD.Close(true);
             }
             else if (editor)
             {
@@ -406,8 +404,6 @@ public class UserInput : MonoBehaviour
                     Logger.LogError("Error deinitializing character.");
                     Logger.LogError(ex);
                 }
-                DevkitEditorHUD.Close(true);
-                DevkitEditorHUD.Open();
             }
             if (Player.player.first != null)
             {

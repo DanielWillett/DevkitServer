@@ -163,8 +163,8 @@ public sealed class AddFoliageToSurfaceAction : IServersideAction, IAsset
 #if SERVER
     public bool CheckCanApply()
     {
-        if (!VanillaPermissions.EditFoliage.Has(Instigator.m_SteamID) ||
-            VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID))
+        if (!VanillaPermissions.EditFoliage.Has(Instigator.m_SteamID) &&
+            !VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID, false))
         {
             return false;
         }
