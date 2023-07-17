@@ -90,7 +90,7 @@ public sealed class MovedHierarchyObjectsAction : IAction
             }
 
             HierarchyUtil.LocalTranslate(item, in transformation, UseScale);
-            HierarchyUtil.SyncIfAuthority(item);
+            HierarchyUtil.SyncIfAuthority(transformation.NetId);
         }
     }
 #if SERVER
@@ -166,11 +166,12 @@ public sealed class DeleteHierarchyItemsAction : IAction
 
         for (int i = 0; i < NetIds.Length; ++i)
         {
-            if (!HierarchyItemNetIdDatabase.TryGetHierarchyItem(NetIds[i], out IDevkitHierarchyItem item) || item == null)
+            NetId netId = NetIds[i];
+            if (!HierarchyItemNetIdDatabase.TryGetHierarchyItem(netId, out IDevkitHierarchyItem item) || item == null)
                 continue;
 
             HierarchyUtil.LocalRemoveItem(item);
-            HierarchyUtil.SyncIfAuthority(item);
+            HierarchyUtil.SyncIfAuthority(netId);
         }
     }
 #if SERVER

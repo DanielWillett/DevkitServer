@@ -1,10 +1,11 @@
-﻿using DevkitServer.API;
+﻿using System.Collections.ObjectModel;
+using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
-using DevkitServer.Commands.Subsystem;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Sync;
 using System.Reflection;
+using Cysharp.Threading.Tasks;
 #if CLIENT
 using DevkitServer.AssetTools;
 using DevkitServer.Configuration;
@@ -13,14 +14,15 @@ using System.Diagnostics;
 #endif
 
 namespace DevkitServer.Core.Commands;
-internal sealed class TestCommand : SynchronousCommand, ICommandLocalizationFile
+internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFile
 {
     [Permission]
     public static readonly Permission Test = new Permission("test", devkitServer: true);
     [Permission]
     public static readonly Permission TestAll = new Permission("test.*", devkitServer: true);
 
-    public IReadOnlyList<Permission> SubcommandPermissions;
+    public IReadOnlyList<Permission> SyncSubcommandPermissions { get; }
+    public IReadOnlyList<Permission> AsyncSubcommandPermissions { get; }
     Local ILocalizedCommand.Translations { get; set; } = null!;
     public TestCommand() : base("test")
     {
@@ -37,10 +39,20 @@ internal sealed class TestCommand : SynchronousCommand, ICommandLocalizationFile
             perms[i] = perm;
         }
 
-        SubcommandPermissions = perms;
+        SyncSubcommandPermissions = new ReadOnlyCollection<Permission>(perms);
+        perms = new Permission[CommandTests.AsyncCommands.Length];
+        for (int i = 0; i < CommandTests.AsyncCommands.Length; ++i)
+        {
+            Permission perm = new Permission("test." + CommandTests.AsyncCommands[i].Method.Name.ToLowerInvariant(), devkitServer: true);
+            AddPermission(perm);
+            UserPermissions.Handler.Register(perm);
+            perms[i] = perm;
+        }
+
+        AsyncSubcommandPermissions = new ReadOnlyCollection<Permission>(perms);
     }
 
-    public override void Execute(CommandContext ctx)
+    public override async UniTask Execute(CommandContext ctx, CancellationToken token)
     {
         ctx.AssertHelpCheckFormat(0, "CorrectUsage");
 
@@ -50,7 +62,7 @@ internal sealed class TestCommand : SynchronousCommand, ICommandLocalizationFile
             {
                 if (CommandTests.Commands[i].Method.Name.Equals(method, StringComparison.InvariantCultureIgnoreCase))
                 {
-                    ctx.AssertPermissionsOr(TestAll, SubcommandPermissions[i]);
+                    ctx.AssertPermissionsOr(TestAll, SyncSubcommandPermissions[i]);
 
                     ++ctx.ArgumentOffset;
                     try
@@ -71,6 +83,32 @@ internal sealed class TestCommand : SynchronousCommand, ICommandLocalizationFile
                         --ctx.ArgumentOffset;
                     }
                     return;
+                }
+            }
+            for (int i = 0; i < CommandTests.AsyncCommands.Length; ++i)
+            {
+                if (CommandTests.AsyncCommands[i].Method.Name.Equals(method, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    ctx.AssertPermissionsOr(TestAll, AsyncSubcommandPermissions[i]);
+
+                    ++ctx.ArgumentOffset;
+                    try
+                    {
+                        await CommandTests.AsyncCommands[i](ctx, token);
+                    }
+                    catch (CommandContext)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        ctx.Reply("Exception", CommandTests.Commands[i].Method.Name.ToLowerInvariant(), ex.GetType().Name);
+                        Logger.LogError(ex);
+                    }
+                    finally
+                    {
+                        --ctx.ArgumentOffset;
+                    }
                 }
             }
 #if CLIENT
@@ -97,6 +135,7 @@ internal sealed class TestCommand : SynchronousCommand, ICommandLocalizationFile
 internal static class CommandTests
 {
     public static readonly Action<CommandContext>[] Commands;
+    public static readonly Func<CommandContext, CancellationToken, UniTask>[] AsyncCommands;
 #if CLIENT
     private static void grab(CommandContext ctx)
     {
@@ -200,15 +239,28 @@ internal static class CommandTests
     {
         try
         {
-            MethodInfo[] methods = typeof(CommandTests).GetMethods(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public).Where(
+            MethodInfo[] sync = typeof(CommandTests).GetMethods(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public).Where(
                 x =>
                 {
+                    if (x.IsIgnored() || x.ReturnType != typeof(void))
+                        return false;
                     ParameterInfo[] p = x.GetParameters();
                     return p.Length == 1 && p[0].ParameterType.IsAssignableFrom(typeof(CommandContext));
                 }).ToArray();
-            Commands = new Action<CommandContext>[methods.Length];
-            for (int i = 0; i < methods.Length; ++i)
-                Commands[i] = (Action<CommandContext>)methods[i].CreateDelegate(typeof(Action<CommandContext>));
+            Commands = new Action<CommandContext>[sync.Length];
+            for (int i = 0; i < sync.Length; ++i)
+                Commands[i] = (Action<CommandContext>)sync[i].CreateDelegate(typeof(Action<CommandContext>));
+            MethodInfo[] async = typeof(CommandTests).GetMethods(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public).Where(
+                x =>
+                {
+                    if (x.IsIgnored() || x.ReturnType != typeof(UniTask))
+                        return false;
+                    ParameterInfo[] p = x.GetParameters();
+                    return p.Length == 2 && p[0].ParameterType.IsAssignableFrom(typeof(CommandContext)) && p[1].ParameterType.IsAssignableFrom(typeof(CancellationToken));
+                }).ToArray();
+            AsyncCommands = new Func<CommandContext, CancellationToken, UniTask>[async.Length];
+            for (int i = 0; i < async.Length; ++i)
+                AsyncCommands[i] = (Func<CommandContext, CancellationToken, UniTask>)async[i].CreateDelegate(typeof(Func<CommandContext, CancellationToken, UniTask>));
         }
         catch (Exception ex)
         {

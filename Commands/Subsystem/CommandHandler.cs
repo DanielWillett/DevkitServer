@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using Cysharp.Threading.Tasks;
 using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.Configuration;
@@ -16,10 +17,42 @@ namespace DevkitServer.Commands.Subsystem;
 /// <remarks>Override to change behavior (or implement <see cref="ICommandHandler"/>) and set <see cref="Handler"/>.</remarks>
 public class CommandHandler : ICommandHandler, IDisposable
 {
-    public static event ExecutedCommand? GlobalOnCommandExecuted;
-    public static event ExecutingCommand? GlobalOnExecutingCommand;
-    public static event Action<IExecutableCommand>? GlobalOnCommandRegistered;
-    public static event Action<IExecutableCommand>? GlobalOnCommandDeregistered;
+    protected static CachedMulticastEvent<ExecutedCommand> EventGlobalOnCommandExecuted = new CachedMulticastEvent<ExecutedCommand>(typeof(CommandHandler), nameof(GlobalOnCommandExecuted));
+    protected static CachedMulticastEvent<ExecutingCommand> EventGlobalOnExecutingCommand = new CachedMulticastEvent<ExecutingCommand>(typeof(CommandHandler), nameof(GlobalOnExecutingCommand));
+    protected static CachedMulticastEvent<Action<IExecutableCommand>> EventGlobalOnCommandRegistered = new CachedMulticastEvent<Action<IExecutableCommand>>(typeof(CommandHandler), nameof(GlobalOnCommandRegistered));
+    protected static CachedMulticastEvent<Action<IExecutableCommand>> EventGlobalOnCommandDeregistered = new CachedMulticastEvent<Action<IExecutableCommand>>(typeof(CommandHandler), nameof(GlobalOnCommandDeregistered));
+
+    protected CachedMulticastEvent<ExecutedCommand> EventOnCommandExecuted = new CachedMulticastEvent<ExecutedCommand>(typeof(CommandHandler), nameof(OnCommandExecuted));
+    protected CachedMulticastEvent<ExecutingCommand> EventOnExecutingCommand = new CachedMulticastEvent<ExecutingCommand>(typeof(CommandHandler), nameof(OnExecutingCommand));
+    protected CachedMulticastEvent<Action<IExecutableCommand>> EventOnCommandRegistered = new CachedMulticastEvent<Action<IExecutableCommand>>(typeof(CommandHandler), nameof(OnCommandRegistered));
+    protected CachedMulticastEvent<Action<IExecutableCommand>> EventOnCommandDeregistered = new CachedMulticastEvent<Action<IExecutableCommand>>(typeof(CommandHandler), nameof(OnCommandDeregistered));
+
+    public static event ExecutedCommand GlobalOnCommandExecuted
+    {
+        add => EventGlobalOnCommandExecuted.Add(value);
+        remove => EventGlobalOnCommandExecuted.Remove(value);
+    }
+    public static event ExecutingCommand GlobalOnExecutingCommand
+    {
+        add => EventGlobalOnExecutingCommand.Add(value);
+        remove => EventGlobalOnExecutingCommand.Remove(value);
+    }
+    public static event Action<IExecutableCommand> GlobalOnCommandRegistered
+    {
+        add => EventGlobalOnCommandRegistered.Add(value);
+        remove => EventGlobalOnCommandRegistered.Remove(value);
+    }
+    public static event Action<IExecutableCommand> GlobalOnCommandDeregistered
+    {
+        add => EventGlobalOnCommandDeregistered.Add(value);
+        remove => EventGlobalOnCommandDeregistered.Remove(value);
+    }
+
+    public delegate void ExecutedCommand(
+#if SERVER
+        EditorUser? user,
+# endif
+        CommandContext context);
 
     public delegate void ExecutingCommand(
 #if SERVER
@@ -28,12 +61,6 @@ public class CommandHandler : ICommandHandler, IDisposable
         CommandContext context,
         ref bool shouldExecute
     );
-
-    public delegate void ExecutedCommand(
-#if SERVER
-        EditorUser? user,
-# endif
-        CommandContext context);
 
     protected bool Initialized;
     private static ICommandHandler _handler = null!;
@@ -51,10 +78,26 @@ public class CommandHandler : ICommandHandler, IDisposable
     private readonly List<IExecutableCommand> _registeredCommands = new List<IExecutableCommand>();
     public IReadOnlyList<IExecutableCommand> Commands { get; }
 
-    public event ExecutedCommand? OnCommandExecuted;
-    public event ExecutingCommand? OnExecutingCommand;
-    public event Action<IExecutableCommand>? OnCommandRegistered;
-    public event Action<IExecutableCommand>? OnCommandDeregistered;
+    public event ExecutedCommand OnCommandExecuted
+    {
+        add => EventOnCommandExecuted.Add(value);
+        remove => EventOnCommandExecuted.Remove(value);
+    }
+    public event ExecutingCommand OnExecutingCommand
+    {
+        add => EventOnExecutingCommand.Add(value);
+        remove => EventOnExecutingCommand.Remove(value);
+    }
+    public event Action<IExecutableCommand> OnCommandRegistered
+    {
+        add => EventOnCommandRegistered.Add(value);
+        remove => EventOnCommandRegistered.Remove(value);
+    }
+    public event Action<IExecutableCommand> OnCommandDeregistered
+    {
+        add => EventOnCommandDeregistered.Add(value);
+        remove => EventOnCommandDeregistered.Remove(value);
+    }
     internal static bool IsLoggingFromDevkitServer;
 
     /// <exception cref="NotSupportedException">Called setter on non-game thread.</exception>
@@ -65,10 +108,10 @@ public class CommandHandler : ICommandHandler, IDisposable
         {
             ThreadUtil.assertIsGameThread();
 
-            value.OnCommandExecuted += TryInvokeGlobalOnCommandExecuted;
-            value.OnExecutingCommand += TryInvokeGlobalOnCommandExecuting;
-            value.OnCommandRegistered += TryInvokeGlobalOnCommandRegistered;
-            value.OnCommandDeregistered += TryInvokeGlobalOnCommandDeregistered;
+            value.OnCommandExecuted += EventGlobalOnCommandExecuted.TryInvoke;
+            value.OnExecutingCommand += EventGlobalOnExecutingCommand.TryInvoke;
+            value.OnCommandRegistered += EventGlobalOnCommandRegistered.TryInvoke;
+            value.OnCommandDeregistered += EventGlobalOnCommandDeregistered.TryInvoke;
             ICommandHandler? old = Interlocked.Exchange(ref _handler, value);
             if (old != null)
             {
@@ -77,10 +120,10 @@ public class CommandHandler : ICommandHandler, IDisposable
                     old.TryDeregisterCommand(command);
                     value.TryRegisterCommand(command);
                 }
-                old.OnCommandExecuted -= TryInvokeGlobalOnCommandExecuted;
-                old.OnExecutingCommand -= TryInvokeGlobalOnCommandExecuting;
-                old.OnCommandRegistered -= TryInvokeGlobalOnCommandRegistered;
-                old.OnCommandDeregistered -= TryInvokeGlobalOnCommandDeregistered;
+                old.OnCommandExecuted -= EventGlobalOnCommandExecuted.TryInvoke;
+                old.OnExecutingCommand -= EventGlobalOnExecutingCommand.TryInvoke;
+                old.OnCommandRegistered -= EventGlobalOnCommandRegistered.TryInvoke;
+                old.OnCommandDeregistered -= EventGlobalOnCommandDeregistered.TryInvoke;
                 if (old is IDisposable disp)
                     disp.Dispose();
             }
@@ -139,6 +182,13 @@ public class CommandHandler : ICommandHandler, IDisposable
 #if CLIENT
     void ICommandHandler.TransitionCommandExecutionToServer(CommandContext ctx)
     {
+        if (DevkitServerModule.IsMainThread)
+            TransitionCommandExecutionToServerIntl(ctx);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => TransitionCommandExecutionToServerIntl(ctx));
+    }
+    private void TransitionCommandExecutionToServerIntl(CommandContext ctx)
+    {
         _resending = true;
         ChatManager.sendChat(EChatMode.GLOBAL, ctx.OriginalMessage);
         _resending = false;
@@ -155,183 +205,6 @@ public class CommandHandler : ICommandHandler, IDisposable
         return true;
     }
 #endif
-    protected void TryInvokeOnCommandRegistered(IExecutableCommand command)
-    {
-        if (OnCommandRegistered == null)
-            return;
-        foreach (Action<IExecutableCommand> action in OnCommandRegistered.GetInvocationList().Cast<Action<IExecutableCommand>>())
-        {
-            try
-            {
-                action(command);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + GetType().Format() + "." + nameof(OnCommandRegistered) + ".");
-                Logger.LogError(ex);
-            }
-        }
-    }
-
-    protected void TryInvokeOnCommandDeregistered(IExecutableCommand command)
-    {
-        if (OnCommandDeregistered == null)
-            return;
-        foreach (Action<IExecutableCommand> action in OnCommandDeregistered.GetInvocationList().Cast<Action<IExecutableCommand>>())
-        {
-            try
-            {
-                action(command);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + GetType().Format() + "." + nameof(OnCommandDeregistered) + ".");
-                Logger.LogError(ex);
-            }
-        }
-    }
-
-    private static void TryInvokeGlobalOnCommandRegistered(IExecutableCommand command)
-    {
-        if (GlobalOnCommandRegistered == null)
-            return;
-        foreach (Action<IExecutableCommand> action in GlobalOnCommandRegistered.GetInvocationList().Cast<Action<IExecutableCommand>>())
-        {
-            try
-            {
-                action(command);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + typeof(CommandHandler).Format() + "." + nameof(GlobalOnCommandRegistered) + ".");
-                Logger.LogError(ex);
-            }
-        }
-    }
-
-    private static void TryInvokeGlobalOnCommandDeregistered(IExecutableCommand command)
-    {
-        if (GlobalOnCommandDeregistered == null)
-            return;
-        foreach (Action<IExecutableCommand> action in GlobalOnCommandDeregistered.GetInvocationList().Cast<Action<IExecutableCommand>>())
-        {
-            try
-            {
-                action(command);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + typeof(CommandHandler).Format() + "." + nameof(GlobalOnCommandDeregistered) + ".");
-                Logger.LogError(ex);
-            }
-        }
-    }
-
-    protected void TryInvokeOnCommandExecuted(
-#if SERVER
-        EditorUser? user,
-#endif
-        CommandContext ctx)
-    {
-        if (OnCommandExecuted == null)
-            return;
-        foreach (ExecutedCommand action in OnCommandExecuted.GetInvocationList().Cast<ExecutedCommand>())
-        {
-            try
-            {
-                action(
-#if SERVER
-                    user,
-#endif
-                    ctx);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + GetType().Format() + "." + nameof(OnCommandExecuted) + ".");
-                Logger.LogError(ex);
-            }
-        }
-    }
-
-    protected void TryInvokeOnCommandExecuting(
-#if SERVER
-        EditorUser? user,
-#endif
-        CommandContext ctx,
-        ref bool shouldExecute)
-    {
-        if (OnExecutingCommand == null)
-            return;
-        foreach (ExecutingCommand action in OnExecutingCommand.GetInvocationList().Cast<ExecutingCommand>())
-        {
-            try
-            {
-                action(
-#if SERVER
-                    user,
-#endif
-                    ctx, ref shouldExecute);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + GetType().Format() + "." + nameof(OnExecutingCommand) + ".");
-                Logger.LogError(ex);
-            }
-        }
-    }
-
-    private static void TryInvokeGlobalOnCommandExecuted(
-#if SERVER
-        EditorUser? user,
-#endif
-        CommandContext ctx)
-    {
-        if (GlobalOnCommandExecuted == null)
-            return;
-        foreach (ExecutedCommand action in GlobalOnCommandExecuted.GetInvocationList().Cast<ExecutedCommand>())
-        {
-            try
-            {
-                action(
-#if SERVER
-                    user,
-#endif
-                    ctx);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + typeof(CommandHandler).Format() + "." + nameof(OnCommandExecuted) + ".");
-                Logger.LogError(ex);
-            }
-        }
-    }
-
-    private static void TryInvokeGlobalOnCommandExecuting(
-#if SERVER
-        EditorUser? user,
-#endif
-        CommandContext ctx,
-        ref bool shouldExecute)
-    {
-        if (GlobalOnExecutingCommand == null)
-            return;
-        foreach (ExecutingCommand action in GlobalOnExecutingCommand.GetInvocationList().Cast<ExecutingCommand>())
-        {
-            try
-            {
-                action(
-#if SERVER
-                    user,
-#endif
-                    ctx, ref shouldExecute);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + typeof(CommandHandler).Format() + "." + nameof(OnExecutingCommand) + ".");
-                Logger.LogError(ex);
-            }
-        }
-    }
 
     public virtual void ExecuteCommand(IExecutableCommand command,
 #if SERVER
@@ -371,75 +244,20 @@ public class CommandHandler : ICommandHandler, IDisposable
 #endif
         );
         bool shouldExecute = true;
-        TryInvokeOnCommandExecuting(
+        EventOnExecutingCommand.TryInvoke(
 #if SERVER
             ctx.Caller,
 #endif
             ctx, ref shouldExecute);
         if (!shouldExecute)
             return;
+        if (command is VanillaCommand)
+            _activeVanillaCommand = ctx;
 
-        if (command.Asynchronous)
-        {
-            Task.Run(async () =>
-            {
-                CancellationToken token = DevkitServerModule.UnloadToken;
-                await DevkitServerUtility.ToUpdate(token);
-                SemaphoreSlim? waited;
-                if (command is ISynchronizedAsyncCommand sync)
-                {
-                    waited = sync.Semaphore;
-                    await waited.WaitAsync(token).ConfigureAwait(false);
-                    await DevkitServerUtility.ToUpdate(token);
-                }
-                else waited = null;
+        UniTask.Create(ctx.ExecuteAsync);
 
-                try
-                {
-                    await command.ExecuteAsync(ctx, token).ConfigureAwait(false);
-                }
-                catch (CommandContext) { }
-                catch (Exception ex)
-                {
-                    await DevkitServerUtility.ToUpdate(token);
-                    HandleCommandException(ctx, ex);
-                }
-                finally
-                {
-                    waited?.Release();
-                    TryInvokeOnCommandExecuted(
-#if SERVER
-                        ctx.Caller,
-#endif
-                        ctx);
-                }
-            });
-        }
-        else
-        {
-            bool isVanilla = command is VanillaCommand;
-            if (isVanilla)
-                _activeVanillaCommand = ctx;
-            try
-            {
-                command.Execute(ctx);
-            }
-            catch (CommandContext) { }
-            catch (Exception ex)
-            {
-                HandleCommandException(ctx, ex);
-            }
-            finally
-            {
-                TryInvokeOnCommandExecuted(
-#if SERVER
-                    ctx.Caller,
-#endif
-                    ctx);
-                if (isVanilla)
-                    _activeVanillaCommand = null;
-            }
-        }
+        if (ctx == _activeVanillaCommand)
+            _activeVanillaCommand = null;
     }
 
     internal static void InitImpl()
@@ -627,6 +445,7 @@ public class CommandHandler : ICommandHandler, IDisposable
                     case Severity.Debug:
                         command.LogDebug(msg);
                         break;
+                    case Severity.Info:
                     default:
                         command.LogInfo(msg);
                         break;
@@ -644,15 +463,13 @@ public class CommandHandler : ICommandHandler, IDisposable
             return false;
         }
 
-        if (command.Asynchronous)
+
+        if (command is ISynchronizedCommand sync)
         {
-            if (command is ISynchronizedAsyncCommand sync)
-            {
-                if (sync.Semaphore == null)
-                    sync.Semaphore = new SemaphoreSlim(1, 1);
-                else if (sync.Semaphore.CurrentCount != 1)
-                    command.LogWarning("Predefined semaphore should have a 1 initialCount and 1 maxCount to properly synchronize access.");
-            }
+            if (sync.Semaphore == null)
+                sync.Semaphore = new SemaphoreSlim(1, 1);
+            else if (sync.Semaphore.CurrentCount != 1)
+                command.LogWarning("Predefined semaphore should have a 1 initialCount and 1 maxCount to properly synchronize access.");
         }
         if (command is ICommandLocalizationFile file)
         {
@@ -717,7 +534,7 @@ public class CommandHandler : ICommandHandler, IDisposable
         else
             command.LogInfo("Registered from ".Colorize(clr) + DevkitServerModule.MainLocalization.format("Name").Colorize(DevkitServerModule.ModuleColor) + ".".Colorize(clr), ConsoleColor.DarkGray);
 
-        TryInvokeOnCommandRegistered(command);
+        EventOnCommandRegistered.TryInvoke(command);
 
         return true;
     }
@@ -730,7 +547,7 @@ public class CommandHandler : ICommandHandler, IDisposable
 
         _registeredCommands.RemoveAt(ind);
 
-        TryInvokeOnCommandDeregistered(command);
+        EventOnCommandDeregistered.TryInvoke(command);
         return true;
     }
 
@@ -741,4 +558,15 @@ public class CommandHandler : ICommandHandler, IDisposable
         if (!ctx.IsConsole)
             ctx.Reply("Exception", ex.GetType().Name);
     }
+
+    internal void TryInvokeOnCommandExecuted(
+#if SERVER
+        EditorUser? user,
+#endif
+        CommandContext ctx
+    ) => EventOnCommandExecuted.TryInvoke(
+#if SERVER
+        user,
+#endif
+        ctx);
 }

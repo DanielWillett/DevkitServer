@@ -1,4 +1,5 @@
 ﻿using DevkitServer.API;
+using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
 using DevkitServer.Plugins;
 using System.Reflection;

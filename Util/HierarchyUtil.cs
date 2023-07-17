@@ -105,28 +105,14 @@ public static class HierarchyUtil
         }
 
         IDevkitHierarchyItem? newItem = LevelHierarchy.instance.items.Count > 0 ? LevelHierarchy.instance.items.GetTail() : null;
-        if (newItem != null && type.Type.IsInstanceOfType(newItem))
-        {
-            DevkitServerModule.ComponentHost.StartCoroutine(InstantiateHierarchyItemCoroutine(ctx, newItem, type, user, position, rotation, scale));
-        }
-        else
+        if (newItem == null || !type.Type.IsInstanceOfType(newItem))
         {
             Logger.LogError($"Failed to create {type.Format()}.", method: Source);
             UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+            return;
         }
-    }
-    private static IEnumerator InstantiateHierarchyItemCoroutine(MessageContext ctx, IDevkitHierarchyItem newItem, IHierarchyItemTypeIdentifier type, EditorUser user, Vector3 position, Quaternion rotation, Vector3 scale)
-    {
-        // have to wait for OnEnable to run
-        yield return null;
-        yield return new WaitForEndOfFrame();
 
-        if (!HierarchyItemNetIdDatabase.TryGetHierarchyItemNetId(newItem, out NetId netId)) // todo failing
-        {
-            Logger.LogError($"Failed to assign NetId to {type.Format()}.", method: Source);
-            UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("UnknownError"));
-            yield break;
-        }
+        NetId netId = HierarchyItemNetIdDatabase.AddHierarchyItem(newItem);
 
         if (newItem is Component comp)
         {
@@ -160,6 +146,7 @@ public static class HierarchyUtil
         else if (item is Object o)
             Object.Destroy(o);
         else LevelHierarchy.removeItem(item);
+        LevelHierarchy.MarkDirty();
     }
     /// <summary>
     /// Does not replicate. Properly move a hierarchy item.
@@ -197,14 +184,15 @@ public static class HierarchyUtil
             if (useScale)
                 comp.transform.localScale = transformation.Scale;
         }
+        LevelHierarchy.MarkDirty();
     }
     public static bool TryGetTransform(IDevkitHierarchyItem item, out Transform transform)
     {
         ThreadUtil.assertIsGameThread();
 
-        if (item is MonoBehaviour { isActiveAndEnabled: true } monoBehaviour)
+        if (item is Component { gameObject.activeInHierarchy: true } component)
         {
-            transform = monoBehaviour.transform;
+            transform = component.transform;
             return true;
         }
 
@@ -216,8 +204,8 @@ public static class HierarchyUtil
     {
         ThreadUtil.assertIsGameThread();
 
-        if (item is MonoBehaviour { isActiveAndEnabled: true } monoBehaviour)
-            return monoBehaviour.transform;
+        if (item is Component { gameObject.activeInHierarchy: true } component)
+            return component.transform;
 
         return null;
     }

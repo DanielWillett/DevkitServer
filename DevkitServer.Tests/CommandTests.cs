@@ -1,4 +1,5 @@
-﻿using DevkitServer.API;
+﻿using Cysharp.Threading.Tasks;
+using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
 using DevkitServer.Commands.Subsystem;
@@ -251,10 +252,8 @@ public class CommandTests
             set => throw new NotImplementedException();
         }
         public IList<Permission> Permissions => throw new NotImplementedException();
-        public bool Asynchronous => throw new NotImplementedException();
         public bool AnyPermissions => throw new NotImplementedException();
-        public void Execute(CommandContext ctx) => throw new NotImplementedException();
-        public Task ExecuteAsync(CommandContext ctx, CancellationToken token) => throw new NotImplementedException();
+        public UniTask Execute(CommandContext ctx, CancellationToken token) => throw new NotImplementedException();
         public bool CheckPermission(
 #if SERVER
             EditorUser? user

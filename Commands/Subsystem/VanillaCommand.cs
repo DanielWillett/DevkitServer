@@ -1,4 +1,5 @@
-﻿using DevkitServer.API;
+﻿using Cysharp.Threading.Tasks;
+using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
 #if SERVER
@@ -11,7 +12,6 @@ namespace DevkitServer.Commands.Subsystem;
 internal sealed class VanillaCommand : IExecutableCommand
 {
     public Command Command { get; }
-    bool IExecutableCommand.Asynchronous => false;
     bool IExecutableCommand.AnyPermissions => true;
     public string CommandName => Command.command;
     int IExecutableCommand.Priority => 0;
@@ -24,12 +24,11 @@ internal sealed class VanillaCommand : IExecutableCommand
         Permissions = new List<Permission>(1) { new Permission(Command.command.ToLowerInvariant(), true, false) };
         UserPermissions.Handler.Register(Permissions[0]);
     }
-    void IExecutableCommand.Execute(CommandContext ctx)
+    UniTask IExecutableCommand.Execute(CommandContext ctx, CancellationToken token)
     {
         Command.check(ctx.IsConsole ? CSteamID.Nil : ctx.Caller.SteamId, CommandName, string.Join("/", ctx.Arguments));
+        return UniTask.CompletedTask;
     }
-
-    Task IExecutableCommand.ExecuteAsync(CommandContext ctx, CancellationToken token) => throw new NotImplementedException();
 
 #if SERVER
     public bool CheckPermission(EditorUser? user) => user.CheckPermission(Permissions, (this as IExecutableCommand).AnyPermissions);

@@ -1,4 +1,5 @@
-﻿using DevkitServer.Levels;
+﻿using System.Collections.Concurrent;
+using DevkitServer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using SDG.Framework.Devkit;
 
@@ -16,7 +17,6 @@ internal static class HierarchyItemNetIdDatabase
     {
 #if SERVER
         LevelHierarchy.itemRemoved += LevelHierarchyOnItemRemoved;
-        LevelHierarchy.itemAdded += LevelHierarchyOnItemAdded;
 #endif
 }
     internal static void Shutdown()
@@ -24,16 +24,9 @@ internal static class HierarchyItemNetIdDatabase
 #if SERVER
         _initialLoaded = false;
         LevelHierarchy.itemRemoved -= LevelHierarchyOnItemRemoved;
-        LevelHierarchy.itemAdded -= LevelHierarchyOnItemAdded;
 #endif
     }
 #if SERVER
-    private static void LevelHierarchyOnItemAdded(IDevkitHierarchyItem item)
-    {
-        if (!_initialLoaded) return;
-        Logger.LogDebug($"[{Source}] Hierarchy item added: {item.Format()}.");
-        AddHierarchyItem(item);
-    }
     private static void LevelHierarchyOnItemRemoved(IDevkitHierarchyItem item)
     {
         if (!_initialLoaded) return;
@@ -54,7 +47,7 @@ internal static class HierarchyItemNetIdDatabase
             ctx.Acknowledge(StandardErrorCode.NotFound);
     }
 #endif
-        public static void RemoveHierarchyItem(IDevkitHierarchyItem item)
+    public static void RemoveHierarchyItem(IDevkitHierarchyItem item)
     {
         if (item == null)
             return;
@@ -67,7 +60,7 @@ internal static class HierarchyItemNetIdDatabase
                 NetIdRegistry.Release(netId);
             HierarchyItemAssignments.Remove(item.instanceID);
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Released hierarchy item NetId: {netId.Format()} ({item.instanceID}, {item.Format()})");
+                Logger.LogDebug($"[{Source}] Released hierarchy item NetId: {netId.Format()} ({item.instanceID}, {item.Format()}).");
         }
         else
             Logger.LogWarning($"Unable to release NetId to hierarchy item {netId.Format()} ({item.instanceID}, {item.Format()}), NetId not registered.", method: Source);

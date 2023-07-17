@@ -1,12 +1,12 @@
 ﻿#if SERVER
+using Cysharp.Threading.Tasks;
 using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
-using DevkitServer.Commands.Subsystem;
 using DevkitServer.Players;
 
 namespace DevkitServer.Core.Commands;
-internal sealed class ControlCommand : SynchronousCommand, ICommandLocalizationFile
+internal sealed class ControlCommand : DevkitServerCommand, ICommandLocalizationFile
 {
     [Permission]
     public static readonly Permission ChangeController = new Permission("control", devkitServer: true);
@@ -28,7 +28,7 @@ internal sealed class ControlCommand : SynchronousCommand, ICommandLocalizationF
         AddPermission(ChangeControllerAll);
     }
 
-    public override void Execute(CommandContext ctx)
+    public override UniTask Execute(CommandContext ctx, CancellationToken token)
     {
         ctx.AssertRanByPlayer();
 
@@ -61,6 +61,8 @@ internal sealed class ControlCommand : SynchronousCommand, ICommandLocalizationF
             else throw ctx.Reply("NoPermission", fmt);
         }
         else throw ctx.Reply("CorrectUsage");
+
+        return UniTask.CompletedTask;
     }
 
     public string TranslationsDirectory => nameof(ControlCommand);

@@ -67,6 +67,9 @@
         <Reference Include="StackCleaner">
             <HintPath>C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Libraries\StackCleaner.dll</HintPath>
         </Reference>
+        <Reference Include="UniTask">
+            <HintPath>C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Libraries\UniTask.dll</HintPath>
+        </Reference>
     </ItemGroup>
     <ItemGroup Condition="$(DefineConstants.Contains(CLIENT))">
         
@@ -132,6 +135,9 @@
         <!-- Other -->
         <Reference Include="StackCleaner">
             <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Libraries\StackCleaner.dll</HintPath>
+        </Reference>
+        <Reference Include="UniTask">
+            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Libraries\UniTask.dll</HintPath>
         </Reference>
     </ItemGroup>
     <ItemGroup>

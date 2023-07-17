@@ -1,14 +1,14 @@
 ﻿#if SERVER
-using System.Globalization;
-using System.Text;
+using Cysharp.Threading.Tasks;
 using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
-using DevkitServer.Commands.Subsystem;
 using DevkitServer.Players;
+using System.Globalization;
+using System.Text;
 
 namespace DevkitServer.Core.Commands;
-internal sealed class PermissionsCommand : SynchronousCommand, ICommandLocalizationFile
+internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocalizationFile
 {
     private readonly string[] _userMatches = { "user", "users", "player", "players", "u", "p" };
     private readonly string[] _permMatches = { "perm", "permission", "perms", "permissions", "p" };
@@ -50,7 +50,7 @@ internal sealed class PermissionsCommand : SynchronousCommand, ICommandLocalizat
         AddAlias("permission");
     }
 
-    public override void Execute(CommandContext ctx)
+    public override UniTask Execute(CommandContext ctx, CancellationToken token)
     {
         ctx.AssertHelpCheckFormat(0, "CorrectUsage");
 
@@ -91,7 +91,7 @@ internal sealed class PermissionsCommand : SynchronousCommand, ICommandLocalizat
             else if (!init)
                 ctx.Reply("NoPermissions");
 
-            return;
+            return UniTask.CompletedTask;
         }
 
         bool pAll = ctx.HasPermission(All);
@@ -197,7 +197,7 @@ internal sealed class PermissionsCommand : SynchronousCommand, ICommandLocalizat
                                 else
                                     ctx.Reply(group.AddPermission(perm) ? "AddedPermission" : "PermissionAlreadyAdded", group.Id, perm.ToString(), "#" + ColorUtility.ToHtmlStringRGB(group.Color));
                                 UserPermissions.Handler.SavePermissionGroup(group);
-                                return;
+                                return UniTask.CompletedTask;
                             }
 
                             FailToFindGroup(id);
@@ -315,6 +315,7 @@ internal sealed class PermissionsCommand : SynchronousCommand, ICommandLocalizat
 
             throw ctx.Reply("GroupList", sb.ToString());
         }
+        return UniTask.CompletedTask;
     }
 
     public string TranslationsDirectory => nameof(PermissionsCommand);

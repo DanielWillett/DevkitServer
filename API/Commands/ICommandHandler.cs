@@ -1,16 +1,17 @@
-﻿using DevkitServer.API.Permissions;
-using DevkitServer.Commands.Subsystem;
+﻿using DevkitServer.Commands.Subsystem;
+#if SERVER
 using DevkitServer.Players;
+#endif
 
 namespace DevkitServer.API.Commands;
 public interface ICommandHandler
 {
     IReadOnlyList<IExecutableCommand> Commands { get; }
 
-    event CommandHandler.ExecutedCommand? OnCommandExecuted;
-    event CommandHandler.ExecutingCommand? OnExecutingCommand;
-    event Action<IExecutableCommand>? OnCommandRegistered;
-    event Action<IExecutableCommand>? OnCommandDeregistered;
+    event CommandHandler.ExecutedCommand OnCommandExecuted;
+    event CommandHandler.ExecutingCommand OnExecutingCommand;
+    event Action<IExecutableCommand> OnCommandRegistered;
+    event Action<IExecutableCommand> OnCommandDeregistered;
 
     void Init();
     void ExecuteCommand(IExecutableCommand command,

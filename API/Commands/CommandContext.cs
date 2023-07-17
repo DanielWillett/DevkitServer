@@ -1,9 +1,10 @@
-﻿using System.Globalization;
-using System.Runtime.CompilerServices;
+﻿using Cysharp.Threading.Tasks;
 using DevkitServer.API.Permissions;
 using DevkitServer.Commands.Subsystem;
 using DevkitServer.Multiplayer;
 using DevkitServer.Players;
+using System.Globalization;
+using System.Runtime.CompilerServices;
 
 namespace DevkitServer.API.Commands;
 /// <summary>
@@ -1527,4 +1528,43 @@ public class CommandContext : Exception
 
 
     public override string ToString() => $"\"/{Command.CommandName.ToLower()}\" ran by {(IsConsole ? "{CONSOLE}" : Caller)} with args [{string.Join(", ", Arguments)}].";
+
+    internal async UniTask ExecuteAsync()
+    {
+        CancellationToken token = DevkitServerModule.UnloadToken;
+        await UniTask.SwitchToMainThread(token);
+
+        SemaphoreSlim? waited = null;
+        if (Command is ISynchronizedCommand { Semaphore: not null } sync)
+        {
+            waited = sync.Semaphore;
+
+            await waited.WaitAsync(token).ConfigureAwait(false);
+
+            await UniTask.SwitchToMainThread(token);
+        }
+
+        try
+        {
+            await Command.Execute(this, token);
+        }
+        catch (CommandContext) { }
+        catch (Exception ex)
+        {
+            CommandHandler.Handler.HandleCommandException(this, ex);
+        }
+        finally
+        {
+            waited?.Release();
+
+            if (CommandHandler.Handler is CommandHandler handler)
+            {
+                handler.TryInvokeOnCommandExecuted(
+#if SERVER
+                    Caller,
+#endif
+                    this);
+            }
+        }
+    }
 }

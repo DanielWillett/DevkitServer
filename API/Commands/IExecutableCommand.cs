@@ -1,21 +1,16 @@
-﻿using DevkitServer.API;
-using DevkitServer.API.Commands;
+﻿using Cysharp.Threading.Tasks;
 using DevkitServer.API.Permissions;
+#if SERVER
 using DevkitServer.Players;
+#endif
 
-namespace DevkitServer.Commands.Subsystem;
+namespace DevkitServer.API.Commands;
 
 /// <summary>
 /// Represents a command ran by either a <see cref="EditorUser"/> or the console.
 /// </summary>
-/// <remarks>Can be synchronous or asynchronous, depending on the value of <see cref="Asynchronous"/>.</remarks>
 public interface IExecutableCommand
 {
-    /// <summary>
-    /// Run <see cref="ExecuteAsync"/> instead of <see cref="Execute"/>.
-    /// </summary>
-    bool Asynchronous { get; }
-
     /// <summary>
     /// Treat <see cref="Permissions"/> as a list of any permission the user must have instead of a list of all permissions a user must have.
     /// </summary>
@@ -42,7 +37,7 @@ public interface IExecutableCommand
     /// <summary>
     /// List of all permissions required to run the command. Change this behavior with <see cref="AnyPermissions"/>. This is safe to add to or remove from at runtime.
     /// </summary>
-    /// <remarks>This getter is called each time someone runs a command. It is not a good idea to point it to a new <see cref="List{API.Permissions.Permission}"/> each time it's called.</remarks>
+    /// <remarks>This getter is called each time someone runs a command. It is not a good idea to point it to a new <see cref="List{Permission}"/> each time it's called.</remarks>
     IList<Permission> Permissions { get; }
 
     /// <summary>
@@ -53,13 +48,7 @@ public interface IExecutableCommand
     /// <summary>
     /// Runs the command synchronously. Not required to be implemented if <see cref="Asynchronous"/> is <see langword="true"/>.
     /// </summary>
-    void Execute(CommandContext ctx);
-
-    /// <summary>
-    /// Runs the command asynchronously. Not required to be implemented if <see cref="Asynchronous"/> is <see langword="false"/>.
-    /// </summary>
-    /// <remarks>Execution of this method will start on the game thread.</remarks>
-    Task ExecuteAsync(CommandContext ctx, CancellationToken token);
+    UniTask Execute(CommandContext ctx, CancellationToken token);
 
     /// <summary>
     /// Check if the <paramref name="user"/> has permission to run this command.
@@ -78,7 +67,7 @@ public interface IExecutableCommand
 /// <summary>
 /// When <see cref="IExecutableCommand.Asynchronous"/> is set to <see langword="true"/>, only allows one execution of this command to run at once.
 /// </summary>
-public interface ISynchronizedAsyncCommand : IExecutableCommand
+public interface ISynchronizedCommand : IExecutableCommand
 {
     /// <summary>
     /// Semaphore used to synchronize access to the command.

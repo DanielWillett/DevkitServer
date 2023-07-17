@@ -17,6 +17,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security;
+using Cysharp.Threading.Tasks;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Levels;
 using UnityEngine.SceneManagement;
@@ -143,6 +144,10 @@ public sealed class DevkitServerModule : IModuleNexus
             goto fault;
         try
         {
+            // Initialize UniTask
+            if (!PlayerLoopHelper.HasBeenInitialized)
+                PlayerLoopHelper.Init();
+
             GameObjectHost = new GameObject(ModuleName);
             ComponentHost = GameObjectHost.AddComponent<DevkitServerModuleComponent>();
             GameObjectHost.AddComponent<CachedTime>();
