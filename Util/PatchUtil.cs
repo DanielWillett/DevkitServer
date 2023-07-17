@@ -287,27 +287,6 @@ public static class PatchUtil
     /// <summary>Limits to 60 actions per second.</summary>
     public static void InsertActionRateLimiter(ref int offset, Label beginLabel, IList<CodeInstruction> ins)
     {
-        return;
-        ins.Insert(offset, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
-        ins.Insert(offset + 1, new CodeInstruction(OpCodes.Brfalse_S, beginLabel));
-        ins.Insert(offset + 2, new CodeInstruction(OpCodes.Call, Accessor.GetRealtimeSinceStartup));
-        ins.Insert(offset + 3, new CodeInstruction(OpCodes.Ldsfld, EditorActions.LocalLastActionField));
-        ins.Insert(offset + 4, new CodeInstruction(OpCodes.Sub));
-        ins.Insert(offset + 5, new CodeInstruction(OpCodes.Ldc_R4, 1f / 60f));
-        ins.Insert(offset + 6, new CodeInstruction(OpCodes.Bge_S, beginLabel));
-        ins.Insert(offset + 7, new CodeInstruction(OpCodes.Ret));
-        if (ins.Count > offset + 8)
-        {
-            ins[offset + 8].labels.Add(beginLabel);
-            offset += 8;
-        }
-        else
-        {
-            CodeInstruction rtn = new CodeInstruction(OpCodes.Ret);
-            rtn.labels.Add(beginLabel);
-            ins.Insert(offset + 8, rtn);
-            offset += 9;
-        }
     }
 #endif
     [Pure]

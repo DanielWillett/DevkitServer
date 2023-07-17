@@ -2,7 +2,6 @@
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 using System.IO.Compression;
-using JetBrains.Annotations;
 #if CLIENT
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Patches;

@@ -36,6 +36,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     public EditorActions Actions { get; private set; } = null!;
     public TileSync TileSync { get; private set; } = null!;
     public ObjectSync ObjectSync { get; private set; } = null!;
+    public HierarchySync HierarchySync { get; private set; } = null!;
     public string DisplayName { get; private set; } = null!;
     public SteamPlayer? Player { get; internal set; }
     public IReadOnlyList<AuthoritativeSync> Syncs { get; }
@@ -67,6 +68,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         Actions = EditorObject.GetComponent<EditorActions>();
         TileSync = EditorObject.GetComponent<TileSync>();
         ObjectSync = EditorObject.GetComponent<ObjectSync>();
+        HierarchySync = EditorObject.GetComponent<HierarchySync>();
         IntlSyncs.Add(TileSync);
 #if SERVER
         ClientInfo = DevkitServerGamemode.GetClientInfo(this);

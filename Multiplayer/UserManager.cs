@@ -36,10 +36,10 @@ public static class UserManager
             while (min <= max)
             {
                 int index = min + (max - min) / 2;
-                int comparison = users[index].SteamId.m_SteamID.CompareTo(id);
-                if (comparison == 0)
+                ulong s64 = users[index].SteamId.m_SteamID;
+                if (s64 == id)
                     return users[index];
-                if (comparison < 0)
+                if (s64 < id)
                     min = index + 1;
                 else
                     max = index - 1;

@@ -83,7 +83,7 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
         }
         if (!sync.HasAuthority)
         {
-            Logger.LogError($"Found relay source, but it didn't have authority: {relaySource.Format()}, {sync.Format()}.", method: Source);
+            Logger.LogError($"Found object sync relay source, but it didn't have authority: {relaySource.Format()}, {sync.Format()}.", method: Source);
             return;
         }
 
@@ -121,6 +121,12 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
             Transform? transform = levelObject.GetTransform();
             if (transform == null)
                 return;
+            if (!obj.IsAlive)
+            {
+                Logger.LogDebug($"[{Source}] Deleting invalid object: {levelObject.asset.Format()}.");
+                LevelObjects.registerRemoveObject(transform);
+                return;
+            }
 
             if (!transform.position.IsNearlyEqual(obj.Position) ||
                 !transform.rotation.IsNearlyEqual(obj.Rotation) ||
@@ -130,28 +136,51 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
                 LevelObjects.registerTransformObject(transform, obj.Position, obj.Rotation, obj.Scale, transform.position, transform.rotation, transform.localScale);
             }
 
+            // material overrides, reapply is turned off and done at once at the end if needed.
+#if CLIENT
             bool reapply = false;
+#endif
             if (levelObject.GetCustomMaterialOverride().GUID != obj.MaterialPaletteGuid)
             {
-                LevelObjectUtil.SetCustomMaterialPaletteOverrideLocal(levelObject, new AssetReference<MaterialPaletteAsset>(obj.MaterialPaletteGuid), false);
+                LevelObjectUtil.SetCustomMaterialPaletteOverrideLocal(levelObject, new AssetReference<MaterialPaletteAsset>(obj.MaterialPaletteGuid)
+#if CLIENT
+                    , false
+#endif
+                    );
+#if CLIENT
                 reapply = true;
+#endif
             }
             if (levelObject.GetMaterialIndexOverride() != obj.MaterialIndex)
             {
                 LevelObjectUtil.SetMaterialIndexOverrideLocal(levelObject, obj.MaterialIndex, false);
+#if CLIENT
                 reapply = true;
+#endif
             }
 
+#if CLIENT
             if (reapply)
                 levelObject.ReapplyMaterialOverrides();
+#endif
         }
         else
         {
             Transform? transform = buildable!.transform;
-            
-            if (transform != null && (!transform.position.IsNearlyEqual(obj.Position) ||
-                                      !transform.rotation.IsNearlyEqual(obj.Rotation) ||
-                                      !transform.localScale.IsNearlyEqual(obj.Scale)))
+
+            if (transform == null)
+                return;
+
+            if (!obj.IsAlive)
+            {
+                Logger.LogDebug($"[{Source}] Deleting invalid buildable: {buildable.asset.Format()}.");
+                LevelObjects.registerRemoveObject(transform);
+                return;
+            }
+
+            if (!transform.position.IsNearlyEqual(obj.Position) ||
+                !transform.rotation.IsNearlyEqual(obj.Rotation) ||
+                !transform.localScale.IsNearlyEqual(obj.Scale))
             {
                 Logger.LogDebug($"[{Source}] Transforming invalid buildable: {buildable.asset.Format()}.");
                 LevelObjects.registerTransformObject(transform, obj.Position, obj.Rotation, obj.Scale, transform.position, transform.rotation, transform.localScale);

@@ -219,7 +219,7 @@ public static class LevelObjectNetIdDatabase
     }
 #endif
 #if SERVER
-    public static void AssignExisting()
+    internal static void AssignExisting()
     {
         if (LevelObjects.buildables == null || LevelObjects.objects == null)
             throw new InvalidOperationException("LevelObjects not loaded.");
@@ -297,9 +297,10 @@ public static class LevelObjectNetIdDatabase
         if (Level.isLoaded)
             Logger.LogDebug($"[{Source}] Claimed new NetId: {netId.Format()} @ {transform.name.Format()}.");
     }
-
     public static void GatherData(LevelData data)
     {
+        ThreadUtil.assertIsGameThread();
+
         NetId[] netIds = new NetId[BuildableAssignments.Count + LevelObjectAssignments.Count];
         RegionIdentifier[] buildables = BuildableAssignments.Count == 0 ? Array.Empty<RegionIdentifier>() : new RegionIdentifier[BuildableAssignments.Count];
         uint[] objects = new uint[LevelObjectAssignments.Count];

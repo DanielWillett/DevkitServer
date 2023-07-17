@@ -591,11 +591,11 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         Instance = this;
         Logger.LogDebug("[TEMP EDITOR ACTIONS] Initialized.");
     }
-    public void QueueInstantiation(IHierarchyItemTypeIdentifier type, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner)
+    public void QueueInstantiation(IHierarchyItemTypeIdentifier type, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
     {
         if (type == null) throw new ArgumentNullException(nameof(type));
 
-        _hierarchyInstantiations.Add(new PendingHierarchyInstantiation(type, instanceId, position, rotation, scale, owner));
+        _hierarchyInstantiations.Add(new PendingHierarchyInstantiation(type, position, rotation, scale, owner, netId));
         Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued hierarchy item instantiation for {type.Format()} when the level loads.");
     }
     public void QueueInstantiation(Asset asset, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
@@ -655,8 +655,8 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         for (int i = 0; i < _hierarchyInstantiations.Count; i++)
         {
             PendingHierarchyInstantiation hierarchyItemInstantiation = _hierarchyInstantiations[i];
-            HierarchyUtil.ReceiveHierarchyInstantiation(MessageContext.Nil, hierarchyItemInstantiation.Type, hierarchyItemInstantiation.InstanceId,
-                hierarchyItemInstantiation.Position, hierarchyItemInstantiation.Rotation, hierarchyItemInstantiation.Scale, hierarchyItemInstantiation.Owner);
+            HierarchyUtil.ReceiveHierarchyInstantiation(MessageContext.Nil, hierarchyItemInstantiation.Type, hierarchyItemInstantiation.Position, hierarchyItemInstantiation.Rotation,
+                hierarchyItemInstantiation.Scale, hierarchyItemInstantiation.Owner, hierarchyItemInstantiation.NetId);
         }
 
         EditorActions.HasProcessedPendingHierarchyObjects = true;
@@ -707,15 +707,15 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     private readonly struct PendingHierarchyInstantiation
     {
         public readonly IHierarchyItemTypeIdentifier Type;
-        public readonly uint InstanceId;
+        public readonly NetId NetId;
         public readonly Vector3 Position;
         public readonly Quaternion Rotation;
         public readonly Vector3 Scale;
         public readonly ulong Owner;
-        public PendingHierarchyInstantiation(IHierarchyItemTypeIdentifier type, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner)
+        public PendingHierarchyInstantiation(IHierarchyItemTypeIdentifier type, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
         {
             Type = type;
-            InstanceId = instanceId;
+            NetId = netId;
             Position = position;
             Rotation = rotation;
             Scale = scale;
@@ -725,11 +725,11 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     private readonly struct PendingLevelObjectInstantiation
     {
         public readonly AssetReference<Asset> Asset;
+        public readonly NetId NetId;
         public readonly Vector3 Position;
         public readonly Quaternion Rotation;
         public readonly Vector3 Scale;
         public readonly ulong Owner;
-        public readonly NetId NetId;
         public PendingLevelObjectInstantiation(AssetReference<Asset> assetAsset, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
         {
             Asset = assetAsset;

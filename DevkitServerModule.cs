@@ -30,7 +30,6 @@ using DevkitServer.Players.UI;
 #endif
 #if SERVER
 using DevkitServer.Levels;
-using DevkitServer.Multiplayer.Actions;
 #endif
 
 namespace DevkitServer;
@@ -40,7 +39,6 @@ public sealed class DevkitServerModule : IModuleNexus
     public static readonly string RepositoryUrl = "https://github.com/DanielWillett/DevkitServer"; // don't suffix this with '/'
     private static StaticGetter<Assets>? GetAssetsInstance;
     private static InstanceSetter<AssetOrigin, bool>? SetOverrideIDs;
-    private static StaticGetter<bool>? GetIsShuttingDown;
     public const string ModuleName = "DevkitServer";
     public static readonly string ServerRule = "DevkitServer";
     private static CancellationTokenSource? _tknSrc;
@@ -267,6 +265,7 @@ public sealed class DevkitServerModule : IModuleNexus
             UserTPVControl.Init();
 #endif
             LevelObjectNetIdDatabase.Init();
+            HierarchyItemNetIdDatabase.Init();
 
             PluginLoader.Load();
             CreateDirectoryAttribute.DisposeLoadList();
@@ -332,6 +331,7 @@ public sealed class DevkitServerModule : IModuleNexus
         {
             TileSync.CreateServersideAuthority();
             ObjectSync.CreateServersideAuthority();
+            HierarchySync.CreateServersideAuthority();
         }
         else
         {
@@ -339,6 +339,8 @@ public sealed class DevkitServerModule : IModuleNexus
                 Object.Destroy(tileSync);
             if (GameObjectHost.TryGetComponent(out ObjectSync objectSync))
                 Object.Destroy(objectSync);
+            if (GameObjectHost.TryGetComponent(out HierarchySync hierarchySync))
+                Object.Destroy(hierarchySync);
         }
 
         if (!BitConverter.IsLittleEndian)
@@ -347,17 +349,17 @@ public sealed class DevkitServerModule : IModuleNexus
                               "please report it as I am unable to test with these conditioins.");
         }
 
-        ComponentHost.StartCoroutine(ClearLoggingErrorsIn1Second());
+        ComponentHost.StartCoroutine(ClearLoggingErrorsDelayed());
 #if CLIENT
         EditorLevel.ServerPendingLevelData = null;
         GC.Collect();
 #endif
     }
-    private static IEnumerator<WaitForSeconds> ClearLoggingErrorsIn1Second()
+    private static IEnumerator<WaitForSeconds> ClearLoggingErrorsDelayed()
     {
-        yield return new WaitForSeconds(1);
+        yield return new WaitForSeconds(2);
         Logger.ClearLoadingErrors();
-        Logger.LogDebug($"Load memory usage: {DevkitServerUtility.FormatBytes(GC.GetTotalMemory(true)).Format(false)}");
+        Logger.LogDebug($"DevkitServer managed memory usage: {DevkitServerUtility.FormatBytes(GC.GetTotalMemory(true)).Format(false)}");
     }
     internal void UnloadBundle()
     {
@@ -547,7 +549,9 @@ public sealed class DevkitServerModule : IModuleNexus
 #if SERVER
         DevkitServerUtility.CheckDirectory(false, false, DevkitServerConfig.LevelDirectory, typeof(DevkitServerConfig).GetProperty(nameof(DevkitServerConfig.LevelDirectory), BindingFlags.Public | BindingFlags.Static));
         BackupManager = GameObjectHost.AddComponent<BackupManager>();
+
         LevelObjectNetIdDatabase.AssignExisting();
+        HierarchyItemNetIdDatabase.AssignExisting();
 #endif
         if (IsEditing)
         {
@@ -605,6 +609,7 @@ public sealed class DevkitServerModule : IModuleNexus
         UserTPVControl.Deinit();
 #endif
         LevelObjectNetIdDatabase.Shutdown();
+        HierarchyItemNetIdDatabase.Shutdown();
 
         Instance = null!;
         GameObjectHost = null!;

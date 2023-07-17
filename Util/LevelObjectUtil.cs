@@ -9,7 +9,6 @@ using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players.UI;
 using DevkitServer.Util.Region;
 #if CLIENT
-using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Patches;
 using DevkitServer.Players;
 using System.Reflection;
@@ -153,6 +152,7 @@ public static class LevelObjectUtil
 
                 if (owner == Provider.client.m_SteamID)
                     BuildableResponsibilities.Set(id, true, false);
+                SyncIfAuthority(id);
             }
             catch (Exception ex)
             {
@@ -181,6 +181,8 @@ public static class LevelObjectUtil
 
             if (owner == Provider.client.m_SteamID)
                 LevelObjectResponsibilities.Set(lvlObject.instanceID);
+
+            SyncIfAuthority(lvlObject);
         }
         catch (Exception ex)
         {
@@ -355,20 +357,38 @@ public static class LevelObjectUtil
             CallReapplyMaterialOverridesIntl!(levelObject);
         return true;
     }
-    internal static bool SetCustomMaterialPaletteOverrideLocal(LevelObject levelObject, AssetReference<MaterialPaletteAsset> customMaterialOverride, bool reapply = true)
+    internal static bool SetCustomMaterialPaletteOverrideLocal(LevelObject levelObject, AssetReference<MaterialPaletteAsset> customMaterialOverride
+#if CLIENT
+        , bool reapply = true
+#endif
+        )
     {
         ThreadUtil.assertIsGameThread();
 
-        if (SetCustomMaterialOverrideIntl == null || reapply && !Dedicator.IsDedicatedServer && CallReapplyMaterialOverridesIntl == null)
+        if (SetCustomMaterialOverrideIntl == null
+#if CLIENT
+            || reapply && CallReapplyMaterialOverridesIntl == null
+#endif
+            )
             return false;
         SetCustomMaterialOverrideIntl(levelObject, customMaterialOverride);
-        if (reapply && !Dedicator.IsDedicatedServer)
+#if CLIENT
+        if (reapply)
             CallReapplyMaterialOverridesIntl!(levelObject);
+#endif
         return true;
     }
-    public static bool SetMaterialIndexOverride(this LevelObject levelObject, int materialIndexOverride, bool reapply = true)
+    public static bool SetMaterialIndexOverride(this LevelObject levelObject, int materialIndexOverride
+#if CLIENT
+        , bool reapply = true
+#endif
+        )
     {
-        if (!SetMaterialIndexOverrideLocal(levelObject, materialIndexOverride, reapply))
+        if (!SetMaterialIndexOverrideLocal(levelObject, materialIndexOverride
+#if CLIENT
+                , reapply
+#endif
+            ))
             return false;
 #if CLIENT
         if (DevkitServerModule.IsEditing && LevelObjectNetIdDatabase.TryGetObjectNetId(levelObject, out NetId netId))
@@ -386,9 +406,17 @@ public static class LevelObjectUtil
 #endif
         return true;
     }
-    public static bool SetCustomMaterialPaletteOverride(this LevelObject levelObject, AssetReference<MaterialPaletteAsset> customMaterialPaletteOverride, bool reapply = true)
+    public static bool SetCustomMaterialPaletteOverride(this LevelObject levelObject, AssetReference<MaterialPaletteAsset> customMaterialPaletteOverride
+#if CLIENT
+        , bool reapply = true
+#endif
+        )
     {
-        if (!SetCustomMaterialPaletteOverrideLocal(levelObject, customMaterialPaletteOverride, reapply))
+        if (!SetCustomMaterialPaletteOverrideLocal(levelObject, customMaterialPaletteOverride
+#if CLIENT
+                , reapply
+#endif
+                ))
             return false;
 #if CLIENT
         if (DevkitServerModule.IsEditing && LevelObjectNetIdDatabase.TryGetObjectNetId(levelObject, out NetId netId))
@@ -406,18 +434,17 @@ public static class LevelObjectUtil
 #endif
         return true;
     }
+#if CLIENT
     public static bool ReapplyMaterialOverrides(this LevelObject levelObject)
     {
         ThreadUtil.assertIsGameThread();
-
-        if (!Dedicator.IsDedicatedServer)
-            return true;
 
         if (CallReapplyMaterialOverridesIntl == null)
             return false;
         CallReapplyMaterialOverridesIntl(levelObject);
         return true;
     }
+#endif
     public static bool GetObjectOrBuildableAsset(Guid guid, out ObjectAsset? @object, out ItemAsset? buildable)
     {
         Asset asset = Assets.find(guid);

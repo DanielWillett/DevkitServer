@@ -2,8 +2,8 @@
 using DevkitServer.API.Permissions;
 #elif CLIENT
 #endif
-using DevkitServer.API.Abstractions;
 using DevkitServer.Models;
+using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Util.Encoding;
 using SDG.Framework.Devkit;
 
@@ -23,7 +23,6 @@ public sealed class HierarchyActions
         {
             ClientEvents.OnDeleteHierarchyObjects += OnDeleteHierarchyObjects;
             ClientEvents.OnRequestInstantiateHierarchyObject += OnRequestInstantiateHierarchyObject;
-            ClientEvents.OnMoveHierarchyObjectsPreview += OnMoveHierarchyObjectsPreview;
             ClientEvents.OnMoveHierarchyObjectsFinal += OnMoveHierarchyObjectsFinal;
         }
 #endif
@@ -35,7 +34,6 @@ public sealed class HierarchyActions
         {
             ClientEvents.OnDeleteHierarchyObjects -= OnDeleteHierarchyObjects;
             ClientEvents.OnRequestInstantiateHierarchyObject -= OnRequestInstantiateHierarchyObject;
-            ClientEvents.OnMoveHierarchyObjectsPreview -= OnMoveHierarchyObjectsPreview;
             ClientEvents.OnMoveHierarchyObjectsFinal -= OnMoveHierarchyObjectsFinal;
         }
 #endif
@@ -46,411 +44,166 @@ public sealed class HierarchyActions
         EditorActions.QueueAction(new DeleteHierarchyItemsAction
         {
             DeltaTime = properties.DeltaTime,
-            InstanceIds = properties.InstanceIds
+            NetIds = properties.NetIds
         });
     }
     private static void OnRequestInstantiateHierarchyObject(in InstantiateHierarchyObjectProperties properties)
     {
         HierarchyUtil.RequestInstantiation(properties.Type, properties.Position, Quaternion.identity, Vector3.one);
     }
-    private void OnMoveHierarchyObjectsPreview(in MoveHierarchyObjectsPreviewProperties properties)
-    {
-        const int samples = 4;
-        if (DevkitServerModuleComponent.Ticks % samples != 0)
-            return;
-
-        EditorActions.QueueAction(new MovingHierarchyItemsAction
-        {
-            DeltaTime = properties.DeltaTime * samples,
-            InstanceIds = properties.InstanceIds,
-            TransformDeltas = properties.Transformations,
-            Pivot = properties.PivotPoint
-        });
-    }
     private void OnMoveHierarchyObjectsFinal(in MoveHierarchyObjectsFinalProperties properties)
     {
         MovedHierarchyObjectsAction action = new MovedHierarchyObjectsAction
         {
             DeltaTime = properties.DeltaTime,
-            InstanceIds = properties.InstanceIds,
-            TransformDeltas = properties.Transformations
+            Transformations = properties.Transformations,
+            UseScale = properties.UseScale
         };
-        if (properties.Scales != null && properties.OriginalScales != null)
-        {
-            action.UseScale = true;
-            action.Scales = properties.Scales;
-            action.OriginalScales = properties.OriginalScales;
-        }
         EditorActions.QueueAction(action);
     }
 #endif
 }
 
-
-[Action(ActionType.HierarchyItemsTransforming, 65 + TransformationDelta.Capacity * 8, 4)]
-[EarlyTypeInit]
-public sealed class MovingHierarchyItemsAction : IAction
-{
-    public ActionType Type => ActionType.HierarchyItemsTransforming;
-    public CSteamID Instigator { get; set; }
-    public float DeltaTime { get; set; }
-    public uint[] InstanceIds { get; set; } = Array.Empty<uint>();
-    public TransformationDelta[] TransformDeltas { get; set; } = Array.Empty<TransformationDelta>();
-    public Vector3 Pivot { get; set; }
-    public void Apply()
-    {
-        if (InstanceIds is not { Length: > 0 } || TransformDeltas is not { Length: > 0 })
-            return;
-        int len = Math.Min(InstanceIds.Length, TransformDeltas.Length);
-        Vector3 pivot = default;
-        for (int i = 0; i < len; ++i)
-        {
-            ref TransformationDelta t = ref TransformDeltas[i];
-            TransformationDelta.TransformFlags flags = t.Flags;
-            IDevkitHierarchyItem? item =
-#if SERVER
-                i == 0 ? _item : 
-#endif
-                null;
-            item ??= HierarchyUtil.FindItem(InstanceIds[i]);
-            if (item is not Component comp)
-                continue;
-            if (i == 0 && InstanceIds.Length == 1)
-                pivot = comp.transform.position;
-            else if (i == 1)
-                pivot = Pivot;
-            Vector3 newPos;
-            bool modifyRotation = (flags & TransformationDelta.TransformFlags.Rotation) != 0;
-            if (modifyRotation)
-            {
-                newPos = t.OriginalPosition - pivot;
-                newPos = newPos.IsNearlyZero() ? t.OriginalPosition + t.Position : pivot + t.Rotation * newPos + t.Position;
-            }
-            else newPos = t.OriginalPosition + t.Position;
-
-            Quaternion newRot = t.Rotation * t.OriginalRotation;
-
-            if (comp.gameObject.TryGetComponent(out ITransformedHandler handler))
-            {
-                handler.OnTransformed(
-                    (flags & TransformationDelta.TransformFlags.OriginalPosition) != 0 ? t.OriginalPosition : comp.gameObject.transform.position,
-                    (flags & TransformationDelta.TransformFlags.OriginalRotation) != 0 ? t.OriginalRotation : comp.gameObject.transform.rotation,
-                    Vector3.zero,
-                    newPos,
-                    newRot,
-                    Vector3.zero,
-                    modifyRotation,
-                    false
-                );
-            }
-            else
-            {
-                bool eq = newPos.IsNearlyEqual(comp.transform.position);
-                if (!eq && modifyRotation)
-                    comp.transform.SetPositionAndRotation(newPos, newRot);
-                else if (!eq)
-                    comp.transform.position = newPos;
-                else if (modifyRotation)
-                    comp.transform.rotation = newRot;
-            }
-        }
-    }
-#if SERVER
-    private IDevkitHierarchyItem? _item;
-    public bool CheckCanApply()
-    {
-        if (Permission.SuperuserPermission.Has(Instigator.m_SteamID, false))
-            return true;
-        if (InstanceIds.Length < 1) return false;
-        _item = HierarchyUtil.FindItem(InstanceIds[0]);
-        return _item != null && HierarchyUtil.CheckMovePermission(_item, Instigator.m_SteamID);
-    }
-#endif
-    public void Write(ByteWriter writer)
-    {
-        writer.Write(DeltaTime);
-        byte flag = (byte)((InstanceIds.Length > ushort.MaxValue ? 2 : 0) | (InstanceIds.Length > byte.MaxValue ? 1 : 0));
-        writer.Write(flag);
-        if (InstanceIds.Length < 1)
-        {
-            writer.Write((byte)0);
-            return;
-        }
-        writer.Write(Pivot);
-        if ((flag & 2) != 0)
-            writer.Write(InstanceIds.Length);
-        else if ((flag & 1) != 0)
-            writer.Write((ushort)InstanceIds.Length);
-        else
-            writer.Write((byte)InstanceIds.Length);
-        for (int i = 0; i < InstanceIds.Length; ++i)
-            writer.Write(InstanceIds[i]);
-        ref TransformationDelta t = ref TransformDeltas[0];
-        TransformationDelta.TransformFlags flags = t.Flags;
-        t.Write(writer);
-        for (int i = 1; i < TransformDeltas.Length; ++i)
-        {
-            t = ref TransformDeltas[i];
-            t.WritePartial(writer, flags);
-        }
-    }
-    public void Read(ByteReader reader)
-    {
-        DeltaTime = reader.ReadFloat();
-        byte flag = reader.ReadUInt8();
-        int len;
-        if ((flag & 2) != 0)
-            len = reader.ReadInt32();
-        else if ((flag & 1) != 0)
-            len = reader.ReadUInt16();
-        else
-            len = reader.ReadUInt8();
-        if (len > 0)
-        {
-            Pivot = reader.ReadVector3();
-            if (InstanceIds == null || InstanceIds.Length != len)
-                InstanceIds = new uint[len];
-            if (TransformDeltas == null || TransformDeltas.Length != len)
-                TransformDeltas = new TransformationDelta[len];
-            for (int i = 0; i < len; ++i)
-                InstanceIds[i] = reader.ReadUInt32();
-            ref TransformationDelta t = ref TransformDeltas[0];
-            t = new TransformationDelta(reader);
-            TransformationDelta.TransformFlags flags = t.Flags;
-            Vector3 pos = t.Position;
-            Quaternion rot = t.Rotation;
-            for (int i = 1; i < TransformDeltas.Length; ++i)
-            {
-                t = ref TransformDeltas[i];
-                t = new TransformationDelta(reader, flags, pos, rot);
-            }
-        }
-        else
-        {
-            Pivot = Vector3.zero;
-            InstanceIds = Array.Empty<uint>();
-            TransformDeltas = Array.Empty<TransformationDelta>();
-        }
-    }
-    public int CalculateSize()
-    {
-        int size = 4 + 1;
-        if (InstanceIds.Length < 1)
-            return size + 1;
-        size += 12;
-        if (InstanceIds.Length > ushort.MaxValue)
-            size += 4;
-        else if (InstanceIds.Length > byte.MaxValue)
-            size += 2;
-        else ++size;
-        size += InstanceIds.Length * 4;
-        ref TransformationDelta t = ref TransformDeltas[0];
-        size += t.CalculateSize();
-        TransformationDelta.TransformFlags flags = t.Flags;
-        size += TransformationDelta.CalculatePartialSize(flags) * (TransformDeltas.Length - 1);
-        return size;
-    }
-}
-[Action(ActionType.HierarchyItemsTransform, 65 + TransformationDelta.Capacity * 16 + sizeof(float) * 3 * 16 * 2, 0)]
+[Action(ActionType.MoveHierarchyItems, FinalTransformation.Capacity * 32 + 7, 0)]
 [EarlyTypeInit]
 public sealed class MovedHierarchyObjectsAction : IAction
 {
-    public ActionType Type => ActionType.HierarchyItemsTransform;
+    public ActionType Type => ActionType.MoveHierarchyItems;
     public CSteamID Instigator { get; set; }
     public float DeltaTime { get; set; }
-    public uint[] InstanceIds { get; set; } = Array.Empty<uint>();
-    public TransformationDelta[] TransformDeltas { get; set; } = Array.Empty<TransformationDelta>();
-    public Vector3[] Scales { get; set; } = Array.Empty<Vector3>();
-    public Vector3[] OriginalScales { get; set; } = Array.Empty<Vector3>();
+    public FinalTransformation[] Transformations { get; set; } = Array.Empty<FinalTransformation>();
     public bool UseScale { get; set; }
 
     public void Apply()
     {
-        if (InstanceIds == null)
+        if (Transformations == null)
             return;
-        for (int i = 0; i < InstanceIds.Length; ++i)
+        FinalTransformation[] transformations = Transformations;
+        for (int i = 0; i < transformations.Length; ++i)
         {
-            IDevkitHierarchyItem? item =
-#if SERVER
-                i == 0 ? _item : 
-#endif
-                null;
-            item ??= HierarchyUtil.FindItem(InstanceIds[i]);
-            if (item is not Component comp)
-                continue;
-#if SERVER
-            if (i != 0 && !HierarchyUtil.CheckMovePermission(item, Instigator.m_SteamID))
-            {
-                Logger.LogWarning($"No permission hierarchy transformation slipped by: {item.Format()}.", method: "EDITOR ACTIONS");
-                continue;
-            }
-#endif
-            ref TransformationDelta t = ref TransformDeltas[i];
-            TransformationDelta.TransformFlags flags = t.Flags;
-            bool modifyRotation = (flags & TransformationDelta.TransformFlags.Rotation) != 0;
+            ref FinalTransformation transformation = ref transformations[i];
 
-            if (comp.gameObject.TryGetComponent(out ITransformedHandler handler))
+            if (!HierarchyItemNetIdDatabase.TryGetHierarchyItem(transformation.NetId, out IDevkitHierarchyItem item))
             {
-                handler.OnTransformed(
-                    (flags & TransformationDelta.TransformFlags.OriginalPosition) != 0 ? t.OriginalPosition : comp.gameObject.transform.position,
-                    (flags & TransformationDelta.TransformFlags.OriginalRotation) != 0 ? t.OriginalRotation : comp.gameObject.transform.rotation,
-                    UseScale ? OriginalScales[i] : Vector3.zero,
-                    t.Position,
-                    t.Rotation,
-                    UseScale ? Scales[i] : Vector3.zero,
-                    modifyRotation,
-                    UseScale
-                );
+                Logger.LogWarning($"Unknown hierarchy item: {transformation.NetId.Format()}.");
+                continue;
             }
-            else
-            {
-                if (modifyRotation)
-                    comp.transform.SetPositionAndRotation(t.Position, t.Rotation);
-                else
-                    comp.transform.position = t.Position;
-                if (UseScale)
-                    comp.transform.localScale = Scales[i];
-            }
+
+            HierarchyUtil.LocalTranslate(item, in transformation, UseScale);
+            HierarchyUtil.SyncIfAuthority(item);
         }
     }
 #if SERVER
-    private IDevkitHierarchyItem? _item;
     public bool CheckCanApply()
     {
         if (Permission.SuperuserPermission.Has(Instigator.m_SteamID, false))
             return true;
-        if (InstanceIds.Length < 1) return false;
-        _item = HierarchyUtil.FindItem(InstanceIds[0]);
-        return _item != null && HierarchyUtil.CheckMovePermission(_item, Instigator.m_SteamID);
+        for (int i = 0; i < Transformations.Length; ++i)
+        {
+            ref FinalTransformation transformation = ref Transformations[i];
+            if (!HierarchyItemNetIdDatabase.TryGetHierarchyItem(transformation.NetId, out IDevkitHierarchyItem item))
+                continue;
+            if (!HierarchyUtil.CheckMovePermission(item, Instigator.m_SteamID))
+                return false;
+        }
+
+        return true;
     }
 #endif
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
-        int wrtLen = Math.Min(InstanceIds.Length, TransformDeltas.Length);
-        if (UseScale)
-            wrtLen = Math.Min(wrtLen, Math.Min(Scales.Length, OriginalScales.Length));
-        byte flag = (byte)((UseScale ? 4 : 0) | (wrtLen > ushort.MaxValue ? 2 : 0) | (wrtLen > byte.MaxValue ? 1 : 0));
-        writer.Write(flag);
-        
-        if ((flag & 2) != 0)
-            writer.Write(wrtLen);
-        else if ((flag & 1) != 0)
-            writer.Write((ushort)wrtLen);
-        else
-            writer.Write((byte)wrtLen);
 
-        for (int i = 0; i < wrtLen; ++i)
+        byte flag = (byte)(UseScale ? 1 : 0);
+        writer.Write(flag);
+
+        int len = Math.Min(byte.MaxValue, Transformations.Length);
+        writer.Write((byte)len);
+
+        for (int i = 0; i < len; ++i)
         {
-            writer.Write(InstanceIds[i]);
-            ref TransformationDelta t = ref TransformDeltas[i];
-            t.Write(writer);
-            if (UseScale)
-            {
-                writer.Write(Scales[i]);
-                writer.Write(OriginalScales[i]);
-            }
+            ref FinalTransformation transformation = ref Transformations[i];
+            transformation.Write(writer, UseScale, false);
         }
     }
     public void Read(ByteReader reader)
     {
         DeltaTime = reader.ReadFloat();
-        byte flag = reader.ReadUInt8();
-        UseScale = (flag & 4) != 0;
-        int len;
-        if ((flag & 2) != 0)
-            len = reader.ReadInt32();
-        else if ((flag & 1) != 0)
-            len = reader.ReadUInt16();
-        else
-            len = reader.ReadUInt8();
-        InstanceIds = len == 0 ? Array.Empty<uint>() : new uint[len];
-        TransformDeltas = len == 0 ? Array.Empty<TransformationDelta>() : new TransformationDelta[len];
-        if (UseScale)
-        {
-            Scales = len == 0 ? Array.Empty<Vector3>() : new Vector3[len];
-            OriginalScales = len == 0 ? Array.Empty<Vector3>() : new Vector3[len];
-        }
+
+        UseScale = (reader.ReadUInt8() & 1) != 0;
+
+        int len = reader.ReadUInt8();
+        Transformations = new FinalTransformation[len];
+
         for (int i = 0; i < len; ++i)
         {
-            InstanceIds[i] = reader.ReadUInt32();
-            TransformDeltas[i] = new TransformationDelta(reader);
-            if (UseScale)
-            {
-                Scales[i] = reader.ReadVector3();
-                OriginalScales[i] = reader.ReadVector3();
-            }
+            ref FinalTransformation transformation = ref Transformations[i];
+            transformation = new FinalTransformation(reader, UseScale, false);
         }
     }
     public int CalculateSize()
     {
-        int size = 4 + 1;
-        if (InstanceIds.Length < 1)
-            return size + 1;
-        size += 12;
-        if (InstanceIds.Length > ushort.MaxValue)
-            size += 4;
-        else if (InstanceIds.Length > byte.MaxValue)
-            size += 2;
-        else ++size;
-        size += InstanceIds.Length * 4;
-        ref TransformationDelta t = ref TransformDeltas[0];
-        size += t.CalculateSize();
-        TransformationDelta.TransformFlags flags = t.Flags;
-        size += TransformationDelta.CalculatePartialSize(flags) * (TransformDeltas.Length - 1);
-        if (UseScale)
-            size += 24 * InstanceIds.Length;
+        int size = 6;
+        int objectCount = Math.Min(byte.MaxValue, Transformations.Length);
+        for (int i = 0; i < objectCount; ++i)
+            size += Transformations[i].CalculateSize(UseScale);
         return size;
     }
 }
-[Action(ActionType.HierarchyItemsDelete, 68, 0)]
+[Action(ActionType.DeleteHierarchyItems, 68, 0)]
 [EarlyTypeInit]
 public sealed class DeleteHierarchyItemsAction : IAction
 {
-    public ActionType Type => ActionType.HierarchyItemsDelete;
+    public ActionType Type => ActionType.DeleteHierarchyItems;
     public CSteamID Instigator { get; set; }
     public float DeltaTime { get; set; }
-    public uint[] InstanceIds { get; set; } = Array.Empty<uint>();
+    public NetId[] NetIds { get; set; } = Array.Empty<NetId>();
 
     public void Apply()
     {
-        if (InstanceIds == null)
+        if (NetIds == null)
             return;
 
-        for (int i = 0; i < InstanceIds.Length; ++i)
+        for (int i = 0; i < NetIds.Length; ++i)
         {
-            IDevkitHierarchyItem? item = HierarchyUtil.FindItem(InstanceIds[i]);
-            if (item != null && item is Component comp)
-                Object.Destroy(comp.gameObject);
+            if (!HierarchyItemNetIdDatabase.TryGetHierarchyItem(NetIds[i], out IDevkitHierarchyItem item) || item == null)
+                continue;
+
+            HierarchyUtil.LocalRemoveItem(item);
+            HierarchyUtil.SyncIfAuthority(item);
         }
     }
 #if SERVER
-    private IDevkitHierarchyItem? _item;
     public bool CheckCanApply()
     {
         if (Permission.SuperuserPermission.Has(Instigator.m_SteamID, false))
             return true;
-        if (InstanceIds.Length < 1) return false;
-        _item = HierarchyUtil.FindItem(InstanceIds[0]);
-        return _item != null && HierarchyUtil.CheckMovePermission(_item, Instigator.m_SteamID);
+        for (int i = 0; i < NetIds.Length; ++i)
+        {
+            if (!HierarchyItemNetIdDatabase.TryGetHierarchyItem(NetIds[i], out IDevkitHierarchyItem item))
+                continue;
+            if (!HierarchyUtil.CheckDeletePermission(item, Instigator.m_SteamID))
+                return false;
+        }
+        return true;
     }
 #endif
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
-        int len = InstanceIds.Length;
+        int len = NetIds.Length;
         writer.Write(len);
         for (int i = 0; i < len; ++i)
-            writer.Write(InstanceIds[i]);
+            writer.Write(NetIds[i]);
     }
     public void Read(ByteReader reader)
     {
         DeltaTime = reader.ReadFloat();
         int len = reader.ReadInt32();
-        if (InstanceIds == null || InstanceIds.Length != len)
-            InstanceIds = new uint[len];
+        if (NetIds == null || NetIds.Length != len)
+            NetIds = new NetId[len];
         for (int i = 0; i < len; ++i)
-            InstanceIds[i] = reader.ReadUInt32();
+            NetIds[i] = new NetId(reader.ReadUInt32());
     }
-    public int CalculateSize() => 8 + InstanceIds.Length * 4;
+    public int CalculateSize() => 8 + NetIds.Length * 4;
 }

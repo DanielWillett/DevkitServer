@@ -11,12 +11,12 @@ public class HighSpeedConnection : ITransportConnection
 {
 #if CLIENT
     public static HighSpeedConnection? Instance => _instance;
+    private static HighSpeedConnection? _instance;
 #endif
     private readonly byte[] _buffer = new byte[HighSpeedNetFactory.BufferSize];
     private readonly NetworkBuffer _netBuffer;
     public event NetworkBufferProgressUpdate? BufferProgressUpdated;
     private bool _disposed;
-    private static HighSpeedConnection? _instance;
     public bool Verified { get; internal set; }
     public Guid SteamToken { get; internal set; }
     public TcpClient Client { get; }

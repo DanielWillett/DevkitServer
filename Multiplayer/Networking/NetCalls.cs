@@ -34,5 +34,7 @@ internal enum NetCalls : ushort
     RequestInitialState = 31,
     SendBuildableResponsibilities = 33,
     SendBindObject = 34,
-    SendObjectSyncData = 35
+    SendObjectSyncData = 35,
+    SendBindHierarchyItem = 36,
+    SendHierarchySyncData = 37,
 }

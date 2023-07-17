@@ -278,7 +278,7 @@ public class MoveLevelObjectsFinalAction : IAction
         int size = 5;
         int objectCount = Math.Min(byte.MaxValue, Transformations.Length);
         for (int i = 0; i < objectCount; ++i)
-            size += Transformations[i].CalculateSize(false);
+            size += Transformations[i].CalculateSize(UseScale);
         return size;
     }
 }

@@ -6,7 +6,14 @@ using SDG.Framework.Utilities;
 namespace DevkitServer.Util;
 public static class DevkitServerGLUtility
 {
-    public static event GLRenderHandler? OnRenderAny;
+    private static readonly CachedMulticastEvent<GLRenderHandler> EventOnRenderAny = new CachedMulticastEvent<GLRenderHandler>(typeof(DevkitServerGLUtility), nameof(OnRenderAny));
+
+    public static event GLRenderHandler OnRenderAny
+    {
+        add => EventOnRenderAny.Add(value);
+        remove => EventOnRenderAny.Remove(value);
+    }
+
     internal static void Init()
     {
         GLRenderer.render += OnRender;
@@ -20,7 +27,7 @@ public static class DevkitServerGLUtility
     private static void OnRender()
     {
         if (DevkitServerModule.IsEditing)
-            OnRenderAny?.Invoke();
+            EventOnRenderAny.TryInvoke();
     }
     public static void DrawTerrainBounds(LandscapeCoord tile, int xMin, int xMax, int yMin, int yMax, bool splatmap, Color? constColor = null)
     {

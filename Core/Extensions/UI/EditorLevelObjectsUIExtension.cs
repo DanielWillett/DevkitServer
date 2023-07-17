@@ -19,21 +19,20 @@ internal class EditorLevelObjectsUIExtension : UIExtension
     [ExistingUIMember("assetsScrollBox")]
     private readonly SleekList<Asset> _assetsScrollBox;
 
-    private readonly ISleekBox _displayBox;
     private readonly ISleekBox _displayTitle;
     private readonly ISleekImage _preview;
     internal EditorLevelObjectsUIExtension()
     {
         if (DevkitServerConfig.Config.EnableObjectUIExtension)
         {
-            _displayBox = Glazier.Get().CreateBox();
-            _displayBox.positionScale_X = 1f;
-            _displayBox.positionScale_Y = 1f;
-            _displayBox.positionOffset_X = _assetsScrollBox.positionOffset_X - (Size + 30);
-            _displayBox.positionOffset_Y = -Size - 20;
-            _displayBox.sizeOffset_X = Size + 20;
-            _displayBox.sizeOffset_Y = Size + 20;
-            _container.AddChild(_displayBox);
+            ISleekBox displayBox = Glazier.Get().CreateBox();
+            displayBox.positionScale_X = 1f;
+            displayBox.positionScale_Y = 1f;
+            displayBox.positionOffset_X = _assetsScrollBox.positionOffset_X - (Size + 30);
+            displayBox.positionOffset_Y = -Size - 20;
+            displayBox.sizeOffset_X = Size + 20;
+            displayBox.sizeOffset_Y = Size + 20;
+            _container.AddChild(displayBox);
 
             _displayTitle = Glazier.Get().CreateBox();
             _displayTitle.positionScale_X = 1f;
@@ -57,7 +56,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
 
             UpdateSelectedObject();
 
-            _displayBox.AddChild(_preview);
+            displayBox.AddChild(_preview);
 
             if (!_patched)
                 Patch();
@@ -144,6 +143,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
 
         MethodInfo method = new Action<bool>(OnUpdatedElement).Method;
         PatchesMain.Patcher.Patch(target, finalizer: new HarmonyMethod(method));
+        _patched = true;
     }
     private static void OnUpdatedElement(bool __runOriginal)
     {

@@ -3,6 +3,7 @@ using DevkitServer.API.Permissions;
 using DevkitServer.Commands.Subsystem;
 using DevkitServer.Configuration;
 using System.Reflection;
+using DevkitServer.API.Abstractions;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Patches;
 using DevkitServer.Players.UI;
@@ -76,6 +77,9 @@ public static class PluginLoader
     /// All loaded assemblies and their plugins and patching info.
     /// </summary>
     public static IReadOnlyList<PluginAssembly> Assemblies { get; } = AssembliesIntl.AsReadOnly();
+
+    public static bool IsLoaded(IDevkitServerPlugin plugin) => PluginsIntl.Contains(plugin);
+
     private static void AssertPluginValid(IDevkitServerPlugin plugin)
     {
         if (string.IsNullOrWhiteSpace(plugin.DataDirectory) || !Uri.TryCreate(plugin.DataDirectory, UriKind.Absolute, out Uri uri) || !uri.IsFile)
@@ -420,6 +424,21 @@ public static class PluginLoader
         }
     }
 
+    public static IDevkitServerPlugin? FindPluginForAssembly(Assembly assembly)
+    {
+        // check if the assembly just has one plugin
+        if (assembly == Accessor.DevkitServer) return null;
+        for (int i = 0; i < AssembliesIntl.Count; ++i)
+        {
+            if (AssembliesIntl[i].Assembly == assembly)
+            {
+                if (AssembliesIntl[i].Plugins.Count == 1)
+                    return AssembliesIntl[i].Plugins[0];
+                break;
+            }
+        }
+        return null;
+    }
     public static IDevkitServerPlugin? FindPluginForMember(MemberInfo member)
     {
         Type? relaventType = member as Type ?? member.DeclaringType;
@@ -522,6 +541,7 @@ public class PluginAssembly
     private readonly List<IDevkitServerPlugin> _plugins = new List<IDevkitServerPlugin>();
     private readonly List<NetInvokerInfo> _netCalls = new List<NetInvokerInfo>();
     private readonly List<NetMethodInfo> _netMethods = new List<NetMethodInfo>();
+    private readonly List<HierarchyItemTypeIdentifierFactoryInfo> _hierarchyItemFactories = new List<HierarchyItemTypeIdentifierFactoryInfo>();
     public IReadOnlyList<IDevkitServerPlugin> Plugins { get; }
     public Assembly Assembly { get; }
     public Harmony Patcher { get; internal set; }
@@ -530,12 +550,14 @@ public class PluginAssembly
     public string HarmonyId => Patcher.Id;
     public IReadOnlyList<NetInvokerInfo> NetCalls { get; }
     public IReadOnlyList<NetMethodInfo> NetMethods { get; }
+    public IReadOnlyList<HierarchyItemTypeIdentifierFactoryInfo> HierarchyItemFactories { get; }
     public PluginAssembly(Assembly assembly)
     {
         Assembly = assembly;
         Plugins = _plugins.AsReadOnly();
         NetCalls = _netCalls.AsReadOnly();
         NetMethods = _netMethods.AsReadOnly();
+        HierarchyItemFactories = _hierarchyItemFactories.AsReadOnly();
         Patcher = new Harmony(PatchesMain.HarmonyId + ".assembly." + assembly.GetName().Name.ToLowerInvariant());
     }
     internal void AddPlugin(IDevkitServerPlugin plugin)
@@ -567,6 +589,7 @@ public class PluginAssembly
 #endif
                 , _netMethods, _netCalls
             );
+            HierarchyItemTypeIdentifierEx.RegisterFromAssembly(Assembly, _hierarchyItemFactories);
         }
         if (!HasPatched)
         {
@@ -598,6 +621,16 @@ public class PluginAssembly
     internal void Unpatch()
     {
         ThreadUtil.assertIsGameThread();
+
+        if (HasReflected)
+        {
+            HasReflected = false;
+
+            for (int i = 0; i < _hierarchyItemFactories.Count; i++)
+                HierarchyItemTypeIdentifierEx.TryRemoveFactory(_hierarchyItemFactories[i].Type);
+
+            _hierarchyItemFactories.Clear();
+        }
 
         if (!HasPatched) return;
         HasPatched = false;

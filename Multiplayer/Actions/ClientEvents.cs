@@ -72,8 +72,6 @@ public static class ClientEvents
     public static event RemoveResourceSpawnpointFoliage? OnRemoveResourceSpawnpointFoliage;
     public static event RemoveLevelObjectFoliage? OnRemoveLevelObjectFoliage;
     public static event UpdateLandscapeTile? OnUpdateTileSplatmapLayers;
-    public static event MoveHierarchyObjectPreview? OnMoveHierarchyObjectPreview;
-    public static event MoveHierarchyObjectsPreview? OnMoveHierarchyObjectsPreview;
     public static event MoveHierarchyObjectFinal? OnMoveHierarchyObjectFinal;
     public static event MoveHierarchyObjectsFinal? OnMoveHierarchyObjectsFinal;
     public static event DeleteHierarchyObject? OnDeleteHierarchyObject;
@@ -111,8 +109,6 @@ public static class ClientEvents
     public static bool ListeningOnRemoveResourceSpawnpointFoliage => OnRemoveResourceSpawnpointFoliage != null;
     public static bool ListeningOnRemoveLevelObjectFoliage => OnRemoveLevelObjectFoliage != null;
     public static bool ListeningOnUpdateTileSplatmapLayers => OnUpdateTileSplatmapLayers != null;
-    public static bool ListeningOnMoveHierarchyObjectPreview => OnMoveHierarchyObjectPreview != null;
-    public static bool ListeningOnMoveHierarchyObjectsPreview => OnMoveHierarchyObjectsPreview != null;
     public static bool ListeningOnMoveHierarchyObjectFinal => OnMoveHierarchyObjectFinal != null;
     public static bool ListeningOnMoveHierarchyObjectsFinal => OnMoveHierarchyObjectsFinal != null;
     public static bool ListeningOnDeleteHierarchyObject => OnDeleteHierarchyObject != null;
@@ -139,8 +135,6 @@ public static class ClientEvents
     internal static void InvokeOnRemoveResourceSpawnpointFoliage(in RemoveResourceSpawnpointFoliageProperties properties) => OnRemoveResourceSpawnpointFoliage?.Invoke(in properties);
     internal static void InvokeOnRemoveLevelObjectFoliage(in RemoveLevelObjectFoliageProperties properties) => OnRemoveLevelObjectFoliage?.Invoke(in properties);
     internal static void InvokeOnUpdateTileSplatmapLayers(in UpdateLandscapeTileProperties properties) => OnUpdateTileSplatmapLayers?.Invoke(in properties);
-    internal static void InvokeOnMoveHierarchyObjectPreview(in MoveHierarchyObjectPreviewProperties properties) => OnMoveHierarchyObjectPreview?.Invoke(in properties);
-    internal static void InvokeOnMoveHierarchyObjectsPreview(in MoveHierarchyObjectsPreviewProperties properties) => OnMoveHierarchyObjectsPreview?.Invoke(in properties);
     internal static void InvokeOnMoveHierarchyObjectFinal(in MoveHierarchyObjectFinalProperties properties) => OnMoveHierarchyObjectFinal?.Invoke(in properties);
     internal static void InvokeOnMoveHierarchyObjectsFinal(in MoveHierarchyObjectsFinalProperties properties) => OnMoveHierarchyObjectsFinal?.Invoke(in properties);
     internal static void InvokeOnDeleteHierarchyObject(in DeleteHierarchyObjectProperties properties) => OnDeleteHierarchyObject?.Invoke(in properties);

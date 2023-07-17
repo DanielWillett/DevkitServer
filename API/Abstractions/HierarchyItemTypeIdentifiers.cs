@@ -5,13 +5,180 @@ using SDG.Framework.Foliage;
 using SDG.Framework.Landscapes;
 using SDG.Framework.Water;
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using DevkitServer.Plugins;
 
 namespace DevkitServer.API.Abstractions;
 public static class HierarchyItemTypeIdentifierEx
 {
+    private const string Source = "HIERARCHY ITEM IDENTIFIERS";
     private const ushort DataVersion = 0;
     private const int MaxType = 5;
+    private static readonly List<HierarchyItemTypeIdentifierFactoryInfo> Factories = new List<HierarchyItemTypeIdentifierFactoryInfo>();
+    private static bool _anyInFactory;
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static bool TryAddFactory(IHierarchyItemTypeIdentifierFactory factory)
+    {
+        Type type = factory.GetType();
+        IDevkitServerPlugin? pluginSource = PluginLoader.FindPluginForMember(type);
+        if (pluginSource == null)
+        {
+            Assembly caller = Assembly.GetCallingAssembly();
+            pluginSource = PluginLoader.FindPluginForAssembly(caller);
+            if (pluginSource == null)
+            {
+                Logger.LogError("Unable to link " + type.Format() + " to a plugin. Use the " + typeof(PluginIdentifierAttribute).Format() +
+                                 " to link a hierarchy item identifier factory to a plugin when multiple plugins are loaded from an assembly.", method: Source);
+                return false;
+            }
+        }
+
+        HierarchyItemTypeIdentifierFactoryInfo info = new HierarchyItemTypeIdentifierFactoryInfo(factory, type, pluginSource);
+        AddFactory(info);
+        return true;
+    }
+    internal static void AddFactory(HierarchyItemTypeIdentifierFactoryInfo factoryInfo)
+    {
+        lock (Factories)
+        {
+            Type type = factoryInfo.Type;
+            HierarchyItemTypeIdentifierFactoryInfo? removed = null;
+            for (int i = Factories.Count - 1; i >= 0; --i)
+            {
+                HierarchyItemTypeIdentifierFactoryInfo factory2 = Factories[i];
+                if (!type.IsAssignableFrom(factory2.Type))
+                    continue;
+
+                if (factory2.Factory is IDisposable disp)
+                    disp.Dispose();
+                Factories[i] = factoryInfo;
+                removed = factory2;
+                break;
+            }
+            if (removed == null)
+            {
+                Factories.Add(factoryInfo);
+                _anyInFactory = true;
+            }
+
+            IDevkitServerPlugin? pluginSource = PluginLoader.FindPluginForMember(type);
+
+            if (pluginSource != null)
+                pluginSource.LogInfo($"Registered hierarchy item identifier factory: {type.Format()}.");
+            else if (type.Assembly == Accessor.DevkitServer)
+                Logger.LogInfo($"Registered hierarchy item identifier factory: {type.Format()}.");
+            else
+                Logger.LogInfo($"Registered hierarchy item identifier factory: {type.Format()} from {type.Assembly}.");
+
+            if (removed.HasValue)
+            {
+                Type removedType = removed.Value.Type;
+                if (removed.Value.Plugin != null)
+                    removed.Value.Plugin.LogDebug($" + Deregistered duplicate hierarchy item identifier factory: {removedType.Format()}.");
+                else if (removedType.Assembly == Accessor.DevkitServer)
+                    Logger.LogDebug($" + Deregistered duplicate hierarchy item identifier factory: {removedType.Format()}.");
+                else
+                    Logger.LogDebug($" + Deregistered duplicate hierarchy item identifier factory: {removedType.Format()} from {removedType.Assembly.Format()}.");
+            }
+        }
+    }
+    public static int TryRemoveFactory(Type type)
+    {
+        int c = 0;
+        lock (Factories)
+        {
+            for (int i = Factories.Count - 1; i >= 0; --i)
+            {
+                HierarchyItemTypeIdentifierFactoryInfo info = Factories[i];
+                if (!type.IsAssignableFrom(info.Type))
+                    continue;
+                if (info.Factory is IDisposable disp)
+                    disp.Dispose();
+                Factories.RemoveAt(i);
+                _anyInFactory = Factories.Count > 0;
+                ++c;
+
+                Type removedType = info.Type;
+                if (info.Plugin != null)
+                    info.Plugin.LogInfo($"Deregistered hierarchy item identifier factory: {removedType.Format()}.");
+                else if (removedType.Assembly == Accessor.DevkitServer)
+                    Logger.LogDebug($"Deregistered hierarchy item identifier factory: {removedType.Format()}.");
+                else
+                    Logger.LogDebug($"Deregistered hierarchy item identifier factory: {removedType.Format()} from {removedType.Assembly.Format()}.");
+            }
+        }
+
+        return c;
+    }
+
+    public static IHierarchyItemTypeIdentifier? GetIdentifier(IDevkitHierarchyItem item)
+    {
+        if (_anyInFactory)
+        {
+            IHierarchyItemTypeIdentifier? res = GetIdentifierFromFactories(item);
+            if (res != null)
+                return res;
+        }
+
+        if (item is TempNodeBase)
+            return new NodeItemTypeIdentifier(item.GetType());
+
+        if (item is VolumeBase)
+            return new VolumeItemTypeIdentifier(item.GetType());
+
+        if (item is Landscape)
+            return LandscapeItemTypeIdentifier.Instance;
+
+        if (item is FoliageSystem)
+            return FoliageSystemItemTypeIdentifier.Instance;
+
+#pragma warning disable CS0612
+        if (item is DevkitHierarchyWorldObject obj)
+        {
+            return new LegacyDevkitHierarchyWorldObjectIdentifier(obj.GUID, obj.placementOrigin, obj.customMaterialOverride, obj.materialIndexOverride);
+        }
+#pragma warning restore CS0612
+
+        return null;
+    }
+    private static IHierarchyItemTypeIdentifier? GetIdentifierFromFactories(IDevkitHierarchyItem item)
+    {
+        lock (Factories)
+        {
+            for (int i = Factories.Count - 1; i >= 0; --i)
+            {
+                HierarchyItemTypeIdentifierFactoryInfo info = Factories[i];
+                try
+                {
+                    if ((info.Plugin == null || PluginLoader.IsLoaded(info.Plugin)) && info.Factory.GetIdentifier(item) is { } result)
+                        return result;
+                }
+                catch (Exception ex)
+                {
+                    Type type = info.GetType();
+                    IDevkitServerPlugin? pluginSource = PluginLoader.FindPluginForMember(type);
+                    if (pluginSource != null)
+                    {
+                        pluginSource.LogError($"Error in hierarchy item identifier factory: {type.Format()}.");
+                        pluginSource.LogError(ex);
+                    }
+                    else
+                    {
+                        if (type.Assembly == Accessor.DevkitServer)
+                            Logger.LogError($"Error in hierarchy item identifier factory: {type.Format()}.");
+                        else
+                            Logger.LogError(
+                                $"Error in hierarchy item identifier factory: {type.Format()} from {type.Assembly.Format()}.");
+
+                        Logger.LogError(ex);
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
     public static void Instantiate(this IHierarchyItemTypeIdentifier identifier, Vector3 position) =>
         identifier.Instantiate(position, Quaternion.identity, Vector3.one);
     public static void WriteIdentifier(ByteWriter writer, IHierarchyItemTypeIdentifier? identifier)
@@ -24,6 +191,8 @@ public static class HierarchyItemTypeIdentifierEx
             return;
         }
         byte type = identifier.TypeIndex;
+        if (type == 255)
+            throw new InvalidOperationException("Tried to write an identifier with type code 255.");
         writer.Write(type);
         if (type is 0 or > MaxType)
             writer.Write(identifier.GetType());
@@ -42,33 +211,163 @@ public static class HierarchyItemTypeIdentifierEx
             255 => null,
             1 => NodeItemTypeIdentifier.ReadFromPool(reader),
             2 => VolumeItemTypeIdentifier.ReadFromPool(reader),
-            // 3 => new ObjectItemTypeIdentifier(),
+#pragma warning disable CS0612
+            3 => LegacyDevkitHierarchyWorldObjectIdentifier.ReadSingle(reader, version),
+#pragma warning restore CS0612
             4 => LandscapeItemTypeIdentifier.Instance,
             5 => FoliageSystemItemTypeIdentifier.Instance,
             _ => type2 != null && !type2.IsAbstract && typeof(IHierarchyItemTypeIdentifier).IsAssignableFrom(type2)
                 ? Activator.CreateInstance(type2, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.CreateInstance | BindingFlags.Instance,
-                    null, Array.Empty<object>(), CultureInfo.InvariantCulture) as IHierarchyItemTypeIdentifier
-                : null
+                    null, Array.Empty<object>(), CultureInfo.InvariantCulture) as IHierarchyItemTypeIdentifier : null
         };
         if (val == null)
         {
-            Logger.LogWarning($"[READ IDENTIFIER] Failed to read identifier type: {type2?.Format() ?? type.Format()}.");
+            Logger.LogWarning($"Failed to read identifier type: {type2?.Format() ?? type.Format()}.", method: Source);
             return null;
         }
-        if (type == 3)
+
+        if (type is > MaxType and not 255 or 0)
             val.Read(reader, version);
+
         return val;
     }
+    public static void RegisterFromAssembly(Assembly assembly, List<HierarchyItemTypeIdentifierFactoryInfo>? infoOut)
+    {
+        List<Type> types = Accessor.GetTypesSafe(assembly, true);
+        foreach (Type type in types)
+        {
+            if (!typeof(IHierarchyItemTypeIdentifierFactory).IsAssignableFrom(type))
+                continue;
+
+            ConstructorInfo? ctor = type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+            if (ctor == null)
+            {
+                Logger.LogError($"Unable to instantiate hierarchy item identifier factory {type.Format()} because it does not have a default constructor.", method: Source);
+                continue;
+            }
+
+            IDevkitServerPlugin? pluginSource = PluginLoader.FindPluginForMember(type);
+            if (pluginSource == null)
+            {
+                Logger.LogError("Unable to link " + type.Format() + " to a plugin. Use the " + typeof(PluginIdentifierAttribute).Format() +
+                                " to link a hierarchy item identifier factory to a plugin when multiple plugins are loaded from an assembly.", method: Source);
+            }
+
+            IHierarchyItemTypeIdentifierFactory factory = (IHierarchyItemTypeIdentifierFactory)Activator.CreateInstance(type, true);
+            HierarchyItemTypeIdentifierFactoryInfo info = new HierarchyItemTypeIdentifierFactoryInfo(factory, type, pluginSource);
+            AddFactory(info);
+            infoOut?.Add(info);
+        }
+    }
+}
+/// <summary>
+/// Allows a plugin to create custom implementations of <see cref="IHierarchyItemTypeIdentifier"/>.<br/>
+/// Register with <see cref="HierarchyItemTypeIdentifierEx.TryAddFactory"/>, deregister with <see cref="HierarchyItemTypeIdentifierEx.TryRemoveFactory"/>.
+/// </summary>
+/// <remarks>Implementing types will be auto-registered unless they have the <see cref="IgnoreAttribute"/>.</remarks>
+public interface IHierarchyItemTypeIdentifierFactory
+{
+    /// <returns><see langword="null"/> to move on to the next registered factory, otherwise returns the correct identifier.</returns>
+    IHierarchyItemTypeIdentifier? GetIdentifier(IDevkitHierarchyItem item);
 }
 
-public interface IHierarchyItemTypeIdentifier
+public readonly struct HierarchyItemTypeIdentifierFactoryInfo
 {
+    public IHierarchyItemTypeIdentifierFactory Factory { get; }
+    public Type Type { get; }
+    public IDevkitServerPlugin? Plugin { get; }
+    internal HierarchyItemTypeIdentifierFactoryInfo(IHierarchyItemTypeIdentifierFactory factory, Type type, IDevkitServerPlugin? plugin)
+    {
+        Factory = factory;
+        Type = factory.GetType();
+        Plugin = plugin;
+    }
+    internal HierarchyItemTypeIdentifierFactoryInfo(IHierarchyItemTypeIdentifierFactory factory, IDevkitServerPlugin plugin)
+        : this(factory, factory.GetType(), plugin ?? throw new ArgumentNullException(nameof(plugin))) { }
+}
+
+/// <summary>
+/// Represents a generic unique identifier for a hierarchy item.
+/// </summary>
+public interface IHierarchyItemTypeIdentifier : ITerminalFormattable
+{
+    /// <summary>
+    /// Set to zero for custom implementations.
+    /// </summary>
     byte TypeIndex { get; }
+
+    /// <summary>
+    /// Type of the Hierarchy Item.
+    /// </summary>
     Type Type { get; }
+
+    /// <summary>
+    /// Function to instantiate the Hierarchy Object. Should take care of adding it to <see cref="LevelHierarchy"/>.
+    /// </summary>
+    /// <remarks>Most Unturned hierarchy items are added to the <see cref="LevelHierarchy"/> in OnEnable, check for this before adding it yourself.</remarks>
     void Instantiate(Vector3 position, Quaternion rotation, Vector3 scale);
+
     void Write(ByteWriter writer);
     void Read(ByteReader reader, ushort version);
-    string FormatToString();
+}
+
+[Obsolete]
+public sealed class LegacyDevkitHierarchyWorldObjectIdentifier : IHierarchyItemTypeIdentifier
+{
+    private static readonly Type LegacyDevkitHierarchyWorldObjectType = typeof(DevkitHierarchyWorldObject);
+    public byte TypeIndex => 3;
+    public Type Type => LegacyDevkitHierarchyWorldObjectType;
+    public Guid Guid { get; set; }
+    public ELevelObjectPlacementOrigin PlacementOrigin { get; set; }
+    public AssetReference<MaterialPaletteAsset> MaterialPaletteAsset { get; set; }
+    public int MaterialIndexOverride { get; set; }
+    public LegacyDevkitHierarchyWorldObjectIdentifier()
+    {
+        MaterialIndexOverride = -1;
+    }
+    public LegacyDevkitHierarchyWorldObjectIdentifier(Guid guid, ELevelObjectPlacementOrigin placementOrigin, AssetReference<MaterialPaletteAsset> palette, int paletteIndex)
+    {
+        Guid = guid;
+        PlacementOrigin = placementOrigin;
+        MaterialPaletteAsset = palette;
+        MaterialIndexOverride = paletteIndex;
+    }
+    public void Instantiate(Vector3 position, Quaternion rotation, Vector3 scale)
+    {
+        throw new NotSupportedException("Adding new legacy devkit hierarchy objects is not supported by DevkitServer or Unturned.");
+    }
+    public void Write(ByteWriter writer)
+    {
+        writer.Write(Guid);
+        writer.Write((byte)PlacementOrigin);
+        writer.Write(MaterialIndexOverride);
+        writer.Write(MaterialPaletteAsset.GUID);
+    }
+    public void Read(ByteReader reader, ushort version)
+    {
+        Guid = reader.ReadGuid();
+        PlacementOrigin = (ELevelObjectPlacementOrigin)reader.ReadUInt8();
+        MaterialIndexOverride = reader.ReadInt32();
+        MaterialPaletteAsset = new AssetReference<MaterialPaletteAsset>(reader.ReadGuid());
+    }
+
+    internal static LegacyDevkitHierarchyWorldObjectIdentifier ReadSingle(ByteReader reader, ushort version)
+    {
+        LegacyDevkitHierarchyWorldObjectIdentifier id = new LegacyDevkitHierarchyWorldObjectIdentifier();
+        id.Read(reader, version);
+        return id;
+    }
+
+    public string Format(ITerminalFormatProvider provider)
+    {
+        ObjectAsset? asset = Assets.find<ObjectAsset>(Guid);
+        return "[HIID] Legacy Object: " + (asset != null ? asset.Format() : Guid.Format());
+    }
+    public override string ToString()
+    {
+        ObjectAsset? asset = Assets.find<ObjectAsset>(Guid);
+        return "[HIID] Legacy Object: " + (asset != null ? ("\"" + asset.objectName + "/" + asset.GUID.ToString("N") + "/" + asset.id) : Guid.ToString("N"));
+    }
 }
 
 [EarlyTypeInit]
@@ -216,7 +515,7 @@ public sealed class NodeItemTypeIdentifier : IHierarchyItemTypeIdentifier
 
         return null;
     }
-    string IHierarchyItemTypeIdentifier.FormatToString() => "[HIID] Node: " + Type.Format();
+    string ITerminalFormattable.Format(ITerminalFormatProvider provider) => "[HIID] Node: " + Type.Format();
     public override string ToString() => "[HIID] Node: " + Type.Name;
 }
 
@@ -503,7 +802,7 @@ public sealed class VolumeItemTypeIdentifier : IHierarchyItemTypeIdentifier
 
         return null;
     }
-    string IHierarchyItemTypeIdentifier.FormatToString() => "[HIID] Volume: " + Type.Format();
+    string ITerminalFormattable.Format(ITerminalFormatProvider provider) => "[HIID] Volume: " + Type.Format();
     public override string ToString() => "[HIID] Volume: " + Type.Name;
 }
 
@@ -518,7 +817,7 @@ public sealed class LandscapeItemTypeIdentifier : IHierarchyItemTypeIdentifier
     public void Instantiate(Vector3 position, Quaternion rotation, Vector3 scale) => throw new NotSupportedException("Landscape is a singleton and can not be instantiated. Access with Landscape.instance.");
     public void Write(ByteWriter writer) { }
     public void Read(ByteReader reader, ushort version) { }
-    string IHierarchyItemTypeIdentifier.FormatToString() => ToString();
+    string ITerminalFormattable.Format(ITerminalFormatProvider provider) => ToString();
     public override string ToString() => "[HIID] Landscape";
 }
 
@@ -533,6 +832,6 @@ public sealed class FoliageSystemItemTypeIdentifier : IHierarchyItemTypeIdentifi
     public void Instantiate(Vector3 position, Quaternion rotation, Vector3 scale) => throw new NotSupportedException("Foliage system is a singleton and can not be instantiated. Access with FoliageSystem.instance.");
     public void Write(ByteWriter writer) { }
     public void Read(ByteReader reader, ushort version) { }
-    string IHierarchyItemTypeIdentifier.FormatToString() => ToString();
+    string ITerminalFormattable.Format(ITerminalFormatProvider provider) => ToString();
     public override string ToString() => "[HIID] Foliage System";
 }

@@ -264,57 +264,19 @@ public readonly struct SmoothSplatmapProperties
     }
 }
 
-public delegate void MoveHierarchyObjectPreview(in MoveHierarchyObjectPreviewProperties properties);
-public readonly struct MoveHierarchyObjectPreviewProperties
-{
-    public readonly DevkitSelection Selection;
-    public readonly IDevkitHierarchyItem Item;
-    public readonly TransformationDelta Transformation;
-    public readonly Vector3 PivotPoint;
-    public readonly float DeltaTime;
-    public MoveHierarchyObjectPreviewProperties(DevkitSelection selection, IDevkitHierarchyItem item, TransformationDelta transformation, Vector3 pivotPoint, float deltaTime)
-    {
-        Selection = selection;
-        Item = item;
-        Transformation = transformation;
-        PivotPoint = pivotPoint;
-        DeltaTime = deltaTime;
-    }
-}
-
-public delegate void MoveHierarchyObjectsPreview(in MoveHierarchyObjectsPreviewProperties properties);
-public readonly struct MoveHierarchyObjectsPreviewProperties
-{
-    public readonly uint[] InstanceIds;
-    public readonly TransformationDelta[] Transformations;
-    public readonly Vector3 PivotPoint;
-    public readonly float DeltaTime;
-    public MoveHierarchyObjectsPreviewProperties(uint[] instanceIds, TransformationDelta[] transformations, Vector3 pivotPoint, float deltaTime)
-    {
-        InstanceIds = instanceIds;
-        Transformations = transformations;
-        PivotPoint = pivotPoint;
-        DeltaTime = deltaTime;
-    }
-}
-
 public delegate void MoveHierarchyObjectFinal(in MoveHierarchyObjectFinalProperties properties);
 public readonly struct MoveHierarchyObjectFinalProperties
 {
     public readonly DevkitSelection Selection;
     public readonly IDevkitHierarchyItem Item;
-    public readonly TransformationDelta Transformation;
-    public readonly Vector3 Scale;
-    public readonly Vector3 OriginalScale;
+    public readonly FinalTransformation Transformation;
     public readonly bool UseScale;
     public readonly float DeltaTime;
-    public MoveHierarchyObjectFinalProperties(DevkitSelection selection, IDevkitHierarchyItem item, TransformationDelta transformation, Vector3 scale, Vector3 originalScale, bool useScale, float deltaTime)
+    public MoveHierarchyObjectFinalProperties(DevkitSelection selection, IDevkitHierarchyItem item, FinalTransformation transformation, bool useScale, float deltaTime)
     {
         Selection = selection;
         Item = item;
         Transformation = transformation;
-        Scale = scale;
-        OriginalScale = originalScale;
         UseScale = useScale;
         DeltaTime = deltaTime;
     }
@@ -323,17 +285,13 @@ public readonly struct MoveHierarchyObjectFinalProperties
 public delegate void MoveHierarchyObjectsFinal(in MoveHierarchyObjectsFinalProperties properties);
 public readonly struct MoveHierarchyObjectsFinalProperties
 {
-    public readonly uint[] InstanceIds;
-    public readonly TransformationDelta[] Transformations;
-    public readonly Vector3[]? Scales;
-    public readonly Vector3[]? OriginalScales;
+    public readonly FinalTransformation[] Transformations;
+    public readonly bool UseScale;
     public readonly float DeltaTime;
-    public MoveHierarchyObjectsFinalProperties(uint[] instanceIds, TransformationDelta[] transformations, Vector3[]? scales, Vector3[]? originalScales, float deltaTime)
+    public MoveHierarchyObjectsFinalProperties(FinalTransformation[] transformations, bool useScale, float deltaTime)
     {
-        InstanceIds = instanceIds;
         Transformations = transformations;
-        Scales = scales;
-        OriginalScales = originalScales;
+        UseScale = useScale;
         DeltaTime = deltaTime;
     }
 }
@@ -343,21 +301,23 @@ public readonly struct DeleteHierarchyObjectProperties
 {
     public readonly GameObject GameObject;
     public readonly IDevkitHierarchyItem Item;
-    public DeleteHierarchyObjectProperties(GameObject gameObject, IDevkitHierarchyItem item)
+    public readonly NetId NetId;
+    public DeleteHierarchyObjectProperties(GameObject gameObject, IDevkitHierarchyItem item, NetId netId)
     {
         GameObject = gameObject;
         Item = item;
+        NetId = netId;
     }
 }
 
 public delegate void DeleteHierarchyObjects(in DeleteHierarchyObjectsProperties properties);
 public readonly struct DeleteHierarchyObjectsProperties
 {
-    public readonly uint[] InstanceIds;
+    public readonly NetId[] NetIds;
     public readonly float DeltaTime;
-    public DeleteHierarchyObjectsProperties(uint[] instanceIds, float deltaTime)
+    public DeleteHierarchyObjectsProperties(NetId[] netIds, float deltaTime)
     {
-        InstanceIds = instanceIds;
+        NetIds = netIds;
         DeltaTime = deltaTime;
     }
 }
@@ -394,18 +354,6 @@ public readonly struct DeleteLevelObjectsProperties
     public DeleteLevelObjectsProperties(NetId[] netIds, float deltaTime)
     {
         NetIds = netIds;
-        DeltaTime = deltaTime;
-    }
-}
-
-public delegate void MoveLevelObjectsPreview(in MoveLevelObjectsPreviewProperties properties);
-public readonly struct MoveLevelObjectsPreviewProperties
-{
-    public readonly PreviewTransformation[] Transformations;
-    public readonly float DeltaTime;
-    public MoveLevelObjectsPreviewProperties(PreviewTransformation[] transformations, float deltaTime)
-    {
-        Transformations = transformations;
         DeltaTime = deltaTime;
     }
 }

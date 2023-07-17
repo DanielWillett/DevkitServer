@@ -1,14 +1,18 @@
 ﻿using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;
+using DevkitServer.Models;
 using DevkitServer.Multiplayer;
-using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Multiplayer.Sync;
 #if SERVER
 using DevkitServer.Players;
 using DevkitServer.Players.UI;
+#elif CLIENT
+using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Players;
 #endif
-using JetBrains.Annotations;
 using SDG.Framework.Devkit;
 
 namespace DevkitServer.Util;
@@ -16,14 +20,9 @@ namespace DevkitServer.Util;
 public static class HierarchyUtil
 {
     private const string Source = "LEVEL HIERARCHY";
-    
+
     internal static readonly List<IDevkitHierarchyItem> HierarchyItemBuffer = new List<IDevkitHierarchyItem>(64);
-
-#if CLIENT
-    private static readonly StaticSetter<uint>? SetAvailableInstanceId = Accessor.GenerateStaticSetter<LevelHierarchy, uint>("availableInstanceID");
-    private static readonly StaticGetter<uint>? GetAvailableInstanceId = Accessor.GenerateStaticGetter<LevelHierarchy, uint>("availableInstanceID");
-#endif
-
+    
     [UsedImplicitly]
     private static readonly NetCallRaw<IHierarchyItemTypeIdentifier, Vector3, Quaternion, Vector3> SendRequestInstantiation =
         new NetCallRaw<IHierarchyItemTypeIdentifier, Vector3, Quaternion, Vector3>(NetCalls.RequestHierarchyInstantiation,
@@ -31,8 +30,8 @@ public static class HierarchyUtil
             HierarchyItemTypeIdentifierEx.WriteIdentifier, null, null, null);
 
     [UsedImplicitly]
-    private static readonly NetCallRaw<IHierarchyItemTypeIdentifier, uint, Vector3, Quaternion, Vector3, ulong> SendInstantiation =
-        new NetCallRaw<IHierarchyItemTypeIdentifier, uint, Vector3, Quaternion, Vector3, ulong>(NetCalls.SendHierarchyInstantiation,
+    private static readonly NetCallRaw<IHierarchyItemTypeIdentifier, Vector3, Quaternion, Vector3, ulong, NetId> SendInstantiation =
+        new NetCallRaw<IHierarchyItemTypeIdentifier, Vector3, Quaternion, Vector3, ulong, NetId>(NetCalls.SendHierarchyInstantiation,
             HierarchyItemTypeIdentifierEx.ReadIdentifier!, null, null, null, null, null,
             HierarchyItemTypeIdentifierEx.WriteIdentifier, null, null, null, null, null);
 #if CLIENT
@@ -42,33 +41,14 @@ public static class HierarchyUtil
     }
 
     [NetCall(NetCallSource.FromServer, NetCalls.SendHierarchyInstantiation)]
-    public static StandardErrorCode ReceiveHierarchyInstantiation(MessageContext ctx, IHierarchyItemTypeIdentifier? type, uint instanceId, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner)
+    public static StandardErrorCode ReceiveHierarchyInstantiation(MessageContext ctx, IHierarchyItemTypeIdentifier? type, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
     {
         if (type == null)
             return StandardErrorCode.InvalidData;
         if (!EditorActions.HasProcessedPendingHierarchyObjects)
         {
-            EditorActions.TemporaryEditorActions?.QueueInstantiation(type, instanceId, position, rotation, scale, owner);
+            EditorActions.TemporaryEditorActions?.QueueInstantiation(type, position, rotation, scale, owner, netId);
             return StandardErrorCode.Success;
-        }
-        uint lastInstanceId = uint.MaxValue;
-        if (GetAvailableInstanceId != null && SetAvailableInstanceId != null)
-        {
-            int existing = FindItemIndex(instanceId);
-            if (existing > -1)
-            {
-                IDevkitHierarchyItem existingItem = LevelHierarchy.instance.items[existing];
-                Logger.LogWarning($"Received instantiation of {type.FormatToString()} with overlapping instance ID with {existingItem.Format()} ({instanceId.Format()}). " +
-                                  "Conflict destroyed".Colorize(ConsoleColor.Red) + ".", method: Source);
-                RemoveItem(existingItem);
-            }
-
-            lastInstanceId = GetAvailableInstanceId();
-            if (lastInstanceId != instanceId)
-            {
-                SetAvailableInstanceId(lastInstanceId);
-                Logger.LogDebug($"Instance ID mismatch, resolving. New: {instanceId.Format()}, Expected: {lastInstanceId.Format()}.");
-            }
         }
 
         try
@@ -77,36 +57,23 @@ public static class HierarchyUtil
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error instantiating {type.FormatToString()} at instance ID {instanceId.Format()}.", method: Source);
+            Logger.LogError($"Error instantiating {type.Format()} at Net ID {netId.Format()}.", method: Source);
             Logger.LogError(ex, method: Source);
             return StandardErrorCode.GenericError;
-        }
-        finally
-        {
-            if (lastInstanceId != instanceId && lastInstanceId != uint.MaxValue)
-                SetAvailableInstanceId!(lastInstanceId);
         }
 
         IDevkitHierarchyItem? newItem = LevelHierarchy.instance.items.Count > 0 ? LevelHierarchy.instance.items.GetTail() : null;
         if (newItem != null && type.Type.IsInstanceOfType(newItem))
         {
-            if (newItem.instanceID != instanceId)
-            {
-                Logger.LogError($"Failed to assign correct instance ID: {instanceId.Format()}, to {type.FormatToString()}.", method: Source);
-                RemoveItem(newItem);
-            }
-            else
-            {
-                if (owner == Provider.client.m_SteamID)
-                    HierarchyResponsibilities.Set(newItem.instanceID);
-                
-                return StandardErrorCode.Success;
-            }
+            if (owner == Provider.client.m_SteamID)
+                HierarchyResponsibilities.Set(newItem.instanceID);
+
+            HierarchyItemNetIdDatabase.RegisterHierarchyItem(newItem, netId);
+            SyncIfAuthority(newItem);
+            return StandardErrorCode.Success;
         }
-        else
-            Logger.LogError($"Failed to create {type.FormatToString()}, instance ID: {instanceId.Format()}.", method: Source);
 
-
+        Logger.LogError($"Failed to create {type.Format()}, at Net ID {netId.Format()}.", method: Source);
         return StandardErrorCode.GenericError;
     }
 #elif SERVER
@@ -131,7 +98,7 @@ public static class HierarchyUtil
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error instantiating {type.FormatToString()}.", method: Source);
+            Logger.LogError($"Error instantiating {type.Format()}.", method: Source);
             Logger.LogError(ex, method: Source);
             UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", ex.Message));
             return;
@@ -140,39 +107,182 @@ public static class HierarchyUtil
         IDevkitHierarchyItem? newItem = LevelHierarchy.instance.items.Count > 0 ? LevelHierarchy.instance.items.GetTail() : null;
         if (newItem != null && type.Type.IsInstanceOfType(newItem))
         {
-            if (newItem is Component comp)
-            {
-                position = comp.transform.position;
-                rotation = comp.transform.rotation;
-                scale = comp.transform.localScale;
-            }
-
-            HierarchyResponsibilities.Set(newItem.instanceID, user.SteamId.m_SteamID);
-
-            PooledTransportConnectionList list;
-            if (ctx.IsRequest)
-            {
-                ctx.ReplyLayered(SendInstantiation, type, newItem.instanceID, position, rotation, scale, user.SteamId.m_SteamID);
-                list = DevkitServerUtility.GetAllConnections(ctx.Connection);
-            }
-            else list = DevkitServerUtility.GetAllConnections();
-            SendInstantiation.Invoke(list, type, newItem.instanceID, position, rotation, scale, user.SteamId.m_SteamID);
-            Logger.LogDebug($"[{Source}] Granted request for instantiation of {type.FormatToString()}, instance ID: {newItem.instanceID.Format()} ({newItem.Format()}) from {user.SteamId.Format()}.");
+            DevkitServerModule.ComponentHost.StartCoroutine(InstantiateHierarchyItemCoroutine(ctx, newItem, type, user, position, rotation, scale));
         }
         else
         {
-            Logger.LogError($"Failed to create {type.FormatToString()}.", method: Source);
+            Logger.LogError($"Failed to create {type.Format()}.", method: Source);
             UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("UnknownError"));
         }
     }
+    private static IEnumerator InstantiateHierarchyItemCoroutine(MessageContext ctx, IDevkitHierarchyItem newItem, IHierarchyItemTypeIdentifier type, EditorUser user, Vector3 position, Quaternion rotation, Vector3 scale)
+    {
+        // have to wait for OnEnable to run
+        yield return null;
+        yield return new WaitForEndOfFrame();
+
+        if (!HierarchyItemNetIdDatabase.TryGetHierarchyItemNetId(newItem, out NetId netId)) // todo failing
+        {
+            Logger.LogError($"Failed to assign NetId to {type.Format()}.", method: Source);
+            UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+            yield break;
+        }
+
+        if (newItem is Component comp)
+        {
+            position = comp.transform.position;
+            rotation = comp.transform.rotation;
+            scale = comp.transform.localScale;
+        }
+
+        HierarchyResponsibilities.Set(newItem.instanceID, user.SteamId.m_SteamID);
+
+        PooledTransportConnectionList list;
+        if (ctx.IsRequest)
+        {
+            ctx.ReplyLayered(SendInstantiation, type, position, rotation, scale, user.SteamId.m_SteamID, netId);
+            list = DevkitServerUtility.GetAllConnections(ctx.Connection);
+        }
+        else list = DevkitServerUtility.GetAllConnections();
+
+        SendInstantiation.Invoke(list, type, position, rotation, scale, user.SteamId.m_SteamID, netId);
+        Logger.LogDebug($"[{Source}] Granted request for instantiation of {type.Format()}, instance ID: {newItem.instanceID.Format()} ({newItem.Format()}) from {user.SteamId.Format()}.");
+        SyncIfAuthority(newItem);
+    }
 #endif
-    public static void RemoveItem(IDevkitHierarchyItem item)
+    /// <summary>
+    /// Does not replicate. Properly delete a hierarchy item, removing it from <see cref="LevelHierarchy"/>.
+    /// </summary>
+    public static void LocalRemoveItem(IDevkitHierarchyItem item)
     {
         if (item is Component o2)
             Object.Destroy(o2.gameObject);
         else if (item is Object o)
             Object.Destroy(o);
         else LevelHierarchy.removeItem(item);
+    }
+    /// <summary>
+    /// Does not replicate. Properly move a hierarchy item.
+    /// </summary>
+    public static void LocalTranslate(IDevkitHierarchyItem item, in FinalTransformation transformation, bool useScale)
+    {
+        if (item is not Component comp)
+            return;
+        Transform transform = comp.transform;
+        TransformationDelta t = transformation.Transformation;
+        if (comp.gameObject.TryGetComponent(out ITransformedHandler handler))
+        {
+            handler.OnTransformed(
+                (t.Flags & TransformationDelta.TransformFlags.OriginalPosition) != 0 ? t.OriginalPosition : transform.position,
+                (t.Flags & TransformationDelta.TransformFlags.OriginalRotation) != 0 ? t.OriginalRotation : transform.rotation,
+                useScale ? transformation.OriginalScale : Vector3.zero,
+                (t.Flags & TransformationDelta.TransformFlags.Position) != 0 ? t.Position : transform.position,
+                (t.Flags & TransformationDelta.TransformFlags.Rotation) != 0 ? t.Rotation : transform.rotation,
+                useScale ? transformation.Scale : Vector3.zero,
+                (t.Flags & TransformationDelta.TransformFlags.Rotation) != 0,
+                useScale
+            );
+        }
+        else
+        {
+            if ((t.Flags & TransformationDelta.TransformFlags.Rotation) != 0)
+            {
+                if ((t.Flags & TransformationDelta.TransformFlags.Position) != 0)
+                    comp.transform.SetPositionAndRotation(t.Position, t.Rotation);
+                else
+                    comp.transform.rotation = t.Rotation;
+            }
+            else if ((t.Flags & TransformationDelta.TransformFlags.Position) != 0)
+                comp.transform.position = t.Position;
+            if (useScale)
+                comp.transform.localScale = transformation.Scale;
+        }
+    }
+    public static bool TryGetTransform(IDevkitHierarchyItem item, out Transform transform)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (item is MonoBehaviour { isActiveAndEnabled: true } monoBehaviour)
+        {
+            transform = monoBehaviour.transform;
+            return true;
+        }
+
+        transform = null!;
+        return false;
+    }
+    [Pure]
+    public static Transform? GetTransform(IDevkitHierarchyItem item)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (item is MonoBehaviour { isActiveAndEnabled: true } monoBehaviour)
+            return monoBehaviour.transform;
+
+        return null;
+    }
+    public static bool TryGetItem(Transform transform, out IDevkitHierarchyItem item)
+    {
+        item = GetItem(transform)!;
+        return item != null;
+    }
+    public static bool TryFindItem(uint instanceId, out IDevkitHierarchyItem item)
+    {
+        item = FindItem(instanceId)!;
+        return item != null;
+    }
+    public static bool TryFindItemIndex(uint instanceId, out int index)
+    {
+        index = FindItemIndex(instanceId);
+        return index >= 0;
+    }
+    [Pure]
+    public static IDevkitHierarchyItem? GetItem(Transform transform)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (transform == null)
+            throw new ArgumentNullException(nameof(transform));
+
+        transform.GetComponents(HierarchyItemBuffer);
+        try
+        {
+            if (HierarchyItemBuffer.Count == 0)
+                return null;
+            
+            if (HierarchyItemBuffer.Count == 1)
+                return HierarchyItemBuffer[0];
+            
+            return HierarchyItemBuffer.Aggregate((a, b) => a.instanceID > b.instanceID ? a : b);
+        }
+        finally
+        {
+            HierarchyItemBuffer.Clear();
+        }
+    }
+    [Pure]
+    public static IDevkitHierarchyItem[] GetItems(Transform transform)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (transform == null)
+            throw new ArgumentNullException(nameof(transform));
+
+        transform.GetComponents(HierarchyItemBuffer);
+        try
+        {
+            if (HierarchyItemBuffer.Count == 0)
+                return Array.Empty<IDevkitHierarchyItem>();
+            
+            if (HierarchyItemBuffer.Count == 1)
+                return new IDevkitHierarchyItem[] { HierarchyItemBuffer[0] };
+
+            return HierarchyItemBuffer.OrderByDescending(x => x.instanceID).ToArray();
+        }
+        finally
+        {
+            HierarchyItemBuffer.Clear();
+        }
     }
     [Pure]
     public static IDevkitHierarchyItem? FindItem(uint instanceId)
@@ -181,6 +291,7 @@ public static class HierarchyUtil
         return ind < 0 ? null : LevelHierarchy.instance.items[ind];
     }
     /// <returns>Inverse of binary search if not found, will always be &lt; 0 when not found.</returns>
+    [Pure]
     public static int FindItemIndex(uint instanceId)
     {
         ThreadUtil.assertIsGameThread();
@@ -193,10 +304,10 @@ public static class HierarchyUtil
         while (min <= max)
         {
             int index = min + (max - min) / 2;
-            int comparison = items[index].instanceID.CompareTo(instanceId);
-            if (comparison == 0)
+            uint instId = items[index].instanceID;
+            if (instId == instanceId)
                 return index;
-            if (comparison < 0)
+            if (instId < instanceId)
                 min = index + 1;
             else
                 max = index - 1;
@@ -207,6 +318,41 @@ public static class HierarchyUtil
             if (instanceId == items[i].instanceID)
                 return i;
         return ~min;
+    }
+    private static bool CheckSync(out HierarchySync sync)
+    {
+        sync = null!;
+#if CLIENT
+        if (!DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.HierarchySync == null || !EditorUser.User.HierarchySync.HasAuthority)
+            return false;
+        sync = EditorUser.User.HierarchySync;
+#elif SERVER
+        if (!DevkitServerModule.IsEditing || HierarchySync.ServersideAuthority == null || !HierarchySync.ServersideAuthority.HasAuthority)
+            return false;
+        sync = HierarchySync.ServersideAuthority;
+#endif
+        return true;
+    }
+    public static bool SyncIfAuthority(IDevkitHierarchyItem item)
+    {
+        if (!CheckSync(out HierarchySync sync))
+            return false;
+        sync.EnqueueSync(item);
+        return true;
+    }
+    public static bool SyncIfAuthority(uint instanceId)
+    {
+        if (!CheckSync(out HierarchySync sync))
+            return false;
+        sync.EnqueueSync(instanceId);
+        return true;
+    }
+    public static bool SyncIfAuthority(NetId netId)
+    {
+        if (!CheckSync(out HierarchySync sync))
+            return false;
+        sync.EnqueueSync(netId);
+        return true;
     }
 #if SERVER
     [Pure]
