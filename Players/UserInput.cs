@@ -590,10 +590,11 @@ public class UserInput : MonoBehaviour
 #endif
         User = null!;
     }
-#if CLIENT
     [UsedImplicitly]
-    private void LateUpdate()
+    private void Update()
     {
+        float t = CachedTime.RealtimeSinceStartup;
+#if CLIENT
         if (IsOwner)
         {
             if (!User.IsOnline)
@@ -601,7 +602,6 @@ public class UserInput : MonoBehaviour
                 Destroy(this);
                 return;
             }
-            float t = CachedTime.RealtimeSinceStartup;
             if (!_networkedInitialPosition || _movement == null)
                 return;
             Vector3 pos = transform.position;
@@ -667,11 +667,7 @@ public class UserInput : MonoBehaviour
                 _lastFlush = t;
             }
         }
-    }
 #endif
-    [UsedImplicitly]
-    private void Update()
-    {
 #if SERVER
         if (Controller == CameraController.Player && User.Player?.player != null)
             _lastPos = User.Player.player.transform.position;
@@ -682,8 +678,7 @@ public class UserInput : MonoBehaviour
             Destroy(this);
             return;
         }
-
-        float t = CachedTime.RealtimeSinceStartup;
+        
         while (_packets is { Count: > 0 } && t >= _nextPacketApplyTime)
         {
             UserInputPacket packet = _packets.Dequeue();

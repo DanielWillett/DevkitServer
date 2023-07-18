@@ -230,7 +230,7 @@ public static class HierarchyUtil
         ThreadUtil.assertIsGameThread();
 
         if (transform == null)
-            throw new ArgumentNullException(nameof(transform));
+            return null;
 
         transform.GetComponents(HierarchyItemBuffer);
         try

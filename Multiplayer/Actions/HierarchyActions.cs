@@ -53,13 +53,12 @@ public sealed class HierarchyActions
     }
     private void OnMoveHierarchyObjectsFinal(in MoveHierarchyObjectsFinalProperties properties)
     {
-        MovedHierarchyObjectsAction action = new MovedHierarchyObjectsAction
+        EditorActions.QueueAction(new MovedHierarchyObjectsAction
         {
             DeltaTime = properties.DeltaTime,
             Transformations = properties.Transformations,
             UseScale = properties.UseScale
-        };
-        EditorActions.QueueAction(action);
+        });
     }
 #endif
 }

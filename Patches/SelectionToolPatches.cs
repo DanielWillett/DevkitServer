@@ -3,6 +3,7 @@ using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Players;
 using DevkitServer.Players.UI;
 using HarmonyLib;
@@ -12,8 +13,6 @@ using SDG.Framework.Landscapes;
 using SDG.Framework.Utilities;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Runtime.InteropServices;
-using DevkitServer.Multiplayer.Levels;
 using Action = System.Action;
 
 namespace DevkitServer.Patches;
@@ -207,8 +206,8 @@ internal static class SelectionToolPatches
         float dt = CachedTime.DeltaTime;
         try
         {
-            TransformationDelta.TransformFlags flags = TransformationDelta.TransformFlags.Position;
-            if (doRotation) flags |= TransformationDelta.TransformFlags.Rotation;
+            TransformationDelta.TransformFlags flags = TransformationDelta.TransformFlags.Position | TransformationDelta.TransformFlags.OriginalPosition;
+            if (doRotation) flags |= TransformationDelta.TransformFlags.Rotation | TransformationDelta.TransformFlags.OriginalRotation;
             int c = DevkitSelectionManager.selection.Count;
             transformations.IncreaseCapacity(c);
             foreach (DevkitSelection selection in DevkitSelectionManager.selection)
@@ -229,7 +228,7 @@ internal static class SelectionToolPatches
                         FinalTransformation transformation = new FinalTransformation(netId, t, selection.gameObject.transform.localScale, selection.preTransformLocalScale);
 
                         transformations.Add(transformation);
-                        if (ClientEvents.ListeningOnMoveHierarchyObjectsFinal)
+                        if (ClientEvents.ListeningOnMoveHierarchyObjectFinal)
                             ClientEvents.InvokeOnMoveHierarchyObjectFinal(new MoveHierarchyObjectFinalProperties(selection, item, transformation, hasScale, dt));
                     }
                 }
@@ -353,18 +352,18 @@ internal static class SelectionToolPatches
     [UsedImplicitly]
     private static void OnFinishTransform()
     {
-        int ct = DevkitSelectionManager.selection.Count;
+        HashSet<DevkitSelection> selections = DevkitSelectionManager.selection;
 
-        if (!DevkitServerModule.IsEditing || _skippedMoveHandle || ct <= 0)
+        if (!DevkitServerModule.IsEditing || _skippedMoveHandle || selections.Count < 1)
             return;
 
         float dt = CachedTime.DeltaTime;
         bool globalUseScale = false;
         List<FinalTransformation> transformations = ListPool<FinalTransformation>.claim();
-        transformations.IncreaseCapacity(ct);
+        transformations.IncreaseCapacity(selections.Count);
         try
         {
-            foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+            foreach (DevkitSelection selection in selections)
             {
                 selection.gameObject.GetComponents(HierarchyUtil.HierarchyItemBuffer);
                 try
@@ -388,8 +387,7 @@ internal static class SelectionToolPatches
                             new TransformationDelta(TransformationDelta.TransformFlags.All, transform.position, transform.rotation, selection.preTransformPosition, selection.preTransformRotation),
                             selection.gameObject.transform.localScale, selection.preTransformLocalScale);
 
-                        
-                        if (ClientEvents.ListeningOnMoveHierarchyObjectsFinal)
+                        if (ClientEvents.ListeningOnMoveHierarchyObjectFinal)
                             ClientEvents.InvokeOnMoveHierarchyObjectFinal(new MoveHierarchyObjectFinalProperties(selection, item, transformation, useScale, dt));
                     }
                 }
@@ -406,7 +404,7 @@ internal static class SelectionToolPatches
             ListPool<FinalTransformation>.release(transformations);
         }
 
-        Logger.LogDebug("[CLIENT EVENTS] Move completed for: " + string.Join(Environment.NewLine, DevkitSelectionManager.selection.Select(x => x.transform.name)) + ".");
+        Logger.LogDebug("[CLIENT EVENTS] Move completed for: " + string.Join(",", selections.Select(x => x.transform.name.Format(false))) + ".");
     }
 }
 #endif

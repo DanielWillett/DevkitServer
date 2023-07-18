@@ -1224,6 +1224,23 @@ public class CommandContext : Exception
     }
 
     /// <summary>
+    /// Get <see cref="RaycastInfo"/> from the user.
+    /// </summary>
+    /// <param name="mask">Raycast mask, could also use <see cref="ERayMask"/>.</param>
+    /// <param name="distance">Default distance is 4m for players and 16m for editors.</param>
+    public bool TryRaycast(out RaycastInfo info, int mask, float distance = -1)
+    {
+        if (IsConsole || Caller == null || Caller.Input.Aim == null || !Caller.IsOnline)
+        {
+            info = null!;
+            return false;
+        }
+        Transform aim = Caller.Input.Aim;
+        info = DamageTool.raycast(new Ray(aim.position, aim.forward), GetDistance(distance), mask == 0 ? RayMasks.PLAYER_INTERACT : mask, Caller.Player?.player);
+        return info.transform != null;
+    }
+
+    /// <summary>
     /// Get the <see cref="Interactable"/> the user is looking at.
     /// </summary>
     /// <param name="mask">Default raymask is <see cref="RayMasks.PLAYER_INTERACT"/>.</param>
