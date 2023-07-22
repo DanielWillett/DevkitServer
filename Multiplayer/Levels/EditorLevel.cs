@@ -2,6 +2,9 @@
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 using System.IO.Compression;
+using System.Reflection;
+using SDG.Provider;
+using Action = System.Action;
 #if CLIENT
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Patches;
@@ -791,9 +794,18 @@ public static class EditorLevel
     }
     private static void OnLevelReady(string dir)
     {
-        DevkitServerModule.ComponentHost.StartCoroutine(DevkitServerModule.Instance.TryLoadBundle(() => LoadLevel(dir)));
+        DevkitServerModule.ComponentHost.StartCoroutine(DevkitServerModule.Instance.TryLoadBundle(() => DevkitServerModule.ComponentHost.StartCoroutine(LoadLevel(dir))));
     }
-    private static void LoadLevel(string dir)
+
+    private static readonly InstanceGetter<Asset, AssetOrigin>? GetAssetOrigin = Accessor.GenerateInstanceGetter<Asset, AssetOrigin>("origin");
+
+    private static readonly InstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>> GetServerPendingIDs =
+        Accessor.GenerateInstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>>("serverPendingIDs", BindingFlags.NonPublic, true)!;
+
+    private static readonly Action<LevelInfo, List<PublishedFileId_t>> ApplyServerAssetMapping =
+        Accessor.GenerateStaticCaller<Assets, Action<LevelInfo, List<PublishedFileId_t>>>("ApplyServerAssetMapping", null, true)!;
+
+    private static IEnumerator LoadLevel(string dir)
     {
         GC.Collect();
         Resources.UnloadUnusedAssets();
@@ -802,7 +814,35 @@ public static class EditorLevel
         {
             Logger.LogWarning("[RECEIVE LEVEL] Failed to read received level at: \"" + dir + "\".", ConsoleColor.DarkCyan);
             DevkitServerUtility.CustomDisconnect("Failed to read received level.");
-            return;
+            yield break;
+        }
+
+        // apply the asset mapping before so the level assets dont get pooled in with the vanilla stuff.
+        ApplyServerAssetMapping(info, GetServerPendingIDs(Provider.provider.workshopService));
+        string bundlesFolder = Path.Combine(dir, "Bundles");
+        if (Directory.Exists(bundlesFolder))
+        {
+            // Load assets from the map's Bundles folder.
+            AssetOrigin origin = new AssetOrigin { name = "Map \"" + info.name + "\"", workshopFileId = 0ul };
+
+            Assets.RequestAddSearchLocation(bundlesFolder, origin);
+
+            yield return null;
+            yield return new WaitForEndOfFrame();
+            while (Assets.isLoading)
+            {
+                yield return null;
+            }
+
+            if (GetAssetOrigin != null)
+            {
+                List<Asset> allAssets = new List<Asset>(8192);
+                Assets.find(allAssets);
+                Logger.LogInfo($"[RECEIVE LEVEL] Loaded {allAssets.Count(x => GetAssetOrigin(x) == origin).Format()} asset(s) from {origin.name.Format()}");
+            }
+
+            GC.Collect();
+            Resources.UnloadUnusedAssets();
         }
 
         DevkitServerModule.PendingLevelInfo = info;

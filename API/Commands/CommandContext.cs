@@ -1098,7 +1098,7 @@ public class CommandContext : Exception
             multipleResultsFound = false;
             return asset is not null && (selector is null || selector(asset));
         }
-        EAssetType type = AssetTypeHelper<TAsset>.Type;
+        EAssetType type = AssetUtil.GetAssetCategory<TAsset>();
         if (type != EAssetType.NONE)
         {
             if (ushort.TryParse(p, out ushort value))

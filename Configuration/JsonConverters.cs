@@ -819,83 +819,6 @@ public sealed class Color32JsonConverter : JsonConverter<Color32>
         writer.WriteStringValue(str.ToLowerInvariant());
     }
 }
-public sealed class AssetReferenceJsonConverterFactory : JsonConverterFactory
-{
-    public override bool CanConvert(Type typeToConvert) => typeToConvert.IsGenericType && typeToConvert.GetGenericTypeDefinition() == typeof(AssetReference<>);
-    public override JsonConverter? CreateConverter(Type typeToConvert, JsonSerializerOptions options)
-    {
-        return (JsonConverter?)Activator.CreateInstance(typeof(AssetReferenceJsonConverter<>).MakeGenericType(typeToConvert.GetGenericArguments()[0]));
-    }
-}
-public sealed class AssetReferenceJsonConverter<TAsset> : JsonConverter<AssetReference<TAsset>> where TAsset : Asset
-{
-    public static AssetReferenceJsonConverter<TAsset> Instance { get; } = new AssetReferenceJsonConverter<TAsset>();
-    public override AssetReference<TAsset> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-    {
-        switch (reader.TokenType)
-        {
-            case JsonTokenType.Null:
-                return new AssetReference<TAsset>();
-            case JsonTokenType.Number:
-                if (reader.TryGetUInt16(out ushort id))
-                {
-                    try
-                    {
-                        return new AssetReference<TAsset>(Assets.find(AssetTypeHelper<TAsset>.Type, id) is { } asset ? asset.GUID : default);
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new JsonException("Tried to read a UInt16 formatted asset reference before assets were loaded.", ex);
-                    }
-                }
-
-                throw new JsonException("Failed to read a UInt16 formatted asset reference.");
-            case JsonTokenType.String:
-                string str = reader.GetString()!;
-                if (!Guid.TryParse(str, out Guid guid))
-                    throw new JsonException("Failed to read a Guid formatted asset reference.");
-
-                return new AssetReference<TAsset>(guid);
-            case JsonTokenType.StartObject:
-                Guid? guid2 = null;
-                while (reader.Read())
-                {
-                    if (reader.TokenType == JsonTokenType.EndObject)
-                        break;
-                    if (reader.TokenType == JsonTokenType.PropertyName)
-                    {
-                        string? prop = reader.GetString();
-                        if (reader.Read() && prop != null && "GUID".Equals(prop, StringComparison.InvariantCultureIgnoreCase) || "_guid".Equals(prop, StringComparison.InvariantCultureIgnoreCase))
-                        {
-                            if (reader.TokenType == JsonTokenType.String)
-                            {
-                                str = reader.GetString()!;
-                                if (Guid.TryParse(str, out guid))
-                                {
-                                    guid2 = guid;
-                                    continue;
-                                }
-                            }
-                            throw new JsonException("Failed to read a Guid-object formatted asset reference.");
-                        }
-                    }
-                }
-
-                if (guid2.HasValue)
-                    return new AssetReference<TAsset>(guid2.Value);
-
-                throw new JsonException("Failed to read an object formatted asset reference.");
-
-            default:
-                throw new JsonException("Unknown " + typeof(TAsset).Name + " token: " + reader.TokenType + ".");
-        }
-    }
-
-    public override void Write(Utf8JsonWriter writer, AssetReference<TAsset> value, JsonSerializerOptions options)
-    {
-        writer.WriteStringValue(value.GUID.ToString("N"));
-    }
-}
 public sealed class CSteamIDJsonConverter : JsonConverter<CSteamID>
 {
     public override CSteamID Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -991,12 +914,20 @@ public sealed class TypeJsonConverter : JsonConverter<Type>
                 string? str = reader.GetString();
                 if (string.IsNullOrEmpty(str) || str!.Equals("null", StringComparison.InvariantCultureIgnoreCase) || str.Equals("<null>", StringComparison.InvariantCultureIgnoreCase))
                     return null;
-                Type? type = Type.GetType(str, false, true);
+                Type? type = Type.GetType(str, false) ?? Type.GetType(str, false, true);
                 if (type == null)
                 {
-                    type = Assembly.GetExecutingAssembly().GetType(str, false, true);
+                    type = Accessor.DevkitServer.GetType(str, false, true);
                     if (type == null)
-                        throw new JsonException("Unknown type: \"" + str + "\".");
+                    {
+                        type = Accessor.AssemblyCSharp.GetType(str, false, true);
+                        if (type == null)
+                        {
+                            type = Accessor.MSCoreLib.GetType(str, false, true);
+                            if (type == null)
+                                throw new JsonException("Unknown type: \"" + str + "\". Try using the type's fully qualified name. Example: \"SDG.NetTransport.ITransportConnection, SDG.NetTransport\".");
+                        }
+                    }
                 }
 
                 return type;
@@ -1009,10 +940,14 @@ public sealed class TypeJsonConverter : JsonConverter<Type>
     {
         if (value == null)
             writer.WriteNullValue();
-        else if (value.Assembly == Assembly.GetExecutingAssembly())
-            writer.WriteStringValue(value.FullName);
         else
-            writer.WriteStringValue(value.AssemblyQualifiedName);
+        {
+            Assembly asm = value.Assembly;
+            if (asm == Accessor.DevkitServer || asm == Accessor.AssemblyCSharp || asm == Accessor.MSCoreLib)
+                writer.WriteStringValue(value.FullName);
+            else
+                writer.WriteStringValue(value.AssemblyQualifiedName);
+        }
     }
 }
 public class ScheduleConverter : JsonConverter<DateTime[]?>
@@ -1107,7 +1042,7 @@ public class ScheduleConverter : JsonConverter<DateTime[]?>
             }
             finally
             {
-                _sb!.Clear();
+                _sb?.Clear();
             }
 
             throw new JsonException("Invalid date string in schedule element, expected '" + str + "' (YYYY-MM-DD hh:mm:ss).");
@@ -1146,5 +1081,69 @@ public class ScheduleConverter : JsonConverter<DateTime[]?>
             }
         }
         writer.WriteEndArray();
+    }
+}
+public class AssetReferenceJsonConverterFactory : JsonConverterFactory
+{
+    public override bool CanConvert(Type typeToConvert) => typeToConvert.IsGenericType && typeToConvert.GetGenericTypeDefinition() == typeof(AssetReference<>);
+    public override JsonConverter? CreateConverter(Type typeToConvert, JsonSerializerOptions options)
+    {
+        return (JsonConverter)Activator.CreateInstance(typeof(AssetReferenceJsonConverter<>).MakeGenericType(typeToConvert.GetGenericArguments()[0]));
+    }
+    private class AssetReferenceJsonConverter<TAsset> : JsonConverter<AssetReference<TAsset>> where TAsset : Asset
+    {
+        public override AssetReference<TAsset> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.Null:
+                    return AssetReference<TAsset>.invalid;
+                case JsonTokenType.Number:
+                    if (reader.TryGetUInt16(out ushort value))
+                    {
+                        if (value == 0)
+                            return AssetReference<TAsset>.invalid;
+
+                        EAssetType type = AssetUtil.GetAssetCategory<TAsset>();
+                        if (type != EAssetType.NONE && Assets.hasLoadedUgc && Assets.find(type, value) is TAsset asset)
+                            return new AssetReference<TAsset>(asset.GUID);
+                    }
+
+                    throw new JsonException("Failed to parse number as a " + typeof(TAsset).Name + " reference (UInt16 format).");
+                case JsonTokenType.String:
+                    if (reader.TryGetGuid(out Guid guid))
+                        return new AssetReference<TAsset>(guid);
+
+                    throw new JsonException("Failed to parse string as a " + typeof(TAsset).Name + " reference (GUID format).");
+
+                case JsonTokenType.StartObject:
+                    while (reader.Read())
+                    {
+                        if (reader.TokenType == JsonTokenType.EndObject)
+                            break;
+                        if (reader.TokenType == JsonTokenType.PropertyName)
+                        {
+                            string prop = reader.GetString()!;
+                            if (prop.Equals("GUID", StringComparison.InvariantCultureIgnoreCase) || prop.Equals("_guid", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                if (reader.Read() && reader.TokenType == JsonTokenType.String && reader.TryGetGuid(out guid))
+                                    return new AssetReference<TAsset>(guid);
+                            }
+                        }
+                    }
+
+                    throw new JsonException("Failed to parse object as a " + typeof(TAsset).Name + " reference (Object-GUID format).");
+                default:
+                    throw new JsonException("Failed to parse a " + typeof(TAsset).Name + $" reference, unknown token: {reader.TokenType}.");
+            }
+        }
+
+        public override void Write(Utf8JsonWriter writer, AssetReference<TAsset> value, JsonSerializerOptions options)
+        {
+            writer.WriteStartObject();
+            writer.WritePropertyName("GUID");
+            writer.WriteStringValue(value.GUID.ToString("N"));
+            writer.WriteEndObject();
+        }
     }
 }

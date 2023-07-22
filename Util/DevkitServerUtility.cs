@@ -1,15 +1,14 @@
-﻿using System.Diagnostics;
-using System.Globalization;
-using System.Reflection;
-using System.Text.RegularExpressions;
-using DevkitServer.API;
-using DevkitServer.Configuration;
+﻿using DevkitServer.API;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
-using JetBrains.Annotations;
+using System.Diagnostics;
+using System.Globalization;
+using System.Reflection;
+using System.Text.RegularExpressions;
 using Action = System.Action;
 #if SERVER
+using DevkitServer.Configuration;
 using DevkitServer.Patches;
 using DevkitServer.Players;
 using System.Net;
@@ -114,39 +113,47 @@ public static class DevkitServerUtility
     }
     public static bool TryParseSteamId(string str, out CSteamID steamId)
     {
-        if (str.Equals("Nil", StringComparison.InvariantCultureIgnoreCase) ||
-            str.Equals("null", StringComparison.InvariantCultureIgnoreCase))
+        if (str.Length > 2 && str[0] is 'N' or 'n' or 'O' or 'o' or 'L' or 'l' or 'z' or 'Z')
         {
-            steamId = CSteamID.Nil;
-            return true;
-        }
-        if (str.Equals("OutofDateGS", StringComparison.InvariantCultureIgnoreCase) ||
-            str.Equals("out-of-date-gs", StringComparison.InvariantCultureIgnoreCase) ||
-            str.Equals("out_of_date_gs", StringComparison.InvariantCultureIgnoreCase))
-        {
-            steamId = CSteamID.OutofDateGS;
-            return true;
-        }
-        if (str.Equals("LanModeGS", StringComparison.InvariantCultureIgnoreCase) ||
-            str.Equals("lan-mode-gs", StringComparison.InvariantCultureIgnoreCase) ||
-            str.Equals("lan_mode_gs", StringComparison.InvariantCultureIgnoreCase))
-        {
-            steamId = CSteamID.LanModeGS;
-            return true;
-        }
-        if (str.Equals("NotInitYetGS", StringComparison.InvariantCultureIgnoreCase) ||
-            str.Equals("not-init-yet-gs", StringComparison.InvariantCultureIgnoreCase) ||
-            str.Equals("not_init_yet_gs", StringComparison.InvariantCultureIgnoreCase))
-        {
-            steamId = CSteamID.NotInitYetGS;
-            return true;
-        }
-        if (str.Equals("NonSteamGS", StringComparison.InvariantCultureIgnoreCase) ||
-            str.Equals("non-steam-gs", StringComparison.InvariantCultureIgnoreCase) ||
-            str.Equals("non_steam_gs", StringComparison.InvariantCultureIgnoreCase))
-        {
-            steamId = CSteamID.NonSteamGS;
-            return true;
+            if (str.Equals("Nil", StringComparison.InvariantCultureIgnoreCase) ||
+                str.Equals("zero", StringComparison.InvariantCultureIgnoreCase) ||
+                str.Equals("null", StringComparison.InvariantCultureIgnoreCase))
+            {
+                steamId = CSteamID.Nil;
+                return true;
+            }
+            if (str.Equals("OutofDateGS", StringComparison.InvariantCultureIgnoreCase) ||
+                str.Equals("out-of-date-gs", StringComparison.InvariantCultureIgnoreCase) ||
+                str.Equals("out of date gs", StringComparison.InvariantCultureIgnoreCase) ||
+                str.Equals("out_of_date_gs", StringComparison.InvariantCultureIgnoreCase))
+            {
+                steamId = CSteamID.OutofDateGS;
+                return true;
+            }
+            if (str.Equals("LanModeGS", StringComparison.InvariantCultureIgnoreCase) ||
+                str.Equals("lan-mode-gs", StringComparison.InvariantCultureIgnoreCase) ||
+                str.Equals("lan mode gs", StringComparison.InvariantCultureIgnoreCase) ||
+                str.Equals("lan_mode_gs", StringComparison.InvariantCultureIgnoreCase))
+            {
+                steamId = CSteamID.LanModeGS;
+                return true;
+            }
+            if (str.Equals("NotInitYetGS", StringComparison.InvariantCultureIgnoreCase) ||
+                str.Equals("not-init-yet-gs", StringComparison.InvariantCultureIgnoreCase) ||
+                str.Equals("not init yet gs", StringComparison.InvariantCultureIgnoreCase) ||
+                str.Equals("not_init_yet_gs", StringComparison.InvariantCultureIgnoreCase))
+            {
+                steamId = CSteamID.NotInitYetGS;
+                return true;
+            }
+            if (str.Equals("NonSteamGS", StringComparison.InvariantCultureIgnoreCase) ||
+                str.Equals("non-steam-gs", StringComparison.InvariantCultureIgnoreCase) ||
+                str.Equals("non steam gs", StringComparison.InvariantCultureIgnoreCase) ||
+                str.Equals("non_steam_gs", StringComparison.InvariantCultureIgnoreCase))
+            {
+                steamId = CSteamID.NonSteamGS;
+                return true;
+            }
         }
 
         if (uint.TryParse(str, NumberStyles.Number, CultureInfo.InvariantCulture, out uint acctId1))
@@ -162,11 +169,11 @@ public static class DevkitServerUtility
             // try parse as hex instead
             if (steamId.GetEAccountType() != EAccountType.k_EAccountTypeIndividual)
             {
-                if (!ulong.TryParse(str, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out id) ||
-                    new CSteamID(id).GetEAccountType() != EAccountType.k_EAccountTypeIndividual)
+                if (!ulong.TryParse(str, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out id))
                     return true;
-
-                steamId = new CSteamID(id);
+                CSteamID steamid2 = new CSteamID(id);
+                if (steamid2.GetEAccountType() == EAccountType.k_EAccountTypeIndividual)
+                    steamId = steamid2;
             }
             return true;
         }
@@ -197,8 +204,7 @@ public static class DevkitServerUtility
             if (!uint.TryParse(str.Substring(10), NumberStyles.Number, CultureInfo.InvariantCulture, out uint acctId))
                 goto fail;
 
-            steamId = new CSteamID(new AccountID_t((uint)(acctId * 2 + (y ? 1 : 0))), universe,
-                EAccountType.k_EAccountTypeIndividual);
+            steamId = new CSteamID(new AccountID_t((uint)(acctId * 2 + (y ? 1 : 0))), universe, EAccountType.k_EAccountTypeIndividual);
             return true;
         }
 
@@ -235,14 +241,12 @@ public static class DevkitServerUtility
             uint acctId;
             if (str[str.Length - 3] != ':')
             {
-                if (!uint.TryParse(str.Substring(5, str.Length - 6), NumberStyles.Number, CultureInfo.InvariantCulture,
-                        out acctId))
+                if (!uint.TryParse(str.Substring(5, str.Length - 6), NumberStyles.Number, CultureInfo.InvariantCulture, out acctId))
                     goto fail;
             }
             else
             {
-                if (!uint.TryParse(str.Substring(5, str.Length - 8), NumberStyles.Number, CultureInfo.InvariantCulture,
-                        out acctId))
+                if (!uint.TryParse(str.Substring(5, str.Length - 8), NumberStyles.Number, CultureInfo.InvariantCulture, out acctId))
                     goto fail;
                 acctId *= 2;
                 uv = str[str.Length - 2];
@@ -576,12 +580,12 @@ public static class DevkitServerUtility
     public static bool UserSteam64(this CSteamID s64) => s64.GetEAccountType() == EAccountType.k_EAccountTypeIndividual;
 #if SERVER
     [Pure]
-    public static string GetPlayerSavedataLocation(ulong s64, string path, int characterId = 0)
+    public static string GetUserSavedataLocation(ulong s64, string path, int characterId = 0)
     {
         string basePath;
-        if (!string.IsNullOrEmpty(DevkitServerConfig.Config.PlayerSavedataLocationOverride))
+        if (!string.IsNullOrEmpty(DevkitServerConfig.Config.UserSavedataLocationOverride))
         {
-            basePath = DevkitServerConfig.Config.PlayerSavedataLocationOverride!;
+            basePath = DevkitServerConfig.Config.UserSavedataLocationOverride!;
             if (!Path.IsPathRooted(basePath))
                 basePath = Path.Combine(ReadWrite.PATH, basePath);
         }
@@ -1065,34 +1069,6 @@ public sealed class CreateDirectoryAttribute : Attribute
         }
 
         _checkedTypes?.Add(type);
-    }
-}
-
-public static class AssetTypeHelper<TAsset>
-{
-    public static readonly EAssetType Type = GetAssetType();
-    private static EAssetType GetAssetType()
-    {
-        Type c = typeof(TAsset);
-        if (typeof(ItemAsset).IsAssignableFrom(c))
-            return EAssetType.ITEM;
-        if (typeof(EffectAsset).IsAssignableFrom(c))
-            return EAssetType.EFFECT;
-        if (typeof(VehicleAsset).IsAssignableFrom(c))
-            return EAssetType.VEHICLE;
-        if (typeof(ObjectAsset).IsAssignableFrom(c))
-            return EAssetType.OBJECT;
-        if (typeof(ResourceAsset).IsAssignableFrom(c))
-            return EAssetType.RESOURCE;
-        if (typeof(AnimalAsset).IsAssignableFrom(c))
-            return EAssetType.ANIMAL;
-        if (typeof(MythicAsset).IsAssignableFrom(c))
-            return EAssetType.MYTHIC;
-        if (typeof(SkinAsset).IsAssignableFrom(c))
-            return EAssetType.SKIN;
-        if (typeof(SpawnAsset).IsAssignableFrom(c))
-            return EAssetType.SPAWN;
-        return typeof(DialogueAsset).IsAssignableFrom(c) || typeof(VendorAsset).IsAssignableFrom(c) || typeof(QuestAsset).IsAssignableFrom(c) ? EAssetType.NPC : EAssetType.NONE;
     }
 }
 public enum ScheduleInterval

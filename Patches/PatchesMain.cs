@@ -93,12 +93,6 @@ internal static class PatchesMain
         return !(user != null && user.Input.Controller == CameraController.Player);
     }
 #if CLIENT
-    private static readonly InstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>> GetServerPendingIDs =
-        Accessor.GenerateInstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>>("serverPendingIDs", BindingFlags.NonPublic, true)!;
-
-    private static readonly Action<LevelInfo, List<PublishedFileId_t>> ApplyServerAssetMapping =
-        Accessor.GenerateStaticCaller<Assets, Action<LevelInfo, List<PublishedFileId_t>>>("ApplyServerAssetMapping", null, true)!;
-
     //private static readonly Action LoadGameMode = Accessor.GenerateStaticCaller<Provider, Action>("loadGameMode", throwOnError: true)!;
 
     [HarmonyPatch(typeof(Provider), nameof(Provider.launch))]
@@ -127,7 +121,6 @@ internal static class PatchesMain
         }
         else
         {
-            ApplyServerAssetMapping(level, GetServerPendingIDs(Provider.provider.workshopService));
             UnturnedLog.info("Loading server level ({0})", Provider.map);
             Level.edit(level);
             Provider.gameMode = new DevkitServerGamemode();
@@ -429,6 +422,8 @@ internal static class PatchesMain
     private static IEnumerable<CodeInstruction> DedicatedUgcLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
         bool one = false;
+        yield return new CodeInstruction(OpCodes.Call, new System.Action(MapCreation.PrefixLoadingDedicatedUGC).Method);
+
         foreach (CodeInstruction instr in instructions)
         {
             if (!one && instr.Calls(lvlLoad))

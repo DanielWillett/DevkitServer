@@ -36,6 +36,37 @@ public static class PatchUtil
             new CodeInstruction(OpCodes.Throw)
         };
     }
+    public static object? Get(this MemberInfo member, object? instance)
+    {
+        if (member is PropertyInfo property)
+        {
+            MethodInfo? getter = property.GetGetMethod(true);
+            if (getter == null)
+                throw new NotSupportedException(property.Name + " does not have a getter.");
+            return getter.Invoke(instance, Array.Empty<object>());
+        }
+
+        if (member is FieldInfo field)
+            return field.GetValue(instance);
+
+        throw new ArgumentException("Member must be a FieldInfo or PropertyInfo.", nameof(member));
+    }
+    public static void Set(this MemberInfo member, object? instance, object? value)
+    {
+        if (member is PropertyInfo property)
+        {
+            MethodInfo? setter = property.GetSetMethod(true);
+            if (setter == null)
+                throw new NotSupportedException(property.Name + " does not have a setter.");
+
+            setter.Invoke(instance, new object?[] { value });
+        }
+
+        if (member is FieldInfo field)
+            field.SetValue(instance, value);
+
+        throw new ArgumentException("Member must be a FieldInfo or PropertyInfo.", nameof(member));
+    }
     [Pure]
     public static Type? GetMemberType(this MemberInfo member) => member switch
     {

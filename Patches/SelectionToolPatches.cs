@@ -29,7 +29,6 @@ internal static class SelectionToolPatches
     {
         Type st = typeof(SelectionTool);
         Type dtu = typeof(DevkitTransactionUtility);
-        // Type vp = typeof(VanillaPermissions);
 
         MethodInfo moveHandleInvoker = new Action<Vector3, Quaternion, Vector3, bool, bool>(OnMoveHandle).Method;
         MethodInfo requestInstantiationInvoker = new Action<Vector3>(OnRequestInstantiaion).Method;

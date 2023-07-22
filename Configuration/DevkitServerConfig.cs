@@ -7,6 +7,7 @@ namespace DevkitServer.Configuration;
 [EarlyTypeInit(-1)]
 public class DevkitServerConfig
 {
+    private const string Source = "CONFIG";
     private static readonly object Sync = new object();
 
     private static readonly JavaScriptEncoder Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
@@ -20,11 +21,11 @@ public class DevkitServerConfig
         new ColorJsonConverter(),
         new Color32JsonConverter(),
         new CSteamIDJsonConverter(),
-        new AssetReferenceJsonConverterFactory(),
         new TypeJsonConverter(),
         new PermissionConverter(),
         new PermissionGroupConverter(),
-        new GroupPermissionConverter()
+        new GroupPermissionConverter(),
+        new AssetReferenceJsonConverterFactory()
     };
 
     internal static readonly InstanceSetter<Utf8JsonWriter, JsonWriterOptions>? SetWriterOptions = Accessor.GenerateInstanceSetter<Utf8JsonWriter, JsonWriterOptions>("_options");
@@ -46,9 +47,9 @@ public class DevkitServerConfig
         MaxDepth = 32
     };
 
-    public static readonly JsonWriterOptions WriterOptions = new JsonWriterOptions { Indented = true, Encoder = Encoder };
-    public static readonly JsonWriterOptions CondensedWriterOptions = new JsonWriterOptions { Indented = false, Encoder = Encoder };
-    public static readonly JsonReaderOptions ReaderOptions = new JsonReaderOptions { AllowTrailingCommas = true };
+    public static readonly JsonWriterOptions WriterOptions = new JsonWriterOptions { Indented = true, Encoder = Encoder, MaxDepth = 32, SkipValidation = false };
+    public static readonly JsonWriterOptions CondensedWriterOptions = new JsonWriterOptions { Indented = false, Encoder = Encoder, MaxDepth = 32, SkipValidation = false };
+    public static readonly JsonReaderOptions ReaderOptions = new JsonReaderOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip, MaxDepth = 32 };
     static DevkitServerConfig()
     {
         for (int i = 0; i < Converters.Length; ++i)
@@ -115,14 +116,15 @@ public class DevkitServerConfig
             }
         }
     }
-    public static void Reset()
+    public static void ResetToDefaults()
     {
+        (_config ??= new SystemConfig()).SetDefaults();
         Save();
     }
     public static void Reload()
     {
         _config = Read();
-        Save();
+        // Save();
     }
     public static void Save()
     {
@@ -146,8 +148,8 @@ public class DevkitServerConfig
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error writing config file: \"" + ConfigFilePath + "\".");
-                Logger.LogError(ex);
+                Logger.LogError("Error writing config file: \"" + ConfigFilePath + "\".", method: Source);
+                Logger.LogError(ex, method: Source);
             }
         }
     }
@@ -161,6 +163,39 @@ public class DevkitServerConfig
             try
             {
                 string path = ConfigFilePath;
+                try
+                {
+                    if (!File.Exists(path))
+                    {
+#if SERVER
+                        string? modulePath = DevkitServerModule.FindModuleFile("server_config.json");
+#else
+                        string? modulePath = DevkitServerModule.FindModuleFile("client_config.json");
+#endif
+                        if (modulePath != null)
+                        {
+                            File.Copy(modulePath, path, false);
+
+                            if (DevkitServerModule.InitializedLogging)
+                                Logger.LogInfo($"[{Source}] Copied default config file from: \"{modulePath}\".");
+                            else
+                                CommandWindow.Log($"[{Source}] Copied default config file from: \"{modulePath}\".");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (DevkitServerModule.InitializedLogging)
+                    {
+                        Logger.LogError("Error copying default config file: \"" + ConfigFilePath + "\".", method: Source);
+                        Logger.LogError(ex, method: Source);
+                    }
+                    else
+                    {
+                        CommandWindow.LogError("Error copying default config file: \"" + ConfigFilePath + "\".");
+                        CommandWindow.LogError(ex);
+                    }
+                }
                 if (File.Exists(path))
                 {
                     using FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -183,8 +218,16 @@ public class DevkitServerConfig
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error reading config file: \"" + ConfigFilePath + "\".");
-                Logger.LogError(ex);
+                if (DevkitServerModule.InitializedLogging)
+                {
+                    Logger.LogError("Error reading config file: \"" + ConfigFilePath + "\".", method: Source);
+                    Logger.LogError(ex, method: Source);
+                }
+                else
+                {
+                    CommandWindow.LogError("Error reading config file: \"" + ConfigFilePath + "\".");
+                    CommandWindow.LogError(ex);
+                }
 
                 try
                 {
@@ -200,14 +243,27 @@ public class DevkitServerConfig
                 }
                 catch (Exception ex2)
                 {
-                    Logger.LogError("Error backing up config file from: \"" + ConfigFilePath + "\".");
-                    Logger.LogError(ex2);
+                    if (DevkitServerModule.InitializedLogging)
+                    {
+                        Logger.LogError("Error backing up config file from: \"" + ConfigFilePath + "\".", method: Source);
+                        Logger.LogError(ex2, method: Source);
+                    }
+                    else
+                    {
+                        CommandWindow.LogError("Error backing up config file from: \"" + ConfigFilePath + "\".");
+                        CommandWindow.LogError(ex);
+                    }
                 }
 #if SERVER
-                Logger.LogWarning("Server startup halted... fix the config errors or retart the server to use a clean config.");
+                if (DevkitServerModule.InitializedLogging)
+                    Logger.LogWarning("Server startup halted... fix the config errors or retart the server to use a clean config.", method: Source);
+                else
+                    CommandWindow.LogWarning("Server startup halted... fix the config errors or retart the server to use a clean config.");
+
                 DevkitServerModule.Fault();
 #endif
             }
+
             SystemConfig config = new SystemConfig();
             config.SetDefaults();
             return config;
@@ -232,6 +288,9 @@ public class SystemConfig
 #endif
 
 #if SERVER
+    [JsonPropertyName("new_level_info")]
+    public NewLevelCreationOptions NewLevelInfo { get; set; }
+
     [JsonPropertyName("disable_map_download")]
     public bool DisableMapDownload { get; set; }
 
@@ -243,20 +302,12 @@ public class SystemConfig
 
     [JsonPropertyName("high_speed")]
     public TcpServerInfo TcpSettings;
-    public class TcpServerInfo
-    {
-        [JsonPropertyName("enable_high_speed_support")]
-        public bool EnableHighSpeedSupport { get; set; }
-
-        [JsonPropertyName("high_speed_tcp_port")]
-        public ushort HighSpeedPort { get; set; }
-    }
 #endif
 #nullable restore
 #if SERVER
 
-    [JsonPropertyName("player_savedata_override")]
-    public string? PlayerSavedataLocationOverride { get; set; }
+    [JsonPropertyName("user_savedata_override")]
+    public string? UserSavedataLocationOverride { get; set; }
 
 #endif
     public void SetDefaults()
@@ -268,6 +319,7 @@ public class SystemConfig
         EnableObjectUIExtension = true;
 #endif
 #if SERVER
+        NewLevelInfo = NewLevelCreationOptions.Default;
         DisableMapDownload = false;
         TcpSettings = new TcpServerInfo { EnableHighSpeedSupport = false, HighSpeedPort = (ushort)(Provider.port + 2) };
         DefaultUserPermissions = Array.Empty<string>();
@@ -275,7 +327,38 @@ public class SystemConfig
         {
             "viewer"
         };
-        PlayerSavedataLocationOverride = null;
+        UserSavedataLocationOverride = null;
 #endif
     }
+#if SERVER
+    public class TcpServerInfo
+    {
+        [JsonPropertyName("enable_high_speed_support")]
+        public bool EnableHighSpeedSupport { get; set; }
+
+        [JsonPropertyName("high_speed_tcp_port")]
+        public ushort HighSpeedPort { get; set; }
+    }
+    public class NewLevelCreationOptions
+    {
+        public static readonly NewLevelCreationOptions Default = new NewLevelCreationOptions
+        {
+            LevelSize = ELevelSize.MEDIUM,
+            LevelType = ELevelType.SURVIVAL,
+            Owner = CSteamID.Nil
+        };
+
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        [JsonPropertyName("gamemode_type")]
+        public ELevelType LevelType { get; set; }
+
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        [JsonPropertyName("start_size")]
+        public ELevelSize LevelSize { get; set; }
+
+        [JsonConverter(typeof(CSteamIDJsonConverter))]
+        [JsonPropertyName("map_owner")]
+        public CSteamID Owner { get; set; }
+    }
+#endif
 }

@@ -1137,6 +1137,7 @@ public sealed class TileModifyAction : IAction, ICoordinates
         {
             tile.readHeightmaps();
             tile.readSplatmaps();
+            tile.updatePrototypes();
             Landscape.linkNeighbors();
             Landscape.reconcileNeighbors(tile);
             Landscape.applyLOD();

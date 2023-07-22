@@ -11,6 +11,68 @@ using DevkitServer.Util.Encoding;
 namespace DevkitServer.API.Permissions;
 public class UserPermissions : IPermissionHandler, IUserPermissionHandler
 {
+    private static readonly CachedMulticastEvent<Action<PermissionGroup>> EventGlobalPermissionGroupUpdated = new CachedMulticastEvent<Action<PermissionGroup>>(typeof(UserPermissions), nameof(GlobalPermissionGroupUpdated));
+    private static readonly CachedMulticastEvent<Action<PermissionGroup>> EventGlobalPermissionGroupRegistered = new CachedMulticastEvent<Action<PermissionGroup>>(typeof(UserPermissions), nameof(GlobalPermissionGroupRegistered));
+    private static readonly CachedMulticastEvent<Action<PermissionGroup>> EventGlobalPermissionGroupDeregistered = new CachedMulticastEvent<Action<PermissionGroup>>(typeof(UserPermissions), nameof(GlobalPermissionGroupDeregistered));
+    private static readonly CachedMulticastEvent<Action<Permission>> EventGlobalPermissionRegistered = new CachedMulticastEvent<Action<Permission>>(typeof(UserPermissions), nameof(GlobalPermissionRegistered));
+    private static readonly CachedMulticastEvent<Action<Permission>> EventGlobalPermissionDeregistered = new CachedMulticastEvent<Action<Permission>>(typeof(UserPermissions), nameof(GlobalPermissionDeregistered));
+
+    public static event Action<PermissionGroup> GlobalPermissionGroupUpdated
+    {
+        add => EventGlobalPermissionGroupUpdated.Add(value);
+        remove => EventGlobalPermissionGroupUpdated.Remove(value);
+    }
+    public static event Action<PermissionGroup> GlobalPermissionGroupRegistered
+    {
+        add => EventGlobalPermissionGroupRegistered.Add(value);
+        remove => EventGlobalPermissionGroupRegistered.Remove(value);
+    }
+    public static event Action<PermissionGroup> GlobalPermissionGroupDeregistered
+    {
+        add => EventGlobalPermissionGroupDeregistered.Add(value);
+        remove => EventGlobalPermissionGroupDeregistered.Remove(value);
+    }
+    public static event Action<Permission> GlobalPermissionRegistered
+    {
+        add => EventGlobalPermissionRegistered.Add(value);
+        remove => EventGlobalPermissionRegistered.Remove(value);
+    }
+    public static event Action<Permission> GlobalPermissionDeregistered
+    {
+        add => EventGlobalPermissionDeregistered.Add(value);
+        remove => EventGlobalPermissionDeregistered.Remove(value);
+    }
+
+#if SERVER
+    protected static readonly CachedMulticastEvent<Action<Permission, ulong, bool>> EventGlobalUserPermissionUpdated = new CachedMulticastEvent<Action<Permission, ulong, bool>>(typeof(UserPermissions), nameof(GlobalUserPermissionUpdated));
+    protected static readonly CachedMulticastEvent<Action<PermissionGroup, ulong, bool>> EventGlobalUserPermissionGroupUpdated = new CachedMulticastEvent<Action<PermissionGroup, ulong, bool>>(typeof(UserPermissions), nameof(GlobalUserPermissionGroupUpdated));
+
+    public static event Action<Permission, ulong, bool> GlobalUserPermissionUpdated
+    {
+        add => EventGlobalUserPermissionUpdated.Add(value);
+        remove => EventGlobalUserPermissionUpdated.Remove(value);
+    }
+    public static event Action<PermissionGroup, ulong, bool> GlobalUserPermissionGroupUpdated
+    {
+        add => EventGlobalUserPermissionGroupUpdated.Add(value);
+        remove => EventGlobalUserPermissionGroupUpdated.Remove(value);
+    }
+#else
+    protected static readonly CachedMulticastEvent<Action<Permission, bool>> EventGlobalUserPermissionUpdated = new CachedMulticastEvent<Action<Permission, bool>>(typeof(UserPermissions), nameof(GlobalUserPermissionUpdated));
+    protected static readonly CachedMulticastEvent<Action<PermissionGroup, bool>> EventGlobalUserPermissionGroupUpdated = new CachedMulticastEvent<Action<PermissionGroup, bool>>(typeof(UserPermissions), nameof(GlobalUserPermissionGroupUpdated));
+
+    public static event Action<Permission, bool> GlobalUserPermissionUpdated
+    {
+        add => EventGlobalUserPermissionUpdated.Add(value);
+        remove => EventGlobalUserPermissionUpdated.Remove(value);
+    }
+    public static event Action<PermissionGroup, bool> GlobalUserPermissionGroupUpdated
+    {
+        add => EventGlobalUserPermissionGroupUpdated.Add(value);
+        remove => EventGlobalUserPermissionGroupUpdated.Remove(value);
+    }
+#endif
+
     internal static readonly NetCallRaw<Permission, bool> SendPermissionState = new NetCallRaw<Permission, bool>((ushort)NetCalls.SendPermissionState,
         Permission.ReadPermission, null, Permission.WritePermission, null);
     internal static readonly NetCallRaw<PermissionGroup, bool> SendPermissionGroupState = new NetCallRaw<PermissionGroup, bool>((ushort)NetCalls.SendPermissionGroupState,
@@ -42,11 +104,15 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         Logger.LogDebug("Found: " + _handler.Permissions.Count + " permissions.");
     }
     /// <exception cref="NotSupportedException">Called setter on non-game thread.</exception>
+    /// <exception cref="ArgumentNullException"/>
     public static IPermissionHandler Handler
     {
         get => _handler;
         set
         {
+            if (value == null)
+                throw new ArgumentNullException(nameof(value));
+
             ThreadUtil.assertIsGameThread();
 
             IPermissionHandler old = Interlocked.Exchange(ref _handler, value);
@@ -55,14 +121,33 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
                 disp.Dispose();
             if (value != other && _inited)
                 _handler.Init();
+
+            if (old != null)
+            {
+                old.PermissionDeregistered -= EventGlobalPermissionDeregistered.TryInvoke;
+                old.PermissionGroupDeregistered -= EventGlobalPermissionGroupDeregistered.TryInvoke;
+                old.PermissionGroupRegistered -= EventGlobalPermissionGroupRegistered.TryInvoke;
+                old.PermissionGroupUpdated -= EventGlobalPermissionGroupUpdated.TryInvoke;
+                old.PermissionRegistered -= EventGlobalPermissionRegistered.TryInvoke;
+            }
+
+            value.PermissionDeregistered += EventGlobalPermissionDeregistered.TryInvoke;
+            value.PermissionGroupDeregistered += EventGlobalPermissionGroupDeregistered.TryInvoke;
+            value.PermissionGroupRegistered += EventGlobalPermissionGroupRegistered.TryInvoke;
+            value.PermissionGroupUpdated += EventGlobalPermissionGroupUpdated.TryInvoke;
+            value.PermissionRegistered += EventGlobalPermissionRegistered.TryInvoke;
         }
     }
     /// <exception cref="NotSupportedException">Called setter on non-game thread.</exception>
+    /// <exception cref="ArgumentNullException"/>
     public static IUserPermissionHandler UserHandler
     {
         get => _userHandler;
         set
         {
+            if (value == null)
+                throw new ArgumentNullException(nameof(value));
+
             ThreadUtil.assertIsGameThread();
 
             IUserPermissionHandler old = Interlocked.Exchange(ref _userHandler, value);
@@ -71,6 +156,15 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
                 disp.Dispose();
             if (value != other && _inited)
                 _userHandler.Init();
+
+            if (old != null)
+            {
+                old.UserPermissionGroupUpdated -= EventGlobalUserPermissionGroupUpdated.TryInvoke;
+                old.UserPermissionUpdated -= EventGlobalUserPermissionUpdated.TryInvoke;
+            }
+
+            value.UserPermissionGroupUpdated += EventGlobalUserPermissionGroupUpdated.TryInvoke;
+            value.UserPermissionUpdated += EventGlobalUserPermissionUpdated.TryInvoke;
         }
     }
     public static List<Permission> GetDefaultPermissionsFromLoaded()
@@ -143,21 +237,67 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
     IReadOnlyList<Permission> IUserPermissionHandler.Permissions => _roClientPerms;
     IReadOnlyList<PermissionGroup> IUserPermissionHandler.PermissionGroups => _roClientPermGrps;
 #endif
-    public event Action<PermissionGroup>? PermissionGroupUpdated; 
-    public event Action<PermissionGroup>? PermissionGroupRegistered; 
-    public event Action<PermissionGroup>? PermissionGroupDeregistered; 
-    public event Action<Permission>? PermissionRegistered; 
-    public event Action<Permission>? PermissionDeregistered; 
+    protected readonly CachedMulticastEvent<Action<PermissionGroup>> EventPermissionGroupUpdated = new CachedMulticastEvent<Action<PermissionGroup>>(typeof(UserPermissions), nameof(PermissionGroupUpdated));
+    protected readonly CachedMulticastEvent<Action<PermissionGroup>> EventPermissionGroupRegistered = new CachedMulticastEvent<Action<PermissionGroup>>(typeof(UserPermissions), nameof(PermissionGroupRegistered));
+    protected readonly CachedMulticastEvent<Action<PermissionGroup>> EventPermissionGroupDeregistered = new CachedMulticastEvent<Action<PermissionGroup>>(typeof(UserPermissions), nameof(PermissionGroupDeregistered));
+    protected readonly CachedMulticastEvent<Action<Permission>> EventPermissionRegistered = new CachedMulticastEvent<Action<Permission>>(typeof(UserPermissions), nameof(PermissionRegistered));
+    protected readonly CachedMulticastEvent<Action<Permission>> EventPermissionDeregistered = new CachedMulticastEvent<Action<Permission>>(typeof(UserPermissions), nameof(PermissionDeregistered));
+
+    public event Action<PermissionGroup> PermissionGroupUpdated
+    {
+        add => EventPermissionGroupUpdated.Add(value);
+        remove => EventPermissionGroupUpdated.Remove(value);
+    }
+    public event Action<PermissionGroup> PermissionGroupRegistered
+    {
+        add => EventPermissionGroupRegistered.Add(value);
+        remove => EventPermissionGroupRegistered.Remove(value);
+    }
+    public event Action<PermissionGroup> PermissionGroupDeregistered
+    {
+        add => EventPermissionGroupDeregistered.Add(value);
+        remove => EventPermissionGroupDeregistered.Remove(value);
+    }
+    public event Action<Permission> PermissionRegistered
+    {
+        add => EventPermissionRegistered.Add(value);
+        remove => EventPermissionRegistered.Remove(value);
+    }
+    public event Action<Permission> PermissionDeregistered
+    {
+        add => EventPermissionDeregistered.Add(value);
+        remove => EventPermissionDeregistered.Remove(value);
+    }
 #if SERVER
-    public event Action<Permission, ulong, bool>? UserPermissionUpdated;
+    protected readonly CachedMulticastEvent<Action<Permission, ulong, bool>> EventUserPermissionUpdated = new CachedMulticastEvent<Action<Permission, ulong, bool>>(typeof(UserPermissions), nameof(UserPermissionUpdated));
+    protected readonly CachedMulticastEvent<Action<PermissionGroup, ulong, bool>> EventUserPermissionGroupUpdated = new CachedMulticastEvent<Action<PermissionGroup, ulong, bool>>(typeof(UserPermissions), nameof(UserPermissionGroupUpdated));
+
+    public event Action<Permission, ulong, bool> UserPermissionUpdated
+    {
+        add => EventUserPermissionUpdated.Add(value);
+        remove => EventUserPermissionUpdated.Remove(value);
+    }
+    public event Action<PermissionGroup, ulong, bool> UserPermissionGroupUpdated
+    {
+        add => EventUserPermissionGroupUpdated.Add(value);
+        remove => EventUserPermissionGroupUpdated.Remove(value);
+    }
 #else
-    public event Action<Permission, bool>? UserPermissionUpdated;
+    protected readonly CachedMulticastEvent<Action<Permission, bool>> EventUserPermissionUpdated = new CachedMulticastEvent<Action<Permission, bool>>(typeof(UserPermissions), nameof(UserPermissionUpdated));
+    protected readonly CachedMulticastEvent<Action<PermissionGroup, bool>> EventUserPermissionGroupUpdated = new CachedMulticastEvent<Action<PermissionGroup, bool>>(typeof(UserPermissions), nameof(UserPermissionGroupUpdated));
+
+    public event Action<Permission, bool> UserPermissionUpdated
+    {
+        add => EventUserPermissionUpdated.Add(value);
+        remove => EventUserPermissionUpdated.Remove(value);
+    }
+    public event Action<PermissionGroup, bool> UserPermissionGroupUpdated
+    {
+        add => EventUserPermissionGroupUpdated.Add(value);
+        remove => EventUserPermissionGroupUpdated.Remove(value);
+    }
 #endif
-#if SERVER
-    public event Action<PermissionGroup, ulong, bool>? UserPermissionGroupUpdated;
-#else
-    public event Action<PermissionGroup, bool>? UserPermissionGroupUpdated;
-#endif
+
     IReadOnlyList<Permission> IPermissionHandler.Permissions => _roPerms;
     IReadOnlyList<PermissionGroup> IPermissionHandler.PermissionGroups => _roPermGrps;
     public virtual void Init()
@@ -176,7 +316,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         Reload();
 #endif
         for (int i = 0; i < _perms.Count; ++i)
-            TryInvokePermissionRegistered(_perms[i]);
+            EventPermissionRegistered.TryInvoke(_perms[i]);
     }
 
     public virtual void Reload()
@@ -194,7 +334,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
             if (_perms[i].Equals(permission))
                 return false;
         }
-        TryInvokePermissionRegistered(permission);
+        EventPermissionRegistered.TryInvoke(permission);
         _perms.Add(permission);
 #if SERVER
         PermissionsEx.ReplicateLatePermissionRegistration(permission);
@@ -221,7 +361,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         }
         if (!added)
             _permGrps.Add(group);
-        TryInvokePermissionGroupRegistered(group);
+        EventPermissionGroupRegistered.TryInvoke(group);
 #if SERVER
         PermissionsEx.ReplicateLatePermissionGroupRegistration(group);
         _config.SaveConfig();
@@ -255,14 +395,14 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
                 }
 
                 Logger.LogInfo("Permission group updated: " + grp.Format() + ".");
-                TryInvokePermissionGroupUpdated(grp);
+                EventPermissionGroupUpdated.TryInvoke(grp);
                 return true;
             }
         }
 
         _permGrps.Add(group);
         Logger.LogInfo("Permission group added during update: " + group.Format() + ".");
-        TryInvokePermissionGroupUpdated(group);
+        EventPermissionGroupUpdated.TryInvoke(group);
         return false;
     }
 #endif
@@ -277,7 +417,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
                 PermissionsEx.ReplicatePermissionDeregistration(permission);
 #endif
                 Logger.LogInfo("Permission deregistered: " + permission.Format() + ".");
-                TryInvokePermissionDeregistered(permission);
+                EventPermissionDeregistered.TryInvoke(permission);
                 return true;
             }
         }
@@ -297,155 +437,12 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
                 _config.SaveConfig();
 #endif
                 Logger.LogInfo("Permission group deregistered: " + group.Format() + ".");
-                TryInvokePermissionGroupDeregistered(group);
+                EventPermissionGroupDeregistered.TryInvoke(group);
                 return true;
             }
         }
 
         return false;
-    }
-    private void TryInvokePermissionGroupUpdated(PermissionGroup group)
-    {
-        if (PermissionGroupUpdated == null)
-            return;
-        foreach (Action<PermissionGroup> action in PermissionGroupUpdated.GetInvocationList().Cast<Action<PermissionGroup>>())
-        {
-            try
-            {
-                action(group);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + typeof(UserPermissions).Format() + "." + nameof(PermissionGroupUpdated) + ".");
-                Logger.LogError(ex);
-            }
-        }
-    }
-    private void TryInvokePermissionGroupRegistered(PermissionGroup group)
-    {
-        if (PermissionGroupRegistered == null)
-            return;
-        foreach (Action<PermissionGroup> action in PermissionGroupRegistered.GetInvocationList().Cast<Action<PermissionGroup>>())
-        {
-            try
-            {
-                action(group);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + typeof(UserPermissions).Format() + "." + nameof(PermissionGroupRegistered) + ".");
-                Logger.LogError(ex);
-            }
-        }
-    }
-    private void TryInvokePermissionGroupDeregistered(PermissionGroup group)
-    {
-        if (PermissionGroupDeregistered == null)
-            return;
-        foreach (Action<PermissionGroup> action in PermissionGroupDeregistered.GetInvocationList().Cast<Action<PermissionGroup>>())
-        {
-            try
-            {
-                action(group);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + typeof(UserPermissions).Format() + "." + nameof(PermissionGroupDeregistered) + ".");
-                Logger.LogError(ex);
-            }
-        }
-    }
-    private void TryInvokePermissionRegistered(Permission permission)
-    {
-        if (PermissionRegistered == null)
-            return;
-        foreach (Action<Permission> action in PermissionRegistered.GetInvocationList().Cast<Action<Permission>>())
-        {
-            try
-            {
-                action(permission);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + typeof(UserPermissions).Format() + "." + nameof(PermissionRegistered) + ".");
-                Logger.LogError(ex);
-            }
-        }
-    }
-    private void TryInvokePermissionDeregistered(Permission permission)
-    {
-        if (PermissionDeregistered == null)
-            return;
-        foreach (Action<Permission> action in PermissionDeregistered.GetInvocationList().Cast<Action<Permission>>())
-        {
-            try
-            {
-                action(permission);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + typeof(UserPermissions).Format() + "." + nameof(PermissionDeregistered) + ".");
-                Logger.LogError(ex);
-            }
-        }
-    }
-    private void TryInvokeUserPermissionUpdated(Permission permission,
-#if SERVER
-        ulong player,
-#endif
-        bool state)
-    {
-        if (UserPermissionUpdated == null)
-            return;
-#if SERVER
-        foreach (Action<Permission, ulong, bool> action in UserPermissionUpdated.GetInvocationList().Cast<Action<Permission, ulong, bool>>())
-#else
-        foreach (Action<Permission, bool> action in UserPermissionUpdated.GetInvocationList().Cast<Action<Permission, bool>>())
-#endif
-        {
-            try
-            {
-#if SERVER
-                action(permission, player, state);
-#else
-                action(permission, state);
-#endif
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + typeof(UserPermissions).Format() + "." + nameof(UserPermissionUpdated) + ".");
-                Logger.LogError(ex);
-            }
-        }
-    }
-    private void TryInvokeUserPermissionGroupUpdated(PermissionGroup group,
-#if SERVER
-        ulong player,
-#endif
-        bool state)
-    {
-        if (UserPermissionGroupUpdated == null)
-            return;
-#if SERVER
-        foreach (Action<PermissionGroup, ulong, bool> action in UserPermissionGroupUpdated.GetInvocationList().Cast<Action<PermissionGroup, ulong, bool>>())
-#else
-        foreach (Action<PermissionGroup, bool> action in UserPermissionGroupUpdated.GetInvocationList().Cast<Action<PermissionGroup, bool>>())
-#endif
-        {
-            try
-            {
-#if SERVER
-                action(group, player, state);
-#else
-                action(group, state);
-#endif
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + typeof(UserPermissions).Format() + "." + nameof(UserPermissionGroupUpdated) + ".");
-                Logger.LogError(ex);
-            }
-        }
     }
 
 #if SERVER
@@ -457,7 +454,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         {
             user2.AddPermission(permission);
             SavePermissions(user2.SteamId.m_SteamID, perms);
-            TryInvokeUserPermissionUpdated(permission, user, true);
+            EventUserPermissionUpdated.TryInvoke(permission, user, true);
             return;
         }
 
@@ -471,7 +468,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         perms2.AddRange(perms);
         perms2.Add(permission);
         SavePermissions(user, perms2);
-        TryInvokeUserPermissionUpdated(permission, user, true);
+        EventUserPermissionUpdated.TryInvoke(permission, user, true);
     }
 
     public virtual void RemovePermission(ulong user, Permission permission)
@@ -482,7 +479,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         {
             user2.RemovePermission(permission);
             SavePermissions(user2.SteamId.m_SteamID, perms);
-            TryInvokeUserPermissionUpdated(permission, user, false);
+            EventUserPermissionUpdated.TryInvoke(permission, user, false);
             return;
         }
 
@@ -495,30 +492,30 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
                 perms2.RemoveAt(i);
         }
         SavePermissions(user, perms2);
-        TryInvokeUserPermissionUpdated(permission, user, false);
+        EventUserPermissionUpdated.TryInvoke(permission, user, false);
     }
 
     public virtual void ClearPermissions(ulong user)
     {
         ThreadUtil.assertIsGameThread();
 
-        if (UserManager.FromId(user) is { Permissions: { } } user2)
+        if (UserManager.FromId(user) is { Permissions: not null } user2)
         {
-            if (UserPermissionUpdated != null)
+            if (!EventUserPermissionUpdated.IsEmpty)
             {
                 foreach (Permission perm in user2.Permissions)
-                    TryInvokeUserPermissionUpdated(perm, user, false);
+                    EventUserPermissionUpdated.TryInvoke(perm, user, false);
             }
             user2.ClearPermissions();
             SavePermissions(user2.SteamId.m_SteamID, Array.Empty<Permission>());
             return;
         }
 
-        if (UserPermissionUpdated != null)
+        if (!EventUserPermissionUpdated.IsEmpty)
         {
             IReadOnlyList<Permission> perms = GetPermissions(user, true);
             foreach (Permission perm in perms)
-                TryInvokeUserPermissionUpdated(perm, user, false);
+                EventUserPermissionUpdated.TryInvoke(perm, user, false);
         }
         SavePermissions(user, Array.Empty<Permission>());
     }
@@ -529,7 +526,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         {
             if (!forceReload && UserManager.FromId(user) is { Permissions: { } perms })
                 return perms;
-            string path = DevkitServerUtility.GetPlayerSavedataLocation(user, Path.Combine("DevkitServer", "Permissions.dat"));
+            string path = DevkitServerUtility.GetUserSavedataLocation(user, Path.Combine("DevkitServer", "Permissions.dat"));
             if (File.Exists(path))
             {
                 using FileStream str = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -571,7 +568,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         {
             user2.AddPermissionGroup(group);
             SavePermissionGroups(user2.SteamId.m_SteamID, groups);
-            TryInvokeUserPermissionGroupUpdated(group, user, true);
+            EventUserPermissionGroupUpdated.TryInvoke(group, user, true);
             return;
         }
 
@@ -595,7 +592,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         if (!added)
             perms2.Add(group);
         SavePermissionGroups(user, perms2);
-        TryInvokeUserPermissionGroupUpdated(group, user, true);
+        EventUserPermissionGroupUpdated.TryInvoke(group, user, true);
     }
 
     public virtual void RemovePermissionGroup(ulong user, PermissionGroup group)
@@ -606,7 +603,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         {
             user2.RemovePermissionGroup(group);
             SavePermissionGroups(user2.SteamId.m_SteamID, groups);
-            TryInvokeUserPermissionGroupUpdated(group, user, false);
+            EventUserPermissionGroupUpdated.TryInvoke(group, user, false);
             return;
         }
 
@@ -619,7 +616,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
                 perms2.RemoveAt(i);
         }
         SavePermissionGroups(user, perms2);
-        TryInvokeUserPermissionGroupUpdated(group, user, false);
+        EventUserPermissionGroupUpdated.TryInvoke(group, user, false);
     }
 
     public virtual void ClearPermissionGroups(ulong user)
@@ -628,21 +625,21 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
 
         if (UserManager.FromId(user) is { Permissions: { } } user2)
         {
-            if (UserPermissionGroupUpdated != null)
+            if (!EventUserPermissionGroupUpdated.IsEmpty)
             {
                 foreach (PermissionGroup grp in user2.PermissionGroups)
-                    TryInvokeUserPermissionGroupUpdated(grp, user, false);
+                    EventUserPermissionGroupUpdated.TryInvoke(grp, user, false);
             }
             user2.ClearPermissionGroups();
             SavePermissionGroups(user2.SteamId.m_SteamID, Array.Empty<PermissionGroup>());
             return;
         }
-
-        if (UserPermissionGroupUpdated != null)
+        
+        if (!EventUserPermissionGroupUpdated.IsEmpty)
         {
             IReadOnlyList<PermissionGroup> perms = GetPermissionGroups(user, true);
             foreach (PermissionGroup grp in perms)
-                TryInvokeUserPermissionGroupUpdated(grp, user, false);
+                EventUserPermissionGroupUpdated.TryInvoke(grp, user, false);
         }
         SavePermissionGroups(user, Array.Empty<PermissionGroup>());
     }
@@ -653,7 +650,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         {
             if (!forceReload && UserManager.FromId(user) is { PermissionGroups: { } perms })
                 return perms;
-            string path = DevkitServerUtility.GetPlayerSavedataLocation(user, Path.Combine("DevkitServer", "PermissionGroups.dat"));
+            string path = DevkitServerUtility.GetUserSavedataLocation(user, Path.Combine("DevkitServer", "PermissionGroups.dat"));
             if (File.Exists(path))
             {
                 using FileStream str = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -699,13 +696,13 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
     {
         _config.SaveConfig();
         PermissionsEx.ReplicatePermissionGroupUpdate(group);
-        TryInvokePermissionGroupUpdated(group);
+        EventPermissionGroupUpdated.TryInvoke(group);
     }
     private static void SavePermissions(ulong user, IReadOnlyCollection<Permission> permissions)
     {
         lock (Writer)
         {
-            string path = DevkitServerUtility.GetPlayerSavedataLocation(user, Path.Combine("DevkitServer", "Permissions.dat"));
+            string path = DevkitServerUtility.GetUserSavedataLocation(user, Path.Combine("DevkitServer", "Permissions.dat"));
             string? dir = Path.GetDirectoryName(path);
             if (dir != null && !DevkitServerUtility.CheckDirectory(false, dir))
             {
@@ -727,7 +724,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
     {
         lock (Writer)
         {
-            string path = DevkitServerUtility.GetPlayerSavedataLocation(user, Path.Combine("DevkitServer", "PermissionGroups.dat"));
+            string path = DevkitServerUtility.GetUserSavedataLocation(user, Path.Combine("DevkitServer", "PermissionGroups.dat"));
             string? dir = Path.GetDirectoryName(path);
             if (dir != null)
                 Directory.CreateDirectory(dir);
@@ -748,29 +745,29 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
 #else
     public virtual void ReceivePermissions(IReadOnlyList<Permission> permissions, IReadOnlyList<PermissionGroup> groups)
     {
-        if (UserPermissionUpdated != null)
+        if (!EventUserPermissionUpdated.IsEmpty)
         {
             foreach (Permission permission in _clientPerms)
-                TryInvokeUserPermissionUpdated(permission, false);
+                EventUserPermissionUpdated.TryInvoke(permission, false);
         }
-        if (UserPermissionGroupUpdated != null)
+        if (EventUserPermissionGroupUpdated.IsEmpty)
         {
             foreach (PermissionGroup group in _clientPermGrps)
-                TryInvokeUserPermissionGroupUpdated(group, false);
+                EventUserPermissionGroupUpdated.TryInvoke(group, false);
         }
         _clientPerms.Clear();
         _clientPerms.AddRange(permissions);
         _clientPermGrps.Clear();
         _clientPermGrps.AddRange(groups);
-        if (UserPermissionUpdated != null)
+        if (!EventUserPermissionUpdated.IsEmpty)
         {
             foreach (Permission permission in _clientPerms)
-                TryInvokeUserPermissionUpdated(permission, true);
+                EventUserPermissionUpdated.TryInvoke(permission, true);
         }
-        if (UserPermissionGroupUpdated != null)
+        if (!EventUserPermissionGroupUpdated.IsEmpty)
         {
             foreach (PermissionGroup group in _clientPermGrps)
-                TryInvokeUserPermissionGroupUpdated(group, true);
+                EventUserPermissionGroupUpdated.TryInvoke(group, true);
         }
     }
 
@@ -784,7 +781,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
                 if (!state)
                 {
                     _clientPerms.RemoveAt(i);
-                    TryInvokeUserPermissionUpdated(p2, false);
+                    EventUserPermissionUpdated.TryInvoke(p2, false);
                 }
                 return;
             }
@@ -792,7 +789,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
 
         if (!state) return;
         _clientPerms.Add(permission);
-        TryInvokeUserPermissionUpdated(permission, true);
+        EventUserPermissionUpdated.TryInvoke(permission, true);
     }
 
     public virtual void ReceivePermissionGroupState(PermissionGroup group, bool state)
@@ -805,7 +802,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
                 if (!state)
                 {
                     _clientPermGrps.RemoveAt(i);
-                    TryInvokeUserPermissionGroupUpdated(p2, false);
+                    EventUserPermissionGroupUpdated.TryInvoke(p2, false);
                 }
                 return;
             }
@@ -823,24 +820,24 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         }
         if (!added)
             _clientPermGrps.Add(group);
-        TryInvokeUserPermissionGroupUpdated(group, true);
+        EventUserPermissionGroupUpdated.TryInvoke(group, true);
     }
 
     public virtual void ReceiveClearPermissions()
     {
-        if (UserPermissionUpdated != null)
+        if (!EventUserPermissionUpdated.IsEmpty)
         {
             foreach (Permission permission in _clientPerms)
-                TryInvokeUserPermissionUpdated(permission, false);
+                EventUserPermissionUpdated.TryInvoke(permission, false);
         }
         _clientPerms.Clear();
     }
     public virtual void ReceiveClearPermissionGroups()
     {
-        if (UserPermissionGroupUpdated != null)
+        if (!EventUserPermissionGroupUpdated.IsEmpty)
         {
             foreach (PermissionGroup group in _clientPermGrps)
-                TryInvokeUserPermissionGroupUpdated(group, false);
+                EventUserPermissionGroupUpdated.TryInvoke(group, false);
         }
         _clientPermGrps.Clear();
     }

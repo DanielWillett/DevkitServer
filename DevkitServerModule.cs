@@ -12,6 +12,7 @@ using DevkitServer.Patches;
 using DevkitServer.Plugins;
 using SDG.Framework.Modules;
 using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
@@ -46,6 +47,7 @@ public sealed class DevkitServerModule : IModuleNexus
     internal static readonly Color ModuleColor = new Color32(0, 255, 153, 255);
     internal static readonly Color UnturnedColor = new Color32(99, 123, 99, 255);
     private static string? _asmPath;
+    private static IReadOnlyList<string>? _searchLocations;
     public Assembly Assembly { get; } = Assembly.GetExecutingAssembly();
     internal static string HelpMessage => CommandLocalization.format("Help");
     public static GameObject GameObjectHost { get; private set; } = null!;
@@ -66,7 +68,18 @@ public sealed class DevkitServerModule : IModuleNexus
     public static bool MonoLoaded { get; }
     public static bool UnityLoaded { get; }
     public static bool UnturnedLoaded { get; }
+    public static bool InitializedLogging { get; set; }
     public static string AssemblyPath => _asmPath ??= Accessor.DevkitServer.Location;
+    public static IReadOnlyList<string> AssemblyFileSearchLocations
+    {
+        get
+        {
+            if (_searchLocations != null)
+                return _searchLocations;
+            LoadSearchLocations();
+            return _searchLocations!;
+        }
+    }
 
     private static readonly LocalDatDictionary DefaultMainLocalization = new LocalDatDictionary
     {
@@ -139,7 +152,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public void initialize()
     {
         Stopwatch watch = Stopwatch.StartNew();
-        bool loggerInited = false;
+        InitializedLogging = false;
         if (LoadFaulted)
             goto fault;
         try
@@ -162,7 +175,7 @@ public sealed class DevkitServerModule : IModuleNexus
 #endif
 
             Logger.InitLogger();
-            loggerInited = true;
+            InitializedLogging = true;
             PatchesMain.Init();
 #if CLIENT
             Logger.PostPatcherSetupInitLogger();
@@ -172,7 +185,7 @@ public sealed class DevkitServerModule : IModuleNexus
         }
         catch (Exception ex)
         {
-            if (loggerInited)
+            if (InitializedLogging)
             {
                 Logger.LogError($"Error setting up {ModuleName.Colorize(ModuleColor)}");
                 Logger.LogError(ex);
@@ -295,7 +308,7 @@ public sealed class DevkitServerModule : IModuleNexus
             }
             catch (Exception ex)
             {
-                if (loggerInited)
+                if (InitializedLogging)
                 {
                     Logger.LogError($"Error unloading {ModuleName.Colorize(ModuleColor)}.");
                     Logger.LogError(ex);
@@ -365,6 +378,60 @@ public sealed class DevkitServerModule : IModuleNexus
         yield return new WaitForSeconds(2);
         Logger.ClearLoadingErrors();
         Logger.LogDebug($"DevkitServer managed memory usage: {DevkitServerUtility.FormatBytes(GC.GetTotalMemory(true)).Format(false)}");
+    }
+    private static void LoadSearchLocations()
+    {
+        string asmDir = Path.GetDirectoryName(AssemblyPath)!;
+        List<string> locs = new List<string>
+        {
+            Path.GetFullPath(asmDir)
+        };
+        string dir = Path.GetFullPath(Path.Combine(asmDir, ".."));
+        if (!Path.GetFileName(dir).Equals("Modules", StringComparison.OrdinalIgnoreCase))
+        {
+            locs.Add(dir);
+            string dir2 = Path.GetFullPath(Path.Combine(asmDir, "..", ".."));
+            if (!Path.GetFileName(dir2).Equals("Modules", StringComparison.OrdinalIgnoreCase))
+            {
+                locs.Add(dir2);
+                foreach (string directory in Directory.EnumerateDirectories(dir2))
+                {
+                    dir2 = Path.GetFullPath(directory);
+                    if (!locs.Contains(dir2))
+                        locs.Add(dir2);
+                }
+            }
+
+            foreach (string directory in Directory.EnumerateDirectories(dir))
+            {
+                dir = Path.GetFullPath(directory);
+                if (!locs.Contains(dir))
+                    locs.Add(dir);
+            }
+        }
+
+#if DEBUG
+        foreach (string directory in locs)
+        {
+            if (InitializedLogging)
+                Logger.LogDebug($"Added module file search location: {directory.Format(true)}.");
+            else
+                CommandWindow.Log($"Added module file search location: \"{directory}\".");
+        }
+#endif
+
+        _searchLocations = new ReadOnlyCollection<string>(locs.ToArray());
+    }
+    public static string? FindModuleFile(string name)
+    {
+        foreach (string location in AssemblyFileSearchLocations)
+        {
+            string path = Path.Combine(location, name);
+            if (File.Exists(path))
+                return path;
+        }
+
+        return null;
     }
     internal void UnloadBundle()
     {
@@ -448,7 +515,7 @@ public sealed class DevkitServerModule : IModuleNexus
         BundleConfig = bundle;
         Logger.LogInfo("Loaded bundle: " + bundle.assetBundleNameWithoutExtension.Format() + " from " + path.Format() + ".");
         HasLoadedBundle = true;
-#if true
+#if false
         Logger.LogDebug("Assets:");
         foreach (string asset in Bundle.cfg.assetBundle.GetAllAssetNames())
             Logger.LogDebug("Asset: " + asset.Format() + ".");

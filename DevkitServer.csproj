@@ -40,6 +40,7 @@
   <ItemGroup>
     <Using Remove="System.Net.Http" />
     <Using Remove="System.Text" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <Using Include="SDG.NetTransport" />
     <Using Include="SDG.Unturned" />
     <Using Include="Steamworks" />

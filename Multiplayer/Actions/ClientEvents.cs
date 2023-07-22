@@ -46,6 +46,7 @@ public static class ClientEvents
         add => EventOnEditHolesRequested.Add(value);
         remove => EventOnEditHolesRequested.Remove(value);
     }
+
     public static event TryInstantiateHierarchyObject OnTryInstantiateHierarchyObject
     {
         add => EventOnTryInstantiateHierarchyObject.Add(value);

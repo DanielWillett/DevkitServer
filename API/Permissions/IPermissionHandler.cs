@@ -11,27 +11,27 @@ public interface IPermissionHandler
     /// Fired when a <see cref="PermissionGroup"/> is changed.
     /// </summary>
     /// <remarks>Sever-side or client-side.</remarks>
-    event Action<PermissionGroup>? PermissionGroupUpdated;
+    event Action<PermissionGroup> PermissionGroupUpdated;
     /// <summary>
     /// Fired when a <see cref="PermissionGroup"/> is registered (including on startup).
     /// </summary>
     /// <remarks>Sever-side or client-side.</remarks>
-    event Action<PermissionGroup>? PermissionGroupRegistered;
+    event Action<PermissionGroup> PermissionGroupRegistered;
     /// <summary>
     /// Fired when a <see cref="PermissionGroup"/> is deregistered (not including on shutdown).
     /// </summary>
     /// <remarks>Sever-side or client-side.</remarks>
-    event Action<PermissionGroup>? PermissionGroupDeregistered;
+    event Action<PermissionGroup> PermissionGroupDeregistered;
     /// <summary>
     /// Fired when a <see cref="Permission"/> is registered (including on startup).
     /// </summary>
     /// <remarks>Sever-side or client-side.</remarks>
-    event Action<Permission>? PermissionRegistered;
+    event Action<Permission> PermissionRegistered;
     /// <summary>
     /// Fired when a <see cref="Permission"/> is deregistered (not including on shutdown).
     /// </summary>
     /// <remarks>Sever-side or client-side.</remarks>
-    event Action<Permission>? PermissionDeregistered;
+    event Action<Permission> PermissionDeregistered;
     /// <summary>
     /// Ran on startup, or when the <see cref="UserPermissions.Handler"/> setter is ran.
     /// </summary>
@@ -101,11 +101,11 @@ public interface IUserPermissionHandler
     /// <summary>
     /// Called when a <see cref="Permission"/> is given to or taken from a user.
     /// </summary>
-    event Action<Permission, ulong, bool>? UserPermissionUpdated;
+    event Action<Permission, ulong, bool> UserPermissionUpdated;
     /// <summary>
     /// Called when a <see cref="PermissionGroup"/> is given to or taken from a user.
     /// </summary>
-    event Action<PermissionGroup, ulong, bool>? UserPermissionGroupUpdated;
+    event Action<PermissionGroup, ulong, bool> UserPermissionGroupUpdated;
     /// <summary>
     /// Reload any configs.
     /// </summary>
@@ -156,11 +156,11 @@ public interface IUserPermissionHandler
     /// <summary>
     /// Called when a <see cref="Permission"/> is given to or taken from the client.
     /// </summary>
-    event Action<Permission, bool>? UserPermissionUpdated;
+    event Action<Permission, bool> UserPermissionUpdated;
     /// <summary>
     /// Called when a <see cref="PermissionGroup"/> is given to or taken from the client.
     /// </summary>
-    event Action<PermissionGroup, bool>? UserPermissionGroupUpdated;
+    event Action<PermissionGroup, bool> UserPermissionGroupUpdated;
     /// <summary>
     /// List of all <see cref="Permission"/>s the client has.
     /// </summary>
