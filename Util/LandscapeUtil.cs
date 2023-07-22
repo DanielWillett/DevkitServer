@@ -3,31 +3,20 @@ using SDG.Framework.Landscapes;
 using System.Reflection;
 
 namespace DevkitServer.Util;
+
+[EarlyTypeInit]
 public static class LandscapeUtil
 {
     internal static bool SaveTransactions = true;
     internal static FieldInfo SaveTransactionsField = typeof(LandscapeUtil).GetField(nameof(SaveTransactions), BindingFlags.Static | BindingFlags.NonPublic)!;
 
-    internal static int[] SurroundingOffsets =
-    {
-         0,  0,
-         1,  0,
-         0, -1,
-        -1,  0,
-         0,  1,
-         1,  1,
-         1, -1,
-        -1, -1,
-        -1,  1
-    };
-
     private static readonly StaticGetter<Dictionary<LandscapeCoord, LandscapeTile>> GetTiles =
         Accessor.GenerateStaticGetter<Landscape, Dictionary<LandscapeCoord, LandscapeTile>>("tiles", throwOnError: true)!;
 
-    /// <returns>An enumerable used to loop through all the existing tiles.</returns>
+    /// <returns>A readonly value collection used to loop through all the existing tiles.</returns>
     public static IReadOnlyCollection<LandscapeTile> Tiles => GetTiles().Values;
     /// <summary>
-    /// If possible, use <see cref="EnumerateAllTiles"/> instead.
+    /// If possible, use <see cref="Tiles"/> instead.
     /// </summary>
     /// <returns>A copy of all existing tiles.</returns>
     public static List<LandscapeTile> GetAllTiles() => new List<LandscapeTile>(Tiles);

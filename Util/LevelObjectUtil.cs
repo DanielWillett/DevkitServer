@@ -524,7 +524,7 @@ public static class LevelObjectUtil
             return false;
         }
         LevelObject? found = null;
-        RegionUtil.ForEach(transform.position, coord => !TryFindObject(transform, coord, out found, checkSkyboxAndPlaceholder));
+        RegionUtil.ForEachRegion(transform.position, coord => !TryFindObject(transform, coord, out found, checkSkyboxAndPlaceholder));
         levelObject = found!;
         return found != null;
     }
@@ -536,35 +536,35 @@ public static class LevelObjectUtil
             return false;
         }
         RegionIdentifier r = RegionIdentifier.Invalid;
-        RegionUtil.ForEach(transform.position, coord => !TryFindObject(transform, coord, out r, checkSkyboxAndPlaceholder));
+        RegionUtil.ForEachRegion(transform.position, coord => !TryFindObject(transform, coord, out r, checkSkyboxAndPlaceholder));
         regionId = r;
         return !r.IsInvalid;
     }
     public static bool TryFindObject(uint instanceId, out LevelObject levelObject)
     {
         LevelObject? found = null;
-        RegionUtil.ForEach(coord => !TryFindObject(instanceId, coord, out found));
+        RegionUtil.ForEachRegion(coord => !TryFindObject(instanceId, coord, out found));
         levelObject = found!;
         return found != null;
     }
     public static bool TryFindObject(uint instanceId, out RegionIdentifier regionId)
     {
         RegionIdentifier r = RegionIdentifier.Invalid;
-        RegionUtil.ForEach(coord => !TryFindObject(instanceId, coord, out r));
+        RegionUtil.ForEachRegion(coord => !TryFindObject(instanceId, coord, out r));
         regionId = r;
         return !r.IsInvalid;
     }
     public static bool TryFindObject(Vector3 expectedPosition, uint instanceId, out LevelObject levelObject)
     {
         LevelObject? found = null;
-        RegionUtil.ForEach(expectedPosition, coord => !TryFindObject(instanceId, coord, out found));
+        RegionUtil.ForEachRegion(expectedPosition, coord => !TryFindObject(instanceId, coord, out found));
         levelObject = found!;
         return found != null;
     }
     public static bool TryFindObject(Vector3 expectedPosition, uint instanceId, out RegionIdentifier regionId)
     {
         RegionIdentifier r = RegionIdentifier.Invalid;
-        RegionUtil.ForEach(expectedPosition, coord => !TryFindObject(instanceId, coord, out r));
+        RegionUtil.ForEachRegion(expectedPosition, coord => !TryFindObject(instanceId, coord, out r));
         regionId = r;
         return !r.IsInvalid;
     }
@@ -673,14 +673,14 @@ public static class LevelObjectUtil
     public static bool TryFindBuildable(Transform transform, out LevelBuildableObject buildable)
     {
         LevelBuildableObject? found = null;
-        RegionUtil.ForEach(transform.position, coord => !TryFindBuildable(transform, coord, out found));
+        RegionUtil.ForEachRegion(transform.position, coord => !TryFindBuildable(transform, coord, out found));
         buildable = found!;
         return found != null;
     }
     public static bool TryFindBuildable(Transform transform, out RegionIdentifier regionId)
     {
         RegionIdentifier r = RegionIdentifier.Invalid;
-        RegionUtil.ForEach(transform.position, coord => !TryFindBuildable(transform, coord, out r));
+        RegionUtil.ForEachRegion(transform.position, coord => !TryFindBuildable(transform, coord, out r));
         regionId = r;
         return !r.IsInvalid;
     }
@@ -720,7 +720,7 @@ public static class LevelObjectUtil
     {
         RegionIdentifier r = RegionIdentifier.Invalid;
         bool isBuildable = false;
-        RegionUtil.ForEach(transform.position, coord =>
+        RegionUtil.ForEachRegion(transform.position, coord =>
         {
             if (!TryFindObject(transform, coord, out r, false))
             {

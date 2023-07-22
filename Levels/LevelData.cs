@@ -127,7 +127,7 @@ public sealed class LevelData
             writer.Write(objects[i]);
 
         // HierarchyItemNetIdDatabase
-        for (int i = 0; i < hierarchyItemNetIds.Length; ++i)
+        for (int i = 0; i < hierarchyItems.Length; ++i)
             writer.Write(hierarchyItemNetIds[i].id);
         for (int i = 0; i < hierarchyItems.Length; ++i)
             writer.Write(hierarchyItems[i]);

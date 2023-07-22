@@ -258,6 +258,7 @@ public sealed class DevkitServerModule : IModuleNexus
                 goto fault;
 
             Level.onPostLevelLoaded += OnPostLevelLoaded;
+            Level.onLevelLoaded += OnLevelLoaded;
             Editor.onEditorCreated += OnEditorCreated;
             Level.onPrePreLevelLoaded += OnPrePreLevelLoaded;
             SaveManager.onPreSave += OnPreSaved;
@@ -266,7 +267,6 @@ public sealed class DevkitServerModule : IModuleNexus
             Provider.onServerConnected += UserManager.AddUser;
             Provider.onEnemyConnected += UserManager.OnAccepted;
             Provider.onServerDisconnected += UserManager.RemoveUser;
-            Level.onLevelLoaded += OnLevelLoaded;
 #if USERINPUT_DEBUG
             Players.UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
 #endif
@@ -342,16 +342,35 @@ public sealed class DevkitServerModule : IModuleNexus
         }
     }
 #endif
-
-    private void OnPostLevelLoaded(int level)
+    private static void OnLevelLoaded(int level)
     {
-        if (IsEditing && level == Level.BUILD_INDEX_GAME)
+#if CLIENT
+        if (level == Level.BUILD_INDEX_MENU)
         {
-            TileSync.CreateServersideAuthority();
-            ObjectSync.CreateServersideAuthority();
-            HierarchySync.CreateServersideAuthority();
+            LoadingUI? loadingUI = UIAccessTools.LoadingUI;
+            if (loadingUI == null)
+            {
+                Logger.LogWarning("Unable to find LoadingUI.");
+            }
+
+            string dsPath = DevkitServerConfig.Directory;
+            Logger.LogDebug("Clearing temporary folders.");
+            foreach (string folder in Directory.EnumerateDirectories(dsPath, "Temp_*", SearchOption.TopDirectoryOnly))
+            {
+                try
+                {
+                    Directory.Delete(folder, true);
+                    Logger.LogDebug($"Removed temporary folder: {folder.Format()}.");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Unable to delete temporary folder: {folder.Format()}.");
+                    Logger.LogError(ex);
+                }
+            }
         }
-        else
+#endif
+        if (!IsEditing || level != Level.BUILD_INDEX_GAME)
         {
             if (GameObjectHost.TryGetComponent(out TileSync tileSync))
                 Object.Destroy(tileSync);
@@ -359,6 +378,25 @@ public sealed class DevkitServerModule : IModuleNexus
                 Object.Destroy(objectSync);
             if (GameObjectHost.TryGetComponent(out HierarchySync hierarchySync))
                 Object.Destroy(hierarchySync);
+            if (GameObjectHost.TryGetComponent(out EditorActions actions))
+                Object.Destroy(actions);
+        }
+        Logger.LogInfo("Level loaded: " + level + ".");
+        if (level == Level.BUILD_INDEX_GAME)
+        {
+#if SERVER
+            if (DevkitServerConfig.Config.TcpSettings is { EnableHighSpeedSupport: true })
+                _ = HighSpeedServer.Instance;
+#endif
+        }
+    }
+    private static void OnPostLevelLoaded(int level)
+    {
+        if (IsEditing && level == Level.BUILD_INDEX_GAME)
+        {
+            TileSync.CreateServersideAuthority();
+            ObjectSync.CreateServersideAuthority();
+            HierarchySync.CreateServersideAuthority();
         }
 
         if (!BitConverter.IsLittleEndian)
@@ -565,16 +603,6 @@ public sealed class DevkitServerModule : IModuleNexus
             Object.Destroy(comp);
 #endif
     }
-#if SERVER
-    private void OnLevelLoaded(int level)
-    {
-        Logger.LogInfo("Level loaded: " + level + ".");
-        if (level != Level.BUILD_INDEX_GAME)
-            return;
-        if (DevkitServerConfig.Config.TcpSettings is { EnableHighSpeedSupport: true })
-            _ = HighSpeedServer.Instance;
-    }
-#endif
     private static void OnPreSaved()
     {
         Logger.LogInfo("Saving...");
@@ -601,23 +629,6 @@ public sealed class DevkitServerModule : IModuleNexus
     }
     private static void OnPrePreLevelLoaded(int level)
     {
-#if CLIENT
-        if (level == Level.BUILD_INDEX_MENU)
-        {
-            LoadingUI? loadingUI = UIAccessTools.LoadingUI;
-            if (loadingUI == null)
-            {
-                Logger.LogWarning("Unable to find LoadingUI.");
-            }
-        }
-#endif
-        if (level != Level.BUILD_INDEX_GAME)
-        {
-            if (GameObjectHost.TryGetComponent(out EditorActions actions))
-                Object.Destroy(actions);
-            return;
-        }
-
 #if SERVER
         DevkitServerUtility.CheckDirectory(false, false, DevkitServerConfig.LevelDirectory, typeof(DevkitServerConfig).GetProperty(nameof(DevkitServerConfig.LevelDirectory), BindingFlags.Public | BindingFlags.Static));
         BackupManager = GameObjectHost.AddComponent<BackupManager>();
@@ -640,7 +651,10 @@ public sealed class DevkitServerModule : IModuleNexus
         CartographyUtil.Reset();
 #if CLIENT
         if (IsEditing)
+        {
             LevelObjectNetIdDatabase.LoadFromLevelData();
+            HierarchyItemNetIdDatabase.LoadFromLevelData();
+        }
 #endif
     }
 
