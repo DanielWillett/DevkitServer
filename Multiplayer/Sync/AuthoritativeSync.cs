@@ -166,6 +166,6 @@ public abstract class AuthoritativeSync<TSync> : AuthoritativeSync, ITerminalFor
 #endif
         Logger.LogDebug(this.Format() + " destroyed.");
     }
-    public override string ToString() => GetType().Name + " (" + (HasAuthority ? "Authority" : "Non-Authority") + ") (" + (User == null ? "Serverside" : User.SteamId.m_SteamID.ToString()) + ")";
-    public string Format(ITerminalFormatProvider provider) => GetType().Format() + " (" + (HasAuthority ? "Authority".Colorize(AuthColor) : "Non-Authority".Colorize(NoAuthColor)) + ") (" + (User == null ? "Serverside" : User.SteamId.m_SteamID.Format()) + ")";
+    public override string ToString() => GetType().Name + " (" + (HasAuthority ? "Authority" : "Non-Authority") + ") (" + (User is null ? "Serverside" : User.SteamId.m_SteamID.ToString()) + ")";
+    public string Format(ITerminalFormatProvider provider) => GetType().Format() + " (" + (HasAuthority ? "Authority".Colorize(AuthColor) : "Non-Authority".Colorize(NoAuthColor)) + ") (" + (User is null ? "Serverside" : User.SteamId.m_SteamID.Format()) + ")";
 }

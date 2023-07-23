@@ -93,7 +93,7 @@ internal static class SelectionToolPatches
                     }
 
                     i += i - lastLdArg0;
-                    Logger.LogDebug($"[CLIENT EVENTS] {method.Format()} - Patched in {invoker.Format()} to {method.Format()}.");
+                    Logger.LogDebug($"[CLIENT EVENTS] {method.Format()} - Patched in {invoker.Format()}.");
                 }
             }
             else if (recordDestruction != null && c.Calls(recordDestruction))
@@ -105,7 +105,7 @@ internal static class SelectionToolPatches
                     if (ins[j].operand is LocalBuilder bld && typeof(IEnumerator<DevkitSelection>).IsAssignableFrom(bld.LocalType))
                         break;
                 }
-                Logger.LogDebug($"[CLIENT EVENTS] {method.Format()} - Patched in {recordDestructionInvoker.Format()} to {method.Format()}.");
+                Logger.LogDebug($"[CLIENT EVENTS] {method.Format()} - Patched in {recordDestructionInvoker.Format()}.");
             }
             else if (requestInstantiation != null && c.Calls(requestInstantiation))
             {
@@ -133,10 +133,11 @@ internal static class SelectionToolPatches
     [UsedImplicitly]
     private static void SelectionToolOnHandleTranslatedAndRotated(Vector3 worldPositionDelta, Quaternion worldRotationDelta, Vector3 pivotPosition, bool modifyRotation)
     {
-        if (!DevkitServerModule.IsEditing || _movingHandle)
+        if (!DevkitServerModule.IsEditing || !_movingHandle)
             return;
 
-        Logger.LogDebug($"[CLIENT EVENTS] Temp move requested at: {string.Join(",", DevkitSelectionManager.selection.Select(selection => selection.gameObject.name.Format()))}: deltaPos: {worldPositionDelta.Format()}, deltaRot: {worldRotationDelta.eulerAngles.Format()}, pivotPos: {pivotPosition.Format()}, modifyRotation: {modifyRotation}.");
+        // todo (E with multiple selections)
+        Logger.LogDebug($"[CLIENT EVENTS] Set transform move requested at: {string.Join(",", DevkitSelectionManager.selection.Select(selection => selection.gameObject.name.Format()))}: deltaPos: {worldPositionDelta.Format()}, deltaRot: {worldRotationDelta.eulerAngles.Format()}, pivotPos: {pivotPosition.Format()}, modifyRotation: {modifyRotation}.");
     }
 
     /// <summary>Skipped for no permissions.</summary>
@@ -183,7 +184,7 @@ internal static class SelectionToolPatches
         {
             HierarchyUtil.HierarchyItemBuffer.Clear();
         }
-
+        
         _movingHandle = true;
         return true;
     }
@@ -385,7 +386,7 @@ internal static class SelectionToolPatches
                         FinalTransformation transformation = new FinalTransformation(netId,
                             new TransformationDelta(TransformationDelta.TransformFlags.All, transform.position, transform.rotation, selection.preTransformPosition, selection.preTransformRotation),
                             selection.gameObject.transform.localScale, selection.preTransformLocalScale);
-
+                        transformations.Add(transformation);
                         if (ClientEvents.ListeningOnMoveHierarchyObjectFinal)
                             ClientEvents.InvokeOnMoveHierarchyObjectFinal(new MoveHierarchyObjectFinalProperties(selection, item, transformation, useScale, dt));
                     }
