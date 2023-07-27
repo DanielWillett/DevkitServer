@@ -442,6 +442,17 @@ internal static class Accessor
             ? pA.Priority
             : 0);
     }
+    public static MethodInfo? GetMethod(Delegate @delegate)
+    {
+        try
+        {
+            return @delegate.Method;
+        }
+        catch (MemberAccessException)
+        {
+            return null;
+        }
+    }
     public static Delegate? GenerateInstanceCaller<TInstance>(string methodName, Type[]? parameters = null, bool throwOnError = false, bool useFptrReconstruction = false)
     {
         MethodInfo? method = null;

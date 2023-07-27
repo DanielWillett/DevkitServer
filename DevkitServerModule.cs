@@ -223,8 +223,7 @@ public sealed class DevkitServerModule : IModuleNexus
                 goto fault;
             }
             
-            foreach (Type type in Assembly.GetExecutingAssembly()
-                         .GetTypes()
+            foreach (Type type in Accessor.GetTypesSafe()
                          .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x,
                              (EarlyTypeInitAttribute?)Attribute.GetCustomAttribute(x, typeof(EarlyTypeInitAttribute))))
                          .Where(x => x.Value != null)
@@ -611,6 +610,7 @@ public sealed class DevkitServerModule : IModuleNexus
             Thread.BeginCriticalRegion();
             try
             {
+                LandscapeUtil.DeleteUnusedTileData();
                 Level.save();
 
                 HierarchyResponsibilities.Save();

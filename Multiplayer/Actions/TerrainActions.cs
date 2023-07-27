@@ -1126,24 +1126,13 @@ public sealed class TileModifyAction : IAction, ICoordinates
     {
         if (IsDelete)
         {
-            Landscape.removeTile(Coordinates);
-            LevelHierarchy.MarkDirty();
+            LandscapeUtil.RemoveTileLocal(Coordinates);
             Logger.LogInfo("Tile deleted: " + Coordinates + ".", ConsoleColor.DarkRed);
             return;
         }
 
-        LandscapeTile tile = Landscape.addTile(Coordinates);
-        if (tile != null)
-        {
-            tile.readHeightmaps();
-            tile.readSplatmaps();
-            tile.updatePrototypes();
-            Landscape.linkNeighbors();
-            Landscape.reconcileNeighbors(tile);
-            Landscape.applyLOD();
-            LevelHierarchy.MarkDirty();
-            Logger.LogInfo("Tile added: " + Coordinates + ".", ConsoleColor.Green);
-        }
+        LandscapeUtil.AddTileLocal(Coordinates);
+        Logger.LogInfo("Tile added: " + Coordinates + ".", ConsoleColor.Green);
     }
 #if SERVER
     public bool CheckCanApply()

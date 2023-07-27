@@ -1,5 +1,6 @@
 ﻿using SDG.Framework.Devkit;
 using SDG.Framework.Landscapes;
+using System.Globalization;
 using System.Reflection;
 
 namespace DevkitServer.Util;
@@ -12,6 +13,9 @@ public static class LandscapeUtil
 
     private static readonly StaticGetter<Dictionary<LandscapeCoord, LandscapeTile>> GetTiles =
         Accessor.GenerateStaticGetter<Landscape, Dictionary<LandscapeCoord, LandscapeTile>>("tiles", throwOnError: true)!;
+
+    private static readonly Action<LandscapeTile>? CallReadHoles =
+        Accessor.GenerateInstanceCaller<LandscapeTile, Action<LandscapeTile>>("ReadHoles", Array.Empty<Type>());
 
     /// <returns>A readonly value collection used to loop through all the existing tiles.</returns>
     public static IReadOnlyCollection<LandscapeTile> Tiles => GetTiles().Values;
@@ -132,6 +136,202 @@ public static class LandscapeUtil
             LandscapeHoleCopyPool.release(hm);
 
         dict.Clear();
+    }
+
+    /// <summary>
+    /// Locally delete a tile.
+    /// </summary>
+    /// <param name="deleteTerrainData">Deletes heightmap, splatmap, and hole data files from the map. The same as calling <see cref="CleanupTile(LandscapeCoord)"/></param>
+    public static void RemoveTileLocal(LandscapeCoord coordinate, bool deleteTerrainData = false)
+    {
+        Landscape.removeTile(coordinate);
+        LevelHierarchy.MarkDirty();
+        CleanupTile(coordinate);
+    }
+
+    /// <summary>
+    /// Locally add a tile and clear any heightmap and splatmap files for it.
+    /// </summary>
+    /// <returns><see langword="false"/> if the tile already exists.</returns>
+    public static bool AddTileLocal(LandscapeCoord coordinate)
+    {
+        LandscapeTile tile = Landscape.addTile(coordinate);
+        if (tile == null)
+            return false;
+
+        tile.readHeightmaps();
+        tile.readSplatmaps();
+        tile.updatePrototypes();
+        CallReadHoles?.Invoke(tile);
+        Landscape.linkNeighbors();
+        Landscape.reconcileNeighbors(tile);
+        Landscape.applyLOD();
+        LevelHierarchy.MarkDirty();
+
+        return true;
+    }
+    /// <summary>
+    /// Deletes splatmap, heightmap, and hole files for the provided tile.
+    /// </summary>
+    public static void CleanupTile(LandscapeCoord coordinate)
+    {
+        if (Level.info?.name == null)
+            return;
+
+        string prefix = "Tile_" + coordinate.x.ToString(CultureInfo.InvariantCulture) + "_" +
+                        coordinate.y.ToString(CultureInfo.InvariantCulture);
+        string hmDir = Path.Combine(Level.info.path, "Landscape", "Heightmaps");
+        try
+        {
+            if (Directory.Exists(hmDir))
+            {
+                foreach (string hmFile in Directory.GetFiles(hmDir, "*.heightmap", SearchOption.TopDirectoryOnly)
+                             .Where(x => Path.GetFileName(x).StartsWith(prefix, StringComparison.Ordinal)))
+                {
+                    try
+                    {
+                        File.Delete(hmFile);
+                        Logger.LogDebug($"[CLEANUP TILE] Cleaned up heightmap for tile {coordinate.Format()}: {hmFile.Format(true)}.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Error cleaning up heightmap for tile {coordinate.Format()}: {hmFile.Format(true)}.", method: "CLEANUP TILE");
+                        Logger.LogError(ex, method: "CLEANUP TILE");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error cleaning up heightmaps for tile {coordinate.Format()} in: {hmDir.Format(true)}.", method: "CLEANUP TILE");
+            Logger.LogError(ex, method: "CLEANUP TILE");
+        }
+
+        string smDir = Path.Combine(Level.info.path, "Landscape", "Splatmaps");
+        try
+        {
+            if (Directory.Exists(smDir))
+            {
+                foreach (string smFile in Directory.GetFiles(smDir, "*.splatmap", SearchOption.TopDirectoryOnly)
+                             .Where(x => Path.GetFileName(x).StartsWith(prefix, StringComparison.Ordinal)))
+                {
+                    try
+                    {
+                        File.Delete(smFile);
+                        Logger.LogDebug($"[CLEANUP TILE] Cleaned up splatmap for tile {coordinate.Format()}: {smFile.Format(true)}.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Error cleaning up splatmap for tile {coordinate.Format()}: {smFile.Format(true)}.", method: "CLEANUP TILE");
+                        Logger.LogError(ex, method: "CLEANUP TILE");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error cleaning up splatmaps for tile {coordinate.Format()} in: {smDir.Format(true)}.", method: "CLEANUP TILE");
+            Logger.LogError(ex, method: "CLEANUP TILE");
+        }
+
+        string hlDir = Path.Combine(Level.info.path, "Landscape", "Holes");
+        try
+        {
+            if (Directory.Exists(hlDir))
+            {
+                foreach (string hlFile in Directory.GetFiles(hlDir, "*.bin", SearchOption.TopDirectoryOnly)
+                             .Where(x => Path.GetFileName(x).StartsWith(prefix, StringComparison.Ordinal)))
+                {
+                    try
+                    {
+                        File.Delete(hlFile);
+                        Logger.LogDebug($"[CLEANUP TILE] Cleaned up holes for tile {coordinate.Format()}: {hlFile.Format(true)}.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Error cleaning up holes for tile {coordinate.Format()}: {hlFile.Format(true)}.", method: "CLEANUP TILE");
+                        Logger.LogError(ex, method: "CLEANUP TILE");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error cleaning up holes for tile {coordinate.Format()} in: {hlDir.Format(true)}.", method: "CLEANUP TILE");
+            Logger.LogError(ex, method: "CLEANUP TILE");
+        }
+    }
+    /// <summary>
+    /// Checks all heightmap, splatmap, and hole data files and deletes those without a matching tile.
+    /// </summary>
+    public static void DeleteUnusedTileData()
+    {
+        if (Level.info?.name == null)
+            return;
+        
+        const string prefix = "1_2_";
+
+        DeleteFilesIn(Path.Combine(Level.info.path, "Landscape", "Heightmaps"), "heightmaps", "heightmap", "heightmap");
+        DeleteFilesIn(Path.Combine(Level.info.path, "Landscape", "Splatmaps"), "splatmaps", "splatmap", "splatmap");
+        DeleteFilesIn(Path.Combine(Level.info.path, "Landscape", "Holes"), "holes", "holes", "bin");
+
+        static void DeleteFilesIn(string dir, string category, string type, string extension)
+        {
+            try
+            {
+                if (!Directory.Exists(dir))
+                    return;
+
+                foreach (string file in Directory.GetFiles(dir, "*." + extension, SearchOption.TopDirectoryOnly))
+                {
+                    string fn = Path.GetFileNameWithoutExtension(file);
+                    if (!fn.StartsWith(prefix, StringComparison.Ordinal))
+                        continue;
+                    int endX = fn.IndexOf('_', prefix.Length);
+                    if (endX == -1 || endX == fn.Length - 1)
+                        continue;
+                    int endY = fn.IndexOf('_', endX + 1);
+                    if (endY == -1)
+                        endY = fn.Length;
+
+                    if (!int.TryParse(fn.Substring(prefix.Length, endX - prefix.Length), NumberStyles.Number, CultureInfo.InvariantCulture, out int x) ||
+                        !int.TryParse(fn.Substring(endX + 1, endY - (endX + 1)), NumberStyles.Number, CultureInfo.InvariantCulture, out int y))
+                        continue;
+
+                    LandscapeCoord coordinate = new LandscapeCoord(x, y);
+                    if (Landscape.getTile(coordinate) != null)
+                        continue;
+
+                    try
+                    {
+                        File.Delete(file);
+                        Logger.LogDebug($"[DELETE UNUSED TILE DATA] Cleaned up {type} for tile {coordinate.Format()}: {file.Format(true)}.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Error cleaning up {type} for tile {coordinate.Format()}: {file.Format(true)}.", method: "DELETE UNUSED TILE DATA");
+                        Logger.LogError(ex, method: "DELETE UNUSED TILE DATA");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Error cleaning up {category}.", method: "DELETE UNUSED TILE DATA");
+                Logger.LogError(ex, method: "DELETE UNUSED TILE DATA");
+            }
+        }
+    }
+    /// <summary>
+    /// Calls <see cref="LandscapeTile.ReadHoles()"/>.
+    /// </summary>
+    /// <returns><see langword="true"/> if the method was successfully called.</returns>
+    public static bool ReadHoles(LandscapeTile tile)
+    {
+        if (CallReadHoles == null)
+            return false;
+
+        CallReadHoles(tile);
+        return true;
     }
 
     /// <returns>Number of tiles copied.</returns>

@@ -53,6 +53,7 @@ internal static class PatchesMain
 #if CLIENT
             LevelObjectPatches.OptionalPatches();
 #endif
+            DoManualPatches();
 
             Accessor.AddFunctionBreakpoints(AccessTools.Method(typeof(EditorObjects), "save"));
             // ConstructorInfo? info = typeof(MenuConfigurationOptionsUI).GetConstructors(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
@@ -73,12 +74,50 @@ internal static class PatchesMain
         try
         {
             Patcher.UnpatchAll(HarmonyId);
+            DoManualUnpatches();
             Logger.LogInfo($"Finished unpatching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
         }
         catch (Exception ex)
         {
             Logger.LogError(ex);
         }
+    }
+    private static void DoManualPatches()
+    {
+        try
+        {
+            MethodInfo? method = typeof(Level).GetMethod(nameof(Level.includeHash), BindingFlags.Public | BindingFlags.Static);
+            if (method != null)
+            {
+                Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(PatchLevelIncludeHatch)));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("Patcher error: Level.includeHash.");
+            Logger.LogError(ex);
+        }
+    }
+    private static void DoManualUnpatches()
+    {
+        try
+        {
+            MethodInfo? method = typeof(Level).GetMethod(nameof(Level.includeHash), BindingFlags.Public | BindingFlags.Static);
+            if (method != null)
+            {
+                Patcher.Unpatch(method, Accessor.GetMethod(PatchLevelIncludeHatch));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("Patcher unpatching error: Level.includeHash.");
+            Logger.LogError(ex);
+        }
+    }
+
+    private static bool PatchLevelIncludeHatch(string id, byte[] pendingHash)
+    {
+        return !Level.isLoaded;
     }
 
     private static bool IsEditorMode(PlayerCaller caller)
