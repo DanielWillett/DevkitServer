@@ -150,16 +150,23 @@ public static class LandscapeUtil
     }
 
     /// <summary>
-    /// Locally add a tile and clear any heightmap and splatmap files for it.
+    /// Locally add a tile.
     /// </summary>
-    /// <returns><see langword="false"/> if the tile already exists.</returns>
-    public static bool AddTileLocal(LandscapeCoord coordinate)
-    {
-        LandscapeTile tile = Landscape.addTile(coordinate);
-        if (tile == null)
-            return false;
+    /// <returns>The new tile, or if the tile already exists, the existing tile.</returns>
+    public static LandscapeTile AddTileLocal(LandscapeCoord coordinate) => AddTileLocal(coordinate, out _);
 
-        tile.readHeightmaps();
+    /// <summary>
+    /// Locally add a tile.
+    /// </summary>
+    /// <returns>The new tile, or if the tile already exists, the existing tile.</returns>
+    public static LandscapeTile AddTileLocal(LandscapeCoord coordinate, out bool alreadyExisted)
+    {
+        LandscapeTile? tile = Landscape.addTile(coordinate);
+        alreadyExisted = tile == null;
+        if (alreadyExisted)
+            return Landscape.getTile(coordinate)!;
+
+        tile!.readHeightmaps();
         tile.readSplatmaps();
         tile.updatePrototypes();
         CallReadHoles?.Invoke(tile);
@@ -167,8 +174,7 @@ public static class LandscapeUtil
         Landscape.reconcileNeighbors(tile);
         Landscape.applyLOD();
         LevelHierarchy.MarkDirty();
-
-        return true;
+        return tile;
     }
     /// <summary>
     /// Deletes splatmap, heightmap, and hole files for the provided tile.
