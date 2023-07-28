@@ -41,7 +41,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
             _displayTitle.positionOffset_Y = -Size - 60;
             _displayTitle.sizeOffset_X = Size + 20;
             _displayTitle.sizeOffset_Y = 30;
-            _displayTitle.text = DevkitServerModule.MainLocalization.Translate("No_Asset_Selected");
+            _displayTitle.text = DevkitServerModule.MainLocalization.Translate("NoAssetSelected");
 
             _container.AddChild(_displayTitle);
 
@@ -94,7 +94,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         else
         {
             _displayTitle.textColor = ESleekTint.FOREGROUND;
-            _displayTitle.text = DevkitServerModule.MainLocalization.Translate("No_Asset_Selected");
+            _displayTitle.text = DevkitServerModule.MainLocalization.Translate("NoAssetSelected");
         }
     }
 

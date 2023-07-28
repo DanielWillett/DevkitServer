@@ -12,7 +12,6 @@ using DevkitServer.Util.Region;
 using DevkitServer.Patches;
 using DevkitServer.Players;
 using System.Reflection;
-using Action = System.Action;
 #endif
 #if SERVER
 using DevkitServer.Players;

@@ -269,7 +269,7 @@ public static class LandscapeUtil
         if (Level.info?.name == null)
             return;
         
-        const string prefix = "1_2_";
+        const string prefix = "Tile_";
 
         DeleteFilesIn(Path.Combine(Level.info.path, "Landscape", "Heightmaps"), "heightmaps", "heightmap", "heightmap");
         DeleteFilesIn(Path.Combine(Level.info.path, "Landscape", "Splatmaps"), "splatmaps", "splatmap", "splatmap");

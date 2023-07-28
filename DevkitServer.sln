@@ -24,6 +24,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestPlugin", "TestPlugin\Te
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DevkitServer.Tests", "DevkitServer.Tests\DevkitServer.Tests.csproj", "{1653CB14-E527-4FD1-AB0F-06DAC72BFCDF}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{E7D6E35D-E5F1-4869-97F5-C515D78054DD}"
+	ProjectSection(SolutionItems) = preProject
+		Common.targets = Common.targets
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		ClientDebug|Any CPU = ClientDebug|Any CPU

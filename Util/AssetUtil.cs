@@ -182,6 +182,12 @@ public static class AssetUtil
         else if (File.Exists(englishLang))
             translationData = ReadFileWithoutHash(englishLang);
     }
+#if CLIENT
+    public static void RefreshLevelsUI()
+    {
+        Level.broadcastLevelsRefreshed();
+    }
+#endif
     static AssetUtil()
     {
         try

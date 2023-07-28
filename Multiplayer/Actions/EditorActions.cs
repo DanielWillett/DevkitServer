@@ -5,7 +5,6 @@ using DevkitServer.Players.UI;
 #endif
 #if CLIENT
 using DevkitServer.API.Abstractions;
-using Action = System.Action;
 #endif
 using System.Reflection;
 using DevkitServer.Multiplayer.Networking;

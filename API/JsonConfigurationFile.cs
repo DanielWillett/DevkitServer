@@ -2,7 +2,6 @@
 using SDG.Framework.Devkit;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Action = System.Action;
 
 namespace DevkitServer.API;
 public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvider<TConfig> where TConfig : class, new()

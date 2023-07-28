@@ -9,7 +9,6 @@ using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Players.UI;
 using SDG.Framework.Devkit.Transactions;
 using SDG.Framework.Utilities;
-using Action = System.Action;
 #endif
 
 namespace DevkitServer.Patches;

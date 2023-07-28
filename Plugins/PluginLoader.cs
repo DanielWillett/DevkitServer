@@ -8,7 +8,6 @@ using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Patches;
 using DevkitServer.Players.UI;
 using HarmonyLib;
-using Action = System.Action;
 
 namespace DevkitServer.Plugins;
 public static class PluginLoader

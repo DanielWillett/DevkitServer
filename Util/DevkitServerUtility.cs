@@ -6,7 +6,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using Action = System.Action;
 #if SERVER
 using DevkitServer.Configuration;
 using DevkitServer.Patches;

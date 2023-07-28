@@ -3,7 +3,6 @@ using DevkitServer.Players.UI;
 using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
-using Action = System.Action;
 
 namespace DevkitServer.API.UI;
 public abstract class UIExtension

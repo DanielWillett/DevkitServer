@@ -13,7 +13,6 @@ using SDG.Framework.Landscapes;
 using SDG.Framework.Utilities;
 using System.Reflection;
 using System.Reflection.Emit;
-using Action = System.Action;
 
 namespace DevkitServer.Patches;
 

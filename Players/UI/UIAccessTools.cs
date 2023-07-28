@@ -5,7 +5,6 @@ using HarmonyLib;
 using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Reflection.Emit;
-using Action = System.Action;
 
 namespace DevkitServer.Players.UI;
 

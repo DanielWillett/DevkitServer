@@ -85,7 +85,8 @@ public sealed class DevkitServerModule : IModuleNexus
     {
         { "Name", "Devkit Server" },
         { "Help", "help" },
-        { "No_Asset_Selected", "No Asset Selected" }
+        { "NoAssetSelected", "No Asset Selected" },
+        { "RefreshLevelButton", "Refresh Level" }
     };
     public static Local CommandLocalization { get; private set; } = null!;
 

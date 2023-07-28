@@ -7,7 +7,6 @@ using DevkitServer.API;
 using DevkitServer.Patches;
 using HarmonyLib;
 using StackCleaner;
-using Action = System.Action;
 
 namespace DevkitServer.Util;
 internal static class Accessor

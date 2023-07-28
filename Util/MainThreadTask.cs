@@ -1,5 +1,4 @@
 ﻿using System.Runtime.CompilerServices;
-using Action = System.Action;
 
 namespace DevkitServer.Util;
 

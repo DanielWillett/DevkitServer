@@ -4,7 +4,6 @@ using DevkitServer.Util.Encoding;
 using System.IO.Compression;
 using System.Reflection;
 using SDG.Provider;
-using Action = System.Action;
 #if CLIENT
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Patches;
