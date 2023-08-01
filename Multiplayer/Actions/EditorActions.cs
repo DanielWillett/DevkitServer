@@ -23,6 +23,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     public const ushort DataVersion = 1;
     public const ushort ActionBaseSize = 1;
     public const int MaxPacketSize = 16384;
+    private const float ActionFlushInterval = 0.125f;
 
     private static readonly ByteReader Reader = new ByteReader { ThrowOnError = true };
     private static readonly ByteWriter Writer = new ByteWriter(false, 8192);
@@ -57,7 +58,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 
     internal static Coroutine? CatchUpCoroutine;
     private bool _isRunningCatchUpCoroutine;
-    public static bool HasLargeQueue(EditorUser? user = null, int ct = 96)
+    public static bool HasLargeQueue(EditorUser? user = null)
     {
         user ??= EditorUser.User;
         if (user == null || user.Actions == null)
@@ -249,7 +250,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         _queuedThisFrame = false;
         if (IsOwner)
         {
-            if (t - _lastFlush >= 1f)
+            if (t - _lastFlush >= ActionFlushInterval)
             {
                 _lastFlush = t;
                 FlushEdits();

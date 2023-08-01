@@ -19,50 +19,82 @@ internal class EditorLevelObjectsUIExtension : UIExtension
     [ExistingUIMember("assetsScrollBox")]
     private readonly SleekList<Asset> _assetsScrollBox;
 
+    [ExistingUIMember("selectedBox")]
+    private ISleekBox SelectedBox { get; }
+
     private readonly ISleekBox _displayTitle;
     private readonly ISleekImage _preview;
     internal EditorLevelObjectsUIExtension()
     {
-        if (DevkitServerConfig.Config.EnableObjectUIExtension)
-        {
-            ISleekBox displayBox = Glazier.Get().CreateBox();
-            displayBox.positionScale_X = 1f;
-            displayBox.positionScale_Y = 1f;
-            displayBox.positionOffset_X = _assetsScrollBox.positionOffset_X - (Size + 30);
-            displayBox.positionOffset_Y = -Size - 20;
-            displayBox.sizeOffset_X = Size + 20;
-            displayBox.sizeOffset_Y = Size + 20;
-            _container.AddChild(displayBox);
+        if (!DevkitServerConfig.Config.EnableObjectUIExtension)
+            return;
 
-            _displayTitle = Glazier.Get().CreateBox();
-            _displayTitle.positionScale_X = 1f;
-            _displayTitle.positionScale_Y = 1f;
-            _displayTitle.positionOffset_X = _assetsScrollBox.positionOffset_X - (Size + 30);
-            _displayTitle.positionOffset_Y = -Size - 60;
-            _displayTitle.sizeOffset_X = Size + 20;
-            _displayTitle.sizeOffset_Y = 30;
-            _displayTitle.text = DevkitServerModule.MainLocalization.Translate("NoAssetSelected");
+        ISleekBox displayBox = Glazier.Get().CreateBox();
+        displayBox.positionScale_X = 1f;
+        displayBox.positionScale_Y = 1f;
+        displayBox.positionOffset_X = _assetsScrollBox.positionOffset_X - (Size + 30);
+        displayBox.positionOffset_Y = -Size - 20;
+        displayBox.sizeOffset_X = Size + 20;
+        displayBox.sizeOffset_Y = Size + 20;
+        _container.AddChild(displayBox);
 
-            _container.AddChild(_displayTitle);
+        _displayTitle = Glazier.Get().CreateBox();
+        _displayTitle.positionScale_X = 1f;
+        _displayTitle.positionScale_Y = 1f;
+        _displayTitle.positionOffset_X = _assetsScrollBox.positionOffset_X - (Size + 30);
+        _displayTitle.positionOffset_Y = -Size - 60;
+        _displayTitle.sizeOffset_X = Size + 20;
+        _displayTitle.sizeOffset_Y = 30;
+        _displayTitle.text = DevkitServerModule.MainLocalization.Translate("NoAssetSelected");
 
-            _preview = Glazier.Get().CreateImage();
-            _preview.sizeScale_X = 0f;
-            _preview.sizeScale_Y = 0f;
-            _preview.positionScale_X = 0.5f;
-            _preview.positionScale_Y = 0.5f;
-            _preview.sizeOffset_X = Size;
-            _preview.sizeOffset_Y = Size;
-            _preview.shouldDestroyTexture = true;
+        _container.AddChild(_displayTitle);
 
-            UpdateSelectedObject();
+        _preview = Glazier.Get().CreateImage();
+        _preview.sizeScale_X = 0f;
+        _preview.sizeScale_Y = 0f;
+        _preview.positionScale_X = 0.5f;
+        _preview.positionScale_Y = 0.5f;
+        _preview.sizeOffset_X = Size;
+        _preview.sizeOffset_Y = Size;
+        _preview.shouldDestroyTexture = true;
 
-            displayBox.AddChild(_preview);
+        UpdateSelectedObject();
 
-            if (!_patched)
-                Patch();
-        }
+        displayBox.AddChild(_preview);
+
+        if (!_patched)
+            Patch();
     }
 #nullable restore
+
+    public static void UpdateSelection(ObjectAsset? levelObject, ItemAsset? buildable)
+    {
+        UIExtensionInfo? info = UIExtensionManager.Extensions.FirstOrDefault(x => x.ImplementationType == typeof(EditorLevelObjectsUIExtension));
+
+        if (info == null)
+            return;
+        EditorLevelObjectsUIExtension? inst = info.Instantiations.OfType<EditorLevelObjectsUIExtension>().LastOrDefault();
+        try
+        {
+            ISleekBox? box = inst?.SelectedBox;
+            if (box == null)
+                return;
+            if (levelObject == null && buildable is not ItemBarricadeAsset and not ItemStructureAsset)
+                box.text = string.Empty;
+            else if (levelObject != null)
+                box.text = levelObject.FriendlyName;
+            else
+                box.text = buildable!.FriendlyName;
+
+            if (inst != null && DevkitServerConfig.Config.EnableObjectUIExtension)
+                inst.UpdateSelectedObject();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error updating selection.");
+            Logger.LogError(ex);
+        }
+    }
 
     internal void UpdateSelectedObject()
     {
@@ -147,7 +179,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
     }
     private static void OnUpdatedElement(bool __runOriginal)
     {
-        if (!__runOriginal)
+        if (!__runOriginal || !DevkitServerConfig.Config.EnableObjectUIExtension)
             return;
 
         UIExtensionInfo? info = UIExtensionManager.Extensions.FirstOrDefault(x => x.ImplementationType == typeof(EditorLevelObjectsUIExtension));

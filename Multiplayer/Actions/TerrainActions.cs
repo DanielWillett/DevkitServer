@@ -486,12 +486,12 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrush
         }
         catch (NotImplementedException)
         {
-            Logger.LogError("Failed to reverse patch " + Accessor.GetMethodInfo(SampleHeightPixelSmooth)?.Format() + ".");
+            Logger.LogError("Failed to reverse patch " + Accessor.GetMethod(SampleHeightPixelSmooth)?.Format() + ".");
             DevkitServerModule.Fault();
             return;
         }
 
-        Logger.LogDebug("Reverse patched " + Accessor.GetMethodInfo(SampleHeightPixelSmooth)?.Format() + ".");
+        Logger.LogDebug("Reverse patched " + Accessor.GetMethod(SampleHeightPixelSmooth)?.Format() + ".");
     }
     public void Apply()
     {
@@ -636,12 +636,12 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
         }
         catch (NotImplementedException)
         {
-            Logger.LogError("Failed to reverse patch " + Accessor.GetMethodInfo(BlendSplatmapWeights)?.Format() + ".");
+            Logger.LogError("Failed to reverse patch " + Accessor.GetMethod(BlendSplatmapWeights)?.Format() + ".");
             DevkitServerModule.Fault();
         }
         catch (NullReferenceException)
         {
-            Logger.LogDebug("Reverse patched " + Accessor.GetMethodInfo(BlendSplatmapWeights)?.Format() + ".");
+            Logger.LogDebug("Reverse patched " + Accessor.GetMethod(BlendSplatmapWeights)?.Format() + ".");
         }
 
         try
@@ -662,16 +662,16 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
         {
             int val = GetSplatmapTargetMaterialLayerIndex(null, null!, default); // invalid material returns -1
             if (val == -1)
-                Logger.LogDebug("Reverse patched " + Accessor.GetMethodInfo(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
+                Logger.LogDebug("Reverse patched " + Accessor.GetMethod(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
         }
         catch (NotImplementedException)
         {
-            Logger.LogError("Failed to reverse patch " + Accessor.GetMethodInfo(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
+            Logger.LogError("Failed to reverse patch " + Accessor.GetMethod(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
             DevkitServerModule.Fault();
         }
         catch (NullReferenceException)
         {
-            Logger.LogDebug("Reverse patched " + Accessor.GetMethodInfo(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
+            Logger.LogDebug("Reverse patched " + Accessor.GetMethod(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
         }
     }
 
@@ -1170,7 +1170,7 @@ public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinates
             Accessor.AssemblyCSharp
                 .GetType("SDG.Unturned.TerrainTileLayer")?
                 .GetMethod("UpdateSelectedTile", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!
-            , false, useFptrReconstruction: true);
+            , allowUnsafeTypeBinding: true);
 #endif
     public ActionType Type => ActionType.UpdateSplatmapLayers;
     public CSteamID Instigator { get; set; }

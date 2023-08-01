@@ -16,7 +16,6 @@ using System.Net;
 namespace DevkitServer.Util;
 public static class DevkitServerUtility
 {
-    public const int Int24MaxValue = 8388607;
     public static string QuickFormat(string input, string? val)
     {
         int ind = input.IndexOf("{0}", StringComparison.Ordinal);
@@ -36,7 +35,7 @@ public static class DevkitServerUtility
     public static Regex RemoveTMProRichTextRegex { get; } =
         new Regex(@"(?<!(?:\<noparse\>(?!\<\/noparse\>)).*)\<\/{0,1}(?:(?:noparse)|(?:alpha)|(?:alpha=#[0-f]{1,2})|(?:[su])|(?:su[pb])|(?:lowercase)|(?:uppercase)|(?:smallcaps))\>", RegexOptions.IgnoreCase);
     [Pure]
-    public static string FormatBytes(long length)
+    public static string FormatBytes(long length, int decimals = 1)
     {
         _sizeCodes ??= new string[]
         {
@@ -75,7 +74,7 @@ public static class DevkitServerUtility
         double len = length / _sizeIncrements[inc];
         if (neg) len = -len;
 
-        return len.ToString("N1") + " " + _sizeCodes[inc];
+        return len.ToString("N" + Math.Max(0, decimals).ToString(CultureInfo.InvariantCulture)) + " " + _sizeCodes[inc];
     }
     [Pure]
     public static Bounds InflateBounds(in Bounds bounds)
@@ -83,15 +82,6 @@ public static class DevkitServerUtility
         Vector3 c = bounds.center;
         Vector3 e = bounds.extents;
         return new Bounds(new Vector3(Mathf.Round(c.x), Mathf.Round(c.y), Mathf.Round(c.z)), new Vector3((e.x + 0.5f).CeilToIntIgnoreSign(), (e.y + 0.5f).CeilToIntIgnoreSign(), (e.z + 0.5f).CeilToIntIgnoreSign()));
-    }
-    public static unsafe void ReverseFloat(byte* ptr, int index)
-    {
-        byte b = ptr[index + 1];
-        ptr[index + 1] = ptr[index + 2];
-        ptr[index + 2] = b;
-        b = ptr[index];
-        ptr[index] = ptr[index + 3];
-        ptr[index + 3] = b;
     }
     [Pure]
     public static uint ReverseUInt32(uint val) => ((val >> 24) & 0xFF) | (((val >> 16) & 0xFF) << 8) | (((val >> 8) & 0xFF) << 16) | (val << 24);
@@ -653,10 +643,21 @@ public static class DevkitServerUtility
 #if SERVER
         EditorUser user,
 #endif
-        string message)
+        string message) =>
+        CustomDisconnect(
+#if SERVER
+            user,
+#endif
+        message, ESteamConnectionFailureInfo.KICKED
+    );
+    public static void CustomDisconnect(
+#if SERVER
+        EditorUser user,
+#endif
+        string message, ESteamConnectionFailureInfo failureType)
     {
 #if CLIENT
-        Provider.connectionFailureInfo = ESteamConnectionFailureInfo.KICKED;
+        Provider.connectionFailureInfo = failureType;
         Provider.RequestDisconnect(Provider.connectionFailureReason = message);
 #else
         if (Provider.pending.Any(x => x.playerID.steamID.m_SteamID == user.SteamId.m_SteamID))
@@ -715,28 +716,6 @@ public static class DevkitServerUtility
         return q.x > -tolerance && q.x < tolerance && q.y > -tolerance && q.y < tolerance && q.z > -tolerance && q.z < tolerance && q.w - 1f > -tolerance && q.w - 1f < tolerance;
     }
 
-    /// <remarks><see cref="ItemPantsAsset"/> and <see cref="ItemShirtAsset"/> takes a <see cref="Texture2D"/> instead of a <see cref="GameObject"/> so they are not included in this method.</remarks>
-    [Pure]
-    public static GameObject? GetItemInstance(this ItemAsset asset)
-    {
-        return asset switch
-        {
-            ItemBackpackAsset a => a.backpack,
-            ItemBarrelAsset a => a.barrel,
-            ItemBarricadeAsset a => a.barricade,
-            ItemGlassesAsset a => a.glasses,
-            ItemGripAsset a => a.grip,
-            ItemHatAsset a => a.hat,
-            ItemMagazineAsset a => a.magazine,
-            ItemMaskAsset a => a.mask,
-            ItemSightAsset a => a.sight,
-            ItemStructureAsset a => a.structure,
-            ItemTacticalAsset a => a.tactical,
-            ItemThrowableAsset a => a.throwable,
-            ItemVestAsset a => a.vest,
-            _ => null
-        };
-    }
     /// <remarks>Includes pending connections.</remarks>
     [Pure]
     public static PooledTransportConnectionList GetAllConnections()
@@ -965,6 +944,65 @@ public static class DevkitServerUtility
 
         return rtn;
     }
+    /// <summary>
+    /// Creates a copy or moves a file, for example, 'OriginalName' to 'OriginalName Backup', and optionally assigns a number if there are duplicate files.
+    /// </summary>
+    /// <param name="originalFile">Path to the file to copy or move.</param>
+    /// <param name="overwrite">Allows the copy or move operation to just overwrite existing files instead of incrementing a number.</param>
+    /// <returns>The path to the newly created or moved file.</returns>
+    public static string BackupFile(string originalFile, bool moveInsteadOfCopy, bool overwrite = true)
+    {
+        string ext = Path.GetExtension(originalFile);
+        string? dir = Path.GetDirectoryName(originalFile);
+        string fn = Path.GetFileNameWithoutExtension(originalFile) + " Backup";
+        if (dir != null)
+            fn = Path.Combine(dir, fn);
+        if (File.Exists(fn + ext) && !overwrite)
+        {
+            int num = 0;
+            fn += " ";
+            while (File.Exists(fn + num.ToString(CultureInfo.InvariantCulture) + ext))
+                ++num;
+            fn += num.ToString(CultureInfo.InvariantCulture);
+        }
+
+        DateTime? lastModified = null;
+        try
+        {
+            lastModified = File.GetLastWriteTimeUtc(originalFile);
+        }
+        catch
+        {
+            // ignored
+        }
+
+        fn += ext;
+        if (moveInsteadOfCopy)
+        {
+            if (overwrite && File.Exists(fn))
+                File.Delete(fn);
+
+            File.Move(originalFile, fn);
+        }
+        else
+        {
+            File.Copy(originalFile, fn, overwrite);
+        }
+
+        try
+        {
+            File.SetCreationTimeUtc(fn, DateTime.UtcNow);
+
+            if (lastModified.HasValue)
+                File.SetLastWriteTimeUtc(fn, lastModified.Value);
+        }
+        catch
+        {
+            // ignored
+        }
+
+        return fn;
+    }
 }
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
@@ -997,30 +1035,54 @@ public sealed class CreateDirectoryAttribute : Attribute
                 continue;
             if (typeof(string).IsAssignableFrom(field.FieldType))
             {
-                string? path = (string?)field.GetValue(null);
-                if (path == null)
-                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
-                else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, field);
+                try
+                {
+                    string? path = (string?)field.GetValue(null);
+                    if (path == null)
+                        Logger.LogWarning($"Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.", method: "CHECK DIR");
+                    else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, field);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Unable to check directory for {field.Format()}, type initializer threw exception.", method: "CHECK DIR");
+                    Logger.LogError(ex, method: "CHECK DIR");
+                }
             }
             else if (typeof(FileInfo).IsAssignableFrom(field.FieldType))
             {
-                FileInfo? fileInfo = (FileInfo?)field.GetValue(null);
-                cdir.RelativeToGameDir = false;
-                string? file = fileInfo?.DirectoryName;
-                if (file == null)
+                try
                 {
-                    if (fileInfo == null)
-                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
+                    FileInfo? fileInfo = (FileInfo?)field.GetValue(null);
+                    cdir.RelativeToGameDir = false;
+                    string? file = fileInfo?.DirectoryName;
+                    if (file == null)
+                    {
+                        if (fileInfo == null)
+                            Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
+                    }
+                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, field);
                 }
-                else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, field);
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Unable to check directory for {field.Format()}, type initializer threw exception.", method: "CHECK DIR");
+                    Logger.LogError(ex, method: "CHECK DIR");
+                }
             }
             else if (typeof(DirectoryInfo).IsAssignableFrom(field.FieldType))
             {
-                string? dir = ((DirectoryInfo?)field.GetValue(null))?.FullName;
-                cdir.RelativeToGameDir = false;
-                if (dir == null)
-                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
-                else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, field);
+                try
+                {
+                    string? dir = ((DirectoryInfo?)field.GetValue(null))?.FullName;
+                    cdir.RelativeToGameDir = false;
+                    if (dir == null)
+                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
+                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, field);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Unable to check directory for {field.Format()}, type initializer threw exception.", method: "CHECK DIR");
+                    Logger.LogError(ex, method: "CHECK DIR");
+                }
             }
             else
             {
@@ -1037,28 +1099,52 @@ public sealed class CreateDirectoryAttribute : Attribute
                 continue;
             if (typeof(string).IsAssignableFrom(property.PropertyType))
             {
-                string? path = (string?)property.GetMethod?.Invoke(null, Array.Empty<object>());
-                if (path == null)
-                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
-                else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, property);
+                try
+                {
+                    string? path = (string?)property.GetMethod?.Invoke(null, Array.Empty<object>());
+                    if (path == null)
+                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
+                    else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, property);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Unable to check directory for {property.Format()}, property getter or type initializer threw exception.", method: "CHECK DIR");
+                    Logger.LogError(ex, method: "CHECK DIR");
+                }
             }
             else if (typeof(FileInfo).IsAssignableFrom(property.PropertyType))
             {
-                FileInfo? fileInfo = (FileInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>());
-                string? file = fileInfo?.DirectoryName;
-                if (file == null)
+                try
                 {
-                    if (fileInfo == null)
-                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
+                    FileInfo? fileInfo = (FileInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>());
+                    string? file = fileInfo?.DirectoryName;
+                    if (file == null)
+                    {
+                        if (fileInfo == null)
+                            Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
+                    }
+                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, property);
                 }
-                else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, property);
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Unable to check directory for {property.Format()}, property getter or type initializer threw exception.", method: "CHECK DIR");
+                    Logger.LogError(ex, method: "CHECK DIR");
+                }
             }
             else if (typeof(DirectoryInfo).IsAssignableFrom(property.PropertyType))
             {
-                string? dir = ((DirectoryInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>()))?.FullName;
-                if (dir == null)
-                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
-                else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, property);
+                try
+                {
+                    string? dir = ((DirectoryInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>()))?.FullName;
+                    if (dir == null)
+                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
+                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, property);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Unable to check directory for {property.Format()}, property getter or type initializer threw exception.", method: "CHECK DIR");
+                    Logger.LogError(ex, method: "CHECK DIR");
+                }
             }
             else
             {

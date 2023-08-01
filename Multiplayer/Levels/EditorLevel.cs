@@ -395,7 +395,7 @@ public static class EditorLevel
 #endif
 #if CLIENT
     private static readonly Func<string, bool, ulong, LevelInfo?> LoadLevelInfo =
-        Accessor.GenerateStaticCaller<Level, Func<string, bool, ulong, LevelInfo?>>("loadLevelInfo", new Type[] { typeof(string), typeof(bool), typeof(ulong) }, true)!;
+        Accessor.GenerateStaticCaller<Level, Func<string, bool, ulong, LevelInfo?>>("loadLevelInfo", throwOnError: true, allowUnsafeTypeBinding: true)!;
 
     internal static LevelData? ServerPendingLevelData;
 
@@ -796,13 +796,11 @@ public static class EditorLevel
         DevkitServerModule.ComponentHost.StartCoroutine(DevkitServerModule.Instance.TryLoadBundle(() => DevkitServerModule.ComponentHost.StartCoroutine(LoadLevel(dir))));
     }
 
-    private static readonly InstanceGetter<Asset, AssetOrigin>? GetAssetOrigin = Accessor.GenerateInstanceGetter<Asset, AssetOrigin>("origin");
-
     private static readonly InstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>> GetServerPendingIDs =
-        Accessor.GenerateInstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>>("serverPendingIDs", BindingFlags.NonPublic, true)!;
+        Accessor.GenerateInstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>>("serverPendingIDs", throwOnError: true)!;
 
     private static readonly Action<LevelInfo, List<PublishedFileId_t>> ApplyServerAssetMapping =
-        Accessor.GenerateStaticCaller<Assets, Action<LevelInfo, List<PublishedFileId_t>>>("ApplyServerAssetMapping", null, true)!;
+        Accessor.GenerateStaticCaller<Assets, Action<LevelInfo, List<PublishedFileId_t>>>("ApplyServerAssetMapping", throwOnError: true, allowUnsafeTypeBinding: true)!;
 
     private static IEnumerator LoadLevel(string dir)
     {
@@ -832,20 +830,17 @@ public static class EditorLevel
             {
                 yield return null;
             }
-
-            if (GetAssetOrigin != null)
-            {
-                List<Asset> allAssets = new List<Asset>(8192);
-                Assets.find(allAssets);
-                Logger.LogInfo($"[RECEIVE LEVEL] Loaded {allAssets.Count(x => GetAssetOrigin(x) == origin).Format()} asset(s) from {origin.name.Format()}");
-            }
+#if DEBUG
+            List<Asset> allAssets = new List<Asset>(8192);
+            Assets.find(allAssets);
+            Logger.LogInfo($"[RECEIVE LEVEL] Loaded {allAssets.Count(x => x.GetOrigin() == origin).Format()} asset(s) from {origin.name.Format()}");
+#endif
 
             GC.Collect();
             Resources.UnloadUnusedAssets();
         }
-
-        DevkitServerModule.PendingLevelInfo = info;
-        PatchesMain.Launch();
+        
+        PatchesMain.Launch(info);
     }
 #endif
 }

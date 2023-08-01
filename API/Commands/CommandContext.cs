@@ -1,4 +1,5 @@
 ﻿using Cysharp.Threading.Tasks;
+using DevkitServer.API.Logging;
 using DevkitServer.API.Permissions;
 using DevkitServer.Commands.Subsystem;
 using DevkitServer.Multiplayer;

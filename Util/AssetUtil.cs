@@ -15,6 +15,37 @@ public static class AssetUtil
     private static readonly Action<MasterBundleConfig>? CheckOwnerCustomDataAndMaybeUnload;
     private static readonly StaticGetter<List<MasterBundleConfig>>? AllMasterBundlesGetter;
 
+    private static readonly InstanceGetter<Asset, AssetOrigin>? GetAssetOrigin = Accessor.GenerateInstanceGetter<Asset, AssetOrigin>("origin");
+    
+    /// <returns>The origin of the asset, or <see langword="null"/> in the case of a reflection failure.</returns>
+    [Pure]
+    public static AssetOrigin? GetOrigin(this Asset asset)
+    {
+        return asset == null ? null : GetAssetOrigin?.Invoke(asset);
+    }
+
+    /// <remarks><see cref="ItemPantsAsset"/> and <see cref="ItemShirtAsset"/> takes a <see cref="Texture2D"/> instead of a <see cref="GameObject"/> so they are not included in this method.</remarks>
+    [Pure]
+    public static GameObject? GetItemInstance(ItemAsset asset)
+    {
+        return asset switch
+        {
+            ItemBackpackAsset a => a.backpack,
+            ItemBarrelAsset a => a.barrel,
+            ItemBarricadeAsset a => a.barricade,
+            ItemGlassesAsset a => a.glasses,
+            ItemGripAsset a => a.grip,
+            ItemHatAsset a => a.hat,
+            ItemMagazineAsset a => a.magazine,
+            ItemMaskAsset a => a.mask,
+            ItemSightAsset a => a.sight,
+            ItemStructureAsset a => a.structure,
+            ItemTacticalAsset a => a.tactical,
+            ItemThrowableAsset a => a.throwable,
+            ItemVestAsset a => a.vest,
+            _ => null
+        };
+    }
     /// <summary>
     /// Returns the asset category (<see cref="EAssetType"/>) of <typeparamref name="TAsset"/>. Effeciently cached.
     /// </summary>
@@ -24,6 +55,7 @@ public static class AssetUtil
     /// <summary>
     /// Returns a read-only list of all loaded master bundles, or empty in the case of a reflection failure.
     /// </summary>
+    [Pure]
     public static IReadOnlyList<MasterBundleConfig> GetAllMasterBundles() => AllMasterBundlesGetter == null ? Array.Empty<MasterBundleConfig>() : AllMasterBundlesGetter().AsReadOnly();
 
     /// <summary>

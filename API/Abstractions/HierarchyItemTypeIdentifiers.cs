@@ -279,7 +279,7 @@ public readonly struct HierarchyItemTypeIdentifierFactoryInfo
     internal HierarchyItemTypeIdentifierFactoryInfo(IHierarchyItemTypeIdentifierFactory factory, Type type, IDevkitServerPlugin? plugin)
     {
         Factory = factory;
-        Type = factory.GetType();
+        Type = type;
         Plugin = plugin;
     }
     internal HierarchyItemTypeIdentifierFactoryInfo(IHierarchyItemTypeIdentifierFactory factory, IDevkitServerPlugin plugin)
@@ -374,8 +374,7 @@ public sealed class LegacyDevkitHierarchyWorldObjectIdentifier : IHierarchyItemT
 public sealed class NodeItemTypeIdentifier : IHierarchyItemTypeIdentifier
 {
     private static readonly Action<TempNodeSystemBase, Vector3>? CallInstantiateNodeSystem =
-        Accessor.GenerateInstanceCaller<TempNodeSystemBase, Action<TempNodeSystemBase, Vector3>>("Instantiate",
-            new Type[] { typeof(Vector3) }, false);
+        Accessor.GenerateInstanceCaller<TempNodeSystemBase, Action<TempNodeSystemBase, Vector3>>("Instantiate", allowUnsafeTypeBinding: true);
 
     private static readonly Dictionary<Type, NodeItemTypeIdentifier> Pool = new Dictionary<Type, NodeItemTypeIdentifier>(3);
     public static NodeItemTypeIdentifier Get(Type type)
@@ -523,8 +522,7 @@ public sealed class NodeItemTypeIdentifier : IHierarchyItemTypeIdentifier
 public sealed class VolumeItemTypeIdentifier : IHierarchyItemTypeIdentifier
 {
     private static readonly Action<VolumeManagerBase, Vector3, Quaternion, Vector3>? CallInstantiateVolumeSystem =
-        Accessor.GenerateInstanceCaller<VolumeManagerBase, Action<VolumeManagerBase, Vector3, Quaternion, Vector3>>("InstantiateVolume",
-            new Type[] { typeof(Vector3), typeof(Quaternion), typeof(Vector3) }, false);
+        Accessor.GenerateInstanceCaller<VolumeManagerBase, Action<VolumeManagerBase, Vector3, Quaternion, Vector3>>("InstantiateVolume", throwOnError: false, allowUnsafeTypeBinding: true);
 
     private static readonly Dictionary<Type, VolumeItemTypeIdentifier> Pool = new Dictionary<Type, VolumeItemTypeIdentifier>(18);
     public static VolumeItemTypeIdentifier Get(Type type)

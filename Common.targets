@@ -181,6 +181,9 @@
         <Using Include="System.Action">
             <Alias>Action</Alias>
         </Using>
+      <Using Include="DevkitServer.API.Logging.Logger">
+        <Alias>Logger</Alias>
+      </Using>
 
     </ItemGroup>
 

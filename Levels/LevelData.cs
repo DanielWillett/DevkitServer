@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using DevkitServer.Models;
+using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
@@ -19,17 +20,23 @@ public sealed class LevelData
     public RegionIdentifier[] Buildables { get; internal set; }
     public byte[] Data { get; internal set; }
     public bool Compressed { get; internal set; }
+    public List<ulong>[,] BuildableData { get; internal set; }
 #nullable restore
+    private string? _lclPath;
     private LevelData() { }
 
     public LevelData(LevelData other)
     {
         LevelFolderContent = other.LevelFolderContent;
+        _lclPath = other._lclPath;
         Data = other.Data;
         Compressed = other.Compressed;
         Objects = other.Objects;
         Buildables = other.Buildables;
         LevelObjectNetIds = other.LevelObjectNetIds;
+        HierarchyItemNetIds = other.HierarchyItemNetIds;
+        HierarchyItems = other.HierarchyItems;
+        BuildableData = other.BuildableData;
         Version = DataVersion;
     }
     public static LevelData GatherLevelData()
@@ -39,13 +46,16 @@ public sealed class LevelData
         Stopwatch stopwatch = Stopwatch.StartNew();
 #endif
         Level.save();
-        Folder folder = new Folder(Level.info.path, ShouldSendFile, null);
+        string lclPath = Level.info.path;
+        Folder folder = new Folder(lclPath, ShouldSendFile, null);
         LevelData data = new LevelData
         {
             LevelFolderContent = folder,
+            _lclPath = lclPath
         };
         LevelObjectNetIdDatabase.GatherData(data);
         HierarchyItemNetIdDatabase.GatherData(data);
+        BuildableResponsibilities.GatherData(data);
 #if DEBUG
         Logger.LogDebug($"[EDITOR LEVEL] GatherLevelData took {stopwatch.GetElapsedMilliseconds().Format("F2")} ms.");
 #endif
@@ -63,8 +73,7 @@ public sealed class LevelData
         LevelData data = new LevelData
         {
             Version = reader.ReadUInt32(),
-            Data = payload,
-            LevelFolderContent = Folder.Read(_levelReader)
+            Data = payload
         };
         int netIdCount = reader.ReadInt32();
         int buildableCount = reader.ReadInt32();
@@ -97,6 +106,11 @@ public sealed class LevelData
         data.HierarchyItemNetIds = hierarchyItemNetIds;
         data.HierarchyItems = hierarchyItems;
 
+        data.BuildableData = new List<ulong>[Regions.WORLD_SIZE, Regions.WORLD_SIZE];
+        BuildableResponsibilities.ReadToTable(reader, data.BuildableData);
+
+        data.LevelFolderContent = Folder.Read(_levelReader);
+
         reader.LoadNew(Array.Empty<byte>());
         return data;
     }
@@ -106,14 +120,11 @@ public sealed class LevelData
         ByteWriter writer = _levelWriter ??= new ByteWriter(false, 134217728); // 128 MiB
         writer.Write(DataVersion);
         Version = DataVersion;
-        Folder folder = LevelFolderContent;
-        Folder.Write(writer, in folder);
         NetId[] levelObjectNetIds = LevelObjectNetIds;
         NetId[] hierarchyItemNetIds = HierarchyItemNetIds;
         RegionIdentifier[] buildables = Buildables;
         uint[] objects = Objects;
         uint[] hierarchyItems = HierarchyItems;
-        writer.ExtendBuffer(writer.Buffer.Length + sizeof(int) * 3 + sizeof(uint) * levelObjectNetIds.Length + sizeof(int) * buildables.Length + sizeof(uint) * objects.Length + sizeof(uint) * 2 * hierarchyItems.Length);
         writer.Write(levelObjectNetIds.Length);
         writer.Write(buildables.Length);
         writer.Write(hierarchyItems.Length);
@@ -131,6 +142,18 @@ public sealed class LevelData
             writer.Write(hierarchyItemNetIds[i].id);
         for (int i = 0; i < hierarchyItems.Length; ++i)
             writer.Write(hierarchyItems[i]);
+
+        BuildableResponsibilities.WriteTable(writer, BuildableData);
+
+        Folder folder = LevelFolderContent;
+        if (_lclPath != null)
+        {
+            long dirSize = DevkitServerUtility.GetDirectorySize(_lclPath);
+            if (dirSize <= int.MaxValue && dirSize > 0)
+                writer.ExtendBuffer(writer.Count + (int)dirSize);
+        }
+
+        Folder.Write(writer, in folder);
 
         byte[] data = writer.ToArray();
         Data = data;

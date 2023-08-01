@@ -55,7 +55,7 @@ public static class NetFactory
 
 #if CLIENT
     internal static StaticGetter<IClientTransport> GetPlayerTransportConnection =
-        Accessor.GenerateStaticGetter<Provider, IClientTransport>("clientTransport", BindingFlags.NonPublic, throwOnError: true)!;
+        Accessor.GenerateStaticGetter<Provider, IClientTransport>("clientTransport", throwOnError: true)!;
 #endif
     private static bool ClaimMessageBlock()
     {

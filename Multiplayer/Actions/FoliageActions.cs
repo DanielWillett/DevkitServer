@@ -104,7 +104,7 @@ public sealed class FoliageActions
 public sealed class AddFoliageToSurfaceAction : IServersideAction, IAsset
 {
     private static readonly Action<FoliageInfoAsset, Vector3, Quaternion, Vector3, bool>? ExecuteAddFoliage
-        = Accessor.GenerateInstanceCaller<FoliageInfoAsset, Action<FoliageInfoAsset, Vector3, Quaternion, Vector3, bool>>("addFoliage", throwOnError: false);
+        = Accessor.GenerateInstanceCaller<FoliageInfoAsset, Action<FoliageInfoAsset, Vector3, Quaternion, Vector3, bool>>("addFoliage", throwOnError: false, allowUnsafeTypeBinding: true);
     public ActionType Type => ActionType.AddFoliageToSurface;
     public CSteamID Instigator { get; set; }
     public float DeltaTime { get; set; }

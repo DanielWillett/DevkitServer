@@ -6,8 +6,9 @@ using System.Text;
 using DevkitServer.Commands.Subsystem;
 using ThreadPriority = System.Threading.ThreadPriority;
 using ThreadState = System.Threading.ThreadState;
+using DevkitServer.API.Logging;
 
-namespace DevkitServer.Util.Terminals;
+namespace DevkitServer.API.Logging.Terminals;
 internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
 {
     private const uint CodepageUTF8 = 65001U;
@@ -23,7 +24,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
     private bool _setup;
     private bool _inText;
     private bool _writing;
-    public bool IsCommitingToUnturnedLog => _writing;
+    public bool IsComittingToUnturnedLog => _writing;
     public void Init()
     {
         FreeConsole();
@@ -259,7 +260,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                             Console.Write(new string(' ', Console.BufferWidth));
                             break;
                         }
-                        else if (key.KeyChar == 0 || key.Key == ConsoleKey.OemClear || (key.Key >= ConsoleKey.LeftArrow && key.Key <= ConsoleKey.DownArrow))
+                        else if (key.KeyChar == 0 || key.Key == ConsoleKey.OemClear || key.Key >= ConsoleKey.LeftArrow && key.Key <= ConsoleKey.DownArrow)
                         {
                             Console.SetCursorPosition(current.Length, Console.CursorTop);
                             continue;

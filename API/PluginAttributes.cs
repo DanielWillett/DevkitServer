@@ -16,7 +16,7 @@ public sealed class LoadPriorityAttribute : Attribute
         Priority = priority;
     }
 }
-[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+[AttributeUsage(AttributeTargets.All, Inherited = false)]
 public sealed class IgnoreAttribute : Attribute { }
 
 [AttributeUsage(AttributeTargets.All, Inherited = false)]

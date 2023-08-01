@@ -4,8 +4,11 @@ using System.Reflection;
 using System.Reflection.Emit;
 using DevkitServer.Multiplayer.Levels;
 #if CLIENT
+using DevkitServer.Configuration;
+using DevkitServer.Core.Extensions.UI;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Players;
 using DevkitServer.Players.UI;
 using SDG.Framework.Devkit.Transactions;
 using SDG.Framework.Utilities;
@@ -22,7 +25,7 @@ internal static class LevelObjectPatches
     internal static bool IsSyncing;
     private static bool IsFinalTransform;
     private static readonly Action? CallCalculateHandleOffsets =
-        Accessor.GenerateStaticCaller<EditorObjects, Action>("calculateHandleOffsets", Array.Empty<Type>());
+        Accessor.GenerateStaticCaller<EditorObjects, Action>("calculateHandleOffsets", allowUnsafeTypeBinding: true);
 
     private static readonly List<LevelObject> PendingMaterialUpdates = new List<LevelObject>(LevelObjectUtil.MaxUpdateObjectsPacketSize);
 
@@ -179,13 +182,14 @@ internal static class LevelObjectPatches
 
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
         int i = 0;
+        ins.Insert(0, new CodeInstruction(OpCodes.Call, Accessor.GetMethod(OnUpdate)));
         // PatchUtil.InsertActionRateLimiter(ref i, stLbl, ins);
         for (; i < ins.Count; ++i)
         {
             // cancel reun operation
             if (i < ins.Count - 1 && clearSelection != null && ins[i].Calls(clearSelection) && (redo != null && ins[i + 1].Calls(redo) || undo != null && ins[i + 1].Calls(undo)))
             {
-                MethodInfo invoker = (redo != null && ins[i + 1].Calls(redo) ? new Action(TransactionPatches.OnRedoRequested) : TransactionPatches.OnUndoRequested).Method;
+                MethodInfo? invoker = redo != null && ins[i + 1].Calls(redo) ? Accessor.GetMethod(TransactionPatches.OnRedoRequested) : Accessor.GetMethod(TransactionPatches.OnUndoRequested);
                 MethodBase? original = ins[i + 1].operand as MethodBase;
                 ins.RemoveAt(i + 1);
                 ins[i] = new CodeInstruction(OpCodes.Call, invoker);
@@ -212,7 +216,7 @@ internal static class LevelObjectPatches
             // translate with E
             if (!patchedTranslate && patchedHandleDown && patchedPasteTransform && pointSelection != null && ins[i].Calls(pointSelection))
             {
-                ins.Insert(i + 1, new CodeInstruction(OpCodes.Call, new Action(PreIsFinalExternallyTransforming).Method));
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Call, Accessor.GetMethod(PreIsFinalExternallyTransforming)));
                 patchedTranslate = true;
             }
 
@@ -315,12 +319,12 @@ internal static class LevelObjectPatches
                 ins[i + 1].labels.Clear();
                 i += 6;
                 PatchUtil.ContinueUntil(ins, ref i, x => x.Calls(calculateHandleOffsets), false);
-                CodeInstruction instr = new CodeInstruction(OpCodes.Call, new Action(OnMoveOneObject).Method);
+                CodeInstruction instr = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(OnMoveOneObject));
                 ins.Insert(i++, instr);
                 instr.labels.AddRange(ins[i].labels);
                 ins[i].labels.Clear();
                 PatchUtil.ContinueUntil(ins, ref i, x => x.opcode.IsBrAny(), false);
-                instr = new CodeInstruction(OpCodes.Call, new Action(PreIsFinalExternallyTransforming).Method);
+                instr = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(PreIsFinalExternallyTransforming));
                 ins.Insert(i++, instr);
                 instr.labels.AddRange(ins[i].labels);
                 ins[i].labels.Clear();
@@ -388,7 +392,7 @@ internal static class LevelObjectPatches
             Logger.LogWarning($"Patched {patchedReun.Format()}/{2.Format()} undo/redo operations in {method.Format()}.", method: Source);
             DevkitServerModule.Fault();
         }
-
+        
         return ins;
     }
 
@@ -510,6 +514,31 @@ internal static class LevelObjectPatches
         finally
         {
             ListPool<FinalTransformation>.release(transformations);
+        }
+    }
+
+    private static void OnUpdate()
+    {
+        if (!EditorInteractEx.TryGetWorldHit(out RaycastHit hit))
+            return;
+
+        if (!hit.transform.CompareTag("Large") && !hit.transform.CompareTag("Medium") &&
+            !hit.transform.CompareTag("Small") && !hit.transform.CompareTag("Barricade") &&
+            !hit.transform.CompareTag("Structure"))
+            return;
+
+        if (LevelObjectUtil.TryFindObjectOrBuildable(hit.transform, out LevelObject? @object, out LevelBuildableObject? buildable, true))
+        {
+            Asset? asset = @object?.asset ?? (Asset?)buildable?.asset;
+            if (InputEx.GetKeyUp(KeyCode.Mouse2))
+            {
+                LevelObjectUtil.SelectObjectType(asset);
+            }
+            if (asset != null)
+            {
+                AssetOrigin? origin = asset.GetOrigin();
+                EditorUI.hint(EEditorMessage.FOCUS, $"{asset.FriendlyName} ({asset.name}){Environment.NewLine}{origin?.name ?? "Unknown Origin"}");
+            }
         }
     }
     private static void OnInstantiate(Vector3 position, Quaternion rotation, Vector3 scale, ObjectAsset objectAsset, ItemAsset buildableAsset)

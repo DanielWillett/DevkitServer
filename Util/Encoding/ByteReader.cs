@@ -9,6 +9,8 @@ namespace DevkitServer.Util.Encoding;
 
 public class ByteReader
 {
+    private const string InvalidZeroCompressedMessage = "Invalid zero-compressed format.";
+
     private const int MinStreamBufferSize = 32;
     private const int GuidSize = 16;
 
@@ -43,7 +45,7 @@ public class ByteReader
     public bool HasFailed => failure;
     public int Position => _streamMode ? _position : _index;
     public int BytesLeft => _streamMode ? (_streamLengthSupport ? (int)Math.Min(_stream!.Length - _stream!.Position, int.MaxValue) : (_buffer is not null ? _buffer.Length - _index : 0)) : _buffer!.Length - _index;
-    public bool ThrowOnError { get; set; }
+    public bool ThrowOnError { get; set; } = true;
     public bool LogOnError { get; set; } = true;
     public int StreamBufferSize { get; set; } = 128;
 
@@ -156,7 +158,14 @@ public class ByteReader
     private int GetStreamBufferLength() => !_streamLengthSupport
         ? StreamBufferSize
         : (int)Math.Min(StreamBufferSize, Math.Max(_stream!.Length - _stream.Position, MinStreamBufferSize));
-    
+    private void Fail(string message)
+    {
+        failure = true;
+        if (LogOnError)
+            Logger.LogWarning(message, method: "BYTE READER");
+        if (ThrowOnError)
+            throw new ByteEncoderException(message);
+    }
     public void LoadNew(Stream stream)
     {
         failure = false;
@@ -305,10 +314,10 @@ public class ByteReader
         failure = true;
         string ex = "Failed to read " + byteCt.ToString(CultureInfo.InvariantCulture) +
                     " B at offset " + _index.ToString(CultureInfo.InvariantCulture) + " / " + _length.ToString(CultureInfo.InvariantCulture) + ".";
+        if (LogOnError)
+            Logger.LogWarning(ex, method: "BYTE READER");
         if (ThrowOnError)
             throw new ByteBufferOverflowException(ex);
-        if (LogOnError)
-            Logger.LogWarning(ex);
         return false;
     }
     public byte[] ReadBlock(int length)
@@ -344,10 +353,28 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                byte next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadUInt8();
+                {
+                    next = ReadUInt8();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadUInt8();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }
@@ -465,13 +492,13 @@ public class ByteReader
         ushort sh = Read<ushort>();
         byte bt = _buffer![_index];
         ++_index;
-        return (sh | (bt << 16)) - DevkitServerUtility.Int24MaxValue;
+        return (sh | (bt << 16)) - EncodingEx.Int24MaxValue;
     }
     public uint ReadUInt24()
     {
         int i = ReadInt24();
         if (i < 0)
-            return (uint)-(i - DevkitServerUtility.Int24MaxValue);
+            return (uint)-(i - EncodingEx.Int24MaxValue);
         return (uint)i;
     }
     public int? ReadNullableInt24()
@@ -788,10 +815,28 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                int next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadInt32();
+                {
+                    next = ReadInt32();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadInt32();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }
@@ -878,10 +923,28 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                uint next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadUInt32();
+                {
+                    next = ReadUInt32();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadUInt32();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }
@@ -908,10 +971,28 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                sbyte next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadInt8();
+                {
+                    next = ReadInt8();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadInt8();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }
@@ -994,10 +1075,28 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                long next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadInt64();
+                {
+                    next = ReadInt64();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadInt64();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }
@@ -1025,10 +1124,28 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                ulong next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadUInt64();
+                {
+                    next = ReadUInt64();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadUInt64();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }
@@ -1056,10 +1173,28 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                short next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadInt16();
+                {
+                    next = ReadInt16();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadInt16();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }
@@ -1087,10 +1222,28 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                ushort next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadUInt16();
+                {
+                    next = ReadUInt16();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadUInt16();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }

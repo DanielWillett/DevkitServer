@@ -1,11 +1,12 @@
 ﻿using System;
+using DevkitServer.API.Logging;
 
-namespace DevkitServer.Util.Terminals;
-internal interface ITerminal
+namespace DevkitServer.API.Logging.Terminals;
+public interface ITerminal
 {
     event TerminalPreReadDelegate? OnInput;
     event TerminalPreWriteDelegate? OnOutput;
-    bool IsCommitingToUnturnedLog { get; }
+    bool IsComittingToUnturnedLog { get; }
     void Write(string input, ConsoleColor color, bool save, Severity severity);
     void Init();
     void Close();

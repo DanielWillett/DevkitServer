@@ -3,6 +3,7 @@ using DevkitServer.API.Permissions;
 using DevkitServer.Commands.Subsystem;
 using DevkitServer.Configuration;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using DevkitServer.API.Abstractions;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Patches;
@@ -267,16 +268,8 @@ public static class PluginLoader
         List<IDevkitServerPlugin> pluginsTemp = new List<IDevkitServerPlugin>();
         foreach (string pluginDll in plugins)
         {
-            Type[] types;
             Assembly assembly = Assembly.LoadFrom(pluginDll);
-            try
-            {
-                types = assembly.GetTypes();
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                types = ex.Types;
-            }
+            List<Type> types = Accessor.GetTypesSafe(assembly);
             foreach (Type type in types
                          .Where(x => typeof(IDevkitServerPlugin).IsAssignableFrom(x))
                          .OrderByDescending(x =>
@@ -574,7 +567,6 @@ public class PluginAssembly
         if (!HasReflected)
         {
             HasReflected = true;
-            CreateDirectoryAttribute.CreateInAssembly(Assembly);
 #if CLIENT
             UIExtensionManager.Reflect(Assembly);
 #endif
@@ -589,6 +581,40 @@ public class PluginAssembly
                 , _netMethods, _netCalls
             );
             HierarchyItemTypeIdentifierEx.RegisterFromAssembly(Assembly, _hierarchyItemFactories);
+            foreach (Type type in Accessor.GetTypesSafe(Assembly)
+                         .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x,
+                             (EarlyTypeInitAttribute?)Attribute.GetCustomAttribute(x, typeof(EarlyTypeInitAttribute))))
+                         .Where(x => x.Value != null)
+                         .OrderByDescending(x => x.Value!.Priority)
+                         .ThenBy(x => x.Key.Name)
+                         .Select(x => x.Key))
+            {
+                try
+                {
+                    RuntimeHelpers.RunClassConstructor(type.TypeHandle);
+                    CreateDirectoryAttribute.CreateInType(type);
+                    if (Plugins.Count > 0)
+                        Plugins[0].LogDebug("Initialized static module " + type.Format() + ".");
+                    else
+                        Logger.LogDebug($"[{Assembly.GetName().Name.ToUpperInvariant()}] Initialized static module {type.Name.Format()}.");
+                }
+                catch (Exception ex)
+                {
+                    if (Plugins.Count > 0)
+                    {
+                        Plugins[0].LogError("Error while initializing static module " + type.Format() + ".");
+                        Plugins[0].LogError(ex);
+                    }
+                    else
+                    {
+                        Logger.LogError("Error while initializing static module " + type.Format() + ".", method: Assembly.GetName().Name.ToUpperInvariant());
+                        Logger.LogError(ex, method: Assembly.GetName().Name.ToUpperInvariant());
+                    }
+                    break;
+                }
+            }
+
+            CreateDirectoryAttribute.CreateInAssembly(Assembly);
         }
         if (!HasPatched)
         {

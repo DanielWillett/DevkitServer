@@ -214,8 +214,6 @@ public class MoveLevelObjectsFinalAction : IAction
             Vector3 lclScale = !UseScale ? transform.localScale : default;
             LevelObjects.registerTransformObject(transform, transformation.Transformation.Position, transformation.Transformation.Rotation, UseScale ? transformation.Scale : lclScale,
                 transformation.Transformation.OriginalPosition, transformation.Transformation.OriginalRotation, UseScale ? transformation.OriginalScale : lclScale);
-
-            LevelObjectUtil.SyncIfAuthority(transformation.NetId);
         }
     }
 #if SERVER

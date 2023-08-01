@@ -526,7 +526,7 @@ public static class PatchUtil
             _ => new CodeInstruction(OpCodes.Ldarg, index)
         };
     }
-    public static void LoadParameter(this DebuggableEmitter generator, int index, bool byref = false)
+    public static void LoadParameter(this DebuggableEmitter generator, int index, bool byref = false, Type? type = null, Type? targetType = null)
     {
         if (byref)
         {
@@ -546,8 +546,15 @@ public static class PatchUtil
             generator.Emit(code, index);
         else
             generator.Emit(code);
+        if (type != null && targetType != null && type != typeof(void) && targetType != typeof(void))
+        {
+            if (type.IsValueType && !targetType.IsValueType)
+                generator.Emit(OpCodes.Box, type);
+            else if (!type.IsValueType && targetType.IsValueType)
+                generator.Emit(OpCodes.Unbox_Any, targetType);
+        }
     }
-    public static void LoadParameter(this ILGenerator generator, int index, bool byref = false)
+    public static void LoadParameter(this ILGenerator generator, int index, bool byref = false, Type? type = null, Type? targetType = null)
     {
         if (byref)
         {
@@ -567,6 +574,13 @@ public static class PatchUtil
             generator.Emit(code, index);
         else
             generator.Emit(code);
+        if (type != null && targetType != null && type != typeof(void) && targetType != typeof(void))
+        {
+            if (type.IsValueType && !targetType.IsValueType)
+                generator.Emit(OpCodes.Box, type);
+            else if (!type.IsValueType && targetType.IsValueType)
+                generator.Emit(OpCodes.Unbox_Any, targetType);
+        }
     }
     [Pure]
     public static LocalBuilder? GetLocal(CodeInstruction code, out int index, bool set)
@@ -821,7 +835,7 @@ public static class PatchUtil
     [Pure]
     public static bool ShouldCallvirt(this MethodBase method)
     {
-        return !method.IsStatic && (method.DeclaringType is { IsInterface: true } || method.IsVirtual || method.IsAbstract);
+        return method is { IsStatic: false, DeclaringType: not { IsValueType: true }, IsFinal: false } && (method.DeclaringType is { IsInterface: true } || method.IsVirtual || method.IsAbstract);
     }
     [Pure]
     public static OpCode GetCall(this MethodBase method)

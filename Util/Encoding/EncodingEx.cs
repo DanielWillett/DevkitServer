@@ -5,7 +5,15 @@ using DevkitServer.Models;
 namespace DevkitServer.Util.Encoding;
 
 [Serializable]
-public class ByteBufferOverflowException : Exception
+public class ByteEncoderException : Exception
+{
+    public ByteEncoderException() { }
+    public ByteEncoderException(string message) : base(message) { }
+    public ByteEncoderException(string message, Exception inner) : base(message, inner) { }
+    protected ByteEncoderException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+}
+[Serializable]
+public class ByteBufferOverflowException : ByteEncoderException
 {
     public ByteBufferOverflowException() { }
     public ByteBufferOverflowException(string message) : base(message) { }
@@ -14,6 +22,7 @@ public class ByteBufferOverflowException : Exception
 }
 public static class EncodingEx
 {
+    public const int Int24MaxValue = 8388607;
     internal static readonly Type[] ValidTypes =
     {
         typeof(ulong), typeof(float), typeof(long), typeof(ushort), typeof(short), typeof(byte), typeof(int), typeof(uint), typeof(bool), typeof(char), typeof(sbyte), typeof(double),

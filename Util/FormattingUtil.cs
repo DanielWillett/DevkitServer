@@ -127,6 +127,36 @@ public static class FormattingUtil
             bits |= 1;
         return (ConsoleColor)bits;
     }
+
+    /// <summary>
+    /// Adds spaces to a proper-case string. For example: DevkitServer -> Devkit Server.
+    /// </summary>
+    /// <remarks>Also replaces underscores with spaces.</remarks>
+    public static string SpaceProperCaseString(string text)
+    {
+        if (text.Length < 1)
+            return text;
+
+        if (text.IndexOf('_', 1) != -1)
+            text = text.Replace('_', ' ');
+
+        for (int i = 1; i < text.Length; ++i)
+        {
+            char current = text[i];
+
+            bool digit = char.IsDigit(current);
+            bool upper = char.IsUpper(current);
+            if (char.IsWhiteSpace(current) || !digit && !upper || char.IsWhiteSpace(text[i - 1]) ||
+                digit && char.IsDigit(text[i - 1]) && (i == text.Length - 1 || char.IsDigit(text[i + 1])) ||
+                upper && char.IsUpper(text[i - 1]) && (i == text.Length - 1 || char.IsUpper(text[i + 1])))
+                continue;
+
+            text = text.Substring(0, i) + " " + text.Substring(i, text.Length - i);
+            ++i;
+        }
+
+        return text;
+    }
     public static unsafe string RemoveANSIFormatting(string orig)
     {
         if (orig.Length < 5)
@@ -188,103 +218,95 @@ public static class FormattingUtil
             return orig;
         }
     }
-    // this is not a mess, scroll away
-    public static string Format(this FieldInfo? field) => field == null ? ((object)null!).Format() : ((field.DeclaringType != null
-                                                              ? FormatProvider.StackCleaner.GetString(field.DeclaringType)
-                                                              : ((FormatProvider.StackCleaner.Configuration.ColorFormatting ==
-                                                                  StackColorFormatType.None
-                                                                     ? string.Empty
-                                                                     : (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
-                                                                        StackColorFormatType.ExtendedANSIColor
-                                                                         ? GetExtendedANSIString(
-                                                                             FormatProvider.StackCleaner.Configuration.Colors!
-                                                                                 .KeywordColor, false)
-                                                                         : GetANSIString(
-                                                                             ToConsoleColor(
-                                                                                 FormatProvider.StackCleaner.Configuration.Colors!
-                                                                                     .KeywordColor), false))) + "global" +
-                                                                 (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
-                                                                  StackColorFormatType.None
-                                                                     ? string.Empty
-                                                                     : (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
-                                                                        StackColorFormatType.ExtendedANSIColor
-                                                                         ? GetExtendedANSIString(
-                                                                             FormatProvider.StackCleaner.Configuration.Colors!
-                                                                                 .PunctuationColor, false)
-                                                                         : GetANSIString(
-                                                                             ToConsoleColor(
-                                                                                 FormatProvider.StackCleaner.Configuration.Colors!
-                                                                                     .PunctuationColor), false))) + "::" +
-                                                                 (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
-                                                                  StackColorFormatType.None
-                                                                     ? string.Empty
-                                                                     : ANSIForegroundReset))) + " " +
-                                                          (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
-                                                           StackColorFormatType.None
-                                                              ? string.Empty
-                                                              : (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
-                                                                 StackColorFormatType.ExtendedANSIColor
-                                                                  ? GetExtendedANSIString(
-                                                                      FormatProvider.StackCleaner.Configuration.Colors!.PropertyColor, false)
-                                                                  : GetANSIString(
-                                                                      ToConsoleColor(FormatProvider.StackCleaner.Configuration.Colors!
-                                                                          .PropertyColor), false))) + field.Name +
-                                                          (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
-                                                           StackColorFormatType.None
-                                                              ? string.Empty
-                                                              : ANSIForegroundReset));
-    public static string Format(this PropertyInfo? property) => property == null ? ((object)null!).Format() : ((property.DeclaringType != null
-                                                                     ? FormatProvider.StackCleaner.GetString(property.DeclaringType)
-                                                                     : ((FormatProvider.StackCleaner.Configuration.ColorFormatting ==
-                                                                         StackColorFormatType.None
-                                                                            ? string.Empty
-                                                                            : (FormatProvider.StackCleaner.Configuration
-                                                                                   .ColorFormatting ==
-                                                                               StackColorFormatType.ExtendedANSIColor
-                                                                                ? GetExtendedANSIString(
-                                                                                    FormatProvider.StackCleaner.Configuration.Colors!
-                                                                                        .KeywordColor, false)
-                                                                                : GetANSIString(
-                                                                                    ToConsoleColor(
-                                                                                        FormatProvider.StackCleaner.Configuration
-                                                                                            .Colors!.KeywordColor), false))) +
-                                                                        "global" + (FormatProvider.StackCleaner.Configuration
-                                                                            .ColorFormatting == StackColorFormatType.None
-                                                                            ? string.Empty
-                                                                            : (FormatProvider.StackCleaner.Configuration
-                                                                                   .ColorFormatting ==
-                                                                               StackColorFormatType.ExtendedANSIColor
-                                                                                ? GetExtendedANSIString(
-                                                                                    FormatProvider.StackCleaner.Configuration.Colors!
-                                                                                        .PunctuationColor, false)
-                                                                                : GetANSIString(
-                                                                                    ToConsoleColor(
-                                                                                        FormatProvider.StackCleaner.Configuration
-                                                                                            .Colors!
-                                                                                            .PunctuationColor), false))) +
-                                                                        "::" +
-                                                                        (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
-                                                                         StackColorFormatType.None
-                                                                            ? string.Empty
-                                                                            : ANSIForegroundReset))) + " " +
-                                                                 (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
-                                                                  StackColorFormatType.None
-                                                                     ? string.Empty
-                                                                     : (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
-                                                                        StackColorFormatType.ExtendedANSIColor
-                                                                         ? GetExtendedANSIString(
-                                                                             FormatProvider.StackCleaner.Configuration.Colors!
-                                                                                 .PropertyColor, false)
-                                                                         : GetANSIString(
-                                                                             ToConsoleColor(
-                                                                                 FormatProvider.StackCleaner.Configuration.Colors!
-                                                                                     .PropertyColor), false))) + property.Name +
-                                                                 (FormatProvider.StackCleaner.Configuration.ColorFormatting ==
-                                                                  StackColorFormatType.None
-                                                                     ? string.Empty
-                                                                     : ANSIForegroundReset));
+    public static string Format(this FieldInfo? field)
+    {
+        if (field == null)
+            return ((object?)null).Format();
+        string type = field.IsStatic
+            ? "static ".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor)
+            : string.Empty;
+        type += FormatProvider.StackCleaner.GetString(field.FieldType) + " ";
+        if (field.DeclaringType != null)
+            type += FormatProvider.StackCleaner.GetString(field.DeclaringType) + ".";
+        else
+            type += "global".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) +
+                   "::".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
+
+        return type + field.Name.Colorize(FormatProvider.StackCleaner.Configuration.Colors!.PropertyColor);
+    }
+    public static string Format(this PropertyInfo? property)
+    {
+        if (property == null)
+            return ((object?)null).Format();
+        MethodInfo? getter = property.GetGetMethod();
+        MethodInfo? setter = property.GetSetMethod();
+        string type = (getter == null ? setter != null && setter.IsStatic : getter.IsStatic)
+            ? "static ".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor)
+            : string.Empty;
+        type += FormatProvider.StackCleaner.GetString(property.PropertyType) + " ";
+        if (property.DeclaringType != null)
+            type += FormatProvider.StackCleaner.GetString(property.DeclaringType) + " ";
+        else
+            type += "global".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) +
+                   "::".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor) + " ";
+
+        type += property.Name.ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PropertyColor) + " { ".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
+        
+        if (getter != null)
+        {
+            if (getter.IsAssembly)
+                type += "internal get".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+            else if (getter.IsFamilyAndAssembly)
+                type += "protected internal get".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+            else if (getter.IsPrivate)
+                type += "private get".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+            else if (getter.IsFamily)
+                type += "protected get".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+            else
+                type += "get".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+            type += "; ".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
+        }
+
+        if (setter != null)
+        {
+            if (setter.IsAssembly)
+                type += "internal set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+            else if (setter.IsFamilyAndAssembly)
+                type += "protected internal set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+            else if (setter.IsPrivate)
+                type += "private set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+            else if (setter.IsFamily)
+                type += "protected set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+            else
+                type += "set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+            type += "; ".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
+        }
+
+        type += " }";
+
+        return type + GetReset();
+    }
     public static string Format(this MethodBase? method) => method == null ? ((object)null!).Format() : FormatProvider.StackCleaner.GetString(method);
-    public static string FormatMethod(Type rtnType, Type? declType, string name, (Type type, string? name)[]? namedArguments = null, Type[]? arguments = null, Type[]? genericArgs = null, bool isStatic = false, bool isAsync = false, bool isGetter = false, bool isSetter = false, bool isIndexer = false)
+    public static string FormatMethod(Type delegateType, string name, bool removeInstance = false, bool isStatic = false, bool isAsync = false, bool isGetter = false, bool isSetter = false, bool isIndexer = false, Type? declTypeOverride = null)
+    {
+        Accessor.GetDelegateSignature(delegateType, out Type returnType, out ParameterInfo[] parameters);
+        (Type type, string? name)[] typeParameters = new (Type, string?)[removeInstance && parameters.Length > 0 ? parameters.Length - 1 : parameters.Length];
+        for (int i = 0; i < parameters.Length; ++i)
+            typeParameters[i] = (parameters[removeInstance ? i + 1 : i].ParameterType, parameters[removeInstance ? i + 1 : i].Name);
+        
+        return FormatMethod(returnType, declTypeOverride ?? (removeInstance && parameters.Length > 0 ? parameters[0].ParameterType : null), name, typeParameters, null, null, isStatic, isAsync, isGetter, isSetter, isIndexer);
+    }
+    public static string FormatMethod<TDelegate>(string name, bool removeInstance = false, bool isStatic = false, bool isAsync = false, bool isGetter = false, bool isSetter = false, bool isIndexer = false, Type? declTypeOverride = null) where TDelegate : Delegate
+    {
+        ParameterInfo[] parameters = Accessor.GetParameters<TDelegate>();
+        Type returnType = Accessor.GetReturnType<TDelegate>();
+        (Type type, string? name)[] typeParameters = new (Type, string?)[removeInstance && parameters.Length > 0 ? parameters.Length - 1 : parameters.Length];
+        for (int i = 0; i < parameters.Length; ++i)
+            typeParameters[i] = (parameters[removeInstance ? i + 1 : i].ParameterType, parameters[removeInstance ? i + 1 : i].Name);
+        
+        return FormatMethod(returnType, declTypeOverride ?? (removeInstance && parameters.Length > 0 ? parameters[0].ParameterType : null), name, typeParameters, null, null, isStatic, isAsync, isGetter, isSetter, isIndexer);
+    }
+    public static string FormatMethod(Type? rtnType, Type? declType, string name, (Type type, string? name)[]? namedArguments = null, Type[]? arguments = null, Type[]? genericArgs = null, bool isStatic = false, bool isAsync = false, bool isGetter = false, bool isSetter = false, bool isIndexer = false)
     {
         StringBuilder sb = new StringBuilder(32);
         if (!isIndexer && isStatic)
@@ -292,7 +314,8 @@ public static class FormattingUtil
         if (isAsync && !(isGetter || isSetter || isIndexer))
             sb.Append("async ".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor));
 
-        sb.Append(Format(rtnType)).Append(' ');
+        if (rtnType != null)
+            sb.Append(Format(rtnType)).Append(' ');
 
         if (isGetter)
             sb.Append("get ".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor));
@@ -378,7 +401,7 @@ public static class FormattingUtil
         : (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
             ? GetExtendedANSIString(FormatProvider.StackCleaner.Configuration.Colors!.StructColor, false)
             : GetANSIString(ToConsoleColor(FormatProvider.StackCleaner.Configuration.Colors!.StructColor), false))) + "Label #" + label.GetLabelId() +
-                                                     (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIForegroundReset);
+                                                     GetReset();
     public static string Format(this CodeInstruction? instruction)
     {
         if (instruction == null)
@@ -722,6 +745,91 @@ public static class FormattingUtil
                        ? GetExtendedANSIString(argb, false)
                        : GetANSIString(ToConsoleColor(argb), false))
                 + str + ANSIForegroundReset;
+        }
+
+        return str;
+    }
+    public static string Colorize(this string str, FormattingColorType tokenType)
+    {
+        if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+            return ColorizeNoReset(str, tokenType) + ANSIForegroundReset;
+        return str;
+    }
+    public static string ColorizeNoReset(this string str, FormattingColorType tokenType)
+    {
+        StackCleanerConfiguration config = FormatProvider.StackCleaner.Configuration;
+        if (config.ColorFormatting != StackColorFormatType.None)
+        {
+            ColorConfig colors = config.Colors ?? (config.ColorFormatting == StackColorFormatType.ExtendedANSIColor ? (DevkitServerModule.UnityLoaded ? UnityColor32Config.Default : Color32Config.Default) : Color4Config.Default);
+            int argb = tokenType switch
+            {
+                FormattingColorType.Keyword => colors.KeywordColor,
+                FormattingColorType.Method => colors.KeywordColor,
+                FormattingColorType.Property => colors.KeywordColor,
+                FormattingColorType.Parameter => colors.KeywordColor,
+                FormattingColorType.Class => colors.ClassColor,
+                FormattingColorType.Struct => colors.ClassColor,
+                FormattingColorType.FlowKeyword => colors.ClassColor,
+                FormattingColorType.Interface => colors.ClassColor,
+                FormattingColorType.GenericParameter => colors.ClassColor,
+                FormattingColorType.Enum => colors.EnumColor,
+                FormattingColorType.Namespace => colors.EnumColor,
+                FormattingColorType.Punctuation => colors.EnumColor,
+                FormattingColorType.ExtraData => colors.EnumColor,
+                FormattingColorType.LinesHiddenWarning => colors.EnumColor,
+                FormattingColorType.HtmlBackground => colors.EnumColor,
+                _ => unchecked((int)0xFFFFFFFF)
+            };
+
+            return (config.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                       ? GetExtendedANSIString(argb, false)
+                       : GetANSIString(ToConsoleColor(argb), false))
+                + str + ANSIForegroundReset;
+        }
+
+        return str;
+    }
+    public static string ColorizeNoReset(this string str, ConsoleColor color)
+    {
+        if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+        {
+            return GetANSIString(color, false) + str;
+        }
+
+        return str;
+    }
+    public static string ColorizeNoReset(this string str, Color color)
+    {
+        if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+        {
+            return (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                       ? GetExtendedANSIString(ToArgb(color), false)
+                       : GetANSIString(ToConsoleColor(ToArgb(color)), false))
+                + str;
+        }
+
+        return str;
+    }
+    public static string ColorizeNoReset(this string str, Color32 color)
+    {
+        if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+        {
+            return (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                       ? GetExtendedANSIString(ToArgb(color), false)
+                       : GetANSIString(ToConsoleColor(ToArgb(color)), false))
+                + str;
+        }
+
+        return str;
+    }
+    public static string ColorizeNoReset(this string str, int argb)
+    {
+        if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+        {
+            return (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                       ? GetExtendedANSIString(argb, false)
+                       : GetANSIString(ToConsoleColor(argb), false))
+                + str;
         }
 
         return str;
@@ -1301,169 +1409,187 @@ public static class FormattingUtil
         Append(ref data, ptr, index, l);
         return l;
     }
+}
 
+[Flags]
+public enum RemoveRichTextOptions : ulong
+{
+    None = 0L,
+    /// <summary>
+    /// &lt;align&gt;
+    /// </summary>
+    Align = 1L << 0,
+    /// <summary>
+    /// &lt;allcaps&gt;, &lt;uppercase&gt;
+    /// </summary>
+    Uppercase = 1L << 1,
+    /// <summary>
+    /// &lt;alpha&gt;
+    /// </summary>
+    Alpha = 1L << 2,
+    /// <summary>
+    /// &lt;b&gt;
+    /// </summary>
+    Bold = 1L << 3,
+    /// <summary>
+    /// &lt;br&gt;
+    /// </summary>
+    LineBreak = 1L << 4,
+    /// <summary>
+    /// &lt;color=...&gt;, &lt;#...&gt;
+    /// </summary>
+    Color = 1L << 5,
+    /// <summary>
+    /// &lt;cspace&gt;
+    /// </summary>
+    CharacterSpacing = 1L << 6,
+    /// <summary>
+    /// &lt;font&gt;
+    /// </summary>
+    Font = 1L << 7,
+    /// <summary>
+    /// &lt;font-weight&gt;
+    /// </summary>
+    FontWeight = 1L << 8,
+    /// <summary>
+    /// &lt;gradient&gt;
+    /// </summary>
+    Gradient = 1L << 9,
+    /// <summary>
+    /// &lt;i&gt;
+    /// </summary>
+    Italic = 1L << 10,
+    /// <summary>
+    /// &lt;indent&gt;
+    /// </summary>
+    Indent = 1L << 11,
+    /// <summary>
+    /// &lt;line-height&gt;
+    /// </summary>
+    LineHeight = 1L << 12,
+    /// <summary>
+    /// &lt;line-indent&gt;
+    /// </summary>
+    LineIndent = 1L << 13,
+    /// <summary>
+    /// &lt;link&gt;
+    /// </summary>
+    Link = 1L << 14,
+    /// <summary>
+    /// &lt;lowercase&gt;
+    /// </summary>
+    Lowercase = 1L << 15,
+    /// <summary>
+    /// &lt;material&gt;
+    /// </summary>
+    Material = 1L << 16,
+    /// <summary>
+    /// &lt;margin&gt;
+    /// </summary>
+    Margin = 1L << 17,
+    /// <summary>
+    /// &lt;mark&gt;
+    /// </summary>
+    Mark = 1L << 18,
+    /// <summary>
+    /// &lt;mspace&gt;
+    /// </summary>
+    Monospace = 1L << 19,
+    /// <summary>
+    /// &lt;nobr&gt;
+    /// </summary>
+    NoLineBreak = 1L << 20,
+    /// <summary>
+    /// &lt;noparse&gt;
+    /// </summary>
+    NoParse = 1L << 21,
+    /// <summary>
+    /// &lt;page&gt;
+    /// </summary>
+    PageBreak = 1L << 22,
+    /// <summary>
+    /// &lt;pos&gt;
+    /// </summary>
+    Position = 1L << 23,
+    /// <summary>
+    /// &lt;quad&gt;
+    /// </summary>
+    Quad = 1L << 24,
+    /// <summary>
+    /// &lt;rotate&gt;
+    /// </summary>
+    Rotate = 1L << 25,
+    /// <summary>
+    /// &lt;s&gt;, &lt;strikethrough&gt;
+    /// </summary>
+    Strikethrough = 1L << 26,
+    /// <summary>
+    /// &lt;size&gt;
+    /// </summary>
+    Size = 1L << 27,
+    /// <summary>
+    /// &lt;smallcaps&gt;
+    /// </summary>
+    Smallcaps = 1L << 28,
+    /// <summary>
+    /// &lt;space&gt;
+    /// </summary>
+    Space = 1L << 29,
+    /// <summary>
+    /// &lt;sprite&gt;
+    /// </summary>
+    Sprite = 1L << 30,
+    /// <summary>
+    /// &lt;style&gt;
+    /// </summary>
+    Style = 1L << 31,
+    /// <summary>
+    /// &lt;sub&gt;
+    /// </summary>
+    Subscript = 1L << 32,
+    /// <summary>
+    /// &lt;sup&gt;
+    /// </summary>
+    Superscript = 1L << 33,
+    /// <summary>
+    /// &lt;u&gt;, &lt;underline&gt;
+    /// </summary>
+    Underline = 1L << 34,
+    /// <summary>
+    /// &lt;voffset&gt;
+    /// </summary>
+    VerticalOffset = 1L << 35,
+    /// <summary>
+    /// &lt;width&gt;
+    /// </summary>
+    TextWidth = 1L << 36,
 
-    [Flags]
-    public enum RemoveRichTextOptions : ulong
-    {
-        None = 0L,
-        /// <summary>
-        /// &lt;align&gt;
-        /// </summary>
-        Align = 1L << 0,
-        /// <summary>
-        /// &lt;allcaps&gt;, &lt;uppercase&gt;
-        /// </summary>
-        Uppercase = 1L << 1,
-        /// <summary>
-        /// &lt;alpha&gt;
-        /// </summary>
-        Alpha = 1L << 2,
-        /// <summary>
-        /// &lt;b&gt;
-        /// </summary>
-        Bold = 1L << 3,
-        /// <summary>
-        /// &lt;br&gt;
-        /// </summary>
-        LineBreak = 1L << 4,
-        /// <summary>
-        /// &lt;color=...&gt;, &lt;#...&gt;
-        /// </summary>
-        Color = 1L << 5,
-        /// <summary>
-        /// &lt;cspace&gt;
-        /// </summary>
-        CharacterSpacing = 1L << 6,
-        /// <summary>
-        /// &lt;font&gt;
-        /// </summary>
-        Font = 1L << 7,
-        /// <summary>
-        /// &lt;font-weight&gt;
-        /// </summary>
-        FontWeight = 1L << 8,
-        /// <summary>
-        /// &lt;gradient&gt;
-        /// </summary>
-        Gradient = 1L << 9,
-        /// <summary>
-        /// &lt;i&gt;
-        /// </summary>
-        Italic = 1L << 10,
-        /// <summary>
-        /// &lt;indent&gt;
-        /// </summary>
-        Indent = 1L << 11,
-        /// <summary>
-        /// &lt;line-height&gt;
-        /// </summary>
-        LineHeight = 1L << 12,
-        /// <summary>
-        /// &lt;line-indent&gt;
-        /// </summary>
-        LineIndent = 1L << 13,
-        /// <summary>
-        /// &lt;link&gt;
-        /// </summary>
-        Link = 1L << 14,
-        /// <summary>
-        /// &lt;lowercase&gt;
-        /// </summary>
-        Lowercase = 1L << 15,
-        /// <summary>
-        /// &lt;material&gt;
-        /// </summary>
-        Material = 1L << 16,
-        /// <summary>
-        /// &lt;margin&gt;
-        /// </summary>
-        Margin = 1L << 17,
-        /// <summary>
-        /// &lt;mark&gt;
-        /// </summary>
-        Mark = 1L << 18,
-        /// <summary>
-        /// &lt;mspace&gt;
-        /// </summary>
-        Monospace = 1L << 19,
-        /// <summary>
-        /// &lt;nobr&gt;
-        /// </summary>
-        NoLineBreak = 1L << 20,
-        /// <summary>
-        /// &lt;noparse&gt;
-        /// </summary>
-        NoParse = 1L << 21,
-        /// <summary>
-        /// &lt;page&gt;
-        /// </summary>
-        PageBreak = 1L << 22,
-        /// <summary>
-        /// &lt;pos&gt;
-        /// </summary>
-        Position = 1L << 23,
-        /// <summary>
-        /// &lt;quad&gt;
-        /// </summary>
-        Quad = 1L << 24,
-        /// <summary>
-        /// &lt;rotate&gt;
-        /// </summary>
-        Rotate = 1L << 25,
-        /// <summary>
-        /// &lt;s&gt;, &lt;strikethrough&gt;
-        /// </summary>
-        Strikethrough = 1L << 26,
-        /// <summary>
-        /// &lt;size&gt;
-        /// </summary>
-        Size = 1L << 27,
-        /// <summary>
-        /// &lt;smallcaps&gt;
-        /// </summary>
-        Smallcaps = 1L << 28,
-        /// <summary>
-        /// &lt;space&gt;
-        /// </summary>
-        Space = 1L << 29,
-        /// <summary>
-        /// &lt;sprite&gt;
-        /// </summary>
-        Sprite = 1L << 30,
-        /// <summary>
-        /// &lt;style&gt;
-        /// </summary>
-        Style = 1L << 31,
-        /// <summary>
-        /// &lt;sub&gt;
-        /// </summary>
-        Subscript = 1L << 32,
-        /// <summary>
-        /// &lt;sup&gt;
-        /// </summary>
-        Superscript = 1L << 33,
-        /// <summary>
-        /// &lt;u&gt;, &lt;underline&gt;
-        /// </summary>
-        Underline = 1L << 34,
-        /// <summary>
-        /// &lt;voffset&gt;
-        /// </summary>
-        VerticalOffset = 1L << 35,
-        /// <summary>
-        /// &lt;width&gt;
-        /// </summary>
-        TextWidth = 1L << 36,
+    /// <summary>
+    /// All rich text tags.
+    /// </summary>
+    All = Align | Alpha | Bold | LineBreak | CharacterSpacing | Font | FontWeight | Gradient | Italic | Indent |
+          LineHeight | LineIndent | Link | Lowercase | Material | Margin | Mark | Monospace | NoLineBreak |
+          NoParse | PageBreak | Position | Quad | Rotate | Strikethrough | Size | Smallcaps | Space | Sprite |
+          Style | Subscript | Superscript | Underline | Uppercase | VerticalOffset | TextWidth
+}
 
-        /// <summary>
-        /// All rich text tags.
-        /// </summary>
-        All = Align | Alpha | Bold | LineBreak | CharacterSpacing | Font | FontWeight | Gradient | Italic | Indent |
-              LineHeight | LineIndent | Link | Lowercase | Material | Margin | Mark | Monospace | NoLineBreak |
-              NoParse | PageBreak | Position | Quad | Rotate | Strikethrough | Size | Smallcaps | Space | Sprite |
-              Style | Subscript | Superscript | Underline | Uppercase | VerticalOffset | TextWidth
-    }
+public enum FormattingColorType
+{
+    Keyword,
+    Method,
+    Property,
+    Parameter,
+    Class,
+    Struct,
+    FlowKeyword,
+    Interface,
+    GenericParameter,
+    Enum,
+    Namespace,
+    Punctuation,
+    ExtraData,
+    LinesHiddenWarning,
+    HtmlBackground
 }
 
 internal class LoggerFormatProvider : ITerminalFormatProvider

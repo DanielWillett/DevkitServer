@@ -1,10 +1,9 @@
 ﻿#if CLIENT
-using JetBrains.Annotations;
-using System.Globalization;
-using System.Reflection;
 using DevkitServer.API.Abstractions;
 using DevkitServer.Multiplayer;
 using HarmonyLib;
+using System.Globalization;
+using System.Reflection;
 
 namespace DevkitServer.Players;
 
@@ -323,7 +322,7 @@ internal sealed class EditorClothes : MonoBehaviour
                 model = null;
             }
             TAsset? asset = item.Asset;
-            GameObject? instance = asset?.GetItemInstance();
+            GameObject? instance = asset == null ? null : AssetUtil.GetItemInstance(asset);
             if (instance != null && asset!.shouldBeVisible(false))
             {
                 model = Instantiate(instance, transform.position + CosmeticPositionOffset, transform.rotation * CosmeticRotationOffset, transform).transform;

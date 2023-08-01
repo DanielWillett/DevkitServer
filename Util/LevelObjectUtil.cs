@@ -9,6 +9,7 @@ using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players.UI;
 using DevkitServer.Util.Region;
 #if CLIENT
+using DevkitServer.Core.Extensions.UI;
 using DevkitServer.Patches;
 using DevkitServer.Players;
 using System.Reflection;
@@ -83,10 +84,10 @@ public static class LevelObjectUtil
 
 #if CLIENT
     private static readonly Action<CullingVolume>? ClearCullingVolumeObjects =
-        Accessor.GenerateInstanceCaller<CullingVolume, Action<CullingVolume>>("ClearObjects", Array.Empty<Type>());
+        Accessor.GenerateInstanceCaller<CullingVolume, Action<CullingVolume>>("ClearObjects", allowUnsafeTypeBinding: true);
 
     private static readonly Action<CullingVolume>? FindCullingVolumeObjects =
-        Accessor.GenerateInstanceCaller<CullingVolume, Action<CullingVolume>>("FindObjectsInsideVolume", Array.Empty<Type>());
+        Accessor.GenerateInstanceCaller<CullingVolume, Action<CullingVolume>>("FindObjectsInsideVolume", allowUnsafeTypeBinding: true);
 #endif
 
     private static readonly InstanceGetter<LevelObject, AssetReference<MaterialPaletteAsset>>? GetCustomMaterialOverrideIntl =
@@ -102,7 +103,7 @@ public static class LevelObjectUtil
         Accessor.GenerateInstanceSetter<LevelObject, int>("materialIndexOverride");
 
     private static readonly Action<LevelObject>? CallReapplyMaterialOverridesIntl =
-        Accessor.GenerateInstanceCaller<LevelObject, Action<LevelObject>>("ReapplyMaterialOverrides");
+        Accessor.GenerateInstanceCaller<LevelObject, Action<LevelObject>>("ReapplyMaterialOverrides", allowUnsafeTypeBinding: true);
 
 
 #if CLIENT
@@ -150,7 +151,7 @@ public static class LevelObjectUtil
                 InitializeBuildable(newBuildable, out RegionIdentifier id, netId);
 
                 if (owner == Provider.client.m_SteamID)
-                    BuildableResponsibilities.Set(id, true, false);
+                    BuildableResponsibilities.Set(id, true);
                 SyncIfAuthority(id);
             }
             catch (Exception ex)
@@ -206,6 +207,16 @@ public static class LevelObjectUtil
         for (int i = selection.Count - 1; i >= 0; ++i)
             EditorObjects.removeSelection(selection[i].transform);
     }
+    public static void DeselectObjectType() => SelectObjectType(null);
+    public static void SelectObjectType(Asset? asset)
+    {
+        if (asset is not ObjectAsset and not ItemBarricadeAsset and not ItemStructureAsset)
+            asset = null;
+        EditorObjects.selectedItemAsset = asset as ItemAsset;
+        EditorObjects.selectedObjectAsset = asset as ObjectAsset;
+        EditorLevelObjectsUIExtension.UpdateSelection(EditorObjects.selectedObjectAsset, EditorObjects.selectedItemAsset);
+    }
+
 #elif SERVER
     [NetCall(NetCallSource.FromClient, NetCalls.RequestLevelObjectInstantiation)]
     public static void ReceiveLevelObjectInstantiation(MessageContext ctx, Guid guid, Vector3 position, Quaternion rotation, Vector3 scale)
@@ -507,13 +518,21 @@ public static class LevelObjectUtil
 
         return null;
     }
+    [Pure]
     public static LevelObject? FindObject(Transform transform, bool checkSkyboxAndPlaceholder = false) => TryFindObject(transform, out LevelObject obj, checkSkyboxAndPlaceholder) ? obj : null;
+    [Pure]
     public static LevelObject? FindObject(uint instanceId) => TryFindObject(instanceId, out LevelObject obj) ? obj : null;
+    [Pure]
     public static LevelObject? FindObject(Vector3 expectedPosition, uint instanceId) => TryFindObject(expectedPosition, instanceId, out LevelObject obj) ? obj : null;
+    [Pure]
     public static LevelBuildableObject? FindBuildable(Transform transform) => TryFindBuildable(transform, out LevelBuildableObject obj) ? obj : null;
+    [Pure]
     public static RegionIdentifier FindObjectCoordinates(Transform transform, bool checkSkyboxAndPlaceholder = false) => TryFindObject(transform, out RegionIdentifier regionId, checkSkyboxAndPlaceholder) ? regionId : RegionIdentifier.Invalid;
+    [Pure]
     public static RegionIdentifier FindObjectCoordinates(uint instanceId) => TryFindObject(instanceId, out RegionIdentifier regionId) ? regionId : RegionIdentifier.Invalid;
+    [Pure]
     public static RegionIdentifier FindObjectCoordinates(Vector3 expectedPosition, uint instanceId) => TryFindObject(expectedPosition, instanceId, out RegionIdentifier regionId) ? regionId : RegionIdentifier.Invalid;
+    [Pure]
     public static RegionIdentifier FindBuildableCoordinates(Transform transform) => TryFindBuildable(transform, out RegionIdentifier regionId) ? regionId : RegionIdentifier.Invalid;
     public static bool TryFindObject(Transform transform, out LevelObject levelObject, bool checkSkyboxAndPlaceholder = false)
     {
@@ -715,13 +734,13 @@ public static class LevelObjectUtil
         regionId = RegionIdentifier.Invalid;
         return false;
     }
-    public static bool TryFindObjectOrBuildable(Transform transform, out LevelObject? @object, out LevelBuildableObject? buildable)
+    public static bool TryFindObjectOrBuildable(Transform transform, out LevelObject? @object, out LevelBuildableObject? buildable, bool checkSkyboxAndPlaceholder = false)
     {
         RegionIdentifier r = RegionIdentifier.Invalid;
         bool isBuildable = false;
         RegionUtil.ForEachRegion(transform.position, coord =>
         {
-            if (!TryFindObject(transform, coord, out r, false))
+            if (!TryFindObject(transform, coord, out r, checkSkyboxAndPlaceholder))
             {
                 if (!TryFindBuildable(transform, coord, out r))
                     return true;

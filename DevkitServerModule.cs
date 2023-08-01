@@ -2,7 +2,6 @@
 #define TILE_DEBUG_GL
 #endif
 #define TILE_SYNC
-
 using DevkitServer.API;
 using DevkitServer.Configuration;
 using DevkitServer.Multiplayer;
@@ -29,6 +28,7 @@ using DevkitServer.Util.Debugging;
 #endif
 using DevkitServer.Players;
 using DevkitServer.Players.UI;
+using DevkitServer.API.Logging;
 #endif
 #if SERVER
 using DevkitServer.Levels;
@@ -55,7 +55,6 @@ public sealed class DevkitServerModule : IModuleNexus
     public static DevkitServerModule Instance { get; private set; } = null!;
     public static bool IsEditing { get; internal set; }
     public static bool LoadFaulted { get; private set; }
-    public static LevelInfo? PendingLevelInfo { get; internal set; }
     public static bool HasLoadedBundle { get; private set; }
     public static MasterBundle? Bundle { get; private set; }
     public static MasterBundleConfig? BundleConfig { get; private set; }
@@ -86,7 +85,7 @@ public sealed class DevkitServerModule : IModuleNexus
         { "Name", "Devkit Server" },
         { "Help", "help" },
         { "NoAssetSelected", "No Asset Selected" },
-        { "RefreshLevelButton", "Refresh Level" }
+        { "RefreshLevelsButton", "Refresh Levels" }
     };
     public static Local CommandLocalization { get; private set; } = null!;
 
@@ -236,11 +235,11 @@ public sealed class DevkitServerModule : IModuleNexus
                 {
                     RuntimeHelpers.RunClassConstructor(type.TypeHandle);
                     CreateDirectoryAttribute.CreateInType(type, true);
-                    Logger.LogDebug("Initialized static module \"" + type.Name + "\".");
+                    Logger.LogDebug("Initialized static module " + type.Format() + ".");
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError("Error while initializing static module \"" + type.Name + "\".");
+                    Logger.LogError("Error while initializing static module " + type.Format() + ".");
                     Logger.LogError(ex);
                     Fault();
                     break;
@@ -322,14 +321,25 @@ public sealed class DevkitServerModule : IModuleNexus
         }
         else
         {
-            Logger.LogInfo($"{ModuleName.Colorize(ModuleColor)} (by @{"blazingflame".Colorize(new Color32(86, 98, 246, 255))} on {"Discord".Colorize(new Color32(116, 131, 196, 255))} or " +
+            string modName = ModuleName.Colorize(ModuleColor);
+            Color32 nameColor = new Color32(86, 98, 246, 255);
+            Logger.LogInfo($"{modName} (by @{"blazingflame".Colorize(nameColor)} on {"Discord".Colorize(new Color32(116, 131, 196, 255))} or " +
                            $"{"https://github.com/DanielWillett".Format(false)}) initialized.");
             Logger.LogInfo($"Please create an Issue for any bugs at {(RepositoryUrl + "/issues").Format(false)} (one bug per issue please).");
             Logger.LogInfo($"Please give suggestions as a Discussion at {(RepositoryUrl + "/discussions/categories/ideas").Format(false)}.");
+            Logger.LogInfo(string.Empty, ConsoleColor.White);
+            Logger.LogInfo("Legal", ConsoleColor.White);
+            Logger.LogInfo($"{modName} is licensed under the " + "GNU General Public License v3.0".Colorize(new Color32(255, 204, 102, 255)) + ".", ConsoleColor.White);
+            Logger.LogInfo("==================================================================================================", ConsoleColor.White);
+            Logger.LogInfo($" {modName}  Copyright (C) {2023.Format()}  {"Daniel Willett".Colorize(nameColor)}", ConsoleColor.White);
+            Logger.LogInfo( " This program comes with ABSOLUTELY NO WARRANTY.", ConsoleColor.White);
+            Logger.LogInfo( " This is free software, and you are welcome to redistribute it under certain conditions.", ConsoleColor.White);
+            Logger.LogInfo($" Read the full agreement at {"https://github.com/DanielWillett/DevkitServer/blob/master/LICENSE".Format(false)}.", ConsoleColor.White);
+            Logger.LogInfo("==================================================================================================", ConsoleColor.White);
+            Logger.LogInfo(string.Empty, ConsoleColor.White);
         }
         GC.Collect();
     }
-
 #if CLIENT
     private static void OnChatMessageReceived()
     {
@@ -492,7 +502,7 @@ public sealed class DevkitServerModule : IModuleNexus
         Bundle = null;
         HasLoadedBundle = false;
     }
-    internal IEnumerator TryLoadBundle(System.Action? callback)
+    internal IEnumerator TryLoadBundle(Action? callback)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -616,7 +626,9 @@ public sealed class DevkitServerModule : IModuleNexus
 
                 HierarchyResponsibilities.Save();
                 LevelObjectResponsibilities.Save();
+#if SERVER
                 BuildableResponsibilities.Save();
+#endif
             }
             finally
             {
@@ -768,4 +780,5 @@ public sealed class DevkitServerModuleComponent : MonoBehaviour
     {
         _ticks = 0;
     }
+
 }

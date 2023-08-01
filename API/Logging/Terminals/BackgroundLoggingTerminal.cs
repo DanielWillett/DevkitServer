@@ -1,15 +1,16 @@
-﻿using DevkitServer.Commands.Subsystem;
+﻿using DevkitServer.API.Logging;
+using DevkitServer.Commands.Subsystem;
 using JetBrains.Annotations;
 
-namespace DevkitServer.Util.Terminals;
+namespace DevkitServer.API.Logging.Terminals;
 internal sealed class BackgroundLoggingTerminal : MonoBehaviour, ITerminal
 {
     private bool _writing;
     [UsedImplicitly]
     public event TerminalPreReadDelegate? OnInput;
     public event TerminalPreWriteDelegate? OnOutput;
-    public bool IsCommitingToUnturnedLog => _writing;
-    
+    public bool IsComittingToUnturnedLog => _writing;
+
     public void Write(string input, ConsoleColor color, bool save, Severity severity)
     {
         OnOutput?.Invoke(ref input, ref color);

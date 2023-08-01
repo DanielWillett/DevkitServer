@@ -3,7 +3,7 @@ using DevkitServer.API.UI;
 
 namespace DevkitServer.Core.Extensions.UI;
 
-[UIExtension(typeof(MenuWorkshopEditorUI))]
+[UIExtension(typeof(MenuWorkshopEditorUI), SuppressUIExtensionParentWarning = true)]
 internal class MenuWorkshopEditorUIExtension
 {
 #nullable disable
@@ -15,11 +15,11 @@ internal class MenuWorkshopEditorUIExtension
         ISleekButton refreshButton = Glazier.Get().CreateButton();
 
         refreshButton.positionOffset_X = -305;
-        refreshButton.positionOffset_Y = 530;
+        refreshButton.positionOffset_Y = 570;
         refreshButton.positionScale_X = 0.5f;
         refreshButton.sizeOffset_X = 200;
         refreshButton.sizeOffset_Y = 30;
-        refreshButton.text = DevkitServerModule.MainLocalization.Translate("RefreshLevelButton");
+        refreshButton.text = DevkitServerModule.MainLocalization.Translate("RefreshLevelsButton");
         refreshButton.onClickedButton += OnClickedRefresh;
 
         Container.AddChild(refreshButton);

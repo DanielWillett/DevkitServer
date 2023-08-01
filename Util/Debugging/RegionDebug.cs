@@ -78,7 +78,7 @@ internal sealed class RegionDebug : MonoBehaviour
     {
         float height = DebugStyle.CalcHeight(new GUIContent(content), 1024f);
         GUI.Label(new Rect(6, y + 1, 1024f, height + 5f), FormattingUtil.RemoveRichText(content,
-            options: FormattingUtil.RemoveRichTextOptions.Color | FormattingUtil.RemoveRichTextOptions.Mark), DebugShadowStyle);
+            options: RemoveRichTextOptions.Color | RemoveRichTextOptions.Mark), DebugShadowStyle);
         GUI.Label(new Rect(5, y, 1024f, height + 5f), content, DebugStyle);
         y += height + 5f;
     }

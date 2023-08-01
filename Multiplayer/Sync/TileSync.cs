@@ -1,5 +1,5 @@
 ﻿#if CLIENT
-#define GL_SAMPLES
+//#define GL_SAMPLES
 #endif
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;

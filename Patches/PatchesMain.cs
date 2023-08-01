@@ -1,20 +1,17 @@
 ﻿using DevkitServer.Multiplayer;
 using HarmonyLib;
-using JetBrains.Annotations;
 using System.Reflection;
 using System.Text;
 using DevkitServer.Configuration;
 using DevkitServer.Players;
 using SDG.Framework.Landscapes;
+using System.Reflection.Emit;
 #if CLIENT
 using DevkitServer.Multiplayer.Levels;
-using System.Reflection.Emit;
-using SDG.Provider;
 #endif
 #if SERVER
 using DevkitServer.Multiplayer.Networking;
 using SDG.NetPak;
-using System.Reflection.Emit;
 #endif
 
 namespace DevkitServer.Patches;
@@ -31,6 +28,7 @@ internal static class PatchesMain
 #if DEBUG
             string path = Path.Combine(DevkitServerConfig.Directory, "harmony.log");
             Environment.SetEnvironmentVariable("HARMONY_LOG_FILE", path);
+            DevkitServerUtility.CheckDirectory(false, true, DevkitServerConfig.Directory, null);
             try
             {
                 using FileStream str = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
@@ -143,7 +141,7 @@ internal static class PatchesMain
         Provider.provider.matchmakingService.onRulesQueryRefreshed += RulesReady;
         return false;
     }
-    internal static void Launch()
+    internal static void Launch(LevelInfo? overrideLevelInfo)
     {
         if (!DevkitServerModule.IsEditing)
         {
@@ -151,16 +149,15 @@ internal static class PatchesMain
             return;
         }
 
-        LevelInfo level = DevkitServerModule.PendingLevelInfo ?? Level.getLevel(Provider.map);
-        DevkitServerModule.PendingLevelInfo = null;
+        LevelInfo level = overrideLevelInfo ?? Level.getLevel(Provider.map);
         if (level == null)
         {
             Provider._connectionFailureInfo = ESteamConnectionFailureInfo.MAP;
-            Provider.RequestDisconnect("could not find level \"" + Provider.map + "\"");
+            DevkitServerUtility.CustomDisconnect("Could not find level \"" + Provider.map + "\"", ESteamConnectionFailureInfo.MAP);
         }
         else
         {
-            UnturnedLog.info("Loading server level ({0})", Provider.map);
+            Logger.LogInfo($"Loading server level: {level.getLocalizedName().Format(false)}.");
             Level.edit(level);
             Provider.gameMode = new DevkitServerGamemode();
         }
@@ -179,7 +176,7 @@ internal static class PatchesMain
         {
             Logger.LogDebug("Did not find tag '" + DevkitServerModule.ServerRule + "'.");
             DevkitServerModule.IsEditing = false;
-            Launch();
+            Provider.launch();
         }
     }
 

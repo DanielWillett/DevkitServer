@@ -57,7 +57,7 @@ public class UserInput : MonoBehaviour
         }
     }
 
-    public static event Action<EditorUser>? OnUserControllerUpdated; 
+    public static event Action<EditorUser>? OnUserControllerUpdated;
     private bool _hasStopped = true;
 #if CLIENT
     private float _lastFlush;
@@ -124,15 +124,15 @@ public class UserInput : MonoBehaviour
 
     private static readonly Func<IDevkitTool>? GetDevkitTool;
     [UsedImplicitly]
-    private static readonly InstanceGetter<EditorMovement, float> GetSpeed = Accessor.GenerateInstanceGetter<EditorMovement, float>("speed", BindingFlags.NonPublic, throwOnError: true)!;
+    private static readonly InstanceGetter<EditorMovement, float> GetSpeed = Accessor.GenerateInstanceGetter<EditorMovement, float>("speed", throwOnError: true)!;
     [UsedImplicitly]
-    private static readonly InstanceGetter<EditorMovement, Vector3> GetInput = Accessor.GenerateInstanceGetter<EditorMovement, Vector3>("input", BindingFlags.NonPublic, throwOnError: true)!;
+    private static readonly InstanceGetter<EditorMovement, Vector3> GetInput = Accessor.GenerateInstanceGetter<EditorMovement, Vector3>("input", throwOnError: true)!;
     [UsedImplicitly]
     private static readonly InstanceSetter<PlayerInput, float>? SetLastInputted = Accessor.GenerateInstanceSetter<PlayerInput, float>("lastInputed");
     [UsedImplicitly]
-    private static readonly Action<PlayerUI> RestartPlayerUI = Accessor.GenerateInstanceCaller<PlayerUI, Action<PlayerUI>>("InitializePlayer", throwOnError: true)!;
+    private static readonly Action<PlayerUI> RestartPlayerUI = Accessor.GenerateInstanceCaller<PlayerUI, Action<PlayerUI>>("InitializePlayer", throwOnError: true, allowUnsafeTypeBinding: true)!;
 #if SERVER
-    private static readonly Action<Player, SteamPlayer> SendInitialState = Accessor.GenerateInstanceCaller<Player, Action<Player, SteamPlayer>>("SendInitialPlayerState", new Type[] { typeof(SteamPlayer) }, throwOnError: true)!;
+    private static readonly Action<Player, SteamPlayer> SendInitialState = Accessor.GenerateInstanceCaller<Player, Action<Player, SteamPlayer>>("SendInitialPlayerState", throwOnError: true, allowUnsafeTypeBinding: true)!;
 #endif
 #if CLIENT
     private EditorMovement? _movement;

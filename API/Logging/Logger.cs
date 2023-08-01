@@ -1,22 +1,23 @@
 ﻿using DevkitServer.Configuration;
-using DevkitServer.Util.Terminals;
 using StackCleaner;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using DevkitServer.API.Logging.Terminals;
 #if SERVER
 using DevkitServer.Levels;
 #endif
 #if CLIENT
-using System.Text;
 using DevkitServer.Patches;
 using HarmonyLib;
+using System.Text;
 #endif
 
-namespace DevkitServer.Util;
-internal static class Logger
+namespace DevkitServer.API.Logging;
+public static class Logger
 {
+    private static readonly bool IsExternalFeatureset;
 #nullable disable
     private static ITerminal _term;
 #nullable restore
@@ -33,72 +34,149 @@ internal static class Logger
         set
         {
             ITerminal old = Interlocked.Exchange(ref _term, value);
+            Exception? disposeEx = null;
+            Exception? destroyEx = null;
             if (old != null)
             {
                 old.Close();
                 old.OnInput -= OnTerminalInput;
                 old.OnOutput -= OnTerminalOutput;
+                try
+                {
+                    if (old is IDisposable disposable)
+                        disposable.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    disposeEx = ex;
+                }
+
+                if (DevkitServerModule.UnityLoaded)
+                {
+                    try
+                    {
+                        if (old is Object obj)
+                            Object.Destroy(obj);
+                    }
+                    catch (Exception ex)
+                    {
+                        destroyEx = ex;
+                    }
+                }
             }
-            _term.Init();
-            _term.OnInput += OnTerminalInput;
-            _term.OnOutput += OnTerminalOutput;
+            if (value != null)
+            {
+                value.Init();
+                value.OnInput += OnTerminalInput;
+                value.OnOutput += OnTerminalOutput;
+            }
+            if (disposeEx != null && destroyEx != null)
+            {
+                LogError(new AggregateException($"Errors disposing of and destroying old terminal: {old!.GetType().Format()}", disposeEx, destroyEx), method: "SET TERMINAL");
+            }
+            else if (disposeEx != null)
+            {
+                LogError(new Exception($"Error disposing of old terminal: {old!.GetType().Format()}", disposeEx), method: "SET TERMINAL");
+            }
+            else if (destroyEx != null)
+            {
+                LogError(new Exception($"Error destroying old terminal: {old!.GetType().Format()}", destroyEx), method: "SET TERMINAL");
+            }
         }
     }
     private const string TimeFormat = "yyyy-MM-dd hh:mm:ss";
     static Logger()
     {
-        StackCleanerConfiguration config = new StackCleanerConfiguration
+        try
         {
-            ColorFormatting = StackColorFormatType.ExtendedANSIColor,
-            Colors = UnityColor32Config.Default,
-            IncludeNamespaces = false,
+            IsExternalFeatureset = !DevkitServerModule.UnturnedLoaded;
+            StackCleanerConfiguration config = new StackCleanerConfiguration
+            {
+                ColorFormatting = StackColorFormatType.ExtendedANSIColor,
+                Colors = Type.GetType("System.Drawing.Color, System.Drawing", false, false) == null ? UnityColor32Config.Default : Color32Config.Default,
+                IncludeNamespaces = false,
 #if DEBUG
-            IncludeFileData = true,
-            IncludeSourceData = true,
-            IncludeILOffset = true
+                IncludeFileData = true,
+                IncludeSourceData = true,
+                IncludeILOffset = true
 #else
-            IncludeFileData = false,
-            IncludeSourceData = false,
-            IncludeILOffset = false
+                IncludeFileData = false,
+                IncludeSourceData = false,
+                IncludeILOffset = false
 #endif
-        };
+            };
+            if (IsExternalFeatureset)
+            {
+                config.ColorFormatting = StackColorFormatType.ExtendedANSIColor;
+            }
+            else
+            {
 #if !SERVER
-        if (Application.platform is RuntimePlatform.WindowsPlayer or RuntimePlatform.WindowsEditor)
-            config.ColorFormatting = StackColorFormatType.ExtendedANSIColor;
-        else
-            config.ColorFormatting = StackColorFormatType.None;
+                if (Application.platform is RuntimePlatform.WindowsPlayer or RuntimePlatform.WindowsEditor)
+                    config.ColorFormatting = StackColorFormatType.ExtendedANSIColor;
+                else
+                    config.ColorFormatting = StackColorFormatType.None;
 #else
-        if (Application.platform is not RuntimePlatform.WindowsPlayer and not RuntimePlatform.WindowsEditor)
-            config.ColorFormatting = StackColorFormatType.ANSIColor;
+            if (Application.platform is not RuntimePlatform.WindowsPlayer and not RuntimePlatform.WindowsEditor)
+                config.ColorFormatting = StackColorFormatType.ANSIColor;
 #endif
-        if (!DevkitServerConfig.Config.ConsoleVisualANSISupport)
-        {
-            config.ColorFormatting = StackColorFormatType.None;
-            config.Colors = Color4Config.Default;
-        }
-        else if (!DevkitServerConfig.Config.ConsoleExtendedVisualANSISupport)
-        {
-            config.ColorFormatting = StackColorFormatType.ANSIColor;
-            config.Colors = Color4Config.Default;
-        }
+                if (!DevkitServerConfig.Config.ConsoleVisualANSISupport)
+                {
+                    config.ColorFormatting = StackColorFormatType.None;
+                    config.Colors = Color4Config.Default;
+                }
+                else if (!DevkitServerConfig.Config.ConsoleExtendedVisualANSISupport)
+                {
+                    config.ColorFormatting = StackColorFormatType.ANSIColor;
+                    config.Colors = Color4Config.Default;
+                }
+            }
 
-        StackCleaner = new StackTraceCleaner(config);
+            StackCleaner = new StackTraceCleaner(config);
+            if (!IsExternalFeatureset)
+            {
 #if !SERVER
-        if (Application.platform is RuntimePlatform.WindowsPlayer or RuntimePlatform.WindowsEditor)
-        {
-            Terminal = DevkitServerModule.GameObjectHost.AddComponent<WindowsClientTerminal>();
-            LogInfo("Initalized Windows terminal.", ConsoleColor.DarkCyan);
-        }
-        else
-        {
-            Terminal = DevkitServerModule.GameObjectHost.AddComponent<BackgroundLoggingTerminal>();
-            LogInfo("Did not initialize a terminal.", ConsoleColor.DarkCyan);
-        }
+                if (Application.platform is RuntimePlatform.WindowsPlayer or RuntimePlatform.WindowsEditor)
+                {
+                    Terminal = DevkitServerModule.GameObjectHost.AddComponent<WindowsClientTerminal>();
+                    LogInfo("Initalized Windows terminal.", ConsoleColor.DarkCyan);
+                }
+                else
+                {
+                    Terminal = DevkitServerModule.GameObjectHost.AddComponent<BackgroundLoggingTerminal>();
+                    LogInfo("Did not initialize a terminal.", ConsoleColor.DarkCyan);
+                }
 #else
-        Terminal = DevkitServerModule.GameObjectHost.AddComponent<ServerTerminal>();
+                Terminal = DevkitServerModule.GameObjectHost.AddComponent<ServerTerminal>();
 #endif
-        
-        CommandWindow.Log("Loading logger with log type: " + Terminal.GetType().Format() + " colorized with: " + config.ColorFormatting.Format() + ".");
+            }
+            else
+            {
+                Terminal = new ExternalLoggingTerminal();
+            }
+
+            string log = "[DEVKIT SERVER] Loading logger with log type: " + Terminal.GetType().Format() + " colorized with: " + config.ColorFormatting.Format() + ".";
+            if (IsExternalFeatureset)
+                Console.WriteLine(log);
+            else
+                CommandWindow.Log(log);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("[DEVKIT SERVER] Error initializing logger.");
+            Console.WriteLine("[DEVKIT SERVER] " + Environment.NewLine + ex);
+
+            StackCleanerConfiguration config = new StackCleanerConfiguration
+            {
+                ColorFormatting = StackColorFormatType.None,
+                Colors = Type.GetType("System.Drawing.Color, System.Drawing", false, false) == null ? UnityColor32Config.Default : Color32Config.Default,
+                IncludeNamespaces = true,
+                IncludeFileData = true,
+                IncludeSourceData = true,
+                IncludeILOffset = true
+            };
+            StackCleaner = new StackTraceCleaner(config);
+        }
     }
     internal static void ClearLoadingErrors()
     {
@@ -139,6 +217,7 @@ internal static class Logger
 #if CLIENT
     internal static void PostPatcherSetupInitLogger()
     {
+        if (IsExternalFeatureset) throw new InvalidOperationException("External access violation.");
         try
         {
             MethodInfo? method = typeof(LogFile).GetMethod(nameof(LogFile.writeLine), BindingFlags.Instance | BindingFlags.Public);
@@ -149,7 +228,7 @@ internal static class Logger
             if (File.Exists(log))
             {
                 using FileStream str = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using StreamReader reader = new StreamReader(str, System.Text.Encoding.GetEncoding(65001, new EncoderReplacementFallback(), new DecoderReplacementFallback()));
+                using StreamReader reader = new StreamReader(str, Encoding.GetEncoding(65001, new EncoderReplacementFallback(), new DecoderReplacementFallback()));
                 while (reader.ReadLine() is { } line)
                 {
                     OnLinePrinted(ref line);
@@ -164,7 +243,7 @@ internal static class Logger
     }
     private static void OnLinePrinted(ref string line)
     {
-        if (Terminal is not { IsCommitingToUnturnedLog: false })
+        if (Terminal is not { IsComittingToUnturnedLog: false })
             return;
         line = FormattingUtil.RemoveANSIFormatting(line);
         string msg2 = line;
@@ -176,14 +255,11 @@ internal static class Logger
     {
         int ind = message.Length > 22 ? message.IndexOf(']', 0, 22) : -1;
         if (ind != -1)
-            message = message.Substring(ind + (message.Length > ind + 2 && message[ind + 1] == ' ' ? 2 : (message.Length > ind + 1 ? 1 : 0)));
+            message = message.Substring(ind + (message.Length > ind + 2 && message[ind + 1] == ' ' ? 2 : message.Length > ind + 1 ? 1 : 0));
     }
     internal static void CloseLogger()
     {
-        Terminal.Close();
-        Terminal.OnInput -= OnTerminalInput;
-        if (Terminal is Object obj)
-            Object.Destroy(obj);
+        Terminal = null!;
     }
     public static void Log(Severity severity, string message, ConsoleColor? color = null)
     {
@@ -194,13 +270,13 @@ internal static class Logger
                 LogError(message, color ?? ConsoleColor.Red);
                 break;
             case Severity.Warning:
-                LogError(message, color ?? ConsoleColor.Yellow);
+                LogWarning(message, color ?? ConsoleColor.Yellow);
                 break;
             case Severity.Debug:
-                LogError(message, color ?? ConsoleColor.DarkGray);
+                LogDebug(message, color ?? ConsoleColor.DarkGray);
                 break;
             default: // Info
-                LogError(message, color ?? ConsoleColor.DarkCyan);
+                LogInfo(message, color ?? ConsoleColor.DarkCyan);
                 break;
         }
     }
@@ -225,14 +301,17 @@ internal static class Logger
                 _ => "INFO"
             };
         }
-        ChangeResets(ref message, color.Value);
+        ReplaceResetsWithConsoleColor(ref message, color.Value);
         Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] " +
                        "[" + core.ToUpperInvariant() + "]"
-                       + new string(' ', Math.Max(1, 14 - core.Length)) 
+                       + new string(' ', Math.Max(1, 14 - core.Length))
                        + "[" + type!.ToUpperInvariant() + "]" + new string(' ', Math.Max(1, 6 - type.Length)) + message,
             color.Value, true, severity);
     }
-    public static void ChangeResets(ref string message, ConsoleColor color)
+    /// <summary>
+    /// Replaces any ANSI reset strings with the ANSI string for the provided console color.
+    /// </summary>
+    public static void ReplaceResetsWithConsoleColor(ref string message, ConsoleColor color)
     {
         if (color != ConsoleColor.Gray && message.IndexOf(FormattingUtil.ConsoleEscapeCharacter) != -1)
         {
@@ -242,29 +321,49 @@ internal static class Logger
     [Conditional("DEBUG")]
     public static void LogDebug(string message, ConsoleColor color = ConsoleColor.DarkGray)
     {
-        ChangeResets(ref message, color);
-        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [DEBUG] " + message, color, true, Severity.Debug);
+        if (string.IsNullOrWhiteSpace(message))
+            Terminal.Write(string.Empty, color, true, Severity.Debug);
+        else
+        {
+            ReplaceResetsWithConsoleColor(ref message, color);
+            Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [DEBUG] " + message, color, true, Severity.Debug);
+        }
     }
     public static void LogInfo(string message, ConsoleColor color = ConsoleColor.DarkCyan)
     {
-        ChangeResets(ref message, color);
-        Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [INFO]  " + message, color, true, Severity.Info);
+        if (string.IsNullOrWhiteSpace(message))
+            Terminal.Write(string.Empty, color, true, Severity.Info);
+        else
+        {
+            ReplaceResetsWithConsoleColor(ref message, color);
+            Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [DEVKIT SERVER] [INFO]  " + message, color, true, Severity.Info);
+        }
     }
     public static void LogWarning(string message, ConsoleColor color = ConsoleColor.Yellow, [CallerMemberName] string method = "")
     {
-        DateTime now = DateTime.UtcNow;
-        ChangeResets(ref message, color);
-        if (!Level.isLoaded)
-            _loadingErrors?.Add((now, Severity.Warning, message, color, method));
-        Terminal.Write("[" + now.ToString(TimeFormat) + "] [DEVKIT SERVER] [WARN]  [" + method.ToUpperInvariant() + "] " + message, color, true, Severity.Warning);
+        if (string.IsNullOrWhiteSpace(message))
+            Terminal.Write(string.Empty, color, true, Severity.Warning);
+        else
+        {
+            DateTime now = DateTime.UtcNow;
+            ReplaceResetsWithConsoleColor(ref message, color);
+            if (!Level.isLoaded)
+                _loadingErrors?.Add((now, Severity.Warning, message, color, method));
+            Terminal.Write("[" + now.ToString(TimeFormat) + "] [DEVKIT SERVER] [WARN]  [" + method.ToUpperInvariant() + "] " + message, color, true, Severity.Warning);
+        }
     }
     public static void LogError(string message, ConsoleColor color = ConsoleColor.Red, [CallerMemberName] string method = "")
     {
-        DateTime now = DateTime.UtcNow;
-        ChangeResets(ref message, color);
-        if (!Level.isLoaded)
-            _loadingErrors?.Add((now, Severity.Error, message, color, method));
-        Terminal.Write("[" + now.ToString(TimeFormat) + "] [DEVKIT SERVER] [ERROR] [" + method.ToUpperInvariant() + "] " + message, color, true, Severity.Error);
+        if (string.IsNullOrWhiteSpace(message))
+            Terminal.Write(string.Empty, color, true, Severity.Error);
+        else
+        {
+            DateTime now = DateTime.UtcNow;
+            ReplaceResetsWithConsoleColor(ref message, color);
+            if (!Level.isLoaded)
+                _loadingErrors?.Add((now, Severity.Error, message, color, method));
+            Terminal.Write("[" + now.ToString(TimeFormat) + "] [DEVKIT SERVER] [ERROR] [" + method.ToUpperInvariant() + "] " + message, color, true, Severity.Error);
+        }
     }
     public static void DumpJson<T>(T obj, ConsoleColor color = ConsoleColor.DarkGray, bool condensed = false)
     {
@@ -286,6 +385,8 @@ internal static class Logger
     }
     public static void DumpGameObject(GameObject go, ConsoleColor color = ConsoleColor.White)
     {
+        if (!DevkitServerModule.UnityLoaded)
+            throw new InvalidOperationException("External access violation.");
         LogInfo("Gameobject Dump: \"" + go.name + "\":", color);
         Terminal.Write("Transform:", color, true, Severity.Debug);
         Terminal.Write($" Parent: {(go.transform.parent == null ? "none" : go.transform.parent.name)}", color, true, Severity.Debug);
@@ -323,12 +424,16 @@ internal static class Logger
             {
                 Terminal.Write(string.Empty, ConsoleColor.Red, true, Severity.Error);
             }
+
+            string message = GetErrorMessage(ex) ?? "No message";
             Terminal.Write(ind + (
                 inner
                     ? "Inner Exception: "
-                    : ("[" + timestamp.ToString(TimeFormat) + "]" + (string.IsNullOrEmpty(method) ? string.Empty : (" [" + method!.ToUpper() + "] "))) + "Exception: ")
+                    : "[" + timestamp.ToString(TimeFormat) + "]" + (string.IsNullOrEmpty(method) ? string.Empty : " [" + method!.ToUpper() + "] ") + "Exception: ")
                                + ex.GetType().Format() + FormattingUtil.GetANSIString(ConsoleColor.Red, false) + ".", ConsoleColor.Red, true, Severity.Error);
-            Terminal.Write(ind + (GetErrorMessage(ex) ?? "No message"), ConsoleColor.DarkRed, true, Severity.Error);
+            Terminal.Write(ind + message, ConsoleColor.DarkRed, true, Severity.Error);
+            if (!Level.isLoaded)
+                _loadingErrors?.Add((DateTime.UtcNow, Severity.Error, message, ConsoleColor.DarkRed, method ?? string.Empty));
             if (ex is TypeLoadException t)
             {
                 Terminal.Write(ind + "Type: " + t.TypeName, ConsoleColor.DarkRed, true, Severity.Error);
@@ -368,7 +473,7 @@ internal static class Logger
                         LogDebug("Ran into an error cleaning a stack trace: " + ex2.Message + " (" + ex2.GetType().Format() + ").");
                         str = ex.StackTrace;
                     }
-                    
+
                     Terminal.Write(str, ConsoleColor.DarkGray, true, Severity.Error);
                 }
                 /*
@@ -385,7 +490,7 @@ internal static class Logger
     {
         OnInputting?.Invoke(input, ref shouldhandle);
         if (!shouldhandle) return;
-        if (DevkitServerModule.IsMainThread)
+        if (DevkitServerModule.IsMainThread || IsExternalFeatureset)
             OnTerminalInputIntl(input);
         else
             DevkitServerUtility.QueueOnMainThread(() => OnTerminalInputIntl(input));
@@ -393,7 +498,7 @@ internal static class Logger
     private static void OnTerminalOutput(ref string outputMessage, ref ConsoleColor color)
     {
         OnOutputting?.Invoke(ref outputMessage, ref color);
-        if (DevkitServerModule.IsMainThread)
+        if (DevkitServerModule.IsMainThread || IsExternalFeatureset)
             OnTerminalOutputIntl(outputMessage, color);
         else
         {
@@ -405,8 +510,11 @@ internal static class Logger
     private static void OnTerminalOutputIntl(string outputMessage, ConsoleColor color)
     {
 #if SERVER
-        BackupLogs? logs = BackupLogs.Instance;
-        logs?.GetOrAdd<LogQueue>().Logs.Add(outputMessage);
+        if (!IsExternalFeatureset)
+        {
+            BackupLogs? logs = BackupLogs.Instance;
+            logs?.GetOrAdd<LogQueue>().Logs.Add(outputMessage);
+        }
 #endif
         OnOutputed?.Invoke(outputMessage, color);
     }
@@ -414,6 +522,22 @@ internal static class Logger
     {
         OnInputted?.Invoke(input);
         LogInfo(input);
+    }
+    /// <summary>
+    /// Simulates input through the terminal (the same as typing into the terminal and pressing enter).
+    /// </summary>
+    /// <param name="skipEventCheck">Doesn't call <see cref="OnInputting"/> when <see langword="true"/>.</param>
+    public static void SimulateTerminalInput(string input, bool skipEventCheck = false)
+    {
+        if (!skipEventCheck)
+        {
+            bool shouldHandle = true;
+            OnTerminalInput(input, ref shouldHandle);
+        }
+        else if (DevkitServerModule.IsMainThread || IsExternalFeatureset)
+            OnTerminalInputIntl(input);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnTerminalInputIntl(input));
     }
 #if SERVER
     private sealed class LogQueue : IBackupLog

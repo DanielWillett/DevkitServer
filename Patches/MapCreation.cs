@@ -1,13 +1,12 @@
 ﻿#if SERVER
 using DevkitServer.Configuration;
-using System.Reflection;
-using System.Text.Json;
-using DevkitServer.Util.Region;
 using SDG.Framework.Devkit;
 using SDG.Framework.Foliage;
 using SDG.Framework.IO.FormattedFiles.KeyValueTables;
 using SDG.Framework.Landscapes;
 using SDG.Framework.Water;
+using System.Reflection;
+using System.Text.Json;
 
 namespace DevkitServer.Patches;
 internal static class MapCreation
@@ -110,18 +109,25 @@ internal static class MapCreation
             Creators = owner.GetEAccountType() == EAccountType.k_EAccountTypeIndividual ? new string[]
             {
                 owner.m_SteamID.ToString()
-            } : Array.Empty<string>(),
+            } : new string[]
+            {
+                "Enter creators here."
+            },
+            Collaborators = new string[]
+            {
+                "Enter collaborators here."
+            },
             Thanks = new string[]
             {
-                DevkitServerModule.ModuleName + " - BlazingFlame"
+                DevkitServerModule.ModuleName
             }
         }, Path.Combine(lvlPath, "Config.json"));
 
         DevkitServerUtility.WriteData(Path.Combine(lvlPath, "English.dat"), new DatDictionary
         {
-            { "Name", new DatValue(Provider.map) },
-            { "Description", new DatValue("Map called " + Provider.map + ".") },
-            { "Tip_0", new DatValue("Use DevkitServer to collaborate on maps frfr.") }
+            { "Name", new DatValue(FormattingUtil.SpaceProperCaseString(Provider.map)) },
+            { "Description", new DatValue("Sick new " + options.LevelSize.ToString().ToLower() + " map.") },
+            { "Tip_0", new DatValue("Use DevkitServer to collaborate on maps.") }
         });
 
         using FileStream fs = new FileStream(Path.Combine(lvlPath, "Level.hierarchy"), FileMode.Create, FileAccess.Write, FileShare.Read);

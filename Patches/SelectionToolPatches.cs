@@ -247,8 +247,7 @@ internal static class SelectionToolPatches
     }
 
     private static readonly Func<TempNodeSystemBase, Type>? GetNodeComponentType =
-        Accessor.GenerateInstanceCaller<TempNodeSystemBase, Func<TempNodeSystemBase, Type>>("GetComponentType",
-            Array.Empty<Type>(), throwOnError: true);
+        Accessor.GenerateInstanceCaller<TempNodeSystemBase, Func<TempNodeSystemBase, Type>>("GetComponentType", throwOnError: true, allowUnsafeTypeBinding: true);
 
     [UsedImplicitly]
     private static void OnRequestInstantiaion(Vector3 position)
