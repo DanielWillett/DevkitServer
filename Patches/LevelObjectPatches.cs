@@ -530,7 +530,7 @@ internal static class LevelObjectPatches
         if (LevelObjectUtil.TryFindObjectOrBuildable(hit.transform, out LevelObject? @object, out LevelBuildableObject? buildable, true))
         {
             Asset? asset = @object?.asset ?? (Asset?)buildable?.asset;
-            if (InputEx.GetKeyUp(KeyCode.Mouse2))
+            if (InputEx.GetKeyDown(KeyCode.Mouse2))
             {
                 LevelObjectUtil.SelectObjectType(asset);
             }

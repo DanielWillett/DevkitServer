@@ -1,14 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using DevkitServer.API.Permissions;
+using DevkitServer.Multiplayer.Networking;
+#if CLIENT
+using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
-using System.Threading.Tasks;
-using DevkitServer.API.Permissions;
-using DevkitServer.Multiplayer.Networking;
-using HarmonyLib;
-using JetBrains.Annotations;
+#endif
 
 namespace DevkitServer.Players.UI;
 #if CLIENT
@@ -25,6 +21,7 @@ public static class UIMessage
     /// </summary>
     public static EEditorMessage CustomMessage { get; } = (EEditorMessage)typeof(EEditorMessage).GetFields().Length;
 
+    [UsedImplicitly]
     private static readonly NetCall<string> SendEditorUIMessage = new NetCall<string>((ushort)NetCalls.EditorUIMessage);
 #if CLIENT
     [HarmonyPatch(typeof(EditorUI), nameof(EditorUI.message))]

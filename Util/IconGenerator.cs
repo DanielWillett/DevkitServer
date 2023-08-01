@@ -30,6 +30,7 @@ public sealed class IconGenerator : MonoBehaviour
         _camera.fieldOfView = FOV;
 
         _light.enabled = false;
+        _light.bounceIntensity = 0f;
 
         Instance = this;
     }
@@ -108,7 +109,23 @@ public sealed class IconGenerator : MonoBehaviour
         else
             _camera.farClipPlane = metrics.FarClipPlane;
 
-        _camera.transform.SetPositionAndRotation(target.transform.position - metrics.ObjectPositionOffset + position, metrics.CameraRotation);
+        _light.range = _camera.farClipPlane;
+
+        Quaternion rotation;
+
+        if (metrics.IsCustom)
+        {
+            Matrix4x4 matrix = Matrix4x4.TRS(target.transform.position - metrics.ObjectPositionOffset, target.transform.rotation, Vector3.one);
+            position = matrix.MultiplyPoint3x4(position);
+            rotation = target.transform.rotation * metrics.CameraRotation;
+        }
+        else
+        {
+            position = target.transform.position - metrics.ObjectPositionOffset + position;
+            rotation = metrics.CameraRotation;
+        }
+
+        _camera.transform.SetPositionAndRotation(position, rotation);
         RenderTexture targetTexture = RenderTexture.GetTemporary(width, height, 16, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB, GraphicsSettings.IsItemIconAntiAliasingEnabled ? 4 : 1);
         targetTexture.name = "Render_" + name;
         RenderTexture.active = targetTexture;
@@ -150,13 +167,23 @@ public sealed class IconGenerator : MonoBehaviour
             _ => throw new ArgumentException("Asset must be an object asset, barricade asset, or structure asset.")
         };
 
+        if (VanillaEditorObjectIconPresets.Presets.TryGetValue(asset.GUID, out AssetIconPreset preset))
+        {
+            Vector3 pos = preset.IconPosition;
+            Quaternion rot = preset.IconRotation;
+            metrics = new ObjectIconMetrics(pos, Vector3.zero, rot, 0f, pos.magnitude * FarClipPlaneScale, true);
+            Metrics.Add(asset, metrics);
+            return metrics;
+        }
+
         Transform? icon = srcObject.transform.Find("Icon");
         if (icon == null)
             icon = srcObject.transform.Find("Icon2");
         if (icon != null)
         {
-            Vector3 pos = icon.position - srcObject.transform.position;
-            Quaternion rot = icon.rotation * Quaternion.Inverse(srcObject.transform.rotation);
+            Matrix4x4 matrix = srcObject.transform.worldToLocalMatrix;
+            Vector3 pos = matrix.MultiplyPoint3x4(icon.position);
+            Quaternion rot = icon.localRotation;
             metrics = new ObjectIconMetrics(pos, Vector3.zero, rot, 0f, pos.magnitude * FarClipPlaneScale, true);
             Metrics.Add(asset, metrics);
             return metrics;
