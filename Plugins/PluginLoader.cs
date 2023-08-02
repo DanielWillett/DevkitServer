@@ -170,7 +170,7 @@ public static class PluginLoader
                 }
             }
 
-            PluginAssembly assemblyWrapper = new PluginAssembly(asm);
+            PluginAssembly assemblyWrapper = new PluginAssembly(asm, asm.Location);
             assemblyWrapper.AddPlugin(plugin);
             AssembliesIntl.Add(assemblyWrapper);
             skipAssemblyAdd:
@@ -305,7 +305,7 @@ public static class PluginLoader
                 PluginAssembly? info = AssembliesIntl.Find(x => x.Assembly == assembly);
                 if (info == null)
                 {
-                    info = new PluginAssembly(assembly);
+                    info = new PluginAssembly(assembly, pluginDll);
                     AssembliesIntl.Add(info);
                 }
                 for (int k = 0; k < pluginsTemp.Count; ++k)
@@ -536,6 +536,7 @@ public class PluginAssembly
     private readonly List<HierarchyItemTypeIdentifierFactoryInfo> _hierarchyItemFactories = new List<HierarchyItemTypeIdentifierFactoryInfo>();
     public IReadOnlyList<IDevkitServerPlugin> Plugins { get; }
     public Assembly Assembly { get; }
+    public string? File { get; }
     public Harmony Patcher { get; internal set; }
     public bool HasReflected { get; private set; }
     public bool HasPatched { get; private set; }
@@ -543,7 +544,7 @@ public class PluginAssembly
     public IReadOnlyList<NetInvokerInfo> NetCalls { get; }
     public IReadOnlyList<NetMethodInfo> NetMethods { get; }
     public IReadOnlyList<HierarchyItemTypeIdentifierFactoryInfo> HierarchyItemFactories { get; }
-    public PluginAssembly(Assembly assembly)
+    public PluginAssembly(Assembly assembly, string file)
     {
         Assembly = assembly;
         Plugins = _plugins.AsReadOnly();
@@ -551,6 +552,7 @@ public class PluginAssembly
         NetMethods = _netMethods.AsReadOnly();
         HierarchyItemFactories = _hierarchyItemFactories.AsReadOnly();
         Patcher = new Harmony(PatchesMain.HarmonyId + ".assembly." + assembly.GetName().Name.ToLowerInvariant());
+        File = string.IsNullOrEmpty(file) ? null : file;
     }
     internal void AddPlugin(IDevkitServerPlugin plugin)
     {

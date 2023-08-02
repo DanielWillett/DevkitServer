@@ -43,6 +43,13 @@ public interface IDevkitServerPlugin
     Local Translations { get; }
 
     /// <summary>
+    /// Whether the plugin is actively in development. Recommended to use <c>#if DEBUG</c>/<c>#else</c>/<c>#endif</c>
+    /// flags to set this to <see langword="true"/> during debug and <see langword="false"/> in release.
+    /// </summary>
+    /// <remarks>Used to disable various readonly restrictions to plugin files (like object icons).</remarks>
+    bool DeveloperMode { get; }
+
+    /// <summary>
     /// Send a debug message to the log. Shoud be ignored when not building with the DEBUG flag.
     /// </summary>
     void LogDebug(string message, ConsoleColor color = ConsoleColor.DarkGray);

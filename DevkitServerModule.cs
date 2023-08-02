@@ -85,7 +85,11 @@ public sealed class DevkitServerModule : IModuleNexus
         { "Name", "Devkit Server" },
         { "Help", "help" },
         { "NoAssetSelected", "No Asset Selected" },
-        { "RefreshLevelsButton", "Refresh Levels" }
+        { "RefreshLevelsButton", "Refresh Levels" },
+        { "ObjectIconEditorToggle", "Live Editor" },
+        { "ObjectIconEditorSave", "Save" },
+        { "ObjectIconEditorSaveNew", "Save New" },
+        { "ObjectIconEditorToggleHint", "[{0}] to edit." },
     };
     public static Local CommandLocalization { get; private set; } = null!;
 
@@ -168,6 +172,7 @@ public sealed class DevkitServerModule : IModuleNexus
             Provider.gameMode = new DevkitServerGamemode();
             Object.DontDestroyOnLoad(GameObjectHost);
 #if CLIENT
+            ObjectIconPresets.Init();
             GameObject objectItemGeneratorHost = new GameObject("ObjectIconGenerator", typeof(Light), typeof(IconGenerator), typeof(Camera));
             objectItemGeneratorHost.transform.SetParent(GameObjectHost.transform, true);
             objectItemGeneratorHost.hideFlags = HideFlags.DontSave;
@@ -706,6 +711,9 @@ public sealed class DevkitServerModule : IModuleNexus
         Provider.onEnemyDisconnected -= EditorUser.OnEnemyDisconnected;
         ChatManager.onChatMessageReceived -= OnChatMessageReceived;
         UserTPVControl.Deinit();
+        if (IconGenerator.Instance != null)
+            Object.Destroy(IconGenerator.Instance.gameObject);
+        ObjectIconPresets.Deinit();
 #endif
         LevelObjectNetIdDatabase.Shutdown();
         HierarchyItemNetIdDatabase.Shutdown();

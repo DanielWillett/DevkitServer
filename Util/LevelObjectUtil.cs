@@ -107,6 +107,7 @@ public static class LevelObjectUtil
 
 
 #if CLIENT
+    public static Asset? SelectedAsset => EditorObjects.isBuilding ? (Asset?)EditorObjects.selectedObjectAsset ?? EditorObjects.selectedItemAsset : null;
     private static List<EditorSelection>? _selections;
     private static TransformHandles? _handles;
     private static List<EditorCopy>? _copies;

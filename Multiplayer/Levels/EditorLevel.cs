@@ -43,14 +43,10 @@ public static class EditorLevel
     [UsedImplicitly]
     internal static readonly NetCall Ping = new NetCall((ushort)NetCalls.Ping);
     internal static List<ITransportConnection> PendingToReceiveActions = new List<ITransportConnection>(4);
+#if CLIENT
     public static string TempLevelPath => Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer",
-#if SERVER
-        Provider.serverID,
-#else
-        Parser.getIPFromUInt32(Provider.currentServerInfo.ip) + "_" + Provider.currentServerInfo.connectionPort,
+        "Temp_" + Parser.getIPFromUInt32(Provider.currentServerInfo.ip) + "_" + Provider.currentServerInfo.connectionPort, "Level");
 #endif
-        "{0}", "Level");
-
 #if SERVER
     private static bool _isCompressingLevel;
     private static LevelData? _lvl;
@@ -705,14 +701,9 @@ public static class EditorLevel
             Logger.LogDebug($"[RECEIVE LEVEL] Decompressed from {DevkitServerUtility.FormatBytes(_pendingLevelLength)} -> {DevkitServerUtility.FormatBytes(payload.Length)}.");
         }
         string dir = TempLevelPath;
-        dir = DevkitServerUtility.QuickFormat(dir, _pendingLevelName);
         if (Directory.Exists(dir))
             Directory.Delete(dir, true);
         Directory.CreateDirectory(dir);
-#if DEBUG
-        File.WriteAllBytes(Path.Combine(dir, "Raw Data.dat"), payload);
-        yield return null;
-#endif
         Logger.LogDebug("[RECEIVE LEVEL] Reading level folder.");
         ServerPendingLevelData = LevelData.Read(payload);
         Folder folder = ServerPendingLevelData.LevelFolderContent;
@@ -721,7 +712,7 @@ public static class EditorLevel
         LoadingUI.NotifyDownloadProgress(1f);
         Logger.LogInfo($"[RECEIVE LEVEL] Finished receiving level data ({DevkitServerUtility.FormatBytes(_pendingLevelLength)}) for level {_pendingLevelName}.", ConsoleColor.DarkCyan);
         yield return null;
-        OnLevelReady(Path.Combine(dir, folder.FolderName));
+        OnLevelReady(Path.Combine(dir, _pendingLevelName!));
 
         Reset();
         ctx.Acknowledge(StandardErrorCode.Success);

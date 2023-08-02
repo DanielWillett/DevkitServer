@@ -218,10 +218,15 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         }
         Logger.LogDebug("Registered client-side editor user.");
         User = user;
+        UserManager.EventOnConnectedToServer.TryInvoke();
     }
     internal static void OnEnemyConnected(SteamPlayer player)
     {
         UserManager.AddUser(player);
+
+        EditorUI? ui = UIAccessTools.EditorUI;
+        if (ui != null)
+            UIExtensionManager.TellDestroyed(ui);
     }
     internal static void OnClientDisconnected()
     {

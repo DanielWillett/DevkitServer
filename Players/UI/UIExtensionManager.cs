@@ -29,9 +29,13 @@ public static class UIExtensionManager
     private static readonly Dictionary<Type, UIExtensionParentTypeInfo> ParentTypeInfoIntl = new Dictionary<Type, UIExtensionParentTypeInfo>(8);
     private static readonly Dictionary<MethodBase, UIExtensionPatch> Patches = new Dictionary<MethodBase, UIExtensionPatch>(64);
     private static readonly Dictionary<MethodBase, UIExtensionExistingMemberPatchInfo> PatchInfo = new Dictionary<MethodBase, UIExtensionExistingMemberPatchInfo>(64);
+    private static Action<object> _onDestroy;
+    private static Action<object> _onAdd;
     public static IReadOnlyList<UIExtensionInfo> Extensions { get; } = ExtensionsIntl.AsReadOnly();
     public static IReadOnlyDictionary<Type, UIExtensionParentTypeInfo> ParentTypeInfo { get; } = new ReadOnlyDictionary<Type, UIExtensionParentTypeInfo>(ParentTypeInfoIntl);
-    
+
+    public static T? GetInstance<T>() where T : class => InstanceCache<T>.Instance;
+
     [Conditional("UI_EXT_DEBUG")]
     internal static void LogDebug(string message, IDevkitServerPlugin? plugin = null)
     {
@@ -227,6 +231,8 @@ public static class UIExtensionManager
                         Logger.LogError(ex, method: Source);
                     }
                 }
+
+                _onDestroy?.Invoke(instantiation);
             }
             info.InstantiationsIntl.Clear();
             LogDebug($"* Destroyed Instances: {info.ImplementationType.Format()}.", info.Plugin);
@@ -499,6 +505,7 @@ public static class UIExtensionManager
         }
         
         parentInfo.InstancesIntl.Add(new UIExtensionInstanceInfo(instance, uiInstance));
+        _onAdd?.Invoke(instance);
     }
     internal static object? CreateExtension(UIExtensionInfo info, object? uiInstance)
     {
@@ -526,7 +533,10 @@ public static class UIExtensionManager
             return null;
         }
     }
-
+    internal static void TellDestroyed(object instance)
+    {
+        OnDestroy(null, instance);
+    }
     private static void TryInitializeMember(UIExtensionInfo info, MemberInfo member)
     {
         if (Attribute.GetCustomAttribute(member, typeof(ExistingUIMemberAttribute)) is not ExistingUIMemberAttribute existingMemberAttribute)
@@ -1033,6 +1043,35 @@ public static class UIExtensionManager
         {
             Extension = extension;
             MemberInfo = memberInfo;
+        }
+    }
+    private static class InstanceCache<T> where T : class
+    {
+        public static T? Instance;
+        static InstanceCache()
+        {
+            Recache();
+            _onDestroy += OnDestroyed;
+            _onAdd += OnAdded;
+        }
+        private static void Recache()
+        {
+            UIExtensionInfo? info = Extensions.FirstOrDefault(x => x.ImplementationType == typeof(T));
+
+            if (info == null)
+                return;
+            Instance = info.Instantiations.OfType<T>().LastOrDefault();
+        }
+        private static void OnDestroyed(object instance)
+        {
+            if (ReferenceEquals(Instance, instance))
+                Instance = null;
+            Recache();
+        }
+        private static void OnAdded(object obj)
+        {
+            if (obj is T)
+                Recache();
         }
     }
 }

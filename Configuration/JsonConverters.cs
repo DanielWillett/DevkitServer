@@ -228,8 +228,14 @@ public sealed class Vector3JsonConverter : JsonConverter<Vector3>
             DevkitServerConfig.SetWriterOptions(writer, opt2);
     }
 }
-public sealed class QuaternionJsonConverter : JsonConverter<Quaternion>
+public sealed class QuaternionEulerPreferredJsonConverter : QuaternionJsonConverter
 {
+    public QuaternionEulerPreferredJsonConverter() => WriteEuler = true;
+}
+
+public class QuaternionJsonConverter : JsonConverter<Quaternion>
+{
+    public bool WriteEuler { get; protected set; }
     private static readonly char[] SplitChars = { ',' };
     public override Quaternion Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
@@ -345,10 +351,20 @@ public sealed class QuaternionJsonConverter : JsonConverter<Quaternion>
         if (opt2.Indented && DevkitServerConfig.SetWriterOptions != null)
             DevkitServerConfig.SetWriterOptions(writer, opt2 with { Indented = false });
         writer.WriteStartArray();
-        writer.WriteNumberValue(value.x);
-        writer.WriteNumberValue(value.y);
-        writer.WriteNumberValue(value.z);
-        writer.WriteNumberValue(value.w);
+        if (WriteEuler)
+        {
+            Vector3 euler = value.eulerAngles;
+            writer.WriteNumberValue(euler.x);
+            writer.WriteNumberValue(euler.y);
+            writer.WriteNumberValue(euler.z);
+        }
+        else
+        {
+            writer.WriteNumberValue(value.x);
+            writer.WriteNumberValue(value.y);
+            writer.WriteNumberValue(value.z);
+            writer.WriteNumberValue(value.w);
+        }
         writer.WriteEndArray();
         if (opt2.Indented && DevkitServerConfig.SetWriterOptions != null)
             DevkitServerConfig.SetWriterOptions(writer, opt2);
@@ -1083,15 +1099,20 @@ public class ScheduleConverter : JsonConverter<DateTime[]?>
         writer.WriteEndArray();
     }
 }
-public class AssetReferenceJsonConverterFactory : JsonConverterFactory
+public sealed class AssetReferenceJsonConverterFactory : JsonConverterFactory
 {
     public override bool CanConvert(Type typeToConvert) => typeToConvert.IsGenericType && typeToConvert.GetGenericTypeDefinition() == typeof(AssetReference<>);
     public override JsonConverter? CreateConverter(Type typeToConvert, JsonSerializerOptions options)
     {
         return (JsonConverter)Activator.CreateInstance(typeof(AssetReferenceJsonConverter<>).MakeGenericType(typeToConvert.GetGenericArguments()[0]));
     }
-    private class AssetReferenceJsonConverter<TAsset> : JsonConverter<AssetReference<TAsset>> where TAsset : Asset
+    public class AssetReferenceJsonConverterGuidPreferred<TAsset> : AssetReferenceJsonConverter<TAsset> where TAsset : Asset
     {
+        public AssetReferenceJsonConverterGuidPreferred() => WriteGuid = true;
+    }
+    public class AssetReferenceJsonConverter<TAsset> : JsonConverter<AssetReference<TAsset>> where TAsset : Asset
+    {
+        public bool WriteGuid { get; protected set; }
         public override AssetReference<TAsset> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             switch (reader.TokenType)
@@ -1109,9 +1130,10 @@ public class AssetReferenceJsonConverterFactory : JsonConverterFactory
                             return new AssetReference<TAsset>(asset.GUID);
                     }
 
-                    throw new JsonException("Failed to parse number as a " + typeof(TAsset).Name + " reference (UInt16 format).");
+                    throw new JsonException("Failed to parse number as a " + typeof(TAsset).Name + $" reference (UInt16 format), unable to find asset: {value}.");
                 case JsonTokenType.String:
-                    if (reader.TryGetGuid(out Guid guid))
+                    string str = reader.GetString()!;
+                    if (Guid.TryParse(str, out Guid guid))
                         return new AssetReference<TAsset>(guid);
 
                     throw new JsonException("Failed to parse string as a " + typeof(TAsset).Name + " reference (GUID format).");
@@ -1126,7 +1148,7 @@ public class AssetReferenceJsonConverterFactory : JsonConverterFactory
                             string prop = reader.GetString()!;
                             if (prop.Equals("GUID", StringComparison.InvariantCultureIgnoreCase) || prop.Equals("_guid", StringComparison.InvariantCultureIgnoreCase))
                             {
-                                if (reader.Read() && reader.TokenType == JsonTokenType.String && reader.TryGetGuid(out guid))
+                                if (reader.Read() && reader.TokenType == JsonTokenType.String && Guid.TryParse(reader.GetString()!, out guid))
                                     return new AssetReference<TAsset>(guid);
                             }
                         }
@@ -1140,10 +1162,17 @@ public class AssetReferenceJsonConverterFactory : JsonConverterFactory
 
         public override void Write(Utf8JsonWriter writer, AssetReference<TAsset> value, JsonSerializerOptions options)
         {
-            writer.WriteStartObject();
-            writer.WritePropertyName("GUID");
-            writer.WriteStringValue(value.GUID.ToString("N"));
-            writer.WriteEndObject();
+            if (WriteGuid)
+            {
+                writer.WriteStringValue(value.GUID.ToString("N"));
+            }
+            else
+            {
+                writer.WriteStartObject();
+                writer.WritePropertyName("GUID");
+                writer.WriteStringValue(value.GUID.ToString("N"));
+                writer.WriteEndObject();
+            }
         }
     }
 }

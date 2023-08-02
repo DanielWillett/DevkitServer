@@ -944,6 +944,28 @@ public static class DevkitServerUtility
 
         return rtn;
     }
+    [Pure]
+    public static T? SingleOrDefaultSafe<T>(this IEnumerable<T> enumerable)
+    {
+        if (enumerable is IList<T> list)
+            return list.Count == 1 ? list[0] : default;
+
+        if (enumerable is ICollection<T> collection && collection.Count != 1)
+            return default;
+
+        bool found = false;
+        T? rtn = default;
+        foreach (T value in enumerable)
+        {
+            if (found)
+                return default;
+
+            rtn = value;
+            found = true;
+        }
+
+        return rtn;
+    }
     /// <summary>
     /// Creates a copy or moves a file, for example, 'OriginalName' to 'OriginalName Backup', and optionally assigns a number if there are duplicate files.
     /// </summary>

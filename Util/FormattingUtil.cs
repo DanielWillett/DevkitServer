@@ -583,6 +583,13 @@ public static class FormattingUtil
                 return guid.ToString(format).Colorize(FormatProvider.StackCleaner.Configuration.Colors!.StructColor);
             return ("{" + guid.ToString("N") + "}").Colorize(FormatProvider.StackCleaner.Configuration.Colors!.StructColor);
         }
+        if (obj is IAssetReference assetReference)
+        {
+            if (Assets.find(assetReference.GUID) is { } asset2)
+                obj = asset2;
+            else
+                return ("{" + assetReference.GUID.ToString("N") + "}").Colorize(FormatProvider.StackCleaner.Configuration.Colors!.StructColor);
+        }
         if (obj is Asset asset)
         {
             Color color = asset switch

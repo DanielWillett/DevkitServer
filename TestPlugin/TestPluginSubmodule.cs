@@ -6,6 +6,13 @@ namespace TestPlugin;
 internal class TestPluginSubmodule : Plugin
 {
     public override string Name => "TestPlugin.Module";
+
+#if DEBUG
+    public override bool DeveloperMode => true;
+#else
+    public override bool DeveloperMode => false;
+#endif
+
     protected override void Load()
     {
         LogInfo("Loaded " + Name + ".");

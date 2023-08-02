@@ -348,7 +348,9 @@ public class UserInput : MonoBehaviour
                 _editorUiObject = ui.transform;
             else
                 _playerUiObject = ui.transform;
+            UIExtensionManager.TellDestroyed(ui);
             Destroy(ui);
+
             Logger.LogInfo("Cleaned up " + (!editor ? "EditorUI." : "PlayerUI."));
         }
         else

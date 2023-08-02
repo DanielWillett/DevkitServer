@@ -57,6 +57,12 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
             }
         }
     }
+    /// <summary>
+    /// Tells reloading to not make backups, copies, or save on read.
+    /// </summary>
+    public bool ReadOnlyReloading { get; set; }
+    internal bool Faultable { get; set; }
+    internal bool Defaultable { get; set; }
     public JsonConfigurationFile(string file)
     {
         File = file;
@@ -67,7 +73,7 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
     {
         lock (_sync)
         {
-            TConfig old = ReadFromFile(File, this, Default);
+            TConfig old = ReadFromFile(File, Faultable, this, Default, ReadOnlyReloading, Defaultable);
             old = Interlocked.Exchange(ref _config, old);
             if (old is IDisposable d)
                 d.Dispose();
@@ -81,7 +87,8 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
                 Logger.LogError($"Exception in {nameof(OnReload).Colorize(ConsoleColor.White)} after reading {typeof(TConfig).Format()} config at {File.Format(false)}.", method: "JSON CONFIG");
                 Logger.LogError(ex, method: "JSON CONFIG");
             }
-            // WriteToFile(File, _config);
+            // if (!ReadOnlyReloading)
+            //      WriteToFile(File, _config);
         }
     }
     public void SaveConfig()
@@ -116,14 +123,17 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
 
         return null;
     }
-    public static TConfig ReadFromFile(string path, IJsonSettingProvider? options = null, TConfig? @default = null)
+
+    public static TConfig ReadFromFile(string path, IJsonSettingProvider? options = null, TConfig? @default = null, bool readOnly = false)
+        => ReadFromFile(path, false, options, @default, readOnly);
+    internal static TConfig ReadFromFile(string path, bool faultable, IJsonSettingProvider? options = null, TConfig? @default = null, bool readOnly = false, bool defaultable = false)
     {
         TConfig config;
         try
         {
             try
             {
-                if (!System.IO.File.Exists(path) && typeof(TConfig).Assembly == Accessor.DevkitServer)
+                if (!readOnly && !System.IO.File.Exists(path) && defaultable)
                 {
                     string fn = Path.GetFileName(path);
                     string? moduleFile = DevkitServerModule.FindModuleFile(fn);
@@ -177,26 +187,33 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
             Logger.LogError(ex, method: "JSON CONFIG");
 
             string oldpath = path;
-            try
+            if (!readOnly)
             {
-                int c = 0;
-                do
+                try
                 {
-                    ++c;
-                    path = Path.Combine(Path.GetDirectoryName(oldpath)!, Path.GetFileNameWithoutExtension(oldpath) + "_backup_" + c + Path.GetExtension(oldpath));
+                    int c = 0;
+                    do
+                    {
+                        ++c;
+                        path = Path.Combine(Path.GetDirectoryName(oldpath)!, Path.GetFileNameWithoutExtension(oldpath) + "_backup_" + c + Path.GetExtension(oldpath));
+                    }
+                    while (System.IO.File.Exists(path));
+                    System.IO.File.Move(oldpath, path);
                 }
-                while (System.IO.File.Exists(path));
-                System.IO.File.Move(oldpath, path);
-            }
-            catch (Exception ex2)
-            {
-                Logger.LogError("[" + typeof(TConfig).Format() + "] Error backing up invalid config file from: \"" + oldpath + "\" to \"" + path + "\".", method: "JSON CONFIG");
-                Logger.LogError(ex2, method: "JSON CONFIG");
+                catch (Exception ex2)
+                {
+                    Logger.LogError("[" + typeof(TConfig).Format() + "] Error backing up invalid config file from: \"" + oldpath + "\" to \"" + path + "\".", method: "JSON CONFIG");
+                    Logger.LogError(ex2, method: "JSON CONFIG");
+                }
             }
 #if SERVER
-            Logger.LogWarning("[" + typeof(TConfig).Format() + "] Server startup halted. " +
-                              "fix the config errors in \"" + path + "\" and rename it to \"" + oldpath + "\" or retart the server to use the default config.", method: "JSON CONFIG");
-            DevkitServerModule.Fault();
+            if (faultable)
+            {
+                Logger.LogWarning("[" + typeof(TConfig).Format() + "] Server startup halted." + (readOnly ? string.Empty :
+                    (" Fix the config errors in \"" + path + "\" and rename it to \"" + oldpath +
+                    "\" or retart the server to use the default config.")), method: "JSON CONFIG");
+                DevkitServerModule.Fault();
+            }
 #endif
             if (@default != null)
                 return @default;

@@ -519,27 +519,30 @@ internal static class LevelObjectPatches
 
     private static void OnUpdate()
     {
-        if (!EditorInteractEx.TryGetWorldHit(out RaycastHit hit))
+        if (!EditorObjects.isBuilding)
             return;
-
-        if (!hit.transform.CompareTag("Large") && !hit.transform.CompareTag("Medium") &&
-            !hit.transform.CompareTag("Small") && !hit.transform.CompareTag("Barricade") &&
-            !hit.transform.CompareTag("Structure"))
-            return;
-
-        if (LevelObjectUtil.TryFindObjectOrBuildable(hit.transform, out LevelObject? @object, out LevelBuildableObject? buildable, true))
+        if (EditorInteractEx.TryGetWorldHit(out RaycastHit hit) && (hit.transform.CompareTag("Large") || hit.transform.CompareTag("Medium") ||
+                                                                    hit.transform.CompareTag("Small") || hit.transform.CompareTag("Barricade") ||
+                                                                    hit.transform.CompareTag("Structure")) &&
+                LevelObjectUtil.TryFindObjectOrBuildable(hit.transform, out LevelObject? @object,
+                    out LevelBuildableObject? buildable, true))
         {
             Asset? asset = @object?.asset ?? (Asset?)buildable?.asset;
             if (InputEx.GetKeyDown(KeyCode.Mouse2))
             {
                 LevelObjectUtil.SelectObjectType(asset);
             }
+
             if (asset != null)
             {
                 AssetOrigin? origin = asset.GetOrigin();
-                EditorUI.hint(EEditorMessage.FOCUS, $"{asset.FriendlyName} ({asset.name}){Environment.NewLine}{origin?.name ?? "Unknown Origin"}");
+                EditorUI.hint(EEditorMessage.FOCUS,
+                    $"{asset.FriendlyName} ({asset.name}){Environment.NewLine}{origin?.name ?? "Unknown Origin"}");
             }
         }
+
+        if (DevkitServerConfig.Config.EnableObjectUIExtension)
+            EditorLevelObjectsUIExtension.OnUpdate();
     }
     private static void OnInstantiate(Vector3 position, Quaternion rotation, Vector3 scale, ObjectAsset objectAsset, ItemAsset buildableAsset)
     {

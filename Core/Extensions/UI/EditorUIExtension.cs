@@ -37,7 +37,7 @@ internal class EditorUIExtension : UIExtension, IDisposable
         Window?.RemoveChild(Container);
     }
 
-    internal void OnUserPositionUpdated(EditorUser user)
+    private void OnUserPositionUpdated(EditorUser user)
     {
         if (user == EditorUser.User)
         {

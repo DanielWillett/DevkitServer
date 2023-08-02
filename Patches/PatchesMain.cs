@@ -52,8 +52,7 @@ internal static class PatchesMain
             LevelObjectPatches.OptionalPatches();
 #endif
             DoManualPatches();
-
-            Accessor.AddFunctionBreakpoints(AccessTools.Method(typeof(EditorObjects), "save"));
+            
             // ConstructorInfo? info = typeof(MenuConfigurationOptionsUI).GetConstructors(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
             // if (info != null)
             //     Accessor.AddFunctionBreakpoints(info);

@@ -6,12 +6,14 @@ using GraphicsSettings = SDG.Unturned.GraphicsSettings;
 namespace DevkitServer.Util;
 public sealed class IconGenerator : MonoBehaviour
 {
+    internal const string Source = "OBJECT ICONS";
+
     public const float FOV = 60f;
     public const float DistanceScale = 1;
     public const float FarClipPlaneScale = 2.25f;
     private static readonly Vector3 EulerDefaultCameraRotation = new Vector3(5.298f, -23.733f, 0f);
     private static readonly Quaternion DefaultCameraRotation = Quaternion.Euler(EulerDefaultCameraRotation);
-    private static readonly Dictionary<Asset, ObjectIconMetrics> Metrics = new Dictionary<Asset, ObjectIconMetrics>(4, AssetComparer.Instance);
+    private static readonly Dictionary<Guid, ObjectIconMetrics> Metrics = new Dictionary<Guid, ObjectIconMetrics>(4);
     private static readonly List<Renderer> WorkingRenderersList = new List<Renderer>(4);
     private Camera _camera = null!;
     private Light _light = null!;
@@ -34,6 +36,8 @@ public sealed class IconGenerator : MonoBehaviour
 
         Instance = this;
     }
+    public static void ClearCache() => Metrics.Clear();
+    public static void ClearCache(Guid guid) => Metrics.Remove(guid);
     public static void GetIcon(Asset asset, int width, int height, Action<Asset, Texture2D?, bool> onIconReady)
     {
         ThreadUtil.assertIsGameThread();
@@ -156,7 +160,7 @@ public sealed class IconGenerator : MonoBehaviour
     {
         ThreadUtil.assertIsGameThread();
 
-        if (Metrics.TryGetValue(asset, out ObjectIconMetrics metrics))
+        if (Metrics.TryGetValue(asset.GUID, out ObjectIconMetrics metrics))
             return metrics;
 
         GameObject srcObject = asset switch
@@ -167,12 +171,17 @@ public sealed class IconGenerator : MonoBehaviour
             _ => throw new ArgumentException("Asset must be an object asset, barricade asset, or structure asset.")
         };
 
-        if (VanillaEditorObjectIconPresets.Presets.TryGetValue(asset.GUID, out AssetIconPreset preset))
+        AssetIconPreset? preset = ObjectIconPresets.EditCache;
+
+        if (preset == null || preset.Asset.GUID != asset.GUID)
+            ObjectIconPresets.Presets.TryGetValue(asset.GUID, out preset);
+        
+        if (preset != null)
         {
             Vector3 pos = preset.IconPosition;
             Quaternion rot = preset.IconRotation;
             metrics = new ObjectIconMetrics(pos, Vector3.zero, rot, 0f, pos.magnitude * FarClipPlaneScale, true);
-            Metrics.Add(asset, metrics);
+            Metrics.Add(asset.GUID, metrics);
             return metrics;
         }
 
@@ -185,14 +194,14 @@ public sealed class IconGenerator : MonoBehaviour
             Vector3 pos = matrix.MultiplyPoint3x4(icon.position);
             Quaternion rot = icon.localRotation;
             metrics = new ObjectIconMetrics(pos, Vector3.zero, rot, 0f, pos.magnitude * FarClipPlaneScale, true);
-            Metrics.Add(asset, metrics);
+            Metrics.Add(asset.GUID, metrics);
             return metrics;
         }
 
         if (!TryGetExtents(srcObject, out Bounds bounds))
         {
             metrics = new ObjectIconMetrics(Vector3.zero, Vector3.zero, Quaternion.identity, 0f, 16f, false);
-            Metrics.Add(asset, metrics);
+            Metrics.Add(asset.GUID, metrics);
             return metrics;
         }
 
@@ -203,7 +212,7 @@ public sealed class IconGenerator : MonoBehaviour
         Vector3 center = bounds.center;
         center.z = bounds.min.z + bounds.size.z / 4;
         metrics = new ObjectIconMetrics(-position, srcObject.transform.position - center, Quaternion.LookRotation(position), size, distance * FarClipPlaneScale, false);
-        Metrics.Add(asset, metrics);
+        Metrics.Add(asset.GUID, metrics);
         return metrics;
     }
     public static bool TryGetExtents(GameObject obj, out Bounds bounds)
@@ -236,7 +245,12 @@ public sealed class IconGenerator : MonoBehaviour
 
         return foundOne;
     }
-
+    [UsedImplicitly]
+    private void OnDestroy()
+    {
+        ClearCache();
+        Instance = null;
+    }
     private readonly struct RenderSettingsCopy
     {
         private readonly bool _fog;

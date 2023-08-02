@@ -10,6 +10,7 @@ namespace DevkitServer.Core.Extensions.UI;
 [UIExtension(typeof(EditorLevelObjectsUI))]
 internal class EditorLevelObjectsUIExtension : UIExtension
 {
+    public static KeyCode EditToggleKey = KeyCode.F8;
     private const int Size = 158;
     private static bool _patched;
 #nullable disable
@@ -24,6 +25,13 @@ internal class EditorLevelObjectsUIExtension : UIExtension
 
     private readonly ISleekBox _displayTitle;
     private readonly ISleekImage _preview;
+    private bool _isGeneratingIcon;
+    private bool _editorActive;
+    
+    private readonly ISleekToggle _isEditingToggle;
+    private readonly ISleekButton _saveEditButton;
+    private readonly ISleekButton _saveNewEditButton;
+
     internal EditorLevelObjectsUIExtension()
     {
         if (!DevkitServerConfig.Config.EnableObjectUIExtension)
@@ -57,23 +65,161 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         _preview.sizeOffset_X = Size;
         _preview.sizeOffset_Y = Size;
         _preview.shouldDestroyTexture = true;
-
-        UpdateSelectedObject();
-
         displayBox.AddChild(_preview);
 
+        ISleekLabel editKeybindHint = Glazier.Get().CreateLabel();
+        editKeybindHint.shadowStyle = ETextContrastContext.ColorfulBackdrop;
+        editKeybindHint.text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorToggleHint", EditToggleKey.ToString());
+        editKeybindHint.positionScale_X = 1f;
+        editKeybindHint.positionScale_Y = 1f;
+        editKeybindHint.positionOffset_X = _assetsScrollBox.positionOffset_X - (Size + 30);
+        editKeybindHint.positionOffset_Y = -20;
+        editKeybindHint.fontAlignment = TextAnchor.MiddleCenter;
+        editKeybindHint.textColor = new SleekColor(ESleekTint.FOREGROUND);
+        editKeybindHint.sizeOffset_X = Size + 20;
+        editKeybindHint.sizeOffset_Y = 20;
+
+        _container.AddChild(editKeybindHint);
+
+        _editorActive = false;
+
+        _isEditingToggle = Glazier.Get().CreateToggle();
+        _isEditingToggle.positionScale_X = 1f;
+        _isEditingToggle.positionScale_Y = 1f;
+        _isEditingToggle.positionOffset_X = _displayTitle.positionOffset_X - 30;
+        _isEditingToggle.positionOffset_Y = -Size - 55;
+        _isEditingToggle.sizeOffset_X = 20;
+        _isEditingToggle.sizeOffset_Y = 20;
+        _isEditingToggle.addLabel(DevkitServerModule.MainLocalization.Translate("ObjectIconEditorToggle"), new SleekColor(ESleekTint.FOREGROUND).Get(), ESleekSide.LEFT);
+        _isEditingToggle.sideLabel.shadowStyle = ETextContrastContext.ColorfulBackdrop;
+        _isEditingToggle.isVisible = false;
+        _isEditingToggle.onToggled += OnToggled;
+        _container.AddChild(_isEditingToggle);
+
+        _saveEditButton = Glazier.Get().CreateButton();
+        _saveEditButton.positionScale_X = 1f;
+        _saveEditButton.positionScale_Y = 1f;
+        _saveEditButton.positionOffset_X = _isEditingToggle.positionOffset_X - Size - 20;
+        _saveEditButton.positionOffset_Y = -Size - 25;
+        _saveEditButton.sizeOffset_X = Size / 2;
+        _saveEditButton.sizeOffset_Y = 30;
+        _saveEditButton.text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorSave");
+        _saveEditButton.onClickedButton += OnSaveEdit;
+        _saveEditButton.isVisible = false;
+        _container.AddChild(_saveEditButton);
+
+        _saveNewEditButton = Glazier.Get().CreateButton();
+        _saveNewEditButton.positionScale_X = 1f;
+        _saveNewEditButton.positionScale_Y = 1f;
+        _saveNewEditButton.positionOffset_X = _isEditingToggle.positionOffset_X + (Size + 30) / 2 - Size - 30;
+        _saveNewEditButton.positionOffset_Y = -Size - 25;
+        _saveNewEditButton.sizeOffset_X = Size / 2;
+        _saveNewEditButton.sizeOffset_Y = 30;
+        _saveNewEditButton.text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorSaveNew");
+        _saveNewEditButton.onClickedButton += OnSaveNewEdit;
+        _saveNewEditButton.isVisible = false;
+        _container.AddChild(_saveNewEditButton);
+
+        UpdateSelectedObject();
         if (!_patched)
             Patch();
     }
-#nullable restore
 
+    private void OnToggled(ISleekToggle toggle, bool state)
+    {
+        if (!_editorActive)
+            state = false;
+
+        _saveNewEditButton.isVisible = state;
+        _saveEditButton.isVisible = state;
+    }
+
+    public bool EditorActive
+    {
+        get => _editorActive;
+        private set
+        {
+            _editorActive = value;
+            if (!value)
+            {
+                _isEditingToggle.state = false;
+                _saveEditButton.isVisible = false;
+                _saveNewEditButton.isVisible = false;
+            }
+
+            _isEditingToggle.isVisible = value;
+        }
+    }
+#nullable restore
+    private void OnSaveEdit(ISleekElement button)
+    {
+        Asset? asset = LevelObjectUtil.SelectedAsset;
+        if (asset == null)
+            return;
+        ObjectIconPresets.SaveEditCache(false);
+        UpdateSelectedObject();
+    }
+    private void OnSaveNewEdit(ISleekElement button)
+    {
+        Asset? asset = LevelObjectUtil.SelectedAsset;
+        if (asset == null)
+            return;
+        ObjectIconPresets.SaveEditCache(true);
+        UpdateSelectedObject();
+    }
+    internal static void OnUpdate()
+    {
+        EditorLevelObjectsUIExtension? inst = UIExtensionManager.GetInstance<EditorLevelObjectsUIExtension>();
+        if (inst == null)
+        {
+            return;
+        }
+
+        if (InputEx.GetKeyDown(EditToggleKey))
+            inst.EditorActive = !inst.EditorActive;
+        if (inst._isGeneratingIcon)
+        {
+            return;
+        }
+        if (!inst._isEditingToggle.state || LevelObjectUtil.SelectedAsset is not ObjectAsset asset)
+        {
+            goto clear;
+        }
+        LevelObject? selectedObject = null;
+        foreach (EditorSelection selection in LevelObjectUtil.EditorObjectSelection)
+        {
+            if (!LevelObjectUtil.TryFindObject(selection.transform, out LevelObject lvlObj) || lvlObj.asset.GUID != asset.GUID)
+            {
+                continue;
+            }
+            if (selectedObject != null)
+            {
+                goto clear;
+            }
+            selectedObject = lvlObj;
+        }
+
+        if (selectedObject == null)
+        {
+            goto clear;
+        }
+        
+        ObjectIconPresets.UpdateEditCache(selectedObject, asset);
+        inst.UpdateSelectedObject();
+        return;
+
+        clear:
+        if (ObjectIconPresets.EditCache != null)
+        {
+            ObjectIconPresets.ClearEditCache();
+            inst.UpdateSelectedObject();
+        }
+    }
     public static void UpdateSelection(ObjectAsset? levelObject, ItemAsset? buildable)
     {
-        UIExtensionInfo? info = UIExtensionManager.Extensions.FirstOrDefault(x => x.ImplementationType == typeof(EditorLevelObjectsUIExtension));
-
-        if (info == null)
-            return;
-        EditorLevelObjectsUIExtension? inst = info.Instantiations.OfType<EditorLevelObjectsUIExtension>().LastOrDefault();
+        if (levelObject == null && buildable == null)
+            ObjectIconPresets.ClearEditCache();
+        EditorLevelObjectsUIExtension? inst = UIExtensionManager.GetInstance<EditorLevelObjectsUIExtension>();
         try
         {
             ISleekBox? box = inst?.SelectedBox;
@@ -99,10 +245,14 @@ internal class EditorLevelObjectsUIExtension : UIExtension
     internal void UpdateSelectedObject()
     {
         _preview.texture = null;
-        Asset? asset = (Asset?)EditorObjects.selectedObjectAsset ?? EditorObjects.selectedItemAsset;
+        Asset? asset = LevelObjectUtil.SelectedAsset;
         if (asset != null)
         {
-            IconGenerator.GetIcon(asset, Size, Size, OnIconReady);
+            _isGeneratingIcon = true;
+            if (asset is ObjectNPCAsset)
+                OnIconReady(asset, null, false);
+            else
+                IconGenerator.GetIcon(asset, Size, Size, OnIconReady);
             string text = asset.FriendlyName;
             if (asset is ObjectAsset obj)
                 text += " (" + obj.type switch
@@ -132,6 +282,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
 
     private void OnIconReady(Asset asset, Texture? texture, bool destroy)
     {
+        _isGeneratingIcon = false;
         if (EditorObjects.selectedItemAsset != asset && EditorObjects.selectedObjectAsset != asset)
             return;
         _preview.texture = texture;
@@ -182,11 +333,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         if (!__runOriginal || !DevkitServerConfig.Config.EnableObjectUIExtension)
             return;
 
-        UIExtensionInfo? info = UIExtensionManager.Extensions.FirstOrDefault(x => x.ImplementationType == typeof(EditorLevelObjectsUIExtension));
-
-        if (info == null)
-            return;
-        EditorLevelObjectsUIExtension? inst = info.Instantiations.OfType<EditorLevelObjectsUIExtension>().LastOrDefault();
+        EditorLevelObjectsUIExtension? inst = UIExtensionManager.GetInstance<EditorLevelObjectsUIExtension>();
         inst?.UpdateSelectedObject();
     }
 }

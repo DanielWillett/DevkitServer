@@ -40,6 +40,9 @@ public abstract class Plugin : IDevkitServerColorPlugin
     /// <inheritdoc/>
     public string PermissionPrefix { get; set; }
 
+    /// <inheritdoc/>
+    public abstract bool DeveloperMode { get; }
+
     protected Plugin()
     {
         string asmName = GetType().Assembly.GetName().Name;
@@ -127,7 +130,7 @@ public abstract class Plugin<TConfig> : Plugin, IDevkitServerPlugin<TConfig> whe
     protected Plugin()
     {
         // ReSharper disable once VirtualMemberCallInConstructor (Reason: expecting literal string override)
-        _config = new JsonConfigurationFile<TConfig>(Path.Combine(DataDirectory, RelativeMainConfigFileName));
+        _config = new JsonConfigurationFile<TConfig>(Path.Combine(DataDirectory, RelativeMainConfigFileName)) { Faultable = true };
 
         _config.ReloadConfig();
     }

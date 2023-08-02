@@ -11,6 +11,9 @@ namespace DevkitServer.Multiplayer;
 [EarlyTypeInit]
 public static class UserManager
 {
+#if CLIENT
+    internal static readonly CachedMulticastEvent<Action> EventOnConnectedToServer = new CachedMulticastEvent<Action>(typeof(UserManager), nameof(OnConnectedToServer));
+#endif
     private static readonly CachedMulticastEvent<Action<EditorUser>> EventOnUserConnected = new CachedMulticastEvent<Action<EditorUser>>(typeof(UserManager), nameof(OnUserConnected));
     private static readonly CachedMulticastEvent<Action<EditorUser>> EventOnUserDisconnected = new CachedMulticastEvent<Action<EditorUser>>(typeof(UserManager), nameof(OnUserDisconnected));
     public static event Action<EditorUser> OnUserConnected
@@ -23,6 +26,13 @@ public static class UserManager
         add => EventOnUserDisconnected.Add(value);
         remove => EventOnUserDisconnected.Remove(value);
     }
+#if CLIENT
+    public static event Action OnConnectedToServer
+    {
+        add => EventOnConnectedToServer.Add(value);
+        remove => EventOnConnectedToServer.Remove(value);
+    }
+#endif
     private static readonly List<EditorUser> UsersIntl = new List<EditorUser>(16);
     public static IReadOnlyList<EditorUser> Users { get; } = UsersIntl.AsReadOnly();
     public static EditorUser? FromId(ulong id)
