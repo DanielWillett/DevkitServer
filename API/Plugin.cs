@@ -49,7 +49,7 @@ public abstract class Plugin : IDevkitServerColorPlugin
         _defaultName = asmName + "/" + GetType().Name;
         // ReSharper disable once VirtualMemberCallInConstructor (Reason: expecting literal string override)
         string name = Name ?? _defaultName;
-        DataDirectory = Path.Combine(PluginLoader.PluginDirectory, asmName + "." + name);
+        DataDirectory = Path.Combine(PluginLoader.PluginsDirectory, asmName + "." + name);
         LocalizationDirectory = Path.Combine(DataDirectory, "Localization");
         MainLocalizationDirectory = Path.Combine(LocalizationDirectory, "Main");
         Translations = Localization.tryRead(MainLocalizationDirectory, false);
@@ -93,23 +93,23 @@ public abstract class Plugin : IDevkitServerColorPlugin
 
     /// <inheritdoc/>
     public void LogDebug(string message, ConsoleColor color = ConsoleColor.DarkGray) =>
-        Logger.LogDebug("[" + Name.ToUpperInvariant().Colorize(Color) + "] " + message, color);
+        Logger.LogDebug("[" + this.GetSource() + "] " + message, color);
 
     /// <inheritdoc/>
     public void LogInfo(string message, ConsoleColor color = ConsoleColor.DarkCyan) =>
-        Logger.LogInfo("[" + Name.ToUpperInvariant().Colorize(Color) + "] " + message, color);
+        Logger.LogInfo("[" + this.GetSource() + "] " + message, color);
 
     /// <inheritdoc/>
     public void LogWarning(string message, ConsoleColor color = ConsoleColor.Yellow) =>
-        Logger.LogWarning(message, color, method: Name.ToUpperInvariant().Colorize(Color));
+        Logger.LogWarning(message, color, method: this.GetSource());
 
     /// <inheritdoc/>
     public void LogError(string message, ConsoleColor color = ConsoleColor.Red) =>
-        Logger.LogError(message, color, method: Name.ToUpperInvariant().Colorize(Color));
+        Logger.LogError(message, color, method: this.GetSource());
 
     /// <inheritdoc/>
     public void LogError(Exception ex) =>
-        Logger.LogError(ex, method: Name.ToUpperInvariant().Colorize(Color));
+        Logger.LogError(ex, method: this.GetSource());
 #if CLIENT
     public void RegisterUIExtension(Type implementationType, Type parentUIType, int priority)
     {

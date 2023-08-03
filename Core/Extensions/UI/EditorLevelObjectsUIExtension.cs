@@ -209,7 +209,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         return;
 
         clear:
-        if (ObjectIconPresets.EditCache != null)
+        if (ObjectIconPresets.ActivelyEditing != null)
         {
             ObjectIconPresets.ClearEditCache();
             inst.UpdateSelectedObject();

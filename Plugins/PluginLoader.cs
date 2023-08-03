@@ -13,8 +13,8 @@ using HarmonyLib;
 namespace DevkitServer.Plugins;
 public static class PluginLoader
 {
-    public static readonly string PluginDirectory = Path.Combine(DevkitServerConfig.Directory, "Plugins");
-    public static readonly string LibraryDirectory = Path.Combine(DevkitServerConfig.Directory, "Libraries");
+    public static readonly string PluginsDirectory = Path.Combine(DevkitServerConfig.Directory, "Plugins");
+    public static readonly string LibrariesDirectory = Path.Combine(DevkitServerConfig.Directory, "Libraries");
 
     private static readonly CachedMulticastEvent<Action<IDevkitServerPlugin>> OnPluginLoadedEvent = new CachedMulticastEvent<Action<IDevkitServerPlugin>>(typeof(PluginLoader), nameof(OnPluginLoaded));
     private static readonly CachedMulticastEvent<Action<IDevkitServerPlugin>> OnPluginUnloadedEvent = new CachedMulticastEvent<Action<IDevkitServerPlugin>>(typeof(PluginLoader), nameof(OnPluginUnloaded));
@@ -175,12 +175,13 @@ public static class PluginLoader
             AssembliesIntl.Add(assemblyWrapper);
             skipAssemblyAdd:
             OnPluginLoadedEvent.TryInvoke(plugin);
-            Logger.LogInfo("[LOAD " + plugin.Name.ToUpperInvariant() + "] Loaded " + plugin.Name.Colorize(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor));
+            Logger.LogInfo("[LOAD " + plugin.GetSource() + "] Loaded " + plugin.Name.Colorize(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor));
         }
         catch (Exception ex)
         {
-            Logger.LogError("Plugin failed to load: " + plugin.GetType().Format() + ".", method: "LOAD " + plugin.Name.ToUpperInvariant());
-            Logger.LogError(ex, method: "LOAD " + plugin.Name.ToUpperInvariant());
+            string src = "LOAD " + plugin.GetSource();
+            Logger.LogError("Plugin failed to load: " + plugin.GetType().Format() + ".", method: src);
+            Logger.LogError(ex, method: src);
             Exception? unloadEx = null;
             try
             {
@@ -190,11 +191,21 @@ public static class PluginLoader
             catch (Exception ex2)
             {
                 unloadEx = ex2;
-                Logger.LogError("Plugin failed to unload: " + plugin.GetType().Format() + ".", method: "LOAD " + plugin.Name.ToUpperInvariant());
-                Logger.LogError(ex2, method: "LOAD " + plugin.Name.ToUpperInvariant());
+                Logger.LogError("Plugin failed to unload: " + plugin.GetType().Format() + ".", method: src);
+                Logger.LogError(ex2, method: src);
             }
             throw new AggregateException("Plugin failed to load and unload: " + plugin.GetType().FullName + ".", unloadEx != null ? new Exception[] { ex, unloadEx } : new Exception[] { ex });
         }
+    }
+
+    internal static string GetSource(this IDevkitServerPlugin plugin)
+    {
+        Color color = plugin.GetColor();
+        string src = plugin.Name.ToUpperInvariant().Colorize(color);
+        if (plugin.DeveloperMode)
+            src += " (".ColorizeNoReset(FormattingColorType.Punctuation) + "dev".ColorizeNoReset(FormattingColorType.FlowKeyword) + ")".Colorize(FormattingColorType.Punctuation);
+
+        return src;
     }
 
     /// <exception cref="AggregateException">Error(s) unloading the plugin.</exception>
@@ -221,14 +232,16 @@ public static class PluginLoader
                     }
                 }
 
+                string src = "UNLOAD " + plugin.GetSource();
+
                 try
                 {
                     plugin.Unload();
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError("Plugin failed to unload: " + plugin.GetType().Format() + ".", method: "LOAD " + plugin.Name.ToUpperInvariant());
-                    Logger.LogError(ex, method: "LOAD " + plugin.Name.ToUpperInvariant());
+                    Logger.LogError("Plugin failed to unload: " + plugin.GetType().Format() + ".", method: src);
+                    Logger.LogError(ex, method: src);
                     throw new AggregateException("Plugin failed to unload: " + plugin.GetType().FullName + ".", ex);
                 }
                 finally
@@ -241,11 +254,11 @@ public static class PluginLoader
     }
     internal static void Load()
     {
-        Directory.CreateDirectory(PluginDirectory);
-        Directory.CreateDirectory(LibraryDirectory);
+        Directory.CreateDirectory(PluginsDirectory);
+        Directory.CreateDirectory(LibrariesDirectory);
 
-        string[] plugins = Directory.GetFiles(PluginDirectory, "*.dll", SearchOption.TopDirectoryOnly);
-        string[] libraries = Directory.GetFiles(LibraryDirectory, "*.dll", SearchOption.TopDirectoryOnly);
+        string[] plugins = Directory.GetFiles(PluginsDirectory, "*.dll", SearchOption.TopDirectoryOnly);
+        string[] libraries = Directory.GetFiles(LibrariesDirectory, "*.dll", SearchOption.TopDirectoryOnly);
 
         foreach (string libDll in libraries)
         {
@@ -253,13 +266,13 @@ public static class PluginLoader
             Assembly? asm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(x => AssemblyName.ReferenceMatchesDefinition(x.GetName(), asmName));
             if (asm != null)
             {
-                Logger.LogInfo("Library already loaded: " + Path.GetFileName(libDll).Format() + ", skipped.");
+                Logger.LogInfo($"[LOAD {asm.GetName().Name.ToUpperInvariant()}] Library already loaded: " + Path.GetFileName(libDll).Format() + ", skipped.");
                 continue;
             }
             asm = Assembly.LoadFrom(libDll);
             if (asm != null)
             {
-                Logger.LogInfo("Loaded Library: " + Path.GetFileName(libDll).Format() + ".");
+                Logger.LogInfo($"[LOAD {asm.GetName().Name.ToUpperInvariant()}] Loaded Library: " + Path.GetFileName(libDll).Format() + ".");
                 PluginLibrary lib = new PluginLibrary(asm, libDll);
                 LibrariesIntl.Add(lib);
             }
@@ -278,9 +291,10 @@ public static class PluginLoader
                                  : 0
                          ))
             {
+                string src = "LOAD " + assembly.GetName().Name.ToUpperInvariant();
                 if (type.IsAbstract || Attribute.IsDefined(type, typeof(IgnoreAttribute)))
                 {
-                    Logger.LogInfo("[LOAD " + assembly.GetName().Name.ToUpperInvariant() + "] Skipped loading " + type.Format() + ".");
+                    Logger.LogInfo($"[{src}] Skipped loading {type.Format()}.");
                     continue;
                 }
 
@@ -290,9 +304,9 @@ public static class PluginLoader
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError("Failed to load assembly:" + pluginDll.Format() + ".", method: "LOAD " + type.Name.ToUpperInvariant());
-                    Logger.LogError(" Plugin failed to load: " + type.Format() + ".", method: "LOAD " + type.Name.ToUpperInvariant());
-                    Logger.LogError(ex);
+                    Logger.LogError("Failed to load assembly:" + pluginDll.Format() + ".", method: src);
+                    Logger.LogError(" Plugin failed to load: " + type.Format() + ".", method: src);
+                    Logger.LogError(ex, method: src);
                     pluginsTemp.RemoveAll(x => x.GetType().Assembly == assembly);
                     break;
                 }
@@ -300,8 +314,8 @@ public static class PluginLoader
 
             if (pluginsTemp.Count > 0)
             {
-                Logger.LogInfo("[LOAD PLUGINS] Found " + pluginsTemp.Count.Format() + " plugin" + (pluginsTemp.Count == 1 ? string.Empty : "s") +
-                               " from " + Path.GetFileName(pluginDll).Format() + " (" + assembly.GetName().Version.Format() + ")");
+                Logger.LogInfo($"[LOAD PLUGINS] Found {pluginsTemp.Count.Format()} plugin{(pluginsTemp.Count == 1 ? string.Empty : "s")} " +
+                               $"from {Path.GetFileName(pluginDll).Format()} ({assembly.GetName().Version.Format()})");
                 PluginAssembly? info = AssembliesIntl.Find(x => x.Assembly == assembly);
                 if (info == null)
                 {
@@ -350,8 +364,7 @@ public static class PluginLoader
         for (int i = 0; i < pluginsTemp.Count; ++i)
         {
             IDevkitServerPlugin plugin = pluginsTemp[i];
-            Color color = plugin.GetColor();
-            string src = "LOAD " + plugin.Name.ToUpperInvariant().Colorize(color);
+            string src = "LOAD " + plugin.GetSource();
             try
             {
                 AssertPluginValid(plugin);
@@ -565,6 +578,7 @@ public class PluginAssembly
     internal void ReflectAndPatch()
     {
         ThreadUtil.assertIsGameThread();
+        string src = "INIT " + Assembly.GetName().Name.ToUpperInvariant();
 
         if (!HasReflected)
         {
@@ -582,6 +596,7 @@ public class PluginAssembly
 #endif
                 , _netMethods, _netCalls
             );
+
             HierarchyItemTypeIdentifierEx.RegisterFromAssembly(Assembly, _hierarchyItemFactories);
             foreach (Type type in Accessor.GetTypesSafe(Assembly)
                          .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x,
@@ -595,22 +610,22 @@ public class PluginAssembly
                 {
                     RuntimeHelpers.RunClassConstructor(type.TypeHandle);
                     CreateDirectoryAttribute.CreateInType(type);
-                    if (Plugins.Count > 0)
+                    if (Plugins.Count == 1)
                         Plugins[0].LogDebug("Initialized static module " + type.Format() + ".");
                     else
-                        Logger.LogDebug($"[{Assembly.GetName().Name.ToUpperInvariant()}] Initialized static module {type.Name.Format()}.");
+                        Logger.LogDebug($"[{src}] Initialized static module {type.Name.Format()}.");
                 }
                 catch (Exception ex)
                 {
-                    if (Plugins.Count > 0)
+                    if (Plugins.Count == 1)
                     {
                         Plugins[0].LogError("Error while initializing static module " + type.Format() + ".");
                         Plugins[0].LogError(ex);
                     }
                     else
                     {
-                        Logger.LogError("Error while initializing static module " + type.Format() + ".", method: Assembly.GetName().Name.ToUpperInvariant());
-                        Logger.LogError(ex, method: Assembly.GetName().Name.ToUpperInvariant());
+                        Logger.LogError("Error while initializing static module " + type.Format() + ".", method: src);
+                        Logger.LogError(ex, method: src);
                     }
                     break;
                 }
@@ -624,21 +639,20 @@ public class PluginAssembly
             try
             {
                 Patcher.PatchAll(Assembly);
-                if (Plugins.Count > 0)
+                if (Plugins.Count == 1)
                     Plugins[0].LogInfo($"Applied all patches in {Assembly.Location.Format()}.");
                 else
-                    Logger.LogError($"Applied all patches in {Assembly.Location.Format()}.", method: Assembly.GetName().Name.ToUpperInvariant());
+                    Logger.LogInfo($"[{src}] Applied all patches in {Assembly.Location.Format()}.");
             }
             catch (Exception ex)
             {
-                if (Plugins.Count > 0)
+                if (Plugins.Count == 1)
                 {
                     Plugins[0].LogError($"Error while patching in assembly at {Assembly.Location.Format()}.");
                     Plugins[0].LogError(ex);
                 }
                 else
                 {
-                    string src = Assembly.GetName().Name.ToUpperInvariant();
                     Logger.LogError($"Error while patching in assembly at {Assembly.Location.Format()}.", method: src);
                     Logger.LogError(ex, method: src);
                 }
@@ -661,25 +675,25 @@ public class PluginAssembly
 
         if (!HasPatched) return;
         HasPatched = false;
+        string src = "INIT " + Assembly.GetName().Name.ToUpperInvariant();
 
         try
         {
             Patcher.UnpatchAll(HarmonyId);
-            if (Plugins.Count > 0)
+            if (Plugins.Count == 1)
                 Plugins[0].LogInfo($"Removed all patches in {Assembly.Location.Format()}.");
             else
-                Logger.LogError($"Removed all patches in {Assembly.Location.Format()}.", method: Assembly.GetName().Name.ToUpperInvariant());
+                Logger.LogInfo($"[{src}] Removed all patches in {Assembly.Location.Format()}.");
         }
         catch (Exception ex)
         {
-            if (Plugins.Count > 0)
+            if (Plugins.Count == 1)
             {
                 Plugins[0].LogError($"Error while unpatching in assembly at {Assembly.Location.Format()}.");
                 Plugins[0].LogError(ex);
             }
             else
             {
-                string src = Assembly.GetName().Name.ToUpperInvariant();
                 Logger.LogError($"Error while unpatching in assembly at {Assembly.Location.Format()}.", method: src);
                 Logger.LogError(ex, method: src);
             }

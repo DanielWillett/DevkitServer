@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Reflection;
 using SDG.Provider;
 #if CLIENT
+using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Patches;
 using SDG.Framework.Utilities;
@@ -44,8 +45,7 @@ public static class EditorLevel
     internal static readonly NetCall Ping = new NetCall((ushort)NetCalls.Ping);
     internal static List<ITransportConnection> PendingToReceiveActions = new List<ITransportConnection>(4);
 #if CLIENT
-    public static string TempLevelPath => Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer",
-        "Temp_" + Parser.getIPFromUInt32(Provider.currentServerInfo.ip) + "_" + Provider.currentServerInfo.connectionPort, "Level");
+    public static string TempLevelPath => Path.Combine(DevkitServerConfig.ServerFolder, "Levels", _pendingLevelName ?? throw new NotSupportedException("Level not pending."), "Level Install");
 #endif
 #if SERVER
     private static bool _isCompressingLevel;

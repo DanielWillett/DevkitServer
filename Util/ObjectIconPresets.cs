@@ -12,7 +12,7 @@ internal static class ObjectIconPresets
     private static JsonConfigurationFile<List<AssetIconPreset>>? _customPresets;
     private static readonly string _customPresetsPath = Path.Combine(DevkitServerConfig.Directory, "configured_icons.json");
     public static Dictionary<Guid, AssetIconPreset> Presets = new Dictionary<Guid, AssetIconPreset>(128);
-    public static AssetIconPreset? EditCache { get; private set; }
+    public static AssetIconPreset? ActivelyEditing { get; private set; }
     public static void Init()
     {
         Level.onPostLevelLoaded += OnLevelLoaded;
@@ -30,23 +30,23 @@ internal static class ObjectIconPresets
         Transform? transform = levelObject.GetTransform();
         if (transform == null)
             return;
-        if (EditCache == null || EditCache.Asset.GUID != asset.GUID)
+        if (ActivelyEditing == null || ActivelyEditing.Asset.GUID != asset.GUID)
         {
-            EditCache = new AssetIconPreset
+            ActivelyEditing = new AssetIconPreset
             {
                 Asset = asset.getReferenceTo<ObjectAsset>(),
                 File = null
             };
         }
 
-        EditCache.IconPosition = transform.InverseTransformPoint(ctrl.transform.position);
-        EditCache.IconRotation = transform.InverseTransformRotation(ctrl.transform.rotation);
+        ActivelyEditing.IconPosition = transform.InverseTransformPoint(ctrl.transform.position);
+        ActivelyEditing.IconRotation = transform.InverseTransformRotation(ctrl.transform.rotation);
 
         IconGenerator.ClearCache(asset.GUID);
     }
     public static void SaveEditCache(bool asNew)
     {
-        AssetIconPreset? preset = EditCache;
+        AssetIconPreset? preset = ActivelyEditing;
         if (preset == null)
             return;
         Guid guid = preset.Asset.GUID;
@@ -117,11 +117,11 @@ internal static class ObjectIconPresets
     }
     public static void ClearEditCache()
     {
-        if (EditCache == null)
+        if (ActivelyEditing == null)
             return;
         
-        IconGenerator.ClearCache(EditCache.Asset.GUID);
-        EditCache = null;
+        IconGenerator.ClearCache(ActivelyEditing.Asset.GUID);
+        ActivelyEditing = null;
     }
     private static void OnLevelLoaded(int level)
     {
@@ -138,11 +138,12 @@ internal static class ObjectIconPresets
         foreach (JsonConfigurationFile<List<AssetIconPreset>> config in _presetProviders)
             config.OnRead -= OnConfigReloaded;
         _presetProviders.Clear();
+        string dir;
         if (Provider.provider?.workshopService?.ugc != null)
         {
             foreach (SteamContent content in Provider.provider.workshopService.ugc)
             {
-                string dir = content.type == ESteamUGCType.MAP ? Path.Combine(content.path, "Bundles") : content.path;
+                dir = content.type == ESteamUGCType.MAP ? Path.Combine(content.path, "Bundles") : content.path;
                 if (!Directory.Exists(dir))
                     continue;
                 foreach (string directory in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
@@ -154,22 +155,30 @@ internal static class ObjectIconPresets
 
         if (Level.info != null && Level.info.path != null)
         {
-            string dir = Path.Combine(Level.info.path, "Bundles");
+            dir = Path.Combine(Level.info.path, "Bundles");
             if (Directory.Exists(dir))
             {
                 foreach (string directory in Directory.EnumerateDirectories(Path.Combine(Level.info.path, "Bundles"), "*", SearchOption.AllDirectories))
-                    DiscoverAssetIconPresetProvidersIn(directory, false);
+                    DiscoverAssetIconPresetProvidersIn(directory, DevkitServerModule.IsEditing);
             }
         }
 
-        foreach (string directory in Directory.EnumerateDirectories(Path.Combine(ReadWrite.PATH, "Sandbox"), "*", SearchOption.AllDirectories))
-            DiscoverAssetIconPresetProvidersIn(directory, false);
+        dir = Path.Combine(ReadWrite.PATH, "Sandbox");
+        if (Directory.Exists(dir))
+        {
+            foreach (string directory in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
+                DiscoverAssetIconPresetProvidersIn(directory, false);
+        }
 
         DiscoverAssetIconPresetProvidersIn(Path.Combine(ReadWrite.PATH, "Bundles"), true);
-        DiscoverAssetIconPresetProvidersIn(Path.Combine(ReadWrite.PATH, "Bundles", "Objects"), true);
 
-        foreach (string directory in Directory.EnumerateDirectories(Path.Combine(ReadWrite.PATH, "Bundles", "Objects"), "*", SearchOption.AllDirectories))
-            DiscoverAssetIconPresetProvidersIn(directory, true);
+        dir = Path.Combine(ReadWrite.PATH, "Bundles", "Objects");
+        if (Directory.Exists(dir))
+        {
+            DiscoverAssetIconPresetProvidersIn(dir, true);
+            foreach (string directory in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
+                DiscoverAssetIconPresetProvidersIn(directory, true);
+        }
         
         foreach (string directory in DevkitServerModule.AssemblyFileSearchLocations)
             DiscoverAssetIconPresetProvidersIn(directory, true);
@@ -178,9 +187,9 @@ internal static class ObjectIconPresets
 
         foreach (IDevkitServerPlugin plugin in PluginLoader.Plugins)
         {
-            if (plugin.DataDirectory is not { Length: > 0 } dir || !Directory.Exists(dir))
+            if (plugin.DataDirectory is not { Length: > 0 } dir2 || !Directory.Exists(dir2))
                 continue;
-            foreach (string directory in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
+            foreach (string directory in Directory.EnumerateDirectories(dir2, "*", SearchOption.AllDirectories))
                 DiscoverAssetIconPresetProvidersIn(directory, !plugin.DeveloperMode);
         }
         

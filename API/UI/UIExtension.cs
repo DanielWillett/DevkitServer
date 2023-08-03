@@ -144,6 +144,7 @@ public class UIExtensionInfo
     public Type ImplementationType { get; }
     public Type ParentType { get; }
     public int Priority { get; }
+    public Assembly Assembly { get; }
     public IDevkitServerPlugin? Plugin { get; }
     public bool IsBaseType { get; }
     public IReadOnlyList<object> Instantiations { get; }
@@ -161,6 +162,7 @@ public class UIExtensionInfo
         ParentType = parentType;
         Priority = priority;
         Plugin = plugin;
+        Assembly = implementationType.Assembly;
         IsBaseType = typeof(UIExtension).IsAssignableFrom(implementationType);
         InstantiationsIntl = new List<object>(1);
         Instantiations = InstantiationsIntl.AsReadOnly();

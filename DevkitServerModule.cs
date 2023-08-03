@@ -327,20 +327,36 @@ public sealed class DevkitServerModule : IModuleNexus
         else
         {
             string modName = ModuleName.Colorize(ModuleColor);
+            string license = "GNU General Public License".Colorize(new Color32(255, 204, 102, 255));
             Color32 nameColor = new Color32(86, 98, 246, 255);
             Logger.LogInfo($"{modName} (by @{"blazingflame".Colorize(nameColor)} on {"Discord".Colorize(new Color32(116, 131, 196, 255))} or " +
                            $"{"https://github.com/DanielWillett".Format(false)}) initialized.");
             Logger.LogInfo($"Please create an Issue for any bugs at {(RepositoryUrl + "/issues").Format(false)} (one bug per issue please).");
             Logger.LogInfo($"Please give suggestions as a Discussion at {(RepositoryUrl + "/discussions/categories/ideas").Format(false)}.");
             Logger.LogInfo(string.Empty, ConsoleColor.White);
-            Logger.LogInfo("Legal", ConsoleColor.White);
-            Logger.LogInfo($"{modName} is licensed under the " + "GNU General Public License v3.0".Colorize(new Color32(255, 204, 102, 255)) + ".", ConsoleColor.White);
-            Logger.LogInfo("==================================================================================================", ConsoleColor.White);
-            Logger.LogInfo($" {modName}  Copyright (C) {2023.Format()}  {"Daniel Willett".Colorize(nameColor)}", ConsoleColor.White);
+            Logger.LogInfo("============================================== Legal ==============================================", ConsoleColor.White);
+            Logger.LogInfo($" {modName} is licensed under the {"GNU General Public License v3.0".Colorize(new Color32(255, 204, 102, 255))}.", ConsoleColor.White);
+            Logger.LogInfo("===================================================================================================", ConsoleColor.White);
+            Logger.LogInfo($" {modName} - Copyright (C) {2023.Format()} - {"Daniel Willett".Colorize(nameColor)}", ConsoleColor.White);
             Logger.LogInfo( " This program comes with ABSOLUTELY NO WARRANTY.", ConsoleColor.White);
             Logger.LogInfo( " This is free software, and you are welcome to redistribute it under certain conditions.", ConsoleColor.White);
-            Logger.LogInfo($" Read the full agreement at {"https://github.com/DanielWillett/DevkitServer/blob/master/LICENSE".Format(false)}.", ConsoleColor.White);
-            Logger.LogInfo("==================================================================================================", ConsoleColor.White);
+            Logger.LogInfo("===================================================================================================", ConsoleColor.White);
+            Logger.LogInfo($" {modName} - Module for Unturned that enables multi-user map editing.", ConsoleColor.White);
+            Logger.LogInfo(" This program is free software: you can redistribute it and / or modify", ConsoleColor.White);
+            Logger.LogInfo(" it under the terms of the " + license + " as published by", ConsoleColor.White);
+            Logger.LogInfo(" the Free Software Foundation, either version 3 of the License, or", ConsoleColor.White);
+            Logger.LogInfo(" (at your option) any later version.", ConsoleColor.White);
+            Logger.LogInfo(string.Empty, ConsoleColor.White);
+            Logger.LogInfo(" This program is distributed in the hope that it will be useful,", ConsoleColor.White);
+            Logger.LogInfo(" but WITHOUT ANY WARRANTY; without even the implied warranty of", ConsoleColor.White);
+            Logger.LogInfo(" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the", ConsoleColor.White);
+            Logger.LogInfo(" " + license + " for more details.", ConsoleColor.White);
+            Logger.LogInfo(string.Empty, ConsoleColor.White);
+            Logger.LogInfo(" You should have received a copy of the " + license, ConsoleColor.White);
+            Logger.LogInfo($" along with this program. If not, see {"https://www.gnu.org/licenses/".Format(false)}.", ConsoleColor.White);
+            Logger.LogInfo("===================================================================================================", ConsoleColor.White);
+            Logger.LogInfo($" Read the full license agreement at {(RepositoryUrl + "/blob/master/LICENSE").Format(false)}.", ConsoleColor.White);
+            Logger.LogInfo("===================================================================================================", ConsoleColor.White);
             Logger.LogInfo(string.Empty, ConsoleColor.White);
         }
         GC.Collect();

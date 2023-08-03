@@ -771,20 +771,20 @@ public static class FormattingUtil
             int argb = tokenType switch
             {
                 FormattingColorType.Keyword => colors.KeywordColor,
-                FormattingColorType.Method => colors.KeywordColor,
-                FormattingColorType.Property => colors.KeywordColor,
-                FormattingColorType.Parameter => colors.KeywordColor,
+                FormattingColorType.Method => colors.MethodColor,
+                FormattingColorType.Property => colors.PropertyColor,
+                FormattingColorType.Parameter => colors.ParameterColor,
                 FormattingColorType.Class => colors.ClassColor,
-                FormattingColorType.Struct => colors.ClassColor,
-                FormattingColorType.FlowKeyword => colors.ClassColor,
-                FormattingColorType.Interface => colors.ClassColor,
-                FormattingColorType.GenericParameter => colors.ClassColor,
+                FormattingColorType.Struct => colors.StructColor,
+                FormattingColorType.FlowKeyword => colors.FlowKeywordColor,
+                FormattingColorType.Interface => colors.InterfaceColor,
+                FormattingColorType.GenericParameter => colors.GenericParameterColor,
                 FormattingColorType.Enum => colors.EnumColor,
-                FormattingColorType.Namespace => colors.EnumColor,
-                FormattingColorType.Punctuation => colors.EnumColor,
-                FormattingColorType.ExtraData => colors.EnumColor,
-                FormattingColorType.LinesHiddenWarning => colors.EnumColor,
-                FormattingColorType.HtmlBackground => colors.EnumColor,
+                FormattingColorType.Namespace => colors.NamespaceColor,
+                FormattingColorType.Punctuation => colors.PunctuationColor,
+                FormattingColorType.ExtraData => colors.ExtraDataColor,
+                FormattingColorType.LinesHiddenWarning => colors.LinesHiddenWarningColor,
+                FormattingColorType.HtmlBackground => colors.HtmlBackgroundColor,
                 _ => unchecked((int)0xFFFFFFFF)
             };
 

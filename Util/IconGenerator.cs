@@ -1,5 +1,4 @@
 ﻿#if CLIENT
-using DevkitServer.Util.Comparers;
 using UnityEngine.Rendering;
 using GraphicsSettings = SDG.Unturned.GraphicsSettings;
 
@@ -171,7 +170,7 @@ public sealed class IconGenerator : MonoBehaviour
             _ => throw new ArgumentException("Asset must be an object asset, barricade asset, or structure asset.")
         };
 
-        AssetIconPreset? preset = ObjectIconPresets.EditCache;
+        AssetIconPreset? preset = ObjectIconPresets.ActivelyEditing;
 
         if (preset == null || preset.Asset.GUID != asset.GUID)
             ObjectIconPresets.Presets.TryGetValue(asset.GUID, out preset);
