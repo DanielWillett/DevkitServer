@@ -115,7 +115,7 @@ public abstract class AuthoritativeSync<TSync> : AuthoritativeSync, ITerminalFor
         {
             IReadOnlyList<AuthoritativeSync> ts = UserManager.Users[i].Syncs;
             for (int j = 0; j < ts.Count; ++j)
-                if (ts[j] is TSync sync)
+                if (ts[j] is TSync { HasAuthority: true } sync)
                     return sync;
         }
 

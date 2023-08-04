@@ -1281,17 +1281,74 @@ internal static class Accessor
     /// <summary>
     /// Transpiles a method to add logging for each instruction.
     /// </summary>
-    public static void AddFunctionBreakpoints(MethodBase method)
+    public static bool AddFunctionStepthrough(MethodBase method)
     {
-        PatchesMain.Patcher.Patch(method,
-            transpiler: new HarmonyMethod(typeof(Accessor).GetMethod(nameof(AddFunctionBreakpointsTranspiler),
-                BindingFlags.NonPublic | BindingFlags.Static)));
-        Logger.LogInfo($"Added breakpoints to: {method.Format()}.");
+        if (method == null)
+        {
+            Logger.LogError("Error adding function stepthrough to method, not found.");
+            return false;
+        }
+        try
+        {
+            PatchesMain.Patcher.Patch(method,
+                transpiler: new HarmonyMethod(typeof(Accessor).GetMethod(nameof(AddFunctionStepthroughTranspiler),
+                    BindingFlags.NonPublic | BindingFlags.Static)));
+            Logger.LogInfo($"Added stepthrough to: {method.Format()}.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error adding function stepthrough to {method.Format()}.");
+            Logger.LogError(ex);
+            return false;
+        }
     }
-    [Pure]
-    private static IEnumerable<CodeInstruction> AddFunctionBreakpointsTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+    /// <summary>
+    /// Transpiles a method to add logging for entry and exit of the method.
+    /// </summary>
+    public static bool AddFunctionIOLogging(MethodBase method)
     {
-        yield return new CodeInstruction(OpCodes.Ldstr, "Breakpointing Method: " + method.Format() + ":");
+        if (method == null)
+        {
+            Logger.LogError("Error adding function IO logging to method, not found.");
+            return false;
+        }
+        try
+        {
+            PatchesMain.Patcher.Patch(method,
+                transpiler: new HarmonyMethod(typeof(Accessor).GetMethod(nameof(AddFunctionIOTranspiler),
+                    BindingFlags.NonPublic | BindingFlags.Static)));
+            Logger.LogInfo($"Added function IO logging to: {method.Format()}.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error adding function IO logging to {method.Format()}.");
+            Logger.LogError(ex);
+            return false;
+        }
+    }
+    private static IEnumerable<CodeInstruction> AddFunctionIOTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+    {
+        yield return new CodeInstruction(OpCodes.Ldstr, "In method: " + method.Format() + " (basic entry)");
+        yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
+        yield return new CodeInstruction(OpCodes.Call, LogDebug);
+
+        foreach (CodeInstruction instr in instructions)
+        {
+            if (instr.opcode == OpCodes.Ret || instr.opcode == OpCodes.Throw)
+            {
+                yield return new CodeInstruction(OpCodes.Ldstr, "Out method: " + method.Format() + (instr.opcode == OpCodes.Ret ? " (returned)" : " (exception)"));
+                yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
+                yield return new CodeInstruction(OpCodes.Call, LogDebug);
+            }
+            yield return instr;
+        }
+
+    }
+    private static IEnumerable<CodeInstruction> AddFunctionStepthroughTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+    {
+        yield return new CodeInstruction(OpCodes.Ldstr, "Stepping through Method: " + method.Format() + ":");
         yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
         yield return new CodeInstruction(OpCodes.Call, LogDebug);
         foreach (CodeInstruction instr in instructions)

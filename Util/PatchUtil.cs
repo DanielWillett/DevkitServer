@@ -248,32 +248,43 @@ public static class PatchUtil
         return null;
     }
     [Pure]
-    public static Label LabelNextOrReturn(IList<CodeInstruction> instructions, ILGenerator generator, int index, PatternMatch match, int shift = 0)
+    public static Label LabelNextOrReturn(IList<CodeInstruction> instructions, ILGenerator generator, int index, PatternMatch? match, int shift = 0, bool allowUseExisting = true)
     {
-        Label label = generator.DefineLabel();
+        CodeInstruction instruction;
         for (int i = index; i < instructions.Count; ++i)
         {
-            if (match(instructions[i]))
+            if (match == null || match(instructions[i]))
             {
                 int newIndex = i + shift;
                 if (instructions.Count > i)
                 {
-                    instructions[newIndex].labels.Add(label);
+                    instruction = instructions[newIndex];
+                    if (allowUseExisting && instruction.labels.Count > 0)
+                        return instruction.labels[instruction.labels.Count - 1];
+                    Label label = generator.DefineLabel();
+                    instruction.labels.Add(label);
                     return label;
                 }
             }
         }
 
-        if (instructions[instructions.Count - 1].opcode == OpCodes.Ret)
-            instructions[instructions.Count - 1].labels.Add(label);
+        instruction = instructions[instructions.Count - 1];
+        if (instruction.opcode == OpCodes.Ret)
+        {
+            if (allowUseExisting && instruction.labels.Count > 0)
+                return instruction.labels[instruction.labels.Count - 1];
+            Label label = generator.DefineLabel();
+            instruction.labels.Add(label);
+            return label;
+        }
         else
         {
-            CodeInstruction instruction = new CodeInstruction(OpCodes.Ret);
+            Label label = generator.DefineLabel();
+            instruction = new CodeInstruction(OpCodes.Ret);
             instruction.labels.Add(label);
             instructions.Add(instruction);
+            return label;
         }
-
-        return label;
     }
     [Pure]
     public static Label? GetNextBranchTarget(IList<CodeInstruction> instructions, int index)

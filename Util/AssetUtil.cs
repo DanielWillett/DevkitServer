@@ -66,6 +66,8 @@ public static class AssetUtil
         ThreadUtil.assertIsGameThread();
 
         path = Path.GetFullPath(path);
+        if (!Assets.shouldLoadAnyAssets)
+            return;
         if (LoadFile == null)
         {
             Logger.LogWarning($"Unable to load file from origin {origin.name.Format(false)}: {path.Format()}.", method: Source);
@@ -88,6 +90,8 @@ public static class AssetUtil
     /// </summary>
     public static void LoadMasterBundleSync(string masterBundleDatFilePath, AssetOrigin origin)
     {
+        if (!Assets.shouldLoadAnyAssets)
+            return;
         DatDictionary dict = ReadFileWithoutHash(masterBundleDatFilePath);
         MasterBundleConfig config = new MasterBundleConfig(Path.GetDirectoryName(masterBundleDatFilePath), dict, origin);
         byte[] data;
@@ -117,6 +121,8 @@ public static class AssetUtil
     /// <remarks>Do not reuse <paramref name="origin"/>.</remarks>
     public static void LoadAssetsSync(string directory, AssetOrigin origin, bool includeSubDirectories = true, bool loadMasterBundles = true)
     {
+        if (!Assets.shouldLoadAnyAssets)
+            return;
         LoadAssetsSyncIntl(directory, origin, includeSubDirectories, loadMasterBundles, true);
     }
 

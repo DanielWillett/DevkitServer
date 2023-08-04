@@ -69,7 +69,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
 
         ISleekLabel editKeybindHint = Glazier.Get().CreateLabel();
         editKeybindHint.shadowStyle = ETextContrastContext.ColorfulBackdrop;
-        editKeybindHint.text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorToggleHint", EditToggleKey.ToString());
+        editKeybindHint.text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorToggleHint", MenuConfigurationControlsUI.getKeyCodeText(EditToggleKey));
         editKeybindHint.positionScale_X = 1f;
         editKeybindHint.positionScale_Y = 1f;
         editKeybindHint.positionOffset_X = _assetsScrollBox.positionOffset_X - (Size + 30);

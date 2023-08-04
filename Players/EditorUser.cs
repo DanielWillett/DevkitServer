@@ -3,7 +3,6 @@ using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Sync;
-using JetBrains.Annotations;
 #if CLIENT
 using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Networking;
@@ -14,6 +13,9 @@ using DevkitServer.Util.Comparers;
 #endif
 
 namespace DevkitServer.Players;
+/// <summary>
+/// Represents a connected user. This component is added to the Player, not the editor.
+/// </summary>
 public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 {
     internal readonly List<AuthoritativeSync> IntlSyncs = new List<AuthoritativeSync>(4);
@@ -44,6 +46,44 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     public bool IsOnline { get; internal set; }
     public bool IsOwner { get; private set; }
     public GameObject EditorObject { get; private set; } = null!;
+    /// <summary>
+    /// Position of the active controller.
+    /// </summary>
+    public Vector3 Position
+    {
+        get
+        {
+            Transform? aim = Input.Aim;
+            return aim == null ? Vector3.zero : aim.transform.position;
+        }
+    }
+    /// <summary>
+    /// Rotation of the active controller.
+    /// </summary>
+    public Quaternion Rotation
+    {
+        get
+        {
+            Transform? aim = Input.Aim;
+            return aim == null ? Quaternion.identity : aim.transform.rotation;
+        }
+    }
+    /// <summary>
+    /// Forward vector of the active controller.
+    /// </summary>
+    public Vector3 Forward
+    {
+        get
+        {
+            Transform? aim = Input.Aim;
+            return aim == null ? Vector3.forward : aim.transform.forward;
+        }
+    }
+
+    /// <summary>
+    /// Active controller camera look object (like player.look.aim).
+    /// </summary>
+    public Transform? ControllerLook => Input.Aim;
     private EditorUser()
     {
         Syncs = IntlSyncs.AsReadOnly();
@@ -70,6 +110,13 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         ObjectSync = EditorObject.GetComponent<ObjectSync>();
         HierarchySync = EditorObject.GetComponent<HierarchySync>();
         IntlSyncs.Add(TileSync);
+        IntlSyncs.Add(ObjectSync);
+        IntlSyncs.Add(HierarchySync);
+#if CLIENT
+        StartCoroutine(DeactivateAfterFrame());
+#else
+        Player!.player.gameObject.SetActive(false);
+#endif
 #if SERVER
         ClientInfo = DevkitServerGamemode.GetClientInfo(this);
         _perms = ClientInfo.Permissions.ToList();
@@ -84,6 +131,14 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 #endif
         Logger.LogDebug("[USERS] Editor User initialized: " + SteamId.m_SteamID.Format() + " (" + DisplayName.Format() + ").");
     }
+#if CLIENT
+    private IEnumerator DeactivateAfterFrame()
+    {
+        yield return new WaitForEndOfFrame();
+        Player!.player.gameObject.SetActive(false);
+        Logger.LogDebug("[USERS] Player deactivated.");
+    }
+#endif
 #if SERVER
     internal void AddPermission(Permission permission)
     {
@@ -223,10 +278,6 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     internal static void OnEnemyConnected(SteamPlayer player)
     {
         UserManager.AddUser(player);
-
-        EditorUI? ui = UIAccessTools.EditorUI;
-        if (ui != null)
-            UIExtensionManager.TellDestroyed(ui);
     }
     internal static void OnClientDisconnected()
     {
@@ -259,7 +310,6 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         DevkitServerModule.Instance.UnloadBundle();
         
         ClientInfo.OnDisconnect();
-        UserInput.CleaningUpController = 0;
     }
     internal static void OnEnemyDisconnected(SteamPlayer player)
     {

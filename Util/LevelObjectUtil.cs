@@ -194,6 +194,17 @@ public static class LevelObjectUtil
 
         return StandardErrorCode.Success;
     }
+    public static bool IsSelected(Transform transform)
+    {
+        List<EditorSelection> selection = EditorObjectSelection;
+        for (int i = 0; i < selection.Count; ++i)
+        {
+            if (selection[i].transform == transform)
+                return true;
+        }
+
+        return false;
+    }
     public static void ClearSelection()
     {
         ThreadUtil.assertIsGameThread();
@@ -205,7 +216,7 @@ public static class LevelObjectUtil
         }
 
         List<EditorSelection> selection = EditorObjectSelection;
-        for (int i = selection.Count - 1; i >= 0; ++i)
+        for (int i = selection.Count - 1; i >= 0; --i)
             EditorObjects.removeSelection(selection[i].transform);
     }
     public static void DeselectObjectType() => SelectObjectType(null);

@@ -18,7 +18,7 @@ internal class EditorUIExtension : UIExtension, IDisposable
     {
         UserManager.OnUserConnected += OnUserConnected;
         UserManager.OnUserDisconnected += OnUserDisconnected;
-        UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
+        UserInput.OnUserEditorPositionUpdated += OnUserEditorPositionUpdated;
 
         Container = new SleekFullscreenBox
         {
@@ -32,12 +32,12 @@ internal class EditorUIExtension : UIExtension, IDisposable
     {
         UserManager.OnUserConnected -= OnUserConnected;
         UserManager.OnUserDisconnected -= OnUserDisconnected;
-        UserInput.OnUserPositionUpdated -= OnUserPositionUpdated;
+        UserInput.OnUserEditorPositionUpdated -= OnUserEditorPositionUpdated;
         
         Window?.RemoveChild(Container);
     }
 
-    private void OnUserPositionUpdated(EditorUser user)
+    private void OnUserEditorPositionUpdated(EditorUser user)
     {
         if (user == EditorUser.User)
         {
@@ -94,7 +94,7 @@ internal class EditorUIExtension : UIExtension, IDisposable
 
     private void OnUserConnected(EditorUser user)
     {
-        OnUserPositionUpdated(user);
+        OnUserEditorPositionUpdated(user);
     }
 
     private void OnUserDisconnected(EditorUser user)

@@ -108,6 +108,9 @@
         <Reference Include="SDG.Glazier.Runtime">
             <HintPath>$(ClientPath)\Unturned_Data\Managed\SDG.Glazier.Runtime.dll</HintPath>
         </Reference>
+        <Reference Include="HighlightingSystem">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\HighlightingSystem.dll</HintPath>
+        </Reference>
 
         <!-- Unity -->
         <Reference Include="UnityEngine">
@@ -146,9 +149,9 @@
         <Reference Include="UnityEngine.UI">
             <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.UI.dll</HintPath>
         </Reference>
-      <Reference Include="UnityEngine.TextRenderingModule">
-        <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
-      </Reference>
+        <Reference Include="UnityEngine.TextRenderingModule">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+        </Reference>
     </ItemGroup>
 
 

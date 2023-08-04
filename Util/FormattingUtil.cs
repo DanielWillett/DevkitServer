@@ -250,36 +250,36 @@ public static class FormattingUtil
             type += "global".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) +
                    "::".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor) + " ";
 
-        type += property.Name.ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PropertyColor) + " { ".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
+        type += property.Name.ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PropertyColor) + " {".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
         
         if (getter != null)
         {
             if (getter.IsAssembly)
-                type += "internal get".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+                type += " internal get".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
             else if (getter.IsFamilyAndAssembly)
-                type += "protected internal get".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+                type += " protected internal get".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
             else if (getter.IsPrivate)
-                type += "private get".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+                type += " private get".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
             else if (getter.IsFamily)
-                type += "protected get".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+                type += " protected get".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
             else
-                type += "get".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
-            type += "; ".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
+                type += " get".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+            type += ";".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
         }
 
         if (setter != null)
         {
             if (setter.IsAssembly)
-                type += "internal set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+                type += " internal set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
             else if (setter.IsFamilyAndAssembly)
-                type += "protected internal set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+                type += " protected internal set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
             else if (setter.IsPrivate)
-                type += "private set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+                type += " private set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
             else if (setter.IsFamily)
-                type += "protected set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+                type += " protected set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
             else
-                type += "set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
-            type += "; ".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
+                type += " set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+            type += ";".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
         }
 
         type += " }";

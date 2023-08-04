@@ -89,7 +89,7 @@ public sealed class DevkitServerModule : IModuleNexus
         { "ObjectIconEditorToggle", "Live Editor" },
         { "ObjectIconEditorSave", "Save" },
         { "ObjectIconEditorSaveNew", "Save New" },
-        { "ObjectIconEditorToggleHint", "[{0}] to edit." },
+        { "ObjectIconEditorToggleHint", "[{0}] to edit" },
     };
     public static Local CommandLocalization { get; private set; } = null!;
 
@@ -334,13 +334,13 @@ public sealed class DevkitServerModule : IModuleNexus
             Logger.LogInfo($"Please create an Issue for any bugs at {(RepositoryUrl + "/issues").Format(false)} (one bug per issue please).");
             Logger.LogInfo($"Please give suggestions as a Discussion at {(RepositoryUrl + "/discussions/categories/ideas").Format(false)}.");
             Logger.LogInfo(string.Empty, ConsoleColor.White);
-            Logger.LogInfo("============================================== Legal ==============================================", ConsoleColor.White);
+            Logger.LogInfo("================================================ Legal ================================================", ConsoleColor.White);
             Logger.LogInfo($" {modName} is licensed under the {"GNU General Public License v3.0".Colorize(new Color32(255, 204, 102, 255))}.", ConsoleColor.White);
-            Logger.LogInfo("===================================================================================================", ConsoleColor.White);
+            Logger.LogInfo("=======================================================================================================", ConsoleColor.White);
             Logger.LogInfo($" {modName} - Copyright (C) {2023.Format()} - {"Daniel Willett".Colorize(nameColor)}", ConsoleColor.White);
             Logger.LogInfo( " This program comes with ABSOLUTELY NO WARRANTY.", ConsoleColor.White);
             Logger.LogInfo( " This is free software, and you are welcome to redistribute it under certain conditions.", ConsoleColor.White);
-            Logger.LogInfo("===================================================================================================", ConsoleColor.White);
+            Logger.LogInfo("=======================================================================================================", ConsoleColor.White);
             Logger.LogInfo($" {modName} - Module for Unturned that enables multi-user map editing.", ConsoleColor.White);
             Logger.LogInfo(" This program is free software: you can redistribute it and / or modify", ConsoleColor.White);
             Logger.LogInfo(" it under the terms of the " + license + " as published by", ConsoleColor.White);
@@ -354,9 +354,9 @@ public sealed class DevkitServerModule : IModuleNexus
             Logger.LogInfo(string.Empty, ConsoleColor.White);
             Logger.LogInfo(" You should have received a copy of the " + license, ConsoleColor.White);
             Logger.LogInfo($" along with this program. If not, see {"https://www.gnu.org/licenses/".Format(false)}.", ConsoleColor.White);
-            Logger.LogInfo("===================================================================================================", ConsoleColor.White);
+            Logger.LogInfo("=======================================================================================================", ConsoleColor.White);
             Logger.LogInfo($" Read the full license agreement at {(RepositoryUrl + "/blob/master/LICENSE").Format(false)}.", ConsoleColor.White);
-            Logger.LogInfo("===================================================================================================", ConsoleColor.White);
+            Logger.LogInfo("=======================================================================================================", ConsoleColor.White);
             Logger.LogInfo(string.Empty, ConsoleColor.White);
         }
         GC.Collect();
@@ -418,6 +418,8 @@ public sealed class DevkitServerModule : IModuleNexus
 #if SERVER
             if (DevkitServerConfig.Config.TcpSettings is { EnableHighSpeedSupport: true })
                 _ = HighSpeedServer.Instance;
+#elif CLIENT
+            OptionsSettings.hints = true;
 #endif
         }
     }

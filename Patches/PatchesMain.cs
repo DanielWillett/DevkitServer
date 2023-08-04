@@ -20,6 +20,7 @@ namespace DevkitServer.Patches;
 internal static class PatchesMain
 {
     public const string HarmonyId = "dw.devkitserver";
+    private const string Source = "PATCHING";
     internal static Harmony Patcher { get; private set; } = null!;
     internal static void Init()
     {
@@ -53,10 +54,6 @@ internal static class PatchesMain
 #endif
             DoManualPatches();
             
-            // ConstructorInfo? info = typeof(MenuConfigurationOptionsUI).GetConstructors(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
-            // if (info != null)
-            //     Accessor.AddFunctionBreakpoints(info);
-
             Logger.LogInfo($"Finished patching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
         }
         catch (Exception ex)
@@ -123,12 +120,131 @@ internal static class PatchesMain
             return false;
 #if CLIENT
         if (caller.channel.isOwner)
-            return UserInput.CleaningUpController == CameraController.Editor;
+            return UserInput.LocalController == CameraController.Editor;
 #endif
         EditorUser? user = UserManager.FromId(caller.player.channel.owner.playerID.steamID.m_SteamID);
         return !(user != null && user.Input.Controller == CameraController.Player);
     }
 #if CLIENT
+
+    [HarmonyPatch(typeof(LoadingUI), "Update")]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    private static IEnumerable<CodeInstruction> TranspileInitializePlayer(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
+    {
+        FieldInfo? playerUIInstance = typeof(PlayerUI).GetField("instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+        if (playerUIInstance == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find field: PlayerUI.instance.", method: Source);
+            DevkitServerModule.Fault();
+        }
+        FieldInfo? editorUIInstance = typeof(EditorUI).GetField("instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+        if (playerUIInstance == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find field: EditorUI.instance.", method: Source);
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo getController = UserInput.GetLocalControllerMethod;
+
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        bool patchedOutPlayerUI = false;
+        bool patchedOutEditorUI = false;
+        for (int i = 1; i < ins.Count; ++i)
+        {
+            if (PatchUtil.MatchPattern(ins, i,
+                    x => playerUIInstance != null && x.LoadsField(playerUIInstance) ||
+                         editorUIInstance != null && x.LoadsField(editorUIInstance),
+                    x => x.opcode != OpCodes.Ldnull) && ins[i - 1].operand is Label label)
+            {
+                ins.Insert(i, new CodeInstruction(OpCodes.Call, getController));
+                CameraController current = ins[i + 1].LoadsField(playerUIInstance) ? CameraController.Player : CameraController.Editor;
+                ins.Insert(i + 1, PatchUtil.LoadConstantI4((int)current));
+                ins.Insert(i + 2, new CodeInstruction(OpCodes.Bne_Un, label));
+                i += 3;
+                patchedOutPlayerUI |= current == CameraController.Player;
+                patchedOutEditorUI |= current == CameraController.Editor;
+            }
+        }
+
+        if (!patchedOutPlayerUI)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to edit call to {FormattingUtil.FormatMethod(typeof(void), typeof(PlayerUI), "Player_OnGUI", arguments: Array.Empty<Type>())}.", method: Source);
+            DevkitServerModule.Fault();
+        }
+        if (!patchedOutEditorUI)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to edit call to {FormattingUtil.FormatMethod(typeof(void), typeof(EditorUI), "Editor_OnGUI", arguments: Array.Empty<Type>())}.", method: Source);
+            DevkitServerModule.Fault();
+        }
+
+        return ins;
+    }
+
+    
+    [HarmonyPatch("SDG.Unturned.Level, Assembly-CSharp", nameof(Level.isLoading), MethodType.Getter)]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    private static bool PrefixGetIsLevelLoading(ref bool __result)
+    {
+        if (!DevkitServerModule.IsEditing)
+            return true;
+
+        __result = Level.isEditor && Level.isLoadingContent;
+        return false;
+    }
+
+    /*
+    [HarmonyPatch("SDG.Unturned.Player, Assembly-CSharp", nameof(Player.isLoading), MethodType.Getter)]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    private static bool PrefixGetIsPlayerLoading(ref bool __result)
+    {
+        if (!DevkitServerModule.IsEditing)
+            return true;
+
+        __result = false;
+        return false;
+
+    }
+    [HarmonyPatch(typeof(Player), "InitializePlayer")]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    private static IEnumerable<CodeInstruction> TranspileInitializePlayer(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
+    {
+        MethodInfo? initializeUIMethod = typeof(PlayerUI).GetMethod("InitializePlayer", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null, CallingConventions.Any, Array.Empty<Type>(), null);
+        if (initializeUIMethod == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find method: PlayerUI.InitializePlayer.", method: Source);
+            DevkitServerModule.Fault();
+        }
+
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        bool patchedOutUICall = false;
+        for (int i = 0; i < ins.Count; ++i)
+        {
+            if (PatchUtil.MatchPattern(ins, i,
+                    x => x.opcode.IsLdLoc(),
+                    x => initializeUIMethod != null && x.Calls(initializeUIMethod)))
+            {
+                Label label = PatchUtil.LabelNextOrReturn(ins, generator, i + 2, null);
+                ins.Insert(i, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Brtrue, label));
+                i += 4;
+                patchedOutUICall = true;
+                Logger.LogDebug($"[{Source}] {method.Format()} - Removed patch to {initializeUIMethod.Format()}.");
+            }
+        }
+
+        if (!patchedOutUICall)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to remove call to {FormattingUtil.FormatMethod(typeof(void), typeof(PlayerUI), "InitializePlayer", arguments: Array.Empty<Type>())}.", method: Source);
+            DevkitServerModule.Fault();
+        }
+
+        return ins;
+    }*/
+
     //private static readonly Action LoadGameMode = Accessor.GenerateStaticCaller<Provider, Action>("loadGameMode", throwOnError: true)!;
 
     [HarmonyPatch(typeof(Provider), nameof(Provider.launch))]
@@ -185,11 +301,11 @@ internal static class PatchesMain
 
     private static bool IsPlayerControlledOrNotEditing()
     {
-        return !DevkitServerModule.IsEditing || !Level.isEditor || UserInput.CleaningUpController == CameraController.Player;
+        return !DevkitServerModule.IsEditing || !Level.isEditor || UserInput.LocalController == CameraController.Player;
     }
     private static bool IsEditorControlledOrNotEditing()
     {
-        return !DevkitServerModule.IsEditing || !Level.isEditor || UserInput.CleaningUpController == CameraController.Editor;
+        return !DevkitServerModule.IsEditing || !Level.isEditor || UserInput.LocalController == CameraController.Editor;
     }
 
     [UsedImplicitly]

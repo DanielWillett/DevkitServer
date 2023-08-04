@@ -1,16 +1,16 @@
-﻿using DevkitServer.Multiplayer;
+﻿using DevkitServer.API.Permissions;
+using DevkitServer.Core.Permissions;
+using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Players.UI;
 using DevkitServer.Util.Encoding;
+using SDG.NetPak;
+#if CLIENT
+using HarmonyLib;
 using SDG.Framework.Devkit;
 using System.Reflection;
 using System.Reflection.Emit;
-using DevkitServer.API.Permissions;
-using DevkitServer.Core.Permissions;
-using DevkitServer.Players.UI;
-using SDG.NetPak;
-#if CLIENT
 using EditorUI = SDG.Unturned.EditorUI;
-using HarmonyLib;
 #endif
 
 namespace DevkitServer.Players;
@@ -21,6 +21,11 @@ namespace DevkitServer.Players;
 #endif
 public class UserInput : MonoBehaviour
 {
+    private static readonly CachedMulticastEvent<Action<EditorUser>> EventOnUserEditorPositionUpdated = new CachedMulticastEvent<Action<EditorUser>>(typeof(UserInput), nameof(OnUserEditorPositionUpdated));
+    private static readonly CachedMulticastEvent<Action<EditorUser>> EventOnUserControllerUpdated = new CachedMulticastEvent<Action<EditorUser>>(typeof(UserInput), nameof(OnUserControllerUpdated));
+#if SERVER
+    private static readonly CachedMulticastEvent<UserControllerUpdateRequested> EventOnUserControllerUpdateRequested = new CachedMulticastEvent<UserControllerUpdateRequested>(typeof(UserInput), nameof(OnUserControllerUpdateRequested));
+#endif
     public const ushort SaveDataVersion = 4;
     public const ushort SendDataVersion = 0;
     [UsedImplicitly]
@@ -32,39 +37,52 @@ public class UserInput : MonoBehaviour
     [UsedImplicitly]
     private static readonly NetCall RequestInitialState = new NetCall(NetCalls.RequestInitialState);
 #if CLIENT
-    internal static CameraController CleaningUpController;
-    public static CameraController LocalController => EditorUser.User?.Input is { } input ? input.Controller : 0;
+    // internal static CameraController CleaningUpController;
+    internal static MethodInfo GetLocalControllerMethod = typeof(UserInput).GetProperty(nameof(LocalController), BindingFlags.Static | BindingFlags.Public)?.GetMethod!;
+    public static CameraController LocalController
+    {
+        get
+        {
+            if (DevkitServerModule.IsEditing && EditorUser.User?.Input is not null)
+                return EditorUser.User.Input.Controller;
+            return 0;
+        }
+    }
 #endif
     private CameraController _controller;
-    private static Delegate[] _onUpdatedActions = Array.Empty<Delegate>();
 
     /*#if CLIENT
     private static StaticSetter<float>? SetLookPitch = Accessor.GenerateStaticSetter<EditorLook, float>("_pitch");
     private static StaticSetter<float>? SetLookYaw = Accessor.GenerateStaticSetter<EditorLook, float>("_yaw");
     #endif*/
-    private static event Action<EditorUser>? _onUpdated;
-    public static event Action<EditorUser>? OnUserPositionUpdated
+    public static event Action<EditorUser> OnUserEditorPositionUpdated
     {
-        add
-        {
-            _onUpdated += value;
-            _onUpdatedActions = _onUpdated?.GetInvocationList() ?? Array.Empty<Delegate>();
-        }
-        remove
-        {
-            _onUpdated -= value;
-            _onUpdatedActions = _onUpdated?.GetInvocationList() ?? Array.Empty<Delegate>();
-        }
+        add => EventOnUserEditorPositionUpdated.Add(value);
+        remove => EventOnUserEditorPositionUpdated.Remove(value);
     }
 
-    public static event Action<EditorUser>? OnUserControllerUpdated;
+    public static event Action<EditorUser> OnUserControllerUpdated
+    {
+        add => EventOnUserControllerUpdated.Add(value);
+        remove => EventOnUserControllerUpdated.Remove(value);
+    }
+#if SERVER
+    public static event UserControllerUpdateRequested OnUserControllerUpdateRequested
+    {
+        add => EventOnUserControllerUpdateRequested.Add(value);
+        remove => EventOnUserControllerUpdateRequested.Remove(value);
+    }
+#endif
     private bool _hasStopped = true;
 #if CLIENT
     private float _lastFlush;
+    private float _lastQueue;
     private bool _bufferHasStop;
     private bool _nextPacketSendRotation;
     private int _rotSkip;
 #endif
+    private UserInputPacket _pendingPacket;
+    private float _pendingPacketTime;
     private bool _networkedInitialPosition;
     private Vector3 _lastPos;
     private float _lastYaw;
@@ -75,8 +93,14 @@ public class UserInput : MonoBehaviour
     public bool IsOwner { get; private set; }
     public GameObject? ControllerObject { get; private set; }
 #if CLIENT
-    /// <summary>Set with <see cref="RequestSetController"/>.</summary>
+    /// <summary>
+    /// The controller of the user's camera. Either <see cref="CameraController.Editor"/> or <see cref="CameraController.Player"/>.
+    /// </summary>
+    /// <remarks>Set with <see cref="RequestSetController"/>.</remarks>
 #elif SERVER
+    /// <summary>
+    /// The controller of the user's camera. Either <see cref="CameraController.Editor"/> or <see cref="CameraController.Player"/>.
+    /// </summary>
     /// <remarks>Setter replicates to clients.</remarks>
 #endif
     public CameraController Controller
@@ -122,7 +146,6 @@ public class UserInput : MonoBehaviour
         _ => null
     };
 
-    private static readonly Func<IDevkitTool>? GetDevkitTool;
     [UsedImplicitly]
     private static readonly InstanceGetter<EditorMovement, float> GetSpeed = Accessor.GenerateInstanceGetter<EditorMovement, float>("speed", throwOnError: true)!;
     [UsedImplicitly]
@@ -143,7 +166,8 @@ public class UserInput : MonoBehaviour
 #endif
     private static readonly ByteReader Reader = new ByteReader { ThrowOnError = true };
     private readonly Queue<UserInputPacket> _packets = new Queue<UserInputPacket>();
-
+#if CLIENT
+    private static readonly Func<IDevkitTool>? GetDevkitTool;
     public static IDevkitTool? ActiveTool => GetDevkitTool?.Invoke();
 
     static UserInput()
@@ -176,53 +200,7 @@ public class UserInput : MonoBehaviour
         il.Emit(OpCodes.Ret);
         GetDevkitTool = (Func<IDevkitTool>)method.CreateDelegate(typeof(Func<IDevkitTool>));
     }
-
-#if CLIENT
-    [UsedImplicitly]
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendInitialPosition)]
-    private static void ReceiveInitialPosition(MessageContext ctx, ulong player, Vector3 pos)
-    {
-        EditorUser? user = UserManager.FromId(player);
-        if (user != null && user.Input != null)
-        {
-            UserInput input = user.Input;
-            input.transform.position = pos;
-            input._networkedInitialPosition = true;
-            if (input.IsOwner)
-                input._nextPacketSendRotation = true;
-            Logger.LogInfo("Received initial transform " + user + ": " + pos + ".");
-            ctx.Acknowledge(StandardErrorCode.Success);
-            TryInvokeOnUserPositionUpdated(user);
-        }
-    }
 #endif
-#if SERVER
-    [NetCall(NetCallSource.FromClient, NetCalls.RequestInitialState)]
-    private static void ReceiveRequestInitialState(MessageContext ctx)
-    {
-        EditorUser? user = ctx.GetCaller();
-        if (user == null || !user.IsOnline || user.Player?.player == null)
-            return;
-        SendInitialState(user.Player.player, user.Player);
-    }
-#endif
-    private static void TryInvokeOnUserPositionUpdated(EditorUser user)
-    {
-        for (int i = 0; i < _onUpdatedActions.Length; ++i)
-        {
-            Action<EditorUser> action = (Action<EditorUser>)_onUpdatedActions[i];
-            try
-            {
-                action(user);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Plugin threw an error in " + typeof(EditorUser) + "." + nameof(OnUserPositionUpdated) + ".");
-                Logger.LogError(ex);
-            }
-        }
-    }
-
     [UsedImplicitly]
     private void Start()
     {
@@ -249,12 +227,15 @@ public class UserInput : MonoBehaviour
             EditorUI? edUi = User.EditorObject.GetComponentInChildren<EditorUI>();
             if (edUi != null)
                 _editorUiObject = edUi.transform;
+            _controller = CameraController.Editor;
+            ControllerObject = User.EditorObject;
+            SetActiveMainCamera(User.EditorObject.transform);
         }
-        Controller = CameraController.Editor;
+        else Controller = CameraController.Editor;
 #endif
 
         _nextPacketApplyTime = CachedTime.RealtimeSinceStartup;
-        TryInvokeOnUserPositionUpdated(User);
+        EventOnUserEditorPositionUpdated.TryInvoke(User);
         
 #if SERVER
         _controller = CameraController.Editor;
@@ -271,10 +252,39 @@ public class UserInput : MonoBehaviour
 
         Logger.LogDebug("User input module created for " + User.SteamId.m_SteamID.Format() + " ( owner: " + IsOwner.Format() + " ).");
     }
+
+#if CLIENT
+    [UsedImplicitly]
+    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendInitialPosition)]
+    private static void ReceiveInitialPosition(MessageContext ctx, ulong player, Vector3 pos)
+    {
+        EditorUser? user = UserManager.FromId(player);
+        if (user != null && user.Input != null)
+        {
+            UserInput input = user.Input;
+            input.transform.position = pos;
+            input._networkedInitialPosition = true;
+            if (input.IsOwner)
+                input._nextPacketSendRotation = true;
+            Logger.LogInfo("Received initial transform " + user + ": " + pos + ".");
+            ctx.Acknowledge(StandardErrorCode.Success);
+            EventOnUserEditorPositionUpdated.TryInvoke(user);
+        }
+    }
+#endif
+#if SERVER
+    [NetCall(NetCallSource.FromClient, NetCalls.RequestInitialState)]
+    private static void ReceiveRequestInitialState(MessageContext ctx)
+    {
+        EditorUser? user = ctx.GetCaller();
+        if (user == null || !user.IsOnline || user.Player?.player == null)
+            return;
+        SendInitialState(user.Player.player, user.Player);
+    }
+#endif
+
     private void HandleControllerUpdated()
     {
-        User.Player!.player.gameObject.SetActive(true);
-        User.EditorObject.SetActive(true);
         if (Controller == CameraController.Editor)
         {
             // on controller set to editor
@@ -285,18 +295,18 @@ public class UserInput : MonoBehaviour
             else
                 User.Player.player.life.sendRevive(); // heal the player
 #endif
-            User.Player.player.movement.canAddSimulationResultsToUpdates = false;
+            User.Player!.player.movement.canAddSimulationResultsToUpdates = false;
             User.Player!.player.gameObject.SetActive(false);
         }
         else if (Controller == CameraController.Player)
         {
             // on controller set to player
             User.Player!.player.gameObject.SetActive(true);
-            User.Player.player.movement.canAddSimulationResultsToUpdates = true;
+            User.Player!.player.movement.canAddSimulationResultsToUpdates = true;
 #if SERVER
             Vector3 position = User.EditorObject.transform.position;
             float yaw = User.EditorObject.transform.rotation.eulerAngles.y;
-            if (Physics.Raycast(new Ray(position with { y = Level.HEIGHT }, Vector3.down), out RaycastHit info, Level.HEIGHT, RayMasks.BLOCK_COLLISION, QueryTriggerInteraction.Ignore))
+            if (Physics.Raycast(new Ray(position with { y = Level.HEIGHT }, Vector3.down), out RaycastHit info, Level.HEIGHT * 2f, RayMasks.BLOCK_COLLISION, QueryTriggerInteraction.Ignore))
             {
                 position.y = info.point.y + 1.5f;
             }
@@ -318,111 +328,21 @@ public class UserInput : MonoBehaviour
                 Logger.LogDebug($"Unable to set main camera: {ctrl.Format()}.");
                 return;
             }
-            if (ctrl == User.EditorObject)
-            {
-                ChangeUI(true);
-            }
-            else if (ctrl == User.Player!.player.gameObject)
-            {
-                ChangeUI(false);
-            }
+#if DEBUG
+            PlayerUI? playerUi = UIAccessTools.PlayerUI;
+            if (playerUi != null)
+                Logger.LogDebug("PlayerUI " + (playerUi.gameObject.activeInHierarchy ? "active" : "inactive") + " (" + (playerUi.enabled ? "enabled" : "disabled") + "): " + playerUi.gameObject.GetSceneHierarchyPath() + ".");
+            EditorUI? editorUi = UIAccessTools.EditorUI;
+            if (editorUi != null)
+                Logger.LogDebug("EditorUI " + (editorUi.gameObject.activeInHierarchy ? "active" : "inactive") + " (" + (editorUi.enabled ? "enabled" : "disabled") + "): " + editorUi.gameObject.GetSceneHierarchyPath() + ".");
+#endif
+
             Logger.LogInfo($"Camera controller set to {Controller.Format()}.", ConsoleColor.DarkCyan);
         }
 #endif
-        OnUserControllerUpdated?.Invoke(User);
+        EventOnUserControllerUpdated.TryInvoke(User);
     }
 #if CLIENT
-    private void ChangeUI(bool editor)
-    {
-        Component? ui = !editor ? UIAccessTools.EditorUI : UIAccessTools.PlayerUI;
-        if (editor)
-        {
-            GameObject? editorObj = DevkitServerUtility.GetEditorObject();
-            if (editorObj != null && editorObj)
-                editorObj.SetActive(true);
-            CleaningUpController = CameraController.Editor;
-        }
-        if (ui != null)
-        {
-            if (!editor)
-                _editorUiObject = ui.transform;
-            else
-                _playerUiObject = ui.transform;
-            UIExtensionManager.TellDestroyed(ui);
-            Destroy(ui);
-
-            Logger.LogInfo("Cleaned up " + (!editor ? "EditorUI." : "PlayerUI."));
-        }
-        else
-        {
-            Logger.LogWarning((editor ? "EditorUI" : "PlayerUI") + " not available to clean up.");
-        }
-        Transform? parent = editor ? _editorUiObject : _playerUiObject;
-        if (parent == null)
-        {
-            Logger.LogWarning("Failed to find parent of " + (editor ? "EditorUI." : "PlayerUI."));
-            return;
-        }
-        StartCoroutine(SwitchToUI(parent.gameObject, editor)); // need to wait for OnDestroy to run
-    }
-    private static IEnumerator SwitchToUI(GameObject parent, bool editor)
-    {
-        try
-        {
-            yield return null;
-            while (!Level.isLoaded)
-                yield return null;
-            if (parent == null) // check parent wasn't destroyed
-                yield break;
-
-            Component comp = parent.gameObject.AddComponent(editor ? typeof(EditorUI) : typeof(PlayerUI));
-            yield return null;
-            if (!editor)
-                CleaningUpController = CameraController.Player;
-            Logger.LogInfo("Added " + (editor ? "EditorUI." : "PlayerUI."));
-
-            if (comp is PlayerUI player) // loaded
-            {
-                try
-                {
-                    RestartPlayerUI(player);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError("Error initializing character.");
-                    Logger.LogError(ex);
-                }
-                Logger.LogInfo("Restarted PlayerUI.");
-            }
-            else if (editor)
-            {
-                try
-                {
-                    VehicleManager.exitVehicle();
-                    Player.player.equipment.ReceiveEquip(byte.MaxValue, byte.MaxValue, byte.MaxValue, Guid.Empty, 100, Array.Empty<byte>(), NetId.INVALID);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError("Error deinitializing character.");
-                    Logger.LogError(ex);
-                }
-            }
-            if (Player.player.first != null)
-            {
-                Player.player.first.gameObject.SetActive(!editor);
-            }
-        }
-        finally
-        {
-            if (!editor)
-            {
-                GameObject? editorObj = DevkitServerUtility.GetEditorObject();
-                if (editorObj != null && editorObj)
-                    editorObj.SetActive(false);
-                RequestInitialState.Invoke();
-            }
-        }
-    }
     [HarmonyPatch(typeof(PlayerLook), "updateScope")]
     [HarmonyFinalizer]
     [UsedImplicitly]
@@ -436,7 +356,7 @@ public class UserInput : MonoBehaviour
         }
     }
 
-    private static bool SetActiveMainCamera(Transform tranform)
+    internal static bool SetActiveMainCamera(Transform tranform)
     {
         Transform? child = tranform.FindChildRecursive("Camera");
         if (child == null)
@@ -464,13 +384,13 @@ public class UserInput : MonoBehaviour
             return true;
         }
         camera.enabled = true;
-        Logger.LogDebug("Camera enabled: " + camera.gameObject.name + ".");
+        Logger.LogDebug("Camera enabled: " + camera.gameObject.GetSceneHierarchyPath() + ".");
 
         Camera oldCamera = MainCamera.instance;
         if (oldCamera != null)
         {
             oldCamera.enabled = false;
-            Logger.LogDebug("Camera disabled: " + oldCamera.gameObject.name + ".");
+            Logger.LogDebug("Camera disabled: " + oldCamera.gameObject.GetSceneHierarchyPath() + ".");
         }
 
         try
@@ -480,7 +400,7 @@ public class UserInput : MonoBehaviour
         }
         catch (Exception ex)
         {
-            Logger.LogError("Failed to set camera instance to \"" + tranform.gameObject.name + "\".");
+            Logger.LogError("Failed to set camera instance to \"" + tranform.gameObject.GetSceneHierarchyPath() + "\".");
             Logger.LogError(ex);
         }
 
@@ -568,12 +488,12 @@ public class UserInput : MonoBehaviour
 #endif
     private void HandleReadPackets(ByteReader reader)
     {
-        _ = reader.ReadUInt16(); // UserInput.SendDataVersion
+        ushort version = reader.ReadUInt16();
         byte c = reader.ReadUInt8();
         for (int i = 0; i < c; ++i)
         {
             UserInputPacket p = new UserInputPacket();
-            p.Read(reader);
+            p.Read(reader, version);
             _packets.Enqueue(p);
         }
         if (User.Player != null && User.Player.player != null)
@@ -615,7 +535,7 @@ public class UserInput : MonoBehaviour
             bool rotDiff = pitch != _lastPitch || yaw != _lastYaw;
             if (posDiff || rotDiff || (_nextPacketSendRotation && _hasStopped))
             {
-                TryInvokeOnUserPositionUpdated(User);
+                EventOnUserEditorPositionUpdated.TryInvoke(User);
                 _hasStopped = false;
                 Flags flags = Flags.None;
                 if (posDiff)
@@ -625,6 +545,10 @@ public class UserInput : MonoBehaviour
                     flags |= Flags.Rotation;
                     _nextPacketSendRotation = false;
                 }
+
+                if (_lastPacket.Flags == 0 || (_lastPacket.Flags & Flags.StopMsg) != 0)
+                    flags |= Flags.HasTimeSinceLastQueue;
+
                 if (!posDiff && !_nextPacketSendRotation)
                 {
                     ++_rotSkip;
@@ -637,6 +561,7 @@ public class UserInput : MonoBehaviour
                     Yaw = _lastYaw = yaw,
                     Position = _lastPos = pos,
                     Flags = flags,
+                    TimeSinceLastQueue = t - Mathf.Max(_lastQueue, _lastFlush),
                     Speed = GetSpeed(_movement),
                     Input = GetInput(_movement) with
                     {
@@ -647,6 +572,7 @@ public class UserInput : MonoBehaviour
                     DeltaTime = CachedTime.DeltaTime
                 };
                 _packets.Enqueue(_lastPacket);
+                _lastQueue = t;
             }
             else if (!_hasStopped)
             {
@@ -659,6 +585,7 @@ public class UserInput : MonoBehaviour
                     Pitch = _lastPitch = pitch,
                     Position = _lastPos = pos
                 };
+                _lastQueue = t;
                 _packets.Enqueue(_lastPacket);
                 _bufferHasStop = true;
             }
@@ -680,58 +607,79 @@ public class UserInput : MonoBehaviour
             Destroy(this);
             return;
         }
-        
-        while (_packets is { Count: > 0 } && t >= _nextPacketApplyTime)
+
+        if ((_pendingPacket.Flags & Flags.HasTimeSinceLastQueue) != 0)
         {
-            UserInputPacket packet = _packets.Dequeue();
-            if (_networkedInitialPosition)
+            if (t >= _pendingPacketTime)
             {
-                _nextPacketApplyTime += packet.DeltaTime;
-                if ((packet.Flags & Flags.StopMsg) == 0)
+                ApplyPacket(in _pendingPacket);
+                _pendingPacket = default;
+                _pendingPacketTime = 0f;
+            }
+        }
+        else
+        {
+            while (_packets is { Count: > 0 } && t >= _nextPacketApplyTime)
+            {
+                UserInputPacket packet = _packets.Dequeue();
+                if (_networkedInitialPosition)
                 {
-                    if (_hasStopped)
-                        _nextPacketApplyTime = t + packet.DeltaTime;
-                    _hasStopped = false;
-                    ApplyPacket(in packet);
-                }
-                else
-                {
-                    _nextPacketApplyTime = t + packet.DeltaTime;
-                    _hasStopped = true;
-                    transform.SetPositionAndRotation(packet.Position, Quaternion.Euler(packet.Pitch, packet.Yaw, 0f));
-                    _lastPos = packet.Position;
-                    _lastPitch = packet.Pitch;
-                    _lastYaw = packet.Yaw;
-#if CLIENT
-                    _lastPacket = packet;
-#endif
-                    TryInvokeOnUserPositionUpdated(User);
+                    if ((packet.Flags & Flags.HasTimeSinceLastQueue) != 0 && packet.TimeSinceLastQueue > 0f)
+                    {
+                        _pendingPacket = packet;
+                        _pendingPacketTime = t + packet.TimeSinceLastQueue;
+                    }
+                    else
+                    {
+                        _nextPacketApplyTime += packet.DeltaTime;
+                        ApplyPacket(in packet);
+                    }
                 }
             }
         }
     }
     private void ApplyPacket(in UserInputPacket packet)
     {
-        float dt = packet.DeltaTime;
-        Quaternion rot = (packet.Flags & Flags.Rotation) != 0 ? Quaternion.Euler(packet.Pitch, packet.Yaw, 0f) : transform.rotation;
-        Vector3 pos = transform.position + rot *
-                                              packet.Input with { y = 0 } *
-                                              packet.Speed *
-                                              dt
-                                              +
-                                              Vector3.up *
-                                              packet.Input.y *
-                                              dt *
-                                              packet.Speed;
-        if ((packet.Flags & Flags.Position) != 0)
-            pos = Vector3.Lerp(pos, packet.Position, 1f / (_packets.Count + 1) * ((pos - packet.Position).sqrMagnitude / 16f));
-        
-        if ((packet.Flags & Flags.Rotation) != 0)
-            transform.SetPositionAndRotation(pos, rot);
+        float t = CachedTime.RealtimeSinceStartup;
+
+
+
+        if ((packet.Flags & Flags.StopMsg) == 0)
+        {
+            if (_hasStopped)
+                _nextPacketApplyTime = t + packet.DeltaTime;
+            _hasStopped = false;
+            float dt = packet.DeltaTime;
+            Quaternion rot = (packet.Flags & Flags.Rotation) != 0 ? Quaternion.Euler(packet.Pitch, packet.Yaw, 0f) : transform.rotation;
+            Vector3 pos = transform.position + rot *
+                                             packet.Input with { y = 0 } *
+                                             packet.Speed *
+                                             dt
+                                             +
+                                             Vector3.up *
+                                             packet.Input.y *
+                                             dt *
+                                             packet.Speed;
+            if ((packet.Flags & Flags.Position) != 0)
+                pos = Vector3.Lerp(pos, packet.Position, 1f / (_packets.Count + 1) * ((pos - packet.Position).sqrMagnitude / 16f));
+
+            if ((packet.Flags & Flags.Rotation) != 0)
+                transform.SetPositionAndRotation(pos, rot);
+            else
+                transform.position = pos;
+            _lastPos = pos;
+            EventOnUserEditorPositionUpdated.TryInvoke(User);
+        }
         else
-            transform.position = pos;
-        _lastPos = pos;
-        TryInvokeOnUserPositionUpdated(User);
+        {
+            _nextPacketApplyTime = t + packet.DeltaTime;
+            _hasStopped = true;
+            transform.SetPositionAndRotation(packet.Position, Quaternion.Euler(packet.Pitch, packet.Yaw, 0f));
+            _lastPos = packet.Position;
+            _lastPitch = packet.Pitch;
+            _lastYaw = packet.Yaw;
+            EventOnUserEditorPositionUpdated.TryInvoke(User);
+        }
 #if CLIENT
         _lastPacket = packet;
 #endif
@@ -793,6 +741,14 @@ public class UserInput : MonoBehaviour
 
         if (CheckPermissionForController(controller, user.SteamId.m_SteamID))
         {
+            bool shouldAllow = true;
+            EventOnUserControllerUpdateRequested.TryInvoke(user, ref shouldAllow);
+            if (!shouldAllow)
+            {
+                UIMessage.SendNoPermissionMessage(user);
+                return StandardErrorCode.NoPermissions;
+            }
+
             user.Input.Controller = controller;
             return StandardErrorCode.Success;
         }
@@ -876,15 +832,19 @@ public class UserInput : MonoBehaviour
         public float Yaw { get; set; }
         public float Speed { get; set; }
         public float DeltaTime { get; set; }
+        public float TimeSinceLastQueue { get; set; }
         public Flags Flags { get; set; }
 
         // Y = ascend
         public Vector3 Input { get; set; }
 
-        public void Read(ByteReader reader)
+        // ReSharper disable once UnusedParameter.Local
+        public void Read(ByteReader reader, ushort version)
         {
             Flags = reader.ReadEnum<Flags>();
             DeltaTime = reader.ReadFloat();
+            if ((Flags & Flags.HasTimeSinceLastQueue) != 0)
+                TimeSinceLastQueue = reader.ReadFloat();
             if ((Flags & Flags.StopMsg) == 0)
             {
                 if ((Flags & Flags.Position) != 0)
@@ -916,6 +876,8 @@ public class UserInput : MonoBehaviour
         {
             writer.Write(Flags);
             writer.Write(DeltaTime);
+            if ((Flags & Flags.HasTimeSinceLastQueue) != 0)
+                writer.Write(TimeSinceLastQueue);
             if ((Flags & Flags.StopMsg) == 0)
             {
                 if ((Flags & Flags.Position) != 0)
@@ -964,12 +926,15 @@ public class UserInput : MonoBehaviour
         None = 1,
         StopMsg = 2,
         Position = 4,
-        Rotation = 8
+        Rotation = 8,
+        HasTimeSinceLastQueue = 16
     }
 }
 
+public delegate void UserControllerUpdateRequested(EditorUser user, ref bool shouldAllow);
 public enum CameraController : byte
 {
+    None = 0,
     Player = 1,
-    Editor
+    Editor = 2
 }
