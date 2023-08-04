@@ -38,7 +38,7 @@ Except for the *Custom icons file*, the file name must start with one of the fol
 * object_presets
 
 |Location|Readonly|Recursive File Discovery|
-|-|-|
+|---|---|---|
 |Custom icons file: `Unturned\DevkitServer\configured_icons.json`|No|N/A|
 |Loaded workshop content: `steamapps\workshop\304930\*`|Yes|Yes|
 |Temp level folder: `Unturned\DevkitServer\Temp_IP_Port\Levels\LevelName\Level Install\LevelName\Bundles`|When on Server|Yes|
@@ -58,7 +58,7 @@ The priority will be set as high as it needs to be to be picked over any other p
 Once you're done, cut the custom icon file to somewhere in your mod folder (it must be under `~\Bundles` for maps).
 
 **File Format** for manual entry.
-```json
+```jsonc
 [
   {
     // Asset GUID or UInt16 ID - Objects do not require UInt16 IDs so they will likely become discontinued.
