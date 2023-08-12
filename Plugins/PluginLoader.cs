@@ -1,19 +1,26 @@
 ﻿using DevkitServer.API;
+using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
 using DevkitServer.Commands.Subsystem;
 using DevkitServer.Configuration;
-using System.Reflection;
-using System.Runtime.CompilerServices;
-using DevkitServer.API.Abstractions;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Patches;
 using DevkitServer.Players.UI;
 using HarmonyLib;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace DevkitServer.Plugins;
 public static class PluginLoader
 {
+    /// <summary>
+    /// Path to the directory that plugins are read from.
+    /// </summary>
     public static readonly string PluginsDirectory = Path.Combine(DevkitServerConfig.Directory, "Plugins");
+
+    /// <summary>
+    /// Path to the directory that libraries are read from.
+    /// </summary>
     public static readonly string LibrariesDirectory = Path.Combine(DevkitServerConfig.Directory, "Libraries");
 
     private static readonly CachedMulticastEvent<Action<IDevkitServerPlugin>> OnPluginLoadedEvent = new CachedMulticastEvent<Action<IDevkitServerPlugin>>(typeof(PluginLoader), nameof(OnPluginLoaded));
@@ -78,6 +85,15 @@ public static class PluginLoader
     /// </summary>
     public static IReadOnlyList<PluginAssembly> Assemblies { get; } = AssembliesIntl.AsReadOnly();
 
+    /// <summary>
+    /// Gets the color of a plugin, or default color if one is not defined.
+    /// </summary>
+    [Pure]
+    public static Color GetColor(this IDevkitServerPlugin? plugin) => plugin == null ? DevkitServerModule.ModuleColor : (plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor);
+
+    /// <summary>
+    /// Gets whether or not a plugin is currently loaded (if it's in <see cref="Plugins"/>.)
+    /// </summary>
     public static bool IsLoaded(IDevkitServerPlugin plugin) => PluginsIntl.Contains(plugin);
 
     private static void AssertPluginValid(IDevkitServerPlugin plugin)
@@ -131,33 +147,41 @@ public static class PluginLoader
             throw new Exception("Plugin " + plugin.Name + "'s 'MenuName' can't be equal to \"" + defaultModuleName + "\".");
         }
     }
+
+    /// <summary>
+    /// Registers and loads a plugin. If it's the first plugin to be loaded from that assembly, all patching and reflection will be done.
+    /// </summary>
+    /// <remarks>It is expected for you to pass a new()'d class as an argument to this.</remarks>
     /// <exception cref="AggregateException">Error(s) loading the plugin.</exception>
     /// <exception cref="ArgumentNullException"/>
     public static void RegisterPlugin(IDevkitServerPlugin plugin)
     {
         if (plugin == null)
             throw new ArgumentNullException(nameof(plugin));
-        bool dup = true;
-        while (dup)
+        if (plugin.PermissionPrefix != null)
         {
-            dup = false;
-            for (int i = 0; i < PluginsIntl.Count; i++)
+            bool dup = true;
+            while (dup)
             {
-                IDevkitServerPlugin plugin2 = PluginsIntl[i];
-                if (plugin2.PermissionPrefix.Equals(plugin.PermissionPrefix, StringComparison.InvariantCultureIgnoreCase))
+                dup = false;
+                for (int i = 0; i < PluginsIntl.Count; i++)
                 {
-                    plugin.PermissionPrefix = "_" + plugin.PermissionPrefix;
-                    plugin.LogWarning("Conflicting permission prefix with " + plugin2.Format() +
-                                      " (" + plugin2.PermissionPrefix.Format() + "). Overriding to " + plugin.PermissionPrefix.Format() + ".");
-                    dup = true;
+                    IDevkitServerPlugin plugin2 = PluginsIntl[i];
+                    if (plugin2.PermissionPrefix.Equals(plugin.PermissionPrefix, StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        plugin.PermissionPrefix = "_" + plugin.PermissionPrefix;
+                        plugin.LogWarning("Conflicting permission prefix with " + plugin2.Format() +
+                                          " (" + plugin2.PermissionPrefix.Format() + "). Overriding to " + plugin.PermissionPrefix.Format() + ".");
+                        dup = true;
+                    }
                 }
             }
         }
 
         try
         {
-            plugin.Load();
             AssertPluginValid(plugin);
+            plugin.Load();
             PluginAdvertising.Get().AddPlugin(plugin.MenuName);
             PluginsIntl.Add(plugin);
             Assembly asm = plugin.GetType().Assembly;
@@ -209,6 +233,9 @@ public static class PluginLoader
         return src;
     }
 
+    /// <summary>
+    /// Unloads and deregisters a plugin. No unpatching will be done, that must be done through the <see cref="PluginAssembly"/> class (<seealso cref="Assemblies"/>).
+    /// </summary>
     /// <exception cref="AggregateException">Error(s) unloading the plugin.</exception>
     /// <exception cref="ArgumentNullException"/>
     public static void DeregisterPlugin(IDevkitServerPlugin plugin)
@@ -438,6 +465,9 @@ public static class PluginLoader
         }
     }
 
+    /// <summary>
+    /// Finds a loaded plugin given an assembly. Will fail if there are more than one plugin loaded from the assembly.
+    /// </summary>
     public static IDevkitServerPlugin? FindPluginForAssembly(Assembly assembly)
     {
         // check if the assembly just has one plugin
@@ -453,6 +483,10 @@ public static class PluginLoader
         }
         return null;
     }
+
+    /// <summary>
+    /// Finds a loaded plugin given any member. If there are more than one plugin in it's assembly, the <see cref="PluginIdentifierAttribute"/>s of the method and its declaring classes will be examined.
+    /// </summary>
     public static IDevkitServerPlugin? FindPluginForMember(MemberInfo member)
     {
         Type? relaventType = member as Type ?? member.DeclaringType;

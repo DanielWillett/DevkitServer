@@ -1416,6 +1416,14 @@ public static class FormattingUtil
         Append(ref data, ptr, index, l);
         return l;
     }
+    /// <summary>
+    /// Replaces all null arguments in <paramref name="formatting"/> with the string "null".
+    /// </summary>
+    public static void RemoveNullFormattingArguemnts(object?[] formatting)
+    {
+        for (int i = 0; i < formatting.Length; i++)
+            formatting[i] ??= "null";
+    }
 }
 
 [Flags]

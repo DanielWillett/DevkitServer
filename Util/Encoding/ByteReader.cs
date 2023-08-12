@@ -67,7 +67,7 @@ public class ByteReader
             { typeof(double), GetMethod(nameof(ReadDouble)) },
             { typeof(char), GetMethod(nameof(ReadChar)) },
             { typeof(string), GetMethod(nameof(ReadString)) },
-            { typeof(Type), GetMethod(nameof(ReadType)) },
+            { typeof(Type), typeof(ByteReader).GetMethod(nameof(ReadType), BindingFlags.Instance | BindingFlags.Public, null, CallingConventions.Any, Array.Empty<Type>(), null) },
             { typeof(Type[]), GetMethod(nameof(ReadTypeArray)) },
             { typeof(RegionIdentifier), typeof(RegionIdentifier).GetMethod(nameof(RegionIdentifier.Read), BindingFlags.Static | BindingFlags.Public) },
             { typeof(DateTime), GetMethod(nameof(ReadDateTime)) },
@@ -117,7 +117,7 @@ public class ByteReader
             { typeof(double?), GetMethod(nameof(ReadNullableDouble)) },
             { typeof(char?), GetMethod(nameof(ReadNullableChar)) },
             { typeof(string), GetMethod(nameof(ReadNullableString)) },
-            { typeof(Type), GetMethod(nameof(ReadType)) },
+            { typeof(Type), typeof(ByteReader).GetMethod(nameof(ReadType), BindingFlags.Instance | BindingFlags.Public, null, CallingConventions.Any, Array.Empty<Type>(), null) },
             { typeof(Type[]), GetMethod(nameof(ReadTypeArray)) },
             { typeof(DateTime?), GetMethod(nameof(ReadNullableDateTime)) },
             { typeof(DateTimeOffset?), GetMethod(nameof(ReadNullableDateTimeOffset)) },
@@ -618,17 +618,22 @@ public class ByteReader
         }
         return ns;
     }
-    public Type? ReadType()
+
+    public Type? ReadType() => ReadType(out _);
+    public Type? ReadType(out bool wasPassedNull)
     {
         const string nsSdgUnturned = "SDG.Unturned";
         const string nsSdgFrameworkDevkit = "SDG.Framework.Devkit";
         const string nsSdgFramework = "SDG.Framework";
         const string nsDevkitServer = "DevkitServer";
         const string nsSystem = "System";
-
+        wasPassedNull = false;
         byte flag = ReadUInt8();
         if ((flag & 128) != 0)
+        {
+            wasPassedNull = true;
             return null;
+        }
 
         string ns = ReadString();
         if ((flag & 1) != 0)

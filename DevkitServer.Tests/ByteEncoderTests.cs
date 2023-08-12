@@ -1231,13 +1231,13 @@ public class ByteEncoderTests
         object[] parameters = { newGuid, true, 8, 12u, 64L, 102ul, (short)1, (ushort)3, (sbyte)-4, (byte)250, now, new DateTimeOffset(now), "test string", DBNull.Value };
 
         ByteWriter writer = GetWriter(false, out _);
-        TranslationSource.WriteFormattingParameters(writer, parameters);
+        writer.WriteFormattingParameters(parameters);
 
         TryPrint(writer);
         ByteReader reader = new ByteReader();
         
         reader.LoadNew(writer.ToArray());
-        object?[] outParameters = TranslationSource.ReadFormattingParameters(reader);
+        object?[] outParameters = reader.ReadFormattingParameters();
 
         Assert.AreEqual(outParameters.Length, parameters.Length);
         for (int i = 0; i < outParameters.Length; ++i)

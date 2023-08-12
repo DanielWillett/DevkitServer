@@ -1,4 +1,5 @@
-﻿using DevkitServer.API.Abstractions;
+﻿using DevkitServer.API;
+using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer.Networking;
 #if CLIENT
@@ -26,10 +27,7 @@ public static class UIMessage
     private static readonly NetCall<string> SendEditorUIMessage = new NetCall<string>((ushort)NetCalls.EditorUIMessage);
 
     [UsedImplicitly]
-    private static readonly NetCallRaw<string, ITranslationSource?, object?[]?> SendTranslatableEditorUIMessage =
-        new NetCallRaw<string, ITranslationSource?, object?[]?>((ushort)NetCalls.TranslatableEditorUIMessage, null,
-            TranslationSource.Read, TranslationSource.ReadFormattingParameters, null, TranslationSource.Write,
-            TranslationSource.WriteFormattingParameters);
+    private static readonly NetCallRaw<TranslationData> SendTranslatableEditorUIMessage = new NetCallRaw<TranslationData>((ushort)NetCalls.TranslatableEditorUIMessage, TranslationData.Read, TranslationData.Write);
 #if CLIENT
     [HarmonyPatch(typeof(EditorUI), nameof(EditorUI.message))]
     [HarmonyTranspiler]
@@ -94,9 +92,9 @@ public static class UIMessage
     }
 
     [NetCall(NetCallSource.FromServer, (ushort)NetCalls.TranslatableEditorUIMessage)]
-    private static void ReceiveTranslatableEditorUIMessage(MessageContext ctx, string key, ITranslationSource source, object?[]? formatting)
+    private static void ReceiveTranslatableEditorUIMessage(MessageContext ctx, TranslationData data)
     {
-        ctx.Acknowledge(SendEditorMessage(source, key, formatting) ? StandardErrorCode.Success : StandardErrorCode.GenericError);
+        ctx.Acknowledge(SendEditorMessage(data.Source, data.TranslationKey, data.FormattingArguments) ? StandardErrorCode.Success : StandardErrorCode.GenericError);
     }
 #endif
     /// <summary>
@@ -164,14 +162,14 @@ public static class UIMessage
         if (source == null)
             SendEditorUIMessage.Invoke(user.Connection, translationKey);
         else
-            SendTranslatableEditorUIMessage.Invoke(user.Connection, translationKey, source, formatting);
+            SendTranslatableEditorUIMessage.Invoke(user.Connection, new TranslationData(translationKey, source, formatting ?? Array.Empty<object>()));
 #endif
 #if CLIENT
 
         try
         {
             if (formatting != null)
-                TranslationSource.RemoveNullFormattingArguemnts(formatting);
+                FormattingUtil.RemoveNullFormattingArguemnts(formatting);
             _customText = source.Translate(translationKey, formatting!);
             EditorUI.message(CustomMessage);
             return true;
@@ -213,7 +211,7 @@ public static class UIMessage
 #if SERVER
             user, 
 #endif
-            TranslationSource.MessageLocalizationSource, missingPermission == null ? "NoPermissions" : "NoPermissionsWithPermission",
+            TranslationSource.DevkitServerMessageLocalizationSource, missingPermission == null ? "NoPermissions" : "NoPermissionsWithPermission",
             missingPermission == null ? Array.Empty<object>() : new object[] { missingPermission.ToString() });
     }
 }

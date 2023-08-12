@@ -11,49 +11,70 @@ namespace DevkitServer.API.Abstractions;
 /// <summary>
 /// Translation sources allow you to send a source, a key, and maybe formatting and have it translated client-side depending on their language.
 /// </summary>
+/// <remarks>Use <see cref="TranslationData"/> to package this data and send it to a client.</remarks>
 public class TranslationSource
 {
-    internal static readonly ITranslationSource MainLocalizationSource = new PluginTranslationSource(0);
-    internal static readonly ITranslationSource MessageLocalizationSource = new PluginTranslationSource(1);
-    internal static readonly ITranslationSource CommandLocalizationSource = new PluginTranslationSource(2);
     /// <summary>
-    /// Uses <see cref="ILocalizedCommand.Translations"/>. The command must be registered on the client.
+    /// Translation source referencing <see cref="DevkitServerModule.MainLocalization"/>.
+    /// </summary>
+    public static ITranslationSource DevkitServerMainLocalizationSource { get; } = new PluginTranslationSource(0);
+
+    /// <summary>
+    /// Translation source referencing <see cref="DevkitServerModule.MessageLocalization"/>.
+    /// </summary>
+    public static ITranslationSource DevkitServerMessageLocalizationSource { get; } = new PluginTranslationSource(1);
+
+    /// <summary>
+    /// Translation source referencing <see cref="DevkitServerModule.CommandLocalization"/>.
+    /// </summary>
+    public static ITranslationSource DevkitServerCommandLocalizationSource { get; } = new PluginTranslationSource(2);
+
+    /// <summary>
+    /// Uses <see cref="ILocalizedCommand.Translations"/>. The command must be registered on the receiving party.
     /// </summary>
     public static ITranslationSource FromCommand(ILocalizedCommand command)
     {
         return command is ICachedTranslationSourceCommand { TranslationSource: { } src } ? src : new CommandTranslationSource(command);
     }
+
     /// <summary>
     /// Works for any directory under the root unturned directory. (Pass a folder with .dat children, like a folder containing English.dat).<br/>
     /// Try to avoid using this when possible, as it reads the file for each translation.
     /// </summary>
-    /// <remarks>This directory must exist on the client.</remarks>
+    /// <remarks>This directory must exist on the receiving party.</remarks>
     public static ITranslationSource FromRelativeDirectory(string folder)
     {
         return new FileTranslationSource(folder);
     }
+
     /// <summary>
-    /// Uses <see cref="IDevkitServerPlugin.Translations"/>. The plugin must be registered on the client.
+    /// Uses <see cref="IDevkitServerPlugin.Translations"/>. The plugin must be registered on the receiving party.
     /// </summary>
     public static ITranslationSource FromPlugin(IDevkitServerPlugin plugin)
     {
         return plugin is ICachedTranslationSourcePlugin { TranslationSource: { } src } ? src : new PluginTranslationSource(plugin);
     }
+
     /// <summary>
-    /// Works with any saved keys from the Language.dat file.
+    /// Pulls from an <see cref="Asset"/>'s saved localization data.
     /// </summary>
+    /// <remarks>Only works on values that are saved in the asset during read.</remarks>
     public static ITranslationSource FromAssetLocalization(Asset asset)
     {
         return new AssetTranslationSource(asset.GUID);
     }
+
     /// <summary>
-    /// Works with any saved keys from the Language.dat file.
+    /// Pulls from an <see cref="Asset"/>'s saved localization data.
     /// </summary>
+    /// <remarks>Only works on values that are saved in the asset during read.</remarks>
     public static ITranslationSource FromAssetLocalization(Guid guid)
     {
         return new AssetTranslationSource(guid);
     }
+
     /// <summary>
+    /// Reads from a table of languages and values.<br/>
     /// <c>string[0, n]</c> should be the language name<br/>
     /// <c>string[1, n]</c> should be the value
     /// </summary>
@@ -61,7 +82,9 @@ public class TranslationSource
     {
         return new ExplicitTranslationSource(table);
     }
+
     /// <summary>
+    /// Reads from a table of languages and values.<br/>
     /// Key is language, value is the value.
     /// </summary>
     /// <remarks>Recommended to cache this if you plan to re-use it.</remarks>
@@ -69,6 +92,31 @@ public class TranslationSource
     {
         return new ExplicitTranslationSource(table);
     }
+
+    /// <summary>
+    /// Accesses a static property, or an instance property belonging to a plugin, command, or module.
+    /// </summary>
+    /// <remarks>Must be of type <see cref="Local"/> and must be available to the receiving party.</remarks>
+    public static ITranslationSource FromProperty(PropertyInfo property) => FromVariable(property.AsVariable());
+
+    /// <summary>
+    /// Accesses a static field, or an instance field belonging to a plugin, command, or module.
+    /// </summary>
+    /// <remarks>Must be of type <see cref="Local"/> and must be available to the receiving party.</remarks>
+    public static ITranslationSource FromField(FieldInfo field) => FromVariable(field.AsVariable());
+
+    /// <summary>
+    /// Accesses a static property/field, or an instance property/field belonging to a plugin, command, or module.
+    /// </summary>
+    /// <remarks>Must be of type <see cref="Local"/> and must be available to the receiving party.</remarks>
+    public static ITranslationSource FromVariable(IVariable variable)
+    {
+        return new VariableTranslationSource(variable);
+    }
+
+    /// <summary>
+    /// Write a translation source to a <see cref="ByteWriter"/>. Works with custom implementations as long as there is a parameterless constructor (can be non-public).
+    /// </summary>
     public static void Write(ByteWriter writer, ITranslationSource? source)
     {
         byte code = source switch
@@ -88,6 +136,10 @@ public class TranslationSource
         if (code != 255)
             source!.Write(writer);
     }
+
+    /// <summary>
+    /// Read a translation source from a <see cref="ByteReader"/>. Works with custom implementations as long as there is a parameterless constructor (can be non-public).
+    /// </summary>
     public static ITranslationSource? Read(ByteReader reader)
     {
         byte code = reader.ReadUInt8();
@@ -132,153 +184,40 @@ public class TranslationSource
         source.Read(reader);
         return source;
     }
-
-    public static object?[] ReadFormattingParameters(ByteReader reader)
-    {
-        int ct = reader.ReadUInt8();
-        if (ct == 0)
-            return Array.Empty<object>();
-
-        object?[] parameters = new object?[ct];
-        for (int i = 0; i < ct; ++i)
-        {
-            TypeCode code = (TypeCode)reader.ReadUInt8();
-            if (code == TypeCode.Object)
-            {
-                Type? type = reader.ReadType();
-                if (type == null)
-                    continue;
-                MethodInfo? readerMethod = ByteReader.GetReadMethod(type);
-
-                parameters[i] = readerMethod?.Invoke(reader, Array.Empty<object>());
-                continue;
-            }
-
-            parameters[i] = code switch
-            {
-                TypeCode.DBNull => DBNull.Value,
-                TypeCode.Boolean => reader.ReadBool(),
-                TypeCode.Char => reader.ReadChar(),
-                TypeCode.SByte => reader.ReadInt8(),
-                TypeCode.Byte => reader.ReadUInt8(),
-                TypeCode.Int16 => reader.ReadInt16(),
-                TypeCode.UInt16 => reader.ReadUInt16(),
-                TypeCode.Int32 => reader.ReadInt32(),
-                TypeCode.UInt32 => reader.ReadUInt32(),
-                TypeCode.Int64 => reader.ReadInt64(),
-                TypeCode.UInt64 => reader.ReadUInt64(),
-                TypeCode.Single => reader.ReadFloat(),
-                TypeCode.Double => reader.ReadDouble(),
-                TypeCode.Decimal => reader.ReadDecimal(),
-                TypeCode.DateTime => reader.ReadDateTimeOffset().DateTime,
-                TypeCode.String => reader.ReadString(),
-                _ => parameters[i]
-            };
-        }
-
-        return parameters;
-    }
-    public static void WriteFormattingParameters(ByteWriter writer, object?[]? parameters)
-    {
-        if (parameters is not { Length: > 0 })
-        {
-            writer.Write((byte)0);
-            return;
-        }
-
-        int ct = Math.Min(byte.MaxValue, parameters.Length);
-        writer.Write((byte)ct);
-        for (int i = 0; i < ct; ++i)
-        {
-            object? value = parameters[i];
-            TypeCode typeCode = Convert.GetTypeCode(value);
-            if (typeCode is not TypeCode.Object)
-            {
-                writer.Write((byte)typeCode);
-                switch (typeCode)
-                {
-                    case TypeCode.Boolean:
-                        writer.Write((bool)value!);
-                        break;
-                    case TypeCode.Char:
-                        writer.Write((char)value!);
-                        break;
-                    case TypeCode.SByte:
-                        writer.Write((sbyte)value!);
-                        break;
-                    case TypeCode.Byte:
-                        writer.Write((byte)value!);
-                        break;
-                    case TypeCode.Int16:
-                        writer.Write((short)value!);
-                        break;
-                    case TypeCode.UInt16:
-                        writer.Write((ushort)value!);
-                        break;
-                    case TypeCode.Int32:
-                        writer.Write((int)value!);
-                        break;
-                    case TypeCode.UInt32:
-                        writer.Write((uint)value!);
-                        break;
-                    case TypeCode.Int64:
-                        writer.Write((long)value!);
-                        break;
-                    case TypeCode.UInt64:
-                        writer.Write((ulong)value!);
-                        break;
-                    case TypeCode.Single:
-                        writer.Write((float)value!);
-                        break;
-                    case TypeCode.Double:
-                        writer.Write((double)value!);
-                        break;
-                    case TypeCode.Decimal:
-                        writer.Write((decimal)value!);
-                        break;
-                    case TypeCode.DateTime:
-                        DateTime dt = (DateTime)value!;
-                        writer.Write(new DateTimeOffset(dt));
-                        break;
-                    case TypeCode.String:
-                        writer.Write((string)value!);
-                        break;
-                }
-            }
-            else
-            {
-                Type type = value!.GetType();
-                MethodInfo? writerMethod = ByteWriter.GetWriteMethod(type);
-                if (writerMethod == null)
-                {
-                    writer.Write((byte)TypeCode.String);
-                    writer.Write(value.ToString());
-                }
-                else
-                {
-                    writer.Write((byte)TypeCode.Object);
-                    writer.Write(type);
-                    writerMethod.Invoke(writer, new object[] { value });
-                }
-            }
-        }
-    }
-
-    public static void RemoveNullFormattingArguemnts(object?[] formatting)
-    {
-        for (int i = 0; i < formatting.Length; i++)
-            formatting[i] ??= "null";
-    }
 }
+
+/// <summary>
+/// Use <see cref="TranslationSource"/> to create an <see cref="ITranslationSource"/>.
+/// </summary>
 public interface ITranslationSource
 {
+    /// <summary>
+    /// Formats a <paramref name="key"/> from this source using <paramref name="parameters"/> to format it.
+    /// </summary>
     string Translate(string key, object[]? parameters);
+
+    /// <summary>
+    /// Write the data of this source to a <see cref="ByteWriter"/>.
+    /// </summary>
+    /// <remarks>No need to write any type identifiers, that is handled internally.</remarks>
     void Write(ByteWriter writer);
+
+    /// <summary>
+    /// Read the data of this source from a <see cref="ByteReader"/>.
+    /// </summary>
+    /// <remarks>No need to read any type identifiers, that is handled internally.</remarks>
     void Read(ByteReader reader);
 }
+
+/// <summary>
+/// Accesses a static property/field, or an instance property/field belonging to a plugin, command, or module.
+/// </summary>
 public sealed class VariableTranslationSource : ITranslationSource
 {
 #nullable disable
+    /// <summary>
+    /// Variable containing a <see cref="Local"/> collection.
+    /// </summary>
     public IVariable Variable { get; private set; }
 #nullable restore
     public VariableTranslationSource(IVariable variable)
@@ -401,10 +340,19 @@ public sealed class VariableTranslationSource : ITranslationSource
     }
 }
 
+/// <summary>
+/// Reads from a table of languages and values.
+/// </summary>
 public sealed class ExplicitTranslationSource : ITranslationSource
 {
 #nullable disable
+    /// <summary>
+    /// Table of languages (<c>[0, n]</c>) and values (<c>[1, n]</c>).
+    /// </summary>
     public string[,] Values { get; private set; }
+    /// <summary>
+    /// Amount of translations in <see cref="Values"/>. Equal to <see cref="Array.GetLength"/> of dimension 1.
+    /// </summary>
     public int Length { get; private set; }
 #nullable restore
     public ExplicitTranslationSource(string[,] table)
@@ -481,10 +429,21 @@ public sealed class ExplicitTranslationSource : ITranslationSource
         }
     }
 }
+
+/// <summary>
+/// Pulls from a <see cref="ILocalizedCommand"/>'s localization file.
+/// </summary>
 public sealed class CommandTranslationSource : ITranslationSource
 {
 #nullable disable
+    /// <summary>
+    /// Name of the command (what you type in for /name)
+    /// </summary>
     public string CommandName { get; private set; }
+
+    /// <summary>
+    /// Plugin the command is defined in. This helps with ambiguous references.
+    /// </summary>
     public Type Plugin { get; private set; }
 #nullable restore
     public string Translate(string key, object[]? parameters)
@@ -519,19 +478,34 @@ public sealed class CommandTranslationSource : ITranslationSource
         Plugin = reader.ReadType() ?? typeof(DevkitServerModule);
     }
 }
+
+/// <summary>
+/// Reads a localization file and tries to translate from it (not recommended to use if possible).
+/// </summary>
+/// <remarks>Must be a child of the root unturned directroy.</remarks>
 public sealed class FileTranslationSource : ITranslationSource
 {
 #nullable disable
+    /// <summary>
+    /// Path to the directory containing the language .dat files relative to <see cref="UnturnedPaths.RootDirectory"/>.
+    /// </summary>
     public string RelativeDirectory { get; private set; }
 #nullable restore
     public string Translate(string key, object[]? parameters)
     {
-        DirectoryInfo directory = new DirectoryInfo(DevkitServerUtility.UnformatUniversalPath(RelativeDirectory));
-        if (!DevkitServerUtility.IsChildOf(UnturnedPaths.RootDirectory, directory))
-            throw new FormatException("Relative path must be a child directory of the root unturned directory.");
+        DirectoryInfo directory = new DirectoryInfo(Path.Combine(UnturnedPaths.RootDirectory.FullName, DevkitServerUtility.UnformatUniversalPath(RelativeDirectory)));
 
-        Local local = Localization.tryRead(directory.FullName, false);
-        return local.Translate(key, parameters ?? Array.Empty<object>());
+        try
+        {
+            Local local = Localization.tryRead(directory.FullName, false);
+            return local.Translate(key, parameters ?? Array.Empty<object>());
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error accessing a file for translation.", method: "FILE TRANSLATION SOURCE");
+            Logger.LogError(ex, method: "FILE TRANSLATION SOURCE");
+            return key;
+        }
     }
 
     public FileTranslationSource(string relativeDirectory)
@@ -554,10 +528,21 @@ public sealed class FileTranslationSource : ITranslationSource
         RelativeDirectory = reader.ReadString();
     }
 }
+
+/// <summary>
+/// Pulls from a <see cref="IDevkitServerPlugin"/>'s localization file.<br/>
+/// Also can pull from <see cref="DevkitServerModule"/> translation using an internal index parameter to reference different ones.
+/// </summary>
 public sealed class PluginTranslationSource : ITranslationSource
 {
 #nullable disable
+    /// <summary>
+    /// Type of <see cref="IDevkitServerPlugin"/> to look for.
+    /// </summary>
     public Type Plugin { get; private set; }
+    /// <summary>
+    /// Internal index to reference the various <see cref="DevkitServerModule"/> translations.
+    /// </summary>
     internal byte Index { get; private set; }
 #nullable restore
     public string Translate(string key, object[]? parameters)
@@ -593,22 +578,35 @@ public sealed class PluginTranslationSource : ITranslationSource
     }
     public void Write(ByteWriter writer)
     {
-        writer.Write(Plugin);
         if (Plugin == typeof(DevkitServerModule))
+        {
+            writer.Write((Type?)null);
             writer.Write(Index);
+        }
+        else
+            writer.Write(Plugin);
     }
     public void Read(ByteReader reader)
     {
-        Plugin = reader.ReadType() ?? typeof(DevkitServerModule);
-        if (Plugin == typeof(DevkitServerModule))
+        Type? type = reader.ReadType(out bool wasPassedNull);
+        Plugin = type ?? typeof(DevkitServerModule);
+        if (wasPassedNull)
             Index = reader.ReadUInt8();
     }
 }
+
+/// <summary>
+/// Pulls from an <see cref="Asset"/>'s saved localization data.
+/// </summary>
+/// <remarks>Only works on values that are saved in the asset during read.</remarks>
 [EarlyTypeInit]
 public sealed class AssetTranslationSource : ITranslationSource
 {
     internal static readonly InstanceGetter<ItemGunAsset, NPCRewardsList>? GetRewardsList =
         Accessor.GenerateInstanceGetter<ItemGunAsset, NPCRewardsList>("shootQuestRewards", false);
+    /// <summary>
+    /// Guid of an <see cref="Asset"/> to get localization data from.
+    /// </summary>
     public Guid Guid { get; private set; }
     public void Write(ByteWriter writer)
     {

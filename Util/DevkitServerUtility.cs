@@ -1,7 +1,6 @@
 ﻿using DevkitServer.API;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
-using DevkitServer.Util.Encoding;
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
@@ -633,9 +632,11 @@ public static class DevkitServerUtility
     {
         return RemoveTMProRichTextRegex.Replace(text, string.Empty);
     }
-    [Pure]
-    public static Color GetColor(this IDevkitServerPlugin? plugin) => plugin == null ? DevkitServerModule.ModuleColor : (plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor);
 
+    /// <summary>
+    /// Disconnect a user with a custom message using the <see cref="ESteamConnectionFailureInfo.KICKED"/> failure type. Works on client or server.
+    /// </summary>
+    /// <remarks>Clientside will gracefully disconnect, server will reject or kick.</remarks>
     public static void CustomDisconnect(
 #if SERVER
         EditorUser user,
@@ -647,6 +648,11 @@ public static class DevkitServerUtility
 #endif
         message, ESteamConnectionFailureInfo.KICKED
     );
+
+    /// <summary>
+    /// Disconnect a user with a custom message and failure type. Works on client or server.
+    /// </summary>
+    /// <remarks>Clientside will gracefully disconnect, server will reject or kick.</remarks>
     public static void CustomDisconnect(
 #if SERVER
         EditorUser user,
@@ -663,6 +669,7 @@ public static class DevkitServerUtility
             Provider.kick(user.SteamId, message);
 #endif
     }
+
     /// <summary>
     /// Tries to create a directory.
     /// </summary>
@@ -707,12 +714,18 @@ public static class DevkitServerUtility
             return false;
         }
     }
+    /// <summary>
+    /// Compares a <see cref="Quaternion"/> to <see cref="Quaternion.identity"/> within <paramref name="tolerance"/>.
+    /// </summary>
     [Pure]
     public static bool IsNearlyIdentity(this Quaternion q, float tolerance = 0.001f)
     {
         return q.x > -tolerance && q.x < tolerance && q.y > -tolerance && q.y < tolerance && q.z > -tolerance && q.z < tolerance && q.w - 1f > -tolerance && q.w - 1f < tolerance;
     }
 
+    /// <summary>
+    /// Gets a pooled transport connection list of all connected clients.
+    /// </summary>
     /// <remarks>Includes pending connections.</remarks>
     [Pure]
     public static PooledTransportConnectionList GetAllConnections()
@@ -728,6 +741,9 @@ public static class DevkitServerUtility
 
         return list;
     }
+    /// <summary>
+    /// Gets a pooled transport connection list of all connected clients, excluding <paramref name="exclude"/>.
+    /// </summary>
     /// <remarks>Includes pending connections.</remarks>
     [Pure]
     public static PooledTransportConnectionList GetAllConnections(ITransportConnection exclude)
@@ -761,12 +777,25 @@ public static class DevkitServerUtility
         return list;
     }
 
+    /// <returns>'s' if <paramref name="num"/> != 1, otherwise an empty string.</returns>
     [Pure]
     public static string S(this int num) => num == 1 ? string.Empty : "s";
+
+    /// <returns>'S' if <paramref name="num"/> != 1, otherwise an empty string.</returns>
     [Pure]
     public static string UpperS(this int num) => num == 1 ? string.Empty : "S";
+
+    /// <summary>
+    /// Gets the elapsed milliseconds from a <see cref="Stopwatch"/> as a <see cref="double"/> instead of <see cref="long"/>.
+    /// </summary>
     [Pure]
     public static double GetElapsedMilliseconds(this Stopwatch stopwatch) => stopwatch.ElapsedTicks / (double)Stopwatch.Frequency * 1000d;
+
+    /// <summary>
+    /// From a schedule and interval, chooses the next date time based on the current time.
+    /// </summary>
+    /// <param name="utc">Schedule is in UTC instead of local time.</param>
+    /// <returns>The selected scheduled time, or <see langword="null"/> if there are no future elements.</returns>
     [Pure]
     public static DateTime? FindNextSchedule(DateTime[] schedule, bool utc, ScheduleInterval interval)
     {
@@ -823,28 +852,76 @@ public static class DevkitServerUtility
         return null;
     }
 
+    /// <summary>
+    /// Converts terabytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertTBToB(double tb) => (long)Math.Round(tb * 1000000000000d);
+
+    /// <summary>
+    /// Converts gigabytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertGBToB(double gb) => (long)Math.Round(gb * 1000000000d);
+
+    /// <summary>
+    /// Converts megabytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertMBToB(double mb) => (long)Math.Round(mb * 1000000d);
+
+    /// <summary>
+    /// Converts kilobytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertKBToB(double kb) => (long)Math.Round(kb * 1000d);
+
+    /// <summary>
+    /// Converts tebibytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertTiBToB(double tib) => (long)Math.Round(tib * 1099511627776d);
+
+    /// <summary>
+    /// Converts gibibytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertGiBToB(double gib) => (long)Math.Round(gib * 1073741824d);
+
+    /// <summary>
+    /// Converts mebibytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertMiBToB(double mib) => (long)Math.Round(mib * 1048576d);
+
+    /// <summary>
+    /// Converts kibibytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertKiBToB(double kib) => (long)Math.Round(kib * 1024d);
+
+
+    /// <summary>
+    /// Gets the size in bytes of a directory and all it's subfiles recursively.
+    /// </summary>
     [Pure]
     public static long GetDirectorySize(string directory)
     {
         DirectoryInfo dir = new DirectoryInfo(directory);
         return GetDirectorySize(dir);
     }
+
+    /// <summary>
+    /// Gets the size in bytes of a directory and all it's subfiles recursively.
+    /// </summary>
     [Pure]
     public static long GetDirectorySize(DirectoryInfo directory)
     {
@@ -867,6 +944,12 @@ public static class DevkitServerUtility
 
         return ttl;
     }
+
+    /// <summary>
+    /// Removes all matches in a list.
+    /// </summary>
+    /// <remarks>Runs backwards.</remarks>
+    /// <returns>The amount of elements removed.</returns>
     public static int RemoveAll<T>(this IList<T> list, Predicate<T> selector)
     {
         int c = 0;
@@ -881,12 +964,25 @@ public static class DevkitServerUtility
 
         return c;
     }
+
+    /// <summary>
+    /// Converts a list to array, or uses <see cref="Array.Empty"/> if the count is zero.
+    /// </summary>
     public static T[] ToArrayFast<T>(this List<T> list) => list.Count == 0 ? Array.Empty<T>() : list.ToArray();
-    public static void IncreaseCapacity<T>(this List<T> list, int amount)
+
+    /// <summary>
+    /// Increases the capacity of a list if it is less than <paramref name="capacity"/>.
+    /// </summary>
+    public static void IncreaseCapacity<T>(this List<T> list, int capacity)
     {
-        if (list.Capacity < amount)
-            list.Capacity = amount;
+        if (list.Capacity < capacity)
+            list.Capacity = capacity;
     }
+
+    /// <summary>
+    /// Returns the first matching value only if there are no other matching values.
+    /// </summary>
+    /// <remarks>Doesn't throw an error when there are no matches (unlike the normal linq version).</remarks>
     [Pure]
     public static T? SingleOrDefaultSafe<T>(this IEnumerable<T> enumerable, Predicate<T> predicate)
     {
@@ -935,6 +1031,10 @@ public static class DevkitServerUtility
 
         return rtn;
     }
+    /// <summary>
+    /// Returns the first value only if the count is one.
+    /// </summary>
+    /// <remarks>Doesn't throw an error when there are no elements (unlike the normal linq version).</remarks>
     [Pure]
     public static T? SingleOrDefaultSafe<T>(this IEnumerable<T> enumerable)
     {
@@ -957,6 +1057,7 @@ public static class DevkitServerUtility
 
         return rtn;
     }
+
     /// <summary>
     /// Creates a copy or moves a file, for example, 'OriginalName' to 'OriginalName Backup', and optionally assigns a number if there are duplicate files.
     /// </summary>
@@ -1016,6 +1117,7 @@ public static class DevkitServerUtility
 
         return fn;
     }
+
     /// <summary>
     /// Checks to see if <paramref name="longerPath"/> is a child folder or file of the directory <paramref name="shorterPath"/>.
     /// </summary>
@@ -1030,6 +1132,7 @@ public static class DevkitServerUtility
         DirectoryInfo child = new DirectoryInfo(longerPath);
         return IsChildOf(parent, child, includeSubDirectories);
     }
+
     /// <summary>
     /// Checks to see if <paramref name="longerPath"/> is a child folder or file of the directory <paramref name="shorterPath"/>.
     /// </summary>
@@ -1047,6 +1150,7 @@ public static class DevkitServerUtility
 
         return false;
     }
+
     /// <summary>
     /// Gets the path to a file or directory relative to <paramref name="relativeTo"/> of <paramref name="path"/>.
     /// </summary>
@@ -1082,14 +1186,48 @@ public static class DevkitServerUtility
 
         return rel;
     }
+
     /// <summary>
     /// Changes directory separators to back slashes if they aren't already.
     /// </summary>
     public static string FormatUniversalPath(string path) => Path.DirectorySeparatorChar == '\\' ? path : path.Replace(Path.DirectorySeparatorChar, '\\');
+
     /// <summary>
     /// Changes directory separators to forward slashes if they aren't supposed to be back slashes.
     /// </summary>
     public static string UnformatUniversalPath(string path) => Path.DirectorySeparatorChar == '\\' ? path : path.Replace('\\', Path.DirectorySeparatorChar);
+
+    /// <summary>
+    /// Ceils positive numbers, floors negative numbers.
+    /// </summary>
+    public static int CeilToIntIgnoreSign(this float val) => val < 0 ? Mathf.FloorToInt(val) : Mathf.CeilToInt(val);
+
+    /// <summary>
+    /// Floors positive numbers, ceils negative numbers.
+    /// </summary>
+    public static int FloorToIntIgnoreSign(this float val) => val < 0 ? Mathf.CeilToInt(val) : Mathf.FloorToInt(val);
+
+    /// <summary>
+    /// Adds <paramref name="by"/> to each coordinates' magnitudes (adds when positive, subtracts when negative).
+    /// </summary>
+    public static void Expand(this ref Vector3 v3, float by)
+    {
+        if (v3.x < 0)
+            v3.x -= by;
+        else if (v3.x > 0)
+            v3.x += by;
+
+        if (v3.y < 0)
+            v3.y -= by;
+        else if (v3.y > 0)
+            v3.y += by;
+
+        if (v3.z < 0)
+            v3.z -= by;
+        else if (v3.z > 0)
+            v3.z += by;
+    }
+
 }
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
