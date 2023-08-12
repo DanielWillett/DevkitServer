@@ -1,4 +1,5 @@
-﻿using DevkitServer.API.Permissions;
+﻿using DevkitServer.API.Abstractions;
+using DevkitServer.API.Permissions;
 using DevkitServer.Plugins;
 #if CLIENT
 using DevkitServer.Players.UI;
@@ -6,7 +7,7 @@ using DevkitServer.API.UI;
 #endif
 
 namespace DevkitServer.API;
-public abstract class Plugin : IDevkitServerColorPlugin
+public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourcePlugin
 {
     public static readonly Color DefaultColor = new Color32(204, 153, 255, 255);
     private readonly string _defaultName;
@@ -120,6 +121,9 @@ public abstract class Plugin : IDevkitServerColorPlugin
         UIExtensionManager.DeregisterExtension(implementationType);
     }
 #endif
+#nullable disable
+    ITranslationSource ICachedTranslationSourcePlugin.TranslationSource { get; set; }
+#nullable restore
 }
 
 public abstract class Plugin<TConfig> : Plugin, IDevkitServerPlugin<TConfig> where TConfig : class, new()

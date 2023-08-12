@@ -174,6 +174,7 @@ public static class PluginLoader
             assemblyWrapper.AddPlugin(plugin);
             AssembliesIntl.Add(assemblyWrapper);
             skipAssemblyAdd:
+            InitPlugin(plugin);
             OnPluginLoadedEvent.TryInvoke(plugin);
             Logger.LogInfo("[LOAD " + plugin.GetSource() + "] Loaded " + plugin.Name.Colorize(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor));
         }
@@ -369,6 +370,7 @@ public static class PluginLoader
             {
                 AssertPluginValid(plugin);
                 plugin.Load();
+                InitPlugin(plugin);
                 OnPluginLoadedEvent.TryInvoke(plugin);
                 Logger.LogInfo($"[{src}] Loaded successfully.");
             }
@@ -411,6 +413,13 @@ public static class PluginLoader
         CommandHandler.InitImpl();
 
         OnPluginsLoadedEvent.TryInvoke();
+    }
+    private static void InitPlugin(IDevkitServerPlugin plugin)
+    {
+        if (plugin is ICachedTranslationSourcePlugin cachedTranslationSourcePlugin)
+        {
+            cachedTranslationSourcePlugin.TranslationSource = TranslationSource.FromPlugin(plugin);
+        }
     }
     internal static void Unload()
     {

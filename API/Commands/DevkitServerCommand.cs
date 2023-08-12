@@ -1,4 +1,5 @@
 ﻿using Cysharp.Threading.Tasks;
+using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
 #if SERVER
 using DevkitServer.Players;
@@ -9,7 +10,7 @@ namespace DevkitServer.API.Commands;
 /// <summary>
 /// Default <see cref="IExecutableCommand"/> implementation. If you need to limit execution to one of this command at a time, use <see cref="SynchronizedDevkitServerCommand"/>.
 /// </summary>
-public abstract class DevkitServerCommand : IExecutableCommand
+public abstract class DevkitServerCommand : ICachedTranslationSourceCommand
 {
     public virtual bool AnyPermissions => true;
     public string CommandName { get; }
@@ -32,6 +33,7 @@ public abstract class DevkitServerCommand : IExecutableCommand
 
     protected void AddAlias(string alias) => Aliases.Add(alias);
     protected void AddPermission(Permission permission) => Permissions.Add(permission);
+    ITranslationSource ICachedTranslationSourceCommand.TranslationSource { get; set; }
 }
 
 /// <summary>

@@ -590,14 +590,11 @@ public static class DevkitServerUtility
 
     public static void UpdateLocalizationFile(ref Local read, LocalDatDictionary @default, string directory)
     {
-        LocalDatDictionary def = @default;
         DatDictionary @new = new DatDictionary();
         DatDictionary def2 = new DatDictionary();
-        foreach (KeyValuePair<string, string> pair in def)
+        foreach (KeyValuePair<string, string> pair in @default)
         {
-            if (!read.has(pair.Key))
-                @new.Add(pair.Key, new DatValue(pair.Value));
-            else @new.Add(pair.Key, new DatValue(read.format(pair.Key)));
+            @new.Add(pair.Key, new DatValue(read.has(pair.Key) ? read.format(pair.Key) : pair.Value));
             def2.Add(pair.Key, new DatValue(pair.Value));
         }
 
@@ -768,12 +765,6 @@ public static class DevkitServerUtility
     public static string S(this int num) => num == 1 ? string.Empty : "s";
     [Pure]
     public static string UpperS(this int num) => num == 1 ? string.Empty : "S";
-    [Pure]
-    public static GameObject? GetEditorObject()
-    {
-        Transform editor = Level.editing.Find("Editor");
-        return editor == null ? null : editor.gameObject;
-    }
     [Pure]
     public static double GetElapsedMilliseconds(this Stopwatch stopwatch) => stopwatch.ElapsedTicks / (double)Stopwatch.Frequency * 1000d;
     [Pure]
@@ -1025,6 +1016,80 @@ public static class DevkitServerUtility
 
         return fn;
     }
+    /// <summary>
+    /// Checks to see if <paramref name="longerPath"/> is a child folder or file of the directory <paramref name="shorterPath"/>.
+    /// </summary>
+    [Pure]
+    public static bool IsChildOf(string? shorterPath, string longerPath, bool includeSubDirectories = true)
+    {
+        if (string.IsNullOrEmpty(shorterPath))
+            return true;
+        if (string.IsNullOrEmpty(longerPath))
+            return false;
+        DirectoryInfo parent = new DirectoryInfo(shorterPath);
+        DirectoryInfo child = new DirectoryInfo(longerPath);
+        return IsChildOf(parent, child, includeSubDirectories);
+    }
+    /// <summary>
+    /// Checks to see if <paramref name="longerPath"/> is a child folder or file of the directory <paramref name="shorterPath"/>.
+    /// </summary>
+    [Pure]
+    public static bool IsChildOf(DirectoryInfo shorterPath, DirectoryInfo longerPath, bool includeSubDirectories = true)
+    {
+        if (!includeSubDirectories)
+            return longerPath.Parent != null && longerPath.Parent.FullName.Equals(shorterPath.FullName, StringComparison.Ordinal);
+        while (longerPath.Parent != null)
+        {
+            if (longerPath.Parent.FullName.Equals(shorterPath.FullName, StringComparison.Ordinal))
+                return true;
+            longerPath = longerPath.Parent;
+        }
+
+        return false;
+    }
+    /// <summary>
+    /// Gets the path to a file or directory relative to <paramref name="relativeTo"/> of <paramref name="path"/>.
+    /// </summary>
+    // https://stackoverflow.com/questions/51179331/is-it-possible-to-use-path-getrelativepath-net-core2-in-winforms-proj-targeti
+    [Pure]
+    public static string GetRelativePath(string relativeTo, string path)
+    {
+        if (!IsChildOf(relativeTo, path))
+            throw new ArgumentException("Path is not relative to parent", nameof(path));
+        if (string.IsNullOrEmpty(relativeTo))
+        {
+            path = path.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            if (path.IndexOf(Path.DirectorySeparatorChar) == -1)
+                path = "." + Path.DirectorySeparatorChar + path;
+            return path;
+        }
+        path = Path.GetFullPath(path);
+        relativeTo = Path.GetFullPath(relativeTo);
+        Uri uri = new Uri(relativeTo);
+        string rel = Uri.UnescapeDataString(uri.MakeRelativeUri(new Uri(path)).ToString()).Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+        int index = rel.IndexOf(Path.DirectorySeparatorChar);
+        if (index == -1)
+            rel = "." + Path.DirectorySeparatorChar + rel;
+        else
+        {
+            if (index != rel.Length - 1)
+            {
+                rel = rel.Substring(index + 1);
+                if (rel.IndexOf(Path.DirectorySeparatorChar) == -1)
+                    rel = "." + Path.DirectorySeparatorChar + rel;
+            }
+        }
+
+        return rel;
+    }
+    /// <summary>
+    /// Changes directory separators to back slashes if they aren't already.
+    /// </summary>
+    public static string FormatUniversalPath(string path) => Path.DirectorySeparatorChar == '\\' ? path : path.Replace(Path.DirectorySeparatorChar, '\\');
+    /// <summary>
+    /// Changes directory separators to forward slashes if they aren't supposed to be back slashes.
+    /// </summary>
+    public static string UnformatUniversalPath(string path) => Path.DirectorySeparatorChar == '\\' ? path : path.Replace('\\', Path.DirectorySeparatorChar);
 }
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]

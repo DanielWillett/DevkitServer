@@ -1,5 +1,8 @@
 ﻿using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
+using SDG.Framework.Modules;
+using Module = SDG.Framework.Modules.Module;
 
 namespace DevkitServer.Util;
 [EarlyTypeInit]
@@ -16,6 +19,8 @@ public static class AssetUtil
     private static readonly StaticGetter<List<MasterBundleConfig>>? AllMasterBundlesGetter;
 
     private static readonly InstanceGetter<Asset, AssetOrigin>? GetAssetOrigin = Accessor.GenerateInstanceGetter<Asset, AssetOrigin>("origin");
+    private static readonly InstanceGetter<NPCRewardsList, INPCReward[]>? GetRewardsFromList = Accessor.GenerateInstanceGetter<NPCRewardsList, INPCReward[]>("rewards");
+    private static readonly InstanceGetter<Module, List<IModuleNexus>>? GetNexii = Accessor.GenerateInstanceGetter<Module, List<IModuleNexus>>("nexii");
     
     /// <returns>The origin of the asset, or <see langword="null"/> in the case of a reflection failure.</returns>
     [Pure]
@@ -151,6 +156,25 @@ public static class AssetUtil
         using StreamReader inputReader = new StreamReader(fileStream);
         return Parser.Parse(inputReader);
     }
+    /// <summary>
+    /// Get internal reward array from an <see cref="NPCRewardsList"/>.
+    /// </summary>
+    /// <returns><see langword="null"/> in the case of a refelction error, otherwise the internal list of NPC rewards.</returns>
+    [Pure]
+    public static INPCReward[]? GetRewards(NPCRewardsList list)
+    {
+        return GetRewardsFromList?.Invoke(list);
+    }
+
+    /// <summary>
+    /// Gets a list of <see cref="IModuleNexus"/> loaded by a <see cref="Module"/>.
+    /// </summary>
+    /// <returns><see langword="null"/> in the case of a refelction error, otherwise the list of nexii.</returns>
+    [Pure]
+    public static IReadOnlyList<IModuleNexus>? GetModuleNexii(Module module)
+    {
+        return GetNexii?.Invoke(module);
+    }
 
     private static void LoadAssetsSyncIntl(string directory, AssetOrigin origin, bool includeSubDirectories, bool loadMasterBundles, bool apply)
     {
@@ -221,6 +245,9 @@ public static class AssetUtil
             translationData = ReadFileWithoutHash(englishLang);
     }
 #if CLIENT
+    /// <summary>
+    /// Refreshes the Levels UI for singleplayer, editor, and server browser menu.
+    /// </summary>
     public static void RefreshLevelsUI()
     {
         Level.broadcastLevelsRefreshed();

@@ -1,4 +1,5 @@
-﻿using DevkitServer.API.Permissions;
+﻿using DevkitServer.API.Abstractions;
+using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer.Networking;
 #if CLIENT
 using HarmonyLib;
@@ -23,6 +24,12 @@ public static class UIMessage
 
     [UsedImplicitly]
     private static readonly NetCall<string> SendEditorUIMessage = new NetCall<string>((ushort)NetCalls.EditorUIMessage);
+
+    [UsedImplicitly]
+    private static readonly NetCallRaw<string, ITranslationSource?, object?[]?> SendTranslatableEditorUIMessage =
+        new NetCallRaw<string, ITranslationSource?, object?[]?>((ushort)NetCalls.TranslatableEditorUIMessage, null,
+            TranslationSource.Read, TranslationSource.ReadFormattingParameters, null, TranslationSource.Write,
+            TranslationSource.WriteFormattingParameters);
 #if CLIENT
     [HarmonyPatch(typeof(EditorUI), nameof(EditorUI.message))]
     [HarmonyTranspiler]
@@ -85,6 +92,12 @@ public static class UIMessage
     {
         ctx.Acknowledge(SendEditorMessage(message) ? StandardErrorCode.Success : StandardErrorCode.GenericError);
     }
+
+    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.TranslatableEditorUIMessage)]
+    private static void ReceiveTranslatableEditorUIMessage(MessageContext ctx, string key, ITranslationSource source, object?[]? formatting)
+    {
+        ctx.Acknowledge(SendEditorMessage(source, key, formatting) ? StandardErrorCode.Success : StandardErrorCode.GenericError);
+    }
 #endif
     /// <summary>
     /// Send a toast message to a user, or the current user when called client-side.
@@ -104,15 +117,62 @@ public static class UIMessage
 #endif
         string message)
     {
+        ThreadUtil.assertIsGameThread();
 #if SERVER
         SendEditorUIMessage.Invoke(user.Connection, message);
 #endif
 #if CLIENT
-        ThreadUtil.assertIsGameThread();
 
         try
         {
             _customText = message;
+            EditorUI.message(CustomMessage);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error setting EditorUI message.");
+            Logger.LogError(ex);
+            return false;
+        }
+        finally
+        {
+            _customText = null;
+        }
+#endif
+    }
+    /// <summary>
+    /// Send a toast message to a user, or the current user when called client-side. Will translate the key using the specified source and optional formatting arguments.
+    /// </summary>
+    /// <param name="translationKey">Formatted with <paramref name="source"/> and <paramref name="formatting"/>.</param>
+    /// <remarks>Client-side or server-side. Must be ran on main thread.</remarks>
+    /// <exception cref="NotSupportedException">Ran on non-game thread.</exception>
+    public static
+#if CLIENT
+        bool
+#else
+        void
+#endif
+        SendEditorMessage(
+#if SERVER
+        EditorUser user,
+#endif
+        ITranslationSource source, string translationKey, object?[]? formatting = null)
+    {
+        ThreadUtil.assertIsGameThread();
+#if SERVER
+        if (source == null)
+            SendEditorUIMessage.Invoke(user.Connection, translationKey);
+        else
+            SendTranslatableEditorUIMessage.Invoke(user.Connection, translationKey, source, formatting);
+#endif
+#if CLIENT
+
+        try
+        {
+            if (formatting != null)
+                TranslationSource.RemoveNullFormattingArguemnts(formatting);
+            _customText = source.Translate(translationKey, formatting!);
             EditorUI.message(CustomMessage);
             return true;
         }
@@ -151,11 +211,9 @@ public static class UIMessage
 #endif
         SendEditorMessage(
 #if SERVER
-        user, 
+            user, 
 #endif
-        missingPermission == null
-            ? DevkitServerModule.MessageLocalization.Translate("NoPermissions")
-            : DevkitServerModule.MessageLocalization.Translate("NoPermissionsWithPermission", missingPermission.ToString())
-            );
+            TranslationSource.MessageLocalizationSource, missingPermission == null ? "NoPermissions" : "NoPermissionsWithPermission",
+            missingPermission == null ? Array.Empty<object>() : new object[] { missingPermission.ToString() });
     }
 }

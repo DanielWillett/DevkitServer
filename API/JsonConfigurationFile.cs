@@ -171,7 +171,7 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
                                options == null
                                    ? DevkitServerConfig.SerializerSettings
                                    : options.SerializerOptions)
-                           ?? throw new JsonException("Failed to read SystemConfig: returned null.");
+                           ?? throw new JsonException("Failed to read " + typeof(TConfig).Name + ": returned null.");
                     if (config is IDirtyable dirty2)
                         dirty2.isDirty = false;
                     return config;

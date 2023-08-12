@@ -37,4 +37,5 @@ internal enum NetCalls : ushort
     SendObjectSyncData = 35,
     SendBindHierarchyItem = 36,
     SendHierarchySyncData = 37,
+    TranslatableEditorUIMessage = 38,
 }

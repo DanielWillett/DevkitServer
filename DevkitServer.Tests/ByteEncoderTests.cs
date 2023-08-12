@@ -10,6 +10,7 @@ using SDG.Framework.Landscapes;
 using System;
 using System.Globalization;
 using System.IO;
+using DevkitServer.API.Abstractions;
 using StackCleaner;
 
 namespace DevkitServer.Tests;
@@ -1220,6 +1221,28 @@ public class ByteEncoderTests
                 writer.Stream = null;
             }
         }
+    }
+
+    [TestMethod]
+    public void TestWriteFormattingArguments()
+    {
+        Guid newGuid = Guid.NewGuid();
+        DateTime now = DateTime.Now;
+        object[] parameters = { newGuid, true, 8, 12u, 64L, 102ul, (short)1, (ushort)3, (sbyte)-4, (byte)250, now, new DateTimeOffset(now), "test string", DBNull.Value };
+
+        ByteWriter writer = GetWriter(false, out _);
+        TranslationSource.WriteFormattingParameters(writer, parameters);
+
+        TryPrint(writer);
+        ByteReader reader = new ByteReader();
+        
+        reader.LoadNew(writer.ToArray());
+        object?[] outParameters = TranslationSource.ReadFormattingParameters(reader);
+
+        Assert.AreEqual(outParameters.Length, parameters.Length);
+        for (int i = 0; i < outParameters.Length; ++i)
+            Assert.AreEqual(outParameters[i], parameters[i]);
+        Assert.IsFalse(reader.HasFailed);
     }
 
     [TestMethod]

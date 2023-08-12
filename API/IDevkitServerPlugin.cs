@@ -1,4 +1,5 @@
-﻿using DevkitServer.Plugins;
+﻿using DevkitServer.API.Abstractions;
+using DevkitServer.Plugins;
 
 namespace DevkitServer.API;
 public interface IDevkitServerPlugin<out TConfig> : IReloadableDevkitServerPlugin, IConfigProvider<TConfig> where TConfig : class, new() { }
@@ -99,4 +100,8 @@ public interface IDevkitServerColorPlugin : IDevkitServerPlugin
     /// </summary>
     /// <remarks>Default: rgb(204, 153, 255), <see cref="Plugin.DefaultColor"/>.</remarks>
     Color Color { get; }
+}
+internal interface ICachedTranslationSourcePlugin : IDevkitServerPlugin
+{
+    ITranslationSource TranslationSource { get; set; }
 }

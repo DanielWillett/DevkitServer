@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using Cysharp.Threading.Tasks;
 using DevkitServer.API;
+using DevkitServer.API.Abstractions;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Logging;
 using DevkitServer.Configuration;
@@ -526,6 +527,11 @@ public class CommandHandler : ICommandHandler, IDisposable
 
         if (!added)
             _registeredCommands.Add(command);
+
+        if (command is ILocalizedCommand localizedCommand and ICachedTranslationSourceCommand cachedTranslationSourceCommand)
+        {
+            cachedTranslationSourceCommand.TranslationSource = TranslationSource.FromCommand(localizedCommand);
+        }
 
         Color clr = new Color32(230, 77, 0, 255);
         if (command.Plugin != null)

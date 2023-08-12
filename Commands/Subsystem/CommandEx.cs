@@ -7,6 +7,7 @@ using System.Reflection;
 namespace DevkitServer.Commands.Subsystem;
 public static class CommandEx
 {
+    public static Type GetPluginType(this IExecutableCommand command) => command.Plugin?.GetType() ?? (command is VanillaCommand ? typeof(Provider) : typeof(DevkitServerModule));
     public static void LogDebug(this IExecutableCommand command, string message, ConsoleColor color = ConsoleColor.DarkGray)
     {
         message = "[" + command.CommandName.ToUpperInvariant() + " CMD] " + message;
