@@ -6,9 +6,11 @@ using DevkitServer.Models;
 
 namespace DevkitServer.Util.Encoding;
 
+/// <summary>
+/// Fast encoding to a byte array to data. Also works with <see cref="System.IO.Stream"/>s. Similar to the <see cref="River"/> class.
+/// </summary>
 public class ByteWriter
 {
-    public delegate void Writer<in T>(ByteWriter writer, T arg1);
     private static readonly bool IsBigEndian = !BitConverter.IsLittleEndian;
     private static Dictionary<Type, MethodInfo>? _nonNullableWriters;
     private static Dictionary<Type, MethodInfo>? _nullableWriters;
@@ -1909,6 +1911,9 @@ public class ByteWriter
         }
     }
 }
+
+public delegate void Writer<in T>(ByteWriter writer, T arg1);
+
 public sealed class ByteWriterRaw<T> : ByteWriter
 {
     private readonly Writer<T> writer;

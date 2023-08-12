@@ -432,26 +432,26 @@ public sealed class NetCallRaw<T> : NetCallRaw
     public delegate void Method(MessageContext context, T arg1);
     public delegate Task MethodAsync(MessageContext context, T arg1);
     /// <summary>Leave <paramref name="reader"/> or <paramref name="writer"/> null to auto-fill.</summary>
-    internal NetCallRaw(NetCalls method, ByteReader.Reader<T>? reader, ByteWriter.Writer<T>? writer, int capacity = 0) : this((ushort)method, reader, writer, capacity) { }
-    internal NetCallRaw(ushort method, ByteReader.Reader<T>? reader, ByteWriter.Writer<T>? writer, int capacity = 0) : base(method)
+    internal NetCallRaw(NetCalls method, Reader<T>? reader, Writer<T>? writer, int capacity = 0) : this((ushort)method, reader, writer, capacity) { }
+    internal NetCallRaw(ushort method, Reader<T>? reader, Writer<T>? writer, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T>(writer, capacity: capacity);
         _reader = new ByteReaderRaw<T>(reader);
     }
     /// <summary>Leave <paramref name="reader"/> or <paramref name="writer"/> null to auto-fill.</summary>
-    public NetCallRaw(Guid method, ByteReader.Reader<T>? reader, ByteWriter.Writer<T>? writer, int capacity = 0) : base(method)
+    public NetCallRaw(Guid method, Reader<T>? reader, Writer<T>? writer, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T>(writer, capacity: capacity);
         _reader = new ByteReaderRaw<T>(reader);
     }
     /// <summary>Leave <paramref name="reader"/> or <paramref name="writer"/> null to auto-fill.</summary>
-    public NetCallRaw(Method method, ByteReader.Reader<T>? reader, ByteWriter.Writer<T>? writer, int capacity = 0) : base(method)
+    public NetCallRaw(Method method, Reader<T>? reader, Writer<T>? writer, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T>(writer, capacity: capacity);
         _reader = new ByteReaderRaw<T>(reader);
     }
     /// <summary>Leave <paramref name="reader"/> or <paramref name="writer"/> null to auto-fill.</summary>
-    public NetCallRaw(MethodAsync method, ByteReader.Reader<T>? reader, ByteWriter.Writer<T>? writer, int capacity = 0) : base(method)
+    public NetCallRaw(MethodAsync method, Reader<T>? reader, Writer<T>? writer, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T>(writer, capacity: capacity);
         _reader = new ByteReaderRaw<T>(reader);
@@ -635,28 +635,28 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
     private readonly ByteWriterRaw<T1, T2> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2);
-    internal NetCallRaw(NetCalls method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, int capacity = 0)
+    internal NetCallRaw(NetCalls method, Reader<T1>? reader1, Reader<T2>? reader2, Writer<T1>? writer1, Writer<T2>? writer2, int capacity = 0)
         : this((ushort)method, reader1, reader2, writer1, writer2, capacity) { }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    internal NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, int capacity = 0) : base(method)
+    internal NetCallRaw(ushort method, Reader<T1>? reader1, Reader<T2>? reader2, Writer<T1>? writer1, Writer<T2>? writer2, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(Guid method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, int capacity = 0) : base(method)
+    public NetCallRaw(Guid method, Reader<T1>? reader1, Reader<T2>? reader2, Writer<T1>? writer1, Writer<T2>? writer2, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(Method method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, int capacity = 0) : base(method)
+    public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Writer<T1>? writer1, Writer<T2>? writer2, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(MethodAsync method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, int capacity = 0) : base(method)
+    public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Writer<T1>? writer1, Writer<T2>? writer2, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
@@ -843,28 +843,28 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
     private readonly ByteWriterRaw<T1, T2, T3> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3);
-    internal NetCallRaw(NetCalls method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, int capacity = 0)
+    internal NetCallRaw(NetCalls method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, int capacity = 0)
         : this((ushort)method, reader1, reader2, reader3, writer1, writer2, writer3, capacity) { }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    internal NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, int capacity = 0) : base(method)
+    internal NetCallRaw(ushort method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(Guid method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, int capacity = 0) : base(method)
+    public NetCallRaw(Guid method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(Method method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, int capacity = 0) : base(method)
+    public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(MethodAsync method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, int capacity = 0) : base(method)
+    public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
@@ -1053,28 +1053,28 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
     private readonly ByteWriterRaw<T1, T2, T3, T4> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4);
-    internal NetCallRaw(NetCalls method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, int capacity = 0)
+    internal NetCallRaw(NetCalls method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, int capacity = 0)
         : this((ushort)method, reader1, reader2, reader3, reader4, writer1, writer2, writer3, writer4, capacity) { }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    internal NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, int capacity = 0) : base(method)
+    internal NetCallRaw(ushort method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(Guid method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, int capacity = 0) : base(method)
+    public NetCallRaw(Guid method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(Method method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, int capacity = 0) : base(method)
+    public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(MethodAsync method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, int capacity = 0) : base(method)
+    public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
@@ -1263,28 +1263,28 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
     private readonly ByteWriterRaw<T1, T2, T3, T4, T5> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5);
-    internal NetCallRaw(NetCalls method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, int capacity = 0)
+    internal NetCallRaw(NetCalls method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, int capacity = 0)
         : this((ushort)method, reader1, reader2, reader3, reader4, reader5, writer1, writer2, writer3, writer4, writer5, capacity) { }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    internal NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, int capacity = 0) : base(method)
+    internal NetCallRaw(ushort method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5>(reader1, reader2, reader3, reader4, reader5);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(Guid method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, int capacity = 0) : base(method)
+    public NetCallRaw(Guid method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5>(reader1, reader2, reader3, reader4, reader5);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(Method method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, int capacity = 0) : base(method)
+    public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5>(reader1, reader2, reader3, reader4, reader5);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(MethodAsync method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, int capacity = 0) : base(method)
+    public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5>(reader1, reader2, reader3, reader4, reader5);
@@ -1474,28 +1474,28 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5, T6> : NetCallRaw
     private readonly ByteWriterRaw<T1, T2, T3, T4, T5, T6> _writer;
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6);
-    internal NetCallRaw(NetCalls method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteReader.Reader<T6>? reader6, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, ByteWriter.Writer<T6>? writer6, int capacity = 0)
+    internal NetCallRaw(NetCalls method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Reader<T6>? reader6, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, Writer<T6>? writer6, int capacity = 0)
         : this((ushort)method, reader1, reader2, reader3, reader4, reader5, reader6, writer1, writer2, writer3, writer4, writer5, writer6, capacity) { }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    internal NetCallRaw(ushort method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteReader.Reader<T6>? reader6, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, ByteWriter.Writer<T6>? writer6, int capacity = 0) : base(method)
+    internal NetCallRaw(ushort method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Reader<T6>? reader6, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, Writer<T6>? writer6, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5, T6>(reader1, reader2, reader3, reader4, reader5, reader6);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(Guid method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteReader.Reader<T6>? reader6, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, ByteWriter.Writer<T6>? writer6, int capacity = 0) : base(method)
+    public NetCallRaw(Guid method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Reader<T6>? reader6, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, Writer<T6>? writer6, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5, T6>(reader1, reader2, reader3, reader4, reader5, reader6);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(Method method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteReader.Reader<T6>? reader6, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, ByteWriter.Writer<T6>? writer6, int capacity = 0) : base(method)
+    public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Reader<T6>? reader6, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, Writer<T6>? writer6, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5, T6>(reader1, reader2, reader3, reader4, reader5, reader6);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(MethodAsync method, ByteReader.Reader<T1>? reader1, ByteReader.Reader<T2>? reader2, ByteReader.Reader<T3>? reader3, ByteReader.Reader<T4>? reader4, ByteReader.Reader<T5>? reader5, ByteReader.Reader<T6>? reader6, ByteWriter.Writer<T1>? writer1, ByteWriter.Writer<T2>? writer2, ByteWriter.Writer<T3>? writer3, ByteWriter.Writer<T4>? writer4, ByteWriter.Writer<T5>? writer5, ByteWriter.Writer<T6>? writer6, int capacity = 0) : base(method)
+    public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Reader<T6>? reader6, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, Writer<T6>? writer6, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5, T6>(reader1, reader2, reader3, reader4, reader5, reader6);
