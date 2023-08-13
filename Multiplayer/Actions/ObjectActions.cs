@@ -298,7 +298,7 @@ public class InstantiateLevelObjectAction : IServersideAction
         EditorUser? user = UserManager.FromId(Instigator);
         if (user != null)
         {
-            LevelObjectUtil.ReceiveLevelObjectInstantiation(
+            LevelObjectUtil.ReceiveLevelObjectInstantiationRequest(
                 new MessageContext(user.Connection, new MessageOverhead(MessageFlags.Request, 0, 0, RequestKey, 0), false),
                 Asset, Position, Rotation, Scale);
         }

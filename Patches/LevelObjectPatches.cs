@@ -520,68 +520,61 @@ internal static class LevelObjectPatches
     private static Transform? _hover;
     private static void OnUpdate()
     {
+        // highlight fade time seconds
+        const float fade = 0.1f;
+
         if (!EditorObjects.isBuilding)
         {
             if (_hover != null)
             {
-                HighlighterUtil.Unhighlight(_hover);
+                HighlighterUtil.Unhighlight(_hover, fade);
                 _hover = null;
             }
             return;
         }
 
+        if (DevkitServerConfig.Config.EnableObjectUIExtension)
+            EditorLevelObjectsUIExtension.OnUpdate();
+
         bool midClick = InputEx.GetKeyDown(KeyCode.Mouse2);
 
-        if (!DevkitServerConfig.Config.RemoveCosmeticImprovements || midClick ||
-             DevkitServerConfig.Config.EnableObjectUIExtension)
+        if ((!DevkitServerConfig.Config.RemoveCosmeticImprovements || midClick) && EditorInteractEx.TryGetWorldHit(out RaycastHit hit) && (hit.transform.CompareTag("Large") || hit.transform.CompareTag("Medium") ||
+                hit.transform.CompareTag("Small") || hit.transform.CompareTag("Barricade") ||
+                hit.transform.CompareTag("Structure")) &&
+            LevelObjectUtil.TryFindObjectOrBuildable(hit.transform, out LevelObject? @object, out LevelBuildableObject? buildable, true))
         {
+            Asset? asset = @object?.asset ?? (Asset?)buildable?.asset;
 
-            if (DevkitServerConfig.Config.EnableObjectUIExtension)
-                EditorLevelObjectsUIExtension.OnUpdate();
+            if (midClick)
+                LevelObjectUtil.SelectObjectType(asset);
 
-            if (EditorInteractEx.TryGetWorldHit(out RaycastHit hit) && (hit.transform.CompareTag("Large") || hit.transform.CompareTag("Medium") ||
-                                                                        hit.transform.CompareTag("Small") || hit.transform.CompareTag("Barricade") ||
-                                                                        hit.transform.CompareTag("Structure")) &&
-                LevelObjectUtil.TryFindObjectOrBuildable(hit.transform, out LevelObject? @object, out LevelBuildableObject? buildable, true))
-            {
-                Asset? asset = @object?.asset ?? (Asset?)buildable?.asset;
-
-                if (midClick)
-                    LevelObjectUtil.SelectObjectType(asset);
-
-                if (DevkitServerConfig.Config.RemoveCosmeticImprovements)
-                    return;
-                // object hover highlights
-                bool dif = _hover != hit.transform;
-                if (_hover is not null && dif)
-                {
-                    if (_hover != null && !LevelObjectUtil.IsSelected(_hover))
-                    {
-                        HighlighterUtil.Unhighlight(_hover);
-                    }
-                    _hover = null;
-                }
-
-                if (dif)
-                {
-                    if (!LevelObjectUtil.IsSelected(hit.transform))
-                    {
-                        HighlighterUtil.Highlight(hit.transform, Color.black);
-                        _hover = hit.transform;
-                    }
-                    else _hover = null;
-                }
-                else if (LevelObjectUtil.IsSelected(hit.transform))
-                    _hover = null;
-
+            if (DevkitServerConfig.Config.RemoveCosmeticImprovements)
                 return;
+            // object hover highlights
+            bool dif = _hover != hit.transform;
+            if (_hover is not null && dif)
+            {
+                if (_hover != null && !LevelObjectUtil.IsSelected(_hover))
+                    HighlighterUtil.Unhighlight(_hover, fade);
+                
+                _hover = null;
             }
+
+            if (dif)
+            {
+                if (!LevelObjectUtil.IsSelected(hit.transform))
+                    HighlighterUtil.Highlight(hit.transform, Color.black, fade);
+                
+                _hover = hit.transform;
+            }
+
+            return;
         }
         
         if (_hover != null)
         {
             if (!LevelObjectUtil.IsSelected(_hover))
-                HighlighterUtil.Unhighlight(_hover);
+                HighlighterUtil.Unhighlight(_hover, fade);
 
             _hover = null!;
         }

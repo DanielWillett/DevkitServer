@@ -40,8 +40,8 @@ internal static class PatchesMain
             }
             catch (Exception ex)
             {
-                Logger.LogError("Unable to clear previous harmony log.");
-                Logger.LogError(ex);
+                Logger.LogError("Unable to clear previous harmony log.", method: Source);
+                Logger.LogError(ex, method: Source);
             }
             Harmony.DEBUG = true;
 #endif
@@ -55,11 +55,11 @@ internal static class PatchesMain
 #endif
             DoManualPatches();
             
-            Logger.LogInfo($"Finished patching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
+            Logger.LogInfo($"[{Source}] Finished patching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex);
+            Logger.LogError(ex, method: Source);
             DevkitServerModule.Fault();
             Unpatch();
         }
@@ -92,6 +92,40 @@ internal static class PatchesMain
             Logger.LogWarning("Patcher error: Level.includeHash.");
             Logger.LogError(ex);
         }
+#if CLIENT
+        if (DevkitServerConfig.Config.EnableBetterLevelCreation)
+        {
+            try
+            {
+                MethodInfo? method = typeof(MenuWorkshopEditorUI).GetMethod("onClickedAddButton", BindingFlags.NonPublic | BindingFlags.Static);
+                if (method != null)
+                    Patcher.Patch(method, transpiler: new HarmonyMethod(Accessor.GetMethod(MapCreation.TranspileOnClickedAddLevelButton)));
+                else
+                    Logger.LogWarning($"Method not found to patch map creation: {FormattingUtil.FormatMethod(typeof(void), typeof(MenuWorkshopEditorUI), "onClickedAddButton",
+                            new (Type, string?)[] { (typeof(ISleekElement), "button") }, isStatic: true)}.", method: Source);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning($"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), typeof(MenuWorkshopEditorUI), "onClickedAddButton",
+                        new (Type, string?)[] { (typeof(ISleekElement), "button") }, isStatic: true)}.", method: Source);
+                Logger.LogError(ex, method: Source);
+            }
+        }
+#endif
+        try
+        {
+            MethodInfo? method = Accessor.GetMethod(Level.save);
+            if (method != null)
+                Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(OnLevelSaving)));
+            else
+                Logger.LogWarning($"Method not found to patch map saving: {FormattingUtil.FormatMethod(typeof(void), typeof(Level), nameof(Level.save),
+                    arguments: Array.Empty<Type>(), isStatic: true)}.", method: Source);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Failed to patch method: {Accessor.GetMethod(Level.save).Format()}.", method: Source);
+            Logger.LogError(ex, method: Source);
+        }
     }
     private static void DoManualUnpatches()
     {
@@ -109,7 +143,20 @@ internal static class PatchesMain
             Logger.LogError(ex);
         }
     }
-
+    private static bool OnLevelSaving()
+    {
+#if CLIENT
+        if (DevkitServerModule.IsEditing)
+        {
+            Logger.LogInfo("Asking server to save.");
+            DevkitServerModule.AskSave();
+            return false;
+        }
+#endif
+        Logger.LogInfo("Saving editor data.");
+        LandscapeUtil.DeleteUnusedTileData();
+        return true;
+    }
     private static bool PatchLevelIncludeHatch(string id, byte[] pendingHash)
     {
         return !Level.isLoaded;
@@ -546,7 +593,7 @@ internal static class PatchesMain
     private static IEnumerable<CodeInstruction> DedicatedUgcLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
         bool one = false;
-        yield return new CodeInstruction(OpCodes.Call, new System.Action(MapCreation.PrefixLoadingDedicatedUGC).Method);
+        yield return new CodeInstruction(OpCodes.Call, new Action(MapCreation.PrefixLoadingDedicatedUGC).Method);
 
         foreach (CodeInstruction instr in instructions)
         {

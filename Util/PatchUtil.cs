@@ -1,6 +1,4 @@
-﻿using DevkitServer.Multiplayer.Actions;
-using HarmonyLib;
-using JetBrains.Annotations;
+﻿using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -664,12 +662,24 @@ public static class PatchUtil
     }
     [Pure]
     public static CodeInstruction CopyWithoutSpecial(this CodeInstruction instruction) => new CodeInstruction(instruction.opcode, instruction.operand);
+    public static void TransferEndingInstructionNeeds(CodeInstruction originalEnd, CodeInstruction newEnd)
+    {
+        newEnd.blocks.AddRange(originalEnd.blocks.Where(x => x.blockType.IsEndBlockType()));
+        originalEnd.blocks.RemoveAll(x => x.blockType.IsEndBlockType());
+    }
     public static void TransferStartingInstructionNeeds(CodeInstruction originalStart, CodeInstruction newStart)
     {
         newStart.labels.AddRange(originalStart.labels);
         originalStart.labels.Clear();
         newStart.blocks.AddRange(originalStart.blocks.Where(x => x.blockType.IsBeginBlockType()));
         originalStart.blocks.RemoveAll(x => x.blockType.IsBeginBlockType());
+    }
+    public static void MoveBlocksAndLabels(this CodeInstruction from, CodeInstruction to)
+    {
+        to.labels.AddRange(from.labels);
+        from.labels.Clear();
+        to.blocks.AddRange(from.blocks);
+        from.blocks.Clear();
     }
 
     [Pure]

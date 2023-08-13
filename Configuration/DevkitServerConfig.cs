@@ -1,8 +1,11 @@
-﻿using System.Globalization;
-using DevkitServer.API.Permissions;
+﻿using DevkitServer.API.Permissions;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+
+#if CLIENT
+using System.Globalization;
+#endif
 
 namespace DevkitServer.Configuration;
 [EarlyTypeInit(-1)]
@@ -286,6 +289,9 @@ public class SystemConfig
 #if CLIENT
     [JsonPropertyName("enable_object_ui_extension")]
     public bool EnableObjectUIExtension { get; set; }
+
+    [JsonPropertyName("enable_better_map_creation")]
+    public bool EnableBetterLevelCreation { get; set; }
 #endif
 
 #if SERVER
@@ -318,6 +324,7 @@ public class SystemConfig
         RemoveCosmeticImprovements = false;
 #if CLIENT
         EnableObjectUIExtension = true;
+        EnableBetterLevelCreation = true;
 #endif
 #if SERVER
         NewLevelInfo = NewLevelCreationOptions.Default;

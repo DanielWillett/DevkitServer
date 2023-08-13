@@ -40,13 +40,14 @@ namespace DevkitServer;
 public sealed class DevkitServerModule : IModuleNexus
 {
     public static readonly string RepositoryUrl = "https://github.com/DanielWillett/DevkitServer"; // don't suffix this with '/'
-    private static StaticGetter<Assets>? GetAssetsInstance;
-    private static InstanceSetter<AssetOrigin, bool>? SetOverrideIDs;
     public const string ModuleName = "DevkitServer";
     public static readonly string ServerRule = "DevkitServer";
-    private static CancellationTokenSource? _tknSrc;
     internal static readonly Color32 ModuleColor = new Color32(0, 255, 153, 255);
     internal static readonly Color32 UnturnedColor = new Color32(99, 123, 99, 255);
+    internal static NetCall ClientAskSave = new NetCall(NetCalls.AskSave);
+    private static StaticGetter<Assets>? GetAssetsInstance;
+    private static InstanceSetter<AssetOrigin, bool>? SetOverrideIDs;
+    private static CancellationTokenSource? _tknSrc;
     private static string? _asmPath;
     private static IReadOnlyList<string>? _searchLocations;
     public Assembly Assembly { get; } = Assembly.GetExecutingAssembly();
@@ -643,24 +644,24 @@ public sealed class DevkitServerModule : IModuleNexus
     private static void OnPreSaved()
     {
         Logger.LogInfo("Saving...");
-        if (IsEditing)
+        if (!Level.isEditor)
+            return;
+        Thread.BeginCriticalRegion();
+        try
         {
-            Thread.BeginCriticalRegion();
-            try
+            Level.save();
+            if (IsEditing)
             {
-                LandscapeUtil.DeleteUnusedTileData();
-                Level.save();
-
                 HierarchyResponsibilities.Save();
                 LevelObjectResponsibilities.Save();
 #if SERVER
-                BuildableResponsibilities.Save();
+                    BuildableResponsibilities.Save();
 #endif
             }
-            finally
-            {
-                Thread.EndCriticalRegion();
-            }
+        }
+        finally
+        {
+            Thread.EndCriticalRegion();
         }
     }
     private static void OnSaved()
@@ -778,6 +779,21 @@ public sealed class DevkitServerModule : IModuleNexus
         Version thisVersion = Accessor.DevkitServer.GetName().Version;
         return thisVersion.Major == otherVersion.Major && thisVersion.Minor == otherVersion.Minor;
     }
+    /// <exception cref="InvalidOperationException">Thrown when <see cref="IsEditing"/> is not <see langword="true"/>.</exception>
+    public static void AssertIsDevkitServerClient()
+    {
+        if (IsEditing)
+            return;
+
+        throw new InvalidOperationException("This operation can only be performed while a client on a DevkitServer server.");
+    }
+#if CLIENT
+    public static void AskSave()
+    {
+        AssertIsDevkitServerClient();
+        ClientAskSave.Invoke();
+    }
+#endif
 }
 
 public sealed class DevkitServerModuleComponent : MonoBehaviour

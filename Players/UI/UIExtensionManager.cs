@@ -1,12 +1,11 @@
-﻿
-#if CLIENT
+﻿#if CLIENT
 #if DEBUG
 
 /*
  * Uncomment this to enable UI Extension Debug Logging.
  */
 
-#define UI_EXT_DEBUG
+// #define UI_EXT_DEBUG
 #endif
 
 using DevkitServer.API;
@@ -324,6 +323,7 @@ public static class UIExtensionManager
         if (!info.SuppressUIExtensionParentWarning && !typeof(UIExtension).IsAssignableFrom(info.ImplementationType))
         {
             LogWarning($"It's recommended to derive UI extensions from the {typeof(UIExtension).Format()} class (unlike {info.ImplementationType.Format()}).", info.Plugin, info.Assembly);
+            LogInfo($"Alternatively set {"SuppressUIExtensionParentWarning".Colorize(FormattingColorType.Property)} to {true.Format()} in a {typeof(UIExtensionAttribute).Format()} on the extension class.", info.Plugin, info.Assembly);
         }
 
         if (!UIAccessTools.TryGetUITypeInfo(info.ParentType, out UITypeInfo? typeInfo))
