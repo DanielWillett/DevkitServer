@@ -5,6 +5,7 @@ using DevkitServer.Patches;
 using DevkitServer.Players.UI;
 using HarmonyLib;
 using System.Reflection;
+using DevkitServer.Players;
 
 namespace DevkitServer.Core.Extensions.UI;
 [UIExtension(typeof(EditorLevelObjectsUI))]
@@ -31,6 +32,9 @@ internal class EditorLevelObjectsUIExtension : UIExtension
     private readonly ISleekToggle _isEditingToggle;
     private readonly ISleekButton _saveEditButton;
     private readonly ISleekButton _saveNewEditButton;
+    private readonly ISleekButton _gotoOffsetButton;
+    private readonly ISleekField _offsetField;
+    private readonly ISleekLabel _editHint;
 
     internal EditorLevelObjectsUIExtension()
     {
@@ -67,19 +71,19 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         _preview.shouldDestroyTexture = true;
         displayBox.AddChild(_preview);
 
-        ISleekLabel editKeybindHint = Glazier.Get().CreateLabel();
-        editKeybindHint.shadowStyle = ETextContrastContext.ColorfulBackdrop;
-        editKeybindHint.text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorToggleHint", MenuConfigurationControlsUI.getKeyCodeText(EditToggleKey));
-        editKeybindHint.positionScale_X = 1f;
-        editKeybindHint.positionScale_Y = 1f;
-        editKeybindHint.positionOffset_X = _assetsScrollBox.positionOffset_X - (Size + 30);
-        editKeybindHint.positionOffset_Y = -20;
-        editKeybindHint.fontAlignment = TextAnchor.MiddleCenter;
-        editKeybindHint.textColor = new SleekColor(ESleekTint.FOREGROUND);
-        editKeybindHint.sizeOffset_X = Size + 20;
-        editKeybindHint.sizeOffset_Y = 20;
+        _editHint = Glazier.Get().CreateLabel();
+        _editHint.shadowStyle = ETextContrastContext.ColorfulBackdrop;
+        _editHint.text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorToggleHint", MenuConfigurationControlsUI.getKeyCodeText(EditToggleKey));
+        _editHint.positionScale_X = 1f;
+        _editHint.positionScale_Y = 1f;
+        _editHint.positionOffset_X = _assetsScrollBox.positionOffset_X - (Size + 30);
+        _editHint.positionOffset_Y = -20;
+        _editHint.fontAlignment = TextAnchor.MiddleCenter;
+        _editHint.textColor = new SleekColor(ESleekTint.FOREGROUND);
+        _editHint.sizeOffset_X = Size + 20;
+        _editHint.sizeOffset_Y = 20;
 
-        _container.AddChild(editKeybindHint);
+        _container.AddChild(_editHint);
 
         _editorActive = false;
 
@@ -99,7 +103,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         _saveEditButton = Glazier.Get().CreateButton();
         _saveEditButton.positionScale_X = 1f;
         _saveEditButton.positionScale_Y = 1f;
-        _saveEditButton.positionOffset_X = _isEditingToggle.positionOffset_X - Size - 20;
+        _saveEditButton.positionOffset_X = _isEditingToggle.positionOffset_X - Size + 10;
         _saveEditButton.positionOffset_Y = -Size - 25;
         _saveEditButton.sizeOffset_X = Size / 2;
         _saveEditButton.sizeOffset_Y = 30;
@@ -111,7 +115,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         _saveNewEditButton = Glazier.Get().CreateButton();
         _saveNewEditButton.positionScale_X = 1f;
         _saveNewEditButton.positionScale_Y = 1f;
-        _saveNewEditButton.positionOffset_X = _isEditingToggle.positionOffset_X + (Size + 30) / 2 - Size - 30;
+        _saveNewEditButton.positionOffset_X = _isEditingToggle.positionOffset_X + (Size + 30) / 2 - Size;
         _saveNewEditButton.positionOffset_Y = -Size - 25;
         _saveNewEditButton.sizeOffset_X = Size / 2;
         _saveNewEditButton.sizeOffset_Y = 30;
@@ -120,9 +124,73 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         _saveNewEditButton.isVisible = false;
         _container.AddChild(_saveNewEditButton);
 
+        _offsetField = Glazier.Get().CreateStringField();
+        _offsetField.positionScale_X = 1f;
+        _offsetField.positionScale_Y = 1f;
+        _offsetField.positionOffset_X = _saveEditButton.positionOffset_X;
+        _offsetField.positionOffset_Y = _saveEditButton.positionOffset_Y + 40;
+        _offsetField.sizeOffset_X = 3 * Size / 4 - 5;
+        _offsetField.sizeOffset_Y = 30;
+        _offsetField.hint = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorOffsetAssetHint");
+        _offsetField.isVisible = false;
+        _container.AddChild(_offsetField);
+
+        _gotoOffsetButton = Glazier.Get().CreateButton();
+        _gotoOffsetButton.positionScale_X = 1f;
+        _gotoOffsetButton.positionScale_Y = 1f;
+        _gotoOffsetButton.positionOffset_X = _offsetField.positionOffset_X + _offsetField.sizeOffset_X + 10;
+        _gotoOffsetButton.positionOffset_Y = _offsetField.positionOffset_Y;
+        _gotoOffsetButton.sizeOffset_X = Size / 4;
+        _gotoOffsetButton.sizeOffset_Y = 30;
+        _gotoOffsetButton.text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorOffsetAssetButton");
+        _gotoOffsetButton.isVisible = false;
+        _gotoOffsetButton.onClickedButton += OnClickedGotoAsset;
+        _gotoOffsetButton.onRightClickedButton += OnRightClickedGotoAsset;
+        _container.AddChild(_gotoOffsetButton);
+
         UpdateSelectedObject();
         if (!_patched)
             Patch();
+    }
+#nullable restore
+
+    private void OnRightClickedGotoAsset(ISleekElement button)
+    {
+        _offsetField.text = LevelObjectUtil.SelectedAsset is not ObjectAsset asset ? string.Empty : asset.GUID.ToString("N");
+    }
+    private void OnClickedGotoAsset(ISleekElement button)
+    {
+        if (!Guid.TryParse(_offsetField.text, out Guid guid) || Assets.find(guid) is not ObjectAsset asset)
+        {
+            _offsetField.text = string.Empty;
+            return;
+        }
+        
+        if (LevelObjectUtil.SelectedAsset is not ObjectAsset selectedAsset)
+            return;
+        
+        List<EditorSelection> selections = LevelObjectUtil.EditorObjectSelection;
+        LevelObject? target = null;
+        foreach (EditorSelection selection in selections)
+        {
+            if (!LevelObjectUtil.TryFindObject(selection.transform, out LevelObject obj) || obj.GUID != selectedAsset.GUID)
+                continue;
+
+            if (target == null)
+                target = obj;
+            else
+            {
+                target = null;
+                break;
+            }
+        }
+
+        if (target == null)
+            return;
+
+        IconGenerator.ObjectIconMetrics metrics = IconGenerator.GetObjectIconMetrics(asset);
+        IconGenerator.GetCameraPositionAndRotation(in metrics, target.transform, out Vector3 position, out Quaternion rotation);
+        UserInput.SetEditorTransform(position, rotation);
     }
 
     private void OnToggled(ISleekToggle toggle, bool state)
@@ -132,6 +200,9 @@ internal class EditorLevelObjectsUIExtension : UIExtension
 
         _saveNewEditButton.isVisible = state;
         _saveEditButton.isVisible = state;
+        _offsetField.isVisible = state;
+        _gotoOffsetButton.isVisible = state;
+        _editHint.isVisible = !state;
     }
 
     public bool EditorActive
@@ -142,15 +213,13 @@ internal class EditorLevelObjectsUIExtension : UIExtension
             _editorActive = value;
             if (!value)
             {
+                OnToggled(_isEditingToggle, false);
                 _isEditingToggle.state = false;
-                _saveEditButton.isVisible = false;
-                _saveNewEditButton.isVisible = false;
             }
 
             _isEditingToggle.isVisible = value;
         }
     }
-#nullable restore
     private void OnSaveEdit(ISleekElement button)
     {
         Asset? asset = LevelObjectUtil.SelectedAsset;

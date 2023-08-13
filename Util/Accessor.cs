@@ -514,7 +514,7 @@ internal static class Accessor
             else if (typeof(TValue).IsValueType && !field.FieldType.IsValueType)
                 il.Emit(OpCodes.Box, typeof(TValue));
             
-            il.Emit(OpCodes.Stsfld);
+            il.Emit(OpCodes.Stsfld, field);
             il.Emit(OpCodes.Ret);
             return (StaticSetter<TValue>)method.CreateDelegate(typeof(StaticSetter<TValue>));
         }
@@ -1338,13 +1338,14 @@ internal static class Accessor
         {
             if (instr.opcode == OpCodes.Ret || instr.opcode == OpCodes.Throw)
             {
-                yield return new CodeInstruction(OpCodes.Ldstr, "Out method: " + method.Format() + (instr.opcode == OpCodes.Ret ? " (returned)" : " (exception)"));
+                CodeInstruction logInstr = new CodeInstruction(OpCodes.Ldstr, "Out method: " + method.Format() + (instr.opcode == OpCodes.Ret ? " (returned)" : " (exception)"));
+                PatchUtil.TransferStartingInstructionNeeds(instr, logInstr);
+                yield return logInstr;
                 yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
                 yield return new CodeInstruction(OpCodes.Call, LogDebug);
             }
             yield return instr;
         }
-
     }
     private static IEnumerable<CodeInstruction> AddFunctionStepthroughTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
@@ -1353,23 +1354,31 @@ internal static class Accessor
         yield return new CodeInstruction(OpCodes.Call, LogDebug);
         foreach (CodeInstruction instr in instructions)
         {
+            CodeInstruction? start = null;
             foreach (ExceptionBlock block in instr.blocks)
             {
-                yield return new CodeInstruction(OpCodes.Ldstr, "  " + block.Format());
+                CodeInstruction blockInst = new CodeInstruction(OpCodes.Ldstr, "  " + block.Format());
+                start ??= blockInst;
+                yield return blockInst;
                 yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
                 yield return new CodeInstruction(OpCodes.Call, LogDebug);
             }
             foreach (Label label in instr.labels)
             {
-                yield return new CodeInstruction(OpCodes.Ldstr, "  " + label.Format() + ":");
+                CodeInstruction lblInst = new CodeInstruction(OpCodes.Ldstr, "  " + label.Format() + ":");
+                start ??= lblInst;
+                yield return lblInst;
                 yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
                 yield return new CodeInstruction(OpCodes.Call, LogDebug);
             }
 
-            yield return new CodeInstruction(OpCodes.Ldstr, "  " + instr.Format());
+            CodeInstruction mainInst = new CodeInstruction(OpCodes.Ldstr, "  " + instr.Format());
+            start ??= mainInst;
+            yield return mainInst;
             yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
             yield return new CodeInstruction(OpCodes.Call, LogDebug);
 
+            PatchUtil.TransferStartingInstructionNeeds(instr, start);
             yield return instr;
         }
     }

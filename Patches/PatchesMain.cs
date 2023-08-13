@@ -6,6 +6,7 @@ using DevkitServer.Configuration;
 using DevkitServer.Players;
 using SDG.Framework.Landscapes;
 using System.Reflection.Emit;
+using Version = System.Version;
 #if CLIENT
 using DevkitServer.Multiplayer.Levels;
 #endif
@@ -157,11 +158,15 @@ internal static class PatchesMain
                          editorUIInstance != null && x.LoadsField(editorUIInstance),
                     x => x.opcode != OpCodes.Ldnull) && ins[i - 1].operand is Label label)
             {
-                ins.Insert(i, new CodeInstruction(OpCodes.Call, getController));
-                CameraController current = ins[i + 1].LoadsField(playerUIInstance) ? CameraController.Player : CameraController.Editor;
-                ins.Insert(i + 1, PatchUtil.LoadConstantI4((int)current));
-                ins.Insert(i + 2, new CodeInstruction(OpCodes.Bne_Un, label));
-                i += 3;
+                Label lbl = generator.DefineLabel();
+                ins.Insert(i, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Brfalse, lbl));
+                ins.Insert(i + 2, new CodeInstruction(OpCodes.Call, getController));
+                CameraController current = ins[i + 3].LoadsField(playerUIInstance) ? CameraController.Player : CameraController.Editor;
+                ins.Insert(i + 3, PatchUtil.LoadConstantI4((int)current));
+                ins.Insert(i + 4, new CodeInstruction(OpCodes.Bne_Un, label));
+                i += 5;
+                ins[i].labels.Add(lbl);
                 patchedOutPlayerUI |= current == CameraController.Player;
                 patchedOutEditorUI |= current == CameraController.Editor;
             }
@@ -193,81 +198,42 @@ internal static class PatchesMain
         __result = Level.isEditor && Level.isLoadingContent;
         return false;
     }
-
-    /*
-    [HarmonyPatch("SDG.Unturned.Player, Assembly-CSharp", nameof(Player.isLoading), MethodType.Getter)]
-    [HarmonyPrefix]
-    [UsedImplicitly]
-    private static bool PrefixGetIsPlayerLoading(ref bool __result)
-    {
-        if (!DevkitServerModule.IsEditing)
-            return true;
-
-        __result = false;
-        return false;
-
-    }
-    [HarmonyPatch(typeof(Player), "InitializePlayer")]
-    [HarmonyTranspiler]
-    [UsedImplicitly]
-    private static IEnumerable<CodeInstruction> TranspileInitializePlayer(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
-    {
-        MethodInfo? initializeUIMethod = typeof(PlayerUI).GetMethod("InitializePlayer", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null, CallingConventions.Any, Array.Empty<Type>(), null);
-        if (initializeUIMethod == null)
-        {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: PlayerUI.InitializePlayer.", method: Source);
-            DevkitServerModule.Fault();
-        }
-
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
-        bool patchedOutUICall = false;
-        for (int i = 0; i < ins.Count; ++i)
-        {
-            if (PatchUtil.MatchPattern(ins, i,
-                    x => x.opcode.IsLdLoc(),
-                    x => initializeUIMethod != null && x.Calls(initializeUIMethod)))
-            {
-                Label label = PatchUtil.LabelNextOrReturn(ins, generator, i + 2, null);
-                ins.Insert(i, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
-                ins.Insert(i + 1, new CodeInstruction(OpCodes.Brtrue, label));
-                i += 4;
-                patchedOutUICall = true;
-                Logger.LogDebug($"[{Source}] {method.Format()} - Removed patch to {initializeUIMethod.Format()}.");
-            }
-        }
-
-        if (!patchedOutUICall)
-        {
-            Logger.LogWarning($"{method.Format()} - Unable to remove call to {FormattingUtil.FormatMethod(typeof(void), typeof(PlayerUI), "InitializePlayer", arguments: Array.Empty<Type>())}.", method: Source);
-            DevkitServerModule.Fault();
-        }
-
-        return ins;
-    }*/
-
-    //private static readonly Action LoadGameMode = Accessor.GenerateStaticCaller<Provider, Action>("loadGameMode", throwOnError: true)!;
-
+    
+    private static bool _shouldContinueToLaunch;
     [HarmonyPatch(typeof(Provider), nameof(Provider.launch))]
     [HarmonyPrefix]
     [UsedImplicitly]
     private static bool LaunchPatch()
     {
+        if (_shouldContinueToLaunch)
+            return true;
         Provider.provider.matchmakingService.refreshRules(Provider.currentServerInfo.ip, Provider.currentServerInfo.queryPort);
         Provider.provider.matchmakingService.onRulesQueryRefreshed += RulesReady;
         return false;
+    }
+    private static void ProceedWithLaunch()
+    {
+        _shouldContinueToLaunch = true;
+        try
+        {
+            Provider.launch();
+        }
+        finally
+        {
+            _shouldContinueToLaunch = false;
+        }
     }
     internal static void Launch(LevelInfo? overrideLevelInfo)
     {
         if (!DevkitServerModule.IsEditing)
         {
-            Provider.launch();
+            ProceedWithLaunch();
             return;
         }
 
         LevelInfo level = overrideLevelInfo ?? Level.getLevel(Provider.map);
         if (level == null)
         {
-            Provider._connectionFailureInfo = ESteamConnectionFailureInfo.MAP;
             DevkitServerUtility.CustomDisconnect("Could not find level \"" + Provider.map + "\"", ESteamConnectionFailureInfo.MAP);
         }
         else
@@ -276,22 +242,28 @@ internal static class PatchesMain
             Level.edit(level);
             Provider.gameMode = new DevkitServerGamemode();
         }
-
     }
     private static void RulesReady(Dictionary<string, string> rulesmap)
     {
         Provider.provider.matchmakingService.onRulesQueryRefreshed -= RulesReady;
-        if (rulesmap.TryGetValue(DevkitServerModule.ServerRule, out string val) && val.Equals("True", StringComparison.InvariantCultureIgnoreCase))
+        if (rulesmap.TryGetValue(DevkitServerModule.ServerRule, out string val))
         {
+            if (!Version.TryParse(val, out Version version) || !DevkitServerModule.IsCompatibleWith(version))
+            {
+                DevkitServerUtility.CustomDisconnect(DevkitServerModule.MainLocalization.Translate("VersionKickMessage",
+                    version?.ToString(4) ?? "[Unspecified]", Accessor.DevkitServer.GetName().Version.ToString(4)), ESteamConnectionFailureInfo.CUSTOM);
+                return;
+            }
             DevkitServerModule.IsEditing = true;
-            Logger.LogDebug("Found tag '" + DevkitServerModule.ServerRule + "'.");
+            Logger.LogInfo($"Connecting to a server running {DevkitServerModule.ModuleName.Colorize(DevkitServerModule.ModuleColor)} " +
+                           $"v{version.Format()} (You are running {Accessor.DevkitServer.GetName().Version.Format()})...");
             EditorLevel.RequestLevel();
         }
         else
         {
-            Logger.LogDebug("Did not find tag '" + DevkitServerModule.ServerRule + "'.");
+            Logger.LogDebug($"Did not find tag {DevkitServerModule.ServerRule.Format()}.");
             DevkitServerModule.IsEditing = false;
-            Provider.launch();
+            ProceedWithLaunch();
         }
     }
 
@@ -541,8 +513,9 @@ internal static class PatchesMain
     [HarmonyPrefix]
     private static void AdvertiseConfig()
     {
-        Logger.LogDebug("Setting SteamGameServer KeyValue '" + DevkitServerModule.ServerRule + "' to 'True'.");
-        SteamGameServer.SetKeyValue(DevkitServerModule.ServerRule, "True");
+        Version version = Accessor.DevkitServer.GetName().Version;
+        Logger.LogDebug($"Setting SteamGameServer KeyValue {DevkitServerModule.ServerRule.Format()} to {version.Format()}.");
+        SteamGameServer.SetKeyValue(DevkitServerModule.ServerRule, version.ToString(4));
     }
 
     [UsedImplicitly]

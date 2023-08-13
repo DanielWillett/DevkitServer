@@ -5,9 +5,9 @@ The front is assumed to be the -Z face of the object when at a euler rotation of
 
 Most vanilla objects have icon camera transform overrides (when necessary).
 
-## Implementing custom overrides for your mod
+# Implementing custom overrides for your mod
 
-### JSON Icon Provider Method (recommended)
+## JSON Icon Provider Method (recommended)
 You can create offsets using the in-editor object extension menu. You must have this enabled in the config, which will be enabled by default.
 
 Spawn in the object you want to edit (E).
@@ -26,7 +26,7 @@ Position your camera so the preview looks how you want the icon, then either hit
 **Save** looks for a non-readonly file with an icon preset for that asset and saves there, otherwise it saves to the same place as **Save New**.
 
 
-**Read Locations**
+### Read Locations
 
 Except for the *Custom icons file*, the file name must start with one of the following (case insensitive) and be a `.json` file:
 
@@ -57,7 +57,8 @@ The priority will be set as high as it needs to be to be picked over any other p
 
 Once you're done, cut the custom icon file to somewhere in your mod folder (it must be under `~\Bundles` for maps).
 
-**File Format** for manual entry.
+### File Format 
+*For manual entry*
 ```jsonc
 [
   {
@@ -82,14 +83,19 @@ Once you're done, cut the custom icon file to somewhere in your mod folder (it m
 ]
 ```
 
+### Copy Offsets
+You can copy offsets of other objects by selecting the object asset, then right clicking the **Goto** button to fill it's GUID into the text box next to it. You could also just type the GUID in manually.
 
-### "Icon" Method
+Next select the asset you want to align and a spawned level object object of the same type (not more than one) and left click **Goto**, it will teleport your camera to the same offset as the other object had relative to your selected object, and you can save it from there.
+
+
+## "Icon" Method
 I recommend using the JSON method described above for compatibility and performance reasons.
 
 Adding an empty GameObject as a child to the base prefab will provide a position and rotation for a camera.
 
-Name it "Icon" ("Icon2" is also supported).
+Name it `Icon` (`Icon2` is also supported).
 
-To preview it in Unity, add a Camera Component in perspective mode with a 60 FOV. Then just position the camera where you want.
+To preview it in Unity, add a Camera Component in perspective mode with 60 FOV. Then just position the camera where you want.
 
-Make sure you remove the Camera and I'd recommend disabling the `Icon` GameObject for performance reasons.
+Make sure you remove the Camera and I'd recommend disabling your `Icon` GameObject for performance reasons.

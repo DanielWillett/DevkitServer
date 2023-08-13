@@ -22,6 +22,7 @@ using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Levels;
 using UnityEngine.SceneManagement;
 using Module = SDG.Framework.Modules.Module;
+using Version = System.Version;
 #if CLIENT
 #if DEBUG
 using DevkitServer.Util.Debugging;
@@ -44,8 +45,8 @@ public sealed class DevkitServerModule : IModuleNexus
     public const string ModuleName = "DevkitServer";
     public static readonly string ServerRule = "DevkitServer";
     private static CancellationTokenSource? _tknSrc;
-    internal static readonly Color ModuleColor = new Color32(0, 255, 153, 255);
-    internal static readonly Color UnturnedColor = new Color32(99, 123, 99, 255);
+    internal static readonly Color32 ModuleColor = new Color32(0, 255, 153, 255);
+    internal static readonly Color32 UnturnedColor = new Color32(99, 123, 99, 255);
     private static string? _asmPath;
     private static IReadOnlyList<string>? _searchLocations;
     public Assembly Assembly { get; } = Assembly.GetExecutingAssembly();
@@ -90,6 +91,9 @@ public sealed class DevkitServerModule : IModuleNexus
         { "ObjectIconEditorSave", "Save" },
         { "ObjectIconEditorSaveNew", "Save New" },
         { "ObjectIconEditorToggleHint", "[{0}] to edit" },
+        { "ObjectIconEditorOffsetAssetHint", "Goto offset" },
+        { "ObjectIconEditorOffsetAssetButton", "Go" },
+        { "VersionKickMessage", "This server is running version {0} of DevkitServer, whereas you are running incompatible version {1}."}
     };
     public static Local CommandLocalization { get; private set; } = null!;
 
@@ -768,6 +772,11 @@ public sealed class DevkitServerModule : IModuleNexus
         Local lcl = Localization.tryRead(path, false);
         DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultMessageLocalization, path);
         MessageLocalization = lcl;
+    }
+    public static bool IsCompatibleWith(Version otherVersion)
+    {
+        Version thisVersion = Accessor.DevkitServer.GetName().Version;
+        return thisVersion.Major == otherVersion.Major && thisVersion.Minor == otherVersion.Minor;
     }
 }
 

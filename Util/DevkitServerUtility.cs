@@ -650,6 +650,22 @@ public static class DevkitServerUtility
     );
 
     /// <summary>
+    /// Disconnect a user with a custom failure type (and no message). Works on client or server.
+    /// </summary>
+    /// <remarks>Clientside will gracefully disconnect, server will reject or kick.</remarks>
+    public static void CustomDisconnect(
+#if SERVER
+        EditorUser user,
+#endif
+        ESteamConnectionFailureInfo failureType) =>
+        CustomDisconnect(
+#if SERVER
+            user,
+#endif
+        string.Empty, failureType
+    );
+
+    /// <summary>
     /// Disconnect a user with a custom message and failure type. Works on client or server.
     /// </summary>
     /// <remarks>Clientside will gracefully disconnect, server will reject or kick.</remarks>
@@ -662,6 +678,7 @@ public static class DevkitServerUtility
 #if CLIENT
         Provider.connectionFailureInfo = failureType;
         Provider.RequestDisconnect(Provider.connectionFailureReason = message);
+        DevkitServerModule.IsEditing = false;
 #else
         if (Provider.pending.Any(x => x.playerID.steamID.m_SteamID == user.SteamId.m_SteamID))
             Provider.reject(user.SteamId, ESteamRejection.PLUGIN, message);

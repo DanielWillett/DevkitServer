@@ -153,7 +153,7 @@ internal static class SelectionToolPatches
         _skippedMoveHandle = false;
         if (DevkitSelectionManager.selection.Count <= 0)
         {
-            UIMessage.SendEditorMessage(TranslationSource.MessageLocalizationSource, "UnknownError");
+            UIMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "UnknownError");
             _skippedMoveHandle = true;
             return false;
         }
@@ -161,7 +161,7 @@ internal static class SelectionToolPatches
         DevkitSelection? sel = DevkitSelectionManager.selection.FirstOrDefault();
         if (sel == null || sel.gameObject == null)
         {
-            UIMessage.SendEditorMessage(TranslationSource.MessageLocalizationSource, "UnknownError");
+            UIMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "UnknownError");
             _skippedMoveHandle = true;
             return false;
         }

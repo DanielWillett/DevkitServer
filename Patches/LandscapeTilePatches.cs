@@ -13,6 +13,7 @@ internal class LandscapeTilePatches
     [UsedImplicitly]
     private static void OnPrototypesUpdated(LandscapeTile __instance)
     {
+        if (!DevkitServerModule.IsEditing) return;
         // was ran in the read method or during an apply call, no need to update.
         if (!LandscapeUtil.SaveTransactions || Landscape.getTile(__instance.coord) == null) return;
 

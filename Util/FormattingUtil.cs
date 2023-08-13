@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
+using Version = System.Version;
 
 namespace DevkitServer.Util;
 public static class FormattingUtil
@@ -646,6 +647,13 @@ public static class FormattingUtil
             }
 
             return GetColor(ToArgb(new Color32(204, 255, 102, 255))) + (connection.GetAddressString(true) ?? "<unknown address>") + ANSIForegroundReset;
+        }
+
+        if (obj is Version version)
+        {
+            if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
+                return version.ToString(4).Colorize(FormattingColorType.Struct);
+            return version.ToString(4);
         }
 
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)

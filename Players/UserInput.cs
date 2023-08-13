@@ -26,10 +26,10 @@ public class UserInput : MonoBehaviour
 #if SERVER
     private static readonly CachedMulticastEvent<UserControllerUpdateRequested> EventOnUserControllerUpdateRequested = new CachedMulticastEvent<UserControllerUpdateRequested>(typeof(UserInput), nameof(OnUserControllerUpdateRequested));
 #endif
-    public const ushort SaveDataVersion = 4;
+    public const ushort SaveDataVersion = 5;
     public const ushort SendDataVersion = 0;
     [UsedImplicitly]
-    private static readonly NetCall<ulong, Vector3> SendInitialPosition = new NetCall<ulong, Vector3>(NetCalls.SendInitialPosition);
+    private static readonly NetCall<ulong, Vector3, Vector3> SendTransform = new NetCall<ulong, Vector3, Vector3>(NetCalls.SendTransform);
     [UsedImplicitly]
     private static readonly NetCall<ulong, CameraController> SendUpdateController = new NetCall<ulong, CameraController>(NetCalls.SendUpdateController);
     [UsedImplicitly]
@@ -37,6 +37,8 @@ public class UserInput : MonoBehaviour
     [UsedImplicitly]
     private static readonly NetCall RequestInitialState = new NetCall(NetCalls.RequestInitialState);
 #if CLIENT
+    private static readonly StaticSetter<float>? SetPitch = Accessor.GenerateStaticSetter<EditorLook, float>("_pitch");
+    private static readonly StaticSetter<float>? SetYaw = Accessor.GenerateStaticSetter<EditorLook, float>("_yaw");
     // internal static CameraController CleaningUpController;
     internal static MethodInfo GetLocalControllerMethod = typeof(UserInput).GetProperty(nameof(LocalController), BindingFlags.Static | BindingFlags.Public)?.GetMethod!;
     public static CameraController LocalController
@@ -79,6 +81,7 @@ public class UserInput : MonoBehaviour
     private float _lastQueue;
     private bool _bufferHasStop;
     private bool _nextPacketSendRotation;
+    private bool _nextPacketSendStop;
     private int _rotSkip;
 #endif
     private UserInputPacket _pendingPacket;
@@ -233,7 +236,6 @@ public class UserInput : MonoBehaviour
         }
         else Controller = CameraController.Editor;
 #endif
-
         _nextPacketApplyTime = CachedTime.RealtimeSinceStartup;
         EventOnUserEditorPositionUpdated.TryInvoke(User);
         
@@ -246,7 +248,7 @@ public class UserInput : MonoBehaviour
         {
             UserInput inp = UserManager.Users[i].Input;
             if (inp != null && inp != this)
-                SendInitialPosition.Invoke(User.Connection, inp.User.SteamId.m_SteamID, inp._lastPos);
+                SendTransform.Invoke(User.Connection, inp.User.SteamId.m_SteamID, inp._lastPos, new Vector3(inp._lastPitch, inp._lastYaw, 0f));
         }
 #endif
 
@@ -255,21 +257,31 @@ public class UserInput : MonoBehaviour
 
 #if CLIENT
     [UsedImplicitly]
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendInitialPosition)]
-    private static void ReceiveInitialPosition(MessageContext ctx, ulong player, Vector3 pos)
+    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendTransform)]
+    private static void ReceiveTransform(MessageContext ctx, ulong player, Vector3 pos, Vector3 eulerRotation)
     {
         EditorUser? user = UserManager.FromId(player);
-        if (user != null && user.Input != null)
+        if (user == null || user.Input == null)
+            return;
+
+        UserInput input = user.Input;
+        input._networkedInitialPosition = true;
+        if (input.IsOwner)
         {
-            UserInput input = user.Input;
-            input.transform.position = pos;
-            input._networkedInitialPosition = true;
-            if (input.IsOwner)
-                input._nextPacketSendRotation = true;
-            Logger.LogInfo("Received initial transform " + user + ": " + pos + ".");
-            ctx.Acknowledge(StandardErrorCode.Success);
-            EventOnUserEditorPositionUpdated.TryInvoke(user);
+            input.transform.SetPositionAndRotation(pos, Quaternion.Euler(0f, eulerRotation.y, 0f));
+            MainCamera.instance.transform.localRotation = Quaternion.Euler(eulerRotation.x, 0f, 0f);
+            input._nextPacketSendStop = true;
+            input._hasStopped = false;
+            SetPitch?.Invoke(Mathf.Clamp(eulerRotation.x > 90f ? eulerRotation.x - 360f : eulerRotation.x, -90f, 90f));
+            SetYaw?.Invoke(eulerRotation.y);
         }
+        else
+        {
+            input.transform.SetPositionAndRotation(pos, Quaternion.Euler(eulerRotation));
+        }
+        Logger.LogDebug($"Received initial transform {user.Format()}: {pos.Format()}, {eulerRotation.Format()}.");
+        ctx.Acknowledge(StandardErrorCode.Success);
+        EventOnUserEditorPositionUpdated.TryInvoke(user);
     }
 #endif
 #if SERVER
@@ -289,7 +301,7 @@ public class UserInput : MonoBehaviour
         {
             // on controller set to editor
 #if SERVER
-            SetEditorPosition(User.Player!.player.look.aim.transform.position);
+            SetEditorPosition(User.Player!.player.look.aim.transform.position, User.Player!.player.look.aim.rotation.eulerAngles);
             if (User.Player.player.life.isDead)
                 User.Player.player.life.ReceiveRespawnRequest(false);
             else
@@ -533,7 +545,7 @@ public class UserInput : MonoBehaviour
             float pitch = EditorLook.pitch;
             bool posDiff = pos != _lastPos;
             bool rotDiff = pitch != _lastPitch || yaw != _lastYaw;
-            if (posDiff || rotDiff || (_nextPacketSendRotation && _hasStopped))
+            if (!_nextPacketSendStop && (posDiff || rotDiff || (_nextPacketSendRotation && _hasStopped)))
             {
                 EventOnUserEditorPositionUpdated.TryInvoke(User);
                 _hasStopped = false;
@@ -641,8 +653,6 @@ public class UserInput : MonoBehaviour
     private void ApplyPacket(in UserInputPacket packet)
     {
         float t = CachedTime.RealtimeSinceStartup;
-
-
 
         if ((packet.Flags & Flags.StopMsg) == 0)
         {
@@ -769,21 +779,21 @@ public class UserInput : MonoBehaviour
             if (v < 2)
             {
                 block.readSingleQuaternion();
+                _lastPitch = 0;
+                _lastYaw = 0;
             }
-            else if (v < 3)
+            else if (v is < 3 or > 4)
             {
-                block.readSingle();
-                block.readSingle();
+                _lastPitch = block.readSingle();
+                _lastYaw = block.readSingle();
             }
             if (pos.IsFinite() && Mathf.Abs(pos.x) <= ushort.MaxValue && Mathf.Abs(pos.y) <= ushort.MaxValue)
             {
-                _lastPitch = 0;
-                _lastYaw = 0;
                 if (v is > 0 and < 4)
                     block.readByte();
 
-                Logger.LogDebug(" Loaded position: " + pos.Format());
-                SetEditorPosition(pos);
+                Logger.LogDebug($" Loaded position: {pos.Format()}, rotation: {_lastYaw.Format()}, {_lastPitch.Format()}.");
+                SetEditorPosition(pos, new Vector3(_lastYaw, _lastPitch, 0f));
                 return;
             }
         }
@@ -791,27 +801,15 @@ public class UserInput : MonoBehaviour
         PlayerSpawnpoint spawn = LevelPlayers.getSpawn(false);
         pos = spawn.point + new Vector3(0.0f, 2f, 0.0f);
         Logger.LogDebug(" Loaded random position: " + pos.Format() + ", " + spawn.angle.Format() + "°.");
-        SetEditorPosition(pos);
+        SetEditorPosition(pos, new Vector3(0f, spawn.angle, 0f));
 
     }
-    public void SetEditorPosition(Vector3 pos)
+    public void SetEditorPosition(Vector3 pos, Vector3 eulerRotation)
     {
         this.transform.position = pos;
-#if CLIENT
-        _lastPacket = new UserInputPacket
-        {
-            Position = pos,
-            Pitch = 0,
-            Yaw = 0,
-            Flags = Flags.StopMsg,
-            DeltaTime = CachedTime.DeltaTime,
-            Input = Vector3.zero,
-            Speed = 0f
-        };
-#endif
         _lastPos = pos;
 #if SERVER
-        SendInitialPosition.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, pos);
+        SendTransform.Invoke(Provider.GatherRemoteClientConnections(), User.SteamId.m_SteamID, pos, eulerRotation);
 #endif
     }
     public void Save()
@@ -823,6 +821,32 @@ public class UserInput : MonoBehaviour
         block.writeSingleVector3(_lastPos);
         Logger.LogDebug(" Saved position: " + _lastPos.Format() + ", (" + _lastPitch.Format() + ", " + _lastYaw.Format() + ").");
         PlayerSavedata.writeBlock(User.Player.playerID, "/DevkitServer/Input.dat", block);
+    }
+#endif
+
+#if CLIENT
+    /// <summary>
+    /// Teleports the local editor's camera to the specified position and rotation
+    /// </summary>
+    public static void SetEditorTransform(Vector3 position, Quaternion rotation)
+    {
+        UserInput? input = EditorUser.User?.Input;
+        Vector3 euler = rotation.eulerAngles;
+        if (input == null) // singleplayer
+        {
+            Editor.editor.gameObject.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, euler.y, 0f));
+            MainCamera.instance.transform.localRotation = Quaternion.Euler(euler.x, 0f, 0f);
+        }
+        else
+        {
+            input.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, euler.y, 0f));
+            MainCamera.instance.transform.localRotation = Quaternion.Euler(euler.x, 0f, 0f);
+            input._nextPacketSendStop = true;
+            input._hasStopped = false;
+        }
+        SetPitch?.Invoke(Mathf.Clamp(euler.x, -90f, 90f));
+        SetYaw?.Invoke(euler.y);
+        Logger.LogDebug($"Set editor transform: {position.Format()}, {euler.Format()}.");
     }
 #endif
     private struct UserInputPacket

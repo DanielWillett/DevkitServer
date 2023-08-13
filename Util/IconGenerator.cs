@@ -89,6 +89,21 @@ public sealed class IconGenerator : MonoBehaviour
 
         onIconReady(asset, icon, true);
     }
+    public static void GetCameraPositionAndRotation(in ObjectIconMetrics metrics, Transform target, out Vector3 position, out Quaternion rotation)
+    {
+        position = metrics.CameraPosition;
+        if (metrics.IsCustom)
+        {
+            Matrix4x4 matrix = Matrix4x4.TRS(target.transform.position - metrics.ObjectPositionOffset, target.transform.rotation, target.localScale);
+            position = matrix.MultiplyPoint3x4(position);
+            rotation = target.transform.rotation * metrics.CameraRotation;
+        }
+        else
+        {
+            position = target.transform.position - metrics.ObjectPositionOffset + position;
+            rotation = metrics.CameraRotation;
+        }
+    }
     private Texture2D CaptureIcon(string name, GameObject target, in ObjectIconMetrics metrics, int width, int height)
     {
         RenderSettingsCopy settings = new RenderSettingsCopy();

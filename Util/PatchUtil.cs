@@ -664,6 +664,22 @@ public static class PatchUtil
     }
     [Pure]
     public static CodeInstruction CopyWithoutSpecial(this CodeInstruction instruction) => new CodeInstruction(instruction.opcode, instruction.operand);
+    public static void TransferStartingInstructionNeeds(CodeInstruction originalStart, CodeInstruction newStart)
+    {
+        newStart.labels.AddRange(originalStart.labels);
+        originalStart.labels.Clear();
+        newStart.blocks.AddRange(originalStart.blocks.Where(x => x.blockType.IsBeginBlockType()));
+        originalStart.blocks.RemoveAll(x => x.blockType.IsBeginBlockType());
+    }
+
+    [Pure]
+    public static bool IsBeginBlockType(this ExceptionBlockType type) => type is ExceptionBlockType.BeginCatchBlock
+        or ExceptionBlockType.BeginExceptFilterBlock or ExceptionBlockType.BeginExceptionBlock
+        or ExceptionBlockType.BeginFaultBlock or ExceptionBlockType.BeginFinallyBlock;
+
+    [Pure]
+    public static bool IsEndBlockType(this ExceptionBlockType type) => type == ExceptionBlockType.EndExceptionBlock;
+
     [Pure]
     public static bool IsOfType(this OpCode opcode, OpCode comparand, bool fuzzy = false)
     {
