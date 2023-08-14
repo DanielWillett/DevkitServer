@@ -26,14 +26,14 @@ public abstract class DevkitServerCommand : ICachedTranslationSourceCommand
     
     public abstract UniTask Execute(CommandContext ctx, CancellationToken token);
 #if SERVER
-    public bool CheckPermission(EditorUser? user) => user.CheckPermission(Permissions, AnyPermissions);
+    public virtual bool CheckPermission(EditorUser? user) => user.CheckPermission(Permissions, AnyPermissions);
 #else
-    public bool CheckPermission() => true;
+    public virtual bool CheckPermission() => true;
 #endif
 
     protected void AddAlias(string alias) => Aliases.Add(alias);
     protected void AddPermission(Permission permission) => Permissions.Add(permission);
-    ITranslationSource ICachedTranslationSourceCommand.TranslationSource { get; set; }
+    ITranslationSource ICachedTranslationSourceCommand.TranslationSource { get; set; } = null!;
 }
 
 /// <summary>

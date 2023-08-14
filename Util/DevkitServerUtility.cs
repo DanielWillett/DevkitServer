@@ -15,6 +15,7 @@ using System.Net;
 namespace DevkitServer.Util;
 public static class DevkitServerUtility
 {
+    public static T IdentitySelector<T>(T value) => value;
     public static string QuickFormat(string input, string? val)
     {
         int ind = input.IndexOf("{0}", StringComparison.Ordinal);

@@ -1,4 +1,5 @@
-﻿namespace DevkitServer.Players;
+﻿#if CLIENT
+namespace DevkitServer.Players;
 
 [EarlyTypeInit]
 public class EditorInteractEx
@@ -8,7 +9,11 @@ public class EditorInteractEx
     private static readonly StaticGetter<RaycastHit>? GetWorldHit = Accessor.GenerateStaticPropertyGetter<RaycastHit>(EditorInteractType, "worldHit");
     private static readonly StaticGetter<RaycastHit>? GetObjectHit = Accessor.GenerateStaticPropertyGetter<RaycastHit>(EditorInteractType, "objectHit");
     private static readonly StaticGetter<RaycastHit>? GetLogicHit = Accessor.GenerateStaticPropertyGetter<RaycastHit>(EditorInteractType, "logicHit");
+    private static readonly StaticGetter<Ray>? GetScreenRay = Accessor.GenerateStaticPropertyGetter<Ray>(EditorInteractType, "ray");
+    private static readonly StaticGetter<bool>? GetIsFlying = Accessor.GenerateStaticPropertyGetter<bool>(EditorInteractType, "isFlying");
 
+    public static bool IsFlying => GetIsFlying != null && GetIsFlying();
+    public static Ray Ray => GetScreenRay == null ? UserInput.GetLocalLookRay() : GetScreenRay();
     public static bool TryGetWorldHit(out RaycastHit hit)
     {
         if (GetWorldHit == null)
@@ -43,3 +48,4 @@ public class EditorInteractEx
         return hit.transform != null;
     }
 }
+#endif

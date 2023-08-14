@@ -62,7 +62,8 @@ internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFil
             {
                 if (CommandTests.Commands[i].Method.Name.Equals(method, StringComparison.InvariantCultureIgnoreCase))
                 {
-                    ctx.AssertPermissionsOr(TestAll, SyncSubcommandPermissions[i]);
+                    if (DevkitServerModule.IsEditing)
+                        ctx.AssertPermissionsOr(TestAll, SyncSubcommandPermissions[i]);
 
                     ++ctx.ArgumentOffset;
                     try
@@ -89,7 +90,8 @@ internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFil
             {
                 if (CommandTests.AsyncCommands[i].Method.Name.Equals(method, StringComparison.InvariantCultureIgnoreCase))
                 {
-                    ctx.AssertPermissionsOr(TestAll, AsyncSubcommandPermissions[i]);
+                    if (DevkitServerModule.IsEditing)
+                        ctx.AssertPermissionsOr(TestAll, AsyncSubcommandPermissions[i]);
 
                     ++ctx.ArgumentOffset;
                     try
@@ -186,6 +188,8 @@ internal static class CommandTests
 #endif
     private static void syncall(CommandContext ctx)
     {
+        ctx.AssertDevkitServerClient();
+
         TileSync? tileSyncAuth = TileSync.GetAuthority();
 #if CLIENT
         if (tileSyncAuth == null || !tileSyncAuth.IsOwner)

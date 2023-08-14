@@ -170,8 +170,17 @@ public class UserInput : MonoBehaviour
     private static readonly ByteReader Reader = new ByteReader { ThrowOnError = true };
     private readonly Queue<UserInputPacket> _packets = new Queue<UserInputPacket>();
 #if CLIENT
-    private static readonly Func<IDevkitTool>? GetDevkitTool;
-    public static IDevkitTool? ActiveTool => GetDevkitTool?.Invoke();
+    private static readonly Func<IDevkitTool?>? GetDevkitTool;
+    private static readonly Action<IDevkitTool?>? SetDevkitTool;
+
+    /// <summary>
+    /// Get or set the active devkit tool (from EditorInteract.activeTool).
+    /// </summary>
+    public static IDevkitTool? ActiveTool
+    {
+        get => GetDevkitTool?.Invoke();
+        set => SetDevkitTool?.Invoke(value);
+    }
 
     static UserInput()
     {
@@ -191,17 +200,43 @@ public class UserInput : MonoBehaviour
         if (toolField == null || toolField.IsStatic || !typeof(IDevkitTool).IsAssignableFrom(toolField.FieldType))
         {
             Logger.LogWarning("Unable to find field: EditorInteract.activeTool.");
-            return;
         }
-        const MethodAttributes attr = MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig;
-        DynamicMethod method = new DynamicMethod("get_instance", attr,
-            CallingConventions.Standard, typeof(IDevkitTool),
-            Array.Empty<Type>(), type, true);
-        ILGenerator il = method.GetILGenerator();
-        il.Emit(OpCodes.Ldsfld, instanceField);
-        il.Emit(OpCodes.Ldfld, toolField);
-        il.Emit(OpCodes.Ret);
-        GetDevkitTool = (Func<IDevkitTool>)method.CreateDelegate(typeof(Func<IDevkitTool>));
+        MethodInfo? setToolMethod = type.GetMethod("SetActiveTool", BindingFlags.Instance | BindingFlags.Static |
+                                                                    BindingFlags.NonPublic | BindingFlags.Public, null,
+                                                                    CallingConventions.Any, new Type[] { typeof(IDevkitTool) }, null);
+        if (setToolMethod == null)
+        {
+            Logger.LogWarning("Unable to find method: EditorInteract.SetActiveTool.");
+        }
+
+        Accessor.GetDynamicMethodFlags(true, out MethodAttributes attributes, out CallingConventions conventions);
+        if (toolField != null)
+        {
+            DynamicMethod method = new DynamicMethod("get_activeTool", attributes,
+                conventions, typeof(IDevkitTool),
+                Array.Empty<Type>(), type, true);
+            ILGenerator il = method.GetILGenerator();
+            il.Emit(OpCodes.Ldsfld, instanceField);
+            il.Emit(OpCodes.Ldfld, toolField);
+            il.Emit(OpCodes.Ret);
+            GetDevkitTool = (Func<IDevkitTool?>)method.CreateDelegate(typeof(Func<IDevkitTool?>));
+        }
+
+        if (setToolMethod != null)
+        {
+            DynamicMethod method = new DynamicMethod("set_activeTool", attributes,
+                conventions, typeof(void),
+                new Type[] { typeof(IDevkitTool) }, type, true);
+            ILGenerator il = method.GetILGenerator();
+            if (!setToolMethod.IsStatic)
+                il.Emit(OpCodes.Ldsfld, instanceField);
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(setToolMethod.GetCall(), setToolMethod);
+            if (setToolMethod.ReturnType != typeof(void))
+                il.Emit(OpCodes.Pop);
+            il.Emit(OpCodes.Ret);
+            SetDevkitTool = (Action<IDevkitTool?>)method.CreateDelegate(typeof(Action<IDevkitTool?>));
+        }
     }
 #endif
     [UsedImplicitly]
@@ -847,6 +882,13 @@ public class UserInput : MonoBehaviour
         SetPitch?.Invoke(Mathf.Clamp(euler.x, -90f, 90f));
         SetYaw?.Invoke(euler.y);
         Logger.LogDebug($"Set editor transform: {position.Format()}, {euler.Format()}.");
+    }
+    public static Ray GetLocalLookRay()
+    {
+        if (EditorUser.User != null && EditorUser.User.Input.Aim != null)
+            return new Ray(EditorUser.User.Input.Aim.position, EditorUser.User.Input.Aim.forward);
+
+        return new Ray(MainCamera.instance.transform.position, MainCamera.instance.transform.forward);
     }
 #endif
     private struct UserInputPacket

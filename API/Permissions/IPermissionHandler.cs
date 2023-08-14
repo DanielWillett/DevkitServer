@@ -268,7 +268,7 @@ public static class PermissionsEx
     /// </summary>
     public static bool ClientHasPermissionToRun(this Command command)
     {
-        return false;
+        return !DevkitServerModule.IsEditing;
     }
 #endif
 #if SERVER

@@ -86,15 +86,15 @@ internal sealed class RegionDebug : MonoBehaviour
     private void OnGUI()
     {
         if (!_tilesEnabled && !_regionsEnabled) return;
-        if (!DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null)
-            return;
-        Transform ctrlTransform = EditorUser.User.Input.ControllerObject.transform;
+
+        Transform? ctrlTransform = !DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null ? Level.editing.transform : EditorUser.User.Input.ControllerObject.transform;
+        if (ctrlTransform == null) return;
         float yaw = ctrlTransform.rotation.eulerAngles.y;
         yaw %= 360;
         if (yaw < 0) yaw += 360;
         float y = 80;
         Label("<b>Position</b>: " + ctrlTransform.position.ToString("F2") + ", Yaw: " + yaw.ToString("F2") + "°", ref y);
-        Transform? aim = EditorUser.User.Input.Aim;
+        Transform? aim = (!DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null ? MainCamera.instance.transform : EditorUser.User.Input.Aim);
         if (aim != null)
         {
             string facing;
@@ -130,7 +130,8 @@ internal sealed class RegionDebug : MonoBehaviour
     
     private static void HandleGLRender()
     {
-        if (UserInput.LocalController != CameraController.Editor) return;
+        if (DevkitServerModule.IsEditing ? UserInput.LocalController != CameraController.Editor : !Level.isEditor)
+            return;
         GLUtility.matrix = Matrix4x4.identity;
         GLUtility.LINE_FLAT_COLOR.SetPass(0);
         GL.Begin(GL.LINES);
@@ -153,9 +154,10 @@ internal sealed class RegionDebug : MonoBehaviour
             _avgLineHeight = avgLineHeight = Mathf.RoundToInt(y / ((index + 1) * 4f));
             index = -1;
         }
+        Transform? ctrlTransform = !DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null ? Level.editing.transform : EditorUser.User.Input.ControllerObject.transform;
         if (_tilesEnabled)
         {
-            LandscapeTile? current = EditorUser.User!.Input.ControllerObject == null ? null : Landscape.getTile(EditorUser.User.Input.ControllerObject.transform.position);
+            LandscapeTile? current = ctrlTransform == null ? null : Landscape.getTile(ctrlTransform.position);
             bool lastWasCurrent = false;
 
             foreach (LandscapeTile tile in tiles)
@@ -197,8 +199,8 @@ internal sealed class RegionDebug : MonoBehaviour
         {
             byte worldSize = Regions.WORLD_SIZE;
             byte cx = 0, cy = 0;
-            bool isInRegion = EditorUser.User!.Input.ControllerObject != null;
-            Vector3 position = !isInRegion ? Vector3.zero : EditorUser.User.Input.ControllerObject!.transform.position;
+            bool isInRegion = ctrlTransform != null;
+            Vector3 position = !isInRegion ? Vector3.zero : ctrlTransform!.position;
             isInRegion = isInRegion && Regions.tryGetCoordinate(position, out cx, out cy);
             float lvlSizeX = Mathf.Min(4096, Mathf.Max(Mathf.Abs(CartographyUtil.CaptureBounds.max.x), Mathf.Abs(CartographyUtil.CaptureBounds.min.x)));
             float lvlSizeZ = Mathf.Min(4096, Mathf.Max(Mathf.Abs(CartographyUtil.CaptureBounds.max.z), Mathf.Abs(CartographyUtil.CaptureBounds.min.z)));

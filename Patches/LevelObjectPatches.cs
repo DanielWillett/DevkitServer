@@ -74,8 +74,6 @@ internal static class LevelObjectPatches
         Type eo = typeof(EditorObjects);
         Type lo = typeof(LevelObjects);
         Type dtu = typeof(DevkitTransactionUtility);
-        // Type vp = typeof(VanillaPermissions);
-        
 
         MethodInfo? pointSelection = eo.GetMethod("pointSelection", BindingFlags.Static | BindingFlags.Public, null, Array.Empty<Type>(), null);
         if (pointSelection == null)
@@ -169,8 +167,6 @@ internal static class LevelObjectPatches
             DevkitServerModule.Fault();
         }
 
-        // Label stLbl = generator.DefineLabel();
-
         int patchedReun = 0;
         bool patchedCopy = false;
         bool patchedPaste = false;
@@ -181,10 +177,8 @@ internal static class LevelObjectPatches
         bool patchedTranslate = false;
 
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
-        int i = 0;
         ins.Insert(0, new CodeInstruction(OpCodes.Call, Accessor.GetMethod(OnUpdate)));
-        // PatchUtil.InsertActionRateLimiter(ref i, stLbl, ins);
-        for (; i < ins.Count; ++i)
+        for (int i = 1; i < ins.Count; ++i)
         {
             // cancel reun operation
             if (i < ins.Count - 1 && clearSelection != null && ins[i].Calls(clearSelection) && (redo != null && ins[i + 1].Calls(redo) || undo != null && ins[i + 1].Calls(undo)))

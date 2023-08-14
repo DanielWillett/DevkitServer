@@ -4,6 +4,7 @@ using SDG.Framework.Landscapes;
 namespace DevkitServer.Util.Region;
 public static class RegionUtil
 {
+    public static SurroundingRegionsIterator EnumerateRegions(byte centerX, byte centerY, byte maxRegionDistance) => new SurroundingRegionsIterator(centerX, centerY, maxRegionDistance);
     public static SurroundingRegionsIterator EnumerateRegions(byte centerX, byte centerY) => new SurroundingRegionsIterator(centerX, centerY);
     public static SurroundingRegionsIterator EnumerateRegions(Vector3 center)
     {

@@ -52,6 +52,7 @@ internal static class PatchesMain
 #endif
 #if CLIENT
             LevelObjectPatches.OptionalPatches();
+            SpawnsEditorPatches.ManualPatches();
 #endif
             DoManualPatches();
             

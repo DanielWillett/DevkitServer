@@ -30,6 +30,7 @@ using DevkitServer.Util.Debugging;
 using DevkitServer.Players;
 using DevkitServer.Players.UI;
 using DevkitServer.API.Logging;
+using DevkitServer.Core.Tools;
 #endif
 #if SERVER
 using DevkitServer.Levels;
@@ -105,7 +106,8 @@ public sealed class DevkitServerModule : IModuleNexus
         { "ConsoleOnly", "<#ff8c69>This command can only be called from console." },
         { "PlayersOnly", "<#ff8c69>This command can not be called from console." },
         { "Exception", "<#ff8c69>Error executing command: <#4ec9b0>{0}</color>." },
-        { "NoPermissions", "<#ff8c69>You do not have permission to use this command." }
+        { "NoPermissions", "<#ff8c69>You do not have permission to use this command." },
+        { "NotDevkitServerClient", "<#ff8c69>You must be connected to a DevkitServer server." }
     };
     public static Local MessageLocalization { get; private set; } = null!;
 
@@ -425,6 +427,7 @@ public sealed class DevkitServerModule : IModuleNexus
                 _ = HighSpeedServer.Instance;
 #elif CLIENT
             OptionsSettings.hints = true;
+            DevkitServerSpawnsTool.CheckExistingSpawnsForNodeComponents();
 #endif
         }
     }
