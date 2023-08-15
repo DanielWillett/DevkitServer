@@ -92,6 +92,13 @@ public static class DevkitServerUtility
     [Pure]
     public static Vector3 ToVector3(this in Vector2 v2, float y) => new Vector3(v2.x, y, v2.y);
     [Pure]
+    public static float SqrDist2D(this Vector3 v1, Vector3 v2)
+    {
+        float x = v1.x - v2.x, z = v1.z - v2.z;
+        return x * x + z * z;
+    }
+
+    [Pure]
     public static bool IsNearlyEqual(this in Quaternion quaternion, in Quaternion other, float tolerance = 0.001f)
     {
         return

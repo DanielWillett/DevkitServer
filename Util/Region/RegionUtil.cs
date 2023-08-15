@@ -1,9 +1,30 @@
-﻿using SDG.Framework.Foliage;
+﻿using System.Runtime.CompilerServices;
+using SDG.Framework.Foliage;
 using SDG.Framework.Landscapes;
 
 namespace DevkitServer.Util.Region;
 public static class RegionUtil
 {
+    /// <summary>
+    /// Gets the region of a position, or throws an error if it's out of range. Pass an argument name when the name is not 'position'.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"/>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void AssertGetRegion(Vector3 position, out byte x, out byte y, string argumentName)
+    {
+        if (!Regions.tryGetCoordinate(position, out x, out y))
+            throw new ArgumentOutOfRangeException(argumentName, "Position is out of range of the region system.");
+    }
+    /// <summary>
+    /// Gets the region of a position, or throws an error if it's out of range.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"/>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void AssertGetRegion(Vector3 position, out byte x, out byte y)
+    {
+        if (!Regions.tryGetCoordinate(position, out x, out y))
+            throw new ArgumentOutOfRangeException(nameof(position), "Position is out of range of the region system.");
+    }
     public static SurroundingRegionsIterator EnumerateRegions(byte centerX, byte centerY, byte maxRegionDistance) => new SurroundingRegionsIterator(centerX, centerY, maxRegionDistance);
     public static SurroundingRegionsIterator EnumerateRegions(byte centerX, byte centerY) => new SurroundingRegionsIterator(centerX, centerY);
     public static SurroundingRegionsIterator EnumerateRegions(Vector3 center)
@@ -15,6 +36,18 @@ public static class RegionUtil
     }
     public static RegionsIterator LinearEnumerateRegions(bool yPrimary) => new RegionsIterator(yPrimary);
     public static RegionsIterator LinearEnumerateRegions() => new RegionsIterator();
+
+    public static ListRegionsEnumerator<T> CastFrom<T>(this List<T>[,] regions, byte centerX, byte centerY, byte maxRegionDistance = 255)
+        => new ListRegionsEnumerator<T>(regions, centerX, centerY, maxRegionDistance);
+    public static ListRegionsEnumerator<T> CastFrom<T>(this List<T>[,] regions, Vector3 position, byte maxRegionDistance = 255)
+    {
+        if (Regions.tryGetCoordinate(position, out byte x, out byte y))
+            return new ListRegionsEnumerator<T>(regions, x, y, maxRegionDistance);
+        
+        return new ListRegionsEnumerator<T>(regions, (byte)(Regions.WORLD_SIZE / 2), (byte)(Regions.WORLD_SIZE / 2), maxRegionDistance);
+    }
+
+    public static ListRegionsEnumerator<T> CastFrom<T>(this List<T>[,] regions) => new ListRegionsEnumerator<T>(regions);
 
     public static SurroundingTilesIterator EnumerateTiles(int centerX, int centerY, TileIteratorMode mode) => new SurroundingTilesIterator(centerX, centerY, mode);
     public static SurroundingTilesIterator EnumerateTiles(Vector3 center, TileIteratorMode mode)

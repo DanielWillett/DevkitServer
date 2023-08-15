@@ -26,8 +26,7 @@ public static class DevkitServerGLUtility
     }
     private static void OnRender()
     {
-        if (DevkitServerModule.IsEditing)
-            EventOnRenderAny.TryInvoke();
+        EventOnRenderAny.TryInvoke();
     }
     public static void DrawTerrainBounds(LandscapeCoord tile, int xMin, int xMax, int yMin, int yMax, bool splatmap, Color? constColor = null)
     {

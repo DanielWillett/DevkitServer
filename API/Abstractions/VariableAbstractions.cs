@@ -55,18 +55,22 @@ public static class Variables
     /// <summary>
     /// Checks if it is safe to set this variable to a value of <paramref name="type"/>.
     /// </summary>
+    /// <exception cref="ArgumentNullException"/>
     public static bool IsAssignableFrom(this IVariable variable, Type type)
     {
         if (variable == null) throw new ArgumentNullException(nameof(variable));
+        if (type == null) throw new ArgumentNullException(nameof(type));
 
         return variable.MemberType.IsAssignableFrom(type);
     }
     /// <summary>
     /// Checks if it is safe to get a variable and cast the result to <paramref name="type"/>.
     /// </summary>
+    /// <exception cref="ArgumentNullException"/>
     public static bool IsAssignableTo(this IVariable variable, Type type)
     {
         if (variable == null) throw new ArgumentNullException(nameof(variable));
+        if (type == null) throw new ArgumentNullException(nameof(type));
 
         return type.IsAssignableFrom(variable.MemberType);
     }
@@ -97,7 +101,6 @@ public static class Variables
         };
         public override int GetHashCode() => _field.GetHashCode();
     }
-
     private sealed class PropertyVariable : IVariable, IFormattable, IEquatable<IVariable>
     {
         private readonly PropertyInfo _property;

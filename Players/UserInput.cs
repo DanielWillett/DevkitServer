@@ -47,7 +47,8 @@ public class UserInput : MonoBehaviour
         {
             if (DevkitServerModule.IsEditing && EditorUser.User?.Input is not null)
                 return EditorUser.User.Input.Controller;
-            return 0;
+
+            return Level.isEditor ? CameraController.Editor : (Level.isLoaded ? CameraController.Player : CameraController.None);
         }
     }
 #endif

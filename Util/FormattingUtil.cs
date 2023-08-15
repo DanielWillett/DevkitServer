@@ -542,14 +542,16 @@ public static class FormattingUtil
 
         return instruction.Name;
     }
+
+    public static readonly Color32 StringColor = new Color32(214, 157, 133, 255);
     public static string Format(this string? str, bool quotes)
     {
         if (str == null) return ((object?)null).Format();
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string clr = FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetExtendedANSIString(ToArgb(new Color32(214, 157, 133, 255)), false)
-                : GetANSIString(ToConsoleColor(ToArgb(new Color32(214, 157, 133, 255))), false);
+                ? GetExtendedANSIString(ToArgb(StringColor), false)
+                : GetANSIString(ToConsoleColor(ToArgb(StringColor)), false);
 
             if (quotes)
                 return clr + "\"" + str + "\"" + ANSIForegroundReset;

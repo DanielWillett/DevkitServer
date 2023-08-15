@@ -212,18 +212,15 @@ public static class Logger
     }
     internal static void InitLogger()
     {
-        // empty
+#if CLIENT
+        ReadInitialVanillaLogs();
+#endif
     }
 #if CLIENT
-    internal static void PostPatcherSetupInitLogger()
+    internal static void ReadInitialVanillaLogs()
     {
-        if (IsExternalFeatureset) throw new InvalidOperationException("External access violation.");
         try
         {
-            MethodInfo? method = typeof(LogFile).GetMethod(nameof(LogFile.writeLine), BindingFlags.Instance | BindingFlags.Public);
-            if (method != null)
-                PatchesMain.Patcher.Patch(method, prefix: new HarmonyMethod(typeof(Logger).GetMethod(nameof(OnLinePrinted), BindingFlags.Static | BindingFlags.NonPublic)));
-
             string log = Logs.getLogFilePath();
             if (File.Exists(log))
             {
@@ -238,6 +235,21 @@ public static class Logger
         catch (Exception ex)
         {
             LogWarning("Failed to fetch vanilla logs.");
+            LogError(ex);
+        }
+    }
+    internal static void PostPatcherSetupInitLogger()
+    {
+        if (IsExternalFeatureset) throw new InvalidOperationException("External access violation.");
+        try
+        {
+            MethodInfo? method = typeof(LogFile).GetMethod(nameof(LogFile.writeLine), BindingFlags.Instance | BindingFlags.Public);
+            if (method != null)
+                PatchesMain.Patcher.Patch(method, prefix: new HarmonyMethod(typeof(Logger).GetMethod(nameof(OnLinePrinted), BindingFlags.Static | BindingFlags.NonPublic)));
+        }
+        catch (Exception ex)
+        {
+            LogWarning("Failed to patch vanilla logs.");
             LogError(ex);
         }
     }
@@ -345,6 +357,8 @@ public static class Logger
             Terminal.Write(string.Empty, color, true, Severity.Warning);
         else
         {
+            method ??= string.Empty;
+            method = FormattingUtil.SpaceProperCaseString(method);
             DateTime now = DateTime.UtcNow;
             ReplaceResetsWithConsoleColor(ref message, color);
             if (!Level.isLoaded)
@@ -358,6 +372,8 @@ public static class Logger
             Terminal.Write(string.Empty, color, true, Severity.Error);
         else
         {
+            method ??= string.Empty;
+            method = FormattingUtil.SpaceProperCaseString(method);
             DateTime now = DateTime.UtcNow;
             ReplaceResetsWithConsoleColor(ref message, color);
             if (!Level.isLoaded)
@@ -416,6 +432,8 @@ public static class Logger
     public static void LogError(Exception ex, bool cleanStack = true, [CallerMemberName] string method = "") => WriteExceptionIntl(ex, cleanStack, 0, DateTime.UtcNow, method);
     private static void WriteExceptionIntl(Exception ex, bool cleanStack, int indent, DateTime timestamp, string? method = null)
     {
+        if (method != null)
+            method = FormattingUtil.SpaceProperCaseString(method);
         string ind = indent == 0 ? string.Empty : new string(' ', indent);
         bool inner = indent > 0;
         while (ex != null)
@@ -429,7 +447,7 @@ public static class Logger
             Terminal.Write(ind + (
                 inner
                     ? "Inner Exception: "
-                    : "[" + timestamp.ToString(TimeFormat) + "]" + (string.IsNullOrEmpty(method) ? string.Empty : " [" + method!.ToUpper() + "] ") + "Exception: ")
+                    : "[" + timestamp.ToString(TimeFormat) + "]" + (string.IsNullOrEmpty(method) ? string.Empty : " [" + method!.ToUpperInvariant() + "] ") + "Exception: ")
                                + ex.GetType().Format() + FormattingUtil.GetANSIString(ConsoleColor.Red, false) + ".", ConsoleColor.Red, true, Severity.Error);
             Terminal.Write(ind + message, ConsoleColor.DarkRed, true, Severity.Error);
             if (!Level.isLoaded)

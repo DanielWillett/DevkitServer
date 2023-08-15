@@ -1,9 +1,10 @@
-﻿#if SERVER
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
+#if SERVER
 using DevkitServer.Players;
+#endif
 
 namespace DevkitServer.Core.Commands;
 internal sealed class ControlCommand : DevkitServerCommand, ICommandLocalizationFile
@@ -30,6 +31,13 @@ internal sealed class ControlCommand : DevkitServerCommand, ICommandLocalization
 
     public override UniTask Execute(CommandContext ctx, CancellationToken token)
     {
+#if CLIENT
+        if (DevkitServerModule.IsEditing)
+            ctx.BreakAndRunOnServer();
+        
+        throw ctx.Reply("ControlSingleplayerUnsupported");
+#elif SERVER
+
         ctx.AssertRanByPlayer();
 
         ctx.AssertHelpCheckFormat(0, "CorrectUsage");
@@ -63,17 +71,20 @@ internal sealed class ControlCommand : DevkitServerCommand, ICommandLocalization
         else throw ctx.Reply("CorrectUsage");
 
         return UniTask.CompletedTask;
+#endif
     }
 
     public string TranslationsDirectory => nameof(ControlCommand);
     public LocalDatDictionary DefaultTranslations => new LocalDatDictionary
     {
+#if SERVER
         { "CorrectUsage", "<#DB5375>Correct Usage: /control <" + nameof(CameraController.Editor).ToLower() + "|" + nameof(CameraController.Player).ToLower() + "> - Set player controller." },
         { "NoPermission", "<#DB5375>You do not have permission to change to a <#DFBE99>{0}</color> controller." },
         { "ControllerEditor", "Editor" },
         { "ControllerPlayer", "Player" },
-        { "SetController", "<#B5BD89>Changed to <#729EA1>{0}</color> controller."},
-        { "AlreadySet", "<#DFBE99>You are already on the <#B5BD89>{0}</color> controller." }
+        { "SetController", "<#B5BD89>Changed to <#729EA1>{0}</color> controller." },
+        { "AlreadySet", "<#DFBE99>You are already on the <#B5BD89>{0}</color> controller." },
+#endif
+        { "ControlSingleplayerUnsupported", "<#DFBE99>Editor control setting only works on DevkitServer servers." }
     };
 }
-#endif

@@ -12,7 +12,7 @@ namespace DevkitServer.Core.Tools;
 /// <summary>
 /// Copy of <see cref="SelectionTool"/> adjusted to not require <see cref="IDevkitHierarchyItem"/>s.
 /// </summary>
-internal abstract class DevkitServerSelectionTool : IDevkitTool
+public abstract class DevkitServerSelectionTool : IDevkitTool
 {
     protected readonly List<GameObject> IntlCopyBuffer = new List<GameObject>(2);
     protected Vector3 BeginAreaSelect;
@@ -20,13 +20,17 @@ internal abstract class DevkitServerSelectionTool : IDevkitTool
     protected float AreaSelectStartTime;
     protected DevkitSelection PendingClickSelection = DevkitSelection.invalid;
     protected HashSet<DevkitSelection> TempAreaSelection = new HashSet<DevkitSelection>(16);
-    private SelectionTool.ESelectionMode _selectionMode;
+    private SelectionTool.ESelectionMode _handleMode;
     private bool _wantsBoundsEditor;
+    private bool _canScale = true;
+    private bool _canRotate = true;
+    private bool _canTranslate = true;
+    private bool _handleModeDirty;
     public IReadOnlyList<GameObject> CopyBuffer { get; }
     public TransformHandles Handles { get; } = new TransformHandles();
     public bool IsAreaSelecting { get; private set; }
     public bool IsDraggingHandles { get; private set; }
-    public abstract bool CanAreaSelect { get; }
+    public bool CanAreaSelect { get; set; } = true;
     public bool HasReferenceTransform { get; private set; }
     public Vector3 HandlePosition { get; private set; }
     public Vector3 ReferencePosition { get; private set; }
@@ -34,14 +38,44 @@ internal abstract class DevkitServerSelectionTool : IDevkitTool
     public Vector3 ReferenceScale { get; private set; }
     public bool HasReferenceScale { get; private set; }
     public Quaternion HandleRotation { get; private set; }
-    public SelectionTool.ESelectionMode SelectionMode
+    public bool CanTranslate
     {
-        get => _selectionMode;
+        get => _canRotate;
         set
         {
-            _selectionMode = value;
-            _wantsBoundsEditor = false;
+            _handleModeDirty |= value != _canTranslate;
+            _canTranslate = value;
         }
+    }
+
+    public bool CanRotate
+    {
+        get => _canRotate;
+        set
+        {
+            _handleModeDirty |= value != _canRotate;
+            _canRotate = value;
+        }
+    }
+
+    public bool CanScale
+    {
+        get => _canScale;
+        set
+        {
+            _handleModeDirty |= value != _canScale;
+            _canScale = value;
+        }
+    }
+    public SelectionTool.ESelectionMode HandleMode
+    {
+        get => _handleMode;
+        set => _handleMode = value;
+    }
+    public bool WantsBoundsEditor
+    {
+        get => _wantsBoundsEditor && _handleMode != SelectionTool.ESelectionMode.ROTATION;
+        set => _wantsBoundsEditor = value;
     }
     protected DevkitServerSelectionTool()
     {
@@ -58,21 +92,45 @@ internal abstract class DevkitServerSelectionTool : IDevkitTool
         {
             InputTick();
 
-            if (InputEx.GetKeyDown(KeyCode.Q))
+            if (_handleModeDirty)
             {
-                if (_selectionMode != SelectionTool.ESelectionMode.POSITION)
-                    SelectionMode = SelectionTool.ESelectionMode.POSITION;
+                if (!CanScale && _handleMode == SelectionTool.ESelectionMode.SCALE)
+                    _handleMode = SelectionTool.ESelectionMode.POSITION;
+                else if (!CanRotate && _handleMode == SelectionTool.ESelectionMode.ROTATION)
+                    _handleMode = SelectionTool.ESelectionMode.POSITION;
+                if (!CanTranslate && _handleMode == SelectionTool.ESelectionMode.POSITION)
+                {
+                    if (CanRotate)
+                        _handleMode = SelectionTool.ESelectionMode.ROTATION;
+                    else if (CanScale)
+                        _handleMode = SelectionTool.ESelectionMode.SCALE;
+                }
+
+                _handleModeDirty = false;
+            }
+
+            if (InputEx.GetKeyDown(KeyCode.Q) && CanTranslate)
+            {
+                if (_handleMode != SelectionTool.ESelectionMode.POSITION)
+                {
+                    _handleMode = SelectionTool.ESelectionMode.POSITION;
+                    _wantsBoundsEditor = false;
+                }
                 else
                     _wantsBoundsEditor = !_wantsBoundsEditor;
             }
-            else if (InputEx.GetKeyDown(KeyCode.W))
+            else if (InputEx.GetKeyDown(KeyCode.W) && CanRotate)
             {
-                SelectionMode = SelectionTool.ESelectionMode.ROTATION;
+                _handleMode = SelectionTool.ESelectionMode.ROTATION;
+                _wantsBoundsEditor = false;
             }
-            else if (InputEx.GetKeyDown(KeyCode.R))
+            else if (InputEx.GetKeyDown(KeyCode.R) && CanScale)
             {
-                if (_selectionMode != SelectionTool.ESelectionMode.SCALE)
-                    SelectionMode = SelectionTool.ESelectionMode.SCALE;
+                if (_handleMode != SelectionTool.ESelectionMode.SCALE)
+                {
+                    _handleMode = SelectionTool.ESelectionMode.SCALE;
+                    _wantsBoundsEditor = false;
+                }
                 else
                     _wantsBoundsEditor = !_wantsBoundsEditor;
             }
@@ -120,11 +178,7 @@ internal abstract class DevkitServerSelectionTool : IDevkitTool
 
             if (!IsDraggingHandles && !IsAreaSelecting && CanAreaSelect && InputEx.GetKey(KeyCode.Mouse0) && CachedTime.RealtimeSinceStartup - AreaSelectStartTime > 0.1f)
             {
-                // start area selecting
-                IsAreaSelecting = true;
-                TempAreaSelection.Clear();
-                if (!InputEx.GetKey(KeyCode.LeftShift) && !InputEx.GetKey(KeyCode.LeftControl))
-                    DevkitSelectionManager.clear();
+                BeginAreaSelecting();
             }
             
             if (IsDraggingHandles)
@@ -140,7 +194,7 @@ internal abstract class DevkitServerSelectionTool : IDevkitTool
                 if (hit.transform != null)
                 {
                     if (DevkitSelectionManager.selection.Count > 0)
-                        SetHandlePosition(hit.point, Quaternion.identity, Vector3.one, false, false);
+                        SimulateHandleMovement(hit.point, Quaternion.identity, Vector3.one, false, false);
                     else
                         RequestInstantiation(hit.point, Quaternion.FromToRotation(Vector3.up, hit.normal), Vector3.one);
                 }
@@ -148,43 +202,50 @@ internal abstract class DevkitServerSelectionTool : IDevkitTool
 
             if (IsAreaSelecting)
             {
-                EndAreaSelect = MainCamera.instance.ScreenToViewportPoint(Input.mousePosition);
-                
-                Vector2 topLeft = new Vector2(Mathf.Min(EndAreaSelect.x, BeginAreaSelect.x), Mathf.Min(EndAreaSelect.y, BeginAreaSelect.y));
-                Vector2 bottomRight = new Vector2(Mathf.Max(EndAreaSelect.x, BeginAreaSelect.x), Mathf.Max(EndAreaSelect.y, BeginAreaSelect.y));
-
-                foreach (GameObject obj in EnumerateAreaSelectableObjects())
+                if (CanAreaSelect && !(InputEx.GetKeyDown(KeyCode.Escape) || InputEx.GetKeyDown(KeyCode.Mouse1)))
                 {
-                    if (obj == null)
-                        continue;
+                    EndAreaSelect = MainCamera.instance.ScreenToViewportPoint(Input.mousePosition);
 
-                    Vector3 objViewPos = MainCamera.instance.WorldToViewportPoint(obj.transform.position);
-                    DevkitSelection selection = new DevkitSelection(obj, null);
-                    if (objViewPos.z > 0f && objViewPos.x > topLeft.x && objViewPos.x < bottomRight.x && objViewPos.y > topLeft.y && objViewPos.y < bottomRight.y)
+                    Vector2 topLeft = new Vector2(Mathf.Min(EndAreaSelect.x, BeginAreaSelect.x), Mathf.Min(EndAreaSelect.y, BeginAreaSelect.y));
+                    Vector2 bottomRight = new Vector2(Mathf.Max(EndAreaSelect.x, BeginAreaSelect.x), Mathf.Max(EndAreaSelect.y, BeginAreaSelect.y));
+
+                    foreach (GameObject obj in EnumerateAreaSelectableObjects())
                     {
-                        if (TempAreaSelection.Add(selection))
-                            DevkitSelectionManager.add(selection);
+                        if (obj == null)
+                            continue;
+
+                        Vector3 objViewPos = MainCamera.instance.WorldToViewportPoint(obj.transform.position);
+                        DevkitSelection selection = new DevkitSelection(obj, null);
+                        if (objViewPos.z > 0f && objViewPos.x > topLeft.x && objViewPos.x < bottomRight.x && objViewPos.y > topLeft.y && objViewPos.y < bottomRight.y)
+                        {
+                            if (TempAreaSelection.Add(selection))
+                                DevkitSelectionManager.add(selection);
+                        }
+                        else if (TempAreaSelection.Remove(selection))
+                            DevkitSelectionManager.remove(selection);
                     }
-                    else if (TempAreaSelection.Remove(selection))
+                }
+                else
+                {
+                    IsAreaSelecting = false;
+                    foreach (DevkitSelection selection in TempAreaSelection)
                         DevkitSelectionManager.remove(selection);
+                    TempAreaSelection.Clear();
                 }
             }
 
             if (InputEx.GetKeyUp(KeyCode.Mouse0))
             {
                 if (IsDraggingHandles)
-                {
-                    Handles.MouseUp();
-                    PendingClickSelection = DevkitSelection.invalid;
-                    IsDraggingHandles = false;
-                    TransformSelection();
-                    if (!DevkitServerModule.IsEditing)
-                        DevkitTransactionManager.endTransaction();
-                }
+                    EndDragHandles(true);
                 else if (IsAreaSelecting)
                     IsAreaSelecting = false;
                 else
                     DevkitSelectionManager.select(PendingClickSelection);
+            }
+            else if (IsDraggingHandles && (InputEx.GetKeyDown(KeyCode.Mouse1) || InputEx.GetKeyDown(KeyCode.Escape)))
+            {
+                EndDragHandles(false);
             }
         }
         else if (IsAreaSelecting)
@@ -195,14 +256,14 @@ internal abstract class DevkitServerSelectionTool : IDevkitTool
         if (DevkitSelectionManager.selection.Count == 0)
             return;
 
-        if (SelectionMode == SelectionTool.ESelectionMode.POSITION)
+        if (HandleMode == SelectionTool.ESelectionMode.POSITION)
             Handles.SetPreferredMode(_wantsBoundsEditor ? TransformHandles.EMode.PositionBounds : TransformHandles.EMode.Position);
-        else if (SelectionMode == SelectionTool.ESelectionMode.SCALE)
+        else if (HandleMode == SelectionTool.ESelectionMode.SCALE)
             Handles.SetPreferredMode(_wantsBoundsEditor ? TransformHandles.EMode.ScaleBounds : TransformHandles.EMode.Scale);
         else
             Handles.SetPreferredMode(TransformHandles.EMode.Rotation);
 
-        bool globalSpace = !(SelectionMode == SelectionTool.ESelectionMode.SCALE || _wantsBoundsEditor) &&
+        bool globalSpace = !(HandleMode == SelectionTool.ESelectionMode.SCALE || _wantsBoundsEditor) &&
                            (DevkitSelectionToolOptions.instance == null || !DevkitSelectionToolOptions.instance.localSpace);
 
         Vector3 handlePosition = default;
@@ -295,11 +356,44 @@ internal abstract class DevkitServerSelectionTool : IDevkitTool
         }
         if (InputEx.GetKeyDown(KeyCode.N) && HasReferenceTransform)
         {
-            SetHandlePosition(ReferencePosition, ReferenceRotation, ReferenceScale, true, HasReferenceScale);
+            SimulateHandleMovement(ReferencePosition, ReferenceRotation, ReferenceScale, true, HasReferenceScale);
         }
         if (InputEx.GetKeyDown(ControlsSettings.focus))
         {
             UserInput.SetEditorTransform(HandlePosition - 15f * MainCamera.instance.transform.forward, MainCamera.instance.transform.rotation);
+        }
+    }
+    protected void BeginAreaSelecting()
+    {
+        // start area selecting
+        IsAreaSelecting = true;
+        TempAreaSelection.Clear();
+        if (!InputEx.GetKey(KeyCode.LeftShift) && !InputEx.GetKey(KeyCode.LeftControl))
+            DevkitSelectionManager.clear();
+    }
+    protected void EndDragHandles(bool apply)
+    {
+        Handles.MouseUp();
+        PendingClickSelection = DevkitSelection.invalid;
+        IsDraggingHandles = false;
+        if (apply)
+            TransformSelection();
+        else
+        {
+            foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+            {
+                if (selection.gameObject == null)
+                    continue;
+                selection.gameObject.transform.SetPositionAndRotation(selection.preTransformPosition, selection.preTransformRotation);
+                selection.gameObject.transform.localScale = selection.preTransformLocalScale;
+            }
+        }
+        if (!DevkitServerModule.IsEditing)
+        {
+            DevkitTransactionManager.endTransaction();
+
+            if (!apply)
+                DevkitTransactionManager.undo();
         }
     }
     public void equip()
@@ -329,9 +423,7 @@ internal abstract class DevkitServerSelectionTool : IDevkitTool
         if (IsAreaSelecting)
             DevkitServerGLUtility.DrawSelectBox(BeginAreaSelect, EndAreaSelect);
     }
-
-
-    public void SetHandlePosition(Vector3 position, Quaternion rotation, Vector3 scale, bool doRotation, bool hasScale)
+    public void SimulateHandleMovement(Vector3 newPosition, Quaternion newRotation, Vector3 newScale, bool hasRotation, bool hasScale)
     {
         if (!DevkitServerModule.IsEditing)
         {
@@ -350,21 +442,21 @@ internal abstract class DevkitServerSelectionTool : IDevkitTool
                 if (selection.gameObject.TryGetComponent(out ITransformedHandler handler))
                 {
                     handler.OnTransformed(selection.preTransformPosition, selection.preTransformRotation,
-                        selection.preTransformLocalScale, position, rotation, scale, doRotation, hasScale);
+                        selection.preTransformLocalScale, newPosition, newRotation, newScale, hasRotation, hasScale);
                 }
                 else
                 {
-                    if (doRotation)
-                        selection.transform.SetPositionAndRotation(position, rotation);
+                    if (hasRotation)
+                        selection.transform.SetPositionAndRotation(newPosition, newRotation);
                     else
-                        selection.transform.position = position;
+                        selection.transform.position = newPosition;
 
                     if (hasScale)
-                        selection.transform.localScale = scale;
+                        selection.transform.localScale = newScale;
                 }
             }
         }
-        else Handles.ExternallyTransformPivot(position, rotation, doRotation);
+        else Handles.ExternallyTransformPivot(newPosition, newRotation, hasRotation);
 
         TransformSelection();
 
@@ -409,11 +501,11 @@ internal abstract class DevkitServerSelectionTool : IDevkitTool
             {
                 newPosition = selection.preTransformPosition - pivotPosition;
                 newPosition = newPosition.IsNearlyZero()
-                    ? selection.preTransformPosition + worldPositionDelta
-                    : pivotPosition + worldRotationDelta * newPosition + worldPositionDelta;
+                    ? (selection.preTransformPosition + worldPositionDelta)
+                    : (pivotPosition + worldRotationDelta * newPosition + worldPositionDelta);
             }
             else
-                newPosition = selection.preTransformPosition - pivotPosition;
+                newPosition = selection.preTransformPosition + worldPositionDelta;
 
             if (selection.gameObject.TryGetComponent(out ITransformedHandler handler))
             {

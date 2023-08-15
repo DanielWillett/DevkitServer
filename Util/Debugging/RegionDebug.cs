@@ -85,9 +85,10 @@ internal sealed class RegionDebug : MonoBehaviour
     [UsedImplicitly]
     private void OnGUI()
     {
-        if (!_tilesEnabled && !_regionsEnabled) return;
+        if (!Level.isEditor || !_tilesEnabled && !_regionsEnabled || LoadingUI.isBlocked)
+            return;
 
-        Transform? ctrlTransform = !DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null ? Level.editing.transform : EditorUser.User.Input.ControllerObject.transform;
+        Transform? ctrlTransform = !DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null ? MainCamera.instance.transform.parent : EditorUser.User.Input.ControllerObject.transform;
         if (ctrlTransform == null) return;
         float yaw = ctrlTransform.rotation.eulerAngles.y;
         yaw %= 360;
@@ -130,8 +131,9 @@ internal sealed class RegionDebug : MonoBehaviour
     
     private static void HandleGLRender()
     {
-        if (DevkitServerModule.IsEditing ? UserInput.LocalController != CameraController.Editor : !Level.isEditor)
+        if (LoadingUI.isBlocked || !Level.isLoaded || UserInput.LocalController != CameraController.Editor)
             return;
+
         GLUtility.matrix = Matrix4x4.identity;
         GLUtility.LINE_FLAT_COLOR.SetPass(0);
         GL.Begin(GL.LINES);
@@ -144,7 +146,10 @@ internal sealed class RegionDebug : MonoBehaviour
             _tileCorners = new Vector3[tiles.Count, 4];
             foreach (LandscapeTile tile in tiles)
             {
-                GetCornersTile(tile, out Vector3 corner1, out Vector3 corner2, out Vector3 corner3, out Vector3 corner4);
+                Vector3 corner1 = Landscape.getWorldPosition(tile.coord, default, tile.heightmap[0, 0]);
+                Vector3 corner2 = Landscape.getWorldPosition(tile.coord, new HeightmapCoord(0, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE), tile.heightmap[0, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE]);
+                Vector3 corner3 = Landscape.getWorldPosition(tile.coord, new HeightmapCoord(Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE), tile.heightmap[Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE]);
+                Vector3 corner4 = Landscape.getWorldPosition(tile.coord, new HeightmapCoord(Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, 0), tile.heightmap[Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, 0]);
                 _tileCorners[++index, 0] = corner1;
                 _tileCorners[index, 1] = corner2;
                 _tileCorners[index, 2] = corner3;
@@ -154,7 +159,7 @@ internal sealed class RegionDebug : MonoBehaviour
             _avgLineHeight = avgLineHeight = Mathf.RoundToInt(y / ((index + 1) * 4f));
             index = -1;
         }
-        Transform? ctrlTransform = !DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null ? Level.editing.transform : EditorUser.User.Input.ControllerObject.transform;
+        Transform? ctrlTransform = !DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null ? MainCamera.instance.transform.parent : EditorUser.User.Input.ControllerObject.transform;
         if (_tilesEnabled)
         {
             LandscapeTile? current = ctrlTransform == null ? null : Landscape.getTile(ctrlTransform.position);
@@ -253,14 +258,6 @@ internal sealed class RegionDebug : MonoBehaviour
             }
         }
         GL.End();
-
-        void GetCornersTile(LandscapeTile tile, out Vector3 corner1, out Vector3 corner2, out Vector3 corner3, out Vector3 corner4)
-        {
-            corner1 = Landscape.getWorldPosition(tile.coord, default, tile.heightmap[0, 0]);
-            corner2 = Landscape.getWorldPosition(tile.coord, new HeightmapCoord(0, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE), tile.heightmap[0, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE]);
-            corner3 = Landscape.getWorldPosition(tile.coord, new HeightmapCoord(Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE), tile.heightmap[Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE]);
-            corner4 = Landscape.getWorldPosition(tile.coord, new HeightmapCoord(Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, 0), tile.heightmap[Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, 0]);
-        }
     }
 }
 #endif

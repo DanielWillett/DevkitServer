@@ -427,7 +427,8 @@ public sealed class DevkitServerModule : IModuleNexus
                 _ = HighSpeedServer.Instance;
 #elif CLIENT
             OptionsSettings.hints = true;
-            DevkitServerSpawnsTool.CheckExistingSpawnsForNodeComponents();
+            if (Level.isEditor)
+                DevkitServerSpawnsTool.CheckExistingSpawnsForNodeComponents();
 #endif
         }
     }
