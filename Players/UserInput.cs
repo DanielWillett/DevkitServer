@@ -10,6 +10,7 @@ using HarmonyLib;
 using SDG.Framework.Devkit;
 using System.Reflection;
 using System.Reflection.Emit;
+using DevkitServer.API;
 using EditorUI = SDG.Unturned.EditorUI;
 #endif
 
@@ -182,7 +183,6 @@ public class UserInput : MonoBehaviour
         get => GetDevkitTool?.Invoke();
         set => SetDevkitTool?.Invoke(value);
     }
-
     static UserInput()
     {
         Type? type = Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract");

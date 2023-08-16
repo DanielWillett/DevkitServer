@@ -148,6 +148,7 @@ public static class FormattingUtil
             bool digit = char.IsDigit(current);
             bool upper = char.IsUpper(current);
             if (char.IsWhiteSpace(current) || !digit && !upper || char.IsWhiteSpace(text[i - 1]) ||
+                i == text.Length - 1 || char.IsWhiteSpace(text[i + 1]) ||
                 digit && char.IsDigit(text[i - 1]) && (i == text.Length - 1 || char.IsDigit(text[i + 1])) ||
                 upper && char.IsUpper(text[i - 1]) && (i == text.Length - 1 || char.IsUpper(text[i + 1])))
                 continue;
@@ -568,6 +569,23 @@ public static class FormattingUtil
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
                 return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) + "null" + ANSIForegroundReset;
             return "null";
+        }
+
+        if (obj is Vector2 v2)
+        {
+            return v2.ToString(format).Colorize(FormattingColorType.Struct);
+        }
+        if (obj is Vector3 v3)
+        {
+            return v3.ToString(format).Colorize(FormattingColorType.Struct);
+        }
+        if (obj is Vector3 v4)
+        {
+            return v4.ToString(format).Colorize(FormattingColorType.Struct);
+        }
+        if (obj is Quaternion q)
+        {
+            return q.ToString(format).Colorize(FormattingColorType.Struct);
         }
 
         if (obj is IDevkitServerPlugin plugin)

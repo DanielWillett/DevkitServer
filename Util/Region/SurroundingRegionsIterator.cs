@@ -19,7 +19,7 @@ public struct SurroundingRegionsIterator : IEnumerator<RegionCoord>, IEnumerable
     private int _index;
     private int _layer;
     private int _nextLayerIndex;
-    public SurroundingRegionsIterator(byte x, byte y, byte maxRegionDistance)
+    public SurroundingRegionsIterator(byte x, byte y, byte maxRegionDistance = 255)
     {
         MaxRegionDistance = maxRegionDistance;
         StartX = x;
@@ -29,7 +29,6 @@ public struct SurroundingRegionsIterator : IEnumerator<RegionCoord>, IEnumerable
         _nextLayerIndex = 1;
         _current = default;
     }
-    public SurroundingRegionsIterator(byte x, byte y) : this (x, y, 255) { }
     void IDisposable.Dispose() { }
     public bool MoveNext()
     {

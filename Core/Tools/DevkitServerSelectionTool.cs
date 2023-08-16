@@ -166,7 +166,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                     {
                         DevkitTransactionManager.beginTransaction("Transform");
                         foreach (DevkitSelection selection in DevkitSelectionManager.selection)
-                            DevkitTransactionUtility.recordObjectDelta(selection.transform);
+                            DevkitTransactionManager.recordTransaction(new DevkitServerTransformedItem(selection.transform));
                     }
                 }
                 else
@@ -309,7 +309,6 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                     continue;
                 IDevkitSelectionCopyableHandler? handler = go.GetComponent<IDevkitSelectionCopyableHandler>();
                 GameObject copy = handler == null ? Object.Instantiate(go) : handler.copySelection();
-                OnPasted(copy);
                 if (!DevkitServerModule.IsEditing)
                     DevkitTransactionUtility.recordInstantiation(copy);
                 else copy.SetActive(true);
@@ -416,7 +415,6 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
 
     public abstract void RequestInstantiation(Vector3 position, Quaternion rotation, Vector3 scale);
     protected abstract IEnumerable<GameObject> EnumerateAreaSelectableObjects();
-    protected abstract void OnPasted(GameObject newObject);
     protected abstract void InputTick();
     protected virtual void OnGLRender()
     {
@@ -431,7 +429,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
             foreach (DevkitSelection selection in DevkitSelectionManager.selection)
             {
                 if (selection.gameObject != null)
-                    DevkitTransactionUtility.recordObjectDelta(selection.transform);
+                    DevkitTransactionManager.recordTransaction(new DevkitServerTransformedItem(selection.transform));
             }
         }
         if (DevkitSelectionManager.selection.Count == 1)

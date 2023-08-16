@@ -12,8 +12,20 @@ public abstract class UIExtension
     public event Action? OnOpened;
     public event Action? OnClosed;
 
-    internal void InvokeOnOpened() => OnOpened?.Invoke();
-    internal void InvokeOnClosed() => OnClosed?.Invoke();
+    protected virtual void Opened() { }
+    protected virtual void Closed() { }
+
+    internal void InvokeOnOpened()
+    {
+        Opened();
+        OnOpened?.Invoke();
+    }
+
+    internal void InvokeOnClosed()
+    {
+        Closed();
+        OnClosed?.Invoke();
+    }
 }
 public abstract class UIExtension<T> : UIExtension where T : class
 {
@@ -27,16 +39,20 @@ public class UIExtensionParentTypeInfo
     internal readonly List<UIExtensionPatch> InitializePatchesIntl;
     internal readonly List<UIExtensionPatch> DestroyPatchesIntl;
     internal readonly List<UIExtensionInstanceInfo> InstancesIntl;
+    internal readonly List<UIExtensionVanillaInstanceInfo> VanillaInstancesIntl;
     public Type ParentType { get; }
+    public UITypeInfo ParentTypeInfo { get; internal set; }
     public IReadOnlyList<UIExtensionPatch> OpenPatches { get; }
     public IReadOnlyList<UIExtensionPatch> ClosePatches { get; }
     public IReadOnlyList<UIExtensionPatch> InitializePatches { get; }
     public IReadOnlyList<UIExtensionPatch> DestroyPatches { get; }
     public IReadOnlyList<UIExtensionInstanceInfo> Instances { get; }
+    public IReadOnlyList<UIExtensionVanillaInstanceInfo> VanillaInstances { get; }
 
-    public UIExtensionParentTypeInfo(Type parentType)
+    public UIExtensionParentTypeInfo(Type parentType, UITypeInfo typeInfo)
     {
         ParentType = parentType;
+        ParentTypeInfo = typeInfo;
         OpenPatchesIntl = new List<UIExtensionPatch>(1);
         ClosePatchesIntl = new List<UIExtensionPatch>(1);
         InitializePatchesIntl = new List<UIExtensionPatch>(1);
@@ -47,6 +63,8 @@ public class UIExtensionParentTypeInfo
         DestroyPatches = DestroyPatchesIntl.AsReadOnly();
         InstancesIntl = new List<UIExtensionInstanceInfo>(1);
         Instances = InstancesIntl.AsReadOnly();
+        VanillaInstancesIntl = new List<UIExtensionVanillaInstanceInfo>(1);
+        VanillaInstances = VanillaInstancesIntl.AsReadOnly();
     }
 }
 
@@ -124,13 +142,23 @@ public class UIExistingMemberInfo
 public class UIExtensionInstanceInfo
 {
     public object Instance { get; }
-    public object? VanillaInstance { get; }
-    public bool Static { get; }
-    public UIExtensionInstanceInfo(object instance, object? vanillaInstance)
+    public UIExtensionVanillaInstanceInfo VanillaInstance { get; }
+    public UIExtensionInstanceInfo(object instance, UIExtensionVanillaInstanceInfo vanillaInstance)
     {
         Instance = instance;
         VanillaInstance = vanillaInstance;
-        Static = ReferenceEquals(vanillaInstance, null);
+    }
+}
+public class UIExtensionVanillaInstanceInfo
+{
+    public object? Instance { get; }
+    public bool Static { get; }
+    public bool IsOpen { get; internal set; }
+    public UIExtensionVanillaInstanceInfo(object? instance, bool isOpen)
+    {
+        Instance = instance;
+        Static = ReferenceEquals(instance, null);
+        IsOpen = isOpen;
     }
 }
 

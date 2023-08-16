@@ -4,11 +4,18 @@ namespace DevkitServer.Util;
 
 internal class CachedTime : MonoBehaviour
 {
+    private static readonly CachedMulticastEvent<Action> EventOnLateUpdate = new CachedMulticastEvent<Action>(typeof(CachedTime), nameof(OnLateUpdate));
     internal static CachedTime? Instance { get; private set; }
     private static float _deltaTime;
     private static bool _deltaTimeSet;
     private static float _realtimeSinceStartup;
     private static bool _realtimeSinceStartupSet;
+
+    public static event Action OnLateUpdate
+    {
+        add => EventOnLateUpdate.Add(value);
+        remove => EventOnLateUpdate.Remove(value);
+    }
 
     public static float DeltaTime
     {
@@ -52,5 +59,11 @@ internal class CachedTime : MonoBehaviour
     {
         _deltaTimeSet = false;
         _realtimeSinceStartupSet = false;
+    }
+
+    [UsedImplicitly]
+    private void LateUpdate()
+    {
+        EventOnLateUpdate.TryInvoke();
     }
 }

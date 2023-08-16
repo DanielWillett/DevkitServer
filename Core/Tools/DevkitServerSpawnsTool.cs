@@ -86,7 +86,6 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
 
     protected override bool TryRaycastSelectableItems(in Ray ray, out RaycastHit hit)
     {
-        Vector3 pos = Level.editing == null ? Vector3.zero : Level.editing.position;
         foreach (BaseSpawnpointNode spawn in EnumerateSpawns())
         {
             if (spawn.Collider != null && spawn.Collider.Raycast(ray, out hit, 8192f))
@@ -243,8 +242,6 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
             }
         }
     }
-    protected override void OnPasted(GameObject newObject) { }
-
     protected override void InputTick()
     {
         if (!InputEx.GetKeyDown(KeyCode.F8))
@@ -261,9 +258,11 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
 
 public abstract class BaseSpawnpointNode : MonoBehaviour, IDevkitInteractableBeginSelectionHandler, IDevkitInteractableEndSelectionHandler, ITerminalFormattable
 {
+    private bool _init;
     public bool IsSelected { get; private set; }
-    public bool IsAdded { get; set; } = true;
+    public bool IsAdded { get; internal set; } = true;
     public Collider Collider { get; protected set; } = null!;
+    internal bool IgnoreDestroy { get; set; }
 
     [UsedImplicitly]
     private void Start()
@@ -275,19 +274,21 @@ public abstract class BaseSpawnpointNode : MonoBehaviour, IDevkitInteractableBeg
             Collider.isTrigger = true;
             Collider.tag = "Logic";
         }
+
+        _init = true;
     }
 
     [UsedImplicitly]
     private void OnEnable()
     {
-        if (IsAdded) return;
+        if (!_init || IsAdded) return;
         IsAdded = Add();
     }
 
     [UsedImplicitly]
     private void OnDisable()
     {
-        if (!IsAdded) return;
+        if (!IsAdded || Level.isExiting || !Level.isLoaded || !Level.isEditor || IgnoreDestroy) return;
         Remove();
         IsAdded = false;
     }
@@ -322,7 +323,7 @@ public abstract class IndexedSpawnpointNode : BaseSpawnpointNode
     public int Index { get; internal set; }
 }
 
-public class AnimalSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTransformableHandler
+public class AnimalSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTransformableHandler, IDevkitSelectionCopyableHandler
 {
     private static readonly Color32 SpawnpointColor = new Color32(255, 204, 102, 255);
     public AnimalSpawnpoint Spawnpoint { get; internal set; } = null!;
@@ -359,8 +360,14 @@ public class AnimalSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTrans
     {
         SpawnUtil.MoveSpawnpoint(Spawnpoint, transform.position);
     }
+    GameObject IDevkitSelectionCopyableHandler.copySelection()
+    {
+        AnimalSpawnpoint point = new AnimalSpawnpoint(Spawnpoint.type, Spawnpoint.point);
+        SpawnUtil.AddAnimalSpawn(point);
+        return point.node.gameObject;
+    }
 }
-public class VehicleSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTransformableHandler
+public class VehicleSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTransformableHandler, IDevkitSelectionCopyableHandler
 {
     private static readonly Color32 SpawnpointColor = new Color32(148, 184, 184, 255);
     public VehicleSpawnpoint Spawnpoint { get; internal set; } = null!;
@@ -397,8 +404,14 @@ public class VehicleSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTran
     {
         SpawnUtil.TransformSpawnpoint(Spawnpoint, transform.position, transform.rotation.eulerAngles.y);
     }
+    GameObject IDevkitSelectionCopyableHandler.copySelection()
+    {
+        VehicleSpawnpoint point = new VehicleSpawnpoint(Spawnpoint.type, Spawnpoint.point, Spawnpoint.angle);
+        SpawnUtil.AddVehicleSpawn(point);
+        return point.node.gameObject;
+    }
 }
-public class PlayerSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTransformableHandler
+public class PlayerSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTransformableHandler, IDevkitSelectionCopyableHandler
 {
     private static readonly Color32 SpawnpointColor = new Color32(204, 255, 102, 255);
     public PlayerSpawnpoint Spawnpoint { get; internal set; } = null!;
@@ -432,8 +445,14 @@ public class PlayerSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTrans
     {
         SpawnUtil.TransformSpawnpoint(Spawnpoint, transform.position, transform.rotation.eulerAngles.y);
     }
+    GameObject IDevkitSelectionCopyableHandler.copySelection()
+    {
+        PlayerSpawnpoint point = new PlayerSpawnpoint(Spawnpoint.point, Spawnpoint.angle, Spawnpoint.isAlt);
+        SpawnUtil.AddPlayerSpawn(point);
+        return point.node.gameObject;
+    }
 }
-public class ItemSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionTransformableHandler
+public class ItemSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionTransformableHandler, IDevkitSelectionCopyableHandler
 {
     private static readonly Color32 SpawnpointColor = new Color32(204, 255, 255, 255);
     public ItemSpawnpoint Spawnpoint { get; internal set; } = null!;
@@ -449,7 +468,7 @@ public class ItemSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionTransf
     }
     protected override bool Remove()
     {
-        return SpawnUtil.RemoveItemSpawn(Spawnpoint);
+        return SpawnUtil.RemoveItemSpawn(Spawnpoint, false);
     }
     public override string Format(ITerminalFormatProvider provider)
     {
@@ -468,8 +487,14 @@ public class ItemSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionTransf
     {
         SpawnUtil.MoveSpawnpoint(Spawnpoint, transform.position, out _);
     }
+    GameObject IDevkitSelectionCopyableHandler.copySelection()
+    {
+        ItemSpawnpoint point = new ItemSpawnpoint(Spawnpoint.type, Spawnpoint.point);
+        SpawnUtil.AddItemSpawn(point);
+        return point.node.gameObject;
+    }
 }
-public class ZombieSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionTransformableHandler
+public class ZombieSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionTransformableHandler, IDevkitSelectionCopyableHandler
 {
     private static readonly Color32 SpawnpointColor = new Color32(41, 163, 41, 255);
     public ZombieSpawnpoint Spawnpoint { get; internal set; } = null!;
@@ -485,7 +510,7 @@ public class ZombieSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionTran
     }
     protected override bool Remove()
     {
-        return SpawnUtil.RemoveZombieSpawn(Spawnpoint);
+        return SpawnUtil.RemoveZombieSpawn(Spawnpoint, false);
     }
     public override string Format(ITerminalFormatProvider provider)
     {
@@ -503,6 +528,12 @@ public class ZombieSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionTran
     void IDevkitSelectionTransformableHandler.transformSelection()
     {
         SpawnUtil.MoveSpawnpoint(Spawnpoint, transform.position, out _);
+    }
+    GameObject IDevkitSelectionCopyableHandler.copySelection()
+    {
+        ZombieSpawnpoint point = new ZombieSpawnpoint(Spawnpoint.type, Spawnpoint.point);
+        SpawnUtil.AddZombieSpawn(point);
+        return point.node.gameObject;
     }
 }
 #endif

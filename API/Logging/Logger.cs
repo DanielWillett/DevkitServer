@@ -117,8 +117,8 @@ public static class Logger
                 else
                     config.ColorFormatting = StackColorFormatType.None;
 #else
-            if (Application.platform is not RuntimePlatform.WindowsPlayer and not RuntimePlatform.WindowsEditor)
-                config.ColorFormatting = StackColorFormatType.ANSIColor;
+                if (Application.platform is not RuntimePlatform.WindowsPlayer and not RuntimePlatform.WindowsEditor)
+                    config.ColorFormatting = StackColorFormatType.ANSIColor;
 #endif
                 if (!DevkitServerConfig.Config.ConsoleVisualANSISupport)
                 {

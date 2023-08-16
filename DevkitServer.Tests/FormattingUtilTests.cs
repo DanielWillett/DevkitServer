@@ -31,6 +31,14 @@ public class FormattingUtilTests
     }
 
     [TestMethod]
+    public void TestSpaceProperCaseStringFullAcronymWithSpaces()
+    {
+        string result = FormattingUtil.SpaceProperCaseString("UI EXT MANAGER");
+
+        Assert.AreEqual("UI EXT MANAGER", result);
+    }
+
+    [TestMethod]
     public void TestSpaceProperCaseStringMiddleAcronym()
     {
         string result = FormattingUtil.SpaceProperCaseString("AaaaAABb");

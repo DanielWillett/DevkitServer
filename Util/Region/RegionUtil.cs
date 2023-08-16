@@ -25,8 +25,11 @@ public static class RegionUtil
         if (!Regions.tryGetCoordinate(position, out x, out y))
             throw new ArgumentOutOfRangeException(nameof(position), "Position is out of range of the region system.");
     }
+    public static SurroundingRegionsIterator EnumerateRegions() => new SurroundingRegionsIterator((byte)(Regions.WORLD_SIZE / 2), (byte)(Regions.WORLD_SIZE / 2), 255);
     public static SurroundingRegionsIterator EnumerateRegions(byte centerX, byte centerY, byte maxRegionDistance) => new SurroundingRegionsIterator(centerX, centerY, maxRegionDistance);
     public static SurroundingRegionsIterator EnumerateRegions(byte centerX, byte centerY) => new SurroundingRegionsIterator(centerX, centerY);
+    public static SurroundingRegionsIterator EnumerateRegions(RegionCoord center, byte maxRegionDistance) => new SurroundingRegionsIterator(center.x, center.y, maxRegionDistance);
+    public static SurroundingRegionsIterator EnumerateRegions(RegionCoord center) => new SurroundingRegionsIterator(center.x, center.y);
     public static SurroundingRegionsIterator EnumerateRegions(Vector3 center)
     {
         if (!Regions.tryGetCoordinate(center, out byte centerX, out byte centerY))
@@ -37,6 +40,8 @@ public static class RegionUtil
     public static RegionsIterator LinearEnumerateRegions(bool yPrimary) => new RegionsIterator(yPrimary);
     public static RegionsIterator LinearEnumerateRegions() => new RegionsIterator();
 
+    public static ListRegionsEnumerator<T> CastFrom<T>(this List<T>[,] regions, RegionCoord center, byte maxRegionDistance = 255)
+        => new ListRegionsEnumerator<T>(regions, center.x, center.y, maxRegionDistance);
     public static ListRegionsEnumerator<T> CastFrom<T>(this List<T>[,] regions, byte centerX, byte centerY, byte maxRegionDistance = 255)
         => new ListRegionsEnumerator<T>(regions, centerX, centerY, maxRegionDistance);
     public static ListRegionsEnumerator<T> CastFrom<T>(this List<T>[,] regions, Vector3 position, byte maxRegionDistance = 255)
@@ -92,6 +97,8 @@ public static class RegionUtil
             action(coord);
         }
     }
+    public static void ForEachRegion(RegionCoord center, RegionAction action)
+        => ForEachRegion(center.x, center.y, action);
     public static void ForEachRegion(byte centerX, byte centerY, RegionAction action)
     {
         SurroundingRegionsIterator iterator = new SurroundingRegionsIterator(centerX, centerY);
@@ -119,6 +126,8 @@ public static class RegionUtil
                 break;
         }
     }
+    public static void ForEachRegion(RegionCoord center, RegionActionWhile action)
+        => ForEachRegion(center.x, center.y, action);
     public static void ForEachRegion(byte centerX, byte centerY, RegionActionWhile action)
     {
         SurroundingRegionsIterator iterator = new SurroundingRegionsIterator(centerX, centerY);

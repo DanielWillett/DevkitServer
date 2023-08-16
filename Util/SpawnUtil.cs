@@ -277,7 +277,13 @@ public static class SpawnUtil
         if (index == -1)
         {
             if (destroyNode && spawn.node != null)
+            {
+#if CLIENT
+                if (spawn.node.TryGetComponent(out AnimalSpawnpointNode node))
+                    node.IgnoreDestroy = true;
+#endif
                 Object.Destroy(spawn.node.gameObject);
+            }
             return false;
         }
 
@@ -294,6 +300,7 @@ public static class SpawnUtil
 #if CLIENT
             if (changed.node != null && changed.node.TryGetComponent(out AnimalSpawnpointNode node))
             {
+                node.IsAdded = true;
                 node.Index = index;
                 node.Spawnpoint = changed;
             }
@@ -308,7 +315,13 @@ public static class SpawnUtil
         Logger.LogDebug($"Animal spawnpoint removed: {index.Format()}.");
 
         if (destroyNode && spawn.node != null)
+        {
+#if CLIENT
+            if (spawn.node.TryGetComponent(out AnimalSpawnpointNode node))
+                node.IgnoreDestroy = true;
+#endif
             Object.Destroy(spawn.node.gameObject);
+        }
         return true;
     }
 
@@ -325,7 +338,13 @@ public static class SpawnUtil
         if (index == -1)
         {
             if (destroyNode && spawn.node != null)
+            {
+#if CLIENT
+                if (spawn.node.TryGetComponent(out VehicleSpawnpointNode node))
+                    node.IgnoreDestroy = true;
+#endif
                 Object.Destroy(spawn.node.gameObject);
+            }
             return false;
         }
 
@@ -342,6 +361,7 @@ public static class SpawnUtil
 #if CLIENT
             if (changed.node != null && changed.node.TryGetComponent(out VehicleSpawnpointNode node))
             {
+                node.IsAdded = true;
                 node.Index = index;
                 node.Spawnpoint = changed;
             }
@@ -356,7 +376,13 @@ public static class SpawnUtil
         Logger.LogDebug($"Vehicle spawnpoint removed: {index.Format()}.");
 
         if (destroyNode && spawn.node != null)
+        {
+#if CLIENT
+            if (spawn.node.TryGetComponent(out VehicleSpawnpointNode node))
+                node.IgnoreDestroy = true;
+#endif
             Object.Destroy(spawn.node.gameObject);
+        }
         return true;
     }
 
@@ -373,7 +399,13 @@ public static class SpawnUtil
         if (index == -1)
         {
             if (destroyNode && spawn.node != null)
+            {
+#if CLIENT
+                if (spawn.node.TryGetComponent(out PlayerSpawnpointNode node))
+                    node.IgnoreDestroy = true;
+#endif
                 Object.Destroy(spawn.node.gameObject);
+            }
             return false;
         }
 
@@ -390,6 +422,7 @@ public static class SpawnUtil
 #if CLIENT
             if (changed.node != null && changed.node.TryGetComponent(out PlayerSpawnpointNode node))
             {
+                node.IsAdded = true;
                 node.Index = index;
                 node.Spawnpoint = changed;
             }
@@ -402,9 +435,15 @@ public static class SpawnUtil
         }
 
         Logger.LogDebug($"Player spawnpoint removed: {index.Format()}.");
-
+        
         if (destroyNode && spawn.node != null)
+        {
+#if CLIENT
+            if (spawn.node.TryGetComponent(out PlayerSpawnpointNode node))
+                node.IgnoreDestroy = true;
+#endif
             Object.Destroy(spawn.node.gameObject);
+        }
         return true;
     }
 
@@ -439,6 +478,7 @@ public static class SpawnUtil
 #if CLIENT
                 if (changed.node != null && changed.node.TryGetComponent(out ItemSpawnpointNode node))
                 {
+                    node.IsAdded = true;
                     node.Region = newRegion;
                     node.Spawnpoint = changed;
                 }
@@ -453,13 +493,25 @@ public static class SpawnUtil
             Logger.LogDebug($"Item spawnpoint removed: {newRegion.Format()}.");
 
             if (destroyNode && spawn.node != null)
+            {
+#if CLIENT
+                if (spawn.node.TryGetComponent(out ItemSpawnpointNode node))
+                    node.IgnoreDestroy = true;
+#endif
                 Object.Destroy(spawn.node.gameObject);
+            }
             removed = true;
             return false;
         });
 
         if (!removed && destroyNode && spawn.node != null)
+        {
+#if CLIENT
+            if (spawn.node.TryGetComponent(out ItemSpawnpointNode node))
+                node.IgnoreDestroy = true;
+#endif
             Object.Destroy(spawn.node.gameObject);
+        }
 
         return removed;
     }
@@ -495,6 +547,7 @@ public static class SpawnUtil
 #if CLIENT
                 if (changed.node != null && changed.node.TryGetComponent(out ZombieSpawnpointNode node))
                 {
+                    node.IsAdded = true;
                     node.Region = newRegion;
                     node.Spawnpoint = changed;
                 }
@@ -509,13 +562,25 @@ public static class SpawnUtil
             Logger.LogDebug($"Zombie spawnpoint removed: {newRegion.Format()}.");
 
             if (destroyNode && spawn.node != null)
+            {
+#if CLIENT
+                if (spawn.node.TryGetComponent(out ZombieSpawnpointNode node))
+                    node.IgnoreDestroy = true;
+#endif
                 Object.Destroy(spawn.node.gameObject);
+            }
             removed = true;
             return false;
         });
 
         if (!removed && destroyNode && spawn.node != null)
+        {
+#if CLIENT
+            if (spawn.node.TryGetComponent(out ZombieSpawnpointNode node))
+                node.IgnoreDestroy = true;
+#endif
             Object.Destroy(spawn.node.gameObject);
+        }
 
         return removed;
     }
@@ -541,6 +606,7 @@ public static class SpawnUtil
             if (!spawn.node.TryGetComponent(out AnimalSpawnpointNode node))
                 node = spawn.node.gameObject.AddComponent<AnimalSpawnpointNode>();
 
+            node.IsAdded = true;
             node.Spawnpoint = spawn;
             node.Index = index;
         }
@@ -575,6 +641,7 @@ public static class SpawnUtil
             if (!spawn.node.TryGetComponent(out VehicleSpawnpointNode node))
                 node = spawn.node.gameObject.AddComponent<VehicleSpawnpointNode>();
 
+            node.IsAdded = true;
             node.Spawnpoint = spawn;
             node.Index = index;
         }
@@ -609,6 +676,7 @@ public static class SpawnUtil
             if (!spawn.node.TryGetComponent(out PlayerSpawnpointNode node))
                 node = spawn.node.gameObject.AddComponent<PlayerSpawnpointNode>();
 
+            node.IsAdded = true;
             node.Spawnpoint = spawn;
             node.Index = index;
         }
@@ -659,7 +727,13 @@ public static class SpawnUtil
                 goto setNode;
 
             if (spawn.node != null)
+            {
+#if CLIENT
+                if (spawn.node.TryGetComponent(out ItemSpawnpointNode node))
+                    node.IgnoreDestroy = true;
+#endif
                 Object.Destroy(spawn.node.gameObject);
+            }
 
             return;
         }
@@ -678,6 +752,7 @@ public static class SpawnUtil
 #if CLIENT
                 if (changed.node != null && changed.node.TryGetComponent(out ItemSpawnpointNode node))
                 {
+                    node.IsAdded = true;
                     node.Region = changedNewRegion.Value;
                     node.Spawnpoint = changed;
                 }
@@ -698,13 +773,14 @@ public static class SpawnUtil
         }
 
         setNode:
-        RegionIdentifier regionId = x2 == byte.MaxValue || index == -1 ? RegionIdentifier.Invalid : new RegionIdentifier(x2, y2, index2);
+        RegionIdentifier regionId = x2 == byte.MaxValue || index2 == -1 ? RegionIdentifier.Invalid : new RegionIdentifier(x2, y2, index2);
 #if CLIENT
         if (spawn.node != null)
         {
             if (!spawn.node.TryGetComponent(out ItemSpawnpointNode node))
                 node = spawn.node.gameObject.AddComponent<ItemSpawnpointNode>();
 
+            node.IsAdded = true;
             node.Spawnpoint = spawn;
             node.Region = regionId;
         }
@@ -763,7 +839,13 @@ public static class SpawnUtil
                 goto setNode;
 
             if (spawn.node != null)
+            {
+#if CLIENT
+                if (spawn.node.TryGetComponent(out ZombieSpawnpointNode node))
+                    node.IgnoreDestroy = true;
+#endif
                 Object.Destroy(spawn.node.gameObject);
+            }
 
             return;
         }
@@ -782,6 +864,7 @@ public static class SpawnUtil
 #if CLIENT
                 if (changed.node != null && changed.node.TryGetComponent(out ZombieSpawnpointNode node))
                 {
+                    node.IsAdded = true;
                     node.Region = changedNewRegion.Value;
                     node.Spawnpoint = changed;
                 }
@@ -802,13 +885,14 @@ public static class SpawnUtil
         }
 
         setNode:
-        RegionIdentifier regionId = x2 == byte.MaxValue || index == -1 ? RegionIdentifier.Invalid : new RegionIdentifier(x2, y2, index2);
+        RegionIdentifier regionId = x2 == byte.MaxValue || index2 == -1 ? RegionIdentifier.Invalid : new RegionIdentifier(x2, y2, index2);
 #if CLIENT
         if (spawn.node != null)
         {
             if (!spawn.node.TryGetComponent(out ZombieSpawnpointNode node))
                 node = spawn.node.gameObject.AddComponent<ZombieSpawnpointNode>();
 
+            node.IsAdded = true;
             node.Spawnpoint = spawn;
             node.Region = regionId;
         }
@@ -968,6 +1052,7 @@ public static class SpawnUtil
 #if CLIENT
                     if (changed.node != null && changed.node.TryGetComponent(out ItemSpawnpointNode node))
                     {
+                        node.IsAdded = true;
                         node.Region = newRegion;
                         node.Spawnpoint = changed;
                     }
@@ -996,6 +1081,7 @@ public static class SpawnUtil
             if (!point.node.TryGetComponent(out ItemSpawnpointNode spawnpoint))
                 spawnpoint = point.node.gameObject.AddComponent<ItemSpawnpointNode>();
 
+            spawnpoint.IsAdded = true;
             spawnpoint.Region = region;
             spawnpoint.Spawnpoint = point;
 #endif
@@ -1065,6 +1151,7 @@ public static class SpawnUtil
 #if CLIENT
                     if (changed.node != null && changed.node.TryGetComponent(out ZombieSpawnpointNode node))
                     {
+                        node.IsAdded = true;
                         node.Region = newRegion;
                         node.Spawnpoint = changed;
                     }
@@ -1093,6 +1180,7 @@ public static class SpawnUtil
             if (!point.node.TryGetComponent(out ZombieSpawnpointNode spawnpoint))
                 spawnpoint = point.node.gameObject.AddComponent<ZombieSpawnpointNode>();
 
+            spawnpoint.IsAdded = true;
             spawnpoint.Region = region;
             spawnpoint.Spawnpoint = point;
 #endif

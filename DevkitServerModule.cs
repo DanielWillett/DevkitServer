@@ -171,7 +171,6 @@ public sealed class DevkitServerModule : IModuleNexus
             // Initialize UniTask
             if (!PlayerLoopHelper.HasBeenInitialized)
                 PlayerLoopHelper.Init();
-
             GameObjectHost = new GameObject(ModuleName);
             ComponentHost = GameObjectHost.AddComponent<DevkitServerModuleComponent>();
             GameObjectHost.AddComponent<CachedTime>();
@@ -190,6 +189,7 @@ public sealed class DevkitServerModule : IModuleNexus
             InitializedLogging = true;
             PatchesMain.Init();
 #if CLIENT
+            MovementUtil.Init();
             Logger.PostPatcherSetupInitLogger();
 #endif
             GetAssetsInstance = Accessor.GenerateStaticGetter<Assets, Assets>("instance");
@@ -741,6 +741,7 @@ public sealed class DevkitServerModule : IModuleNexus
         if (IconGenerator.Instance != null)
             Object.Destroy(IconGenerator.Instance.gameObject);
         ObjectIconPresets.Deinit();
+        MovementUtil.Deinit();
 #endif
         LevelObjectNetIdDatabase.Shutdown();
         HierarchyItemNetIdDatabase.Shutdown();
@@ -828,6 +829,9 @@ public sealed class DevkitServerModuleComponent : MonoBehaviour
                 res?.Complete();
             }
         }
+#if CLIENT
+        MovementUtil.OnUpdate();
+#endif
     }
 
     [UsedImplicitly]
