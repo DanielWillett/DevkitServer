@@ -324,7 +324,7 @@ public class CommandContext : Exception
     {
         if (ReplyingToConsole)
         {
-            Command.LogInfo(rawText);
+            Command.LogInfo(FormattingUtil.ConvertRichTextToANSI(rawText));
         }
         else
         {

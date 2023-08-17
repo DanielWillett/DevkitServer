@@ -18,6 +18,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security;
 using Cysharp.Threading.Tasks;
+using DevkitServer.Core;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Levels;
 using UnityEngine.SceneManagement;
@@ -293,6 +294,7 @@ public sealed class DevkitServerModule : IModuleNexus
             ChatManager.onChatMessageReceived += OnChatMessageReceived;
             UserTPVControl.Init();
 #endif
+            AssetUtil.OnBeginLevelLoading += OnLevelStartLoading;
             LevelObjectNetIdDatabase.Init();
             HierarchyItemNetIdDatabase.Init();
 
@@ -368,6 +370,14 @@ public sealed class DevkitServerModule : IModuleNexus
         }
         GC.Collect();
     }
+
+    private static async UniTask OnLevelStartLoading(LevelInfo level, CancellationToken token)
+    {
+        if (!HasLoadedBundle)
+        {
+            await TryLoadBundle(null);
+        }
+    }
 #if CLIENT
     private static void OnChatMessageReceived()
     {
@@ -440,14 +450,14 @@ public sealed class DevkitServerModule : IModuleNexus
             ObjectSync.CreateServersideAuthority();
             HierarchySync.CreateServersideAuthority();
         }
-
-        if (!BitConverter.IsLittleEndian)
+        else if (level == Level.BUILD_INDEX_GAME)
         {
-            Logger.LogWarning("Your machine is big-endian, you may face issues with improper data transmission, " +
-                              "please report it as I am unable to test with these conditioins.");
+            ComponentHost.StartCoroutine(TryLoadBundle(null));
         }
 
-        ComponentHost.StartCoroutine(ClearLoggingErrorsDelayed());
+
+        if (level == Level.BUILD_INDEX_GAME)
+            ComponentHost.StartCoroutine(ClearLoggingErrorsDelayed());
 #if CLIENT
         EditorLevel.ServerPendingLevelData = null;
         GC.Collect();
@@ -456,8 +466,18 @@ public sealed class DevkitServerModule : IModuleNexus
     private static IEnumerator<WaitForSeconds> ClearLoggingErrorsDelayed()
     {
         yield return new WaitForSeconds(2);
-        Logger.ClearLoadingErrors();
+        if (Logger.HasLoadingErrors)
+            Logger.ClearLoadingErrors();
         Logger.LogDebug($"DevkitServer managed memory usage: {DevkitServerUtility.FormatBytes(GC.GetTotalMemory(true)).Format(false)}");
+
+        if (!BitConverter.IsLittleEndian)
+        {
+            Logger.LogWarning(string.Empty);
+            Logger.LogWarning("---- WARNING ----");
+            Logger.LogWarning("Your machine has a big-endian byte order, you may face issues with improper data transmission, " +
+                              "please report it as I am unable to test with these conditioins.");
+            Logger.LogWarning("-----------------");
+        }
     }
     private static void LoadSearchLocations()
     {
@@ -534,9 +554,15 @@ public sealed class DevkitServerModule : IModuleNexus
         Bundle = null;
         HasLoadedBundle = false;
     }
-    internal IEnumerator TryLoadBundle(Action? callback)
+    internal static IEnumerator TryLoadBundle(Action? callback)
     {
         ThreadUtil.assertIsGameThread();
+
+        if (HasLoadedBundle)
+        {
+            callback?.Invoke();
+            yield break;
+        }
 
         while (Assets.isLoading)
             yield return null;
@@ -596,10 +622,11 @@ public sealed class DevkitServerModule : IModuleNexus
         Logger.LogInfo("Loaded bundle: " + bundle.assetBundleNameWithoutExtension.Format() + " from " + path.Format() + ".");
         HasLoadedBundle = true;
 #if false
-        Logger.LogDebug("Assets:");
+        Logger.LogDebug("Assets in bundle:");
         foreach (string asset in Bundle.cfg.assetBundle.GetAllAssetNames())
             Logger.LogDebug("Asset: " + asset.Format() + ".");
 #endif
+        SharedResources.LoadFromBundle();
         callback?.Invoke();
     }
 
@@ -743,6 +770,7 @@ public sealed class DevkitServerModule : IModuleNexus
         ObjectIconPresets.Deinit();
         MovementUtil.Deinit();
 #endif
+        AssetUtil.OnBeginLevelLoading -= OnLevelStartLoading;
         LevelObjectNetIdDatabase.Shutdown();
         HierarchyItemNetIdDatabase.Shutdown();
 

@@ -247,10 +247,10 @@ public static class FormattingUtil
             : string.Empty;
         type += FormatProvider.StackCleaner.GetString(property.PropertyType) + " ";
         if (property.DeclaringType != null)
-            type += FormatProvider.StackCleaner.GetString(property.DeclaringType) + " ";
+            type += FormatProvider.StackCleaner.GetString(property.DeclaringType) + ".";
         else
             type += "global".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) +
-                   "::".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor) + " ";
+                   "::".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
 
         type += property.Name.ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PropertyColor) + " {".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
         
@@ -545,6 +545,7 @@ public static class FormattingUtil
     }
 
     public static readonly Color32 StringColor = new Color32(214, 157, 133, 255);
+    public static readonly Color32 NumberColor = new Color32(181, 206, 168, 255);
     public static string Format(this string? str, bool quotes)
     {
         if (str == null) return ((object?)null).Format();
@@ -693,39 +694,38 @@ public static class FormattingUtil
             {
                 if (obj is bool)
                     return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) + str + ANSIForegroundReset;
-
-                Color32 color = new Color32(181, 206, 168, 255);
+                
                 if (format != null)
                 {
                     switch (obj)
                     {
                         case float n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case double n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case decimal n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case int n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case uint n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case short n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case ushort n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case sbyte n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case byte n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case long n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case ulong n:
-                            return GetColor(ToArgb(color)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                     }
                 }
 
 
-                return GetColor(ToArgb(color)) + str + ANSIForegroundReset;
+                return GetColor(ToArgb(NumberColor)) + str + ANSIForegroundReset;
             }
 
             if (type.IsInterface)
@@ -733,6 +733,13 @@ public static class FormattingUtil
 
             if (type.IsValueType)
                 return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.StructColor) + str + ANSIForegroundReset;
+
+            if (type.IsArray)
+            {
+                return (type.GetElementType().Format() + "[".Colorize(FormattingColorType.Punctuation) +
+                        ((Array)obj).Length.ToString(CultureInfo.InvariantCulture).Colorize(NumberColor) +
+                        "]".Colorize(FormattingColorType.Punctuation));
+            }
 
             return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ClassColor) + str + ANSIForegroundReset;
         }
@@ -1640,7 +1647,7 @@ internal class LoggerFormatProvider : ITerminalFormatProvider
     public StackTraceCleaner StackCleaner => Logger.StackCleaner;
 }
 
-internal class CustomTerminalFormatProvider
+internal class CustomTerminalFormatProvider : ITerminalFormatProvider
 {
     public StackTraceCleaner StackCleaner { get; }
     public CustomTerminalFormatProvider(StackTraceCleaner stackCleaner)

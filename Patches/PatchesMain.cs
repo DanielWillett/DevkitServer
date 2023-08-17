@@ -6,6 +6,8 @@ using DevkitServer.Configuration;
 using DevkitServer.Players;
 using SDG.Framework.Landscapes;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
+using Cysharp.Threading.Tasks;
 using Version = System.Version;
 #if CLIENT
 using DevkitServer.Multiplayer.Levels;
@@ -80,6 +82,7 @@ internal static class PatchesMain
     }
     private static void DoManualPatches()
     {
+        // Level.includeHash
         try
         {
             MethodInfo? method = typeof(Level).GetMethod(nameof(Level.includeHash), BindingFlags.Public | BindingFlags.Static);
@@ -96,6 +99,7 @@ internal static class PatchesMain
 #if CLIENT
         if (DevkitServerConfig.Config.EnableBetterLevelCreation)
         {
+            // MenuWorkshopEditorUI.onClickedAddButton
             try
             {
                 MethodInfo? method = typeof(MenuWorkshopEditorUI).GetMethod("onClickedAddButton", BindingFlags.NonPublic | BindingFlags.Static);
@@ -113,6 +117,8 @@ internal static class PatchesMain
             }
         }
 #endif
+
+        // Level.save
         try
         {
             MethodInfo? method = Accessor.GetMethod(Level.save);
@@ -127,9 +133,31 @@ internal static class PatchesMain
             Logger.LogWarning($"Failed to patch method: {Accessor.GetMethod(Level.save).Format()}.", method: Source);
             Logger.LogError(ex, method: Source);
         }
+
+
+        // Level.init
+        try
+        {
+            MethodInfo? method = typeof(Level).GetMethod(nameof(Level.init), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int) }, null);
+            if (method == null)
+            {
+                Logger.LogWarning($"Method not found: {FormattingUtil.FormatMethod(typeof(IEnumerator), typeof(Level), nameof(Level.init), namedArguments: new (Type, string?)[] { (typeof(int), "id") })}.", method: Source);
+            }
+            else
+            {
+                Patcher.Patch(method, postfix: new HarmonyMethod(Accessor.GetMethod(PostfixLevelInit)));
+                Logger.LogDebug($"Postfixed {method.Format()} to add a on begin level load call.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Failed to patch coroutine: {FormattingUtil.FormatMethod(typeof(IEnumerator), typeof(Level), nameof(Level.init), namedArguments: new (Type, string?)[] { (typeof(int), "id") })}.", method: Source);
+            Logger.LogError(ex, method: Source);
+        }
     }
     private static void DoManualUnpatches()
     {
+        // Level.includeHash
         try
         {
             MethodInfo? method = typeof(Level).GetMethod(nameof(Level.includeHash), BindingFlags.Public | BindingFlags.Static);
@@ -142,6 +170,21 @@ internal static class PatchesMain
         {
             Logger.LogWarning("Patcher unpatching error: Level.includeHash.");
             Logger.LogError(ex);
+        }
+
+        // Level.init
+        try
+        {
+            MethodInfo? method = typeof(Level).GetMethod("init", BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int) }, null);
+            if (method != null)
+            {
+                Patcher.Unpatch(method, Accessor.GetMethod(PostfixLevelInit));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Failed to unpatch coroutine: {FormattingUtil.FormatMethod(typeof(IEnumerator), typeof(Level), nameof(Level.init), namedArguments: new (Type, string?)[] { (typeof(int), "id") })}.", method: Source);
+            Logger.LogError(ex, method: Source);
         }
     }
     private static bool OnLevelSaving()
@@ -174,6 +217,19 @@ internal static class PatchesMain
         EditorUser? user = UserManager.FromId(caller.player.channel.owner.playerID.steamID.m_SteamID);
         return !(user != null && user.Input.Controller == CameraController.Player);
     }
+    
+    private static void PostfixLevelInit(ref IEnumerator __result)
+    {
+        Logger.LogInfo($"Level initializing: {Level.info.getLocalizedName().Format(false)}.");
+
+        IEnumerator val = __result;
+        __result = UniTask.ToCoroutine(async () =>
+        {
+            await AssetUtil.InvokeOnBeginLevelLoading(DevkitServerModule.UnloadToken);
+            await val;
+        });
+    }
+
 #if CLIENT
 
     [HarmonyPatch(typeof(LoadingUI), "Update")]
@@ -382,25 +438,25 @@ internal static class PatchesMain
     [UsedImplicitly]
     [HarmonyPatch(typeof(MenuConfigurationOptionsUI), MethodType.Constructor)]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> MenuConfigurationOptionsUITranspiler(IEnumerable<CodeInstruction> instructions)
-        => MenuConfigurationUITranspiler(instructions);
+    private static IEnumerable<CodeInstruction> MenuConfigurationOptionsUITranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+        => MenuConfigurationUITranspiler(instructions, method);
     [UsedImplicitly]
     [HarmonyPatch(typeof(MenuConfigurationGraphicsUI), MethodType.Constructor)]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> MenuConfigurationGraphicsUITranspiler(IEnumerable<CodeInstruction> instructions)
-        => MenuConfigurationUITranspiler(instructions);
+    private static IEnumerable<CodeInstruction> MenuConfigurationGraphicsUITranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+        => MenuConfigurationUITranspiler(instructions, method);
     [UsedImplicitly]
     [HarmonyPatch(typeof(MenuConfigurationDisplayUI), MethodType.Constructor)]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> MenuConfigurationDisplayUITranspiler(IEnumerable<CodeInstruction> instructions)
-        => MenuConfigurationUITranspiler(instructions);
+    private static IEnumerable<CodeInstruction> MenuConfigurationDisplayUITranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+        => MenuConfigurationUITranspiler(instructions, method);
     [UsedImplicitly]
     [HarmonyPatch(typeof(MenuConfigurationControlsUI), MethodType.Constructor)]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> MenuConfigurationControlsUITranspiler(IEnumerable<CodeInstruction> instructions)
-        => MenuConfigurationUITranspiler(instructions);
+    private static IEnumerable<CodeInstruction> MenuConfigurationControlsUITranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+        => MenuConfigurationUITranspiler(instructions, method);
 
-    private static IEnumerable<CodeInstruction> MenuConfigurationUITranspiler(IEnumerable<CodeInstruction> instructions)
+    private static IEnumerable<CodeInstruction> MenuConfigurationUITranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
         MethodInfo? isConnected = typeof(Provider).GetProperty(nameof(Provider.isConnected), BindingFlags.Static | BindingFlags.Public)?.GetMethod;
         if (isConnected == null)
@@ -419,7 +475,14 @@ internal static class PatchesMain
                 yield return new CodeInstruction(OpCodes.Call, IsPlayerControlledOrNotEditingMethod);
                 yield return new CodeInstruction(OpCodes.And);
                 one = true;
+                Logger.LogDebug($"[{Source}] {method.Format()} - Patched connection state checker.");
             }
+        }
+
+        if (!one)
+        {
+            Logger.LogWarning($"Unable to patch connection state checker in {method.Format()}.", method: Source);
+            DevkitServerModule.Fault();
         }
     }
 #endif
@@ -449,7 +512,7 @@ internal static class PatchesMain
     {
         if (DevkitServerModule.HasLoadedBundle)
             return true;
-        DevkitServerModule.ComponentHost.StartCoroutine(DevkitServerModule.Instance.TryLoadBundle(DoHost));
+        DevkitServerModule.ComponentHost.StartCoroutine(DevkitServerModule.TryLoadBundle(DoHost));
         return false;
     }
 

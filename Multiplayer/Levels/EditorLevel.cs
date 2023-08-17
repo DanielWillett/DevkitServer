@@ -784,7 +784,7 @@ public static class EditorLevel
     }
     private static void OnLevelReady(string dir)
     {
-        DevkitServerModule.ComponentHost.StartCoroutine(DevkitServerModule.Instance.TryLoadBundle(() => DevkitServerModule.ComponentHost.StartCoroutine(LoadLevel(dir))));
+        DevkitServerModule.ComponentHost.StartCoroutine(DevkitServerModule.TryLoadBundle(() => DevkitServerModule.ComponentHost.StartCoroutine(LoadLevel(dir))));
     }
 
     private static readonly InstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>> GetServerPendingIDs =

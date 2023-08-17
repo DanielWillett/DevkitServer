@@ -306,8 +306,6 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         {
             DevkitServerModule.RegisterDisconnectFromEditingServer();
         }
-
-        DevkitServerModule.Instance.UnloadBundle();
         
         ClientInfo.OnDisconnect();
     }

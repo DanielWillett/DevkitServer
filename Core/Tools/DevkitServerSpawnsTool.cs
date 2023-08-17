@@ -42,22 +42,38 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
         for (int i = 0; i < LevelAnimals.spawns.Count; i++)
         {
             AnimalSpawnpoint point = LevelAnimals.spawns[i];
-            if (point.node != null && !point.node.TryGetComponent(out AnimalSpawnpointNode _))
-                point.node.gameObject.AddComponent<AnimalSpawnpointNode>().Spawnpoint = point;
+            if (point.node == null)
+                continue;
+            if (!point.node.TryGetComponent(out AnimalSpawnpointNode node))
+                node = point.node.gameObject.AddComponent<AnimalSpawnpointNode>();
+            node.Spawnpoint = point;
+            node.Index = i;
+            SpawnUtil.SetResourceShaders(point.node);
+
         }
 
         for (int i = 0; i < LevelVehicles.spawns.Count; i++)
         {
             VehicleSpawnpoint point = LevelVehicles.spawns[i];
-            if (point.node != null && !point.node.TryGetComponent(out VehicleSpawnpointNode _))
-                point.node.gameObject.AddComponent<VehicleSpawnpointNode>().Spawnpoint = point;
+            if (point.node == null)
+                continue;
+            if (!point.node.TryGetComponent(out VehicleSpawnpointNode node))
+                node = point.node.gameObject.AddComponent<VehicleSpawnpointNode>();
+            node.Spawnpoint = point;
+            node.Index = i;
+            SpawnUtil.SetResourceShaders(point.node);
         }
 
         for (int i = 0; i < LevelPlayers.spawns.Count; i++)
         {
             PlayerSpawnpoint point = LevelPlayers.spawns[i];
-            if (point.node != null && !point.node.TryGetComponent(out PlayerSpawnpointNode _))
-                point.node.gameObject.AddComponent<PlayerSpawnpointNode>().Spawnpoint = point;
+            if (point.node == null)
+                continue;
+            if (!point.node.TryGetComponent(out PlayerSpawnpointNode node))
+                node = point.node.gameObject.AddComponent<PlayerSpawnpointNode>();
+            node.Spawnpoint = point;
+            node.Index = i;
+            SpawnUtil.SetResourceShaders(point.node);
         }
 
         int worldSize = Regions.WORLD_SIZE;
@@ -69,16 +85,26 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
                 for (int i = 0; i < itemSpawnpoints.Count; i++)
                 {
                     ItemSpawnpoint point = itemSpawnpoints[i];
-                    if (point.node != null && !point.node.TryGetComponent(out ItemSpawnpointNode _))
-                        point.node.gameObject.AddComponent<ItemSpawnpointNode>().Spawnpoint = point;
+                    if (point.node == null)
+                        continue;
+                    if (!point.node.TryGetComponent(out ItemSpawnpointNode node))
+                        node = point.node.gameObject.AddComponent<ItemSpawnpointNode>();
+                    node.Spawnpoint = point;
+                    node.Region = new RegionIdentifier(x, y, i);
+                    SpawnUtil.SetResourceShaders(point.node);
                 }
 
                 List<ZombieSpawnpoint> zombieSpawnpoints = LevelZombies.spawns[x, y];
                 for (int i = 0; i < zombieSpawnpoints.Count; i++)
                 {
                     ZombieSpawnpoint point = zombieSpawnpoints[i];
-                    if (point.node != null && !point.node.TryGetComponent(out ZombieSpawnpointNode _))
-                        point.node.gameObject.AddComponent<ZombieSpawnpointNode>().Spawnpoint = point;
+                    if (point.node == null)
+                        continue;
+                    if (!point.node.TryGetComponent(out ZombieSpawnpointNode node))
+                        node = point.node.gameObject.AddComponent<ZombieSpawnpointNode>();
+                    node.Spawnpoint = point;
+                    node.Region = new RegionIdentifier(x, y, i);
+                    SpawnUtil.SetResourceShaders(point.node);
                 }
             }
         }

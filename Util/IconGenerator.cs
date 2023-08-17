@@ -26,6 +26,7 @@ public sealed class IconGenerator : MonoBehaviour
         _camera.cullingMask = RayMasks.LARGE | RayMasks.MEDIUM | RayMasks.SMALL;
         _camera.clearFlags = CameraClearFlags.Nothing;
         _camera.forceIntoRenderTexture = true;
+        _camera.eventMask = 0;
         _camera.enabled = false;
         _camera.orthographic = false;
         _camera.fieldOfView = FOV;

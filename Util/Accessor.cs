@@ -1617,6 +1617,31 @@ internal static class Accessor
         types.Sort(SortTypesByPriorityHandler);
         return types;
     }
+
+    /// <summary>
+    /// Takes a method declared in an interface and returns an implementation on <paramref name="type"/>. Useful for getting explicit implementations.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="interfaceMethod"/> is not defined in an interface or <paramref name="type"/> does not implement the interface it's defined in.</exception>
+    [Pure]
+    public static MethodInfo? GetImplementedMethod(Type type, MethodInfo interfaceMethod)
+    {
+        if (interfaceMethod is not { DeclaringType.IsInterface: true })
+            throw new ArgumentException("Interface method is not defined within an interface.", nameof(interfaceMethod));
+        if (!interfaceMethod.DeclaringType.IsAssignableFrom(type))
+            throw new ArgumentException("Type does not implement the interface this interface method is defined in.", nameof(interfaceMethod));
+
+        InterfaceMapping mapping = type.GetInterfaceMap(interfaceMethod.DeclaringType!);
+        for (int i = 0; i < mapping.InterfaceMethods.Length; ++i)
+        {
+            MethodInfo explictlyImplementedMethod = mapping.InterfaceMethods[i];
+            if (explictlyImplementedMethod.Equals(interfaceMethod))
+            {
+                return explictlyImplementedMethod;
+            }
+        }
+
+        return null;
+    }
     
     public static void GetDelegateSignature<TDelegate>(out Type returnType, out ParameterInfo[] parameters) where TDelegate : Delegate
     {

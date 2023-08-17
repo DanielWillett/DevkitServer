@@ -1,7 +1,9 @@
 ﻿using DevkitServer.Models;
 using DevkitServer.Util.Region;
 #if CLIENT
+using DevkitServer.Core;
 using DevkitServer.Core.Tools;
+using UnityEngine.Rendering;
 #endif
 
 namespace DevkitServer.Util;
@@ -593,6 +595,10 @@ public static class SpawnUtil
     {
         ThreadUtil.assertIsGameThread();
 
+#if CLIENT
+        SetResourceShaders(spawn.node);
+#endif
+
         int index = LevelAnimals.spawns.IndexOf(spawn);
         bool added = index == -1;
         if (added)
@@ -627,6 +633,10 @@ public static class SpawnUtil
     public static void AddVehicleSpawn(VehicleSpawnpoint spawn)
     {
         ThreadUtil.assertIsGameThread();
+
+#if CLIENT
+        SetResourceShaders(spawn.node);
+#endif
 
         int index = LevelVehicles.spawns.IndexOf(spawn);
         bool added = index == -1;
@@ -663,6 +673,10 @@ public static class SpawnUtil
     {
         ThreadUtil.assertIsGameThread();
 
+#if CLIENT
+        SetResourceShaders(spawn.node);
+#endif
+
         int index = LevelPlayers.spawns.IndexOf(spawn);
         bool added = index == -1;
         if (added)
@@ -698,6 +712,10 @@ public static class SpawnUtil
     public static void AddItemSpawn(ItemSpawnpoint spawn)
     {
         ThreadUtil.assertIsGameThread();
+
+#if CLIENT
+        SetResourceShaders(spawn.node);
+#endif
 
         int worldSize = Regions.WORLD_SIZE;
         int x = 0, y = 0;
@@ -810,6 +828,10 @@ public static class SpawnUtil
     public static void AddZombieSpawn(ZombieSpawnpoint spawn)
     {
         ThreadUtil.assertIsGameThread();
+
+#if CLIENT
+        SetResourceShaders(spawn.node);
+#endif
 
         int worldSize = Regions.WORLD_SIZE;
         int x = 0, y = 0;
@@ -1358,4 +1380,14 @@ public static class SpawnUtil
     internal static void SetPoint(this ZombieSpawnpoint spawn, Vector3 point) => SetZombieSpawnpointPoint?.Invoke(spawn, point);
     internal static void SetYaw(this VehicleSpawnpoint spawn, float yaw) => SetVehicleSpawnpointAngle?.Invoke(spawn, yaw);
     internal static void SetYaw(this PlayerSpawnpoint spawn, float yaw) => SetPlayerSpawnpointAngle?.Invoke(spawn, yaw);
+#if CLIENT
+    internal static void SetResourceShaders(Transform? node)
+    {
+        if (node == null)
+            return;
+        node.gameObject.layer = 3;
+        if (SharedResources.LogicShader != null && node.gameObject.TryGetComponent(out Renderer renderer))
+            renderer.material.shader = SharedResources.LogicShader;
+    }
+#endif
 }

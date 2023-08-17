@@ -1,10 +1,13 @@
-﻿using System.Reflection;
+﻿using SDG.Framework.Modules;
+using System.Reflection;
 using System.Reflection.Emit;
-using System.Runtime.CompilerServices;
-using SDG.Framework.Modules;
+using Cysharp.Threading.Tasks;
 using Module = SDG.Framework.Modules.Module;
 
 namespace DevkitServer.Util;
+
+public delegate UniTask BeginLevelLoading(LevelInfo level, CancellationToken token);
+
 [EarlyTypeInit]
 public static class AssetUtil
 {
@@ -21,7 +24,9 @@ public static class AssetUtil
     private static readonly InstanceGetter<Asset, AssetOrigin>? GetAssetOrigin = Accessor.GenerateInstanceGetter<Asset, AssetOrigin>("origin");
     private static readonly InstanceGetter<NPCRewardsList, INPCReward[]>? GetRewardsFromList = Accessor.GenerateInstanceGetter<NPCRewardsList, INPCReward[]>("rewards");
     private static readonly InstanceGetter<Module, List<IModuleNexus>>? GetNexii = Accessor.GenerateInstanceGetter<Module, List<IModuleNexus>>("nexii");
-    
+
+    public static event BeginLevelLoading? OnBeginLevelLoading;
+
     /// <returns>The origin of the asset, or <see langword="null"/> in the case of a reflection failure.</returns>
     [Pure]
     public static AssetOrigin? GetOrigin(this Asset asset)
@@ -444,5 +449,26 @@ public static class AssetUtil
             else
                 Category = EAssetType.NONE;
         }
+    }
+
+    internal static async UniTask InvokeOnBeginLevelLoading(CancellationToken token)
+    {
+        if (OnBeginLevelLoading == null)
+            return;
+        LoadingUI.SetLoadingText("DevkitServer Initialization");
+        LevelInfo info = Level.info;
+        foreach (BeginLevelLoading dele in OnBeginLevelLoading.GetInvocationList().Cast<BeginLevelLoading>())
+        {
+            try
+            {
+                await dele(info, token);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Caller threw an error in " + typeof(AssetUtil).Format() + "." + nameof(OnBeginLevelLoading).Colorize(ConsoleColor.White) + ".");
+                Logger.LogError(ex);
+            }
+        }
+        LoadingUI.NotifyLevelLoadingProgress(1f / 30f);
     }
 }

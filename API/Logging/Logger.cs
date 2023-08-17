@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Cysharp.Threading.Tasks;
 using DevkitServer.API.Logging.Terminals;
 #if SERVER
 using DevkitServer.Levels;
@@ -28,6 +29,7 @@ public static class Logger
     public static event TerminalPostReadDelegate? OnInputted;
     public static event TerminalPreWriteDelegate? OnOutputting;
     public static event TerminalPostWriteDelegate? OnOutputed;
+    internal static bool HasLoadingErrors => _loadingErrors is { Count: > 0 };
     public static ITerminal Terminal
     {
         get => _term;
@@ -111,6 +113,33 @@ public static class Logger
             }
             else
             {
+                List<Type> hiddenTypes = new List<Type>(config.GetHiddenTypes())
+                {
+                    typeof(UniTask),
+                };
+                Type? type = typeof(UniTask).Assembly.GetType("Cysharp.Threading.Tasks.EnumeratorAsyncExtensions+EnumeratorPromise", false, false);
+
+                if (type != null)
+                    hiddenTypes.Add(type);
+                
+                type = typeof(UniTask).Assembly.GetType("Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`1", false, false);
+
+                if (type != null)
+                    hiddenTypes.Add(type);
+                
+                type = typeof(UniTask).Assembly.GetType("Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2", false, false);
+
+                if (type != null)
+                    hiddenTypes.Add(type);
+
+                foreach (Type baseType in typeof(UniTask).GetNestedTypes(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Where(x => x.Name.IndexOf("promise", StringComparison.OrdinalIgnoreCase) != -1))
+                {
+                    hiddenTypes.Add(baseType);
+                }
+
+                Console.WriteLine("Hidden types: " + string.Join(",", hiddenTypes.Select(x => x.FullName)));
+
+                config.HiddenTypes = hiddenTypes;
 #if !SERVER
                 if (Application.platform is RuntimePlatform.WindowsPlayer or RuntimePlatform.WindowsEditor)
                     config.ColorFormatting = StackColorFormatType.ExtendedANSIColor;
