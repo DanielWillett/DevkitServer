@@ -49,7 +49,6 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
             node.Spawnpoint = point;
             node.Index = i;
             SpawnUtil.SetResourceShaders(point.node);
-
         }
 
         for (int i = 0; i < LevelVehicles.spawns.Count; i++)

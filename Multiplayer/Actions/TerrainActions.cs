@@ -1,7 +1,6 @@
 ﻿using DevkitServer.Patches;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
-using JetBrains.Annotations;
 using SDG.Framework.Devkit;
 using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Landscapes;
@@ -260,7 +259,6 @@ public interface IAutoFoundation
 }
 
 [Action(ActionType.HeightmapRamp, EncodingEx.MaxTerrainToolBoundsSize + 28, 8)]
-[EarlyTypeInit]
 public sealed class HeightmapRampAction : ITerrainAction, IBrushRadius, IBrushFalloff
 {
     public ActionType Type => ActionType.HeightmapRamp;
@@ -325,7 +323,6 @@ public sealed class HeightmapRampAction : ITerrainAction, IBrushRadius, IBrushFa
 }
 
 [Action(ActionType.HeightmapAdjust, EncodingEx.MaxTerrainToolBoundsSize + 12, 16)]
-[EarlyTypeInit]
 public sealed class HeightmapAdjustAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength, IBrushSensitivity
 {
     public ActionType Type => ActionType.HeightmapAdjust;
@@ -382,7 +379,6 @@ public sealed class HeightmapAdjustAction : ITerrainAction, IBrushRadius, IBrush
 }
 
 [Action(ActionType.HeightmapFlatten, EncodingEx.MaxTerrainToolBoundsSize + 13, 20)]
-[EarlyTypeInit]
 public sealed class HeightmapFlattenAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength, IBrushSensitivity, IBrushTarget
 {
     public ActionType Type => ActionType.HeightmapFlatten;
@@ -1104,7 +1100,6 @@ public sealed class HolemapPaintAction : ITerrainAction, IBrushRadius
 
 [Action(ActionType.AddTile, 5, 8)]
 [Action(ActionType.DeleteTile, 5, 8, CreateMethod = nameof(CreateDeleteTile))]
-[EarlyTypeInit]
 public sealed class TileModifyAction : IAction, ICoordinates
 {
     public ActionType Type => IsDelete ? ActionType.DeleteTile : ActionType.AddTile;
@@ -1158,7 +1153,7 @@ public sealed class TileModifyAction : IAction, ICoordinates
 }
 
 [Action(ActionType.UpdateSplatmapLayers, 132, 8)]
-[EarlyTypeInit]
+[EarlyTypeInit(RequiresUIAccessTools = true)]
 public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinates
 {
 #if CLIENT

@@ -5,14 +5,36 @@ using System.Reflection;
 using System.Reflection.Emit;
 
 namespace DevkitServer.API.UI;
+
+/// <summary>
+/// Optional base class for UI extensions (defined with <see cref="UIExtensionAttribute"/>). Provides OnOpened and OnClosed events, as well as overridable methods for the same events.
+/// Also provides an <see cref="Instance"/> property for accessing the vanilla UI instance (will be <see langword="null"/> for static UIs).
+/// </summary>
 public abstract class UIExtension
 {
+    /// <summary>
+    /// The vanilla UI instance, or <see langword="null"/> when the vanilla UI is a static UI.
+    /// </summary>
     public object? Instance { get; internal set; }
 
+    /// <summary>
+    /// Called when the vanilla UI is opened.
+    /// </summary>
     public event Action? OnOpened;
+
+    /// <summary>
+    /// Called when the vanilla UI is closed.
+    /// </summary>
     public event Action? OnClosed;
 
+    /// <summary>
+    /// Called when the vanilla UI is opened, before <see cref="OnOpened"/>.
+    /// </summary>
     protected virtual void Opened() { }
+
+    /// <summary>
+    /// Called when the vanilla UI is closed, after <see cref="OnClosed"/>.
+    /// </summary>
     protected virtual void Closed() { }
 
     internal void InvokeOnOpened()
@@ -23,15 +45,23 @@ public abstract class UIExtension
 
     internal void InvokeOnClosed()
     {
-        Closed();
         OnClosed?.Invoke();
+        Closed();
     }
 }
+/// <summary>
+/// Optional base class for UI extensions (defined with <see cref="UIExtensionAttribute"/>). Provides OnOpened and OnClosed events, as well as overridable methods for the same events.
+/// Also provides a typed <see cref="Instance"/> property for accessing the vanilla UI instance (will be <see langword="null"/> for static UIs).
+/// </summary>
+/// <typeparam name="T">The vanilla UI type.</typeparam>
 public abstract class UIExtension<T> : UIExtension where T : class
 {
     public new T? Instance => (T?)base.Instance;
 }
 
+/// <summary>
+/// Stores information about a parent type (vanilla UI type like <see cref="MenuPlayServerInfoUI"/>).
+/// </summary>
 public class UIExtensionParentTypeInfo
 {
     internal readonly List<UIExtensionPatch> OpenPatchesIntl;
@@ -40,16 +70,48 @@ public class UIExtensionParentTypeInfo
     internal readonly List<UIExtensionPatch> DestroyPatchesIntl;
     internal readonly List<UIExtensionInstanceInfo> InstancesIntl;
     internal readonly List<UIExtensionVanillaInstanceInfo> VanillaInstancesIntl;
+
+    /// <summary>
+    /// Type of the parent UI.
+    /// </summary>
     public Type ParentType { get; }
+
+    /// <summary>
+    /// Information about the type of the parent UI.
+    /// </summary>
     public UITypeInfo ParentTypeInfo { get; internal set; }
+
+    /// <summary>
+    /// All existing patches for open handlers.
+    /// </summary>
     public IReadOnlyList<UIExtensionPatch> OpenPatches { get; }
+
+    /// <summary>
+    /// All existing patches for close handlers.
+    /// </summary>
     public IReadOnlyList<UIExtensionPatch> ClosePatches { get; }
+
+    /// <summary>
+    /// All existing patches for initialize handlers.
+    /// </summary>
     public IReadOnlyList<UIExtensionPatch> InitializePatches { get; }
+
+    /// <summary>
+    /// All existing patches for destroy handlers.
+    /// </summary>
     public IReadOnlyList<UIExtensionPatch> DestroyPatches { get; }
+
+    /// <summary>
+    /// All active extension instances.
+    /// </summary>
     public IReadOnlyList<UIExtensionInstanceInfo> Instances { get; }
+
+    /// <summary>
+    /// All active parent type instances.
+    /// </summary>
     public IReadOnlyList<UIExtensionVanillaInstanceInfo> VanillaInstances { get; }
 
-    public UIExtensionParentTypeInfo(Type parentType, UITypeInfo typeInfo)
+    internal UIExtensionParentTypeInfo(Type parentType, UITypeInfo typeInfo)
     {
         ParentType = parentType;
         ParentTypeInfo = typeInfo;
@@ -68,12 +130,26 @@ public class UIExtensionParentTypeInfo
     }
 }
 
+/// <summary>
+/// Stores information about a UI handler patch (open, close, destroy, or initialize).
+/// </summary>
 public class UIExtensionPatch
 {
+    /// <summary>
+    /// Original method that was patched.
+    /// </summary>
     public MethodBase Original { get; }
+
+    /// <summary>
+    /// Method that was patched onto <see cref="Original"/>.
+    /// </summary>
     public MethodInfo Patch { get; }
+
+    /// <summary>
+    /// Type of patch used.
+    /// </summary>
     public HarmonyPatchType Type { get; }
-    public UIExtensionPatch(MethodBase original, MethodInfo patch, HarmonyPatchType type)
+    internal UIExtensionPatch(MethodBase original, MethodInfo patch, HarmonyPatchType type)
     {
         Original = original;
         Patch = patch;
@@ -81,13 +157,31 @@ public class UIExtensionPatch
     }
 }
 
+/// <summary>
+/// Stores information about existing members (defined with <see cref="ExistingUIMemberAttribute"/>) on an extension.
+/// </summary>
 public class UIExistingMemberInfo
 {
+    /// <summary>
+    /// Member to get or set in the extension.
+    /// </summary>
     public MemberInfo Member { get; }
+
+    /// <summary>
+    /// Member to reference in the parent type.
+    /// </summary>
     public MemberInfo Existing { get; }
+
+    /// <summary>
+    /// If the member in the parent type is static.
+    /// </summary>
     public bool ExistingIsStatic { get; }
+
+    /// <summary>
+    /// If the member is set when the extension is created, instead of patching the extension member to get the value in realtime (customized by setting <see cref="ExistingUIMemberAttribute.InitializeMode"/>).
+    /// </summary>
     public bool IsInitialized { get; }
-    public UIExistingMemberInfo(MemberInfo member, MemberInfo existing, bool existingIsStatic, bool isInitialized)
+    internal UIExistingMemberInfo(MemberInfo member, MemberInfo existing, bool existingIsStatic, bool isInitialized)
     {
         Member = member;
         Existing = existing;
@@ -139,52 +233,122 @@ public class UIExistingMemberInfo
     }
 }
 
+/// <summary>
+/// Stores information about an extension instance.
+/// </summary>
 public class UIExtensionInstanceInfo
 {
+    /// <summary>
+    /// A reference to the actual extension.
+    /// </summary>
     public object Instance { get; }
+
+    /// <summary>
+    /// The vanilla type the instance is extending.
+    /// </summary>
     public UIExtensionVanillaInstanceInfo VanillaInstance { get; }
-    public UIExtensionInstanceInfo(object instance, UIExtensionVanillaInstanceInfo vanillaInstance)
+    internal UIExtensionInstanceInfo(object instance, UIExtensionVanillaInstanceInfo vanillaInstance)
     {
         Instance = instance;
         VanillaInstance = vanillaInstance;
     }
 }
+
+/// <summary>
+/// Stores information about a vanilla UI type.
+/// </summary>
 public class UIExtensionVanillaInstanceInfo
 {
+    /// <summary>
+    /// The instance of the vanilla UI type, or <see langword="null"/> for static UIs.
+    /// </summary>
     public object? Instance { get; }
+
+    /// <summary>
+    /// If the vanilla UI type is a static UI.
+    /// </summary>
     public bool Static { get; }
+
+    /// <summary>
+    /// Open state of the vanilla UI.
+    /// </summary>
     public bool IsOpen { get; internal set; }
-    public UIExtensionVanillaInstanceInfo(object? instance, bool isOpen)
+    internal UIExtensionVanillaInstanceInfo(object? instance, bool isOpen)
     {
         Instance = instance;
         Static = ReferenceEquals(instance, null);
         IsOpen = isOpen;
     }
+
+    public override string ToString() => $"Instance: {Instance.Format()} ({(Instance == null ? 0 : Instance.GetHashCode()).Format("X8")}), static: {Static.Format()}, is open: {IsOpen.Format()}.";
 }
 
-internal delegate object? CreateUIExtension(object? uiInstance);
-
+/// <summary>
+/// Stores cached information about a UI extension.
+/// </summary>
 public class UIExtensionInfo
 {
     internal List<object> InstantiationsIntl { get; }
     internal List<UIExtensionPatch> PatchesIntl { get; }
     internal List<UIExistingMemberInfo> ExistingMembersIntl { get; }
+    
+    /// <summary>
+    /// Type of the extension.
+    /// </summary>
     public Type ImplementationType { get; }
+
+    /// <summary>
+    /// Type of the vanilla parent UI.
+    /// </summary>
     public Type ParentType { get; }
+
+    /// <summary>
+    /// Priority of the extension.
+    /// </summary>
     public int Priority { get; }
+
+    /// <summary>
+    /// Assembly the extension is from.
+    /// </summary>
     public Assembly Assembly { get; }
+
+    /// <summary>
+    /// Plugin the extension is from.
+    /// </summary>
     public IDevkitServerPlugin? Plugin { get; }
+
+    /// <summary>
+    /// If the extension derives from <see cref="UIExtension"/>.
+    /// </summary>
     public bool IsBaseType { get; }
+
+    /// <summary>
+    /// All instantiations of the extension.
+    /// </summary>
     public IReadOnlyList<object> Instantiations { get; }
+
+    /// <summary>
+    /// All patches used by the extension's existing UI members.
+    /// </summary>
     public IReadOnlyList<UIExtensionPatch> Patches { get; }
+
+    /// <summary>
+    /// All existing UI members defined by the extension. These are defined using the <see cref="ExistingUIMemberAttribute"/>.
+    /// </summary>
     public IReadOnlyList<UIExistingMemberInfo> ExistingMembers { get; }
-    public bool IsEmittable { get; internal set; }
+
+    /// <summary>
+    /// If the warning for not deriving your class from the <see cref="UIExtension"/> class is supressed, which can be done using the <see cref="UIExtensionAttribute.SuppressUIExtensionParentWarning"/> property.
+    /// </summary>
     public bool SuppressUIExtensionParentWarning { get; internal set; }
 #nullable disable
+    /// <summary>
+    /// UI type info for the parent type of the UI.
+    /// </summary>
     public UITypeInfo TypeInfo { get; internal set; }
-    internal CreateUIExtension CreateCallback { get; set; }
+    internal UIExtensionManager.CreateUIExtension CreateCallback { get; set; }
 #nullable restore
-    public UIExtensionInfo(Type implementationType, Type parentType, int priority, IDevkitServerPlugin? plugin)
+    internal UIExtensionInfo(Type implementationType, Type parentType, int priority, IDevkitServerPlugin? plugin)
     {
         ImplementationType = implementationType;
         ParentType = parentType;
@@ -201,16 +365,28 @@ public class UIExtensionInfo
     }
 }
 
+/// <summary>
+/// Mark your extension to be auto-registered to <see cref="UIExtensionManager"/> when your plugin loads.
+/// </summary>
 [MeansImplicitUse]
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class UIExtensionAttribute : Attribute
 {
+    /// <summary>
+    /// Type of the vanilla UI being extended.
+    /// </summary>
     public Type ParentType { get; }
+
+    /// <summary>
+    /// Supress the warning for not deriving an extension from <see cref="UIExtension"/>.
+    /// </summary>
     public bool SuppressUIExtensionParentWarning { get; set; }
+
     public UIExtensionAttribute(Type parentType)
     {
         ParentType = parentType;
     }
+
     /// <summary>
     /// Add type by name, mainly for internal types.<br/>
     /// Use assembly qualified name if the type is not from SDG (Assembly-CSharp.dll).
@@ -221,22 +397,43 @@ public sealed class UIExtensionAttribute : Attribute
     }
 }
 
+/// <summary>
+/// Mark a field, property, or method as an accessor for a field, property, or method in the parent type. The member can be static or instance.
+/// </summary>
+/// <remarks>For fields, the value is cached on initialization.
+/// For properties with setters (on default <see cref="InitializeMode"/>), the value is cached on initialization,
+/// for properties without setters, the getter is patched to get the value in realtime each time it's called.
+/// For methods, they will be patched to get the value in realtime each time they're called.
+///
+/// <br/><br/>Usage of methods isn't really recommended for existing fields or properties, just because it's not very practical, but it does work.</remarks>
 [MeansImplicitUse]
 [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property | AttributeTargets.Method)]
 public sealed class ExistingUIMemberAttribute : Attribute
 {
+    /// <summary>
+    /// Name of the member.
+    /// </summary>
     public string MemberName { get; }
+
     /// <summary>
     /// Influences how values are cached, if at all.
     /// </summary>
     public ExistingMemberInitializeMode InitializeMode { get; set; }
+
+    /// <summary>
+    /// Type that owns the member if it isn't the parent type you're extending or a base type of it.
+    /// </summary>
     public Type? OwningType { get; set; }
+
     public ExistingUIMemberAttribute(string memberName)
     {
         MemberName = memberName;
     }
 }
 
+/// <summary>
+/// Describes the behavior of a member marked by the <see cref="ExistingUIMemberAttribute"/>.
+/// </summary>
 public enum ExistingMemberInitializeMode
 {
     /// <summary>

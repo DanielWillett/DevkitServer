@@ -43,6 +43,7 @@ internal static class Accessor
     internal static Type[]? ActionTypes;
     private static bool _castExCtorCalc;
     private static bool _nreExCtorCalc;
+
     /// <summary>
     /// Generates a dynamic method that sets an instance field value. For value types use <see cref="GenerateInstanceSetter{TValue}"/> instead.
     /// </summary>
@@ -1423,10 +1424,22 @@ internal static class Accessor
             typeof(Action<,,,,,,,,,,,,,,,>)
         };
     }
+
+    /// <summary>
+    /// Checks <paramref name="method"/> for the <see langword="extern"/> flag.
+    /// </summary>
     [Pure]
     public static bool IsExtern(this MethodBase method) => (method.Attributes & MethodAttributes.PinvokeImpl) != 0;
+
+    /// <summary>
+    /// Checks <paramref name="field"/> for the <see langword="extern"/> flag.
+    /// </summary>
     [Pure]
     public static bool IsExtern(this FieldInfo field) => field.IsPinvokeImpl;
+
+    /// <summary>
+    /// Checks <paramref name="property"/>'s getter and setter for the <see langword="extern"/> flag.
+    /// </summary>
     [Pure]
     public static bool IsExtern(this PropertyInfo property, bool checkGetterFirst = true)
     {
@@ -1452,26 +1465,67 @@ internal static class Accessor
             return true;
         }
     }
+
+    /// <summary>
+    /// Checks for the <see cref="IgnoreAttribute"/> on <paramref name="type"/>.
+    /// </summary>
     [Pure]
     public static bool IsIgnored(this Type type) => Attribute.IsDefined(type, typeof(IgnoreAttribute));
+
+    /// <summary>
+    /// Checks for the <see cref="IgnoreAttribute"/> on <paramref name="member"/>.
+    /// </summary>
     [Pure]
     public static bool IsIgnored(this MemberInfo member) => Attribute.IsDefined(member, typeof(IgnoreAttribute));
+
+    /// <summary>
+    /// Checks for the <see cref="IgnoreAttribute"/> on <paramref name="assembly"/>.
+    /// </summary>
     [Pure]
     public static bool IsIgnored(this Assembly assembly) => Attribute.IsDefined(assembly, typeof(IgnoreAttribute));
+
+    /// <summary>
+    /// Checks for the <see cref="IgnoreAttribute"/> on <paramref name="parameter"/>.
+    /// </summary>
     [Pure]
     public static bool IsIgnored(this ParameterInfo parameter) => Attribute.IsDefined(parameter, typeof(IgnoreAttribute));
+
+    /// <summary>
+    /// Checks for the <see cref="IgnoreAttribute"/> on <paramref name="module"/>.
+    /// </summary>
     [Pure]
     public static bool IsIgnored(this Module module) => Attribute.IsDefined(module, typeof(IgnoreAttribute));
+
+    /// <summary>
+    /// Checks for the <see cref="LoadPriorityAttribute"/> on <paramref name="type"/> and returns the priority (or zero if not found).
+    /// </summary>
     [Pure]
     public static int GetPriority(this Type type) => Attribute.GetCustomAttribute(type, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr ? attr.Priority : 0;
+
+    /// <summary>
+    /// Checks for the <see cref="LoadPriorityAttribute"/> on <paramref name="member"/> and returns the priority (or zero if not found).
+    /// </summary>
     [Pure]
     public static int GetPriority(this MemberInfo member) => Attribute.GetCustomAttribute(member, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr ? attr.Priority : 0;
+
+    /// <summary>
+    /// Checks for the <see cref="LoadPriorityAttribute"/> on <paramref name="assembly"/> and returns the priority (or zero if not found).
+    /// </summary>
     [Pure]
     public static int GetPriority(this Assembly assembly) => Attribute.GetCustomAttribute(assembly, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr ? attr.Priority : 0;
+
+    /// <summary>
+    /// Checks for the <see cref="LoadPriorityAttribute"/> on <paramref name="parameter"/> and returns the priority (or zero if not found).
+    /// </summary>
     [Pure]
     public static int GetPriority(this ParameterInfo parameter) => Attribute.GetCustomAttribute(parameter, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr ? attr.Priority : 0;
+
+    /// <summary>
+    /// Checks for the <see cref="LoadPriorityAttribute"/> on <paramref name="module"/> and returns the priority (or zero if not found).
+    /// </summary>
     [Pure]
     public static int GetPriority(this Module module) => Attribute.GetCustomAttribute(module, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr ? attr.Priority : 0;
+
     /// <summary>
     /// Created for <see cref="List{T}.Sort(Comparison{T})"/> to order by priority (highest to lowest).
     /// </summary>
@@ -1480,6 +1534,7 @@ internal static class Accessor
     {
         return b.GetPriority().CompareTo(a.GetPriority());
     }
+
     /// <summary>
     /// Created for <see cref="List{T}.Sort(Comparison{T})"/> to order by priority (highest to lowest).
     /// </summary>
@@ -1567,6 +1622,57 @@ internal static class Accessor
         }
     }
 
+    /// <summary>
+    /// Used to perform a repeated <paramref name="action"/> for each base type of a <paramref name="type"/>.
+    /// </summary>
+    /// <param name="action">Called optionally for <paramref name="type"/>, then for each base type in order from most related to least related.</param>
+    /// <param name="includeParent">Call <paramref name="action"/> on <paramref name="type"/>. Overrides <paramref name="excludeSystemBase"/>.</param>
+    /// <param name="excludeSystemBase">Excludes calling <paramref name="action"/> for <see cref="object"/> or <see cref="ValueType"/>.</param>
+    public static void ForEachBaseType(this Type type, ForEachBaseType action, bool includeParent = true, bool excludeSystemBase = true)
+    {
+        Type? type2 = type;
+        if (includeParent)
+        {
+            action(type2, 0);
+        }
+
+        type2 = type.BaseType;
+
+        int level = 0;
+        for (; type2 != null && (!excludeSystemBase || type2 != typeof(object) && type != typeof(ValueType)); type2 = type.BaseType)
+        {
+            ++level;
+            action(type2, level);
+        }
+    }
+
+    /// <summary>
+    /// Used to perform a repeated <paramref name="action"/> for each base type of a <paramref name="type"/>.
+    /// </summary>
+    /// <remarks>Execution can be broken by returning <see langword="false"/>.</remarks>
+    /// <param name="action">Called optionally for <paramref name="type"/>, then for each base type in order from most related to least related.</param>
+    /// <param name="includeParent">Call <paramref name="action"/> on <paramref name="type"/>. Overrides <paramref name="excludeSystemBase"/>.</param>
+    /// <param name="excludeSystemBase">Excludes calling <paramref name="action"/> for <see cref="object"/> or <see cref="ValueType"/>.</param>
+    public static void ForEachBaseType(this Type type, ForEachBaseTypeWhile action, bool includeParent = true, bool excludeSystemBase = true)
+    {
+        Type? type2 = type;
+        if (includeParent)
+        {
+            if (!action(type2, 0))
+                return;
+        }
+
+        type2 = type.BaseType;
+
+        int level = 0;
+        for (; type2 != null && (!excludeSystemBase || type2 != typeof(object) && type != typeof(ValueType)); type2 = type.BaseType)
+        {
+            ++level;
+            if (!action(type2, level))
+                return;
+        }
+    }
+
     /// <returns>Every type defined in the calling assembly.</returns>
     [MethodImpl(MethodImplOptions.NoInlining)]
     [Pure]
@@ -1642,24 +1748,47 @@ internal static class Accessor
 
         return null;
     }
-    
+
+    /// <summary>
+    /// Gets the (cached) <paramref name="returnType"/> and <paramref name="parameters"/> of a <typeparamref name="TDelegate"/> delegate type.
+    /// </summary>
     public static void GetDelegateSignature<TDelegate>(out Type returnType, out ParameterInfo[] parameters) where TDelegate : Delegate
     {
         returnType = DelegateInfo<TDelegate>.ReturnType;
         parameters = DelegateInfo<TDelegate>.Parameters;
     }
+
+    /// <summary>
+    /// Gets the (cached) return type of a <typeparamref name="TDelegate"/> delegate type.
+    /// </summary>
     [Pure]
     public static Type GetReturnType<TDelegate>() where TDelegate : Delegate => DelegateInfo<TDelegate>.ReturnType;
+
+    /// <summary>
+    /// Gets the (cached) parameters of a <typeparamref name="TDelegate"/> delegate type.
+    /// </summary>
     [Pure]
     public static ParameterInfo[] GetParameters<TDelegate>() where TDelegate : Delegate => DelegateInfo<TDelegate>.Parameters;
+
+    /// <summary>
+    /// Gets the (cached) <see langword="Invoke"/> method of a <typeparamref name="TDelegate"/> delegate type. All delegates have one by default.
+    /// </summary>
     [Pure]
     public static MethodInfo GetInvokeMethod<TDelegate>() where TDelegate : Delegate => DelegateInfo<TDelegate>.InvokeMethod;
+
+    /// <summary>
+    /// Gets the <paramref name="returnType"/> and <paramref name="parameters"/> of a <paramref name="delegateType"/>.
+    /// </summary>
     public static void GetDelegateSignature(Type delegateType, out Type returnType, out ParameterInfo[] parameters)
     {
         MethodInfo invokeMethod = GetInvokeMethod(delegateType);
         returnType = invokeMethod.ReturnType;
         parameters = invokeMethod.GetParameters();
     }
+
+    /// <summary>
+    /// Gets the return type of a <paramref name="delegateType"/>.
+    /// </summary>
     [Pure]
     public static Type GetReturnType(Type delegateType)
     {
@@ -1668,6 +1797,10 @@ internal static class Accessor
 
         return delegateType.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!.ReturnType;
     }
+
+    /// <summary>
+    /// Gets the parameters of a <paramref name="delegateType"/>.
+    /// </summary>
     [Pure]
     public static ParameterInfo[] GetParameters(Type delegateType)
     {
@@ -1676,6 +1809,10 @@ internal static class Accessor
 
         return delegateType.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!.GetParameters();
     }
+
+    /// <summary>
+    /// Gets the (cached) <see langword="Invoke"/> method of a <paramref name="delegateType"/>. All delegates have one by default.
+    /// </summary>
     [Pure]
     public static MethodInfo GetInvokeMethod(Type delegateType)
     {
@@ -1710,109 +1847,141 @@ internal static class Accessor
         }
     }
 
-
+    /// <summary>
+    /// Unturned primary assembly.
+    /// </summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="TypeLoadException"/>
     public static Assembly AssemblyCSharp => _sdgAssembly ??= typeof(Provider).Assembly;
+
+    /// <summary>
+    /// DevkitServer primary assembly.
+    /// </summary>
+    /// <remarks>Lazily cached.</remarks>
+    /// <exception cref="TypeLoadException"/>
     public static Assembly DevkitServer => _devkitServerAssembly ??= Assembly.GetExecutingAssembly();
+
+    /// <summary>
+    /// System primary assembly.
+    /// </summary>
+    /// <remarks>Lazily cached.</remarks>
+    /// <exception cref="TypeLoadException"/>
     public static Assembly MSCoreLib => _mscorlibAssembly ??= typeof(object).Assembly;
 
     /// <summary><see cref="Provider.isServer"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo IsServerGetter => _getIsServer ??=
         typeof(Provider).GetProperty(nameof(Provider.isServer), BindingFlags.Static | BindingFlags.Public)
             ?.GetMethod ?? throw new MemberAccessException("Unable to find Provider.isServer.");
 
     /// <summary><see cref="Level.isEditor"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo IsEditorGetter => _getIsEditor ??=
         typeof(Level).GetProperty(nameof(Level.isEditor), BindingFlags.Static | BindingFlags.Public)
             ?.GetMethod ?? throw new MemberAccessException("Unable to find Level.isEditor.");
 
     /// <summary><see cref="DevkitServerModule.IsEditing"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo IsDevkitServerGetter => _getIsDevkitServer ??=
         typeof(DevkitServerModule).GetProperty(nameof(DevkitServerModule.IsEditing), BindingFlags.Static | BindingFlags.Public)
             ?.GetMethod ?? throw new MemberAccessException("Unable to find DevkitServerModule.IsEditing.");
 
     /// <summary><see cref="Logger.LogDebug"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo LogDebug => _logDebug ??=
         typeof(Logger).GetMethod(nameof(Logger.LogDebug), BindingFlags.Public | BindingFlags.Static)
         ?? throw new MemberAccessException("Unable to find Logger.LogDebug.");
 
     /// <summary><see cref="CachedTime.RealtimeSinceStartup"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo GetRealtimeSinceStartup => _getRealtimeSinceStartup ??=
         typeof(CachedTime).GetProperty(nameof(CachedTime.RealtimeSinceStartup), BindingFlags.Static | BindingFlags.Public)
             ?.GetMethod ?? throw new MemberAccessException("Unable to find CachedTime.RealtimeSinceStartup.");
 
     /// <summary><see cref="Time.realtimeSinceStartupAsDouble"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo GetRealtimeSinceStartupAsDouble => _getRealtimeSinceStartupAsDouble ??=
         typeof(Time).GetProperty(nameof(Time.realtimeSinceStartupAsDouble), BindingFlags.Static | BindingFlags.Public)
             ?.GetMethod ?? throw new MemberAccessException("Unable to find Time.realtimeSinceStartupAsDouble.");
 
     /// <summary><see cref="Time.time"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo GetTime => _getTime ??=
         typeof(Time).GetProperty(nameof(Time.time), BindingFlags.Static | BindingFlags.Public)
             ?.GetMethod ?? throw new MemberAccessException("Unable to find Time.time.");
 
     /// <summary><see cref="CachedTime.DeltaTime"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo GetDeltaTime => _getDeltaTime ??=
         typeof(CachedTime).GetProperty(nameof(CachedTime.DeltaTime), BindingFlags.Static | BindingFlags.Public)
             ?.GetMethod ?? throw new MemberAccessException("Unable to find CachedTime.DeltaTime.");
 
     /// <summary><see cref="Time.fixedDeltaTime"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo GetFixedDeltaTime => _getFixedDeltaTime ??=
         typeof(Time).GetProperty(nameof(Time.fixedDeltaTime), BindingFlags.Static | BindingFlags.Public)
             ?.GetMethod ?? throw new MemberAccessException("Unable to find Time.fixedDeltaTime.");
 
     /// <summary><see cref="GameObject.transform"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo GetGameObjectTransform => _getGameObjectTransform ??=
         typeof(GameObject).GetProperty(nameof(GameObject.transform), BindingFlags.Instance | BindingFlags.Public)
             ?.GetMethod ?? throw new MemberAccessException("Unable to find GameObject.transform.");
 
     /// <summary><see cref="Component.transform"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo GetComponentTransform => _getComponentTransform ??=
         typeof(Component).GetProperty(nameof(Component.transform), BindingFlags.Instance | BindingFlags.Public)
             ?.GetMethod ?? throw new MemberAccessException("Unable to find Component.transform.");
 
     /// <summary><see cref="Component.gameObject"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo GetComponentGameObject => _getComponentGameObject ??=
         typeof(Component).GetProperty(nameof(Component.gameObject), BindingFlags.Instance | BindingFlags.Public)
             ?.GetMethod ?? throw new MemberAccessException("Unable to find Component.gameObject.");
 
     /// <summary><see cref="InputEx.GetKeyDown"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo GetKeyDown => _getKeyDown ??=
         typeof(InputEx).GetMethod(nameof(InputEx.GetKeyDown), BindingFlags.Public | BindingFlags.Static)
         ?? throw new MemberAccessException("Unable to find InputEx.GetKeyDown.");
 
     /// <summary><see cref="InputEx.GetKeyUp"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo GetKeyUp => _getKeyUp ??=
         typeof(InputEx).GetMethod(nameof(InputEx.GetKeyUp), BindingFlags.Public | BindingFlags.Static)
         ?? throw new MemberAccessException("Unable to find InputEx.GetKeyUp.");
 
     /// <summary><see cref="InputEx.GetKey"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo GetKey => _getKey ??=
         typeof(InputEx).GetMethod(nameof(InputEx.GetKey), BindingFlags.Public | BindingFlags.Static)
         ?? throw new MemberAccessException("Unable to find InputEx.GetKey.");
 
     /// <summary><see cref="StackTrace(int)"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static ConstructorInfo StackTraceIntConstructor => _stackTraceIntCtor ??= 
         typeof(StackTrace).GetConstructor(BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int) },
             null) ?? throw new MemberAccessException("Unable to find StackTrace.StackTrace(int).");
 
     /// <summary><see cref="string.Concat(string, string)"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo Concat2StringsMethod => _concat2Strings ??=
         typeof(string).GetMethod(nameof(string.Concat), BindingFlags.Static | BindingFlags.Public, null,
@@ -1820,6 +1989,7 @@ internal static class Accessor
         ?? throw new MemberAccessException("Unable to find string.Concat(string, string).");
 
     /// <summary><see cref="StackTraceCleaner.GetString(StackTrace)"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static MethodInfo StackTraceCleanerGetStringMethod => _getStackTraceString ??=
         typeof(StackTraceCleaner).GetMethod(nameof(StackTraceCleaner.GetString), BindingFlags.Instance | BindingFlags.Public, null,
@@ -1827,6 +1997,7 @@ internal static class Accessor
         ?? throw new MemberAccessException("Unable to find StackTraceCleaner.GetString(StackTrace).");
 
     /// <summary><see cref="Logger.StackCleaner"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
     public static FieldInfo LoggerStackCleanerField => _getStackCleaner ??=
         typeof(Logger).GetField(nameof(Logger.StackCleaner), BindingFlags.Static | BindingFlags.Public)
@@ -1838,10 +2009,30 @@ public delegate T InstanceGetter<in TInstance, out T>(TInstance owner);
 public delegate void StaticSetter<in T>(T value);
 public delegate T StaticGetter<out T>();
 
+/// <param name="depth">Number of types below the provided type this base type is. Will be zero if the type returned is the provided type, 1 for its base type, and so on.</param>
+public delegate void ForEachBaseType(Type type, int depth);
+
+/// <param name="depth">Number of types below the provided type this base type is. Will be zero if the type returned is the provided type, 1 for its base type, and so on.</param>
+/// <returns><see langword="True"/> to continue, <see langword="false"/> to break.</returns>
+public delegate bool ForEachBaseTypeWhile(Type type, int depth);
+
+/// <summary>
+/// Marks a class to have it's static constructor (type initializer) ran on load.
+/// Helps ensure there are no errors hidden in your static members that will pop up later, and moves all load time to when the game/server actually loads.
+/// </summary>
+/// <remarks>Works in plugins as well.</remarks>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
-internal sealed class EarlyTypeInitAttribute : Attribute
+public sealed class EarlyTypeInitAttribute : Attribute
 {
+    /// <summary>
+    /// Defines the order in which type initializers run. Lower gets ran first. Default priority is zero.
+    /// </summary>
     public int Priority { get; }
+
+    /// <remarks>
+    /// Irrelevant for plugins.
+    /// </remarks>
+    public bool RequiresUIAccessTools { get; set; }
 
     public EarlyTypeInitAttribute() : this (0) { }
 

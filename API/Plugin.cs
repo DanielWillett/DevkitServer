@@ -7,7 +7,7 @@ using DevkitServer.API.UI;
 #endif
 
 namespace DevkitServer.API;
-public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourcePlugin
+public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourcePlugin, IReflectionDoneListenerDevkitServerPlugin
 {
     public static readonly Color DefaultColor = new Color32(204, 153, 255, 255);
     private readonly string _defaultName;
@@ -60,6 +60,7 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
     }
     protected virtual LocalDatDictionary DefaultLocalization => new LocalDatDictionary();
 
+
     /// <inheritdoc/>
     void IDevkitServerPlugin.Load()
     {
@@ -72,10 +73,20 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
     /// <inheritdoc/>
     void IDevkitServerPlugin.Unload() => Unload();
 
+    void IReflectionDoneListenerDevkitServerPlugin.OnReflectionDone(PluginAssembly assembly, bool isFirstPluginInAssembly)
+    {
+        OnReflectionDone(assembly, isFirstPluginInAssembly);
+    }
+
     /// <summary>
     /// Called to load the plugin.
     /// </summary>
     protected abstract void Load();
+
+    /// <summary>
+    /// Called when reflection for the plugin's assembly is ran. Will only call once shortly after <see cref="IDevkitServerPlugin.Load"/>.
+    /// </summary>
+    protected virtual void OnReflectionDone(PluginAssembly assembly, bool isFirstPluginInAssembly) { }
 
     /// <summary>
     /// Called to unload the plugin.

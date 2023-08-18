@@ -129,7 +129,8 @@ public static class UIMessage
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error setting EditorUI message.");
+            Logger.LogError("Error setting EditorUI message:");
+            Logger.LogInfo(message);
             Logger.LogError(ex);
             return false;
         }

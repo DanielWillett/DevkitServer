@@ -231,6 +231,35 @@ internal static class PatchesMain
     }
 
 #if CLIENT
+    [HarmonyPatch(typeof(EditorUI), "OnEnable")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void OnEditorUIEnabled(EditorUI __instance)
+    {
+        FieldInfo? areaField = typeof(Editor).GetField("_area", BindingFlags.NonPublic | BindingFlags.Instance);
+        if (areaField == null)
+        {
+            Logger.LogWarning("Unable to find field: Editor._area.", method: Source);
+            return;
+        }
+        FieldInfo? editorField = typeof(Editor).GetField("_editor", BindingFlags.NonPublic | BindingFlags.Static);
+        if (editorField == null)
+        {
+            Logger.LogWarning("Unable to find field: Editor._editor.", method: Source);
+            return;
+        }
+        Transform parent = __instance.transform.parent;
+        if (parent != null && parent.TryGetComponent(out EditorArea area) && parent.TryGetComponent(out Editor editor))
+        {
+            editorField.SetValue(null, editor);
+            areaField.SetValue(editor, area);
+            Logger.LogDebug($"[{Source}] Patched issue with EditorUI not loading (set Editor._area and Editor._editor in OnEnable).");
+        }
+        else
+        {
+            Logger.LogWarning("Unable to fix order of Editor component instantiations.", method: Source);
+        }
+    }
 
     [HarmonyPatch(typeof(LoadingUI), "Update")]
     [HarmonyTranspiler]

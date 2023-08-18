@@ -4,7 +4,7 @@ using DevkitServer.API.UI;
 using DevkitServer.Configuration;
 
 namespace DevkitServer.Core.Extensions.UI;
-internal abstract class BaseEditorSpawnsUIExtension<T> : UIExtension where T : class
+internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension where T : class
 {
     private bool _subbed;
     private bool _update;
@@ -13,25 +13,18 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : UIExtension where T : c
     protected readonly float DistanceCurveMin;
     protected readonly float DistanceCurveLength;
     protected readonly Dictionary<T, Label> Labels = new Dictionary<T, Label>(16);
-    public SleekFullscreenBox Container { get; set; }
+    protected override SleekWindow Parent => EditorUI.window;
     protected BaseEditorSpawnsUIExtension(Vector3 offset, float distanceCurveMin, float distanceCurveMax)
     {
         Offset = offset;
         
-        Container = new SleekFullscreenBox
-        {
-            sizeScale_X = 1f,
-            sizeScale_Y = 1f
-        };
         DistanceCurveMin = distanceCurveMin;
         DistanceCurveLength = distanceCurveMax - distanceCurveMin;
-        UpdateAllLabels();
     }
 
     protected override void Opened()
     {
-        EditorUI.window.AddChild(Container);
-        Container.isVisible = true;
+        base.Opened();
         if (!_subbed)
         {
             MovementUtil.OnMainCameraTransformUpdated += OnUpdated;
@@ -52,8 +45,7 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : UIExtension where T : c
         }
 
         _update = false;
-        Container.isVisible = false;
-        EditorUI.window.RemoveChild(Container);
+        base.Closed();
     }
 
     protected virtual bool ShouldShow(T spawn) => true;
@@ -71,7 +63,7 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : UIExtension where T : c
         }
     }
 
-    public virtual void Dispose()
+    public override void Dispose()
     {
         if (_subbed)
         {
@@ -80,14 +72,14 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : UIExtension where T : c
             CachedTime.OnLateUpdate -= OnLateUpdate;
             _subbed = false;
         }
-
-        if (EditorUI.window != null && EditorUI.window.FindIndexOfChild(Container) >= 0)
-            EditorUI.window.RemoveChild(Container);
+        base.Dispose();
     }
 
     protected abstract Vector3 GetPosition(T spawn);
     protected int CreateLabel(T spawn, string text)
     {
+        if (Container == null)
+            return -1;
         ISleekLabel label = Glazier.Get().CreateLabel();
         label.positionOffset_X = -150;
         label.positionOffset_Y = -15;
@@ -112,7 +104,7 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : UIExtension where T : c
     }
     protected void RemoveLabel(T spawn)
     {
-        if (!Labels.TryGetValue(spawn, out Label lbl))
+        if (Container == null || !Labels.TryGetValue(spawn, out Label lbl))
             return;
 
         Container.RemoveChild(lbl.Element);
@@ -120,6 +112,8 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : UIExtension where T : c
     }
     protected void ClearLabels()
     {
+        if (Container == null)
+            return;
         foreach (Label label in Labels.Values)
             Container.RemoveChild(label.Element);
 
@@ -134,6 +128,8 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : UIExtension where T : c
     }
     protected void UpdateLabel(Label label, string? text = null)
     {
+        if (Container == null)
+            return;
         bool show = ShouldShow(label.Spawn);
         if (!show)
         {
@@ -142,7 +138,7 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : UIExtension where T : c
             return;
         }
         Vector3 position = GetPosition(label.Spawn);
-        Vector3 screenPos = MainCamera.instance.WorldToViewportPoint(position + Vector3.up);
+        Vector3 screenPos = MainCamera.instance.WorldToViewportPoint(position + Offset);
         if (screenPos.z <= 0.0)
         {
             if (label.Element.isVisible)

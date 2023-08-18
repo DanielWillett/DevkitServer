@@ -456,6 +456,7 @@ public static class AssetUtil
         if (OnBeginLevelLoading == null)
             return;
         LoadingUI.SetLoadingText("DevkitServer Initialization");
+        LoadingUI.NotifyLevelLoadingProgress(0.00001f);
         LevelInfo info = Level.info;
         foreach (BeginLevelLoading dele in OnBeginLevelLoading.GetInvocationList().Cast<BeginLevelLoading>())
         {
@@ -470,5 +471,6 @@ public static class AssetUtil
             }
         }
         LoadingUI.NotifyLevelLoadingProgress(1f / 30f);
+        LoadingUI.updateScene();
     }
 }

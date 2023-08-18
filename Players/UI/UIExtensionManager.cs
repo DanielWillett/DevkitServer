@@ -20,6 +20,9 @@ using System.Reflection.Emit;
 using System.Runtime.Serialization;
 
 namespace DevkitServer.Players.UI;
+/// <summary>
+/// Manages UI extensions, which is a system designed to easily extend vanilla UIs.
+/// </summary>
 public static class UIExtensionManager
 {
     internal const string Source = "UI EXT MNGR";
@@ -30,9 +33,20 @@ public static class UIExtensionManager
     private static readonly Dictionary<MethodBase, UIExtensionExistingMemberPatchInfo> PatchInfo = new Dictionary<MethodBase, UIExtensionExistingMemberPatchInfo>(64);
     private static Action<object>? _onDestroy;
     private static Action<object>? _onAdd;
+    /// <summary>
+    /// List of all registered UI Extensions (info, not instances themselves).
+    /// </summary>
     public static IReadOnlyList<UIExtensionInfo> Extensions { get; } = ExtensionsIntl.AsReadOnly();
+
+    /// <summary>
+    /// Dictionary of all parent types. Parent types references the vanilla UI type backend. (i.e. <see cref="PlayerDashboardCraftingUI"/>)
+    /// </summary>
     public static IReadOnlyDictionary<Type, UIExtensionParentTypeInfo> ParentTypeInfo { get; } = new ReadOnlyDictionary<Type, UIExtensionParentTypeInfo>(ParentTypeInfoIntl);
 
+    /// <summary>
+    /// Gets the last created instance of <typeparamref name="T"/> (which should be a UI extension), or <see langword="null"/> if one isn't registered.
+    /// </summary>
+    /// <remarks>Lazily cached.</remarks>
     public static T? GetInstance<T>() where T : class => InstanceCache<T>.Instance;
 
     [Conditional("UI_EXT_DEBUG")]
@@ -126,12 +140,12 @@ public static class UIExtensionManager
             LogWarning($"Unable to find parent type info while opening {type.Format()}.");
             return;
         }
-
+        
         bool found = false;
         for (int i = 0; i < parentTypeInfo.VanillaInstancesIntl.Count; ++i)
         {
             UIExtensionVanillaInstanceInfo instanceInfo = parentTypeInfo.VanillaInstancesIntl[i];
-            if (ReferenceEquals(instanceInfo.Instance, instance))
+            if (ReferenceEquals(instanceInfo.Instance, instance) || parentTypeInfo.VanillaInstancesIntl.Count == 1 && parentTypeInfo.ParentTypeInfo.IsInstanceUI)
             {
                 if (instanceInfo.IsOpen)
                 {
@@ -184,12 +198,12 @@ public static class UIExtensionManager
             LogWarning($"Unable to find parent type info while closing {type.Format()}.");
             return;
         }
-
+        
         bool found = false;
         for (int i = 0; i < parentTypeInfo.VanillaInstancesIntl.Count; ++i)
         {
             UIExtensionVanillaInstanceInfo instanceInfo = parentTypeInfo.VanillaInstancesIntl[i];
-            if (ReferenceEquals(instanceInfo.Instance, instance))
+            if (ReferenceEquals(instanceInfo.Instance, instance) || parentTypeInfo.VanillaInstancesIntl.Count == 1 && parentTypeInfo.ParentTypeInfo.IsInstanceUI)
             {
                 if (!instanceInfo.IsOpen)
                 {
@@ -237,6 +251,7 @@ public static class UIExtensionManager
         if (instance != null)
             type = instance.GetType();
         LogDebug($"Initialized: {type.Format()}.");
+
         for (int i = 0; i < ExtensionsIntl.Count; i++)
         {
             UIExtensionInfo info = ExtensionsIntl[i];
@@ -267,7 +282,7 @@ public static class UIExtensionManager
         LogDebug($"Destroyed: {type.Format()}.");
         foreach (UITypeInfo otherTypeInfo in UIAccessTools.TypeInfo.Values)
         {
-            if (otherTypeInfo.DestroyedByParent && otherTypeInfo.Parent == type)
+            if (otherTypeInfo.DestroyWhenParentDestroys && otherTypeInfo.Type != type && otherTypeInfo.Parent == type)
             {
                 LogDebug($"* Destroying child: {otherTypeInfo.Type.Format()}.");
                 OnDestroy(otherTypeInfo.Type, null);
@@ -275,35 +290,38 @@ public static class UIExtensionManager
         }
         if (!ParentTypeInfoIntl.TryGetValue(type!, out UIExtensionParentTypeInfo parentTypeInfo))
         {
-            LogWarning($"Unable to find parent type info while destroying {type.Format()}.");
-            return;
+            LogDebug($"Unable to find parent type info while destroying {type.Format()}.");
         }
-
-        bool close = parentTypeInfo.ParentTypeInfo.CloseOnDestroy;
-        if (close)
+        bool close = true;
+        if (parentTypeInfo != null)
         {
-            bool found = false;
-            for (int i = 0; i < parentTypeInfo.VanillaInstancesIntl.Count; ++i)
+            close = parentTypeInfo.ParentTypeInfo.CloseOnDestroy;
+            if (close)
             {
-                UIExtensionVanillaInstanceInfo instanceInfo = parentTypeInfo.VanillaInstancesIntl[i];
-                if (ReferenceEquals(instanceInfo.Instance, instance))
+                bool found = false;
+                for (int i = 0; i < parentTypeInfo.VanillaInstancesIntl.Count; ++i)
                 {
-                    if (!instanceInfo.IsOpen)
+                    UIExtensionVanillaInstanceInfo instanceInfo = parentTypeInfo.VanillaInstancesIntl[i];
+                    if (ReferenceEquals(instanceInfo.Instance, instance) || parentTypeInfo.VanillaInstancesIntl.Count == 1 && parentTypeInfo.ParentTypeInfo.IsInstanceUI)
                     {
-                        LogDebug($"Already closed: {type.Format()}.");
-                        close = false;
+                        if (!instanceInfo.IsOpen)
+                        {
+                            LogDebug($"Already closed: {type.Format()}.");
+                            close = false;
+                        }
+                        else instanceInfo.IsOpen = false;
+
+                        found = true;
+                        parentTypeInfo.VanillaInstancesIntl.RemoveAt(i);
+                        break;
                     }
-                    else instanceInfo.IsOpen = false;
-
-                    found = true;
-                    break;
                 }
-            }
 
-            if (!found)
-            {
-                LogWarning($"Unable to find vanilla instance info while closing (destroying) {type.Format()}.");
-                close = false;
+                if (!found)
+                {
+                    LogWarning($"Unable to find vanilla instance info while closing (destroying) {type.Format()}.");
+                    close = false;
+                }
             }
         }
 
@@ -322,7 +340,7 @@ public static class UIExtensionManager
                     }
                     catch (Exception ex)
                     {
-                        LogError($"Error invoking OnClosed from {instantiation.GetType().Format()}.", info.Plugin, info.Assembly);
+                        LogError($"Error invoking OnClosed from {instantiation.GetType().Format()} while destroying.", info.Plugin, info.Assembly);
                         LogError(ex, info.Plugin, info.Assembly);
                     }
                 }
@@ -433,7 +451,6 @@ public static class UIExtensionManager
         info.TypeInfo = typeInfo;
 
         bool staticUI = !info.ParentType.GetIsStatic() && typeInfo.IsStaticUI;
-        info.IsEmittable = !staticUI;
 
         List<Exception>? exceptions = null;
 
@@ -584,18 +601,18 @@ public static class UIExtensionManager
     [UsedImplicitly]
     private static void AddInstance(object? uiInstance, object instance)
     {
-        UIExtensionParentTypeInfo? parentInfo = null;
         Type? type;
         UIExtensionInfo? extInfo = null;
         if (uiInstance == null)
         {
             type = instance.GetType();
-            for (; type != null && !ExtensionsDictIntl.TryGetValue(type, out extInfo); type = type.BaseType) { }
+            type.ForEachBaseType((type, _) => !ExtensionsDictIntl.TryGetValue(type, out extInfo));
             type = extInfo?.ParentType;
         }
         else type = uiInstance.GetType();
 
-        for (; type != null && !ParentTypeInfoIntl.TryGetValue(type, out parentInfo); type = type.BaseType) { }
+        UIExtensionParentTypeInfo? parentInfo = null;
+        type?.ForEachBaseType((type, _) => !ParentTypeInfoIntl.TryGetValue(type, out parentInfo));
 
         if (parentInfo == null)
         {
@@ -604,22 +621,35 @@ public static class UIExtensionManager
         }
 
         UIExtensionVanillaInstanceInfo? info = null;
-        for (int i = 0; i < parentInfo.VanillaInstancesIntl.Count; ++i)
+        List<UIExtensionVanillaInstanceInfo> vanillaInstances = parentInfo.VanillaInstancesIntl;
+
+        if (vanillaInstances.Count != 0 && (parentInfo.ParentTypeInfo.IsInstanceUI || parentInfo.ParentTypeInfo.IsStaticUI) && (vanillaInstances.Count != 1 || !ReferenceEquals(vanillaInstances[0].Instance, instance)))
         {
-            if (ReferenceEquals(parentInfo.VanillaInstancesIntl[i].Instance, uiInstance))
+            vanillaInstances.Clear();
+            info = new UIExtensionVanillaInstanceInfo(parentInfo.ParentTypeInfo.IsStaticUI ? null : uiInstance, parentInfo.ParentTypeInfo.OpenOnInitialize || parentInfo.ParentTypeInfo.DefaultOpenState);
+            vanillaInstances.Add(info);
+            LogDebug($"Replaced vanilla instance info: {parentInfo.ParentType.Format()}.");
+        }
+        else
+        {
+            for (int i = 0; i < vanillaInstances.Count; ++i)
             {
-                info = parentInfo.VanillaInstancesIntl[i];
-                LogDebug($"Found vanilla instance info: {parentInfo.ParentType.Format()}.");
-                break;
+                if (ReferenceEquals(vanillaInstances[i].Instance, uiInstance))
+                {
+                    info = vanillaInstances[i];
+                    LogDebug($"Found vanilla instance info: {parentInfo.ParentType.Format()}.");
+                    break;
+                }
+            }
+
+            if (info == null)
+            {
+                info = new UIExtensionVanillaInstanceInfo(parentInfo.ParentTypeInfo.IsStaticUI ? null : uiInstance, parentInfo.ParentTypeInfo.OpenOnInitialize || parentInfo.ParentTypeInfo.DefaultOpenState);
+                vanillaInstances.Add(info);
+                LogDebug($"Added vanilla instance info: {parentInfo.ParentType.Format()}.");
             }
         }
 
-        if (info == null)
-        {
-            info = new UIExtensionVanillaInstanceInfo(uiInstance, parentInfo.ParentTypeInfo.OpenOnInitialize || parentInfo.ParentTypeInfo.DefaultOpenState);
-            parentInfo.VanillaInstancesIntl.Add(info);
-            LogDebug($"Added vanilla instance info: {parentInfo.ParentType.Format()}.");
-        }
         
         parentInfo.InstancesIntl.Add(new UIExtensionInstanceInfo(instance, info));
         _onAdd?.Invoke(instance);
@@ -641,9 +671,9 @@ public static class UIExtensionManager
             return null;
         }
     }
-    internal static void TellDestroyed(object instance)
+    internal static void TellDestroyed(Type? type, object? instance)
     {
-        OnDestroy(null, instance);
+        OnDestroy(type, instance);
     }
     private static void TryInitializeMember(UIExtensionInfo info, MemberInfo member)
     {
@@ -966,7 +996,7 @@ public static class UIExtensionManager
     }
     private static void PatchParentOnDestroy(UITypeInfo typeInfo, UIExtensionParentTypeInfo parentTypeInfo, IDevkitServerPlugin? plugin, Assembly assembly)
     {
-        if (typeInfo.DestroyedByParent && typeInfo.Parent != null && UIAccessTools.TryGetUITypeInfo(typeInfo.Parent, out UITypeInfo parentUITypeInfo))
+        if (typeInfo.DestroyWhenParentDestroys && typeInfo.Parent != null && UIAccessTools.TryGetUITypeInfo(typeInfo.Parent, out UITypeInfo parentUITypeInfo))
             PatchParentOnDestroy(parentUITypeInfo, GetOrAddParentTypeInfo(parentUITypeInfo.Type, typeInfo), plugin, assembly);
         
         if (typeInfo.CustomOnDestroy != null)
@@ -1035,7 +1065,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal || __exception != null)
             return;
-        OnOpened(__originalMethod.DeclaringType!, null);
+        if (DevkitServerModule.IsMainThread)
+            OnOpened(__originalMethod.DeclaringType!, null);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnOpened(__originalMethod.DeclaringType!, null));
     }
 
     private static readonly MethodInfo StaticCloseMethodFinalizerMethod = typeof(UIExtensionManager).GetMethod(nameof(StaticCloseMethodFinalizer), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -1043,7 +1076,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal || __exception != null)
             return;
-        OnClosed(__originalMethod.DeclaringType!, null);
+        if (DevkitServerModule.IsMainThread)
+            OnClosed(__originalMethod.DeclaringType!, null);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnClosed(__originalMethod.DeclaringType!, null));
     }
 
     private static readonly MethodInfo StaticDestroyMethodPrefixMethod = typeof(UIExtensionManager).GetMethod(nameof(StaticDestroyMethodPrefix), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -1051,7 +1087,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal)
             return;
-        OnDestroy(__originalMethod.DeclaringType!, null);
+        if (DevkitServerModule.IsMainThread)
+            OnDestroy(__originalMethod.DeclaringType!, null);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnDestroy(__originalMethod.DeclaringType!, null));
     }
 
     private static readonly MethodInfo StaticDestroyMethodFinalizerMethod = typeof(UIExtensionManager).GetMethod(nameof(StaticDestroyMethodFinalizer), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -1059,7 +1098,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal || __exception != null)
             return;
-        OnDestroy(__originalMethod.DeclaringType!, null);
+        if (DevkitServerModule.IsMainThread)
+            OnDestroy(__originalMethod.DeclaringType!, null);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnDestroy(__originalMethod.DeclaringType!, null));
     }
 
     private static readonly MethodInfo InstanceOpenMethodFinalizerMethod = typeof(UIExtensionManager).GetMethod(nameof(InstanceOpenMethodFinalizer), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -1067,7 +1109,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal || __exception != null)
             return;
-        OnOpened(null, __instance);
+        if (DevkitServerModule.IsMainThread)
+            OnOpened(null, __instance);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnOpened(null, __instance));
     }
 
     private static readonly MethodInfo InstanceCloseMethodFinalizerMethod = typeof(UIExtensionManager).GetMethod(nameof(InstanceCloseMethodFinalizer), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -1075,7 +1120,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal || __exception != null)
             return;
-        OnClosed(null, __instance);
+        if (DevkitServerModule.IsMainThread)
+            OnClosed(null, __instance);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnClosed(null, __instance));
     }
 
 
@@ -1084,7 +1132,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal || __exception != null)
             return;
-        OnDestroy(null, __instance);
+        if (DevkitServerModule.IsMainThread)
+            OnDestroy(null, __instance);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnDestroy(null, __instance));
     }
 
     private static readonly MethodInfo InstanceDestroyMethodPrefixMethod = typeof(UIExtensionManager).GetMethod(nameof(InstanceDestroyMethodPrefix), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -1092,7 +1143,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal)
             return;
-        OnDestroy(null, __instance);
+        if (DevkitServerModule.IsMainThread)
+            OnDestroy(null, __instance);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnDestroy(null, __instance));
     }
 
     private static readonly MethodInfo InstanceInitializeMethodFinalizerMethod = typeof(UIExtensionManager).GetMethod(nameof(InstanceInitializeMethodFinalizer), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -1100,7 +1154,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal || __exception != null || __originalMethod.DeclaringType != __instance.GetType())
             return;
-        OnInitialized(null, __instance);
+        if (DevkitServerModule.IsMainThread)
+            OnInitialized(null, __instance);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnInitialized(null, __instance));
     }
     
     private static readonly MethodInfo TranspileGetterPropertyMethod = typeof(UIExtensionManager).GetMethod(nameof(TranspileGetterProperty), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -1182,5 +1239,7 @@ public static class UIExtensionManager
                 Recache();
         }
     }
+
+    internal delegate object? CreateUIExtension(object? uiInstance);
 }
 #endif

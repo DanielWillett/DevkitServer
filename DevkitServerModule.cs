@@ -239,7 +239,7 @@ public sealed class DevkitServerModule : IModuleNexus
             foreach (Type type in Accessor.GetTypesSafe()
                          .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x,
                              (EarlyTypeInitAttribute?)Attribute.GetCustomAttribute(x, typeof(EarlyTypeInitAttribute))))
-                         .Where(x => x.Value != null)
+                         .Where(x => x.Value is { RequiresUIAccessTools: false })
                          .OrderByDescending(x => x.Value!.Priority)
                          .ThenBy(x => x.Key.Name)
                          .Select(x => x.Key))
@@ -263,9 +263,6 @@ public sealed class DevkitServerModule : IModuleNexus
                 goto fault;
 
             CreateDirectoryAttribute.CreateInAssembly(Assembly, true);
-#if CLIENT
-            UIExtensionManager.Reflect(Accessor.DevkitServer);
-#endif
             if (LoadFaulted)
                 goto fault;
 
@@ -298,7 +295,7 @@ public sealed class DevkitServerModule : IModuleNexus
             LevelObjectNetIdDatabase.Init();
             HierarchyItemNetIdDatabase.Init();
 
-            PluginLoader.Load();
+            PluginLoader.LoadPlugins();
             CreateDirectoryAttribute.DisposeLoadList();
         }
         catch (Exception ex)
@@ -370,12 +367,50 @@ public sealed class DevkitServerModule : IModuleNexus
         }
         GC.Collect();
     }
+    internal static void JustBeforePluginsReflect()
+    {
+#if CLIENT
+        try
+        {
+            UIAccessTools.Init();
 
+            foreach (Type type in Accessor.GetTypesSafe()
+                         .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x,
+                             (EarlyTypeInitAttribute?)Attribute.GetCustomAttribute(x, typeof(EarlyTypeInitAttribute))))
+                         .Where(x => x.Value is { RequiresUIAccessTools: true })
+                         .OrderByDescending(x => x.Value!.Priority)
+                         .ThenBy(x => x.Key.Name)
+                         .Select(x => x.Key))
+            {
+                try
+                {
+                    RuntimeHelpers.RunClassConstructor(type.TypeHandle);
+                    CreateDirectoryAttribute.CreateInType(type, true);
+                    Logger.LogDebug("Initialized static module " + type.Format() + ".");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Error while initializing static module " + type.Format() + ".");
+                    Logger.LogError(ex);
+                    Fault();
+                    break;
+                }
+            }
+
+            UIExtensionManager.Reflect(Accessor.DevkitServer);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Failed to reflect DevkitServer UI extensions.");
+            Logger.LogError(ex);
+        }
+#endif
+    }
     private static async UniTask OnLevelStartLoading(LevelInfo level, CancellationToken token)
     {
         if (!HasLoadedBundle)
         {
-            await TryLoadBundle(null);
+            await TryLoadBundle(null).ToUniTask(ComponentHost);
         }
     }
 #if CLIENT

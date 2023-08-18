@@ -137,8 +137,6 @@ public static class Logger
                     hiddenTypes.Add(baseType);
                 }
 
-                Console.WriteLine("Hidden types: " + string.Join(",", hiddenTypes.Select(x => x.FullName)));
-
                 config.HiddenTypes = hiddenTypes;
 #if !SERVER
                 if (Application.platform is RuntimePlatform.WindowsPlayer or RuntimePlatform.WindowsEditor)

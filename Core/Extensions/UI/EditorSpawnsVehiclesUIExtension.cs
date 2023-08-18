@@ -15,15 +15,17 @@ internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtension<Veh
     protected override void OnRegionUpdated(RegionCoord oldRegion, RegionCoord newRegion, bool isInRegion)
     {
         Regions.tryGetPoint(newRegion.x, newRegion.y, out Vector3 regionPos);
+        float rad = DistanceMax + (Regions.REGION_SIZE / 2f);
+        rad *= rad;
         foreach (VehicleSpawnpoint spawn in new List<VehicleSpawnpoint>(Labels.Keys))
         {
-            if ((regionPos - spawn.point).sqrMagnitude >= DistanceMax * DistanceMax + 10f)
+            if ((regionPos - spawn.point).sqrMagnitude >= rad)
                 RemoveLabel(spawn);
         }
 
         foreach (VehicleSpawnpoint spawn in LevelVehicles.spawns)
         {
-            if ((regionPos - spawn.point).sqrMagnitude < DistanceMax * DistanceMax + 10f && !Labels.ContainsKey(spawn))
+            if ((regionPos - spawn.point).sqrMagnitude < rad && !Labels.ContainsKey(spawn))
                 CreateLabel(spawn, GetText(spawn));
         }
     }

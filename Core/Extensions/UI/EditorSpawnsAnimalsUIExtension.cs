@@ -15,15 +15,17 @@ internal class EditorSpawnsAnimalsUIExtension : BaseEditorSpawnsUIExtension<Anim
     protected override void OnRegionUpdated(RegionCoord oldRegion, RegionCoord newRegion, bool isInRegion)
     {
         Regions.tryGetPoint(newRegion.x, newRegion.y, out Vector3 regionPos);
+        float rad = DistanceMax + (Regions.REGION_SIZE / 2f);
+        rad *= rad;
         foreach (AnimalSpawnpoint spawn in new List<AnimalSpawnpoint>(Labels.Keys))
         {
-            if ((regionPos - spawn.point).sqrMagnitude >= DistanceMax * DistanceMax + 10f)
+            if ((regionPos - spawn.point).sqrMagnitude >= rad)
                 RemoveLabel(spawn);
         }
 
         foreach (AnimalSpawnpoint spawn in LevelAnimals.spawns)
         {
-            if ((regionPos - spawn.point).sqrMagnitude < DistanceMax * DistanceMax + 10f && !Labels.ContainsKey(spawn))
+            if ((regionPos - spawn.point).sqrMagnitude < rad && !Labels.ContainsKey(spawn))
                 CreateLabel(spawn, GetText(spawn));
         }
     }

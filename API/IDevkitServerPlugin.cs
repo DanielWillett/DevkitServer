@@ -92,6 +92,13 @@ public interface IReloadableDevkitServerPlugin : IDevkitServerPlugin
     /// </summary>
     void Reload();
 }
+public interface IReflectionDoneListenerDevkitServerPlugin : IDevkitServerPlugin
+{
+    /// <summary>
+    /// Called when reflection for the plugin's assembly is ran. Will only call once shortly after <see cref="IDevkitServerPlugin.Load"/>.
+    /// </summary>
+    void OnReflectionDone(PluginAssembly assembly, bool isFirstPluginInAssembly);
+}
 
 public interface IDevkitServerColorPlugin : IDevkitServerPlugin
 {
