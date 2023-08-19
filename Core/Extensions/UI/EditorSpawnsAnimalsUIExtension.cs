@@ -11,10 +11,23 @@ internal class EditorSpawnsAnimalsUIExtension : BaseEditorSpawnsUIExtension<Anim
         SpawnUtil.OnAnimalSpawnpointAdded += OnSpawnAdded;
         SpawnUtil.OnAnimalSpawnpointRemoved += OnSpawnRemoved;
         SpawnUtil.OnAnimalSpawnpointMoved += OnSpawnMoved;
+        SpawnTableUtil.OnAnimalSpawnTableNameUpdated += OnNameUpdated;
     }
+
+    private void OnNameUpdated(AnimalTable table, int index)
+    {
+        foreach (AnimalSpawnpoint spawnpoint in SpawnUtil.EnumerateAnimalSpawns(MovementUtil.MainCameraRegion))
+        {
+            if (spawnpoint.type == index)
+                UpdateLabel(spawnpoint, table.name);
+        }
+    }
+
     protected override void OnRegionUpdated(RegionCoord oldRegion, RegionCoord newRegion, bool isInRegion)
     {
         Regions.tryGetPoint(newRegion.x, newRegion.y, out Vector3 regionPos);
+        regionPos.x += Regions.WORLD_SIZE / 2f;
+        regionPos.y += Regions.WORLD_SIZE / 2f;
         float rad = DistanceMax + (Regions.REGION_SIZE / 2f);
         rad *= rad;
         foreach (AnimalSpawnpoint spawn in new List<AnimalSpawnpoint>(Labels.Keys))
@@ -67,6 +80,7 @@ internal class EditorSpawnsAnimalsUIExtension : BaseEditorSpawnsUIExtension<Anim
         SpawnUtil.OnAnimalSpawnpointAdded -= OnSpawnAdded;
         SpawnUtil.OnAnimalSpawnpointRemoved -= OnSpawnRemoved;
         SpawnUtil.OnAnimalSpawnpointMoved -= OnSpawnMoved;
+        SpawnTableUtil.OnAnimalSpawnTableNameUpdated -= OnNameUpdated;
         base.Dispose();
     }
 }

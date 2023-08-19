@@ -294,6 +294,7 @@ public sealed class DevkitServerModule : IModuleNexus
             AssetUtil.OnBeginLevelLoading += OnLevelStartLoading;
             LevelObjectNetIdDatabase.Init();
             HierarchyItemNetIdDatabase.Init();
+            SpawnpointNetIdDatabase.Init();
 
             PluginLoader.LoadPlugins();
             CreateDirectoryAttribute.DisposeLoadList();
@@ -761,6 +762,7 @@ public sealed class DevkitServerModule : IModuleNexus
         {
             LevelObjectNetIdDatabase.LoadFromLevelData();
             HierarchyItemNetIdDatabase.LoadFromLevelData();
+            SpawnpointNetIdDatabase.LoadFromLevelData();
         }
 #endif
     }
@@ -808,6 +810,7 @@ public sealed class DevkitServerModule : IModuleNexus
         AssetUtil.OnBeginLevelLoading -= OnLevelStartLoading;
         LevelObjectNetIdDatabase.Shutdown();
         HierarchyItemNetIdDatabase.Shutdown();
+        SpawnpointNetIdDatabase.Shutdown();
 
         Instance = null!;
         GameObjectHost = null!;

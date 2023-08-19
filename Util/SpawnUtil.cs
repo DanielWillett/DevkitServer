@@ -1,9 +1,9 @@
-﻿using DevkitServer.Models;
+﻿using DevkitServer.API.Iterators;
+using DevkitServer.Models;
 using DevkitServer.Util.Region;
 #if CLIENT
 using DevkitServer.Core;
 using DevkitServer.Core.Tools;
-using UnityEngine.Rendering;
 #endif
 
 namespace DevkitServer.Util;
@@ -264,6 +264,302 @@ public static class SpawnUtil
         bool oldIsAlternate = spawn.isAlt;
         SetPlayerSpawnpointIsAlternate.Invoke(spawn, isAlternate);
         Logger.LogDebug($"Player spawnpoint updated: {(oldIsAlternate ? "Alternate" : "Primary")} -> {(isAlternate ? "Alternate" : "Primary")}");
+    }
+
+    /// <summary>
+    /// Enumerates item spawns by region (starting at the middle of the map).
+    /// </summary>
+    public static ListRegionsEnumerator<ItemSpawnpoint> EnumerateItemSpawns()
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return LevelItems.spawns.CastFrom();
+    }
+
+    /// <summary>
+    /// Enumerates zombie spawns by region (starting at the middle of the map).
+    /// </summary>
+    public static ListRegionsEnumerator<ZombieSpawnpoint> EnumerateZombieSpawns()
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return LevelZombies.spawns.CastFrom();
+    }
+
+    /// <summary>
+    /// Enumerates item spawns by region (starting at the middle of the map).
+    /// </summary>
+    public static ListRegionsEnumerator<ItemSpawnpoint> EnumerateItemSpawns(byte centerX, byte centerY, byte maxRegionDistance = 255)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return LevelItems.spawns.CastFrom(centerX, centerY, maxRegionDistance);
+    }
+
+    /// <summary>
+    /// Enumerates zombie spawns by region (starting at the specified region).
+    /// </summary>
+    public static ListRegionsEnumerator<ZombieSpawnpoint> EnumerateZombieSpawns(byte centerX, byte centerY, byte maxRegionDistance = 255)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return LevelZombies.spawns.CastFrom(centerX, centerY, maxRegionDistance);
+    }
+
+    /// <summary>
+    /// Enumerates item spawns by region (starting at the specified region).
+    /// </summary>
+    public static ListRegionsEnumerator<ItemSpawnpoint> EnumerateItemSpawns(RegionCoord center, byte maxRegionDistance = 255)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return LevelItems.spawns.CastFrom(center, maxRegionDistance);
+    }
+
+    /// <summary>
+    /// Enumerates zombie spawns by region (starting at the specified region).
+    /// </summary>
+    public static ListRegionsEnumerator<ZombieSpawnpoint> EnumerateZombieSpawns(RegionCoord center, byte maxRegionDistance = 255)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return LevelZombies.spawns.CastFrom(center, maxRegionDistance);
+    }
+
+    /// <summary>
+    /// Enumerates item spawns by region (starting at the region containing the specified point).
+    /// </summary>
+    public static ListRegionsEnumerator<ItemSpawnpoint> EnumerateItemSpawns(Vector3 center, byte maxRegionDistance = 255)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return LevelItems.spawns.CastFrom(center, maxRegionDistance);
+    }
+
+    /// <summary>
+    /// Enumerates zombie spawns by region (starting at the region containing the specified point).
+    /// </summary>
+    public static ListRegionsEnumerator<ZombieSpawnpoint> EnumerateZombieSpawns(Vector3 center, byte maxRegionDistance = 255)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return LevelZombies.spawns.CastFrom(center, maxRegionDistance);
+    }
+
+    /// <summary>
+    /// Enumerates animal spawns starting at the center of the map.
+    /// </summary>
+    public static DistanceListIterator<AnimalSpawnpoint> EnumerateAnimalSpawns()
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return new DistanceListIterator<AnimalSpawnpoint>(LevelAnimals.spawns, x => x.point, Vector3.zero, useXZAxisOnly: true);
+    }
+
+    /// <summary>
+    /// Enumerates player spawns starting at the center of the map.
+    /// </summary>
+    public static DistanceListIterator<PlayerSpawnpoint> EnumeratePlayerSpawns()
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return new DistanceListIterator<PlayerSpawnpoint>(LevelPlayers.spawns, x => x.point, Vector3.zero, useXZAxisOnly: true);
+    }
+
+    /// <summary>
+    /// Enumerates vehicle spawns starting at the center of the map.
+    /// </summary>
+    public static DistanceListIterator<VehicleSpawnpoint> EnumerateVehicleSpawns()
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return new DistanceListIterator<VehicleSpawnpoint>(LevelVehicles.spawns, x => x.point, Vector3.zero, useXZAxisOnly: true);
+    }
+
+    /// <summary>
+    /// Enumerates animal spawns starting at <paramref name="center"/>.
+    /// </summary>
+    public static DistanceListIterator<AnimalSpawnpoint> EnumerateAnimalSpawns(Vector3 center)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return new DistanceListIterator<AnimalSpawnpoint>(LevelAnimals.spawns, x => x.point, center, useXZAxisOnly: true);
+    }
+
+    /// <summary>
+    /// Enumerates player spawns starting at <paramref name="center"/>.
+    /// </summary>
+    public static DistanceListIterator<PlayerSpawnpoint> EnumeratePlayerSpawns(Vector3 center)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return new DistanceListIterator<PlayerSpawnpoint>(LevelPlayers.spawns, x => x.point, center, useXZAxisOnly: true);
+    }
+
+    /// <summary>
+    /// Enumerates vehicle spawns starting at <paramref name="center"/>.
+    /// </summary>
+    public static DistanceListIterator<VehicleSpawnpoint> EnumerateVehicleSpawns(Vector3 center)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return new DistanceListIterator<VehicleSpawnpoint>(LevelVehicles.spawns, x => x.point, center, useXZAxisOnly: true);
+    }
+
+    /// <summary>
+    /// Enumerates animal spawns starting the center of the specified region.
+    /// </summary>
+    public static DistanceListIterator<AnimalSpawnpoint> EnumerateAnimalSpawns(byte centerX, byte centerY)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        Regions.tryGetPoint(centerX, centerY, out Vector3 center);
+        center.x += Regions.REGION_SIZE / 2f;
+        center.z += Regions.REGION_SIZE / 2f;
+        return new DistanceListIterator<AnimalSpawnpoint>(LevelAnimals.spawns, x => x.point, center, useXZAxisOnly: true);
+    }
+
+    /// <summary>
+    /// Enumerates player spawns starting the center of the specified region.
+    /// </summary>
+    public static DistanceListIterator<PlayerSpawnpoint> EnumeratePlayerSpawns(byte centerX, byte centerY)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        Regions.tryGetPoint(centerX, centerY, out Vector3 center);
+        center.x += Regions.REGION_SIZE / 2f;
+        center.z += Regions.REGION_SIZE / 2f;
+        return new DistanceListIterator<PlayerSpawnpoint>(LevelPlayers.spawns, x => x.point, center, useXZAxisOnly: true);
+    }
+
+    /// <summary>
+    /// Enumerates vehicle spawns starting the center of the specified region.
+    /// </summary>
+    public static DistanceListIterator<VehicleSpawnpoint> EnumerateVehicleSpawns(byte centerX, byte centerY)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        Regions.tryGetPoint(centerX, centerY, out Vector3 center);
+        center.x += Regions.REGION_SIZE / 2f;
+        center.z += Regions.REGION_SIZE / 2f;
+        return new DistanceListIterator<VehicleSpawnpoint>(LevelVehicles.spawns, x => x.point, center, useXZAxisOnly: true);
+    }
+
+    /// <summary>
+    /// Enumerates animal spawns starting the center of the specified region.
+    /// </summary>
+    public static DistanceListIterator<AnimalSpawnpoint> EnumerateAnimalSpawns(RegionCoord center)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        Regions.tryGetPoint(center.x, center.y, out Vector3 center2);
+        center2.x += Regions.REGION_SIZE / 2f;
+        center2.z += Regions.REGION_SIZE / 2f;
+        return new DistanceListIterator<AnimalSpawnpoint>(LevelAnimals.spawns, x => x.point, center2, useXZAxisOnly: true);
+    }
+
+    /// <summary>
+    /// Enumerates vehicle spawns starting the center of the specified region.
+    /// </summary>
+    public static DistanceListIterator<VehicleSpawnpoint> EnumerateVehicleSpawns(RegionCoord center)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        Regions.tryGetPoint(center.x, center.y, out Vector3 center2);
+        center2.x += Regions.REGION_SIZE / 2f;
+        center2.z += Regions.REGION_SIZE / 2f;
+        return new DistanceListIterator<VehicleSpawnpoint>(LevelVehicles.spawns, x => x.point, center2, useXZAxisOnly: true);
+    }
+
+    /// <summary>
+    /// Enumerates player spawns starting the center of the specified region.
+    /// </summary>
+    public static DistanceListIterator<PlayerSpawnpoint> EnumeratePlayerSpawns(RegionCoord center)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        Regions.tryGetPoint(center.x, center.y, out Vector3 center2);
+        center2.x += Regions.REGION_SIZE / 2f;
+        center2.z += Regions.REGION_SIZE / 2f;
+        return new DistanceListIterator<PlayerSpawnpoint>(LevelPlayers.spawns, x => x.point, center2, useXZAxisOnly: true);
+    }
+
+    /// <summary>
+    /// Execute <paramref name="action"/> for each item spawn starting at the provided region.
+    /// </summary>
+    public static void ForEachItemSpawn(byte centerX, byte centerY, byte maxRegionDistance, ForEach<ItemSpawnpoint> action)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (LevelItems.spawns == null)
+            return;
+        SurroundingRegionsIterator iterator = new SurroundingRegionsIterator(centerX, centerY, maxRegionDistance);
+        while (iterator.MoveNext())
+        {
+            List<ItemSpawnpoint> region = LevelItems.spawns[iterator.Current.x, iterator.Current.y];
+            for (int i = 0; i < region.Count; ++i)
+                action(region[i]);
+        }
+    }
+
+    /// <summary>
+    /// Execute <paramref name="action"/> for each item spawn starting at the provided region.
+    /// </summary>
+    public static void ForEachItemSpawn(byte centerX, byte centerY, byte maxRegionDistance, ForEachWhile<ItemSpawnpoint> action)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (LevelItems.spawns == null)
+            return;
+        SurroundingRegionsIterator iterator = new SurroundingRegionsIterator(centerX, centerY, maxRegionDistance);
+        while (iterator.MoveNext())
+        {
+            List<ItemSpawnpoint> region = LevelItems.spawns[iterator.Current.x, iterator.Current.y];
+            for (int i = 0; i < region.Count; ++i)
+            {
+                if (!action(region[i]))
+                    return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Execute <paramref name="action"/> for each zombie spawn starting at the provided region.
+    /// </summary>
+    public static void ForEachZombieSpawn(byte centerX, byte centerY, byte maxRegionDistance, ForEach<ItemSpawnpoint> action)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (LevelItems.spawns == null)
+            return;
+        SurroundingRegionsIterator iterator = new SurroundingRegionsIterator(centerX, centerY, maxRegionDistance);
+        while (iterator.MoveNext())
+        {
+            List<ItemSpawnpoint> region = LevelItems.spawns[iterator.Current.x, iterator.Current.y];
+            for (int i = 0; i < region.Count; ++i)
+                action(region[i]);
+        }
+    }
+
+    /// <summary>
+    /// Execute <paramref name="action"/> for each zombie spawn starting at the provided region.
+    /// </summary>
+    public static void ForEachZombieSpawn(byte centerX, byte centerY, byte maxRegionDistance, ForEachWhile<ItemSpawnpoint> action)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (LevelItems.spawns == null)
+            return;
+        SurroundingRegionsIterator iterator = new SurroundingRegionsIterator(centerX, centerY, maxRegionDistance);
+        while (iterator.MoveNext())
+        {
+            List<ItemSpawnpoint> region = LevelItems.spawns[iterator.Current.x, iterator.Current.y];
+            for (int i = 0; i < region.Count; ++i)
+            {
+                if (!action(region[i]))
+                    return;
+            }
+        }
     }
 
     /// <summary>
@@ -596,7 +892,7 @@ public static class SpawnUtil
         ThreadUtil.assertIsGameThread();
 
 #if CLIENT
-        SetResourceShaders(spawn.node);
+        SetNodeShaders(spawn.node);
 #endif
 
         int index = LevelAnimals.spawns.IndexOf(spawn);
@@ -635,7 +931,7 @@ public static class SpawnUtil
         ThreadUtil.assertIsGameThread();
 
 #if CLIENT
-        SetResourceShaders(spawn.node);
+        SetNodeShaders(spawn.node);
 #endif
 
         int index = LevelVehicles.spawns.IndexOf(spawn);
@@ -674,7 +970,7 @@ public static class SpawnUtil
         ThreadUtil.assertIsGameThread();
 
 #if CLIENT
-        SetResourceShaders(spawn.node);
+        SetNodeShaders(spawn.node);
 #endif
 
         int index = LevelPlayers.spawns.IndexOf(spawn);
@@ -714,7 +1010,7 @@ public static class SpawnUtil
         ThreadUtil.assertIsGameThread();
 
 #if CLIENT
-        SetResourceShaders(spawn.node);
+        SetNodeShaders(spawn.node);
 #endif
 
         int worldSize = Regions.WORLD_SIZE;
@@ -830,7 +1126,7 @@ public static class SpawnUtil
         ThreadUtil.assertIsGameThread();
 
 #if CLIENT
-        SetResourceShaders(spawn.node);
+        SetNodeShaders(spawn.node);
 #endif
 
         int worldSize = Regions.WORLD_SIZE;
@@ -1381,7 +1677,7 @@ public static class SpawnUtil
     internal static void SetYaw(this VehicleSpawnpoint spawn, float yaw) => SetVehicleSpawnpointAngle?.Invoke(spawn, yaw);
     internal static void SetYaw(this PlayerSpawnpoint spawn, float yaw) => SetPlayerSpawnpointAngle?.Invoke(spawn, yaw);
 #if CLIENT
-    internal static void SetResourceShaders(Transform? node)
+    internal static void SetNodeShaders(Transform? node)
     {
         if (node == null)
             return;

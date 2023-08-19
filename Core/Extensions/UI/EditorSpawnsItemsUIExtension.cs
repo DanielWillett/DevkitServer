@@ -8,20 +8,31 @@ namespace DevkitServer.Core.Extensions.UI;
 internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSpawnpoint>
 {
     private const float DistanceMax = 48f;
+    private const int RegionDistance = 2;
     public EditorSpawnsItemsUIExtension() : base(new Vector3(0f, 0.5f, 0f), 16f, DistanceMax)
     {
         SpawnUtil.OnItemSpawnpointAdded += OnSpawnAdded;
         SpawnUtil.OnItemSpawnpointRemoved += OnSpawnRemoved;
         SpawnUtil.OnItemSpawnpointMoved += OnSpawnMoved;
+        SpawnTableUtil.OnItemSpawnTableNameUpdated += OnNameUpdated;
     }
+
+    private void OnNameUpdated(ItemTable table, int index)
+    {
+        foreach (ItemSpawnpoint spawnpoint in SpawnUtil.EnumerateItemSpawns(MovementUtil.MainCameraRegion, RegionDistance))
+        {
+            UpdateLabel(spawnpoint, table.name);
+        }
+    }
+
     protected override void OnRegionUpdated(RegionCoord oldRegion, RegionCoord newRegion, bool isInRegion)
     {
         foreach (ItemSpawnpoint spawn in new List<ItemSpawnpoint>(Labels.Keys))
         {
-            if (!Regions.tryGetCoordinate(spawn.point, out byte x, out byte y) || !Regions.checkArea(newRegion.x, newRegion.y, x, y, 2))
+            if (!Regions.tryGetCoordinate(spawn.point, out byte x, out byte y) || !Regions.checkArea(newRegion.x, newRegion.y, x, y, RegionDistance))
                 RemoveLabel(spawn);
         }
-        foreach (ItemSpawnpoint spawn in LevelItems.spawns.CastFrom(newRegion, 2))
+        foreach (ItemSpawnpoint spawn in LevelItems.spawns.CastFrom(newRegion, RegionDistance))
         {
             if (!Labels.ContainsKey(spawn))
                 CreateLabel(spawn, GetText(spawn));
@@ -65,6 +76,7 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSp
         SpawnUtil.OnItemSpawnpointAdded -= OnSpawnAdded;
         SpawnUtil.OnItemSpawnpointRemoved -= OnSpawnRemoved;
         SpawnUtil.OnItemSpawnpointMoved -= OnSpawnMoved;
+        SpawnTableUtil.OnItemSpawnTableNameUpdated -= OnNameUpdated;
         base.Dispose();
     }
 }

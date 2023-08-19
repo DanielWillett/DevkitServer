@@ -48,7 +48,7 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
                 node = point.node.gameObject.AddComponent<AnimalSpawnpointNode>();
             node.Spawnpoint = point;
             node.Index = i;
-            SpawnUtil.SetResourceShaders(point.node);
+            SpawnUtil.SetNodeShaders(point.node);
         }
 
         for (int i = 0; i < LevelVehicles.spawns.Count; i++)
@@ -60,7 +60,7 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
                 node = point.node.gameObject.AddComponent<VehicleSpawnpointNode>();
             node.Spawnpoint = point;
             node.Index = i;
-            SpawnUtil.SetResourceShaders(point.node);
+            SpawnUtil.SetNodeShaders(point.node);
         }
 
         for (int i = 0; i < LevelPlayers.spawns.Count; i++)
@@ -72,7 +72,7 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
                 node = point.node.gameObject.AddComponent<PlayerSpawnpointNode>();
             node.Spawnpoint = point;
             node.Index = i;
-            SpawnUtil.SetResourceShaders(point.node);
+            SpawnUtil.SetNodeShaders(point.node);
         }
 
         int worldSize = Regions.WORLD_SIZE;
@@ -90,7 +90,7 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
                         node = point.node.gameObject.AddComponent<ItemSpawnpointNode>();
                     node.Spawnpoint = point;
                     node.Region = new RegionIdentifier(x, y, i);
-                    SpawnUtil.SetResourceShaders(point.node);
+                    SpawnUtil.SetNodeShaders(point.node);
                 }
 
                 List<ZombieSpawnpoint> zombieSpawnpoints = LevelZombies.spawns[x, y];
@@ -103,7 +103,7 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
                         node = point.node.gameObject.AddComponent<ZombieSpawnpointNode>();
                     node.Spawnpoint = point;
                     node.Region = new RegionIdentifier(x, y, i);
-                    SpawnUtil.SetResourceShaders(point.node);
+                    SpawnUtil.SetNodeShaders(point.node);
                 }
             }
         }

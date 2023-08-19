@@ -463,9 +463,10 @@ public static class UIExtensionManager
                 (exceptions ??= new List<Exception>()).Add(new InvalidOperationException("Type " + info.ImplementationType.Name + " does not have a parameterless constructor or an instance input constructor."));
         }
 
-        foreach (MemberInfo member in info.ImplementationType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                     .Concat<MemberInfo>(info.ImplementationType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
-                     .Concat(info.ImplementationType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Where(x => !x.IsSpecialName))
+        foreach (MemberInfo member in info.ImplementationType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+                     .Concat<MemberInfo>(info.ImplementationType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.FlattenHierarchy))
+                     .Concat(info.ImplementationType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+                         .Where(x => !x.IsSpecialName))
                      .OrderByDescending(Accessor.GetPriority)
                      .ThenBy(x => x.Name))
         {
@@ -680,6 +681,8 @@ public static class UIExtensionManager
         if (Attribute.GetCustomAttribute(member, typeof(ExistingUIMemberAttribute)) is not ExistingUIMemberAttribute existingMemberAttribute)
             return;
 
+        ExistingMemberFailureBehavior failureMode = existingMemberAttribute.FailureBehavior;
+
         FieldInfo? field = member as FieldInfo;
         PropertyInfo? property = member as PropertyInfo;
         MethodInfo? method = member as MethodInfo;
@@ -689,7 +692,7 @@ public static class UIExtensionManager
 
         bool isStatic = member.GetIsStatic();
         if (isStatic)
-            throw new Exception($"UI extensions should not have static existing members, such as {member.Name}.");
+            throw new Exception($"UI extensions should not have static existing members, such as \"{member.Name}\".");
 
         Type owningType = existingMemberAttribute.OwningType ?? info.ParentType;
 
@@ -704,7 +707,12 @@ public static class UIExtensionManager
              existingProperty.GetIndexParameters().Length > 0) &&
             (existingMethod == null || existingMethod.ReturnType == typeof(void) || existingMethod.GetParameters().Length > 0))
         {
-            throw new MemberAccessException($"Unable to match \"{owningType.FullName}.{existingMemberAttribute.MemberName}\" to a field, get-able property, or no-argument, non-void-returning method.");
+            string msg = $"Unable to match \"{owningType.Format()}.{existingMemberAttribute.MemberName.Colorize(FormattingColorType.Property)}\" to a field, get-able property, or no-argument, non-void-returning method.";
+            if (failureMode != ExistingMemberFailureBehavior.Ignore)
+                throw new MemberAccessException(msg);
+            
+            LogDebug(msg, info.Plugin, info.Assembly);
+            return;
         }
         MemberInfo existingMember = ((MemberInfo?)existingField ?? existingProperty) ?? existingMethod!;
 
@@ -718,22 +726,50 @@ public static class UIExtensionManager
             {
                 // setter
                 if (parameters.Length == 0 || !parameters[0].ParameterType.IsAssignableFrom(existingMemberType))
-                    throw new Exception($"Unable to assign existing method parameter type: \"{existingMemberType.FullName}\" to expected member type: \"{parameters[0].ParameterType.FullName}\".");
+                {
+                    string msg = $"Unable to assign existing method parameter type: \"{existingMemberType.FullName}\" to expected member type: \"{parameters[0].ParameterType.FullName}\" for existing member \"{member.Name}\".";
+                    if (failureMode != ExistingMemberFailureBehavior.Ignore)
+                        throw new Exception(msg);
+
+                    LogDebug(msg, info.Plugin, info.Assembly);
+                    return;
+                }
             }
             else
             {
                 // getter
                 if (parameters.Length != 0 || !memberType.IsAssignableFrom(existingMemberType))
-                    throw new Exception($"Unable to assign existing method parameter type: \"{existingMemberType.FullName}\" to expected member type: \"{memberType.FullName}\".");
+                {
+                    string msg = $"Unable to assign existing method parameter type: \"{existingMemberType.FullName}\" to expected member type: \"{memberType.FullName}\" for existing member \"{member.Name}\".";
+                    if (failureMode != ExistingMemberFailureBehavior.Ignore)
+                        throw new Exception(msg);
+
+                    LogDebug(msg, info.Plugin, info.Assembly);
+                    return;
+                }
             }
         }
         else if (!memberType.IsAssignableFrom(existingMemberType))
-            throw new Exception($"Unable to assign existing member type: \"{existingMemberType.FullName}\" to expected member type: \"{memberType.FullName}\".");
+        {
+            string msg = $"Unable to assign existing member type: \"{existingMemberType.FullName}\" to expected member type: \"{memberType.FullName}\" for existing member \"{member.Name}\".";
+            if (failureMode != ExistingMemberFailureBehavior.Ignore)
+                throw new Exception(msg);
+
+            LogDebug(msg, info.Plugin, info.Assembly);
+            return;
+        }
         
         bool existingIsStatic = existingMember.GetIsStatic();
 
         if (!existingIsStatic && info.TypeInfo.IsStaticUI)
-            throw new InvalidOperationException($"Requeste instance variable ({existingMember.Name}) from static UI: {info.ParentType.Name}.");
+        {
+            string msg = $"Requested instance variable ({existingMember.Name}) from static UI: {info.ParentType.Name} for existing member \"{member.Name}\".";
+            if (failureMode != ExistingMemberFailureBehavior.Ignore)
+                throw new InvalidOperationException(msg);
+
+            LogDebug(msg, info.Plugin, info.Assembly);
+            return;
+        }
 
         bool initialized;
         if (existingMemberAttribute.InitializeMode is ExistingMemberInitializeMode.InitializeOnConstruct or ExistingMemberInitializeMode.PatchGetter)
@@ -775,7 +811,7 @@ public static class UIExtensionManager
         }
 
         if (!initialized && existingProperty != null && existingProperty.GetSetMethod(true) != null)
-            LogWarning($"Setter on {existingProperty.Format()} can not be used to set the original value.", info.Plugin, info.Assembly);
+            LogWarning($"Setter on {existingProperty.Format()} can not be used to set the original value. Recommended to make the property get-only (readonly).", info.Plugin, info.Assembly);
 
         info.ExistingMembersIntl.Add(new UIExistingMemberInfo(member, existingMember, existingIsStatic, initialized));
     }

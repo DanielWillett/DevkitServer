@@ -14,12 +14,32 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
     protected readonly float DistanceCurveLength;
     protected readonly Dictionary<T, Label> Labels = new Dictionary<T, Label>(16);
     protected override SleekWindow Parent => EditorUI.window;
+    [ExistingUIMember("addButton", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
+    protected SleekButtonIcon? AddButton;
+
+    [ExistingUIMember("removeButton", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
+    protected SleekButtonIcon? RemoveButton;
+
+    [ExistingUIMember("radiusSlider", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
+    protected ISleekSlider? RadiusSlider;
+
+    [ExistingUIMember("rotationSlider", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
+    protected ISleekSlider? RotationSlider;
     protected BaseEditorSpawnsUIExtension(Vector3 offset, float distanceCurveMin, float distanceCurveMax)
     {
         Offset = offset;
         
         DistanceCurveMin = distanceCurveMin;
         DistanceCurveLength = distanceCurveMax - distanceCurveMin;
+
+        if (AddButton != null)
+            AddButton.isVisible = false;
+        if (RemoveButton != null)
+            RemoveButton.isVisible = false;
+        if (RadiusSlider != null)
+            RadiusSlider.isVisible = false;
+        if (RotationSlider != null)
+            RotationSlider.isVisible = false;
     }
 
     protected override void Opened()
@@ -131,6 +151,8 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
         if (Container == null)
             return;
         bool show = ShouldShow(label.Spawn);
+        if (text != null)
+            label.Element.text = text;
         if (!show)
         {
             if (label.Element.isVisible)
@@ -149,8 +171,6 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
             Vector2 adjScreenPos = Container.ViewportToNormalizedPosition(screenPos);
             label.Element.positionScale_X = adjScreenPos.x;
             label.Element.positionScale_Y = adjScreenPos.y;
-            if (text != null && !text.Equals(label.Element.text, StringComparison.Ordinal))
-                label.Element.text = text;
 
             float dist = (position - MainCamera.instance.transform.position).sqrMagnitude;
             bool isClose = DevkitServerConfig.Config.RemoveCosmeticImprovements || dist < DistanceCurveMin * DistanceCurveMin;

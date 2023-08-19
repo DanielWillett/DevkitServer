@@ -11,10 +11,22 @@ internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtension<Veh
         SpawnUtil.OnVehicleSpawnpointAdded += OnSpawnAdded;
         SpawnUtil.OnVehicleSpawnpointRemoved += OnSpawnRemoved;
         SpawnUtil.OnVehicleSpawnpointMoved += OnSpawnMoved;
+        SpawnTableUtil.OnVehicleSpawnTableNameUpdated += OnNameUpdated;
+    }
+
+    private void OnNameUpdated(VehicleTable table, int index)
+    {
+        foreach (VehicleSpawnpoint spawnpoint in SpawnUtil.EnumerateVehicleSpawns(MovementUtil.MainCameraRegion))
+        {
+            if (spawnpoint.type == index)
+                UpdateLabel(spawnpoint, table.name);
+        }
     }
     protected override void OnRegionUpdated(RegionCoord oldRegion, RegionCoord newRegion, bool isInRegion)
     {
         Regions.tryGetPoint(newRegion.x, newRegion.y, out Vector3 regionPos);
+        regionPos.x += Regions.WORLD_SIZE / 2f;
+        regionPos.y += Regions.WORLD_SIZE / 2f;
         float rad = DistanceMax + (Regions.REGION_SIZE / 2f);
         rad *= rad;
         foreach (VehicleSpawnpoint spawn in new List<VehicleSpawnpoint>(Labels.Keys))
@@ -67,6 +79,7 @@ internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtension<Veh
         SpawnUtil.OnVehicleSpawnpointAdded -= OnSpawnAdded;
         SpawnUtil.OnVehicleSpawnpointRemoved -= OnSpawnRemoved;
         SpawnUtil.OnVehicleSpawnpointMoved -= OnSpawnMoved;
+        SpawnTableUtil.OnVehicleSpawnTableNameUpdated -= OnNameUpdated;
         base.Dispose();
     }
 }

@@ -51,7 +51,6 @@ public static class RegionUtil
         
         return new ListRegionsEnumerator<T>(regions, (byte)(Regions.WORLD_SIZE / 2), (byte)(Regions.WORLD_SIZE / 2), maxRegionDistance);
     }
-
     public static ListRegionsEnumerator<T> CastFrom<T>(this List<T>[,] regions) => new ListRegionsEnumerator<T>(regions);
 
     public static SurroundingTilesIterator EnumerateTiles(int centerX, int centerY, TileIteratorMode mode) => new SurroundingTilesIterator(centerX, centerY, mode);

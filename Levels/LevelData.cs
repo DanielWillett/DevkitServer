@@ -21,6 +21,14 @@ public sealed class LevelData
     public byte[] Data { get; internal set; }
     public bool Compressed { get; internal set; }
     public List<ulong>[,] BuildableData { get; internal set; }
+
+    public int SpawnIndexPlayer { get; internal set; }
+    public int SpawnIndexVehicle { get; internal set; }
+    public int SpawnIndexItem { get; internal set; }
+    public int SpawnIndexZombie { get; internal set; }
+    public int SpawnCount { get; internal set; }
+    public NetId[] SpawnNetIds { get; internal set; }
+    public int[] SpawnIndexes { get; internal set; }
 #nullable restore
     private string? _lclPath;
     private LevelData() { }
@@ -56,6 +64,7 @@ public sealed class LevelData
         LevelObjectNetIdDatabase.GatherData(data);
         HierarchyItemNetIdDatabase.GatherData(data);
         BuildableResponsibilities.GatherData(data);
+        SpawnpointNetIdDatabase.GatherData(data);
 #if DEBUG
         Logger.LogDebug($"[EDITOR LEVEL] GatherLevelData took {stopwatch.GetElapsedMilliseconds().Format("F2")} ms.");
 #endif
@@ -108,6 +117,9 @@ public sealed class LevelData
 
         data.BuildableData = new List<ulong>[Regions.WORLD_SIZE, Regions.WORLD_SIZE];
         BuildableResponsibilities.ReadToTable(reader, data.BuildableData);
+
+        // SpawnpointNetIdDatabase
+        SpawnpointNetIdDatabase.ReadToDatabase(reader, data);
 
         data.LevelFolderContent = Folder.Read(_levelReader);
 

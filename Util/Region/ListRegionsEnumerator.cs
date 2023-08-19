@@ -9,8 +9,9 @@ public struct ListRegionsEnumerator<T> : IEnumerable<T>, IEnumerator<T>
     private T? _current;
 
     public RegionCoord Coordinate = RegionCoord.ZERO;
-
-    public ListRegionsEnumerator(List<T>[,] regions) : this(regions, (byte)(Regions.WORLD_SIZE / 2), (byte)(Regions.WORLD_SIZE / 2), 255) { }
+    public List<T>[,] Regions => _regions;
+    public List<T>? Region => _currentRegion;
+    public ListRegionsEnumerator(List<T>[,] regions) : this(regions, (byte)(SDG.Unturned.Regions.WORLD_SIZE / 2), (byte)(SDG.Unturned.Regions.WORLD_SIZE / 2), 255) { }
     public ListRegionsEnumerator(List<T>[,] regions, byte centerX, byte centerY, byte maxRegionDistance = 255)
     {
         _regions = regions;
@@ -24,6 +25,8 @@ public struct ListRegionsEnumerator<T> : IEnumerable<T>, IEnumerator<T>
         ++_index;
         while (_currentRegion == null || _index >= _currentRegion.Count)
         {
+            if (_regions == null)
+                return false;
             if (!_xyIterator.MoveNext())
             {
                 _current = default;

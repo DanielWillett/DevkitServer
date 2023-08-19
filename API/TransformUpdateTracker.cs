@@ -9,6 +9,8 @@ public class TransformUpdateTracker
     private Vector3 _lastPosition;
     private Quaternion _lastRotation;
     public Transform? Transform { get; }
+    public Vector3 LastPosition => _lastPosition;
+    public Quaternion LastRotation => _lastRotation;
     public bool HasPositionChanged { get; private set; } = true;
     public bool HasRotationChanged { get; private set; } = true;
     

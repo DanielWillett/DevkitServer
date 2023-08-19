@@ -13,6 +13,8 @@ public static class MovementUtil
     private static TransformUpdateTracker _mainCameraTracker = new TransformUpdateTracker(MainCamera.instance == null ? null : MainCamera.instance.transform);
     public static RegionCoord MainCameraRegion { get; private set; }
     public static bool MainCameraIsInRegion { get; private set; }
+    public static Vector3 MainCameraPosition { get; private set; }
+    public static Quaternion MainCameraRotation { get; private set; }
 
     public static event TransformUpdateTrackerUpdated OnMainCameraTransformUpdated
     {
@@ -48,6 +50,7 @@ public static class MovementUtil
         if (_mainCameraTracker.HasPositionChanged && LoadingUI.window != MenuUI.window)
         {
             Vector3 position = MainCamera.instance.transform.position;
+            MainCameraPosition = position;
             bool wasInRegion = MainCameraIsInRegion;
             if (!Regions.checkSafe(position))
             {
@@ -73,6 +76,8 @@ public static class MovementUtil
                     Logger.LogDebug($"Region updated: {r2.Format()} -> {r.Format()}.");
             }
         }
+        
+        MainCameraRotation = _mainCameraTracker.LastRotation;
     }
 #endif
 }

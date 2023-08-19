@@ -78,6 +78,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     public FoliageActions FoliageActions { get; }
     public HierarchyActions HierarchyActions { get; }
     public ObjectActions ObjectActions { get; }
+    public SpawnActions SpawnActions { get; }
 
     private EditorActions()
     {
@@ -86,6 +87,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         FoliageActions = new FoliageActions(this);
         HierarchyActions = new HierarchyActions(this);
         ObjectActions = new ObjectActions(this);
+        SpawnActions = new SpawnActions(this);
     }
 
     [UsedImplicitly]
@@ -549,6 +551,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         FoliageActions.Subscribe();
         HierarchyActions.Subscribe();
         ObjectActions.Subscribe();
+        SpawnActions.Subscribe();
     }
 
     public void Unsubscribe()
@@ -557,6 +560,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         FoliageActions.Unsubscribe();
         HierarchyActions.Unsubscribe();
         ObjectActions.Unsubscribe();
+        SpawnActions.Unsubscribe();
     }
 }
 public interface IActionListener

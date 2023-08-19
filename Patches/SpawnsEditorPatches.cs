@@ -1,10 +1,9 @@
 ﻿#if CLIENT
+using DevkitServer.Core.Tools;
+using DevkitServer.Players;
 using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
-using AOT;
-using DevkitServer.Core.Tools;
-using DevkitServer.Players;
 
 namespace DevkitServer.Patches;
 
@@ -56,6 +55,54 @@ internal static class SpawnsEditorPatches
             Logger.LogError(ex, method: Source);
             DevkitServerModule.Fault();
         }
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onTypedTableNameField")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static void OnItemNameUpdated(ISleekField field, string state)
+    {
+        if (EditorSpawns.selectedItem >= LevelItems.tables.Count)
+            return;
+
+        SpawnTableUtil.EventOnItemSpawnTableNameUpdated.TryInvoke(LevelItems.tables[EditorSpawns.selectedItem], EditorSpawns.selectedItem);
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onTypedNameField")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static void OnAnimalNameUpdated(ISleekField field, string state)
+    {
+        if (EditorSpawns.selectedAnimal >= LevelAnimals.tables.Count)
+            return;
+
+        SpawnTableUtil.EventOnAnimalSpawnTableNameUpdated.TryInvoke(LevelAnimals.tables[EditorSpawns.selectedAnimal], EditorSpawns.selectedAnimal);
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onTypedNameField")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static void OnZombieNameUpdated(ISleekField field, string state)
+    {
+        if (EditorSpawns.selectedZombie >= LevelZombies.tables.Count)
+            return;
+
+        SpawnTableUtil.EventOnZombieSpawnTableNameUpdated.TryInvoke(LevelZombies.tables[EditorSpawns.selectedZombie], EditorSpawns.selectedZombie);
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsVehiclesUI), "onTypedNameField")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static void OnVehicleNameUpdated(ISleekField field, string state)
+    {
+        if (EditorSpawns.selectedVehicle >= LevelVehicles.tables.Count)
+            return;
+
+        SpawnTableUtil.EventOnVehicleSpawnTableNameUpdated.TryInvoke(LevelVehicles.tables[EditorSpawns.selectedVehicle], EditorSpawns.selectedVehicle);
     }
     private static IEnumerable<CodeInstruction> TranspileOnClickedPlayersButton(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
@@ -156,7 +203,6 @@ internal static class SpawnsEditorPatches
 
         return ins;
     }
-
     private static void Open(SpawnType type)
     {
         if (UserInput.ActiveTool is DevkitServerSpawnsTool tool)

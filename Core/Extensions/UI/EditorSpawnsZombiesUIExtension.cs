@@ -8,20 +8,31 @@ namespace DevkitServer.Core.Extensions.UI;
 internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<ZombieSpawnpoint>
 {
     private const float DistanceMax = 60f;
+    private const int RegionDistance = 2;
     public EditorSpawnsZombiesUIExtension() : base(new Vector3(0f, 2.5f, 0f), 20f, DistanceMax)
     {
         SpawnUtil.OnZombieSpawnpointAdded += OnSpawnAdded;
         SpawnUtil.OnZombieSpawnpointRemoved += OnSpawnRemoved;
         SpawnUtil.OnZombieSpawnpointMoved += OnSpawnMoved;
+        SpawnTableUtil.OnZombieSpawnTableNameUpdated += OnNameUpdated;
+    }
+
+    private void OnNameUpdated(ZombieTable table, int index)
+    {
+        foreach (ZombieSpawnpoint spawnpoint in SpawnUtil.EnumerateZombieSpawns(MovementUtil.MainCameraRegion, RegionDistance))
+        {
+            if (spawnpoint.type == index)
+                UpdateLabel(spawnpoint, table.name);
+        }
     }
     protected override void OnRegionUpdated(RegionCoord oldRegion, RegionCoord newRegion, bool isInRegion)
     {
         foreach (ZombieSpawnpoint spawn in new List<ZombieSpawnpoint>(Labels.Keys))
         {
-            if (!Regions.tryGetCoordinate(spawn.point, out byte x, out byte y) || !Regions.checkArea(newRegion.x, newRegion.y, x, y, 2))
+            if (!Regions.tryGetCoordinate(spawn.point, out byte x, out byte y) || !Regions.checkArea(newRegion.x, newRegion.y, x, y, RegionDistance))
                 RemoveLabel(spawn);
         }
-        foreach (ZombieSpawnpoint spawn in LevelZombies.spawns.CastFrom(newRegion, 2))
+        foreach (ZombieSpawnpoint spawn in LevelZombies.spawns.CastFrom(newRegion, RegionDistance))
         {
             if (!Labels.ContainsKey(spawn))
                 CreateLabel(spawn, GetText(spawn));
@@ -65,6 +76,7 @@ internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<Zomb
         SpawnUtil.OnZombieSpawnpointAdded -= OnSpawnAdded;
         SpawnUtil.OnZombieSpawnpointRemoved -= OnSpawnRemoved;
         SpawnUtil.OnZombieSpawnpointMoved -= OnSpawnMoved;
+        SpawnTableUtil.OnZombieSpawnTableNameUpdated -= OnNameUpdated;
         base.Dispose();
     }
 }

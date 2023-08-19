@@ -421,6 +421,11 @@ public sealed class ExistingUIMemberAttribute : Attribute
     public ExistingMemberInitializeMode InitializeMode { get; set; }
 
     /// <summary>
+    /// Influences how reflection failures are handled (member can't be found or is the wrong type).
+    /// </summary>
+    public ExistingMemberFailureBehavior FailureBehavior { get; set; }
+
+    /// <summary>
     /// Type that owns the member if it isn't the parent type you're extending or a base type of it.
     /// </summary>
     public Type? OwningType { get; set; }
@@ -450,5 +455,21 @@ public enum ExistingMemberInitializeMode
     /// The property's getter is patched to refetch the element each time.
     /// </summary>
     PatchGetter
+}
+
+/// <summary>
+/// Describes the behavior of a member marked by the <see cref="ExistingUIMemberAttribute"/> when it's unable to be found or doesn't match the expected type.
+/// </summary>
+public enum ExistingMemberFailureBehavior
+{
+    /// <summary>
+    /// Do not load the extension if the member can not be found or doesn't match the expected type.
+    /// </summary>
+    FailToLoad,
+
+    /// <summary>
+    /// If the member can't be found or doesn't match the expected type, the value will not be initialized (will be default/null).
+    /// </summary>
+    Ignore
 }
 #endif
