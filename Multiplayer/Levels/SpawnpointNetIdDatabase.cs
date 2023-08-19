@@ -28,7 +28,7 @@ internal static class SpawnpointNetIdDatabase
     };
 
     [UsedImplicitly]
-    internal static NetCall<uint, NetId> SendBindHierarchyItem = new NetCall<uint, NetId>(NetCalls.SendBindHierarchyItem);
+    internal static NetCall<byte, int, NetId> SendBindSpawnpoint = new NetCall<byte, int, NetId>(NetCalls.SendBindSpawnpoint);
 #if SERVER
     private static bool _initialLoaded;
 #endif
@@ -244,11 +244,11 @@ internal static class SpawnpointNetIdDatabase
 #endif
     
 #if CLIENT
-    [NetCall(NetCallSource.FromServer, NetCalls.SendBindIndexSpawnpoint)]
-    private static StandardErrorCode ReceiveBindIndexSpawnpoint(MessageContext ctx, byte spawnType, int index, NetId netId)
+    [NetCall(NetCallSource.FromServer, NetCalls.SendBindSpawnpoint)]
+    private static StandardErrorCode ReceiveBindSpawnpoint(MessageContext ctx, byte spawnType, int index, NetId netId)
     {
         SpawnType type = (SpawnType)spawnType;
-        if (type is not SpawnType.Animal and not SpawnType.Player and not SpawnType.Vehicle)
+        if (type is not SpawnType.Animal and not SpawnType.Player and not SpawnType.Vehicle and not SpawnType.Item and not SpawnType.Zombie)
             return StandardErrorCode.InvalidData;
 
         switch (type)
@@ -257,14 +257,38 @@ internal static class SpawnpointNetIdDatabase
                 if (LevelAnimals.spawns.Count <= index)
                     return StandardErrorCode.NotFound;
                 break;
+
             case SpawnType.Player:
                 if (LevelPlayers.spawns.Count <= index)
                     return StandardErrorCode.NotFound;
                 break;
+
             default:
                 if (LevelVehicles.spawns.Count <= index)
                     return StandardErrorCode.NotFound;
                 break;
+
+            case SpawnType.Item:
+                RegionIdentifier id = RegionIdentifier.CreateUnsafe(index);
+                if (id.IsInvalid)
+                    return StandardErrorCode.InvalidData;
+                List<ItemSpawnpoint> items = LevelItems.spawns[id.X, id.Y];
+                if (items.Count <= id.Index)
+                    return StandardErrorCode.NotFound;
+
+                ClaimBasicNetId(id, type, netId);
+                return StandardErrorCode.Success;
+
+            case SpawnType.Zombie:
+                id = RegionIdentifier.CreateUnsafe(index);
+                if (id.IsInvalid)
+                    return StandardErrorCode.InvalidData;
+                List<ZombieSpawnpoint> zombies = LevelZombies.spawns[id.X, id.Y];
+                if (zombies.Count <= id.Index)
+                    return StandardErrorCode.NotFound;
+
+                ClaimBasicNetId(id, type, netId);
+                return StandardErrorCode.Success;
         }
 
         ClaimBasicNetId(index, type, netId);
@@ -536,11 +560,19 @@ internal static class SpawnpointNetIdDatabase
         }
         for (; index < data.SpawnIndexZombie; ++index)
         {
-            ClaimBasicNetId(new RegionIdentifier(indexes[index]), SpawnType.Item, netIds[index]);
+            RegionIdentifier id = RegionIdentifier.CreateUnsafe(indexes[index]);
+            if (!id.IsInvalid)
+                ClaimBasicNetId(id, SpawnType.Item, netIds[index]);
+            else
+                Logger.LogWarning($"Received item spawn with invalid region identifier: {id.Format()}.");
         }
         for (; index < data.SpawnCount; ++index)
         {
-            ClaimBasicNetId(new RegionIdentifier(indexes[index]), SpawnType.Zombie, netIds[index]);
+            RegionIdentifier id = RegionIdentifier.CreateUnsafe(indexes[index]);
+            if (!id.IsInvalid)
+                ClaimBasicNetId(id, SpawnType.Zombie, netIds[index]);
+            else
+                Logger.LogWarning($"Received zombie spawn with invalid region identifier: {id.Format()}.");
         }
     }
 #endif
