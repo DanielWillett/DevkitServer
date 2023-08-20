@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using DevkitServer.Configuration;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Levels;
@@ -10,6 +11,9 @@ namespace DevkitServer.Levels;
 public sealed class LevelData
 {
     private static readonly uint DataVersion = 0;
+
+    private static readonly InstanceSetter<LevelInfo, string> SetFilePath = Accessor.GenerateInstancePropertySetter<LevelInfo, string>("path", throwOnError: true)!;
+
     public uint Version { get; private set; }
 #nullable disable
     public Folder LevelFolderContent { get; private set; }
@@ -47,24 +51,52 @@ public sealed class LevelData
         BuildableData = other.BuildableData;
         Version = DataVersion;
     }
-    public static LevelData GatherLevelData()
+    public static LevelData GatherLevelData(bool saveToTemp, bool gatherOtherData)
     {
         ThreadUtil.assertIsGameThread();
 #if DEBUG
         Stopwatch stopwatch = Stopwatch.StartNew();
 #endif
+        DirtyManagerState? dirtyState = null;
+        string newPath, oldPath = newPath = Level.info.path;
+        if (saveToTemp)
+        {
+            newPath = Path.Combine(DevkitServerConfig.TempFolder, "Level");
+            try
+            {
+                DevkitServerUtility.CopyDirectory(oldPath, newPath);
+                SetFilePath(Level.info, newPath);
+            }
+            catch (AggregateException ex)
+            {
+                Logger.LogError($"Error copying directory to avoid saving ({oldPath.Format()} -> {newPath.Format()}), saving to main directory.", method: "EDITOR LEVEL");
+#if DEBUG
+                Logger.LogError(ex, method: "EDITOR LEVEL");
+#endif
+                newPath = oldPath;
+                saveToTemp = false;
+            }
+        }
+
         Level.save();
-        string lclPath = Level.info.path;
-        Folder folder = new Folder(lclPath, ShouldSendFile, null);
+
+        if (saveToTemp)
+            SetFilePath(Level.info, oldPath);
+
+        dirtyState?.Apply();
+        Folder folder = new Folder(newPath, ShouldSendFile, null);
         LevelData data = new LevelData
         {
             LevelFolderContent = folder,
-            _lclPath = lclPath
+            _lclPath = newPath
         };
-        LevelObjectNetIdDatabase.GatherData(data);
-        HierarchyItemNetIdDatabase.GatherData(data);
-        BuildableResponsibilities.GatherData(data);
-        SpawnpointNetIdDatabase.GatherData(data);
+        if (gatherOtherData)
+        {
+            LevelObjectNetIdDatabase.GatherData(data);
+            HierarchyItemNetIdDatabase.GatherData(data);
+            BuildableResponsibilities.GatherData(data);
+            SpawnpointNetIdDatabase.GatherData(data);
+        }
 #if DEBUG
         Logger.LogDebug($"[EDITOR LEVEL] GatherLevelData took {stopwatch.GetElapsedMilliseconds().Format("F2")} ms.");
 #endif
@@ -172,7 +204,7 @@ public sealed class LevelData
         writer.FinishWrite();
     }
 
-    private static bool ShouldSendFile(FileInfo file)
+    internal static bool ShouldSendFile(FileInfo file)
     {
         string nm = file.Name;
         string? origDir = file.DirectoryName;

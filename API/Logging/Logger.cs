@@ -6,9 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Cysharp.Threading.Tasks;
 using DevkitServer.API.Logging.Terminals;
-#if SERVER
 using DevkitServer.Levels;
-#endif
 #if CLIENT
 using DevkitServer.Patches;
 using HarmonyLib;
@@ -554,13 +552,11 @@ public static class Logger
     }
     private static void OnTerminalOutputIntl(string outputMessage, ConsoleColor color)
     {
-#if SERVER
         if (!IsExternalFeatureset)
         {
             BackupLogs? logs = BackupLogs.Instance;
-            logs?.GetOrAdd<LogQueue>().Logs.Add(outputMessage);
+            logs?.GetOrAdd<LogQueue>().Add(outputMessage);
         }
-#endif
         OnOutputed?.Invoke(outputMessage, color);
     }
     private static void OnTerminalInputIntl(string input)
@@ -584,20 +580,26 @@ public static class Logger
         else
             DevkitServerUtility.QueueOnMainThread(() => OnTerminalInputIntl(input));
     }
-#if SERVER
     private sealed class LogQueue : IBackupLog
     {
         public List<string> Logs { get; } = new List<string>(1024);
         public string RelativeName => "main_log";
+        public void Add(string log)
+        {
+            lock (Logs)
+                Logs.Add(log);
+        }
         public void Write(TextWriter fileWriter)
         {
-            for (int i = Logs.Count - 1; i >= 0; --i)
+            lock (Logs)
             {
-                fileWriter.WriteLine(FormattingUtil.RemoveANSIFormatting(Logs[i]));
+                for (int i = Logs.Count - 1; i >= 0; --i)
+                {
+                    fileWriter.WriteLine(FormattingUtil.RemoveANSIFormatting(Logs[i]));
+                }
             }
         }
     }
-#endif
 }
 
 public enum Severity : byte

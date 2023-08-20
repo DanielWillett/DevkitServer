@@ -2,9 +2,14 @@
 #define TILE_DEBUG_GL
 #endif
 #define TILE_SYNC
+using Cysharp.Threading.Tasks;
 using DevkitServer.API;
 using DevkitServer.Configuration;
+using DevkitServer.Core;
+using DevkitServer.Levels;
 using DevkitServer.Multiplayer;
+using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Patches;
@@ -17,24 +22,17 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security;
-using Cysharp.Threading.Tasks;
-using DevkitServer.Core;
-using DevkitServer.Multiplayer.Actions;
-using DevkitServer.Multiplayer.Levels;
 using UnityEngine.SceneManagement;
 using Module = SDG.Framework.Modules.Module;
 using Version = System.Version;
 #if CLIENT
+using DevkitServer.API.Logging;
+using DevkitServer.Core.Tools;
+using DevkitServer.Players;
+using DevkitServer.Players.UI;
 #if DEBUG
 using DevkitServer.Util.Debugging;
 #endif
-using DevkitServer.Players;
-using DevkitServer.Players.UI;
-using DevkitServer.API.Logging;
-using DevkitServer.Core.Tools;
-#endif
-#if SERVER
-using DevkitServer.Levels;
 #endif
 
 namespace DevkitServer;
@@ -52,6 +50,9 @@ public sealed class DevkitServerModule : IModuleNexus
     private static CancellationTokenSource? _tknSrc;
     private static string? _asmPath;
     private static IReadOnlyList<string>? _searchLocations;
+    private static string? _commitIdShort;
+    public static string LongCommitId => DevkitServer.CommitId.Commit;
+    public static string CommitId => _commitIdShort ??= DevkitServer.CommitId.Commit.Length > 7 ? DevkitServer.CommitId.Commit.Substring(0, 7) : DevkitServer.CommitId.Commit;
     public Assembly Assembly { get; } = Assembly.GetExecutingAssembly();
     internal static string HelpMessage => CommandLocalization.format("Help");
     public static GameObject GameObjectHost { get; private set; } = null!;
@@ -65,14 +66,18 @@ public sealed class DevkitServerModule : IModuleNexus
     public static bool IsMainThread => ThreadUtil.gameThread == Thread.CurrentThread;
     public static CancellationToken UnloadToken => _tknSrc == null ? CancellationToken.None : _tknSrc.Token;
     public static Local MainLocalization { get; private set; } = null!;
-#if SERVER
     public static BackupManager? BackupManager { get; private set; }
-#endif
     public static bool MonoLoaded { get; }
     public static bool UnityLoaded { get; }
     public static bool UnturnedLoaded { get; }
     public static bool InitializedLogging { get; set; }
     public static string AssemblyPath => _asmPath ??= Accessor.DevkitServer.Location;
+    public static bool IsAuthorityEditor =>
+#if CLIENT
+        Level.isEditor && !IsEditing;
+#else
+        IsEditing;
+#endif
     public static IReadOnlyList<string> AssemblyFileSearchLocations
     {
         get
@@ -223,6 +228,8 @@ public sealed class DevkitServerModule : IModuleNexus
 
             DevkitServerConfig.Reload();
 
+            DevkitServerConfig.ClearTempFolder();
+
             if (LoadFaulted)
             {
                 Provider.shutdown(1, "Failed to load config.");
@@ -232,7 +239,7 @@ public sealed class DevkitServerModule : IModuleNexus
             if (!NetFactory.Init())
             {
                 Fault();
-                Logger.LogError("Failed to load! Loading cancelled. Check for updates on https://github.com/DanielWillett/DevkitServer.");
+                Logger.LogError($"Failed to load! Loading cancelled. Check for updates on {RepositoryUrl.Format()}.");
                 goto fault;
             }
             
@@ -290,6 +297,7 @@ public sealed class DevkitServerModule : IModuleNexus
             Provider.onEnemyDisconnected += EditorUser.OnEnemyDisconnected;
             ChatManager.onChatMessageReceived += OnChatMessageReceived;
             UserTPVControl.Init();
+            Level.onLevelExited += OnLevelExited;
 #endif
             AssetUtil.OnBeginLevelLoading += OnLevelStartLoading;
             LevelObjectNetIdDatabase.Init();
@@ -425,6 +433,14 @@ public sealed class DevkitServerModule : IModuleNexus
                 "UNTURNED", "CHAT", color: ConsoleColor.White, Severity.Info);
         }
     }
+    private static void OnLevelExited()
+    {
+        if (BackupManager != null)
+        {
+            Object.Destroy(BackupManager);
+            Logger.LogDebug("Destoryed backup manager.");
+        }
+    }
 #endif
     private static void OnLevelLoaded(int level)
     {
@@ -557,6 +573,25 @@ public sealed class DevkitServerModule : IModuleNexus
 #endif
 
         _searchLocations = new ReadOnlyCollection<string>(locs.ToArray());
+    }
+    /// <summary>
+    /// Returns a URL to the github repository with a path relative to its root.
+    /// </summary>
+    /// <param name="relativePath"></param>
+    /// <param name="shortenCommitId">Uses the 7 digit commit ID instead of the full commit ID.</param>
+    public static string GetRelativeRepositoryUrl(string? relativePath, bool shortenCommitId = true)
+    {
+        string tree = shortenCommitId ? CommitId : LongCommitId;
+        if (string.IsNullOrEmpty(tree))
+            tree = "master";
+        tree = RepositoryUrl + (relativePath != null && relativePath.IndexOf('.') != -1 ? "/blob/" : "/tree/") + tree;
+        if (string.IsNullOrWhiteSpace(tree))
+            return tree;
+        
+        if (relativePath![0] == '/')
+            return tree + relativePath;
+        
+        return tree + "/" + relativePath;
     }
     public static string? FindModuleFile(string name)
     {
@@ -722,7 +757,7 @@ public sealed class DevkitServerModule : IModuleNexus
                 HierarchyResponsibilities.Save();
                 LevelObjectResponsibilities.Save();
 #if SERVER
-                    BuildableResponsibilities.Save();
+                BuildableResponsibilities.Save();
 #endif
             }
         }
@@ -737,9 +772,15 @@ public sealed class DevkitServerModule : IModuleNexus
     }
     private static void OnPrePreLevelLoaded(int level)
     {
+        if (IsAuthorityEditor)
+        {
+            if (BackupManager != null)
+                Object.Destroy(BackupManager);
+            BackupManager = GameObjectHost.AddComponent<BackupManager>();
+        }
+
 #if SERVER
         DevkitServerUtility.CheckDirectory(false, false, DevkitServerConfig.LevelDirectory, typeof(DevkitServerConfig).GetProperty(nameof(DevkitServerConfig.LevelDirectory), BindingFlags.Public | BindingFlags.Static));
-        BackupManager = GameObjectHost.AddComponent<BackupManager>();
 
         LevelObjectNetIdDatabase.AssignExisting();
         HierarchyItemNetIdDatabase.AssignExisting();
@@ -772,14 +813,16 @@ public sealed class DevkitServerModule : IModuleNexus
         /* SAVE DATA */
         OnSaved();
 
+        DevkitServerConfig.ClearTempFolder();
+
         PluginLoader.Unload();
         _tknSrc?.Cancel();
         _tknSrc = null;
         TileSync.DestroyServersideAuthority();
-#if SERVER
-        Object.Destroy(BackupManager);
+        if (BackupManager != null)
+            Object.Destroy(BackupManager);
         BackupManager = null;
-#endif
+
         Object.Destroy(GameObjectHost);
         Logger.LogInfo("Shutting down...");
         PatchesMain.Unpatch();
@@ -806,6 +849,7 @@ public sealed class DevkitServerModule : IModuleNexus
             Object.Destroy(IconGenerator.Instance.gameObject);
         ObjectIconPresets.Deinit();
         MovementUtil.Deinit();
+        Level.onLevelExited -= OnLevelExited;
 #endif
         AssetUtil.OnBeginLevelLoading -= OnLevelStartLoading;
         LevelObjectNetIdDatabase.Shutdown();

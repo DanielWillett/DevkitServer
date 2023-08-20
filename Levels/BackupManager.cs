@@ -1,16 +1,22 @@
-﻿#if SERVER
-using DevkitServer.Configuration;
+﻿using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Networking;
-using JetBrains.Annotations;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO.Compression;
 using Level = SDG.Unturned.Level;
 
 namespace DevkitServer.Levels;
+
+/// <summary>
+/// Schedules level backups for the map editor.
+/// </summary>
 public sealed class BackupManager : MonoBehaviour
 {
+    /// <summary>
+    /// Date format for backup file names.
+    /// </summary>
     public const string FileNameDateFormat = "yyyy-MM-dd_HH-mm-ss";
+
     private const string Source = "BACKUPS";
     private Coroutine? _backupCoroutine;
     private bool _event;
@@ -19,7 +25,15 @@ public sealed class BackupManager : MonoBehaviour
     private BackupLogs _logs = new BackupLogs();
     internal static bool PlayerHasJoinedSinceLastBackup;
     private static volatile bool _working;
+
+    /// <summary>
+    /// Time the last backup was made (relative to <see cref="Time.realtimeSinceStartup"/>).
+    /// </summary>
     public float LastSaveRealtime => _lastSave;
+
+    /// <summary>
+    /// Log tracker for the next backup.
+    /// </summary>
     public BackupLogs Logs => _logs;
     
 
@@ -43,6 +57,10 @@ public sealed class BackupManager : MonoBehaviour
             }
         }
     }
+
+    /// <summary>
+    /// Reloads the config and refereshes the cached data in <see cref="BackupManager"/>.
+    /// </summary>
     public void RefreshFromConfig() => BackupConfiguration.ConfigProvider.ReloadConfig();
 
     internal void Restart()
@@ -116,18 +134,54 @@ public sealed class BackupManager : MonoBehaviour
         }
     }
     private static void LogNotEnabled() => Logger.LogWarning($"Backups {"disabled".Colorize(ConsoleColor.Red)} (not recommended).", method: Source);
+
+    /// <summary>
+    /// Gets the path of a backup saved at <paramref name="timestamp"/>.
+    /// </summary>
     public static string GetBackupPath(DateTimeOffset timestamp) => GetBackupPath(Level.info.name, timestamp);
+
+    /// <summary>
+    /// Gets the path of a backup's log folder saved at <paramref name="timestamp"/>.
+    /// </summary>
     public static string GetLogFolderPath(DateTimeOffset timestamp) => GetLogFolderPath(Level.info.name, timestamp);
+
+    /// <summary>
+    /// Gets the path of a backup with the name <paramref name="levelName"/> saved at <paramref name="timestamp"/>.
+    /// </summary>
     public static string GetBackupPath(string levelName, DateTimeOffset timestamp) =>
         Path.Combine(BackupConfiguration.BackupPath, GetBackupName(levelName, timestamp));
+
+    /// <summary>
+    /// Gets the path of a backup with the name <paramref name="levelName"/>'s log folder saved at <paramref name="timestamp"/>.
+    /// </summary>
     public static string GetLogFolderPath(string levelName, DateTimeOffset timestamp) =>
         Path.Combine(BackupConfiguration.BackupPath, GetLogFolderName(levelName, timestamp));
+
+    /// <summary>
+    /// Gets the file name of a backup saved at <paramref name="timestamp"/>.
+    /// </summary>
     public static string GetBackupName(DateTimeOffset timestamp) => GetBackupName(Level.info.name, timestamp);
+
+    /// <summary>
+    /// Gets the file name of a backup's log folder saved at <paramref name="timestamp"/>.
+    /// </summary>
     public static string GetLogFolderName(DateTimeOffset timestamp) => GetLogFolderName(Level.info.name, timestamp);
+
+    /// <summary>
+    /// Gets the file name of a backup with the name <paramref name="levelName"/> saved at <paramref name="timestamp"/>.
+    /// </summary>
     public static string GetBackupName(string levelName, DateTimeOffset timestamp) =>
         "backup_" + levelName + "_" + timestamp.UtcDateTime.ToString(FileNameDateFormat, CultureInfo.InvariantCulture) + ".zip";
+
+    /// <summary>
+    /// Gets the file name of a backup with the name <paramref name="levelName"/>'s log folder saved at <paramref name="timestamp"/>.
+    /// </summary>
     public static string GetLogFolderName(string levelName, DateTimeOffset timestamp) =>
         "logs_" + levelName + "_" + timestamp.UtcDateTime.ToString(FileNameDateFormat, CultureInfo.InvariantCulture) + Path.DirectorySeparatorChar;
+
+    /// <summary>
+    /// Parses a backup or log folder name to get the timestamp and level name from the file name.
+    /// </summary>
     public static bool TryParseBackupName(string fileName, out DateTime utcTimestamp, out string levelName)
     {
         utcTimestamp = default;
@@ -163,7 +217,15 @@ public sealed class BackupManager : MonoBehaviour
         else
             Logger.LogInfo($"[{Source}] Backup {DateTime.UtcNow.ToString(FileNameDateFormat).Format(false)} (UTC) skipped because the level was very recently backed up.");
     }
+
+    /// <summary>
+    /// Start a backup (compression will be done on another thread, fire and forget).
+    /// </summary>
     public void Backup() => Backup(BackupConfiguration.Config.MaxBackups, BackupConfiguration.Config.MaxBackupSizeMegabytes, BackupConfiguration.Config.SaveBackupLogs);
+
+    /// <summary>
+    /// Run a backup with the configured deletion settings (compression will be done on another thread, fire and forget).
+    /// </summary>
     public void Backup(int maxBackups, double maxBackupSizeMegabytes, bool saveLogs)
     {
         ThreadUtil.assertIsGameThread();
@@ -174,7 +236,7 @@ public sealed class BackupManager : MonoBehaviour
         _lastSave = CachedTime.RealtimeSinceStartup;
         Logger.LogInfo($"[{Source}] Backing up {Level.info.name.Format(false)}...");
         DateTimeOffset timestamp = DateTimeOffset.UtcNow;
-        LevelData save = LevelData.GatherLevelData();
+        LevelData save = LevelData.GatherLevelData(true, false);
         BackupLogs oldLogs = Interlocked.Exchange(ref _logs, new BackupLogs());
         _working = true;
         if (Provider.clients.Count == 0)
@@ -263,7 +325,7 @@ public sealed class BackupManager : MonoBehaviour
                     long actualSize = CountBackupSize(Level.info.name);
                     if (actualSize > maxSize)
                     {
-                        if (!DeleteOldestBackups(Level.info.name, 1))
+                        if (DeleteOldestBackups(Level.info.name, 1) < 1)
                             break;
                     }
                     else break;
@@ -324,6 +386,10 @@ public sealed class BackupManager : MonoBehaviour
 
         return ct;
     }
+
+    /// <summary>
+    /// Get an array of all backups sorted by date (newest to oldest).
+    /// </summary>
     public static (string Path, DateTime UtcTimestamp)[] GetOrderedBackups(string levelName)
     {
         string[] entries = Directory.GetFiles(BackupConfiguration.BackupPath, "*.zip", SearchOption.TopDirectoryOnly);
@@ -387,17 +453,29 @@ public sealed class BackupManager : MonoBehaviour
         return path != null;
     }
 
+    /// <summary>
+    /// Try to get the most recent backup.
+    /// </summary>
     public static bool TryGetLatestBackup(string levelName, out string path, out DateTime utcTimestamp) =>
         TryGetMinMaxBackup(levelName, out path, out utcTimestamp, true);
+
+    /// <summary>
+    /// Try to get the least recent backup.
+    /// </summary>
     public static bool TryGetOldestBackup(string levelName, out string path, out DateTime utcTimestamp) =>
         TryGetMinMaxBackup(levelName, out path, out utcTimestamp, false);
-    public static bool DeleteOldestBackups(string levelName, int ct = 1)
+
+    /// <summary>
+    /// Try to delete <paramref name="ct"/> backups starting from the oldest one.
+    /// </summary>
+    /// <returns>The amount of files deleted.</returns>
+    public static int DeleteOldestBackups(string levelName, int ct = 1)
     {
         if (ct <= 0)
-            return true;
+            return 0;
         (string Path, DateTime UtcTimestamp)[] backups = GetOrderedBackups(levelName);
-
-        bool last = false;
+        
+        int ctDeleted = 0;
         for (int i = 0; i < ct; ++i)
         {
             int index = backups.Length - i - 1;
@@ -409,12 +487,11 @@ public sealed class BackupManager : MonoBehaviour
             {
                 File.Delete(path);
                 deleted = true;
+                ++ctDeleted;
                 Logger.LogInfo($"[{Source}] Deleted old backup: {backups[index].UtcTimestamp.ToString(FileNameDateFormat).Format(false)} (UTC).");
                 path = GetLogFolderPath(levelName, backups[index].UtcTimestamp);
                 if (Directory.Exists(path))
                     Directory.Delete(path, true);
-                if (i == ct - 1)
-                    last = true;
             }
             catch (Exception ex)
             {
@@ -425,7 +502,7 @@ public sealed class BackupManager : MonoBehaviour
             }
         }
 
-        return last;
+        return ctDeleted;
     }
     private IEnumerator IntervalBackup()
     {
@@ -436,11 +513,13 @@ public sealed class BackupManager : MonoBehaviour
         int maxBackups = config.MaxBackups;
         double maxSizeMb = config.MaxBackupSizeMegabytes;
         bool configSaveLogs = config.SaveBackupLogs;
-        while (true)
+        while (DevkitServerModule.IsAuthorityEditor)
         {
             Logger.LogInfo($"[{Source}] Next Backup: {DateTime.Now.AddSeconds(interval).ToString("G").Format(false)} (LOCAL).");
 
             yield return new WaitForSecondsRealtime((float)interval);
+            if (!DevkitServerModule.IsAuthorityEditor)
+                yield break;
             if (!configSkipInactive || PlayerHasJoinedSinceLastBackup)
             {
                 if (CachedTime.RealtimeSinceStartup - _lastSave > 5f)
@@ -470,7 +549,7 @@ public sealed class BackupManager : MonoBehaviour
             LogNotEnabled();
             yield break;
         }
-        while (true)
+        while (DevkitServerModule.IsAuthorityEditor)
         {
             DateTime? next = DevkitServerUtility.FindNextSchedule(configSchedule, false, configScheduleInterval);
             if (!next.HasValue)
@@ -482,6 +561,8 @@ public sealed class BackupManager : MonoBehaviour
             Logger.LogInfo($"[{Source}] Next Backup: {next.Value.ToString("G").Format(false)} ({(configUtc ? "UTC" : "LOCAL")}).");
             DateTime now = configUtc ? DateTime.UtcNow : DateTime.Now;
             yield return new WaitForSecondsRealtime((float)(next.Value - now).TotalSeconds);
+            if (!DevkitServerModule.IsAuthorityEditor)
+                yield break;
             if (!configSkipInactive || PlayerHasJoinedSinceLastBackup)
             {
                 if (CachedTime.RealtimeSinceStartup - _lastSave > 5f)
@@ -496,4 +577,3 @@ public sealed class BackupManager : MonoBehaviour
         }
     }
 }
-#endif

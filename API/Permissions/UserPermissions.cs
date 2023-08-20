@@ -1,6 +1,7 @@
 ﻿using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Plugins;
 using System.Reflection;
+using System.Text.Json.Serialization;
 #if SERVER
 using DevkitServer.Configuration;
 using DevkitServer.Core.Permissions;
@@ -89,7 +90,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
 #if SERVER
     protected static readonly ByteWriter Writer = new ByteWriter(false, 1024);
     protected static readonly ByteReader Reader = new ByteReader();
-    private PermissionGroupsConfig _config = null!;
+    private PermissionGroupsConfig.ConfigHost _config = null!;
 #endif
     protected UserPermissions() { }
     internal static void InitHandlers()
@@ -312,7 +313,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         _roClientPerms = _clientPerms.AsReadOnly();
         _roPermGrps = _permGrps.AsReadOnly();
 #else
-        _config = new PermissionGroupsConfig();
+        _config = new PermissionGroupsConfig.ConfigHost();
         Reload();
 #endif
         for (int i = 0; i < _perms.Count; ++i)
@@ -323,7 +324,8 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
     {
 #if SERVER
         _config.ReloadConfig();
-        _permGrps = _config.Configuration;
+        _permGrps = _config.Configuration.Groups ?? new List<PermissionGroup>(0);
+        _permGrps.Sort((a, b) => b.Priority.CompareTo(a.Priority));
         _roPermGrps = _permGrps.AsReadOnly();
 #endif
     }
@@ -353,7 +355,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         bool added = false;
         for (int i = 0; i < _permGrps.Count; ++i)
         {
-            if (_permGrps[i].Priority <= group.Priority)
+            if (_permGrps[i].Priority >= group.Priority)
                 continue;
             _permGrps.Insert(i, group);
             added = true;
@@ -384,7 +386,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
                     bool added = false;
                     for (int j = 0; j < _permGrps.Count; ++j)
                     {
-                        if (_permGrps[j].Priority <= grp.Priority)
+                        if (_permGrps[j].Priority >= grp.Priority)
                             continue;
                         _permGrps.Insert(j, grp);
                         added = true;
@@ -583,7 +585,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         bool added = false;
         for (int i = 0; i < perms2.Count; ++i)
         {
-            if (perms2[i].Priority <= group.Priority)
+            if (perms2[i].Priority >= group.Priority)
                 continue;
             perms2.Insert(i, group);
             added = true;
@@ -692,8 +694,34 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
             }
         }
     }
-    public void SavePermissionGroup(PermissionGroup group)
+    public void SavePermissionGroup(PermissionGroup group, bool priorityChanged)
     {
+        if (priorityChanged)
+        {
+            for (int i = 0; i < _permGrps.Count; ++i)
+            {
+                if (!_permGrps[i].Equals(group))
+                    continue;
+
+                PermissionGroup grp = _permGrps[i];
+                // re-sort after priority change
+                _permGrps.RemoveAt(i);
+                bool added = false;
+                for (int j = 0; j < _permGrps.Count; ++j)
+                {
+                    if (_permGrps[j].Priority >= grp.Priority)
+                        continue;
+                    _permGrps.Insert(j, grp);
+                    added = true;
+                    break;
+                }
+
+                if (!added)
+                    _permGrps.Add(grp);
+
+                break;
+            }
+        }
         _config.SaveConfig();
         PermissionsEx.ReplicatePermissionGroupUpdate(group);
         EventPermissionGroupUpdated.TryInvoke(group);
@@ -844,50 +872,67 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
 #endif
 }
 #if SERVER
-public class PermissionGroupsConfig : JsonConfigurationFile<List<PermissionGroup>>
+public class PermissionGroupsConfig : SchemaConfiguration
 {
-    public override List<PermissionGroup>? Default { get; } = new List<PermissionGroup>(4)
+    public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/permission_groups_schema.json");
+
+    [JsonIgnore]
+    private static PermissionGroupsConfig? _default;
+
+    [JsonPropertyName("groups")]
+    public List<PermissionGroup> Groups { get; set; } = null!;
+
+    public static PermissionGroupsConfig Default => _default ??= new PermissionGroupsConfig
     {
-        new PermissionGroup("viewer", "Viewer", new Color32(255, 204, 102, 255), 0, Array.Empty<GroupPermission>()),
-        new PermissionGroup("terrain_editor", "Terrain Editor", new Color32(51, 204, 51, 255), 1, new GroupPermission[]
+        Groups = new List<PermissionGroup>(4)
         {
-            VanillaPermissions.EditHeightmap,
-            VanillaPermissions.EditSplatmap,
-            VanillaPermissions.EditHoles,
-            VanillaPermissions.EditFoliage,
-            VanillaPermissions.BakeFoliage,
-            VanillaPermissions.BakeFoliageNearby,
-            VanillaPermissions.EditObjects,
-            VanillaPermissions.EditVolumes,
-            VanillaPermissions.EditNodes,
-            VanillaPermissions.EditCartographyVolumes,
-            VanillaPermissions.BakeCartography,
-            VanillaPermissions.PlaceRoads,
-            VanillaPermissions.BakeRoads,
-            VanillaPermissions.EditLighting
-        }),
-        new PermissionGroup("location_builder", "Location Builder", new Color32(255, 255, 153, 255), 1, new GroupPermission[]
-        {
-            VanillaPermissions.EditHeightmap,
-            VanillaPermissions.EditSplatmap,
-            VanillaPermissions.EditHoles,
-            VanillaPermissions.EditFoliage,
-            VanillaPermissions.BakeFoliageNearby,
-            VanillaPermissions.EditObjects,
-            VanillaPermissions.EditVolumes,
-            VanillaPermissions.EditNodes,
-            VanillaPermissions.EditCartographyVolumes,
-            VanillaPermissions.BakeCartography,
-            VanillaPermissions.PlaceRoads,
-            VanillaPermissions.BakeRoads,
-        }),
-        new PermissionGroup("director", "Director", new Color32(51, 204, 255, 255), 2, new GroupPermission[]
-        {
-            Permission.SuperuserPermission
-        })
+            new PermissionGroup("viewer", "Viewer", new Color32(255, 204, 102, 255), 0, Array.Empty<GroupPermission>()),
+            new PermissionGroup("terrain_editor", "Terrain Editor", new Color32(51, 204, 51, 255), 1, new GroupPermission[]
+            {
+                VanillaPermissions.EditHeightmap,
+                VanillaPermissions.EditSplatmap,
+                VanillaPermissions.EditHoles,
+                VanillaPermissions.EditFoliage,
+                VanillaPermissions.BakeFoliage,
+                VanillaPermissions.BakeFoliageNearby,
+                VanillaPermissions.EditObjects,
+                VanillaPermissions.EditVolumes,
+                VanillaPermissions.EditNodes,
+                VanillaPermissions.EditCartographyVolumes,
+                VanillaPermissions.BakeCartography,
+                VanillaPermissions.PlaceRoads,
+                VanillaPermissions.BakeRoads,
+                VanillaPermissions.EditLighting
+            }),
+            new PermissionGroup("location_builder", "Location Builder", new Color32(255, 255, 153, 255), 1, new GroupPermission[]
+            {
+                VanillaPermissions.EditHeightmap,
+                VanillaPermissions.EditSplatmap,
+                VanillaPermissions.EditHoles,
+                VanillaPermissions.EditFoliage,
+                VanillaPermissions.BakeFoliageNearby,
+                VanillaPermissions.EditObjects,
+                VanillaPermissions.EditVolumes,
+                VanillaPermissions.EditNodes,
+                VanillaPermissions.EditCartographyVolumes,
+                VanillaPermissions.BakeCartography,
+                VanillaPermissions.PlaceRoads,
+                VanillaPermissions.BakeRoads,
+            }),
+            new PermissionGroup("director", "Director", new Color32(51, 204, 255, 255), 2, new GroupPermission[]
+            {
+                Permission.SuperuserPermission
+            })
+        }
     };
-    public PermissionGroupsConfig() : base(DevkitServerConfig.PermissionGroupsPath) { }
+    internal sealed class ConfigHost : JsonConfigurationFile<PermissionGroupsConfig>
+    {
+        // ReSharper disable once MemberHidesStaticFromOuterClass
+        public override PermissionGroupsConfig Default => PermissionGroupsConfig.Default;
+        public ConfigHost() : base(DevkitServerConfig.PermissionGroupsPath) { }
+    }
 }
+
 #endif
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Field, Inherited = false, AllowMultiple = true)]
 public sealed class PermissionAttribute : PluginIdentifierAttribute { }

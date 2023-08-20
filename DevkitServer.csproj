@@ -58,12 +58,15 @@
   </Target>
   <ItemGroup>
     <Compile Remove="DevkitServer.Tests\**" />
+    <Compile Remove="Module\**" />
     <Compile Remove="packages\**" />
     <Compile Remove="TestPlugin\**" />
     <EmbeddedResource Remove="DevkitServer.Tests\**" />
+    <EmbeddedResource Remove="Module\**" />
     <EmbeddedResource Remove="packages\**" />
     <EmbeddedResource Remove="TestPlugin\**" />
     <None Remove="DevkitServer.Tests\**" />
+    <None Remove="Module\**" />
     <None Remove="packages\**" />
     <None Remove="TestPlugin\**" />
   </ItemGroup>

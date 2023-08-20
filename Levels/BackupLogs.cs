@@ -1,5 +1,4 @@
-﻿#if SERVER
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 
 namespace DevkitServer.Levels;
@@ -106,4 +105,3 @@ public sealed class BackupLogs
         }
     }
 }
-#endif

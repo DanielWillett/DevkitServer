@@ -580,7 +580,7 @@ public static class DevkitServerUtility
     {
         string basePath;
         if (!string.IsNullOrEmpty(DevkitServerConfig.Config.UserSavedataLocationOverride))
-        {
+        {   
             basePath = DevkitServerConfig.Config.UserSavedataLocationOverride!;
             if (!Path.IsPathRooted(basePath))
                 basePath = Path.Combine(ReadWrite.PATH, basePath);
@@ -1210,6 +1210,66 @@ public static class DevkitServerUtility
         }
 
         return rel;
+    }
+
+    /// <summary>
+    /// Recursively copy a directory from <paramref name="source"/> to <paramref name="destination"/>.
+    /// </summary>
+    /// <exception cref="AggregateException">Errors reading or writing files.</exception>
+    public static void CopyDirectory(string source, string destination, bool overwrite = true, Predicate<FileInfo>? shouldInclude = null)
+    {
+        DirectoryInfo sourceInfo = new DirectoryInfo(source);
+        if (!sourceInfo.Exists)
+            return;
+        DirectoryInfo dstInfo = new DirectoryInfo(destination);
+        if (!dstInfo.Exists)
+            dstInfo.Create();
+
+        List<Exception>? exceptions = null;
+        try
+        {
+            foreach (FileSystemInfo info in sourceInfo.GetFileSystemInfos("*", SearchOption.AllDirectories))
+            {
+                if (info is FileInfo file)
+                {
+                    try
+                    {
+                        if (shouldInclude != null && !shouldInclude(file))
+                            continue;
+                        string path = Path.Combine(dstInfo.FullName, GetRelativePath(sourceInfo.FullName, file.FullName));
+                        string? dir = Path.GetDirectoryName(path);
+                        if (dir != null)
+                            Directory.CreateDirectory(dir);
+                        file.CopyTo(path, overwrite);
+                    }
+                    catch (Exception ex)
+                    {
+                        (exceptions ??= new List<Exception>(1)).Add(ex);
+                    }
+                }
+                else if (info is DirectoryInfo { Exists: false } dir)
+                {
+                    try
+                    {
+                        string path = Path.Combine(dstInfo.FullName, GetRelativePath(sourceInfo.FullName, dir.FullName));
+                        Directory.CreateDirectory(path);
+                    }
+                    catch (Exception ex)
+                    {
+                        (exceptions ??= new List<Exception>(1)).Add(ex);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new AggregateException(ex);
+        }
+
+        if (exceptions is { Count: > 0 })
+        {
+            throw new AggregateException(exceptions);
+        }
     }
 
     /// <summary>

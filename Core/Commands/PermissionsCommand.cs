@@ -120,7 +120,7 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
                             if (UserPermissions.Handler.TryFindPermissionGroup(id, out PermissionGroup group))
                             {
                                 group.DisplayName = name ?? id;
-                                UserPermissions.Handler.SavePermissionGroup(group);
+                                UserPermissions.Handler.SavePermissionGroup(group, false);
                                 throw ctx.Reply("ChangedName", group.Id, group.DisplayName, "#" + ColorUtility.ToHtmlStringRGB(group.Color));
                             }
                             
@@ -142,7 +142,7 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
                             {
                                 Color oldColor = group.Color;
                                 group.Color = color;
-                                UserPermissions.Handler.SavePermissionGroup(group);
+                                UserPermissions.Handler.SavePermissionGroup(group, false);
                                 throw ctx.Reply("ChangedColor", group.Id, "#" + ColorUtility.ToHtmlStringRGB(group.Color), "#" + ColorUtility.ToHtmlStringRGB(oldColor));
                             }
                             
@@ -163,7 +163,7 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
                             if (UserPermissions.Handler.TryFindPermissionGroup(id, out PermissionGroup group))
                             {
                                 group.Priority = priority;
-                                UserPermissions.Handler.SavePermissionGroup(group);
+                                UserPermissions.Handler.SavePermissionGroup(group, true);
                                 throw ctx.Reply("ChangedPriority", group.Id, group.Priority.ToString(CultureInfo.InvariantCulture), "#" + ColorUtility.ToHtmlStringRGB(group.Color));
                             }
                             
@@ -196,7 +196,7 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
                                     ctx.Reply(group.RemovePermission(perm) ? "RemovedPermission" : "PermissionAlreadyRemoved", group.Id, perm.ToString(), "#" + ColorUtility.ToHtmlStringRGB(group.Color));
                                 else
                                     ctx.Reply(group.AddPermission(perm) ? "AddedPermission" : "PermissionAlreadyAdded", group.Id, perm.ToString(), "#" + ColorUtility.ToHtmlStringRGB(group.Color));
-                                UserPermissions.Handler.SavePermissionGroup(group);
+                                UserPermissions.Handler.SavePermissionGroup(group, false);
                                 return UniTask.CompletedTask;
                             }
 

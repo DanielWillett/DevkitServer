@@ -1,0 +1,98 @@
+{
+  "$schema": "https://github.com/DanielWillett/DevkitServer/tree/master/Module/Schemas/server_config_schema.json",
+
+  /*
+   *  Full (24-bit) console color support (works in the Win 11 terminal and most web terminals).
+   *
+   *  If your console contains weird symbols, try setting this to false.
+   */
+  "extended_visual_ansi_support": true,
+
+  /*
+   *  Basic (4-bit) console color support (works in most terminals).
+   */
+  "visual_ansi_support": true,
+
+  /*
+   *  Removes cosmetic improvements.
+   */
+  "walmart_pc_support": false,
+
+  /*
+   *  Options for newly created maps.
+   */
+  "new_level_info": {
+
+      /* 
+       *  Level Types
+       *   Survival (Normal)
+       *   Horde
+       *   Arena
+       */
+      "gamemode_type": "Survival",
+
+      /*
+       *  Level Sizes
+       *   Tiny    512m   0.5x0.5 tile  + 0.5 tile border
+       *   Small   1024m  1x1     tile  + 0.5 tile border
+       *   Medium  2048m  2x2     tiles + 1   tile border
+       *   Large   4096m  4x4     tiles + 1   tile border
+       *   Insane  8192m  8x8     tiles + 1   tile border
+       */
+      "start_size": "Medium",
+
+      /*
+       *  SteamID of the 'owner' of the map.
+       *  This value goes in the map metadata, which decides who can open the file normally without a '.unlocker' file.
+       *  Any SteamID format works.
+       *
+       *  This has no effect on uploading to workshop.
+       */
+      "map_owner": "nil"
+  },
+
+  /*
+   *  Not recommended, tries to read the map from your files instead of downloading it on join.
+   *
+   *  You will almost certainly get out of sync from the server.
+   */
+  "disable_map_download": false,
+
+  /*
+   *  Default individual permissions a user has. For example:
+   *  [ "controller.player", "controller.editor", "hierarchy.nodes.place" ]
+   *  or
+   *  [ "*" ] to give all permissions by default.
+   */
+  "default_permissions": [],
+
+  /*
+   *  Default permission groups a user has. For example:
+   *  [ "viewer" ].
+   *
+   *  Permission groups can be configured with the "/p groups" command or in "U3DS\DevkitServer\<Server ID>\permission_groups.json".
+   */
+  "default_permission_groups": [
+    "viewer"
+  ],
+
+  /*
+   *  Override the directory where user savedata is stored. Relative to U3DS unless a root is specified ("\DevkitServer\Savedata\" will be at "...\U3DS\DevkitServer\Savedata\").
+   *  If this is null, it will either be "U3DS\Servers\<Server ID>\Players\" or "U3DS\Sync\", depending on if "Sync" is in Commands.dat.
+   */
+  "user_savedata_override": null,
+
+  /*
+   *  Configure a TCP server to send/receive large packets (like the map, cartography renders, etc) much quicker than over Steamworks servers.
+   *  It is secured using a key sent over your Steam connection.
+   *
+   *  Highly recommended to set this up if possible.
+   *  You will need to port-forward "high_speed_tcp_port" with TCP protocol and possibly allow it in your firewall.
+   *
+   *  This is disabled by default because anyone using a hosting service may not be able to forward this port.
+   */
+  "high_speed": {
+    "enable_high_speed_support": false,
+    "high_speed_tcp_port": 31905
+  }
+}

@@ -83,7 +83,7 @@ public static class EditorLevel
         _isCompressingLevel = true;
         try
         {
-            _lvl = LevelData.GatherLevelData();
+            _lvl = LevelData.GatherLevelData(false, true);
             _lvl.WriteToData();
             byte[] data = _lvl.Data;
             int size1 = data.Length;

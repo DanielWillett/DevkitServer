@@ -29,10 +29,6 @@
         <Reference Include="UniTask">
             <HintPath>$(IncludedLibrariesPath)\UniTask.dll</HintPath>
         </Reference>
-    </ItemGroup>
-
-    <!-- Server References -->
-    <ItemGroup Condition="$(DefineConstants.Contains(SERVER))">
 
         <!-- System.IO.Compression -->
         <Reference Include="System.Data.DataSetExtensions" />
@@ -40,6 +36,10 @@
         <Reference Include="System.IO.Compression.FileSystem">
             <HintPath>$(IncludedLibrariesPath)\System.IO.Compression.FileSystem.dll</HintPath>
         </Reference>
+    </ItemGroup>
+
+    <!-- Server References -->
+    <ItemGroup Condition="$(DefineConstants.Contains(SERVER))">
         
         <!-- Unturned -->
         <Reference Include="Assembly-CSharp">

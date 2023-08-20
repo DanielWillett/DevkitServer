@@ -1,12 +1,12 @@
-﻿#if SERVER
-using DevkitServer.API;
+﻿using DevkitServer.API;
 using System.Text.Json.Serialization;
 using DevkitServer.Levels;
 
 namespace DevkitServer.Configuration;
 [EarlyTypeInit(-2)]
-public sealed class BackupConfiguration
+public sealed class BackupConfiguration : SchemaConfiguration
 {
+    public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/backup_schema.json");
     private sealed class ConfigContainer : JsonConfigurationFile<BackupConfiguration>
     {
         internal ConfigContainer() : base(FilePath) { }
@@ -56,7 +56,7 @@ public sealed class BackupConfiguration
     [CreateDirectory]
     public static readonly string BackupPath = Path.Combine(DevkitServerConfig.Directory, "Backups");
     public static readonly string FilePath = Path.Combine(DevkitServerConfig.Directory, "backup_config.json");
-    private static readonly ConfigContainer IntlConfig = new ConfigContainer();
+    private static readonly ConfigContainer IntlConfig = new ConfigContainer { Defaultable = true };
     public static IConfigProvider<BackupConfiguration> ConfigProvider => IntlConfig;
     public static BackupConfiguration Config => IntlConfig.Configuration;
 
@@ -98,4 +98,3 @@ public sealed class BackupConfiguration
     [JsonPropertyName("save_backup_logs")]
     public bool SaveBackupLogs { get; set; }
 }
-#endif
