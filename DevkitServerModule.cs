@@ -582,7 +582,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static string GetRelativeRepositoryUrl(string? relativePath, bool shortenCommitId = true)
     {
         string tree = shortenCommitId ? CommitId : LongCommitId;
-        if (string.IsNullOrEmpty(tree))
+        if (string.IsNullOrEmpty(tree) || CommitId.Equals("0000000", StringComparison.Ordinal))
             tree = "master";
         tree = RepositoryUrl + (relativePath != null && relativePath.IndexOf('.') != -1 ? "/blob/" : "/tree/") + tree;
         if (string.IsNullOrWhiteSpace(tree))
