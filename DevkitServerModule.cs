@@ -51,8 +51,8 @@ public sealed class DevkitServerModule : IModuleNexus
     private static string? _asmPath;
     private static IReadOnlyList<string>? _searchLocations;
     private static string? _commitIdShort;
-    public static string LongCommitId => DevkitServer.CommitId.Commit;
     public static string CommitId => _commitIdShort ??= DevkitServer.CommitId.Commit.Length > 7 ? DevkitServer.CommitId.Commit.Substring(0, 7) : DevkitServer.CommitId.Commit;
+    public static string LongCommitId => DevkitServer.CommitId.Commit;
     public Assembly Assembly { get; } = Assembly.GetExecutingAssembly();
     internal static string HelpMessage => CommandLocalization.format("Help");
     public static GameObject GameObjectHost { get; private set; } = null!;
