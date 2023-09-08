@@ -189,6 +189,8 @@ public sealed class LevelData
 
         BuildableResponsibilities.WriteTable(writer, BuildableData);
 
+        SpawnpointNetIdDatabase.WriteToDatabase(writer, this);
+
         Folder folder = LevelFolderContent;
         if (_lclPath != null)
         {
