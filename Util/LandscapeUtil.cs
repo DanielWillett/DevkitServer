@@ -146,7 +146,8 @@ public static class LandscapeUtil
     {
         Landscape.removeTile(coordinate);
         LevelHierarchy.MarkDirty();
-        CleanupTile(coordinate);
+        if (deleteTerrainData)
+            CleanupTile(coordinate);
     }
 
     /// <summary>
