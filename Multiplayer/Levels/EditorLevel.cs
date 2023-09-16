@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Reflection;
 using SDG.Provider;
 #if CLIENT
+using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Patches;
 using SDG.Framework.Utilities;
@@ -43,14 +44,9 @@ public static class EditorLevel
     [UsedImplicitly]
     internal static readonly NetCall Ping = new NetCall((ushort)NetCalls.Ping);
     internal static List<ITransportConnection> PendingToReceiveActions = new List<ITransportConnection>(4);
-    public static string TempLevelPath => Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer",
-#if SERVER
-        Provider.serverID,
-#else
-        Parser.getIPFromUInt32(Provider.currentServerInfo.ip) + "_" + Provider.currentServerInfo.connectionPort,
+#if CLIENT
+    public static string TempLevelPath => Path.Combine(DevkitServerConfig.ServerFolder, "Levels", _pendingLevelName ?? throw new NotSupportedException("Level not pending."), "Level Install");
 #endif
-        "{0}", "Level");
-
 #if SERVER
     private static bool _isCompressingLevel;
     private static LevelData? _lvl;
@@ -87,7 +83,7 @@ public static class EditorLevel
         _isCompressingLevel = true;
         try
         {
-            _lvl = LevelData.GatherLevelData();
+            _lvl = LevelData.GatherLevelData(false, true);
             _lvl.WriteToData();
             byte[] data = _lvl.Data;
             int size1 = data.Length;
@@ -395,7 +391,7 @@ public static class EditorLevel
 #endif
 #if CLIENT
     private static readonly Func<string, bool, ulong, LevelInfo?> LoadLevelInfo =
-        Accessor.GenerateStaticCaller<Level, Func<string, bool, ulong, LevelInfo?>>("loadLevelInfo", new Type[] { typeof(string), typeof(bool), typeof(ulong) }, true)!;
+        Accessor.GenerateStaticCaller<Level, Func<string, bool, ulong, LevelInfo?>>("loadLevelInfo", throwOnError: true, allowUnsafeTypeBinding: true)!;
 
     internal static LevelData? ServerPendingLevelData;
 
@@ -705,14 +701,9 @@ public static class EditorLevel
             Logger.LogDebug($"[RECEIVE LEVEL] Decompressed from {DevkitServerUtility.FormatBytes(_pendingLevelLength)} -> {DevkitServerUtility.FormatBytes(payload.Length)}.");
         }
         string dir = TempLevelPath;
-        dir = DevkitServerUtility.QuickFormat(dir, _pendingLevelName);
         if (Directory.Exists(dir))
             Directory.Delete(dir, true);
         Directory.CreateDirectory(dir);
-#if DEBUG
-        File.WriteAllBytes(Path.Combine(dir, "Raw Data.dat"), payload);
-        yield return null;
-#endif
         Logger.LogDebug("[RECEIVE LEVEL] Reading level folder.");
         ServerPendingLevelData = LevelData.Read(payload);
         Folder folder = ServerPendingLevelData.LevelFolderContent;
@@ -721,7 +712,7 @@ public static class EditorLevel
         LoadingUI.NotifyDownloadProgress(1f);
         Logger.LogInfo($"[RECEIVE LEVEL] Finished receiving level data ({DevkitServerUtility.FormatBytes(_pendingLevelLength)}) for level {_pendingLevelName}.", ConsoleColor.DarkCyan);
         yield return null;
-        OnLevelReady(Path.Combine(dir, folder.FolderName));
+        OnLevelReady(Path.Combine(dir, _pendingLevelName!));
 
         Reset();
         ctx.Acknowledge(StandardErrorCode.Success);
@@ -793,16 +784,14 @@ public static class EditorLevel
     }
     private static void OnLevelReady(string dir)
     {
-        DevkitServerModule.ComponentHost.StartCoroutine(DevkitServerModule.Instance.TryLoadBundle(() => DevkitServerModule.ComponentHost.StartCoroutine(LoadLevel(dir))));
+        DevkitServerModule.ComponentHost.StartCoroutine(DevkitServerModule.TryLoadBundle(() => DevkitServerModule.ComponentHost.StartCoroutine(LoadLevel(dir))));
     }
 
-    private static readonly InstanceGetter<Asset, AssetOrigin>? GetAssetOrigin = Accessor.GenerateInstanceGetter<Asset, AssetOrigin>("origin");
-
     private static readonly InstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>> GetServerPendingIDs =
-        Accessor.GenerateInstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>>("serverPendingIDs", BindingFlags.NonPublic, true)!;
+        Accessor.GenerateInstanceGetter<TempSteamworksWorkshop, List<PublishedFileId_t>>("serverPendingIDs", throwOnError: true)!;
 
     private static readonly Action<LevelInfo, List<PublishedFileId_t>> ApplyServerAssetMapping =
-        Accessor.GenerateStaticCaller<Assets, Action<LevelInfo, List<PublishedFileId_t>>>("ApplyServerAssetMapping", null, true)!;
+        Accessor.GenerateStaticCaller<Assets, Action<LevelInfo, List<PublishedFileId_t>>>("ApplyServerAssetMapping", throwOnError: true, allowUnsafeTypeBinding: true)!;
 
     private static IEnumerator LoadLevel(string dir)
     {
@@ -832,20 +821,17 @@ public static class EditorLevel
             {
                 yield return null;
             }
-
-            if (GetAssetOrigin != null)
-            {
-                List<Asset> allAssets = new List<Asset>(8192);
-                Assets.find(allAssets);
-                Logger.LogInfo($"[RECEIVE LEVEL] Loaded {allAssets.Count(x => GetAssetOrigin(x) == origin).Format()} asset(s) from {origin.name.Format()}");
-            }
+#if DEBUG
+            List<Asset> allAssets = new List<Asset>(8192);
+            Assets.find(allAssets);
+            Logger.LogInfo($"[RECEIVE LEVEL] Loaded {allAssets.Count(x => x.GetOrigin() == origin).Format()} asset(s) from {origin.name.Format()}");
+#endif
 
             GC.Collect();
             Resources.UnloadUnusedAssets();
         }
-
-        DevkitServerModule.PendingLevelInfo = info;
-        PatchesMain.Launch();
+        
+        PatchesMain.Launch(info);
     }
 #endif
 }

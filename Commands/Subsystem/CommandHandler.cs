@@ -1,7 +1,9 @@
 ﻿using System.Reflection;
 using Cysharp.Threading.Tasks;
 using DevkitServer.API;
+using DevkitServer.API.Abstractions;
 using DevkitServer.API.Commands;
+using DevkitServer.API.Logging;
 using DevkitServer.Configuration;
 using DevkitServer.Patches;
 #if SERVER
@@ -141,7 +143,7 @@ public class CommandHandler : ICommandHandler, IDisposable
                 Logger.LogWarning("Unable to find method " + typeof(Logs).Format() + "." + nameof(Logs.printLine).Colorize(Color.red) + " for a patch to listen to vanilla command responses.");
             else
             {
-                _logPrefix = Accessor.GetMethodInfo(OnLogged);
+                _logPrefix = Accessor.GetMethod(OnLogged);
                 PatchesMain.Patcher.Patch(_logMethod, prefix: new HarmonyMethod(_logPrefix));
                 _logPatched = true;
                 Logger.LogDebug("Patched " + _logMethod.Format() + " to listen to vanilla command responses.");
@@ -160,7 +162,7 @@ public class CommandHandler : ICommandHandler, IDisposable
                 Logger.LogWarning("Unable to find method " + typeof(ChatManager).Format() + "." + nameof(ChatManager.sendChat).Colorize(Color.red) + " for a patch to listen to client commands.");
             else
             {
-                _chatPrefix = Accessor.GetMethodInfo(OnClientChatted);
+                _chatPrefix = Accessor.GetMethod(OnClientChatted);
                 PatchesMain.Patcher.Patch(_chatMethod, prefix: new HarmonyMethod(_chatPrefix));
                 _chatPatched = true;
                 Logger.LogDebug("Patched " + _chatMethod.Format() + " to listen to client commands.");
@@ -525,6 +527,11 @@ public class CommandHandler : ICommandHandler, IDisposable
 
         if (!added)
             _registeredCommands.Add(command);
+
+        if (command is ILocalizedCommand localizedCommand and ICachedTranslationSourceCommand cachedTranslationSourceCommand)
+        {
+            cachedTranslationSourceCommand.TranslationSource = TranslationSource.FromCommand(localizedCommand);
+        }
 
         Color clr = new Color32(230, 77, 0, 255);
         if (command.Plugin != null)

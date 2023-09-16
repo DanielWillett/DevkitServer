@@ -1,0 +1,29 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/DanielWillett/DevkitServer/tree/master/Module/Schemas/client_config_schema.json",
+    "title": "DevkitServer Configuration (Client)",
+    "description": "Defines general client-side settings for DevkitServer.",
+    "type": "object",
+    "properties": {
+        "extended_visual_ansi_support": {
+            "description": "Full (24-bit) console color support (works in the Win 11 terminal and most web terminals).",
+            "type": "boolean"
+        },
+        "visual_ansi_support": {
+            "description": "Basic (4-bit) console color support (works in most terminals).",
+            "type": "boolean"
+        },
+        "walmart_pc_support": {
+            "description": "Removes cosmetic improvements.",
+            "type": "boolean"
+        },
+        "enable_object_ui_extension": {
+            "description": "Enables a preview window for your selected object in the Object Editor.",
+            "type": "boolean"
+        },
+        "enable_better_map_creation": {
+            "description": "Enables an override for better initial map creation (adding a new map).",
+            "type": "boolean"
+        }
+    }
+}

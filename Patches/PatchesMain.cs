@@ -1,20 +1,20 @@
 ﻿using DevkitServer.Multiplayer;
 using HarmonyLib;
-using JetBrains.Annotations;
 using System.Reflection;
 using System.Text;
 using DevkitServer.Configuration;
 using DevkitServer.Players;
 using SDG.Framework.Landscapes;
+using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
+using Cysharp.Threading.Tasks;
+using Version = System.Version;
 #if CLIENT
 using DevkitServer.Multiplayer.Levels;
-using System.Reflection.Emit;
-using SDG.Provider;
 #endif
 #if SERVER
 using DevkitServer.Multiplayer.Networking;
 using SDG.NetPak;
-using System.Reflection.Emit;
 #endif
 
 namespace DevkitServer.Patches;
@@ -23,6 +23,7 @@ namespace DevkitServer.Patches;
 internal static class PatchesMain
 {
     public const string HarmonyId = "dw.devkitserver";
+    private const string Source = "PATCHING";
     internal static Harmony Patcher { get; private set; } = null!;
     internal static void Init()
     {
@@ -31,6 +32,7 @@ internal static class PatchesMain
 #if DEBUG
             string path = Path.Combine(DevkitServerConfig.Directory, "harmony.log");
             Environment.SetEnvironmentVariable("HARMONY_LOG_FILE", path);
+            DevkitServerUtility.CheckDirectory(false, true, DevkitServerConfig.Directory, null);
             try
             {
                 using FileStream str = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
@@ -40,8 +42,8 @@ internal static class PatchesMain
             }
             catch (Exception ex)
             {
-                Logger.LogError("Unable to clear previous harmony log.");
-                Logger.LogError(ex);
+                Logger.LogError("Unable to clear previous harmony log.", method: Source);
+                Logger.LogError(ex, method: Source);
             }
             Harmony.DEBUG = true;
 #endif
@@ -52,19 +54,15 @@ internal static class PatchesMain
 #endif
 #if CLIENT
             LevelObjectPatches.OptionalPatches();
+            SpawnsEditorPatches.ManualPatches();
 #endif
             DoManualPatches();
-
-            Accessor.AddFunctionBreakpoints(AccessTools.Method(typeof(EditorObjects), "save"));
-            // ConstructorInfo? info = typeof(MenuConfigurationOptionsUI).GetConstructors(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault();
-            // if (info != null)
-            //     Accessor.AddFunctionBreakpoints(info);
-
-            Logger.LogInfo($"Finished patching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
+            
+            Logger.LogInfo($"[{Source}] Finished patching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex);
+            Logger.LogError(ex, method: Source);
             DevkitServerModule.Fault();
             Unpatch();
         }
@@ -84,6 +82,7 @@ internal static class PatchesMain
     }
     private static void DoManualPatches()
     {
+        // Level.includeHash
         try
         {
             MethodInfo? method = typeof(Level).GetMethod(nameof(Level.includeHash), BindingFlags.Public | BindingFlags.Static);
@@ -97,9 +96,68 @@ internal static class PatchesMain
             Logger.LogWarning("Patcher error: Level.includeHash.");
             Logger.LogError(ex);
         }
+#if CLIENT
+        if (DevkitServerConfig.Config.EnableBetterLevelCreation)
+        {
+            // MenuWorkshopEditorUI.onClickedAddButton
+            try
+            {
+                MethodInfo? method = typeof(MenuWorkshopEditorUI).GetMethod("onClickedAddButton", BindingFlags.NonPublic | BindingFlags.Static);
+                if (method != null)
+                    Patcher.Patch(method, transpiler: new HarmonyMethod(Accessor.GetMethod(MapCreation.TranspileOnClickedAddLevelButton)));
+                else
+                    Logger.LogWarning($"Method not found to patch map creation: {FormattingUtil.FormatMethod(typeof(void), typeof(MenuWorkshopEditorUI), "onClickedAddButton",
+                            new (Type, string?)[] { (typeof(ISleekElement), "button") }, isStatic: true)}.", method: Source);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning($"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), typeof(MenuWorkshopEditorUI), "onClickedAddButton",
+                        new (Type, string?)[] { (typeof(ISleekElement), "button") }, isStatic: true)}.", method: Source);
+                Logger.LogError(ex, method: Source);
+            }
+        }
+#endif
+
+        // Level.save
+        try
+        {
+            MethodInfo? method = Accessor.GetMethod(Level.save);
+            if (method != null)
+                Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(OnLevelSaving)));
+            else
+                Logger.LogWarning($"Method not found to patch map saving: {FormattingUtil.FormatMethod(typeof(void), typeof(Level), nameof(Level.save),
+                    arguments: Array.Empty<Type>(), isStatic: true)}.", method: Source);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Failed to patch method: {Accessor.GetMethod(Level.save).Format()}.", method: Source);
+            Logger.LogError(ex, method: Source);
+        }
+
+
+        // Level.init
+        try
+        {
+            MethodInfo? method = typeof(Level).GetMethod(nameof(Level.init), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int) }, null);
+            if (method == null)
+            {
+                Logger.LogWarning($"Method not found: {FormattingUtil.FormatMethod(typeof(IEnumerator), typeof(Level), nameof(Level.init), namedArguments: new (Type, string?)[] { (typeof(int), "id") })}.", method: Source);
+            }
+            else
+            {
+                Patcher.Patch(method, postfix: new HarmonyMethod(Accessor.GetMethod(PostfixLevelInit)));
+                Logger.LogDebug($"Postfixed {method.Format()} to add a on begin level load call.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Failed to patch coroutine: {FormattingUtil.FormatMethod(typeof(IEnumerator), typeof(Level), nameof(Level.init), namedArguments: new (Type, string?)[] { (typeof(int), "id") })}.", method: Source);
+            Logger.LogError(ex, method: Source);
+        }
     }
     private static void DoManualUnpatches()
     {
+        // Level.includeHash
         try
         {
             MethodInfo? method = typeof(Level).GetMethod(nameof(Level.includeHash), BindingFlags.Public | BindingFlags.Static);
@@ -113,8 +171,36 @@ internal static class PatchesMain
             Logger.LogWarning("Patcher unpatching error: Level.includeHash.");
             Logger.LogError(ex);
         }
-    }
 
+        // Level.init
+        try
+        {
+            MethodInfo? method = typeof(Level).GetMethod("init", BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int) }, null);
+            if (method != null)
+            {
+                Patcher.Unpatch(method, Accessor.GetMethod(PostfixLevelInit));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Failed to unpatch coroutine: {FormattingUtil.FormatMethod(typeof(IEnumerator), typeof(Level), nameof(Level.init), namedArguments: new (Type, string?)[] { (typeof(int), "id") })}.", method: Source);
+            Logger.LogError(ex, method: Source);
+        }
+    }
+    private static bool OnLevelSaving()
+    {
+#if CLIENT
+        if (DevkitServerModule.IsEditing)
+        {
+            Logger.LogInfo("Asking server to save.");
+            DevkitServerModule.AskSave();
+            return false;
+        }
+#endif
+        Logger.LogInfo("Saving editor data.");
+        LandscapeUtil.DeleteUnusedTileData();
+        return true;
+    }
     private static bool PatchLevelIncludeHatch(string id, byte[] pendingHash)
     {
         return !Level.isLoaded;
@@ -126,60 +212,191 @@ internal static class PatchesMain
             return false;
 #if CLIENT
         if (caller.channel.isOwner)
-            return UserInput.CleaningUpController == CameraController.Editor;
+            return UserInput.LocalController == CameraController.Editor;
 #endif
         EditorUser? user = UserManager.FromId(caller.player.channel.owner.playerID.steamID.m_SteamID);
         return !(user != null && user.Input.Controller == CameraController.Player);
     }
-#if CLIENT
-    //private static readonly Action LoadGameMode = Accessor.GenerateStaticCaller<Provider, Action>("loadGameMode", throwOnError: true)!;
+    
+    private static void PostfixLevelInit(ref IEnumerator __result)
+    {
+        Logger.LogInfo($"Level initializing: {Level.info.getLocalizedName().Format(false)}.");
 
+        IEnumerator val = __result;
+        __result = UniTask.ToCoroutine(async () =>
+        {
+            await AssetUtil.InvokeOnBeginLevelLoading(DevkitServerModule.UnloadToken);
+            await val;
+        });
+    }
+
+#if CLIENT
+    [HarmonyPatch(typeof(EditorUI), "OnEnable")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void OnEditorUIEnabled(EditorUI __instance)
+    {
+        FieldInfo? areaField = typeof(Editor).GetField("_area", BindingFlags.NonPublic | BindingFlags.Instance);
+        if (areaField == null)
+        {
+            Logger.LogWarning("Unable to find field: Editor._area.", method: Source);
+            return;
+        }
+        FieldInfo? editorField = typeof(Editor).GetField("_editor", BindingFlags.NonPublic | BindingFlags.Static);
+        if (editorField == null)
+        {
+            Logger.LogWarning("Unable to find field: Editor._editor.", method: Source);
+            return;
+        }
+        Transform parent = __instance.transform.parent;
+        if (parent != null && parent.TryGetComponent(out EditorArea area) && parent.TryGetComponent(out Editor editor))
+        {
+            editorField.SetValue(null, editor);
+            areaField.SetValue(editor, area);
+            Logger.LogDebug($"[{Source}] Patched issue with EditorUI not loading (set Editor._area and Editor._editor in OnEnable).");
+        }
+        else
+        {
+            Logger.LogWarning("Unable to fix order of Editor component instantiations.", method: Source);
+        }
+    }
+
+    [HarmonyPatch(typeof(LoadingUI), "Update")]
+    [HarmonyTranspiler]
+    [UsedImplicitly]
+    private static IEnumerable<CodeInstruction> TranspileInitializePlayer(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
+    {
+        FieldInfo? playerUIInstance = typeof(PlayerUI).GetField("instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+        if (playerUIInstance == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find field: PlayerUI.instance.", method: Source);
+            DevkitServerModule.Fault();
+        }
+        FieldInfo? editorUIInstance = typeof(EditorUI).GetField("instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+        if (playerUIInstance == null)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to find field: EditorUI.instance.", method: Source);
+            DevkitServerModule.Fault();
+        }
+
+        MethodInfo getController = UserInput.GetLocalControllerMethod;
+
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        bool patchedOutPlayerUI = false;
+        bool patchedOutEditorUI = false;
+        for (int i = 1; i < ins.Count; ++i)
+        {
+            if (PatchUtil.MatchPattern(ins, i,
+                    x => playerUIInstance != null && x.LoadsField(playerUIInstance) ||
+                         editorUIInstance != null && x.LoadsField(editorUIInstance),
+                    x => x.opcode != OpCodes.Ldnull) && ins[i - 1].operand is Label label)
+            {
+                Label lbl = generator.DefineLabel();
+                ins.Insert(i, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Brfalse, lbl));
+                ins.Insert(i + 2, new CodeInstruction(OpCodes.Call, getController));
+                CameraController current = ins[i + 3].LoadsField(playerUIInstance) ? CameraController.Player : CameraController.Editor;
+                ins.Insert(i + 3, PatchUtil.LoadConstantI4((int)current));
+                ins.Insert(i + 4, new CodeInstruction(OpCodes.Bne_Un, label));
+                i += 5;
+                ins[i].labels.Add(lbl);
+                patchedOutPlayerUI |= current == CameraController.Player;
+                patchedOutEditorUI |= current == CameraController.Editor;
+            }
+        }
+
+        if (!patchedOutPlayerUI)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to edit call to {FormattingUtil.FormatMethod(typeof(void), typeof(PlayerUI), "Player_OnGUI", arguments: Array.Empty<Type>())}.", method: Source);
+            DevkitServerModule.Fault();
+        }
+        if (!patchedOutEditorUI)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to edit call to {FormattingUtil.FormatMethod(typeof(void), typeof(EditorUI), "Editor_OnGUI", arguments: Array.Empty<Type>())}.", method: Source);
+            DevkitServerModule.Fault();
+        }
+
+        return ins;
+    }
+
+    
+    [HarmonyPatch("SDG.Unturned.Level, Assembly-CSharp", nameof(Level.isLoading), MethodType.Getter)]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    private static bool PrefixGetIsLevelLoading(ref bool __result)
+    {
+        if (!DevkitServerModule.IsEditing)
+            return true;
+
+        __result = Level.isEditor && Level.isLoadingContent;
+        return false;
+    }
+    
+    private static bool _shouldContinueToLaunch;
     [HarmonyPatch(typeof(Provider), nameof(Provider.launch))]
     [HarmonyPrefix]
     [UsedImplicitly]
     private static bool LaunchPatch()
     {
+        if (_shouldContinueToLaunch)
+            return true;
         Provider.provider.matchmakingService.refreshRules(Provider.currentServerInfo.ip, Provider.currentServerInfo.queryPort);
         Provider.provider.matchmakingService.onRulesQueryRefreshed += RulesReady;
         return false;
     }
-    internal static void Launch()
+    private static void ProceedWithLaunch()
+    {
+        _shouldContinueToLaunch = true;
+        try
+        {
+            Provider.launch();
+        }
+        finally
+        {
+            _shouldContinueToLaunch = false;
+        }
+    }
+    internal static void Launch(LevelInfo? overrideLevelInfo)
     {
         if (!DevkitServerModule.IsEditing)
         {
-            Provider.launch();
+            ProceedWithLaunch();
             return;
         }
 
-        LevelInfo level = DevkitServerModule.PendingLevelInfo ?? Level.getLevel(Provider.map);
-        DevkitServerModule.PendingLevelInfo = null;
+        LevelInfo level = overrideLevelInfo ?? Level.getLevel(Provider.map);
         if (level == null)
         {
-            Provider._connectionFailureInfo = ESteamConnectionFailureInfo.MAP;
-            Provider.RequestDisconnect("could not find level \"" + Provider.map + "\"");
+            DevkitServerUtility.CustomDisconnect("Could not find level \"" + Provider.map + "\"", ESteamConnectionFailureInfo.MAP);
         }
         else
         {
-            UnturnedLog.info("Loading server level ({0})", Provider.map);
+            Logger.LogInfo($"Loading server level: {level.getLocalizedName().Format(false)}.");
             Level.edit(level);
             Provider.gameMode = new DevkitServerGamemode();
         }
-
     }
     private static void RulesReady(Dictionary<string, string> rulesmap)
     {
         Provider.provider.matchmakingService.onRulesQueryRefreshed -= RulesReady;
-        if (rulesmap.TryGetValue(DevkitServerModule.ServerRule, out string val) && val.Equals("True", StringComparison.InvariantCultureIgnoreCase))
+        if (rulesmap.TryGetValue(DevkitServerModule.ServerRule, out string val))
         {
+            if (!Version.TryParse(val, out Version version) || !DevkitServerModule.IsCompatibleWith(version))
+            {
+                DevkitServerUtility.CustomDisconnect(DevkitServerModule.MainLocalization.Translate("VersionKickMessage",
+                    version?.ToString(4) ?? "[Unspecified]", Accessor.DevkitServer.GetName().Version.ToString(4)), ESteamConnectionFailureInfo.CUSTOM);
+                return;
+            }
             DevkitServerModule.IsEditing = true;
-            Logger.LogDebug("Found tag '" + DevkitServerModule.ServerRule + "'.");
+            Logger.LogInfo($"Connecting to a server running {DevkitServerModule.ModuleName.Colorize(DevkitServerModule.ModuleColor)} " +
+                           $"v{version.Format()} (You are running {Accessor.DevkitServer.GetName().Version.Format()})...");
             EditorLevel.RequestLevel();
         }
         else
         {
-            Logger.LogDebug("Did not find tag '" + DevkitServerModule.ServerRule + "'.");
+            Logger.LogDebug($"Did not find tag {DevkitServerModule.ServerRule.Format()}.");
             DevkitServerModule.IsEditing = false;
-            Launch();
+            ProceedWithLaunch();
         }
     }
 
@@ -189,11 +406,11 @@ internal static class PatchesMain
 
     private static bool IsPlayerControlledOrNotEditing()
     {
-        return !DevkitServerModule.IsEditing || !Level.isEditor || UserInput.CleaningUpController == CameraController.Player;
+        return !DevkitServerModule.IsEditing || !Level.isEditor || UserInput.LocalController == CameraController.Player;
     }
     private static bool IsEditorControlledOrNotEditing()
     {
-        return !DevkitServerModule.IsEditing || !Level.isEditor || UserInput.CleaningUpController == CameraController.Editor;
+        return !DevkitServerModule.IsEditing || !Level.isEditor || UserInput.LocalController == CameraController.Editor;
     }
 
     [UsedImplicitly]
@@ -250,25 +467,25 @@ internal static class PatchesMain
     [UsedImplicitly]
     [HarmonyPatch(typeof(MenuConfigurationOptionsUI), MethodType.Constructor)]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> MenuConfigurationOptionsUITranspiler(IEnumerable<CodeInstruction> instructions)
-        => MenuConfigurationUITranspiler(instructions);
+    private static IEnumerable<CodeInstruction> MenuConfigurationOptionsUITranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+        => MenuConfigurationUITranspiler(instructions, method);
     [UsedImplicitly]
     [HarmonyPatch(typeof(MenuConfigurationGraphicsUI), MethodType.Constructor)]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> MenuConfigurationGraphicsUITranspiler(IEnumerable<CodeInstruction> instructions)
-        => MenuConfigurationUITranspiler(instructions);
+    private static IEnumerable<CodeInstruction> MenuConfigurationGraphicsUITranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+        => MenuConfigurationUITranspiler(instructions, method);
     [UsedImplicitly]
     [HarmonyPatch(typeof(MenuConfigurationDisplayUI), MethodType.Constructor)]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> MenuConfigurationDisplayUITranspiler(IEnumerable<CodeInstruction> instructions)
-        => MenuConfigurationUITranspiler(instructions);
+    private static IEnumerable<CodeInstruction> MenuConfigurationDisplayUITranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+        => MenuConfigurationUITranspiler(instructions, method);
     [UsedImplicitly]
     [HarmonyPatch(typeof(MenuConfigurationControlsUI), MethodType.Constructor)]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> MenuConfigurationControlsUITranspiler(IEnumerable<CodeInstruction> instructions)
-        => MenuConfigurationUITranspiler(instructions);
+    private static IEnumerable<CodeInstruction> MenuConfigurationControlsUITranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+        => MenuConfigurationUITranspiler(instructions, method);
 
-    private static IEnumerable<CodeInstruction> MenuConfigurationUITranspiler(IEnumerable<CodeInstruction> instructions)
+    private static IEnumerable<CodeInstruction> MenuConfigurationUITranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
         MethodInfo? isConnected = typeof(Provider).GetProperty(nameof(Provider.isConnected), BindingFlags.Static | BindingFlags.Public)?.GetMethod;
         if (isConnected == null)
@@ -287,7 +504,14 @@ internal static class PatchesMain
                 yield return new CodeInstruction(OpCodes.Call, IsPlayerControlledOrNotEditingMethod);
                 yield return new CodeInstruction(OpCodes.And);
                 one = true;
+                Logger.LogDebug($"[{Source}] {method.Format()} - Patched connection state checker.");
             }
+        }
+
+        if (!one)
+        {
+            Logger.LogWarning($"Unable to patch connection state checker in {method.Format()}.", method: Source);
+            DevkitServerModule.Fault();
         }
     }
 #endif
@@ -317,7 +541,7 @@ internal static class PatchesMain
     {
         if (DevkitServerModule.HasLoadedBundle)
             return true;
-        DevkitServerModule.ComponentHost.StartCoroutine(DevkitServerModule.Instance.TryLoadBundle(DoHost));
+        DevkitServerModule.ComponentHost.StartCoroutine(DevkitServerModule.TryLoadBundle(DoHost));
         return false;
     }
 
@@ -429,8 +653,9 @@ internal static class PatchesMain
     [HarmonyPrefix]
     private static void AdvertiseConfig()
     {
-        Logger.LogDebug("Setting SteamGameServer KeyValue '" + DevkitServerModule.ServerRule + "' to 'True'.");
-        SteamGameServer.SetKeyValue(DevkitServerModule.ServerRule, "True");
+        Version version = Accessor.DevkitServer.GetName().Version;
+        Logger.LogDebug($"Setting SteamGameServer KeyValue {DevkitServerModule.ServerRule.Format()} to {version.Format()}.");
+        SteamGameServer.SetKeyValue(DevkitServerModule.ServerRule, version.ToString(4));
     }
 
     [UsedImplicitly]
@@ -461,7 +686,7 @@ internal static class PatchesMain
     private static IEnumerable<CodeInstruction> DedicatedUgcLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
         bool one = false;
-        yield return new CodeInstruction(OpCodes.Call, new System.Action(MapCreation.PrefixLoadingDedicatedUGC).Method);
+        yield return new CodeInstruction(OpCodes.Call, new Action(MapCreation.PrefixLoadingDedicatedUGC).Method);
 
         foreach (CodeInstruction instr in instructions)
         {

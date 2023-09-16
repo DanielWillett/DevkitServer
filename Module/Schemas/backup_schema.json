@@ -1,0 +1,59 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/DanielWillett/DevkitServer/tree/master/Module/Schemas/backup_schema.json",
+    "title": "Backup Configuration",
+    "description": "Defines the behavior of level backups.",
+    "type": "object",
+    "properties": {
+        "backup_behavior": {
+            "description": "Controls when backups occur.",
+            "enum": [ "Disabled", "Scheduled", "Interval", "OnDisconnect" ],
+            "type": "string"
+        },
+        "backup_interval": {
+            "description": "How often a backup is made when \"backup_behavior\" is set to \"Interval\"",
+            "type": "string"
+        },
+        "backup_schedule": {
+            "description": "Defines a backup schedule. Only some components of the dates will be used, depending on \"backup_schedule_interval\"",
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "backup_schedule_interval": {
+            "description": "Defines the interval of \"backup_schedule\".",
+            "enum": [ "None", "Daily", "Weekly", "Monthly", "Yearly" ],
+            "type": "string"
+        },
+        "backup_schedule_is_utc": {
+            "description": "Interpret \"backup_schedule\" in UTC instead of local time.",
+            "type": "boolean"
+        },
+        "save_backup_on_startup": {
+            "description": "Save a backup when the server starts up. A cooldown can be customized with \"backup_on_startup_cooldown\"",
+            "type": "boolean"
+        },
+        "backup_on_startup_cooldown": {
+            "description": "If a backup was saved less than this long ago, a startup backup will not be made.",
+            "type": "string",
+            "format": "time"
+        },
+        "max_backups": {
+            "description": "The maximum amount of backups that can be made before older backups are deleted.",
+            "type": "integer"
+        },
+        "max_total_backup_size_mb": {
+            "description": "The maximum size in MB of all backups before older backups are deleted.",
+            "type": "number"
+        },
+        "skip_inactive_backup": {
+            "description": "A backup will be skipped if no users have joined since the last backup.",
+            "type": "boolean"
+        },
+        "save_backup_logs": {
+            "description": "Save extra logging information with the backup.",
+            "type": "boolean"
+        }
+    }
+}

@@ -1,7 +1,6 @@
 ﻿using DevkitServer.Patches;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
-using JetBrains.Annotations;
 using SDG.Framework.Devkit;
 using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Landscapes;
@@ -259,8 +258,7 @@ public interface IAutoFoundation
     ERayMask AutoFoundationRayMask { get; set; }
 }
 
-[Action(ActionType.HeightmapRamp, EncodingEx.MaxHeightmapBoundsSize + 28, 8)]
-[EarlyTypeInit]
+[Action(ActionType.HeightmapRamp, EncodingEx.MaxTerrainToolBoundsSize + 28, 8)]
 public sealed class HeightmapRampAction : ITerrainAction, IBrushRadius, IBrushFalloff
 {
     public ActionType Type => ActionType.HeightmapRamp;
@@ -292,13 +290,13 @@ public sealed class HeightmapRampAction : ITerrainAction, IBrushRadius, IBrushFa
     }
     public void Write(ByteWriter writer)
     {
-        writer.WriteHeightmapBounds(Bounds);
+        writer.WriteTerrainToolBounds(Bounds);
         writer.Write(StartPosition);
         writer.Write(EndPosition);
         writer.Write(DeltaTime);
     }
 
-    public int CalculateSize() => EncodingEx.MaxHeightmapBoundsSize + 28;
+    public int CalculateSize() => EncodingEx.MaxTerrainToolBoundsSize + 28;
     private float IntlHandleHeightmapWriteRamp(LandscapeCoord tileCoord, HeightmapCoord heightmapCoord, Vector3 worldPosition, float currentHeight)
     {
         Vector2 difference = new Vector2(EndPosition.x - StartPosition.x, EndPosition.z - StartPosition.z);
@@ -324,8 +322,7 @@ public sealed class HeightmapRampAction : ITerrainAction, IBrushRadius, IBrushFa
     }
 }
 
-[Action(ActionType.HeightmapAdjust, EncodingEx.MaxHeightmapBoundsSize + 12, 16)]
-[EarlyTypeInit]
+[Action(ActionType.HeightmapAdjust, EncodingEx.MaxTerrainToolBoundsSize + 12, 16)]
 public sealed class HeightmapAdjustAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength, IBrushSensitivity
 {
     public ActionType Type => ActionType.HeightmapAdjust;
@@ -360,11 +357,11 @@ public sealed class HeightmapAdjustAction : ITerrainAction, IBrushRadius, IBrush
     }
     public void Write(ByteWriter writer)
     {
-        writer.WriteHeightmapBounds(Bounds, Subtracting);
+        writer.WriteTerrainToolBounds(Bounds, Subtracting);
         writer.Write(BrushPosition);
         writer.Write(DeltaTime);
     }
-    public int CalculateSize() => EncodingEx.MaxHeightmapBoundsSize + 12;
+    public int CalculateSize() => EncodingEx.MaxTerrainToolBoundsSize + 12;
     private float IntlHandleHeightmapWriteAdjust(LandscapeCoord tileCoord, HeightmapCoord heightmapCoord, Vector3 worldPosition, float currentHeight)
     {
         float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
@@ -381,8 +378,7 @@ public sealed class HeightmapAdjustAction : ITerrainAction, IBrushRadius, IBrush
     }
 }
 
-[Action(ActionType.HeightmapFlatten, EncodingEx.MaxHeightmapBoundsSize + 13, 20)]
-[EarlyTypeInit]
+[Action(ActionType.HeightmapFlatten, EncodingEx.MaxTerrainToolBoundsSize + 13, 20)]
 public sealed class HeightmapFlattenAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength, IBrushSensitivity, IBrushTarget
 {
     public ActionType Type => ActionType.HeightmapFlatten;
@@ -418,12 +414,12 @@ public sealed class HeightmapFlattenAction : ITerrainAction, IBrushRadius, IBrus
     }
     public void Write(ByteWriter writer)
     {
-        writer.WriteHeightmapBounds(Bounds);
+        writer.WriteTerrainToolBounds(Bounds);
         writer.Write((byte)FlattenMethod);
         writer.Write(BrushPosition);
         writer.Write(DeltaTime);
     }
-    public int CalculateSize() => EncodingEx.MaxHeightmapBoundsSize + 13;
+    public int CalculateSize() => EncodingEx.MaxTerrainToolBoundsSize + 13;
     private float IntlHandleHeightmapWriteFlatten(LandscapeCoord tileCoord, HeightmapCoord heightmapCoord, Vector3 worldPosition, float currentHeight)
     {
         float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
@@ -444,7 +440,7 @@ public sealed class HeightmapFlattenAction : ITerrainAction, IBrushRadius, IBrus
     }
 }
 
-[Action(ActionType.HeightmapSmooth, EncodingEx.MaxHeightmapBoundsSize + 16, 12)]
+[Action(ActionType.HeightmapSmooth, EncodingEx.MaxTerrainToolBoundsSize + 16, 12)]
 [EarlyTypeInit]
 public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength
 {
@@ -486,12 +482,12 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrush
         }
         catch (NotImplementedException)
         {
-            Logger.LogError("Failed to reverse patch " + Accessor.GetMethodInfo(SampleHeightPixelSmooth)?.Format() + ".");
+            Logger.LogError("Failed to reverse patch " + Accessor.GetMethod(SampleHeightPixelSmooth)?.Format() + ".");
             DevkitServerModule.Fault();
             return;
         }
 
-        Logger.LogDebug("Reverse patched " + Accessor.GetMethodInfo(SampleHeightPixelSmooth)?.Format() + ".");
+        Logger.LogDebug("Reverse patched " + Accessor.GetMethod(SampleHeightPixelSmooth)?.Format() + ".");
     }
     public void Apply()
     {
@@ -524,13 +520,13 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrush
     }
     public void Write(ByteWriter writer)
     {
-        writer.WriteHeightmapBounds(Bounds, SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE);
+        writer.WriteTerrainToolBounds(Bounds, SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE);
         writer.Write(BrushPosition);
         writer.Write(DeltaTime);
         if (SmoothMethod != EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE)
             writer.Write(SmoothTarget);
     }
-    public int CalculateSize() => EncodingEx.MaxHeightmapBoundsSize + 12 + (SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE ? 4 : 0);
+    public int CalculateSize() => EncodingEx.MaxTerrainToolBoundsSize + 12 + (SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE ? 4 : 0);
     private static void SampleHeightPixelSmooth(object? instance, Vector3 worldPosition, ref int sampleCount, ref float sampleAverage)
     {
         IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
@@ -593,8 +589,8 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrush
     }
 }
 
-[Action(ActionType.SplatmapPaint, EncodingEx.MaxHeightmapBoundsSize + 13, 64)]
-[Action(ActionType.SplatmapAutoPaint, EncodingEx.MaxHeightmapBoundsSize + 12, 64, CreateMethod = nameof(CreateAutoPaint))]
+[Action(ActionType.SplatmapPaint, EncodingEx.MaxTerrainToolBoundsSize + 13, 64)]
+[Action(ActionType.SplatmapAutoPaint, EncodingEx.MaxTerrainToolBoundsSize + 12, 64, CreateMethod = nameof(CreateAutoPaint))]
 [EarlyTypeInit]
 public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength, IBrushTarget, IBrushSensitivity, IAutoSlope, IAutoFoundation, IAsset
 {
@@ -636,12 +632,12 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
         }
         catch (NotImplementedException)
         {
-            Logger.LogError("Failed to reverse patch " + Accessor.GetMethodInfo(BlendSplatmapWeights)?.Format() + ".");
+            Logger.LogError("Failed to reverse patch " + Accessor.GetMethod(BlendSplatmapWeights)?.Format() + ".");
             DevkitServerModule.Fault();
         }
         catch (NullReferenceException)
         {
-            Logger.LogDebug("Reverse patched " + Accessor.GetMethodInfo(BlendSplatmapWeights)?.Format() + ".");
+            Logger.LogDebug("Reverse patched " + Accessor.GetMethod(BlendSplatmapWeights)?.Format() + ".");
         }
 
         try
@@ -662,16 +658,16 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
         {
             int val = GetSplatmapTargetMaterialLayerIndex(null, null!, default); // invalid material returns -1
             if (val == -1)
-                Logger.LogDebug("Reverse patched " + Accessor.GetMethodInfo(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
+                Logger.LogDebug("Reverse patched " + Accessor.GetMethod(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
         }
         catch (NotImplementedException)
         {
-            Logger.LogError("Failed to reverse patch " + Accessor.GetMethodInfo(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
+            Logger.LogError("Failed to reverse patch " + Accessor.GetMethod(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
             DevkitServerModule.Fault();
         }
         catch (NullReferenceException)
         {
-            Logger.LogDebug("Reverse patched " + Accessor.GetMethodInfo(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
+            Logger.LogDebug("Reverse patched " + Accessor.GetMethod(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
         }
     }
 
@@ -735,7 +731,7 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
     }
     public void Write(ByteWriter writer)
     {
-        writer.WriteHeightmapBounds(Bounds, IsAuto);
+        writer.WriteTerrainToolBounds(Bounds, IsAuto);
         if (!IsAuto)
         {
             byte flags = (byte)((UseWeightTarget ? 1 << 0 : 0) | (UseAutoSlope ? 1 << 1 : 0) | (UseAutoFoundation ? 1 << 2 : 0) | (IsRemoving ? 1 << 3 : 0));
@@ -744,7 +740,7 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
         writer.Write(BrushPosition);
         writer.Write(DeltaTime);
     }
-    public int CalculateSize() => EncodingEx.MaxHeightmapBoundsSize + 12 + (!IsAuto ? 1 : 0);
+    public int CalculateSize() => EncodingEx.MaxTerrainToolBoundsSize + 12 + (!IsAuto ? 1 : 0);
     private void IntlHandleSplatmapWritePaint(LandscapeCoord tileCoord, SplatmapCoord splatmapCoord, Vector3 worldPosition, float[] currentWeights)
     {
         if (_assetFound && _asset == null)
@@ -866,7 +862,7 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
     private static SplatmapPaintAction CreateAutoPaint() => new SplatmapPaintAction { IsAuto = true };
 }
 
-[Action(ActionType.SplatmapSmooth, EncodingEx.MaxHeightmapBoundsSize + 8, 12)]
+[Action(ActionType.SplatmapSmooth, EncodingEx.MaxTerrainToolBoundsSize + 8, 12)]
 [EarlyTypeInit]
 public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength
 {
@@ -955,12 +951,12 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushF
     }
     public void Write(ByteWriter writer)
     {
-        writer.WriteHeightmapBounds(Bounds, SmoothMethod == EDevkitLandscapeToolSplatmapSmoothMethod.PIXEL_AVERAGE);
+        writer.WriteTerrainToolBounds(Bounds, SmoothMethod == EDevkitLandscapeToolSplatmapSmoothMethod.PIXEL_AVERAGE);
         writer.Write(BrushPosition);
         writer.Write(DeltaTime);
     }
 
-    public int CalculateSize() => EncodingEx.MaxHeightmapBoundsSize + 12;
+    public int CalculateSize() => EncodingEx.MaxTerrainToolBoundsSize + 12;
     private void IntlHandleSplatmapReadBrushAverage(LandscapeCoord tileCoord, SplatmapCoord splatmapCoord, Vector3 worldPosition, float[] currentWeights)
     {
         float distance = new Vector2(worldPosition.x - BrushPosition.x, worldPosition.z - BrushPosition.y).sqrMagnitude;
@@ -1057,7 +1053,7 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushF
     }
 }
 
-[Action(ActionType.HolesCut, EncodingEx.MaxHeightmapBoundsSize + 8, 4)]
+[Action(ActionType.HolesCut, EncodingEx.MaxTerrainToolBoundsSize + 8, 4)]
 [EarlyTypeInit]
 public sealed class HolemapPaintAction : ITerrainAction, IBrushRadius
 {
@@ -1078,11 +1074,11 @@ public sealed class HolemapPaintAction : ITerrainAction, IBrushRadius
     }
     public void Write(ByteWriter writer)
     {
-        writer.WriteHeightmapBounds(Bounds, IsFilling);
+        writer.WriteTerrainToolBounds(Bounds, IsFilling);
         writer.Write(BrushPosition);
         writer.Write(DeltaTime);
     }
-    public int CalculateSize() => EncodingEx.MaxHeightmapBoundsSize + 12;
+    public int CalculateSize() => EncodingEx.MaxTerrainToolBoundsSize + 12;
     public void Apply()
     {
         LandscapeUtil.WriteHolesNoTransactions(Bounds, IntlHandleHolesWriteCut);
@@ -1104,7 +1100,6 @@ public sealed class HolemapPaintAction : ITerrainAction, IBrushRadius
 
 [Action(ActionType.AddTile, 5, 8)]
 [Action(ActionType.DeleteTile, 5, 8, CreateMethod = nameof(CreateDeleteTile))]
-[EarlyTypeInit]
 public sealed class TileModifyAction : IAction, ICoordinates
 {
     public ActionType Type => IsDelete ? ActionType.DeleteTile : ActionType.AddTile;
@@ -1158,7 +1153,7 @@ public sealed class TileModifyAction : IAction, ICoordinates
 }
 
 [Action(ActionType.UpdateSplatmapLayers, 132, 8)]
-[EarlyTypeInit]
+[EarlyTypeInit(RequiresUIAccessTools = true)]
 public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinates
 {
 #if CLIENT
@@ -1170,7 +1165,7 @@ public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinates
             Accessor.AssemblyCSharp
                 .GetType("SDG.Unturned.TerrainTileLayer")?
                 .GetMethod("UpdateSelectedTile", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!
-            , false, useFptrReconstruction: true);
+            , allowUnsafeTypeBinding: true);
 #endif
     public ActionType Type => ActionType.UpdateSplatmapLayers;
     public CSteamID Instigator { get; set; }

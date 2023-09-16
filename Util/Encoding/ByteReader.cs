@@ -7,8 +7,13 @@ using System.Runtime.CompilerServices;
 
 namespace DevkitServer.Util.Encoding;
 
+/// <summary>
+/// Fast decoding from a byte array to data. Has experimental support for <see cref="System.IO.Stream"/>s. Similar to the <see cref="River"/> class.
+/// </summary>
 public class ByteReader
 {
+    private const string InvalidZeroCompressedMessage = "Invalid zero-compressed format.";
+
     private const int MinStreamBufferSize = 32;
     private const int GuidSize = 16;
 
@@ -20,31 +25,63 @@ public class ByteReader
     private static readonly MethodInfo ReadNullableEnumMethod = typeof(ByteReader).GetMethod(nameof(ReadNullableEnum), BindingFlags.Instance | BindingFlags.Public)
                                                                  ?? throw new MemberAccessException("Unable to find read nullable enum method.");
 
-    public delegate T Reader<out T>(ByteReader reader);
     private byte[]? _buffer;
     private Stream? _stream;
     private int _index;
-    private bool failure;
+    private bool _hasFailed;
     private bool _streamMode;
     private bool _streamLengthSupport;
     private int _position;
     private int _length;
+
+    /// <summary>
+    /// Internal buffer. In stream mode not very useful, but in buffer mode can be used to get the data without allocating a new array. Use <see cref="Position"/> for the length.
+    /// </summary>
     public byte[]? InternalBuffer { get => _buffer; set => _buffer = value; }
+
+    /// <summary>
+    /// Stream to read from. Setter does not reset the buffer, recommnded to use <see cref="LoadNew(Stream)"/> instead.
+    /// </summary>
+    /// <remarks>Stream mode is still in beta.</remarks>
     public Stream? Stream
     {
         get => _stream;
         private set
         {
             if (value is not null && !value.CanRead)
-                throw new ArgumentException("Stream must be able to read.");
+                throw new ArgumentException("Stream must be able to read.", nameof(value));
             _stream = value;
         }
     }
-    public bool HasFailed => failure;
-    public int Position => _streamMode ? _position : _index;
+
+    /// <summary>
+    /// If the reader has failed yet. Useful if <see cref="ThrowOnError"/> is set to <see langword="false"/>.
+    /// </summary>
+    public bool HasFailed => _hasFailed;
+
+    /// <summary>
+    /// Index of the read. In buffer mode it represents the length of data in the buffer, in stream mode it represents the position of the stream minus what hasn't been read from the buffer.
+    /// </summary>
+    public int Position => _streamMode ? (_position - (_length - _index)) : _index;
+
+    /// <summary>
+    /// Number of bytes left in the stream or buffer.
+    /// </summary>
     public int BytesLeft => _streamMode ? (_streamLengthSupport ? (int)Math.Min(_stream!.Length - _stream!.Position, int.MaxValue) : (_buffer is not null ? _buffer.Length - _index : 0)) : _buffer!.Length - _index;
-    public bool ThrowOnError { get; set; }
+
+    /// <summary>
+    /// When <see langword="true"/>, will throw a <see cref="ByteEncoderException"/> or <see cref="ByteBufferOverflowException"/> when there's a read failure. Otherwise it will just set <see cref="HasFailed"/> to <see langword="true"/>.
+    /// </summary>
+    public bool ThrowOnError { get; set; } = true;
+
+    /// <summary>
+    /// When <see langword="true"/>, will log a warning when there's a read failure. Otherwise it will just set <see cref="HasFailed"/> to <see langword="true"/>.
+    /// </summary>
     public bool LogOnError { get; set; } = true;
+
+    /// <summary>
+    /// Influences the size of the buffer in stream mode (how much is read at once).
+    /// </summary>
     public int StreamBufferSize { get; set; } = 128;
 
     private static void PrepareMethods()
@@ -65,7 +102,7 @@ public class ByteReader
             { typeof(double), GetMethod(nameof(ReadDouble)) },
             { typeof(char), GetMethod(nameof(ReadChar)) },
             { typeof(string), GetMethod(nameof(ReadString)) },
-            { typeof(Type), GetMethod(nameof(ReadType)) },
+            { typeof(Type), typeof(ByteReader).GetMethod(nameof(ReadType), BindingFlags.Instance | BindingFlags.Public, null, CallingConventions.Any, Array.Empty<Type>(), null) },
             { typeof(Type[]), GetMethod(nameof(ReadTypeArray)) },
             { typeof(RegionIdentifier), typeof(RegionIdentifier).GetMethod(nameof(RegionIdentifier.Read), BindingFlags.Static | BindingFlags.Public) },
             { typeof(DateTime), GetMethod(nameof(ReadDateTime)) },
@@ -115,7 +152,7 @@ public class ByteReader
             { typeof(double?), GetMethod(nameof(ReadNullableDouble)) },
             { typeof(char?), GetMethod(nameof(ReadNullableChar)) },
             { typeof(string), GetMethod(nameof(ReadNullableString)) },
-            { typeof(Type), GetMethod(nameof(ReadType)) },
+            { typeof(Type), typeof(ByteReader).GetMethod(nameof(ReadType), BindingFlags.Instance | BindingFlags.Public, null, CallingConventions.Any, Array.Empty<Type>(), null) },
             { typeof(Type[]), GetMethod(nameof(ReadTypeArray)) },
             { typeof(DateTime?), GetMethod(nameof(ReadNullableDateTime)) },
             { typeof(DateTimeOffset?), GetMethod(nameof(ReadNullableDateTimeOffset)) },
@@ -149,17 +186,39 @@ public class ByteReader
         };
 
         MethodInfo GetMethod(string name) => typeof(ByteReader).GetMethod(name, BindingFlags.Instance | BindingFlags.Public)
-                                                ?? throw new MemberAccessException("Unable to find read method: " + name + ".");
+                                             ?? throw new MemberAccessException("Unable to find read method: " + name + ".");
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private int GetStreamBufferLength() => !_streamLengthSupport
         ? StreamBufferSize
         : (int)Math.Min(StreamBufferSize, Math.Max(_stream!.Length - _stream.Position, MinStreamBufferSize));
-    
+
+    private void Fail(string message)
+    {
+        _hasFailed = true;
+        if (LogOnError)
+            Logger.LogWarning(message, method: "BYTE READER");
+        if (ThrowOnError)
+            throw new ByteEncoderException(message);
+    }
+    private void Overflow(string message)
+    {
+        _hasFailed = true;
+        if (LogOnError)
+            Logger.LogWarning(message, method: "BYTE READER");
+        if (ThrowOnError)
+            throw new ByteBufferOverflowException(message);
+    }
+
+    /// <summary>
+    /// Loads a <see cref="System.IO.Stream"/> to be read from. Stream must be able to read.
+    /// </summary>
+    /// <remarks>Seek the stream to where you want to start before passing it here. Stream mode is still in beta.</remarks>
+    /// <exception cref="ArgumentNullException"/>
     public void LoadNew(Stream stream)
     {
-        failure = false;
+        _hasFailed = false;
         Stream = stream ?? throw new ArgumentNullException(nameof(stream));
         if (!_stream!.CanSeek)
         {
@@ -194,6 +253,10 @@ public class ByteReader
         _index = 0;
         _streamMode = true;
     }
+    /// <summary>
+    /// Loads a new byte array to be read from. Use <see cref="Skip"/> to set an offset.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"/>
     public void LoadNew(byte[] bytes)
     {
         _buffer = bytes ?? throw new ArgumentNullException(nameof(bytes));
@@ -201,21 +264,23 @@ public class ByteReader
         _streamMode = false;
         _index = 0;
         _position = 0;
-        failure = false;
+        _hasFailed = false;
     }
-    private unsafe void Reverse(byte* litEndStrt, int size)
+    private static unsafe void Reverse(byte* litEndStrt, int size)
     {
         byte* stack = stackalloc byte[size];
         Buffer.MemoryCopy(litEndStrt, stack, size, size);
         for (int i = 0; i < size; i++)
             litEndStrt[i] = stack[size - i - 1];
     }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private unsafe void EndianCheck(byte* litEndStrt, int size)
+    private static unsafe void EndianCheck(byte* litEndStrt, int size)
     {
         if (IsBigEndian && size > 1)
             Reverse(litEndStrt, size);
     }
+
     private unsafe T Read<T>() where T : unmanaged
     {
         int size = sizeof(T);
@@ -228,6 +293,7 @@ public class ByteReader
         _index += size;
         return rtn;
     }
+
     private unsafe T Read<T>(byte* ptr) where T : unmanaged
     {
         int size = sizeof(T);
@@ -237,7 +303,8 @@ public class ByteReader
         _index += size;
         return rtn;
     }
-    public unsafe bool EnsureMoreLength(int byteCt)
+    
+    protected unsafe bool EnsureMoreLength(int byteCt)
     {
         if (_streamMode)
         {
@@ -273,10 +340,13 @@ public class ByteReader
             else // partially or fully processed buffer
             {
                 int remaining = _buffer.Length - _index;
-                if (byteCt < _buffer.Length) // space for remaining and needed bytes in a new buffer
+                if (byteCt <= _buffer.Length) // space for remaining and needed bytes in a new buffer
                 {
-                    fixed (byte* ptr = _buffer)
-                        Buffer.MemoryCopy(ptr + _index, ptr, _buffer.Length, remaining);
+                    if (remaining != 0)
+                    {
+                        fixed (byte* ptr = _buffer)
+                            Buffer.MemoryCopy(ptr + _index, ptr, _buffer.Length, remaining);
+                    }
                 }
                 else // not enough space for needed bytes
                 {
@@ -302,38 +372,79 @@ public class ByteReader
         if (_buffer is not null && _index + byteCt <= _length) return true;
 
         fail:
-        failure = true;
-        string ex = "Failed to read " + byteCt.ToString(CultureInfo.InvariantCulture) +
-                    " B at offset " + _index.ToString(CultureInfo.InvariantCulture) + " / " + _length.ToString(CultureInfo.InvariantCulture) + ".";
-        if (ThrowOnError)
-            throw new ByteBufferOverflowException(ex);
-        if (LogOnError)
-            Logger.LogWarning(ex);
+        Overflow("Failed to read " + byteCt.ToString(CultureInfo.InvariantCulture) +
+                    " B at offset " + _index.ToString(CultureInfo.InvariantCulture) + " / " + _length.ToString(CultureInfo.InvariantCulture) + ".");
         return false;
     }
+
+    /// <summary>
+    /// Reads a byte array of length <paramref name="length"/>, without reading a length.
+    /// </summary>
     public byte[] ReadBlock(int length)
     {
+        if (_streamMode)
+        {
+            byte[] output = new byte[length];
+            if (_buffer is { Length: > 0 })
+            {
+                if (_buffer.Length - _index >= length)
+                {
+                    Buffer.BlockCopy(_buffer, _index, output, 0, length);
+                    _index += length;
+                    return output;
+                }
+
+                int offset = _length - _index;
+                _index = _buffer.Length;
+                Buffer.BlockCopy(_buffer, _index, output, 0, offset);
+                length = Stream!.Read(output, offset, length - offset);
+                _position += length;
+                if (length < output.Length)
+                {
+                    Overflow("Failed to read " + length.ToString(CultureInfo.InvariantCulture) +
+                             " B at offset " + _index.ToString(CultureInfo.InvariantCulture) + " / " + _length.ToString(CultureInfo.InvariantCulture) + ".");
+                }
+                return output;
+            }
+
+            length = Stream!.Read(output, 0, length);
+            _position += length;
+            if (length < output.Length)
+            {
+                Overflow("Failed to read " + length.ToString(CultureInfo.InvariantCulture) +
+                         " B at offset " + _index.ToString(CultureInfo.InvariantCulture) + " / " + _length.ToString(CultureInfo.InvariantCulture) + ".");
+            }
+            return output;
+        }
+
         if (!EnsureMoreLength(length)) return null!;
         byte[] rtn = new byte[length];
         Buffer.BlockCopy(_buffer, _index, rtn, 0, length);
         _index += length;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a generic unmanaged struct. Not recommended as there are no endianness checks, only use for local storage.
+    /// </summary>
     public unsafe T ReadStruct<T>() where T : unmanaged
     {
-        return !EnsureMoreLength(sizeof(T)) ? default(T) : Read<T>();
+        return !EnsureMoreLength(sizeof(T)) ? default : Read<T>();
     }
+
+    /// <summary>
+    /// Reads a byte array and its length (as a UInt16).
+    /// </summary>
     public byte[] ReadUInt8Array()
     {
         ushort length = ReadUInt16();
-        if (length == 0) return Array.Empty<byte>();
-        if (!EnsureMoreLength(length))
-            return null!;
-        byte[] rtn = new byte[length];
-        Buffer.BlockCopy(_buffer, _index, rtn, 0, length);
-        _index += length;
-        return rtn;
+        return length == 0 ? Array.Empty<byte>() : ReadBlock(length);
     }
+
+    /// <summary>
+    /// Reads a byte array which compresses repeating zero elements.
+    /// </summary>
+    /// <param name="long">Write length as an Int32 instead of UInt16.</param>
     public byte[] ReadZeroCompressedUInt8Array(bool @long = false)
     {
         int len = @long ? ReadInt32() : ReadUInt16();
@@ -344,18 +455,45 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                byte next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadUInt8();
+                {
+                    next = ReadUInt8();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadUInt8();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }
+
+    /// <summary>
+    /// Skips a certain number of bytes without reading them.
+    /// </summary>
     public void Skip(int bytes)
     {
         EnsureMoreLength(bytes);
         _index += bytes;
     }
+
+    /// <summary>
+    /// Goto an index in the buffer.
+    /// </summary>
+    /// <exception cref="NotSupportedException">Not supported in stream mode.</exception>
     public void Goto(int toPosition)
     {
         if (_streamMode)
@@ -367,45 +505,80 @@ public class ByteReader
             _index = toPosition;
         }
     }
+
+    /// <summary>
+    /// Reads a byte array that can be null. Length is read as a UInt16.
+    /// </summary>
     public byte[]? ReadNullableUInt8Array()
     {
         if (!ReadBool()) return null;
         return ReadUInt8Array();
     }
+
+    /// <summary>
+    /// Reads a byte array. Length is read as a Int32.
+    /// </summary>
     public byte[] ReadLongUInt8Array()
     {
         int length = ReadInt32();
         if (length == 0) return Array.Empty<byte>();
-        if (!EnsureMoreLength(length))
-            return null!;
-        byte[] rtn = new byte[length];
-        Buffer.BlockCopy(_buffer, _index, rtn, 0, length);
-        _index += length;
-        return rtn;
+        return ReadBlock(length);
     }
+
+    /// <summary>
+    /// Reads a byte array that can be null. Length is read as a Int32.
+    /// </summary>
     public byte[]? ReadNullableLongBytes()
     {
         if (!ReadBool()) return null;
         return ReadLongUInt8Array();
     }
+
+    /// <summary>
+    /// Reads an <see cref="int"/> from the buffer.
+    /// </summary>
     public int ReadInt32() => !EnsureMoreLength(sizeof(int)) ? default : Read<int>();
+
+    /// <summary>
+    /// Reads an <see cref="int?"/> from the buffer.
+    /// </summary>
     public int? ReadNullableInt32()
     {
         if (!ReadBool()) return null;
         return ReadInt32();
     }
+
+    /// <summary>
+    /// Reads a <see cref="uint"/> from the buffer.
+    /// </summary>
     public uint ReadUInt32() => !EnsureMoreLength(sizeof(uint)) ? default : Read<uint>();
+
+    /// <summary>
+    /// Reads a <see cref="uint?"/> from the buffer.
+    /// </summary>
     public uint? ReadNullableUInt32()
     {
         if (!ReadBool()) return null;
         return ReadUInt32();
     }
+
+    /// <summary>
+    /// Reads a <see cref="NetId"/> (<see cref="uint"/>) from the buffer.
+    /// </summary>
     public NetId ReadNetId() => !EnsureMoreLength(sizeof(uint)) ? default : new NetId(Read<uint>());
+
+    /// <summary>
+    /// Reads a <see cref="NetId?"/> (<see cref="uint?"/>) from the buffer.
+    /// </summary>
     public NetId? ReadNullableNetId()
     {
         if (!ReadBool()) return null;
         return new NetId(ReadUInt32());
     }
+
+    /// <summary>
+    /// Reads a <see cref="byte"/> from the buffer.
+    /// </summary>
     public byte ReadUInt8()
     {
         if (!EnsureMoreLength(1))
@@ -414,11 +587,19 @@ public class ByteReader
         ++_index;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="byte?"/> from the buffer.
+    /// </summary>
     public byte? ReadNullableUInt8()
     {
         if (!ReadBool()) return null;
         return ReadUInt8();
     }
+
+    /// <summary>
+    /// Reads a <see cref="sbyte"/> from the buffer.
+    /// </summary>
     public sbyte ReadInt8()
     {
         if (!EnsureMoreLength(1))
@@ -427,11 +608,19 @@ public class ByteReader
         ++_index;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="sbyte?"/> from the buffer.
+    /// </summary>
     public sbyte? ReadNullableInt8()
     {
         if (!ReadBool()) return null;
         return ReadInt8();
     }
+
+    /// <summary>
+    /// Reads a <see cref="bool"/> from the buffer.
+    /// </summary>
     public bool ReadBool()
     {
         if (!EnsureMoreLength(1))
@@ -440,24 +629,53 @@ public class ByteReader
         ++_index;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="bool?"/> from the buffer.
+    /// </summary>
     public bool? ReadNullableBool()
     {
         if (!ReadBool()) return null;
         return ReadBool();
     }
+
+    /// <summary>
+    /// Reads a <see cref="long"/> from the buffer.
+    /// </summary>
     public long ReadInt64() => !EnsureMoreLength(sizeof(long)) ? default : Read<long>();
+
+    /// <summary>
+    /// Reads a <see cref="long?"/> from the buffer.
+    /// </summary>
     public long? ReadNullableInt64()
     {
         if (!ReadBool()) return null;
         return ReadInt64();
     }
+
+    /// <summary>
+    /// Reads a <see cref="ulong"/> from the buffer.
+    /// </summary>
     public ulong ReadUInt64() => !EnsureMoreLength(sizeof(ulong)) ? default : Read<ulong>();
+
+    /// <summary>
+    /// Reads a <see cref="ulong?"/> from the buffer.
+    /// </summary>
     public ulong? ReadNullableUInt64()
     {
         if (!ReadBool()) return null;
         return ReadUInt64();
     }
+
+    /// <summary>
+    /// Reads a <see cref="short"/> from the buffer.
+    /// </summary>
     public short ReadInt16() => !EnsureMoreLength(sizeof(short)) ? default : Read<short>();
+
+    /// <summary>
+    /// Reads a 24-bit (3 byte) <see cref="int"/> from the buffer.
+    /// </summary>
+    /// <remarks>Range: <seealso cref="EncodingEx.Int24MinValue"/>-<seealso cref="EncodingEx.Int24MaxValue"/>.</remarks>
     public int ReadInt24()
     {
         if (!EnsureMoreLength(3))
@@ -465,82 +683,118 @@ public class ByteReader
         ushort sh = Read<ushort>();
         byte bt = _buffer![_index];
         ++_index;
-        return (sh | (bt << 16)) - DevkitServerUtility.Int24MaxValue;
+        return (sh | (bt << 16)) - EncodingEx.Int24MaxValue;
     }
+
+    /// <summary>
+    /// Reads a 24-bit (3 byte) <see cref="uint"/> from the buffer.
+    /// </summary>
+    /// <remarks>Range: 0-2*<seealso cref="EncodingEx.Int24MinValue"/>.</remarks>
     public uint ReadUInt24()
     {
         int i = ReadInt24();
         if (i < 0)
-            return (uint)-(i - DevkitServerUtility.Int24MaxValue);
+            return (uint)-(i - EncodingEx.Int24MaxValue);
         return (uint)i;
     }
+
+    /// <summary>
+    /// Reads a 24-bit (3 byte) <see cref="int?"/> from the buffer.
+    /// </summary>
+    /// <remarks>Range: <seealso cref="EncodingEx.Int24MinValue"/>-<seealso cref="EncodingEx.Int24MaxValue"/>.</remarks>
     public int? ReadNullableInt24()
     {
         if (!ReadBool()) return null;
         return ReadInt24();
     }
+
+    /// <summary>
+    /// Reads a <see cref="short?"/> from the buffer.
+    /// </summary>
     public short? ReadNullableInt16()
     {
         if (!ReadBool()) return null;
         return ReadInt16();
     }
+
+    /// <summary>
+    /// Reads a <see cref="ushort"/> from the buffer.
+    /// </summary>
     public ushort ReadUInt16() => !EnsureMoreLength(sizeof(ushort)) ? default : Read<ushort>();
+
+    /// <summary>
+    /// Reads a <see cref="ushort?"/> from the buffer.
+    /// </summary>
     public ushort? ReadNullableUInt16()
     {
         if (!ReadBool()) return null;
         return ReadUInt16();
     }
+
+    /// <summary>
+    /// Reads a <see cref="float"/> from the buffer.
+    /// </summary>
     public float ReadFloat() => !EnsureMoreLength(sizeof(float)) ? default : Read<float>();
+
+    /// <summary>
+    /// Reads a half-precision <see cref="float"/> from the buffer (using <see cref="Mathf.HalfToFloat"/>).
+    /// </summary>
     public float ReadHalfPrecisionFloat() => !EnsureMoreLength(sizeof(ushort)) ? default : Mathf.HalfToFloat(Read<ushort>());
+
+    /// <summary>
+    /// Reads a <see cref="float?"/> from the buffer.
+    /// </summary>
     public float? ReadNullableFloat()
     {
         if (!ReadBool()) return null;
         return ReadFloat();
     }
+
+    /// <summary>
+    /// Reads a <see cref="decimal"/> from the buffer.
+    /// </summary>
     public decimal ReadDecimal() => !EnsureMoreLength(sizeof(decimal)) ? default : Read<decimal>();
+
+    /// <summary>
+    /// Reads a <see cref="decimal?"/> from the buffer.
+    /// </summary>
     public decimal? ReadNullableDecimal()
     {
         if (!ReadBool()) return null;
         return ReadDecimal();
     }
+
+    /// <summary>
+    /// Reads a <see cref="double"/> from the buffer.
+    /// </summary>
     public double ReadDouble() => !EnsureMoreLength(sizeof(double)) ? default : Read<double>();
+
+    /// <summary>
+    /// Reads a <see cref="double?"/> from the buffer.
+    /// </summary>
     public double? ReadNullableDouble()
     {
         if (!ReadBool()) return null;
         return ReadDouble();
     }
+
+    /// <summary>
+    /// Reads a <see cref="char"/> from the buffer.
+    /// </summary>
     public char ReadChar() => !EnsureMoreLength(sizeof(char)) ? default : Read<char>();
+
+    /// <summary>
+    /// Reads a <see cref="char?"/> from the buffer.
+    /// </summary>
     public char? ReadNullableChar()
     {
         if (!ReadBool()) return null;
         return ReadChar();
     }
-    public string ReadString()
-    {
-        ushort length = ReadUInt16();
-        if (length == 0) return string.Empty;
-        if (!EnsureMoreLength(length))
-            return null!;
-        string str = System.Text.Encoding.UTF8.GetString(_buffer, _index, length);
-        _index += length;
-        return str;
-    }
-    public string ReadAsciiSmall()
-    {
-        bool hf = HasFailed;
-        byte length = ReadUInt8();
-        if (length == 0) return !hf && HasFailed ? null! : string.Empty;
-        byte[]? ascii = ReadBlock(length);
-        if (ascii != null)
-            return System.Text.Encoding.ASCII.GetString(ascii);
 
-        return null!;
-    }
-    public string? ReadNullableAsciiSmall()
-    {
-        if (!ReadBool()) return null;
-        return ReadAsciiSmall();
-    }
+    /// <summary>
+    /// Reads a <see cref="Type"/> array from the buffer with nullable elements.
+    /// </summary>
     public Type?[] ReadTypeArray()
     {
         int len = ReadUInt16();
@@ -552,7 +806,16 @@ public class ByteReader
 
         return rtn;
     }
+
+    /// <summary>
+    /// Follows the template for reading a type but only outputs the string value with assembly info prepended <see cref="Type"/>.
+    /// </summary>
     public string? ReadTypeInfo() => ReadTypeInfo(out _);
+
+    /// <summary>
+    /// Follows the template for reading a type but only outputs the string value with assembly info prepended <see cref="Type"/>.
+    /// </summary>
+    /// <remarks>Also outputs the internal flag used for compression.</remarks>
     public string? ReadTypeInfo(out byte flag)
     {
         const string nsSdgUnturned = "SDG.Unturned";
@@ -591,17 +854,30 @@ public class ByteReader
         }
         return ns;
     }
-    public Type? ReadType()
+
+    /// <summary>
+    /// Reads a nullable <see cref="Type"/> from the buffer.
+    /// </summary>
+    public Type? ReadType() => ReadType(out _);
+
+    /// <summary>
+    /// Reads a nullable <see cref="Type"/> from the buffer.
+    /// </summary>
+    /// <param name="wasPassedNull"><see langword="True"/> if the written type was <see langword="null"/>, otherwise the type was just not found.</param>
+    public Type? ReadType(out bool wasPassedNull)
     {
         const string nsSdgUnturned = "SDG.Unturned";
         const string nsSdgFrameworkDevkit = "SDG.Framework.Devkit";
         const string nsSdgFramework = "SDG.Framework";
         const string nsDevkitServer = "DevkitServer";
         const string nsSystem = "System";
-
+        wasPassedNull = false;
         byte flag = ReadUInt8();
         if ((flag & 128) != 0)
+        {
+            wasPassedNull = true;
             return null;
+        }
 
         string ns = ReadString();
         if ((flag & 1) != 0)
@@ -630,6 +906,56 @@ public class ByteReader
 
         return Type.GetType(ns);
     }
+
+    /// <summary>
+    /// Reads a <see cref="string"/> from the buffer.
+    /// </summary>
+    public string ReadString()
+    {
+        ushort length = ReadUInt16();
+        if (length == 0) return string.Empty;
+        if (!EnsureMoreLength(length))
+            return null!;
+        string str = System.Text.Encoding.UTF8.GetString(_buffer, _index, length);
+        _index += length;
+        return str;
+    }
+
+    /// <summary>
+    /// Reads a nullable <see cref="string"/> from the buffer.
+    /// </summary>
+    public string? ReadNullableString()
+    {
+        return !ReadBool() ? null : ReadString();
+    }
+
+    /// <summary>
+    /// Reads an ASCII <see cref="string"/> from the buffer.
+    /// </summary>
+    public string ReadAsciiSmall()
+    {
+        bool hf = HasFailed;
+        byte length = ReadUInt8();
+        if (length == 0) return !hf && HasFailed ? null! : string.Empty;
+        byte[]? ascii = ReadBlock(length);
+        if (ascii != null)
+            return System.Text.Encoding.ASCII.GetString(ascii);
+
+        return null!;
+    }
+
+    /// <summary>
+    /// Reads a nullable ASCII <see cref="string"/> from the buffer.
+    /// </summary>
+    public string? ReadNullableAsciiSmall()
+    {
+        if (!ReadBool()) return null;
+        return ReadAsciiSmall();
+    }
+
+    /// <summary>
+    /// Reads a <see cref="string"/> from the buffer with a max length of <see cref="byte.MaxValue"/>.
+    /// </summary>
     public string ReadShortString()
     {
         byte length = ReadUInt8();
@@ -640,20 +966,32 @@ public class ByteReader
         _index += length;
         return str;
     }
-    public string? ReadNullableString()
-    {
-        return !ReadBool() ? null : ReadString();
-    }
+
+    /// <summary>
+    /// Reads a nullable <see cref="string"/> from the buffer with a max length of <see cref="byte.MaxValue"/>.
+    /// </summary>
     public string? ReadNullableShortString()
     {
         return !ReadBool() ? null : ReadShortString();
     }
+
+    /// <summary>
+    /// Reads a <see cref="DateTime"/> from the buffer. Keeps <see cref="DateTimeKind"/> information.
+    /// </summary>
     public DateTime ReadDateTime() => !EnsureMoreLength(sizeof(long)) ? default : DateTime.FromBinary(Read<long>());
+
+    /// <summary>
+    /// Reads a <see cref="DateTime?"/> from the buffer. Keeps <see cref="DateTimeKind"/> information.
+    /// </summary>
     public DateTime? ReadNullableDateTime()
     {
         if (!ReadBool()) return null;
         return ReadDateTime();
     }
+
+    /// <summary>
+    /// Reads a <see cref="DateTimeOffset"/> from the buffer. Keeps <see cref="DateTimeKind"/> and offset information.
+    /// </summary>
     public unsafe DateTimeOffset ReadDateTimeOffset()
     {
         if (!EnsureMoreLength(sizeof(long) + sizeof(short)))
@@ -665,11 +1003,19 @@ public class ByteReader
             return new DateTimeOffset(DateTime.FromBinary(v), *(TimeSpan*)&offset);
         }
     }
+
+    /// <summary>
+    /// Reads a <see cref="DateTimeOffset?"/> from the buffer. Keeps <see cref="DateTimeKind"/> and offset information.
+    /// </summary>
     public DateTimeOffset? ReadNullableDateTimeOffset()
     {
         if (!ReadBool()) return null;
         return ReadDateTimeOffset();
     }
+
+    /// <summary>
+    /// Reads a <see cref="TimeSpan"/> from the buffer.
+    /// </summary>
     public unsafe TimeSpan ReadTimeSpan()
     {
         if (!EnsureMoreLength(sizeof(long)))
@@ -677,12 +1023,24 @@ public class ByteReader
         long ticks = Read<long>();
         return *(TimeSpan*)&ticks;
     }
+
+    /// <summary>
+    /// Reads a <see cref="TimeSpan?"/> from the buffer.
+    /// </summary>
     public TimeSpan? ReadNullableTimeSpan()
     {
         if (!ReadBool()) return null;
         return ReadTimeSpan();
     }
+
+    /// <summary>
+    /// Reads a <see cref="Guid"/> from the buffer.
+    /// </summary>
     public Guid ReadGuid() => !EnsureMoreLength(GuidSize) ? default : Read<Guid>();
+
+    /// <summary>
+    /// Reads a <see cref="Guid?"/> from the buffer.
+    /// </summary>
     public Guid? ReadNullableGuid() => !ReadBool() ? null : ReadGuid();
 
     private static readonly Vector2 V2NaN = new Vector2(float.NaN, float.NaN);
@@ -690,65 +1048,133 @@ public class ByteReader
     private static readonly Vector4 V4NaN = new Vector4(float.NaN, float.NaN, float.NaN, float.NaN);
     private static readonly Bounds BoundsNaN = new Bounds(V3NaN, V3NaN);
     private static readonly Color32 C32NaN = new Color32(byte.MaxValue, byte.MaxValue, byte.MaxValue, byte.MaxValue);
+
+    /// <summary>
+    /// Reads a <see cref="Vector2"/> from the buffer.
+    /// </summary>
     public Vector2 ReadVector2() => !EnsureMoreLength(sizeof(float) * 2) ? V2NaN : new Vector2(Read<float>(), Read<float>());
+
+    /// <summary>
+    /// Reads a half-precision <see cref="Vector2"/> from the buffer.
+    /// </summary>
     public Vector2 ReadHalfPrecisionVector2() => !EnsureMoreLength(sizeof(ushort) * 2) ? V2NaN : new Vector2(Mathf.HalfToFloat(Read<ushort>()), Mathf.HalfToFloat(Read<ushort>()));
+
+    /// <summary>
+    /// Reads a <see cref="Vector2?"/> from the buffer.
+    /// </summary>
     public Vector2? ReadNullableVector2()
     {
         if (!ReadBool()) return null;
         return ReadVector2();
     }
+
+    /// <summary>
+    /// Reads a <see cref="Vector3"/> from the buffer.
+    /// </summary>
     public Vector3 ReadVector3() => !EnsureMoreLength(sizeof(float) * 3) ? V3NaN : new Vector3(Read<float>(), Read<float>(), Read<float>());
+
+    /// <summary>
+    /// Reads a half-precision <see cref="Vector3"/> from the buffer.
+    /// </summary>
     public Vector3 ReadHalfPrecisionVector3() => !EnsureMoreLength(sizeof(ushort) * 3)
         ? V3NaN
         : new Vector3(Mathf.HalfToFloat(Read<ushort>()), Mathf.HalfToFloat(Read<ushort>()), Mathf.HalfToFloat(Read<ushort>()));
+
+    /// <summary>
+    /// Reads a <see cref="Vector3?"/> from the buffer.
+    /// </summary>
     public Vector3? ReadNullableVector3()
     {
         if (!ReadBool()) return null;
         return ReadVector3();
     }
+
+    /// <summary>
+    /// Reads a <see cref="Vector4"/> from the buffer.
+    /// </summary>
     public Vector4 ReadVector4() => !EnsureMoreLength(sizeof(float) * 4) ? V4NaN : new Vector4(Read<float>(), Read<float>(), Read<float>(), Read<float>());
+
+    /// <summary>
+    /// Reads a half-precision <see cref="Vector4"/> from the buffer.
+    /// </summary>
     public Vector4 ReadHalfPrecisionVector4() => !EnsureMoreLength(sizeof(ushort) * 4)
         ? V4NaN
         : new Vector4(Mathf.HalfToFloat(Read<ushort>()), Mathf.HalfToFloat(Read<ushort>()), Mathf.HalfToFloat(Read<ushort>()), Mathf.HalfToFloat(Read<ushort>()));
+
+    /// <summary>
+    /// Reads a <see cref="Vector4?"/> from the buffer.
+    /// </summary>
     public Vector4? ReadNullableVector4()
     {
         if (!ReadBool()) return null;
         return ReadVector4();
     }
+
+    /// <summary>
+    /// Reads a <see cref="Bounds"/> from the buffer.
+    /// </summary>
     public Bounds ReadBounds() =>
         !EnsureMoreLength(sizeof(float) * 6)
             ? BoundsNaN
             : new Bounds(new Vector3(Read<float>(), Read<float>(), Read<float>()), new Vector3(Read<float>(), Read<float>(), Read<float>()));
+
+    /// <summary>
+    /// Reads a <see cref="Bounds?"/> from the buffer.
+    /// </summary>
     public Bounds? ReadNullableBounds()
     {
         if (!ReadBool()) return null;
         return ReadBounds();
     }
+
+    /// <summary>
+    /// Reads a <see cref="Quaternion"/> from the buffer.
+    /// </summary>
     public Quaternion ReadQuaternion()
     {
         Vector4 f = ReadVector4();
         return new Quaternion(f.x, f.y, f.z, f.w);
     }
+
+    /// <summary>
+    /// Reads a half-precision <see cref="Quaternion"/> from the buffer.
+    /// </summary>
     public Quaternion ReadHalfPrecisionQuaternion()
     {
         Vector4 f = ReadHalfPrecisionVector4();
         return new Quaternion(f.x, f.y, f.z, f.w);
     }
+
+    /// <summary>
+    /// Reads a <see cref="Quaternion?"/> from the buffer.
+    /// </summary>
     public Quaternion? ReadNullableQuaternion()
     {
         if (!ReadBool()) return null;
         return ReadQuaternion();
     }
+
+    /// <summary>
+    /// Reads a <see cref="Color"/> (16 bytes) from the buffer.
+    /// </summary>
     public Color ReadColor()
     {
         Vector4 f = ReadVector4();
         return new Color(f.y, f.z, f.w, f.x);
     }
+
+    /// <summary>
+    /// Reads a <see cref="Color?"/> (16 bytes) from the buffer.
+    /// </summary>
     public Color? ReadNullableColor()
     {
         if (!ReadBool()) return null;
         return ReadColor();
     }
+
+    /// <summary>
+    /// Reads a <see cref="Color32"/> (4 bytes) from the buffer.
+    /// </summary>
     public Color32 ReadColor32()
     {
         if (!EnsureMoreLength(4))
@@ -759,12 +1185,30 @@ public class ByteReader
         _index += 4;
         return q;
     }
+
+    /// <summary>
+    /// Reads a <see cref="Color32?"/> (4 bytes) from the buffer.
+    /// </summary>
     public Color32? ReadNullableColor32()
     {
         return !ReadBool() ? null : ReadColor32();
     }
+
+    /// <summary>
+    /// Reads a <typeparamref name="TEnum"/> from the buffer. Size is based on the underlying type.
+    /// </summary>
+    /// <remarks>Don't use this if the underlying type is subject to change when data vesioning matters.</remarks>
     public unsafe TEnum ReadEnum<TEnum>() where TEnum : unmanaged, Enum => !EnsureMoreLength(sizeof(TEnum)) ? default : Read<TEnum>();
+
+    /// <summary>
+    /// Reads a nullable <typeparamref name="TEnum"/> from the buffer. Size is based on the underlying type.
+    /// </summary>
+    /// <remarks>Don't use this if the underlying type is subject to change when data vesioning matters.</remarks>
     public TEnum? ReadNullableEnum<TEnum>() where TEnum : unmanaged, Enum => !ReadBool() ? null : ReadEnum<TEnum>();
+
+    /// <summary>
+    /// Reads a <see cref="int"/> array and its length (as a UInt16).
+    /// </summary>
     public int[] ReadInt32Array()
     {
         int len = ReadUInt16();
@@ -778,6 +1222,11 @@ public class ByteReader
         _index += size;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="int"/> array which compresses repeating zero elements.
+    /// </summary>
+    /// <param name="long">Write length as an Int32 instead of UInt16.</param>
     public int[] ReadZeroCompressedInt32Array(bool @long = false)
     {
         int len = @long ? ReadInt32() : ReadUInt16();
@@ -788,14 +1237,40 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                int next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadInt32();
+                {
+                    next = ReadInt32();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadInt32();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }
+
+    /// <summary>
+    /// Reads a <see cref="int"/> array that can be null and its length (as a UInt16).
+    /// </summary>
     public int[]? ReadNullableInt32Array() => !ReadBool() ? null : ReadInt32Array();
+
+    /// <summary>
+    /// Reads a <see cref="Guid"/> array and its length (as a UInt16).
+    /// </summary>
     public unsafe Guid[] ReadGuidArray()
     {
         ushort len = ReadUInt16();
@@ -816,7 +1291,15 @@ public class ByteReader
         _index += size;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="Guid"/> array that can be null and its length (as a UInt16).
+    /// </summary>
     public Guid[]? ReadNullableGuidArray() => !ReadBool() ? null : ReadGuidArray();
+
+    /// <summary>
+    /// Reads a <see cref="DateTime"/> array and its length (as a UInt16). Keeps <see cref="DateTimeKind"/> information.
+    /// </summary>
     public unsafe DateTime[] ReadDateTimeArray()
     {
         ushort len = ReadUInt16();
@@ -834,7 +1317,15 @@ public class ByteReader
         }
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="DateTime"/> array that can be null and its length (as a UInt16). Keeps <see cref="DateTimeKind"/> information.
+    /// </summary>
     public DateTime[]? ReadNullableDateTimeArray() => !ReadBool() ? null : ReadDateTimeArray();
+
+    /// <summary>
+    /// Reads a <see cref="DateTimeOffset"/> array and its length (as a UInt16). Keeps <see cref="DateTimeKind"/> and offset information.
+    /// </summary>
     public unsafe DateTimeOffset[] ReadDateTimeOffsetArray()
     {
         ushort len = ReadUInt16();
@@ -854,7 +1345,15 @@ public class ByteReader
         }
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="DateTimeOffset"/> array that can be null and its length (as a UInt16). Keeps <see cref="DateTimeKind"/> and offset information.
+    /// </summary>
     public DateTimeOffset[]? ReadNullableDateTimeOffsetArray() => !ReadBool() ? null : ReadDateTimeOffsetArray();
+
+    /// <summary>
+    /// Reads a <see cref="uint"/> array and its length (as a UInt16).
+    /// </summary>
     public uint[] ReadUInt32Array()
     {
         ushort len = ReadUInt16();
@@ -868,6 +1367,11 @@ public class ByteReader
         _index += size;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="uint"/> array which compresses repeating zero elements.
+    /// </summary>
+    /// <param name="long">Write length as an Int32 instead of UInt16.</param>
     public uint[] ReadZeroCompressedUInt32Array(bool @long = false)
     {
         int len = @long ? ReadInt32() : ReadUInt16();
@@ -878,14 +1382,40 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                uint next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadUInt32();
+                {
+                    next = ReadUInt32();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadUInt32();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }
+
+    /// <summary>
+    /// Reads a <see cref="uint"/> array that can be null and its length (as a UInt16).
+    /// </summary>
     public uint[]? ReadNullableUInt32Array() => !ReadBool() ? null : ReadUInt32Array();
+
+    /// <summary>
+    /// Reads a <see cref="sbyte"/> array and its length (as a UInt16).
+    /// </summary>
     public sbyte[] ReadInt8Array()
     {
         ushort len = ReadUInt16();
@@ -898,6 +1428,11 @@ public class ByteReader
         _index += len;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="sbyte"/> array which compresses repeating zero elements.
+    /// </summary>
+    /// <param name="long">Write length as an Int32 instead of UInt16.</param>
     public sbyte[] ReadZeroCompressedInt8Array(bool @long = false)
     {
         int len = @long ? ReadInt32() : ReadUInt16();
@@ -908,14 +1443,41 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                sbyte next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadInt8();
+                {
+                    next = ReadInt8();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadInt8();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }
+
+    /// <summary>
+    /// Reads a <see cref="sbyte"/> array that can be null and its length (as a UInt16).
+    /// </summary>
     public sbyte[]? ReadNullableInt8Array() => !ReadBool() ? null : ReadInt8Array();
+
+    /// <summary>
+    /// Reads a <see cref="bool"/> array and its length (as a UInt16).
+    /// </summary>
+    /// <remarks>Compresses into bits.</remarks>
     public unsafe bool[] ReadBoolArray()
     {
         ushort len = ReadUInt16();
@@ -943,6 +1505,11 @@ public class ByteReader
         _index += blen;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="bool"/> array and its length (as a UInt32).
+    /// </summary>
+    /// <remarks>Compresses into bits.</remarks>
     public unsafe bool[] ReadLongBoolArray()
     {
         int len = ReadInt32();
@@ -970,7 +1537,15 @@ public class ByteReader
         _index += blen;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="bool"/> array that can be null and its length (as a UInt16).
+    /// </summary>
     public bool[]? ReadNullableBoolArray() => !ReadBool() ? null : ReadBoolArray();
+
+    /// <summary>
+    /// Reads a <see cref="long"/> array and its length (as a UInt16).
+    /// </summary>
     public long[] ReadInt64Array()
     {
         ushort len = ReadUInt16();
@@ -984,6 +1559,11 @@ public class ByteReader
         _index += size;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="long"/> array which compresses repeating zero elements.
+    /// </summary>
+    /// <param name="long">Write length as an Int32 instead of UInt16.</param>
     public long[] ReadZeroCompressedInt64Array(bool @long = false)
     {
         int len = @long ? ReadInt32() : ReadUInt16();
@@ -994,14 +1574,40 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                long next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadInt64();
+                {
+                    next = ReadInt64();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadInt64();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }
+
+    /// <summary>
+    /// Reads a <see cref="long"/> array that can be null and its length (as a UInt16).
+    /// </summary>
     public long[]? ReadNullableInt64Array() => !ReadBool() ? null : ReadInt64Array();
+
+    /// <summary>
+    /// Reads a <see cref="ulong"/> array and its length (as a UInt16).
+    /// </summary>
     public ulong[] ReadUInt64Array()
     {
         ushort len = ReadUInt16();
@@ -1015,6 +1621,11 @@ public class ByteReader
         _index += size;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="ulong"/> array which compresses repeating zero elements.
+    /// </summary>
+    /// <param name="long">Write length as an Int32 instead of UInt16.</param>
     public ulong[] ReadZeroCompressedUInt64Array(bool @long = false)
     {
         int len = @long ? ReadInt32() : ReadUInt16();
@@ -1025,14 +1636,40 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                ulong next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadUInt64();
+                {
+                    next = ReadUInt64();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadUInt64();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }
+
+    /// <summary>
+    /// Reads a <see cref="ulong"/> array that can be null and its length (as a UInt16).
+    /// </summary>
     public ulong[]? ReadNullableUInt64Array() => !ReadBool() ? null : ReadUInt64Array();
+
+    /// <summary>
+    /// Reads a <see cref="short"/> array and its length (as a UInt16).
+    /// </summary>
     public short[] ReadInt16Array()
     {
         ushort len = ReadUInt16();
@@ -1046,6 +1683,11 @@ public class ByteReader
         _index += size;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="short"/> array which compresses repeating zero elements.
+    /// </summary>
+    /// <param name="long">Write length as an Int32 instead of UInt16.</param>
     public short[] ReadZeroCompressedInt16Array(bool @long = false)
     {
         int len = @long ? ReadInt32() : ReadUInt16();
@@ -1056,14 +1698,40 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                short next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadInt16();
+                {
+                    next = ReadInt16();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadInt16();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }
+
+    /// <summary>
+    /// Reads a <see cref="short"/> array that can be null and its length (as a UInt16).
+    /// </summary>
     public short[]? ReadNullableInt16Array() => !ReadBool() ? null : ReadInt16Array();
+
+    /// <summary>
+    /// Reads a <see cref="ushort"/> array and its length (as a UInt16).
+    /// </summary>
     public ushort[] ReadUInt16Array()
     {
         ushort len = ReadUInt16();
@@ -1077,6 +1745,11 @@ public class ByteReader
         _index += size;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="ushort"/> array which compresses repeating zero elements.
+    /// </summary>
+    /// <param name="long">Write length as an Int32 instead of UInt16.</param>
     public ushort[] ReadZeroCompressedUInt16Array(bool @long = false)
     {
         int len = @long ? ReadInt32() : ReadUInt16();
@@ -1087,14 +1760,40 @@ public class ByteReader
             byte b = ReadUInt8();
             if (b == 255)
             {
+                ushort next;
                 for (int j = ReadUInt8(); j > 0; --j)
-                    output[i++] = ReadUInt16();
+                {
+                    next = ReadUInt16();
+                    if (i < len)
+                        output[i] = next;
+                    else
+                        Fail(InvalidZeroCompressedMessage);
+                    ++i;
+                }
+                next = ReadUInt16();
+                if (i < len)
+                    output[i] = next;
+                else
+                    Fail(InvalidZeroCompressedMessage);
             }
-            else i += b;
+            else
+            {
+                i += b;
+                if (i >= len)
+                    Fail(InvalidZeroCompressedMessage);
+            }
         }
         return output;
     }
+
+    /// <summary>
+    /// Reads a <see cref="ushort"/> array that can be null and its length (as a UInt16).
+    /// </summary>
     public ushort[]? ReadNullableUInt16Array() => !ReadBool() ? null : ReadUInt16Array();
+
+    /// <summary>
+    /// Reads a <see cref="float"/> array and its length (as a UInt16).
+    /// </summary>
     public float[] ReadFloatArray()
     {
         ushort len = ReadUInt16();
@@ -1108,7 +1807,15 @@ public class ByteReader
         _index += size;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="float"/> array that can be null and its length (as a UInt16).
+    /// </summary>
     public float[]? ReadNullableFloatArray() => !ReadBool() ? null : ReadFloatArray();
+
+    /// <summary>
+    /// Reads a <see cref="decimal"/> array and its length (as a UInt16).
+    /// </summary>
     public unsafe decimal[] ReadDecimalArray()
     {
         ushort len = ReadUInt16();
@@ -1130,7 +1837,15 @@ public class ByteReader
         _index += size;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="decimal"/> array that can be null and its length (as a UInt16).
+    /// </summary>
     public decimal[]? ReadNullableDecimalArray() => !ReadBool() ? null : ReadDecimalArray();
+
+    /// <summary>
+    /// Reads a <see cref="double"/> array and its length (as a UInt16).
+    /// </summary>
     public double[] ReadDoubleArray()
     {
         ushort len = ReadUInt16();
@@ -1144,7 +1859,15 @@ public class ByteReader
         _index += size;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="double"/> array that can be null and its length (as a UInt16).
+    /// </summary>
     public double[]? ReadNullableDoubleArray() => !ReadBool() ? null : ReadDoubleArray();
+
+    /// <summary>
+    /// Reads a <see cref="char"/> array and its length (as a UInt16).
+    /// </summary>
     public char[] ReadCharArray()
     {
         ushort length = ReadUInt16();
@@ -1155,7 +1878,15 @@ public class ByteReader
         _index += length;
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="char"/> array that can be null and its length (as a UInt16).
+    /// </summary>
     public char[]? ReadNullableCharArray() => !ReadBool() ? null : ReadCharArray();
+
+    /// <summary>
+    /// Reads a <see cref="string"/> array and its length (as a UInt16).
+    /// </summary>
     public string[] ReadStringArray()
     {
         string[] rtn = new string[ReadUInt16()];
@@ -1163,6 +1894,10 @@ public class ByteReader
             rtn[i] = ReadString();
         return rtn;
     }
+
+    /// <summary>
+    /// Reads a <see cref="string"/> array that can be null and its length (as a UInt16).
+    /// </summary>
     public string[] ReadNullableStringArray() => !ReadBool() ? null! : ReadStringArray();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1173,9 +1908,25 @@ public class ByteReader
             throw new InvalidDynamicTypeException(type, typeIndex, true);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public T InvokeReader<T>(Reader<T> reader) => reader.Invoke(this);
-    public static Reader<T1>? GetReader<T1>(bool isNullable = false) => (Reader<T1>?)GetReader(typeof(T1), isNullable);
+    /// <summary>
+    /// Returns a delegate for reading any supported type. Use <see cref="EncodingEx.IsValidAutoType"/> to check if a type is valid, or <see langword="null"/> if the type is not supported.
+    /// </summary>
+    /// <remarks>Caches when possible, also works for enum types.</remarks>
+    /// <param name="isNullable">Uses the nullable variant when possible.</param>
+    public static Reader<T1>? GetReader<T1>(bool isNullable = false)
+    {
+        Type type = typeof(T1);
+        if (!EncodingEx.IsValidAutoType(type))
+            return GetReaderIntl<T1>();
+
+        return isNullable ? NullableReaderHelper<T1>.Reader : ReaderHelper<T1>.Reader;
+    }
+    private static Reader<T1>? GetReaderIntl<T1>(bool isNullable = false) => (Reader<T1>?)GetReader(typeof(T1), isNullable);
+
+    /// <summary>
+    /// Returns a delegate of type <see cref="Reader{T}"/> for reading any supported type, or <see langword="null"/> if the type is not supported. Use <see cref="EncodingEx.IsValidAutoType"/> to check if a type is valid.
+    /// </summary>
+    /// <remarks>Also works for enum types.</remarks>
     public static Delegate? GetReader(Type type, bool isNullable = false)
     {
         if (type == null) throw new ArgumentNullException(nameof(type));
@@ -1193,6 +1944,11 @@ public class ByteReader
             return null;
         }
     }
+
+    /// <summary>
+    /// Returns a <see cref="MethodInfo"/> for reading any supported type, or <see langword="null"/> if the type is not supported. Use <see cref="EncodingEx.IsValidAutoType"/> to check if a type is valid
+    /// </summary>
+    /// <remarks>Also works for enum types.</remarks>
     public static MethodInfo? GetReadMethod(Type type, bool isNullable = false)
     {
         MethodInfo? method;
@@ -1214,461 +1970,543 @@ public class ByteReader
 
         return method;
     }
-    public static class ReaderHelper<T>
+    internal static class ReaderHelper<T>
     {
         public static readonly Reader<T>? Reader;
         static ReaderHelper()
         {
             VerifyType<T>();
-            Reader = GetReader<T>();
+            Reader = GetReaderIntl<T>();
         }
     }
-    public static class NullableReaderHelper<T>
+    internal static class NullableReaderHelper<T>
     {
         public static readonly Reader<T>? Reader;
         static NullableReaderHelper()
         {
             VerifyType<T>();
-            Reader = GetReader<T>(true);
+            Reader = GetReaderIntl<T>(true);
         }
     }
 }
+
+/// <summary>
+/// Represents a static read method for <typeparamref name="T"/>.
+/// </summary>
+/// <typeparam name="T">The type of value to read.</typeparam>
+/// <param name="reader">The reader.</param>
+/// <returns>The read value.</returns>
+public delegate T Reader<out T>(ByteReader reader);
+
+/// <summary>
+/// Raw byte readers can be given custom reader methods (or leave them <see langword="null"/> to auto-fill them.
+/// </summary>
 public sealed class ByteReaderRaw<T> : ByteReader
 {
-    private readonly Reader<T> reader;
-    /// <summary>Leave <paramref name="reader"/> null to auto-fill.</summary>
+    private readonly Reader<T> _reader;
+
+    /// <summary>Leave <paramref name="reader"/> <see langword="null"/> to auto-fill.</summary>
     public ByteReaderRaw(Reader<T>? reader)
     {
-        this.reader = reader ?? ReaderHelper<T>.Reader!;
+        _reader = reader ?? ReaderHelper<T>.Reader!;
     }
     public bool Read(byte[]? bytes, out T arg)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg = reader.Invoke(this);
+        arg = _reader.Invoke(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Raw byte readers can be given custom reader methods (or leave them <see langword="null"/> to auto-fill them.
+/// </summary>
 public sealed class ByteReaderRaw<T1, T2> : ByteReader
 {
-    private readonly Reader<T1> reader1;
-    private readonly Reader<T2> reader2;
-    /// <summary>Leave any reader null to auto-fill.</summary>
+    private readonly Reader<T1> _reader1;
+    private readonly Reader<T2> _reader2;
+
+    /// <summary>Leave any reader <see langword="null"/> to auto-fill.</summary>
     public ByteReaderRaw(Reader<T1>? reader1, Reader<T2>? reader2)
     {
-        this.reader1 = reader1 ?? ReaderHelper<T1>.Reader!;
-        this.reader2 = reader2 ?? ReaderHelper<T2>.Reader!;
+        _reader1 = reader1 ?? ReaderHelper<T1>.Reader!;
+        _reader2 = reader2 ?? ReaderHelper<T2>.Reader!;
     }
     public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg1 = reader1.Invoke(this);
-        arg2 = reader2.Invoke(this);
+        arg1 = _reader1.Invoke(this);
+        arg2 = _reader2.Invoke(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Raw byte readers can be given custom reader methods (or leave them <see langword="null"/> to auto-fill them.
+/// </summary>
 public sealed class ByteReaderRaw<T1, T2, T3> : ByteReader
 {
-    private readonly Reader<T1> reader1;
-    private readonly Reader<T2> reader2;
-    private readonly Reader<T3> reader3;
-    /// <summary>Leave any reader null to auto-fill.</summary>
+    private readonly Reader<T1> _reader1;
+    private readonly Reader<T2> _reader2;
+    private readonly Reader<T3> _reader3;
+
+    /// <summary>Leave any reader <see langword="null"/> to auto-fill.</summary>
     public ByteReaderRaw(Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3)
     {
-        this.reader1 = reader1 ?? ReaderHelper<T1>.Reader!;
-        this.reader2 = reader2 ?? ReaderHelper<T2>.Reader!;
-        this.reader3 = reader3 ?? ReaderHelper<T3>.Reader!;
+        _reader1 = reader1 ?? ReaderHelper<T1>.Reader!;
+        _reader2 = reader2 ?? ReaderHelper<T2>.Reader!;
+        _reader3 = reader3 ?? ReaderHelper<T3>.Reader!;
     }
     public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg1 = reader1.Invoke(this);
-        arg2 = reader2.Invoke(this);
-        arg3 = reader3.Invoke(this);
+        arg1 = _reader1.Invoke(this);
+        arg2 = _reader2.Invoke(this);
+        arg3 = _reader3.Invoke(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Raw byte readers can be given custom reader methods (or leave them <see langword="null"/> to auto-fill them.
+/// </summary>
 public sealed class ByteReaderRaw<T1, T2, T3, T4> : ByteReader
 {
-    private readonly Reader<T1> reader1;
-    private readonly Reader<T2> reader2;
-    private readonly Reader<T3> reader3;
-    private readonly Reader<T4> reader4;
-    /// <summary>Leave any reader null to auto-fill.</summary>
+    private readonly Reader<T1> _reader1;
+    private readonly Reader<T2> _reader2;
+    private readonly Reader<T3> _reader3;
+    private readonly Reader<T4> _reader4;
+
+    /// <summary>Leave any reader <see langword="null"/> to auto-fill.</summary>
     public ByteReaderRaw(Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4)
     {
-        this.reader1 = reader1 ?? ReaderHelper<T1>.Reader!;
-        this.reader2 = reader2 ?? ReaderHelper<T2>.Reader!;
-        this.reader3 = reader3 ?? ReaderHelper<T3>.Reader!;
-        this.reader4 = reader4 ?? ReaderHelper<T4>.Reader!;
+        _reader1 = reader1 ?? ReaderHelper<T1>.Reader!;
+        _reader2 = reader2 ?? ReaderHelper<T2>.Reader!;
+        _reader3 = reader3 ?? ReaderHelper<T3>.Reader!;
+        _reader4 = reader4 ?? ReaderHelper<T4>.Reader!;
     }
     public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg1 = reader1.Invoke(this);
-        arg2 = reader2.Invoke(this);
-        arg3 = reader3.Invoke(this);
-        arg4 = reader4.Invoke(this);
+        arg1 = _reader1.Invoke(this);
+        arg2 = _reader2.Invoke(this);
+        arg3 = _reader3.Invoke(this);
+        arg4 = _reader4.Invoke(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Raw byte readers can be given custom reader methods (or leave them <see langword="null"/> to auto-fill them.
+/// </summary>
 public sealed class ByteReaderRaw<T1, T2, T3, T4, T5> : ByteReader
 {
-    private readonly Reader<T1> reader1;
-    private readonly Reader<T2> reader2;
-    private readonly Reader<T3> reader3;
-    private readonly Reader<T4> reader4;
-    private readonly Reader<T5> reader5;
-    /// <summary>Leave any reader null to auto-fill.</summary>
+    private readonly Reader<T1> _reader1;
+    private readonly Reader<T2> _reader2;
+    private readonly Reader<T3> _reader3;
+    private readonly Reader<T4> _reader4;
+    private readonly Reader<T5> _reader5;
+
+    /// <summary>Leave any reader <see langword="null"/> to auto-fill.</summary>
     public ByteReaderRaw(Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5)
     {
-        this.reader1 = reader1 ?? ReaderHelper<T1>.Reader!;
-        this.reader2 = reader2 ?? ReaderHelper<T2>.Reader!;
-        this.reader3 = reader3 ?? ReaderHelper<T3>.Reader!;
-        this.reader4 = reader4 ?? ReaderHelper<T4>.Reader!;
-        this.reader5 = reader5 ?? ReaderHelper<T5>.Reader!;
+        _reader1 = reader1 ?? ReaderHelper<T1>.Reader!;
+        _reader2 = reader2 ?? ReaderHelper<T2>.Reader!;
+        _reader3 = reader3 ?? ReaderHelper<T3>.Reader!;
+        _reader4 = reader4 ?? ReaderHelper<T4>.Reader!;
+        _reader5 = reader5 ?? ReaderHelper<T5>.Reader!;
     }
     public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg1 = reader1.Invoke(this);
-        arg2 = reader2.Invoke(this);
-        arg3 = reader3.Invoke(this);
-        arg4 = reader4.Invoke(this);
-        arg5 = reader5.Invoke(this);
+        arg1 = _reader1.Invoke(this);
+        arg2 = _reader2.Invoke(this);
+        arg3 = _reader3.Invoke(this);
+        arg4 = _reader4.Invoke(this);
+        arg5 = _reader5.Invoke(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Raw byte readers can be given custom reader methods (or leave them <see langword="null"/> to auto-fill them.
+/// </summary>
 public sealed class ByteReaderRaw<T1, T2, T3, T4, T5, T6> : ByteReader
 {
-    private readonly Reader<T1> reader1;
-    private readonly Reader<T2> reader2;
-    private readonly Reader<T3> reader3;
-    private readonly Reader<T4> reader4;
-    private readonly Reader<T5> reader5;
-    private readonly Reader<T6> reader6;
-    /// <summary>Leave any reader null to auto-fill.</summary>
+    private readonly Reader<T1> _reader1;
+    private readonly Reader<T2> _reader2;
+    private readonly Reader<T3> _reader3;
+    private readonly Reader<T4> _reader4;
+    private readonly Reader<T5> _reader5;
+    private readonly Reader<T6> _reader6;
+
+    /// <summary>Leave any reader <see langword="null"/> to auto-fill.</summary>
     public ByteReaderRaw(Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Reader<T6>? reader6)
     {
-        this.reader1 = reader1 ?? ReaderHelper<T1>.Reader!;
-        this.reader2 = reader2 ?? ReaderHelper<T2>.Reader!;
-        this.reader3 = reader3 ?? ReaderHelper<T3>.Reader!;
-        this.reader4 = reader4 ?? ReaderHelper<T4>.Reader!;
-        this.reader5 = reader5 ?? ReaderHelper<T5>.Reader!;
-        this.reader6 = reader6 ?? ReaderHelper<T6>.Reader!;
+        _reader1 = reader1 ?? ReaderHelper<T1>.Reader!;
+        _reader2 = reader2 ?? ReaderHelper<T2>.Reader!;
+        _reader3 = reader3 ?? ReaderHelper<T3>.Reader!;
+        _reader4 = reader4 ?? ReaderHelper<T4>.Reader!;
+        _reader5 = reader5 ?? ReaderHelper<T5>.Reader!;
+        _reader6 = reader6 ?? ReaderHelper<T6>.Reader!;
     }
     public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg1 = reader1.Invoke(this);
-        arg2 = reader2.Invoke(this);
-        arg3 = reader3.Invoke(this);
-        arg4 = reader4.Invoke(this);
-        arg5 = reader5.Invoke(this);
-        arg6 = reader6.Invoke(this);
+        arg1 = _reader1.Invoke(this);
+        arg2 = _reader2.Invoke(this);
+        arg3 = _reader3.Invoke(this);
+        arg4 = _reader4.Invoke(this);
+        arg5 = _reader5.Invoke(this);
+        arg6 = _reader6.Invoke(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Dynamic byte readers auto-fill their reader methods.
+/// </summary>
 public sealed class DynamicByteReader<T1> : ByteReader
 {
     static DynamicByteReader()
     {
-        reader1 = ReaderHelper<T1>.Reader!;
+        Reader1 = ReaderHelper<T1>.Reader!;
     }
-    private static readonly Reader<T1> reader1;
+    private static readonly Reader<T1> Reader1;
 
     public bool Read(byte[]? bytes, out T1 arg1)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg1 = InvokeReader(reader1);
+        arg1 = Reader1(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Dynamic byte readers auto-fill their reader methods.
+/// </summary>
 public sealed class DynamicByteReader<T1, T2> : ByteReader
 {
     static DynamicByteReader()
     {
-        reader1 = ReaderHelper<T1>.Reader!;
-        reader2 = ReaderHelper<T2>.Reader!;
+        Reader1 = ReaderHelper<T1>.Reader!;
+        Reader2 = ReaderHelper<T2>.Reader!;
     }
-    private static readonly Reader<T1> reader1;
-    private static readonly Reader<T2> reader2;
+    private static readonly Reader<T1> Reader1;
+    private static readonly Reader<T2> Reader2;
 
     public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg1 = InvokeReader(reader1);
-        arg2 = InvokeReader(reader2);
+        arg1 = Reader1(this);
+        arg2 = Reader2(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Dynamic byte readers auto-fill their reader methods.
+/// </summary>
 public sealed class DynamicByteReader<T1, T2, T3> : ByteReader
 {
     static DynamicByteReader()
     {
-        reader1 = ReaderHelper<T1>.Reader!;
-        reader2 = ReaderHelper<T2>.Reader!;
-        reader3 = ReaderHelper<T3>.Reader!;
+        Reader1 = ReaderHelper<T1>.Reader!;
+        Reader2 = ReaderHelper<T2>.Reader!;
+        Reader3 = ReaderHelper<T3>.Reader!;
     }
-    private static readonly Reader<T1> reader1;
-    private static readonly Reader<T2> reader2;
-    private static readonly Reader<T3> reader3;
+    private static readonly Reader<T1> Reader1;
+    private static readonly Reader<T2> Reader2;
+    private static readonly Reader<T3> Reader3;
 
     public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg1 = InvokeReader(reader1);
-        arg2 = InvokeReader(reader2);
-        arg3 = InvokeReader(reader3);
+        arg1 = Reader1(this);
+        arg2 = Reader2(this);
+        arg3 = Reader3(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Dynamic byte readers auto-fill their reader methods.
+/// </summary>
 public sealed class DynamicByteReader<T1, T2, T3, T4> : ByteReader
 {
     static DynamicByteReader()
     {
-        reader1 = ReaderHelper<T1>.Reader!;
-        reader2 = ReaderHelper<T2>.Reader!;
-        reader3 = ReaderHelper<T3>.Reader!;
-        reader4 = ReaderHelper<T4>.Reader!;
+        Reader1 = ReaderHelper<T1>.Reader!;
+        Reader2 = ReaderHelper<T2>.Reader!;
+        Reader3 = ReaderHelper<T3>.Reader!;
+        Reader4 = ReaderHelper<T4>.Reader!;
     }
-    private static readonly Reader<T1> reader1;
-    private static readonly Reader<T2> reader2;
-    private static readonly Reader<T3> reader3;
-    private static readonly Reader<T4> reader4;
+    private static readonly Reader<T1> Reader1;
+    private static readonly Reader<T2> Reader2;
+    private static readonly Reader<T3> Reader3;
+    private static readonly Reader<T4> Reader4;
 
     public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg1 = InvokeReader(reader1);
-        arg2 = InvokeReader(reader2);
-        arg3 = InvokeReader(reader3);
-        arg4 = InvokeReader(reader4);
+        arg1 = Reader1(this);
+        arg2 = Reader2(this);
+        arg3 = Reader3(this);
+        arg4 = Reader4(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Dynamic byte readers auto-fill their reader methods.
+/// </summary>
 public sealed class DynamicByteReader<T1, T2, T3, T4, T5> : ByteReader
 {
     static DynamicByteReader()
     {
-        reader1 = ReaderHelper<T1>.Reader!;
-        reader2 = ReaderHelper<T2>.Reader!;
-        reader3 = ReaderHelper<T3>.Reader!;
-        reader4 = ReaderHelper<T4>.Reader!;
-        reader5 = ReaderHelper<T5>.Reader!;
+        Reader1 = ReaderHelper<T1>.Reader!;
+        Reader2 = ReaderHelper<T2>.Reader!;
+        Reader3 = ReaderHelper<T3>.Reader!;
+        Reader4 = ReaderHelper<T4>.Reader!;
+        Reader5 = ReaderHelper<T5>.Reader!;
     }
-    private static readonly Reader<T1> reader1;
-    private static readonly Reader<T2> reader2;
-    private static readonly Reader<T3> reader3;
-    private static readonly Reader<T4> reader4;
-    private static readonly Reader<T5> reader5;
+    private static readonly Reader<T1> Reader1;
+    private static readonly Reader<T2> Reader2;
+    private static readonly Reader<T3> Reader3;
+    private static readonly Reader<T4> Reader4;
+    private static readonly Reader<T5> Reader5;
 
     public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg1 = InvokeReader(reader1);
-        arg2 = InvokeReader(reader2);
-        arg3 = InvokeReader(reader3);
-        arg4 = InvokeReader(reader4);
-        arg5 = InvokeReader(reader5);
+        arg1 = Reader1(this);
+        arg2 = Reader2(this);
+        arg3 = Reader3(this);
+        arg4 = Reader4(this);
+        arg5 = Reader5(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Dynamic byte readers auto-fill their reader methods.
+/// </summary>
 public sealed class DynamicByteReader<T1, T2, T3, T4, T5, T6> : ByteReader
 {
     static DynamicByteReader()
     {
-        reader1 = ReaderHelper<T1>.Reader!;
-        reader2 = ReaderHelper<T2>.Reader!;
-        reader3 = ReaderHelper<T3>.Reader!;
-        reader4 = ReaderHelper<T4>.Reader!;
-        reader5 = ReaderHelper<T5>.Reader!;
-        reader6 = ReaderHelper<T6>.Reader!;
+        Reader1 = ReaderHelper<T1>.Reader!;
+        Reader2 = ReaderHelper<T2>.Reader!;
+        Reader3 = ReaderHelper<T3>.Reader!;
+        Reader4 = ReaderHelper<T4>.Reader!;
+        Reader5 = ReaderHelper<T5>.Reader!;
+        Reader6 = ReaderHelper<T6>.Reader!;
     }
-    private static readonly Reader<T1> reader1;
-    private static readonly Reader<T2> reader2;
-    private static readonly Reader<T3> reader3;
-    private static readonly Reader<T4> reader4;
-    private static readonly Reader<T5> reader5;
-    private static readonly Reader<T6> reader6;
+    private static readonly Reader<T1> Reader1;
+    private static readonly Reader<T2> Reader2;
+    private static readonly Reader<T3> Reader3;
+    private static readonly Reader<T4> Reader4;
+    private static readonly Reader<T5> Reader5;
+    private static readonly Reader<T6> Reader6;
 
     public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg1 = InvokeReader(reader1);
-        arg2 = InvokeReader(reader2);
-        arg3 = InvokeReader(reader3);
-        arg4 = InvokeReader(reader4);
-        arg5 = InvokeReader(reader5);
-        arg6 = InvokeReader(reader6);
+        arg1 = Reader1(this);
+        arg2 = Reader2(this);
+        arg3 = Reader3(this);
+        arg4 = Reader4(this);
+        arg5 = Reader5(this);
+        arg6 = Reader6(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Dynamic byte readers auto-fill their reader methods.
+/// </summary>
 public sealed class DynamicByteReader<T1, T2, T3, T4, T5, T6, T7> : ByteReader
 {
     static DynamicByteReader()
     {
-        reader1 = ReaderHelper<T1>.Reader!;
-        reader2 = ReaderHelper<T2>.Reader!;
-        reader3 = ReaderHelper<T3>.Reader!;
-        reader4 = ReaderHelper<T4>.Reader!;
-        reader5 = ReaderHelper<T5>.Reader!;
-        reader6 = ReaderHelper<T6>.Reader!;
-        reader7 = ReaderHelper<T7>.Reader!;
+        Reader1 = ReaderHelper<T1>.Reader!;
+        Reader2 = ReaderHelper<T2>.Reader!;
+        Reader3 = ReaderHelper<T3>.Reader!;
+        Reader4 = ReaderHelper<T4>.Reader!;
+        Reader5 = ReaderHelper<T5>.Reader!;
+        Reader6 = ReaderHelper<T6>.Reader!;
+        Reader7 = ReaderHelper<T7>.Reader!;
     }
-    private static readonly Reader<T1> reader1;
-    private static readonly Reader<T2> reader2;
-    private static readonly Reader<T3> reader3;
-    private static readonly Reader<T4> reader4;
-    private static readonly Reader<T5> reader5;
-    private static readonly Reader<T6> reader6;
-    private static readonly Reader<T7> reader7;
+    private static readonly Reader<T1> Reader1;
+    private static readonly Reader<T2> Reader2;
+    private static readonly Reader<T3> Reader3;
+    private static readonly Reader<T4> Reader4;
+    private static readonly Reader<T5> Reader5;
+    private static readonly Reader<T6> Reader6;
+    private static readonly Reader<T7> Reader7;
 
     public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg1 = InvokeReader(reader1);
-        arg2 = InvokeReader(reader2);
-        arg3 = InvokeReader(reader3);
-        arg4 = InvokeReader(reader4);
-        arg5 = InvokeReader(reader5);
-        arg6 = InvokeReader(reader6);
-        arg7 = InvokeReader(reader7);
+        arg1 = Reader1(this);
+        arg2 = Reader2(this);
+        arg3 = Reader3(this);
+        arg4 = Reader4(this);
+        arg5 = Reader5(this);
+        arg6 = Reader6(this);
+        arg7 = Reader7(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Dynamic byte readers auto-fill their reader methods.
+/// </summary>
 public sealed class DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8> : ByteReader
 {
     static DynamicByteReader()
     {
-        reader1 = ReaderHelper<T1>.Reader!;
-        reader2 = ReaderHelper<T2>.Reader!;
-        reader3 = ReaderHelper<T3>.Reader!;
-        reader4 = ReaderHelper<T4>.Reader!;
-        reader5 = ReaderHelper<T5>.Reader!;
-        reader6 = ReaderHelper<T6>.Reader!;
-        reader7 = ReaderHelper<T7>.Reader!;
-        reader8 = ReaderHelper<T8>.Reader!;
+        Reader1 = ReaderHelper<T1>.Reader!;
+        Reader2 = ReaderHelper<T2>.Reader!;
+        Reader3 = ReaderHelper<T3>.Reader!;
+        Reader4 = ReaderHelper<T4>.Reader!;
+        Reader5 = ReaderHelper<T5>.Reader!;
+        Reader6 = ReaderHelper<T6>.Reader!;
+        Reader7 = ReaderHelper<T7>.Reader!;
+        Reader8 = ReaderHelper<T8>.Reader!;
     }
-    private static readonly Reader<T1> reader1;
-    private static readonly Reader<T2> reader2;
-    private static readonly Reader<T3> reader3;
-    private static readonly Reader<T4> reader4;
-    private static readonly Reader<T5> reader5;
-    private static readonly Reader<T6> reader6;
-    private static readonly Reader<T7> reader7;
-    private static readonly Reader<T8> reader8;
+    private static readonly Reader<T1> Reader1;
+    private static readonly Reader<T2> Reader2;
+    private static readonly Reader<T3> Reader3;
+    private static readonly Reader<T4> Reader4;
+    private static readonly Reader<T5> Reader5;
+    private static readonly Reader<T6> Reader6;
+    private static readonly Reader<T7> Reader7;
+    private static readonly Reader<T8> Reader8;
 
     public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg1 = InvokeReader(reader1);
-        arg2 = InvokeReader(reader2);
-        arg3 = InvokeReader(reader3);
-        arg4 = InvokeReader(reader4);
-        arg5 = InvokeReader(reader5);
-        arg6 = InvokeReader(reader6);
-        arg7 = InvokeReader(reader7);
-        arg8 = InvokeReader(reader8);
+        arg1 = Reader1(this);
+        arg2 = Reader2(this);
+        arg3 = Reader3(this);
+        arg4 = Reader4(this);
+        arg5 = Reader5(this);
+        arg6 = Reader6(this);
+        arg7 = Reader7(this);
+        arg8 = Reader8(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Dynamic byte readers auto-fill their reader methods.
+/// </summary>
 public sealed class DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9> : ByteReader
 {
     static DynamicByteReader()
     {
-        reader1 = ReaderHelper<T1>.Reader!;
-        reader2 = ReaderHelper<T2>.Reader!;
-        reader3 = ReaderHelper<T3>.Reader!;
-        reader4 = ReaderHelper<T4>.Reader!;
-        reader5 = ReaderHelper<T5>.Reader!;
-        reader6 = ReaderHelper<T6>.Reader!;
-        reader7 = ReaderHelper<T7>.Reader!;
-        reader8 = ReaderHelper<T8>.Reader!;
-        reader9 = ReaderHelper<T9>.Reader!;
+        Reader1 = ReaderHelper<T1>.Reader!;
+        Reader2 = ReaderHelper<T2>.Reader!;
+        Reader3 = ReaderHelper<T3>.Reader!;
+        Reader4 = ReaderHelper<T4>.Reader!;
+        Reader5 = ReaderHelper<T5>.Reader!;
+        Reader6 = ReaderHelper<T6>.Reader!;
+        Reader7 = ReaderHelper<T7>.Reader!;
+        Reader8 = ReaderHelper<T8>.Reader!;
+        Reader9 = ReaderHelper<T9>.Reader!;
     }
-    private static readonly Reader<T1> reader1;
-    private static readonly Reader<T2> reader2;
-    private static readonly Reader<T3> reader3;
-    private static readonly Reader<T4> reader4;
-    private static readonly Reader<T5> reader5;
-    private static readonly Reader<T6> reader6;
-    private static readonly Reader<T7> reader7;
-    private static readonly Reader<T8> reader8;
-    private static readonly Reader<T9> reader9;
+    private static readonly Reader<T1> Reader1;
+    private static readonly Reader<T2> Reader2;
+    private static readonly Reader<T3> Reader3;
+    private static readonly Reader<T4> Reader4;
+    private static readonly Reader<T5> Reader5;
+    private static readonly Reader<T6> Reader6;
+    private static readonly Reader<T7> Reader7;
+    private static readonly Reader<T8> Reader8;
+    private static readonly Reader<T9> Reader9;
 
     public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8, out T9 arg9)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg1 = InvokeReader(reader1);
-        arg2 = InvokeReader(reader2);
-        arg3 = InvokeReader(reader3);
-        arg4 = InvokeReader(reader4);
-        arg5 = InvokeReader(reader5);
-        arg6 = InvokeReader(reader6);
-        arg7 = InvokeReader(reader7);
-        arg8 = InvokeReader(reader8);
-        arg9 = InvokeReader(reader9);
+        arg1 = Reader1(this);
+        arg2 = Reader2(this);
+        arg3 = Reader3(this);
+        arg4 = Reader4(this);
+        arg5 = Reader5(this);
+        arg6 = Reader6(this);
+        arg7 = Reader7(this);
+        arg8 = Reader8(this);
+        arg9 = Reader9(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Dynamic byte readers auto-fill their reader methods.
+/// </summary>
 public sealed class DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : ByteReader
 {
     static DynamicByteReader()
     {
-        reader1 = ReaderHelper<T1>.Reader!;
-        reader2 = ReaderHelper<T2>.Reader!;
-        reader3 = ReaderHelper<T3>.Reader!;
-        reader4 = ReaderHelper<T4>.Reader!;
-        reader5 = ReaderHelper<T5>.Reader!;
-        reader6 = ReaderHelper<T6>.Reader!;
-        reader7 = ReaderHelper<T7>.Reader!;
-        reader8 = ReaderHelper<T8>.Reader!;
-        reader9 = ReaderHelper<T9>.Reader!;
-        reader10 = ReaderHelper<T10>.Reader!;
+        Reader1 = ReaderHelper<T1>.Reader!;
+        Reader2 = ReaderHelper<T2>.Reader!;
+        Reader3 = ReaderHelper<T3>.Reader!;
+        Reader4 = ReaderHelper<T4>.Reader!;
+        Reader5 = ReaderHelper<T5>.Reader!;
+        Reader6 = ReaderHelper<T6>.Reader!;
+        Reader7 = ReaderHelper<T7>.Reader!;
+        Reader8 = ReaderHelper<T8>.Reader!;
+        Reader9 = ReaderHelper<T9>.Reader!;
+        Reader10 = ReaderHelper<T10>.Reader!;
     }
-    private static readonly Reader<T1> reader1;
-    private static readonly Reader<T2> reader2;
-    private static readonly Reader<T3> reader3;
-    private static readonly Reader<T4> reader4;
-    private static readonly Reader<T5> reader5;
-    private static readonly Reader<T6> reader6;
-    private static readonly Reader<T7> reader7;
-    private static readonly Reader<T8> reader8;
-    private static readonly Reader<T9> reader9;
-    private static readonly Reader<T10> reader10;
+    private static readonly Reader<T1> Reader1;
+    private static readonly Reader<T2> Reader2;
+    private static readonly Reader<T3> Reader3;
+    private static readonly Reader<T4> Reader4;
+    private static readonly Reader<T5> Reader5;
+    private static readonly Reader<T6> Reader6;
+    private static readonly Reader<T7> Reader7;
+    private static readonly Reader<T8> Reader8;
+    private static readonly Reader<T9> Reader9;
+    private static readonly Reader<T10> Reader10;
 
     public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8, out T9 arg9, out T10 arg10)
     {
         if (bytes != null)
             LoadNew(bytes);
-        arg1 = InvokeReader(reader1);
-        arg2 = InvokeReader(reader2);
-        arg3 = InvokeReader(reader3);
-        arg4 = InvokeReader(reader4);
-        arg5 = InvokeReader(reader5);
-        arg6 = InvokeReader(reader6);
-        arg7 = InvokeReader(reader7);
-        arg8 = InvokeReader(reader8);
-        arg9 = InvokeReader(reader9);
-        arg10 = InvokeReader(reader10);
+        arg1 = Reader1(this);
+        arg2 = Reader2(this);
+        arg3 = Reader3(this);
+        arg4 = Reader4(this);
+        arg5 = Reader5(this);
+        arg6 = Reader6(this);
+        arg7 = Reader7(this);
+        arg8 = Reader8(this);
+        arg9 = Reader9(this);
+        arg10 = Reader10(this);
         return !HasFailed;
     }
 }
+
+/// <summary>
+/// Thrown when a type is given to a <see cref="ByteReader"/> that can't be read automatically.
+/// </summary>
 public sealed class InvalidDynamicTypeException : Exception
 {
     public InvalidDynamicTypeException() { }

@@ -217,6 +217,8 @@ internal static class TerrainEditorPatches
                     if ((permission != null || permissionAll != null) && hasPermission != null)
                     {
                         lbl = generator.DefineLabel();
+                        yield return new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter);
+                        yield return new CodeInstruction(OpCodes.Brfalse, lbl.Value);
                         if (permission != null)
                         {
                             yield return new CodeInstruction(OpCodes.Ldsfld, permission);

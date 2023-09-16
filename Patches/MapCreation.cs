@@ -1,18 +1,22 @@
-﻿#if SERVER
-using DevkitServer.Configuration;
-using System.Reflection;
-using System.Text.Json;
-using DevkitServer.Util.Region;
+﻿using DevkitServer.Configuration;
 using SDG.Framework.Devkit;
 using SDG.Framework.Foliage;
 using SDG.Framework.IO.FormattedFiles.KeyValueTables;
 using SDG.Framework.Landscapes;
 using SDG.Framework.Water;
+using System.Reflection;
+using System.Text.Json;
+
+#if CLIENT
+using HarmonyLib;
+using System.Reflection.Emit;
+#endif
 
 namespace DevkitServer.Patches;
-internal static class MapCreation
+public static class MapCreation
 {
     private static readonly int MapArgb = FormattingUtil.ToArgb(new Color32(102, 255, 102, 255));
+#if SERVER
     internal static void PrefixLoadingDedicatedUGC()
     {
         LevelInfo level = Level.getLevel(Provider.map);
@@ -28,36 +32,66 @@ internal static class MapCreation
             Logger.LogError($"Folder missing for level creation: {"\\Extras\\LevelTemplate\\".Format(true)}!");
             return;
         }
-        
-        CreateMap(Provider.map);
-    }
 
-    /*
-     *
-     *  This method creates a new map and preloads it with some convenience data:
-     *
-     *   Owner set to either what's in config or the first admin on the server.
-     *   'DevkitServer' is added to the Thanks section of the level config.
-     *   All legacy features are turned off by default.
-     *   A copy of the default level asset is created with a new GUID.
-     *   Tiles are created based on the selected size.
-     *   A FoliageSystem is added.
-     *   Player clip volumes are added as a world border based on the selected size.
-     *   Cartography volume is added.
-     *   Water volume is added.
-     *
-     */
-    internal static void CreateMap(string mapName)
+        SystemConfig.NewLevelCreationOptions options = DevkitServerConfig.Config.NewLevelInfo ??= SystemConfig.NewLevelCreationOptions.Default;
+        CreateMap(Provider.map, options.LevelSize, options.LevelType);
+    }
+#elif CLIENT
+    internal static IEnumerable<CodeInstruction> TranspileOnClickedAddLevelButton(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
+        MethodInfo? levelAdd = typeof(Level).GetMethod("add", BindingFlags.Public | BindingFlags.Static, null, CallingConventions.Any, new Type[] { typeof(string), typeof(ELevelSize), typeof(ELevelType) }, null);
+        if (levelAdd == null)
+        {
+            Logger.LogWarning($"[MAP CREATION] {method.Format()} - Unable to find method: Level.add(string, ELevelSize, ELevelType).");
+        }
+
+        bool patched = false;
+        foreach (CodeInstruction ins in instructions)
+        {
+            if (levelAdd != null && ins.Calls(levelAdd))
+            {
+                CodeInstruction newInst = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(CreateMap)!);
+                ins.MoveBlocksAndLabels(newInst);
+                patched = true;
+                Logger.LogDebug($"[MAP CREATION] {method.Format()} - Replaced call to {levelAdd.Format()} with {newInst.operand.Format()}.");
+                yield return newInst;
+            }
+            else yield return ins;
+        }
+
+        if (!patched)
+        {
+            Logger.LogWarning($"[MAP CREATION] {method.Format()} - Unable to replace call to {(levelAdd == null ? "Level.add" : levelAdd.Format())} with a better map creation implemention.");
+        }
+    }
+#endif
+
+    /// <summary>
+    /// <br/>This method creates a new map and preloads it with some convenience data:
+    /// <br/>
+    /// <br/>• Owner set to either what's in config or the first admin on the server.
+    /// <br/>• 'DevkitServer' is added to the Thanks section of the level config (as a template, feel free to change).
+    /// <br/>• All legacy features are turned off by default.
+    /// <br/>• A copy of the default level asset is created with a new GUID.
+    /// <br/>• Tiles are created based on the selected size.
+    /// <br/>• A FoliageSystem is added.
+    /// <br/>• Player clip volumes are added as a world border based on the selected size.
+    /// <br/>• Cartography volume is added.
+    /// <br/>• Water volume is added.
+    /// </summary>
+    public static void CreateMap(string mapName, ELevelSize size, ELevelType type)
+    {
+#if SERVER
         SystemConfig.NewLevelCreationOptions options = DevkitServerConfig.Config.NewLevelInfo ?? SystemConfig.NewLevelCreationOptions.Default;
         FieldInfo? clientField = typeof(Provider).GetField("_client", BindingFlags.Static | BindingFlags.NonPublic);
         CSteamID owner = options.Owner;
+
         if (clientField == null || clientField.FieldType != typeof(CSteamID))
         {
-            Level.add(mapName, options.LevelSize, options.LevelType);
-            Logger.LogWarning($"Unable to set owner of newly created map, it will be set to: {Provider.server.Format()}.");
+            Level.add(mapName, size, type);
+            Logger.LogWarning($"Unable to set owner of newly created map, it will be set to: {Provider.client.Format()}.");
 
-            Logger.LogInfo($"Level created: {mapName.Colorize(MapArgb)}. Size: {options.LevelSize.Format()}. Type: {options.LevelType.Format()}.");
+            Logger.LogInfo($"Level created: {mapName.Colorize(MapArgb)}. Size: {size.Format()}. Type: {type.Format()}.");
         }
         else
         {
@@ -66,12 +100,16 @@ internal static class MapCreation
 
             CSteamID clientOld = (CSteamID)clientField.GetValue(null);
             clientField.SetValue(null, owner);
-            Level.add(mapName, options.LevelSize, options.LevelType);
+            Level.add(mapName, size, type);
             clientField.SetValue(null, clientOld);
 
-            Logger.LogInfo($"Level created: {mapName.Colorize(MapArgb)}. Size: {options.LevelSize.Format()}. Type: {options.LevelType.Format()}. Owner: {owner.Format()}.");
+            Logger.LogInfo($"Level created: {mapName.Colorize(MapArgb)}. Size: {size.Format()}. Type: {type.Format()}. Owner: {owner.Format()}.");
         }
+#else
+        Level.add(mapName, size, type);
 
+        Logger.LogInfo($"Level created: {mapName.Colorize(MapArgb)}. Size: {size.Format()}. Type: {type.Format()}. Owner: {Provider.client.Format()} ({Provider.clientName.Format(false)}).");
+#endif
         string lvlPath = Path.Combine(ReadWrite.PATH, "Maps", mapName);
 
         Guid assetGuid = LevelAsset.defaultLevel.GUID;
@@ -107,28 +145,43 @@ internal static class MapCreation
             Use_Legacy_Snow_Height = false,
             Asset = new AssetReference<LevelAsset>(assetGuid),
             Tips = 1,
+#if SERVER
             Creators = owner.GetEAccountType() == EAccountType.k_EAccountTypeIndividual ? new string[]
             {
                 owner.m_SteamID.ToString()
-            } : Array.Empty<string>(),
+            }
+#else
+            Creators = !string.IsNullOrEmpty(Provider.clientName) ? new string[]
+            {
+                Provider.clientName
+            }
+#endif
+            : new string[]
+            {
+                "Enter creators here."
+            },
+            Collaborators = new string[]
+            {
+                "Enter collaborators here."
+            },
             Thanks = new string[]
             {
-                DevkitServerModule.ModuleName + " - BlazingFlame"
+                DevkitServerModule.ModuleName
             }
         }, Path.Combine(lvlPath, "Config.json"));
 
         DevkitServerUtility.WriteData(Path.Combine(lvlPath, "English.dat"), new DatDictionary
         {
-            { "Name", new DatValue(Provider.map) },
-            { "Description", new DatValue("Map called " + Provider.map + ".") },
-            { "Tip_0", new DatValue("Use DevkitServer to collaborate on maps frfr.") }
+            { "Name", new DatValue(FormattingUtil.SpaceProperCaseString(mapName)) },
+            { "Description", new DatValue("Sick new " + size.ToString().ToLower() + " map.") },
+            { "Tip_0", new DatValue("Use DevkitServer to collaborate on maps.") }
         });
 
         using FileStream fs = new FileStream(Path.Combine(lvlPath, "Level.hierarchy"), FileMode.Create, FileAccess.Write, FileShare.Read);
         using StreamWriter tw = new StreamWriter(fs);
         KeyValueTableWriter writer = new KeyValueTableWriter(tw);
 
-        int worldSize = options.LevelSize switch
+        int worldSize = size switch
         {
             ELevelSize.TINY => Level.TINY_SIZE,
             ELevelSize.SMALL => Level.SMALL_SIZE,
@@ -136,7 +189,7 @@ internal static class MapCreation
             ELevelSize.INSANE => Level.INSANE_SIZE,
             _ => Level.MEDIUM_SIZE
         };
-        int border = options.LevelSize switch
+        int border = size switch
         {
             ELevelSize.TINY => Level.TINY_BORDER,
             ELevelSize.SMALL => Level.SMALL_BORDER,
@@ -145,11 +198,11 @@ internal static class MapCreation
             _ => Level.MEDIUM_BORDER
         };
         Vector2 center = Vector2.zero;
-        if (options.LevelSize == ELevelSize.TINY)
+        if (size == ELevelSize.TINY)
         {
             center = new Vector2(Landscape.TILE_SIZE / 2f, Landscape.TILE_SIZE / 2f);
         }
-        int ground2Size = options.LevelSize is ELevelSize.TINY or ELevelSize.SMALL ? (worldSize * 2) : (worldSize + 2 * Landscape.TILE_SIZE_INT);
+        int ground2Size = size is ELevelSize.TINY or ELevelSize.SMALL ? (worldSize * 2) : (worldSize + 2 * Landscape.TILE_SIZE_INT);
         int tiles = Mathf.CeilToInt(ground2Size / Landscape.TILE_SIZE);
         int half = Mathf.CeilToInt(tiles / 2f);
         writer.writeValue("Available_Instance_ID", 12);
@@ -394,7 +447,11 @@ internal static class MapCreation
             writer.endObject();
         }
     }
-    internal static void WriteLevelInfoConfigData(LevelInfoConfigData data, string path)
+
+    /// <summary>
+    /// Write a config to a json file at <paramref name="path"/>.
+    /// </summary>
+    public static void WriteLevelInfoConfigData(LevelInfoConfigData data, string path)
     {
         FieldInfo[] fields = typeof(LevelInfoConfigData).GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
 
@@ -471,4 +528,3 @@ internal static class MapCreation
         writer.Flush();
     }
 }
-#endif

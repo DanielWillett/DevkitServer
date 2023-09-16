@@ -22,7 +22,7 @@ public class CommandParser
         public int Start;
         public int End;
     }
-    internal virtual unsafe bool TryRunCommand(
+    public virtual unsafe bool TryRunCommand(
 #if SERVER
         EditorUser? user, 
 #endif

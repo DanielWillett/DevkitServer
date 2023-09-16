@@ -1,5 +1,7 @@
 ﻿using System.Diagnostics;
+using DevkitServer.Configuration;
 using DevkitServer.Models;
+using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
@@ -9,6 +11,9 @@ namespace DevkitServer.Levels;
 public sealed class LevelData
 {
     private static readonly uint DataVersion = 0;
+
+    private static readonly InstanceSetter<LevelInfo, string> SetFilePath = Accessor.GenerateInstancePropertySetter<LevelInfo, string>("path", throwOnError: true)!;
+
     public uint Version { get; private set; }
 #nullable disable
     public Folder LevelFolderContent { get; private set; }
@@ -19,33 +24,79 @@ public sealed class LevelData
     public RegionIdentifier[] Buildables { get; internal set; }
     public byte[] Data { get; internal set; }
     public bool Compressed { get; internal set; }
+    public List<ulong>[,] BuildableData { get; internal set; }
+
+    public int SpawnIndexPlayer { get; internal set; }
+    public int SpawnIndexVehicle { get; internal set; }
+    public int SpawnIndexItem { get; internal set; }
+    public int SpawnIndexZombie { get; internal set; }
+    public int SpawnCount { get; internal set; }
+    public NetId[] SpawnNetIds { get; internal set; }
+    public int[] SpawnIndexes { get; internal set; }
 #nullable restore
+    private string? _lclPath;
     private LevelData() { }
 
     public LevelData(LevelData other)
     {
         LevelFolderContent = other.LevelFolderContent;
+        _lclPath = other._lclPath;
         Data = other.Data;
         Compressed = other.Compressed;
         Objects = other.Objects;
         Buildables = other.Buildables;
         LevelObjectNetIds = other.LevelObjectNetIds;
+        HierarchyItemNetIds = other.HierarchyItemNetIds;
+        HierarchyItems = other.HierarchyItems;
+        BuildableData = other.BuildableData;
         Version = DataVersion;
     }
-    public static LevelData GatherLevelData()
+    public static LevelData GatherLevelData(bool saveToTemp, bool gatherOtherData)
     {
         ThreadUtil.assertIsGameThread();
 #if DEBUG
         Stopwatch stopwatch = Stopwatch.StartNew();
 #endif
+        DirtyManagerState? dirtyState = null;
+        string newPath, oldPath = newPath = Level.info.path;
+        if (saveToTemp)
+        {
+            newPath = Path.Combine(DevkitServerConfig.TempFolder, "Level");
+            try
+            {
+                DevkitServerUtility.CopyDirectory(oldPath, newPath);
+                SetFilePath(Level.info, newPath);
+            }
+            catch (AggregateException ex)
+            {
+                Logger.LogError($"Error copying directory to avoid saving ({oldPath.Format()} -> {newPath.Format()}), saving to main directory.", method: "EDITOR LEVEL");
+#if DEBUG
+                Logger.LogError(ex, method: "EDITOR LEVEL");
+#endif
+                newPath = oldPath;
+                saveToTemp = false;
+            }
+        }
+
         Level.save();
-        Folder folder = new Folder(Level.info.path, ShouldSendFile, null);
+
+        if (saveToTemp)
+            SetFilePath(Level.info, oldPath);
+
+        dirtyState?.Apply();
+        Folder folder = new Folder(newPath, ShouldSendFile, null);
         LevelData data = new LevelData
         {
             LevelFolderContent = folder,
+            _lclPath = newPath
         };
-        LevelObjectNetIdDatabase.GatherData(data);
-        HierarchyItemNetIdDatabase.GatherData(data);
+        if (gatherOtherData)
+        {
+            LevelObjectNetIdDatabase.GatherData(data);
+            HierarchyItemNetIdDatabase.GatherData(data);
+            BuildableResponsibilities.GatherData(data);
+            SpawnpointNetIdDatabase.GatherData(data);
+        }
 #if DEBUG
         Logger.LogDebug($"[EDITOR LEVEL] GatherLevelData took {stopwatch.GetElapsedMilliseconds().Format("F2")} ms.");
 #endif
@@ -63,8 +114,7 @@ public sealed class LevelData
         LevelData data = new LevelData
         {
             Version = reader.ReadUInt32(),
-            Data = payload,
-            LevelFolderContent = Folder.Read(_levelReader)
+            Data = payload
         };
         int netIdCount = reader.ReadInt32();
         int buildableCount = reader.ReadInt32();
@@ -97,6 +147,14 @@ public sealed class LevelData
         data.HierarchyItemNetIds = hierarchyItemNetIds;
         data.HierarchyItems = hierarchyItems;
 
+        data.BuildableData = new List<ulong>[Regions.WORLD_SIZE, Regions.WORLD_SIZE];
+        BuildableResponsibilities.ReadToTable(reader, data.BuildableData);
+
+        // SpawnpointNetIdDatabase
+        SpawnpointNetIdDatabase.ReadToDatabase(reader, data);
+
+        data.LevelFolderContent = Folder.Read(_levelReader);
+
         reader.LoadNew(Array.Empty<byte>());
         return data;
     }
@@ -106,14 +164,11 @@ public sealed class LevelData
         ByteWriter writer = _levelWriter ??= new ByteWriter(false, 134217728); // 128 MiB
         writer.Write(DataVersion);
         Version = DataVersion;
-        Folder folder = LevelFolderContent;
-        Folder.Write(writer, in folder);
         NetId[] levelObjectNetIds = LevelObjectNetIds;
         NetId[] hierarchyItemNetIds = HierarchyItemNetIds;
         RegionIdentifier[] buildables = Buildables;
         uint[] objects = Objects;
         uint[] hierarchyItems = HierarchyItems;
-        writer.ExtendBuffer(writer.Buffer.Length + sizeof(int) * 3 + sizeof(uint) * levelObjectNetIds.Length + sizeof(int) * buildables.Length + sizeof(uint) * objects.Length + sizeof(uint) * 2 * hierarchyItems.Length);
         writer.Write(levelObjectNetIds.Length);
         writer.Write(buildables.Length);
         writer.Write(hierarchyItems.Length);
@@ -132,12 +187,26 @@ public sealed class LevelData
         for (int i = 0; i < hierarchyItems.Length; ++i)
             writer.Write(hierarchyItems[i]);
 
+        BuildableResponsibilities.WriteTable(writer, BuildableData);
+
+        SpawnpointNetIdDatabase.WriteToDatabase(writer, this);
+
+        Folder folder = LevelFolderContent;
+        if (_lclPath != null)
+        {
+            long dirSize = DevkitServerUtility.GetDirectorySize(_lclPath);
+            if (dirSize <= int.MaxValue && dirSize > 0)
+                writer.ExtendBuffer(writer.Count + (int)dirSize);
+        }
+
+        Folder.Write(writer, in folder);
+
         byte[] data = writer.ToArray();
         Data = data;
         writer.FinishWrite();
     }
 
-    private static bool ShouldSendFile(FileInfo file)
+    internal static bool ShouldSendFile(FileInfo file)
     {
         string nm = file.Name;
         string? origDir = file.DirectoryName;

@@ -1,6 +1,4 @@
-﻿using DevkitServer.Multiplayer.Actions;
-using HarmonyLib;
-using JetBrains.Annotations;
+﻿using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -248,32 +246,43 @@ public static class PatchUtil
         return null;
     }
     [Pure]
-    public static Label LabelNextOrReturn(IList<CodeInstruction> instructions, ILGenerator generator, int index, PatternMatch match, int shift = 0)
+    public static Label LabelNextOrReturn(IList<CodeInstruction> instructions, ILGenerator generator, int index, PatternMatch? match, int shift = 0, bool allowUseExisting = true)
     {
-        Label label = generator.DefineLabel();
+        CodeInstruction instruction;
         for (int i = index; i < instructions.Count; ++i)
         {
-            if (match(instructions[i]))
+            if (match == null || match(instructions[i]))
             {
                 int newIndex = i + shift;
                 if (instructions.Count > i)
                 {
-                    instructions[newIndex].labels.Add(label);
+                    instruction = instructions[newIndex];
+                    if (allowUseExisting && instruction.labels.Count > 0)
+                        return instruction.labels[instruction.labels.Count - 1];
+                    Label label = generator.DefineLabel();
+                    instruction.labels.Add(label);
                     return label;
                 }
             }
         }
 
-        if (instructions[instructions.Count - 1].opcode == OpCodes.Ret)
-            instructions[instructions.Count - 1].labels.Add(label);
+        instruction = instructions[instructions.Count - 1];
+        if (instruction.opcode == OpCodes.Ret)
+        {
+            if (allowUseExisting && instruction.labels.Count > 0)
+                return instruction.labels[instruction.labels.Count - 1];
+            Label label = generator.DefineLabel();
+            instruction.labels.Add(label);
+            return label;
+        }
         else
         {
-            CodeInstruction instruction = new CodeInstruction(OpCodes.Ret);
+            Label label = generator.DefineLabel();
+            instruction = new CodeInstruction(OpCodes.Ret);
             instruction.labels.Add(label);
             instructions.Add(instruction);
+            return label;
         }
-
-        return label;
     }
     [Pure]
     public static Label? GetNextBranchTarget(IList<CodeInstruction> instructions, int index)
@@ -526,7 +535,7 @@ public static class PatchUtil
             _ => new CodeInstruction(OpCodes.Ldarg, index)
         };
     }
-    public static void LoadParameter(this DebuggableEmitter generator, int index, bool byref = false)
+    public static void LoadParameter(this DebuggableEmitter generator, int index, bool byref = false, Type? type = null, Type? targetType = null)
     {
         if (byref)
         {
@@ -546,8 +555,15 @@ public static class PatchUtil
             generator.Emit(code, index);
         else
             generator.Emit(code);
+        if (type != null && targetType != null && type != typeof(void) && targetType != typeof(void))
+        {
+            if (type.IsValueType && !targetType.IsValueType)
+                generator.Emit(OpCodes.Box, type);
+            else if (!type.IsValueType && targetType.IsValueType)
+                generator.Emit(OpCodes.Unbox_Any, targetType);
+        }
     }
-    public static void LoadParameter(this ILGenerator generator, int index, bool byref = false)
+    public static void LoadParameter(this ILGenerator generator, int index, bool byref = false, Type? type = null, Type? targetType = null)
     {
         if (byref)
         {
@@ -567,6 +583,13 @@ public static class PatchUtil
             generator.Emit(code, index);
         else
             generator.Emit(code);
+        if (type != null && targetType != null && type != typeof(void) && targetType != typeof(void))
+        {
+            if (type.IsValueType && !targetType.IsValueType)
+                generator.Emit(OpCodes.Box, type);
+            else if (!type.IsValueType && targetType.IsValueType)
+                generator.Emit(OpCodes.Unbox_Any, targetType);
+        }
     }
     [Pure]
     public static LocalBuilder? GetLocal(CodeInstruction code, out int index, bool set)
@@ -639,6 +662,34 @@ public static class PatchUtil
     }
     [Pure]
     public static CodeInstruction CopyWithoutSpecial(this CodeInstruction instruction) => new CodeInstruction(instruction.opcode, instruction.operand);
+    public static void TransferEndingInstructionNeeds(CodeInstruction originalEnd, CodeInstruction newEnd)
+    {
+        newEnd.blocks.AddRange(originalEnd.blocks.Where(x => x.blockType.IsEndBlockType()));
+        originalEnd.blocks.RemoveAll(x => x.blockType.IsEndBlockType());
+    }
+    public static void TransferStartingInstructionNeeds(CodeInstruction originalStart, CodeInstruction newStart)
+    {
+        newStart.labels.AddRange(originalStart.labels);
+        originalStart.labels.Clear();
+        newStart.blocks.AddRange(originalStart.blocks.Where(x => x.blockType.IsBeginBlockType()));
+        originalStart.blocks.RemoveAll(x => x.blockType.IsBeginBlockType());
+    }
+    public static void MoveBlocksAndLabels(this CodeInstruction from, CodeInstruction to)
+    {
+        to.labels.AddRange(from.labels);
+        from.labels.Clear();
+        to.blocks.AddRange(from.blocks);
+        from.blocks.Clear();
+    }
+
+    [Pure]
+    public static bool IsBeginBlockType(this ExceptionBlockType type) => type is ExceptionBlockType.BeginCatchBlock
+        or ExceptionBlockType.BeginExceptFilterBlock or ExceptionBlockType.BeginExceptionBlock
+        or ExceptionBlockType.BeginFaultBlock or ExceptionBlockType.BeginFinallyBlock;
+
+    [Pure]
+    public static bool IsEndBlockType(this ExceptionBlockType type) => type == ExceptionBlockType.EndExceptionBlock;
+
     [Pure]
     public static bool IsOfType(this OpCode opcode, OpCode comparand, bool fuzzy = false)
     {
@@ -821,7 +872,7 @@ public static class PatchUtil
     [Pure]
     public static bool ShouldCallvirt(this MethodBase method)
     {
-        return !method.IsStatic && (method.DeclaringType is { IsInterface: true } || method.IsVirtual || method.IsAbstract);
+        return method is { IsStatic: false, DeclaringType: not { IsValueType: true }, IsFinal: false } && (method.DeclaringType is { IsInterface: true } || method.IsVirtual || method.IsAbstract);
     }
     [Pure]
     public static OpCode GetCall(this MethodBase method)

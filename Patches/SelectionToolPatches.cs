@@ -151,9 +151,11 @@ internal static class SelectionToolPatches
     private static bool MoveHandlePrefix(Vector3 position, Quaternion rotation, Vector3 scale, bool doRotation, bool hasScale)
     {
         _skippedMoveHandle = false;
+        if (!DevkitServerModule.IsEditing)
+            return true;
         if (DevkitSelectionManager.selection.Count <= 0)
         {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+            UIMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "UnknownError");
             _skippedMoveHandle = true;
             return false;
         }
@@ -161,7 +163,7 @@ internal static class SelectionToolPatches
         DevkitSelection? sel = DevkitSelectionManager.selection.FirstOrDefault();
         if (sel == null || sel.gameObject == null)
         {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+            UIMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "UnknownError");
             _skippedMoveHandle = true;
             return false;
         }
@@ -246,16 +248,24 @@ internal static class SelectionToolPatches
         }
     }
 
-    private static readonly Func<TempNodeSystemBase, Type>? GetNodeComponentType =
-        Accessor.GenerateInstanceCaller<TempNodeSystemBase, Func<TempNodeSystemBase, Type>>("GetComponentType",
-            Array.Empty<Type>(), throwOnError: true);
+    private static readonly Func<TempNodeSystemBase, Type> GetNodeComponentType =
+        Accessor.GenerateInstanceCaller<TempNodeSystemBase, Func<TempNodeSystemBase, Type>>("GetComponentType", throwOnError: true, allowUnsafeTypeBinding: true)!;
+
+    private static readonly Action<SelectionTool, Vector3>? CallRequestInstantiation =
+        Accessor.GenerateInstanceCaller<SelectionTool, Action<SelectionTool, Vector3>>("RequestInstantiation", throwOnError: false, allowUnsafeTypeBinding: true);
 
     [UsedImplicitly]
     private static void OnRequestInstantiaion(Vector3 position)
     {
-        if (!DevkitServerModule.IsEditing) return;
-
         IDevkitTool? tool = UserInput.ActiveTool;
+        if (!DevkitServerModule.IsEditing)
+        {
+            if (tool is SelectionTool tool2 && CallRequestInstantiation != null)
+                CallRequestInstantiation(tool2, position);
+            
+            return;
+        }
+
         IHierarchyItemTypeIdentifier? id = null;
         switch (tool)
         {

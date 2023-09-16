@@ -1,17 +1,18 @@
 ﻿#if CLIENT
-using DevkitServer.Util.Comparers;
 using UnityEngine.Rendering;
 using GraphicsSettings = SDG.Unturned.GraphicsSettings;
 
 namespace DevkitServer.Util;
 public sealed class IconGenerator : MonoBehaviour
 {
+    internal const string Source = "OBJECT ICONS";
+
     public const float FOV = 60f;
     public const float DistanceScale = 1;
     public const float FarClipPlaneScale = 2.25f;
     private static readonly Vector3 EulerDefaultCameraRotation = new Vector3(5.298f, -23.733f, 0f);
     private static readonly Quaternion DefaultCameraRotation = Quaternion.Euler(EulerDefaultCameraRotation);
-    private static readonly Dictionary<Asset, ObjectIconMetrics> Metrics = new Dictionary<Asset, ObjectIconMetrics>(4, AssetComparer.Instance);
+    private static readonly Dictionary<Guid, ObjectIconMetrics> Metrics = new Dictionary<Guid, ObjectIconMetrics>(4);
     private static readonly List<Renderer> WorkingRenderersList = new List<Renderer>(4);
     private Camera _camera = null!;
     private Light _light = null!;
@@ -25,14 +26,18 @@ public sealed class IconGenerator : MonoBehaviour
         _camera.cullingMask = RayMasks.LARGE | RayMasks.MEDIUM | RayMasks.SMALL;
         _camera.clearFlags = CameraClearFlags.Nothing;
         _camera.forceIntoRenderTexture = true;
+        _camera.eventMask = 0;
         _camera.enabled = false;
         _camera.orthographic = false;
         _camera.fieldOfView = FOV;
 
         _light.enabled = false;
+        _light.bounceIntensity = 0f;
 
         Instance = this;
     }
+    public static void ClearCache() => Metrics.Clear();
+    public static void ClearCache(Guid guid) => Metrics.Remove(guid);
     public static void GetIcon(Asset asset, int width, int height, Action<Asset, Texture2D?, bool> onIconReady)
     {
         ThreadUtil.assertIsGameThread();
@@ -85,6 +90,21 @@ public sealed class IconGenerator : MonoBehaviour
 
         onIconReady(asset, icon, true);
     }
+    public static void GetCameraPositionAndRotation(in ObjectIconMetrics metrics, Transform target, out Vector3 position, out Quaternion rotation)
+    {
+        position = metrics.CameraPosition;
+        if (metrics.IsCustom)
+        {
+            Matrix4x4 matrix = Matrix4x4.TRS(target.transform.position - metrics.ObjectPositionOffset, target.transform.rotation, target.localScale);
+            position = matrix.MultiplyPoint3x4(position);
+            rotation = target.transform.rotation * metrics.CameraRotation;
+        }
+        else
+        {
+            position = target.transform.position - metrics.ObjectPositionOffset + position;
+            rotation = metrics.CameraRotation;
+        }
+    }
     private Texture2D CaptureIcon(string name, GameObject target, in ObjectIconMetrics metrics, int width, int height)
     {
         RenderSettingsCopy settings = new RenderSettingsCopy();
@@ -108,7 +128,23 @@ public sealed class IconGenerator : MonoBehaviour
         else
             _camera.farClipPlane = metrics.FarClipPlane;
 
-        _camera.transform.SetPositionAndRotation(target.transform.position - metrics.ObjectPositionOffset + position, metrics.CameraRotation);
+        _light.range = _camera.farClipPlane;
+
+        Quaternion rotation;
+
+        if (metrics.IsCustom)
+        {
+            Matrix4x4 matrix = Matrix4x4.TRS(target.transform.position - metrics.ObjectPositionOffset, target.transform.rotation, Vector3.one);
+            position = matrix.MultiplyPoint3x4(position);
+            rotation = target.transform.rotation * metrics.CameraRotation;
+        }
+        else
+        {
+            position = target.transform.position - metrics.ObjectPositionOffset + position;
+            rotation = metrics.CameraRotation;
+        }
+
+        _camera.transform.SetPositionAndRotation(position, rotation);
         RenderTexture targetTexture = RenderTexture.GetTemporary(width, height, 16, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB, GraphicsSettings.IsItemIconAntiAliasingEnabled ? 4 : 1);
         targetTexture.name = "Render_" + name;
         RenderTexture.active = targetTexture;
@@ -139,7 +175,7 @@ public sealed class IconGenerator : MonoBehaviour
     {
         ThreadUtil.assertIsGameThread();
 
-        if (Metrics.TryGetValue(asset, out ObjectIconMetrics metrics))
+        if (Metrics.TryGetValue(asset.GUID, out ObjectIconMetrics metrics))
             return metrics;
 
         GameObject srcObject = asset switch
@@ -150,22 +186,37 @@ public sealed class IconGenerator : MonoBehaviour
             _ => throw new ArgumentException("Asset must be an object asset, barricade asset, or structure asset.")
         };
 
+        AssetIconPreset? preset = ObjectIconPresets.ActivelyEditing;
+
+        if (preset == null || preset.Asset.GUID != asset.GUID)
+            ObjectIconPresets.Presets.TryGetValue(asset.GUID, out preset);
+        
+        if (preset != null)
+        {
+            Vector3 pos = preset.IconPosition;
+            Quaternion rot = preset.IconRotation;
+            metrics = new ObjectIconMetrics(pos, Vector3.zero, rot, 0f, pos.magnitude * FarClipPlaneScale, true);
+            Metrics.Add(asset.GUID, metrics);
+            return metrics;
+        }
+
         Transform? icon = srcObject.transform.Find("Icon");
         if (icon == null)
             icon = srcObject.transform.Find("Icon2");
         if (icon != null)
         {
-            Vector3 pos = icon.position - srcObject.transform.position;
-            Quaternion rot = icon.rotation * Quaternion.Inverse(srcObject.transform.rotation);
+            Matrix4x4 matrix = srcObject.transform.worldToLocalMatrix;
+            Vector3 pos = matrix.MultiplyPoint3x4(icon.position);
+            Quaternion rot = icon.localRotation;
             metrics = new ObjectIconMetrics(pos, Vector3.zero, rot, 0f, pos.magnitude * FarClipPlaneScale, true);
-            Metrics.Add(asset, metrics);
+            Metrics.Add(asset.GUID, metrics);
             return metrics;
         }
 
         if (!TryGetExtents(srcObject, out Bounds bounds))
         {
             metrics = new ObjectIconMetrics(Vector3.zero, Vector3.zero, Quaternion.identity, 0f, 16f, false);
-            Metrics.Add(asset, metrics);
+            Metrics.Add(asset.GUID, metrics);
             return metrics;
         }
 
@@ -176,7 +227,7 @@ public sealed class IconGenerator : MonoBehaviour
         Vector3 center = bounds.center;
         center.z = bounds.min.z + bounds.size.z / 4;
         metrics = new ObjectIconMetrics(-position, srcObject.transform.position - center, Quaternion.LookRotation(position), size, distance * FarClipPlaneScale, false);
-        Metrics.Add(asset, metrics);
+        Metrics.Add(asset.GUID, metrics);
         return metrics;
     }
     public static bool TryGetExtents(GameObject obj, out Bounds bounds)
@@ -209,7 +260,12 @@ public sealed class IconGenerator : MonoBehaviour
 
         return foundOne;
     }
-
+    [UsedImplicitly]
+    private void OnDestroy()
+    {
+        ClearCache();
+        Instance = null;
+    }
     private readonly struct RenderSettingsCopy
     {
         private readonly bool _fog;

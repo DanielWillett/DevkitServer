@@ -1,4 +1,5 @@
-﻿using DevkitServer.API;
+﻿#define PRINT_BYTES
+using DevkitServer.API;
 using DevkitServer.Models;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
@@ -9,6 +10,8 @@ using SDG.Framework.Landscapes;
 using System;
 using System.Globalization;
 using System.IO;
+using DevkitServer.API.Abstractions;
+using StackCleaner;
 
 namespace DevkitServer.Tests;
 
@@ -24,12 +27,37 @@ public class ByteEncoderTests
         else memory = null;
         return writer;
     }
+    private static void TryPrint(ByteWriter writer)
+    {
+#if !PRINT_BYTES
+        return;
+#endif
+        try
+        {
+            if (writer.Stream != null)
+            {
+                Logger.LogInfo("Writer is in stream mode.");
+                return;
+            }
+            byte[] bytes = writer.ToArray();
+            FormattingUtil.PrintBytesDec(bytes, columnCount: 16);
+        }
+        catch (Exception ex)
+        {
+            for (; ex != null; ex = ex.InnerException!)
+            {
+                StackTraceCleaner cleaner = new StackTraceCleaner(StackCleanerConfiguration.Default);
+                cleaner.WriteToConsole(ex);
+            }
+        }
+    }
     private static void TestOne<T>(T value, bool stream)
     {
         ByteWriter writer = GetWriter(stream, out Stream? mem);
         try
         {
             ByteWriter.GetWriter<T>().Invoke(writer, value);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem == null)
                 reader.LoadNew(writer.ToArray());
@@ -57,6 +85,7 @@ public class ByteEncoderTests
         try
         {
             ByteWriter.GetWriter<T[]>().Invoke(writer, value);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem == null)
                 reader.LoadNew(writer.ToArray());
@@ -106,6 +135,7 @@ public class ByteEncoderTests
         try
         {
             writer.Write(value);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem != null)
             {
@@ -145,6 +175,7 @@ public class ByteEncoderTests
         try
         {
             writer.WriteLong(value);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem != null)
             {
@@ -206,6 +237,7 @@ public class ByteEncoderTests
         try
         {
             writer.WriteLong(value);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem != null)
             {
@@ -271,6 +303,7 @@ public class ByteEncoderTests
         try
         {
             writer.WriteAsciiSmall(value);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem != null)
             {
@@ -386,8 +419,8 @@ public class ByteEncoderTests
     [DataRow(46, false)]
     [DataRow(0, false)]
     [DataRow(-3578539, false)]
-    [DataRow(-DevkitServerUtility.Int24MaxValue, false)]
-    [DataRow(DevkitServerUtility.Int24MaxValue, false)]
+    [DataRow(-EncodingEx.Int24MaxValue, false)]
+    [DataRow(EncodingEx.Int24MaxValue, false)]
     [DataRow(7, true)]
     public void TestWriteInt24(int value, bool stream)
     {
@@ -396,6 +429,7 @@ public class ByteEncoderTests
         try
         {
             writer.WriteInt24(value);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem != null)
             {
@@ -421,7 +455,7 @@ public class ByteEncoderTests
     [DataRow(46u, false)]
     [DataRow(0u, false)]
     [DataRow(3578539u, false)]
-    [DataRow((uint)(DevkitServerUtility.Int24MaxValue * 2), false)]
+    [DataRow((uint)(EncodingEx.Int24MaxValue * 2), false)]
     [DataRow(3u, true)]
     public void TestWriteUInt24(uint value, bool stream)
     {
@@ -430,6 +464,7 @@ public class ByteEncoderTests
         try
         {
             writer.WriteUInt24(value);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem != null)
             {
@@ -677,6 +712,7 @@ public class ByteEncoderTests
         try
         {
             writer.Write(value);
+            TryPrint(writer);
             if (memory == null)
                 reader.LoadNew(writer.ToArray());
             else
@@ -718,6 +754,7 @@ public class ByteEncoderTests
         try
         {
             writer.Write(value);
+            TryPrint(writer);
             if (memory == null)
                 reader.LoadNew(writer.ToArray());
             else
@@ -877,7 +914,7 @@ public class ByteEncoderTests
     {
         Type type = typeof(ByteEncoderTests);
 
-        Assert.ThrowsException<ArgumentException>(() => ByteWriter.GetWriter(type));
+        Assert.ThrowsException<InvalidDynamicTypeException>(() => ByteWriter.GetWriter(type));
     }
 
     [TestMethod]
@@ -901,6 +938,7 @@ public class ByteEncoderTests
         try
         {
             writer.WriteZeroCompressed(value, @long);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem == null)
                 reader.LoadNew(writer.ToArray());
@@ -937,6 +975,7 @@ public class ByteEncoderTests
         try
         {
             writer.WriteZeroCompressed(value, @long);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem == null)
                 reader.LoadNew(writer.ToArray());
@@ -973,6 +1012,7 @@ public class ByteEncoderTests
         try
         {
             writer.WriteZeroCompressed(value, @long);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem == null)
                 reader.LoadNew(writer.ToArray());
@@ -1009,6 +1049,7 @@ public class ByteEncoderTests
         try
         {
             writer.WriteZeroCompressed(value, @long);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem == null)
                 reader.LoadNew(writer.ToArray());
@@ -1045,6 +1086,7 @@ public class ByteEncoderTests
         try
         {
             writer.WriteZeroCompressed(value, @long);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem == null)
                 reader.LoadNew(writer.ToArray());
@@ -1081,6 +1123,7 @@ public class ByteEncoderTests
         try
         {
             writer.WriteZeroCompressed(value, @long);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem == null)
                 reader.LoadNew(writer.ToArray());
@@ -1117,6 +1160,7 @@ public class ByteEncoderTests
         try
         {
             writer.WriteZeroCompressed(value, @long);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem == null)
                 reader.LoadNew(writer.ToArray());
@@ -1153,6 +1197,7 @@ public class ByteEncoderTests
         try
         {
             writer.WriteZeroCompressed(value, @long);
+            TryPrint(writer);
             ByteReader reader = new ByteReader();
             if (mem == null)
                 reader.LoadNew(writer.ToArray());
@@ -1179,6 +1224,28 @@ public class ByteEncoderTests
     }
 
     [TestMethod]
+    public void TestWriteFormattingArguments()
+    {
+        Guid newGuid = Guid.NewGuid();
+        DateTime now = DateTime.Now;
+        object[] parameters = { newGuid, true, 8, 12u, 64L, 102ul, (short)1, (ushort)3, (sbyte)-4, (byte)250, now, new DateTimeOffset(now), "test string", DBNull.Value };
+
+        ByteWriter writer = GetWriter(false, out _);
+        writer.WriteFormattingParameters(parameters);
+
+        TryPrint(writer);
+        ByteReader reader = new ByteReader();
+        
+        reader.LoadNew(writer.ToArray());
+        object?[] outParameters = reader.ReadFormattingParameters();
+
+        Assert.AreEqual(outParameters.Length, parameters.Length);
+        for (int i = 0; i < outParameters.Length; ++i)
+            Assert.AreEqual(outParameters[i], parameters[i]);
+        Assert.IsFalse(reader.HasFailed);
+    }
+
+    [TestMethod]
     public void TestSkip()
     {
         ByteWriter writer = new ByteWriter(false);
@@ -1186,6 +1253,7 @@ public class ByteEncoderTests
         
         writer.Write(0);
         writer.Write(testString);
+        TryPrint(writer);
         byte[] result = writer.ToArray();
 
         ByteReader reader = new ByteReader();
@@ -1209,6 +1277,7 @@ public class ByteEncoderTests
         writer.Write(3);
         writer.Write((ushort)5);
         writer.WriteBlock(new byte[] { 43, 26, 224, 46, 2 });
+        TryPrint(writer);
 
         Assert.AreEqual(8, writer.Buffer.Length);
         writer.Flush();

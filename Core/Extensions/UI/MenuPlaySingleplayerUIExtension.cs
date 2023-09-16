@@ -3,7 +3,7 @@ using DevkitServer.API.UI;
 
 namespace DevkitServer.Core.Extensions.UI;
 
-[UIExtension(typeof(MenuPlaySingleplayerUI))]
+[UIExtension(typeof(MenuPlaySingleplayerUI), SuppressUIExtensionParentWarning = true)]
 internal class MenuPlaySingleplayerUIExtension
 {
 #nullable disable
@@ -19,7 +19,7 @@ internal class MenuPlaySingleplayerUIExtension
         refreshButton.positionScale_X = 0.5f;
         refreshButton.sizeOffset_X = 200;
         refreshButton.sizeOffset_Y = 30;
-        refreshButton.text = DevkitServerModule.MainLocalization.Translate("RefreshLevelButton");
+        refreshButton.text = DevkitServerModule.MainLocalization.Translate("RefreshLevelsButton");
         refreshButton.onClickedButton += OnClickedRefresh;
 
         Container.AddChild(refreshButton);

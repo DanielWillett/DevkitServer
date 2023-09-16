@@ -1,4 +1,5 @@
 ﻿using Cysharp.Threading.Tasks;
+using DevkitServer.API.Logging;
 using DevkitServer.API.Permissions;
 using DevkitServer.Commands.Subsystem;
 using DevkitServer.Multiplayer;
@@ -122,7 +123,9 @@ public class CommandContext : Exception
     /// <exception cref="CommandContext"/>
     public void BreakAndRunOnServer()
     {
-        CommandHandler.Handler.TransitionCommandExecutionToServer(this);
+        if (DevkitServerModule.IsEditing)
+            CommandHandler.Handler.TransitionCommandExecutionToServer(this);
+        
         throw this;
     }
 #endif
@@ -321,7 +324,7 @@ public class CommandContext : Exception
     {
         if (ReplyingToConsole)
         {
-            Command.LogInfo(rawText);
+            Command.LogInfo(FormattingUtil.ConvertRichTextToANSI(rawText));
         }
         else
         {
@@ -1438,6 +1441,16 @@ public class CommandContext : Exception
     }
 
     /// <summary>
+    /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have at least one of the provided permissions.
+    /// </summary>
+    /// <exception cref="CommandContext"/>
+    public void AssertDevkitServerClient()
+    {
+        if (!DevkitServerModule.IsEditing)
+            throw SendNotDevkitServerClient();
+    }
+
+    /// <summary>
     /// Throws an exception if the command was called from console or the player has left the server since the command was executed.
     /// </summary>
     /// <exception cref="CommandContext"/>
@@ -1537,6 +1550,11 @@ public class CommandContext : Exception
     /// Sends a generic 'no permissions' message.
     /// </summary>
     public Exception SendNoPermission() => Reply(DevkitServerModule.CommandLocalization, "NoPermissions");
+
+    /// <summary>
+    /// Sends a generic 'not connected to DevkitServer server' message.
+    /// </summary>
+    public Exception SendNotDevkitServerClient() => Reply(DevkitServerModule.CommandLocalization, "NotDevkitServerClient");
 
     /// <summary>
     /// Sends a generic 'correct usage' message with <paramref name="usage"/>.

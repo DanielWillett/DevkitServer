@@ -6,9 +6,11 @@ using DevkitServer.Models;
 
 namespace DevkitServer.Util.Encoding;
 
+/// <summary>
+/// Fast encoding to a byte array to data. Also works with <see cref="System.IO.Stream"/>s. Similar to the <see cref="River"/> class.
+/// </summary>
 public class ByteWriter
 {
-    public delegate void Writer<in T>(ByteWriter writer, T arg1);
     private static readonly bool IsBigEndian = !BitConverter.IsLittleEndian;
     private static Dictionary<Type, MethodInfo>? _nonNullableWriters;
     private static Dictionary<Type, MethodInfo>? _nullableWriters;
@@ -411,11 +413,11 @@ public class ByteWriter
     }
     public void WriteInt24(int n)
     {
-        if (n > DevkitServerUtility.Int24MaxValue)
-            n = DevkitServerUtility.Int24MaxValue;
-        if (n < -DevkitServerUtility.Int24MaxValue)
-            n = -DevkitServerUtility.Int24MaxValue;
-        n += DevkitServerUtility.Int24MaxValue;
+        if (n > EncodingEx.Int24MaxValue)
+            n = EncodingEx.Int24MaxValue;
+        if (n < -EncodingEx.Int24MaxValue)
+            n = -EncodingEx.Int24MaxValue;
+        n += EncodingEx.Int24MaxValue;
         // sign bit
         byte b = (byte)((n >> 16) & 0xFF);
         WriteInternal((ushort)(n & 0xFFFF));
@@ -423,9 +425,9 @@ public class ByteWriter
     }
     public void WriteUInt24(uint n)
     {
-        if (n > DevkitServerUtility.Int24MaxValue)
+        if (n > EncodingEx.Int24MaxValue)
         {
-            WriteInt24((int)-(n - DevkitServerUtility.Int24MaxValue));
+            WriteInt24((int)-(n - EncodingEx.Int24MaxValue));
         }
         else WriteInt24((int)n);
     }
@@ -1036,34 +1038,40 @@ public class ByteWriter
             {
                 if (c == 0)
                 {
-                    int ct = 1;
+                    int ct = 0;
                     for (int j = i + 1; j < len; ++j)
                     {
-                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        if (n[j] != 0 || j - i > 254 || j == len - 1)
                         {
-                            ct = j - i + 1;
+                            ct = j - i - 1;
                             break;
                         }
                     }
                     WriteInternal((byte)ct);
-                    i += ct - 1;
+                    i += ct;
                     continue;
                 }
+
                 WriteInternal((byte)255);
-                valuesWriting = len - i;
+                valuesWriting = Math.Min(len - i, 255);
                 for (int j = i + 1; j < len; ++j)
                 {
-                    if (j - i > 254 || n[j] == 0 && j + 2 < len && n[j + 1] == 0 && n[j + 2] == 0)
+                    if (j > len - 3)
+                    {
+                        valuesWriting = Math.Min(len - i, 255);
+                        break;
+                    }
+                    if (j - i > 254 || n[j] == 0 && n[j + 1] == 0 && n[j + 2] == 0)
                     {
                         valuesWriting = j - i;
                         break;
                     }
                 }
 
-                WriteInternal((byte)valuesWriting);
+                WriteInternal((byte)(valuesWriting - 1));
             }
 
-            WriteInternal(n[i]);
+            WriteInternal(c);
             --valuesWriting;
         }
     }
@@ -1156,34 +1164,40 @@ public class ByteWriter
             {
                 if (c == 0)
                 {
-                    int ct = 1;
+                    int ct = 0;
                     for (int j = i + 1; j < len; ++j)
                     {
-                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        if (n[j] != 0 || j - i > 254 || j == len - 1)
                         {
-                            ct = j - i + 1;
+                            ct = j - i - 1;
                             break;
                         }
                     }
                     WriteInternal((byte)ct);
-                    i += ct - 1;
+                    i += ct;
                     continue;
                 }
+
                 WriteInternal((byte)255);
-                valuesWriting = len - i;
+                valuesWriting = Math.Min(len - i, 255);
                 for (int j = i + 1; j < len; ++j)
                 {
-                    if (j - i > 254 || n[j] == 0 && j + 2 < len && n[j + 1] == 0 && n[j + 2] == 0)
+                    if (j > len - 3)
+                    {
+                        valuesWriting = Math.Min(len - i, 255);
+                        break;
+                    }
+                    if (j - i > 254 || n[j] == 0 && n[j + 1] == 0 && n[j + 2] == 0)
                     {
                         valuesWriting = j - i;
                         break;
                     }
                 }
 
-                WriteInternal((byte)valuesWriting);
+                WriteInternal((byte)(valuesWriting - 1));
             }
 
-            WriteInternal(n[i]);
+            WriteInternal(c);
             --valuesWriting;
         }
     }
@@ -1217,34 +1231,40 @@ public class ByteWriter
             {
                 if (c == 0)
                 {
-                    int ct = 1;
+                    int ct = 0;
                     for (int j = i + 1; j < len; ++j)
                     {
-                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        if (n[j] != 0 || j - i > 254 || j == len - 1)
                         {
-                            ct = j - i + 1;
+                            ct = j - i - 1;
                             break;
                         }
                     }
                     WriteInternal((byte)ct);
-                    i += ct - 1;
+                    i += ct;
                     continue;
                 }
+
                 WriteInternal((byte)255);
-                valuesWriting = len - i;
+                valuesWriting = Math.Min(len - i, 255);
                 for (int j = i + 1; j < len; ++j)
                 {
-                    if (j - i > 254 || n[j] == 0 && j + 2 < len && n[j + 1] == 0 && n[j + 2] == 0)
+                    if (j > len - 3)
+                    {
+                        valuesWriting = Math.Min(len - i, 255);
+                        break;
+                    }
+                    if (j - i > 254 || n[j] == 0 && n[j + 1] == 0 && n[j + 2] == 0)
                     {
                         valuesWriting = j - i;
                         break;
                     }
                 }
 
-                WriteInternal((byte)valuesWriting);
+                WriteInternal((byte)(valuesWriting - 1));
             }
 
-            WriteInternal(n[i]);
+            WriteInternal(c);
             --valuesWriting;
         }
     }
@@ -1278,34 +1298,40 @@ public class ByteWriter
             {
                 if (c == 0)
                 {
-                    int ct = 1;
+                    int ct = 0;
                     for (int j = i + 1; j < len; ++j)
                     {
-                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        if (n[j] != 0 || j - i > 254 || j == len - 1)
                         {
-                            ct = j - i + 1;
+                            ct = j - i - 1;
                             break;
                         }
                     }
                     WriteInternal((byte)ct);
-                    i += ct - 1;
+                    i += ct;
                     continue;
                 }
+
                 WriteInternal((byte)255);
-                valuesWriting = len - i;
+                valuesWriting = Math.Min(len - i, 255);
                 for (int j = i + 1; j < len; ++j)
                 {
-                    if (j - i > 254 || n[j] == 0 && j + 2 < len && n[j + 1] == 0 && n[j + 2] == 0)
+                    if (j > len - 3)
+                    {
+                        valuesWriting = Math.Min(len - i, 255);
+                        break;
+                    }
+                    if (j - i > 254 || n[j] == 0 && n[j + 1] == 0 && n[j + 2] == 0)
                     {
                         valuesWriting = j - i;
                         break;
                     }
                 }
 
-                WriteInternal((byte)valuesWriting);
+                WriteInternal((byte)(valuesWriting - 1));
             }
 
-            WriteInternal(n[i]);
+            WriteInternal(c);
             --valuesWriting;
         }
     }
@@ -1451,34 +1477,40 @@ public class ByteWriter
             {
                 if (c == 0)
                 {
-                    int ct = 1;
+                    int ct = 0;
                     for (int j = i + 1; j < len; ++j)
                     {
-                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        if (n[j] != 0 || j - i > 254 || j == len - 1)
                         {
-                            ct = j - i + 1;
+                            ct = j - i - 1;
                             break;
                         }
                     }
                     WriteInternal((byte)ct);
-                    i += ct - 1;
+                    i += ct;
                     continue;
                 }
+
                 WriteInternal((byte)255);
-                valuesWriting = len - i;
+                valuesWriting = Math.Min(len - i, 255);
                 for (int j = i + 1; j < len; ++j)
                 {
-                    if (j - i > 254 || n[j] == 0 && j + 1 < len && n[j + 1] == 0)
+                    if (j > len - 3)
+                    {
+                        valuesWriting = Math.Min(len - i, 255);
+                        break;
+                    }
+                    if (j - i > 254 || n[j] == 0 && n[j + 1] == 0 && n[j + 2] == 0)
                     {
                         valuesWriting = j - i;
                         break;
                     }
                 }
 
-                WriteInternal((byte)valuesWriting);
+                WriteInternal((byte)(valuesWriting - 1));
             }
 
-            WriteInternal(n[i]);
+            WriteInternal(c);
             --valuesWriting;
         }
     }
@@ -1512,34 +1544,40 @@ public class ByteWriter
             {
                 if (c == 0)
                 {
-                    int ct = 1;
+                    int ct = 0;
                     for (int j = i + 1; j < len; ++j)
                     {
-                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        if (n[j] != 0 || j - i > 254 || j == len - 1)
                         {
-                            ct = j - i + 1;
+                            ct = j - i - 1;
                             break;
                         }
                     }
                     WriteInternal((byte)ct);
-                    i += ct - 1;
+                    i += ct;
                     continue;
                 }
+
                 WriteInternal((byte)255);
-                valuesWriting = len - i;
+                valuesWriting = Math.Min(len - i, 255);
                 for (int j = i + 1; j < len; ++j)
                 {
-                    if (j - i > 254 || n[j] == 0 && j + 1 < len && n[j + 1] == 0)
+                    if (j > len - 3)
+                    {
+                        valuesWriting = Math.Min(len - i, 255);
+                        break;
+                    }
+                    if (j - i > 254 || n[j] == 0 && n[j + 1] == 0 && n[j + 2] == 0)
                     {
                         valuesWriting = j - i;
                         break;
                     }
                 }
 
-                WriteInternal((byte)valuesWriting);
+                WriteInternal((byte)(valuesWriting - 1));
             }
 
-            WriteInternal(n[i]);
+            WriteInternal(c);
             --valuesWriting;
         }
     }
@@ -1573,34 +1611,40 @@ public class ByteWriter
             {
                 if (c == 0)
                 {
-                    int ct = 1;
+                    int ct = 0;
                     for (int j = i + 1; j < len; ++j)
                     {
-                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        if (n[j] != 0 || j - i > 254 || j == len - 1)
                         {
-                            ct = j - i + 1;
+                            ct = j - i - 1;
                             break;
                         }
                     }
                     WriteInternal((byte)ct);
-                    i += ct - 1;
+                    i += ct;
                     continue;
                 }
+
                 WriteInternal((byte)255);
-                valuesWriting = len - i;
+                valuesWriting = Math.Min(len - i, 255);
                 for (int j = i + 1; j < len; ++j)
                 {
-                    if (j - i > 254 || n[j] == 0 && j + 2 < len && n[j + 1] == 0 && n[j + 2] == 0)
+                    if (j > len - 3)
+                    {
+                        valuesWriting = Math.Min(len - i, 255);
+                        break;
+                    }
+                    if (j - i > 254 || n[j] == 0 && n[j + 1] == 0 && n[j + 2] == 0)
                     {
                         valuesWriting = j - i;
                         break;
                     }
                 }
 
-                WriteInternal((byte)valuesWriting);
+                WriteInternal((byte)(valuesWriting - 1));
             }
 
-            WriteInternal(n[i]);
+            WriteInternal(c);
             --valuesWriting;
         }
     }
@@ -1634,34 +1678,40 @@ public class ByteWriter
             {
                 if (c == 0)
                 {
-                    int ct = 1;
+                    int ct = 0;
                     for (int j = i + 1; j < len; ++j)
                     {
-                        if (n[j] != 0 || j - i > 252 || j == len - 1)
+                        if (n[j] != 0 || j - i > 254 || j == len - 1)
                         {
-                            ct = j - i + 1;
+                            ct = j - i - 1;
                             break;
                         }
                     }
                     WriteInternal((byte)ct);
-                    i += ct - 1;
+                    i += ct;
                     continue;
                 }
+
                 WriteInternal((byte)255);
-                valuesWriting = len - i;
+                valuesWriting = Math.Min(len - i, 255);
                 for (int j = i + 1; j < len; ++j)
                 {
-                    if (j - i > 254 || n[j] == 0 && j + 2 < len && n[j + 1] == 0 && n[j + 2] == 0)
+                    if (j > len - 3)
+                    {
+                        valuesWriting = Math.Min(len - i, 255);
+                        break;
+                    }
+                    if (j - i > 254 || n[j] == 0 && n[j + 1] == 0 && n[j + 2] == 0)
                     {
                         valuesWriting = j - i;
                         break;
                     }
                 }
 
-                WriteInternal((byte)valuesWriting);
+                WriteInternal((byte)(valuesWriting - 1));
             }
 
-            WriteInternal(n[i]);
+            WriteInternal(c);
             --valuesWriting;
         }
     }
@@ -1861,6 +1911,9 @@ public class ByteWriter
         }
     }
 }
+
+public delegate void Writer<in T>(ByteWriter writer, T arg1);
+
 public sealed class ByteWriterRaw<T> : ByteWriter
 {
     private readonly Writer<T> writer;

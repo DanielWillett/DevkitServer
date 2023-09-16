@@ -1,7 +1,6 @@
 ﻿using DevkitServer.API;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
-using DevkitServer.Util.Encoding;
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
@@ -16,7 +15,7 @@ using System.Net;
 namespace DevkitServer.Util;
 public static class DevkitServerUtility
 {
-    public const int Int24MaxValue = 8388607;
+    public static T IdentitySelector<T>(T value) => value;
     public static string QuickFormat(string input, string? val)
     {
         int ind = input.IndexOf("{0}", StringComparison.Ordinal);
@@ -36,7 +35,7 @@ public static class DevkitServerUtility
     public static Regex RemoveTMProRichTextRegex { get; } =
         new Regex(@"(?<!(?:\<noparse\>(?!\<\/noparse\>)).*)\<\/{0,1}(?:(?:noparse)|(?:alpha)|(?:alpha=#[0-f]{1,2})|(?:[su])|(?:su[pb])|(?:lowercase)|(?:uppercase)|(?:smallcaps))\>", RegexOptions.IgnoreCase);
     [Pure]
-    public static string FormatBytes(long length)
+    public static string FormatBytes(long length, int decimals = 1)
     {
         _sizeCodes ??= new string[]
         {
@@ -75,7 +74,7 @@ public static class DevkitServerUtility
         double len = length / _sizeIncrements[inc];
         if (neg) len = -len;
 
-        return len.ToString("N1") + " " + _sizeCodes[inc];
+        return len.ToString("N" + Math.Max(0, decimals).ToString(CultureInfo.InvariantCulture)) + " " + _sizeCodes[inc];
     }
     [Pure]
     public static Bounds InflateBounds(in Bounds bounds)
@@ -83,15 +82,6 @@ public static class DevkitServerUtility
         Vector3 c = bounds.center;
         Vector3 e = bounds.extents;
         return new Bounds(new Vector3(Mathf.Round(c.x), Mathf.Round(c.y), Mathf.Round(c.z)), new Vector3((e.x + 0.5f).CeilToIntIgnoreSign(), (e.y + 0.5f).CeilToIntIgnoreSign(), (e.z + 0.5f).CeilToIntIgnoreSign()));
-    }
-    public static unsafe void ReverseFloat(byte* ptr, int index)
-    {
-        byte b = ptr[index + 1];
-        ptr[index + 1] = ptr[index + 2];
-        ptr[index + 2] = b;
-        b = ptr[index];
-        ptr[index] = ptr[index + 3];
-        ptr[index + 3] = b;
     }
     [Pure]
     public static uint ReverseUInt32(uint val) => ((val >> 24) & 0xFF) | (((val >> 16) & 0xFF) << 8) | (((val >> 8) & 0xFF) << 16) | (val << 24);
@@ -101,6 +91,13 @@ public static class DevkitServerUtility
     public static Vector3 ToVector3(this in Vector2 v2) => new Vector3(v2.x, 0f, v2.y);
     [Pure]
     public static Vector3 ToVector3(this in Vector2 v2, float y) => new Vector3(v2.x, y, v2.y);
+    [Pure]
+    public static float SqrDist2D(this Vector3 v1, Vector3 v2)
+    {
+        float x = v1.x - v2.x, z = v1.z - v2.z;
+        return x * x + z * z;
+    }
+
     [Pure]
     public static bool IsNearlyEqual(this in Quaternion quaternion, in Quaternion other, float tolerance = 0.001f)
     {
@@ -583,7 +580,7 @@ public static class DevkitServerUtility
     {
         string basePath;
         if (!string.IsNullOrEmpty(DevkitServerConfig.Config.UserSavedataLocationOverride))
-        {
+        {   
             basePath = DevkitServerConfig.Config.UserSavedataLocationOverride!;
             if (!Path.IsPathRooted(basePath))
                 basePath = Path.Combine(ReadWrite.PATH, basePath);
@@ -600,14 +597,11 @@ public static class DevkitServerUtility
 
     public static void UpdateLocalizationFile(ref Local read, LocalDatDictionary @default, string directory)
     {
-        LocalDatDictionary def = @default;
         DatDictionary @new = new DatDictionary();
         DatDictionary def2 = new DatDictionary();
-        foreach (KeyValuePair<string, string> pair in def)
+        foreach (KeyValuePair<string, string> pair in @default)
         {
-            if (!read.has(pair.Key))
-                @new.Add(pair.Key, new DatValue(pair.Value));
-            else @new.Add(pair.Key, new DatValue(read.format(pair.Key)));
+            @new.Add(pair.Key, new DatValue(read.has(pair.Key) ? read.format(pair.Key) : pair.Value));
             def2.Add(pair.Key, new DatValue(pair.Value));
         }
 
@@ -646,18 +640,53 @@ public static class DevkitServerUtility
     {
         return RemoveTMProRichTextRegex.Replace(text, string.Empty);
     }
-    [Pure]
-    public static Color GetColor(this IDevkitServerPlugin? plugin) => plugin == null ? DevkitServerModule.ModuleColor : (plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor);
 
+    /// <summary>
+    /// Disconnect a user with a custom message using the <see cref="ESteamConnectionFailureInfo.KICKED"/> failure type. Works on client or server.
+    /// </summary>
+    /// <remarks>Clientside will gracefully disconnect, server will reject or kick.</remarks>
     public static void CustomDisconnect(
 #if SERVER
         EditorUser user,
 #endif
-        string message)
+        string message) =>
+        CustomDisconnect(
+#if SERVER
+            user,
+#endif
+        message, ESteamConnectionFailureInfo.KICKED
+    );
+
+    /// <summary>
+    /// Disconnect a user with a custom failure type (and no message). Works on client or server.
+    /// </summary>
+    /// <remarks>Clientside will gracefully disconnect, server will reject or kick.</remarks>
+    public static void CustomDisconnect(
+#if SERVER
+        EditorUser user,
+#endif
+        ESteamConnectionFailureInfo failureType) =>
+        CustomDisconnect(
+#if SERVER
+            user,
+#endif
+        string.Empty, failureType
+    );
+
+    /// <summary>
+    /// Disconnect a user with a custom message and failure type. Works on client or server.
+    /// </summary>
+    /// <remarks>Clientside will gracefully disconnect, server will reject or kick.</remarks>
+    public static void CustomDisconnect(
+#if SERVER
+        EditorUser user,
+#endif
+        string message, ESteamConnectionFailureInfo failureType)
     {
 #if CLIENT
-        Provider.connectionFailureInfo = ESteamConnectionFailureInfo.KICKED;
+        Provider.connectionFailureInfo = failureType;
         Provider.RequestDisconnect(Provider.connectionFailureReason = message);
+        DevkitServerModule.IsEditing = false;
 #else
         if (Provider.pending.Any(x => x.playerID.steamID.m_SteamID == user.SteamId.m_SteamID))
             Provider.reject(user.SteamId, ESteamRejection.PLUGIN, message);
@@ -665,6 +694,7 @@ public static class DevkitServerUtility
             Provider.kick(user.SteamId, message);
 #endif
     }
+
     /// <summary>
     /// Tries to create a directory.
     /// </summary>
@@ -709,34 +739,18 @@ public static class DevkitServerUtility
             return false;
         }
     }
+    /// <summary>
+    /// Compares a <see cref="Quaternion"/> to <see cref="Quaternion.identity"/> within <paramref name="tolerance"/>.
+    /// </summary>
     [Pure]
     public static bool IsNearlyIdentity(this Quaternion q, float tolerance = 0.001f)
     {
         return q.x > -tolerance && q.x < tolerance && q.y > -tolerance && q.y < tolerance && q.z > -tolerance && q.z < tolerance && q.w - 1f > -tolerance && q.w - 1f < tolerance;
     }
 
-    /// <remarks><see cref="ItemPantsAsset"/> and <see cref="ItemShirtAsset"/> takes a <see cref="Texture2D"/> instead of a <see cref="GameObject"/> so they are not included in this method.</remarks>
-    [Pure]
-    public static GameObject? GetItemInstance(this ItemAsset asset)
-    {
-        return asset switch
-        {
-            ItemBackpackAsset a => a.backpack,
-            ItemBarrelAsset a => a.barrel,
-            ItemBarricadeAsset a => a.barricade,
-            ItemGlassesAsset a => a.glasses,
-            ItemGripAsset a => a.grip,
-            ItemHatAsset a => a.hat,
-            ItemMagazineAsset a => a.magazine,
-            ItemMaskAsset a => a.mask,
-            ItemSightAsset a => a.sight,
-            ItemStructureAsset a => a.structure,
-            ItemTacticalAsset a => a.tactical,
-            ItemThrowableAsset a => a.throwable,
-            ItemVestAsset a => a.vest,
-            _ => null
-        };
-    }
+    /// <summary>
+    /// Gets a pooled transport connection list of all connected clients.
+    /// </summary>
     /// <remarks>Includes pending connections.</remarks>
     [Pure]
     public static PooledTransportConnectionList GetAllConnections()
@@ -752,6 +766,9 @@ public static class DevkitServerUtility
 
         return list;
     }
+    /// <summary>
+    /// Gets a pooled transport connection list of all connected clients, excluding <paramref name="exclude"/>.
+    /// </summary>
     /// <remarks>Includes pending connections.</remarks>
     [Pure]
     public static PooledTransportConnectionList GetAllConnections(ITransportConnection exclude)
@@ -785,18 +802,25 @@ public static class DevkitServerUtility
         return list;
     }
 
+    /// <returns>'s' if <paramref name="num"/> != 1, otherwise an empty string.</returns>
     [Pure]
     public static string S(this int num) => num == 1 ? string.Empty : "s";
+
+    /// <returns>'S' if <paramref name="num"/> != 1, otherwise an empty string.</returns>
     [Pure]
     public static string UpperS(this int num) => num == 1 ? string.Empty : "S";
-    [Pure]
-    public static GameObject? GetEditorObject()
-    {
-        Transform editor = Level.editing.Find("Editor");
-        return editor == null ? null : editor.gameObject;
-    }
+
+    /// <summary>
+    /// Gets the elapsed milliseconds from a <see cref="Stopwatch"/> as a <see cref="double"/> instead of <see cref="long"/>.
+    /// </summary>
     [Pure]
     public static double GetElapsedMilliseconds(this Stopwatch stopwatch) => stopwatch.ElapsedTicks / (double)Stopwatch.Frequency * 1000d;
+
+    /// <summary>
+    /// From a schedule and interval, chooses the next date time based on the current time.
+    /// </summary>
+    /// <param name="utc">Schedule is in UTC instead of local time.</param>
+    /// <returns>The selected scheduled time, or <see langword="null"/> if there are no future elements.</returns>
     [Pure]
     public static DateTime? FindNextSchedule(DateTime[] schedule, bool utc, ScheduleInterval interval)
     {
@@ -853,28 +877,76 @@ public static class DevkitServerUtility
         return null;
     }
 
+    /// <summary>
+    /// Converts terabytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertTBToB(double tb) => (long)Math.Round(tb * 1000000000000d);
+
+    /// <summary>
+    /// Converts gigabytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertGBToB(double gb) => (long)Math.Round(gb * 1000000000d);
+
+    /// <summary>
+    /// Converts megabytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertMBToB(double mb) => (long)Math.Round(mb * 1000000d);
+
+    /// <summary>
+    /// Converts kilobytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertKBToB(double kb) => (long)Math.Round(kb * 1000d);
+
+    /// <summary>
+    /// Converts tebibytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertTiBToB(double tib) => (long)Math.Round(tib * 1099511627776d);
+
+    /// <summary>
+    /// Converts gibibytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertGiBToB(double gib) => (long)Math.Round(gib * 1073741824d);
+
+    /// <summary>
+    /// Converts mebibytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertMiBToB(double mib) => (long)Math.Round(mib * 1048576d);
+
+    /// <summary>
+    /// Converts kibibytes to bytes.
+    /// </summary>
+    /// <remarks>XiB units are power of 2 based, XB units are power of 10 based.</remarks>
     [Pure]
     public static long ConvertKiBToB(double kib) => (long)Math.Round(kib * 1024d);
+
+
+    /// <summary>
+    /// Gets the size in bytes of a directory and all it's subfiles recursively.
+    /// </summary>
     [Pure]
     public static long GetDirectorySize(string directory)
     {
         DirectoryInfo dir = new DirectoryInfo(directory);
         return GetDirectorySize(dir);
     }
+
+    /// <summary>
+    /// Gets the size in bytes of a directory and all it's subfiles recursively.
+    /// </summary>
     [Pure]
     public static long GetDirectorySize(DirectoryInfo directory)
     {
@@ -897,6 +969,12 @@ public static class DevkitServerUtility
 
         return ttl;
     }
+
+    /// <summary>
+    /// Removes all matches in a list.
+    /// </summary>
+    /// <remarks>Runs backwards.</remarks>
+    /// <returns>The amount of elements removed.</returns>
     public static int RemoveAll<T>(this IList<T> list, Predicate<T> selector)
     {
         int c = 0;
@@ -911,12 +989,25 @@ public static class DevkitServerUtility
 
         return c;
     }
+
+    /// <summary>
+    /// Converts a list to array, or uses <see cref="Array.Empty"/> if the count is zero.
+    /// </summary>
     public static T[] ToArrayFast<T>(this List<T> list) => list.Count == 0 ? Array.Empty<T>() : list.ToArray();
-    public static void IncreaseCapacity<T>(this List<T> list, int amount)
+
+    /// <summary>
+    /// Increases the capacity of a list if it is less than <paramref name="capacity"/>.
+    /// </summary>
+    public static void IncreaseCapacity<T>(this List<T> list, int capacity)
     {
-        if (list.Capacity < amount)
-            list.Capacity = amount;
+        if (list.Capacity < capacity)
+            list.Capacity = capacity;
     }
+
+    /// <summary>
+    /// Returns the first matching value only if there are no other matching values.
+    /// </summary>
+    /// <remarks>Doesn't throw an error when there are no matches (unlike the normal linq version).</remarks>
     [Pure]
     public static T? SingleOrDefaultSafe<T>(this IEnumerable<T> enumerable, Predicate<T> predicate)
     {
@@ -965,6 +1056,263 @@ public static class DevkitServerUtility
 
         return rtn;
     }
+    /// <summary>
+    /// Returns the first value only if the count is one.
+    /// </summary>
+    /// <remarks>Doesn't throw an error when there are no elements (unlike the normal linq version).</remarks>
+    [Pure]
+    public static T? SingleOrDefaultSafe<T>(this IEnumerable<T> enumerable)
+    {
+        if (enumerable is IList<T> list)
+            return list.Count == 1 ? list[0] : default;
+
+        if (enumerable is ICollection<T> collection && collection.Count != 1)
+            return default;
+
+        bool found = false;
+        T? rtn = default;
+        foreach (T value in enumerable)
+        {
+            if (found)
+                return default;
+
+            rtn = value;
+            found = true;
+        }
+
+        return rtn;
+    }
+
+    /// <summary>
+    /// Creates a copy or moves a file, for example, 'OriginalName' to 'OriginalName Backup', and optionally assigns a number if there are duplicate files.
+    /// </summary>
+    /// <param name="originalFile">Path to the file to copy or move.</param>
+    /// <param name="overwrite">Allows the copy or move operation to just overwrite existing files instead of incrementing a number.</param>
+    /// <returns>The path to the newly created or moved file.</returns>
+    public static string BackupFile(string originalFile, bool moveInsteadOfCopy, bool overwrite = true)
+    {
+        string ext = Path.GetExtension(originalFile);
+        string? dir = Path.GetDirectoryName(originalFile);
+        string fn = Path.GetFileNameWithoutExtension(originalFile) + " Backup";
+        if (dir != null)
+            fn = Path.Combine(dir, fn);
+        if (File.Exists(fn + ext) && !overwrite)
+        {
+            int num = 0;
+            fn += " ";
+            while (File.Exists(fn + num.ToString(CultureInfo.InvariantCulture) + ext))
+                ++num;
+            fn += num.ToString(CultureInfo.InvariantCulture);
+        }
+
+        DateTime? lastModified = null;
+        try
+        {
+            lastModified = File.GetLastWriteTimeUtc(originalFile);
+        }
+        catch
+        {
+            // ignored
+        }
+
+        fn += ext;
+        if (moveInsteadOfCopy)
+        {
+            if (overwrite && File.Exists(fn))
+                File.Delete(fn);
+
+            File.Move(originalFile, fn);
+        }
+        else
+        {
+            File.Copy(originalFile, fn, overwrite);
+        }
+
+        try
+        {
+            File.SetCreationTimeUtc(fn, DateTime.UtcNow);
+
+            if (lastModified.HasValue)
+                File.SetLastWriteTimeUtc(fn, lastModified.Value);
+        }
+        catch
+        {
+            // ignored
+        }
+
+        return fn;
+    }
+
+    /// <summary>
+    /// Checks to see if <paramref name="longerPath"/> is a child folder or file of the directory <paramref name="shorterPath"/>.
+    /// </summary>
+    [Pure]
+    public static bool IsChildOf(string? shorterPath, string longerPath, bool includeSubDirectories = true)
+    {
+        if (string.IsNullOrEmpty(shorterPath))
+            return true;
+        if (string.IsNullOrEmpty(longerPath))
+            return false;
+        DirectoryInfo parent = new DirectoryInfo(shorterPath);
+        DirectoryInfo child = new DirectoryInfo(longerPath);
+        return IsChildOf(parent, child, includeSubDirectories);
+    }
+
+    /// <summary>
+    /// Checks to see if <paramref name="longerPath"/> is a child folder or file of the directory <paramref name="shorterPath"/>.
+    /// </summary>
+    [Pure]
+    public static bool IsChildOf(DirectoryInfo shorterPath, DirectoryInfo longerPath, bool includeSubDirectories = true)
+    {
+        if (!includeSubDirectories)
+            return longerPath.Parent != null && longerPath.Parent.FullName.Equals(shorterPath.FullName, StringComparison.Ordinal);
+        while (longerPath.Parent != null)
+        {
+            if (longerPath.Parent.FullName.Equals(shorterPath.FullName, StringComparison.Ordinal))
+                return true;
+            longerPath = longerPath.Parent;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Gets the path to a file or directory relative to <paramref name="relativeTo"/> of <paramref name="path"/>.
+    /// </summary>
+    // https://stackoverflow.com/questions/51179331/is-it-possible-to-use-path-getrelativepath-net-core2-in-winforms-proj-targeti
+    [Pure]
+    public static string GetRelativePath(string relativeTo, string path)
+    {
+        if (!IsChildOf(relativeTo, path))
+            throw new ArgumentException("Path is not relative to parent", nameof(path));
+        if (string.IsNullOrEmpty(relativeTo))
+        {
+            path = path.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            if (path.IndexOf(Path.DirectorySeparatorChar) == -1)
+                path = "." + Path.DirectorySeparatorChar + path;
+            return path;
+        }
+        path = Path.GetFullPath(path);
+        relativeTo = Path.GetFullPath(relativeTo);
+        Uri uri = new Uri(relativeTo);
+        string rel = Uri.UnescapeDataString(uri.MakeRelativeUri(new Uri(path)).ToString()).Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+        int index = rel.IndexOf(Path.DirectorySeparatorChar);
+        if (index == -1)
+            rel = "." + Path.DirectorySeparatorChar + rel;
+        else
+        {
+            if (index != rel.Length - 1)
+            {
+                rel = rel.Substring(index + 1);
+                if (rel.IndexOf(Path.DirectorySeparatorChar) == -1)
+                    rel = "." + Path.DirectorySeparatorChar + rel;
+            }
+        }
+
+        return rel;
+    }
+
+    /// <summary>
+    /// Recursively copy a directory from <paramref name="source"/> to <paramref name="destination"/>.
+    /// </summary>
+    /// <exception cref="AggregateException">Errors reading or writing files.</exception>
+    public static void CopyDirectory(string source, string destination, bool overwrite = true, Predicate<FileInfo>? shouldInclude = null)
+    {
+        DirectoryInfo sourceInfo = new DirectoryInfo(source);
+        if (!sourceInfo.Exists)
+            return;
+        DirectoryInfo dstInfo = new DirectoryInfo(destination);
+        if (!dstInfo.Exists)
+            dstInfo.Create();
+
+        List<Exception>? exceptions = null;
+        try
+        {
+            foreach (FileSystemInfo info in sourceInfo.GetFileSystemInfos("*", SearchOption.AllDirectories))
+            {
+                if (info is FileInfo file)
+                {
+                    try
+                    {
+                        if (shouldInclude != null && !shouldInclude(file))
+                            continue;
+                        string path = Path.Combine(dstInfo.FullName, GetRelativePath(sourceInfo.FullName, file.FullName));
+                        string? dir = Path.GetDirectoryName(path);
+                        if (dir != null)
+                            Directory.CreateDirectory(dir);
+                        file.CopyTo(path, overwrite);
+                    }
+                    catch (Exception ex)
+                    {
+                        (exceptions ??= new List<Exception>(1)).Add(ex);
+                    }
+                }
+                else if (info is DirectoryInfo { Exists: false } dir)
+                {
+                    try
+                    {
+                        string path = Path.Combine(dstInfo.FullName, GetRelativePath(sourceInfo.FullName, dir.FullName));
+                        Directory.CreateDirectory(path);
+                    }
+                    catch (Exception ex)
+                    {
+                        (exceptions ??= new List<Exception>(1)).Add(ex);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new AggregateException(ex);
+        }
+
+        if (exceptions is { Count: > 0 })
+        {
+            throw new AggregateException(exceptions);
+        }
+    }
+
+    /// <summary>
+    /// Changes directory separators to back slashes if they aren't already.
+    /// </summary>
+    public static string FormatUniversalPath(string path) => Path.DirectorySeparatorChar == '\\' ? path : path.Replace(Path.DirectorySeparatorChar, '\\');
+
+    /// <summary>
+    /// Changes directory separators to forward slashes if they aren't supposed to be back slashes.
+    /// </summary>
+    public static string UnformatUniversalPath(string path) => Path.DirectorySeparatorChar == '\\' ? path : path.Replace('\\', Path.DirectorySeparatorChar);
+
+    /// <summary>
+    /// Ceils positive numbers, floors negative numbers.
+    /// </summary>
+    public static int CeilToIntIgnoreSign(this float val) => val < 0 ? Mathf.FloorToInt(val) : Mathf.CeilToInt(val);
+
+    /// <summary>
+    /// Floors positive numbers, ceils negative numbers.
+    /// </summary>
+    public static int FloorToIntIgnoreSign(this float val) => val < 0 ? Mathf.CeilToInt(val) : Mathf.FloorToInt(val);
+
+    /// <summary>
+    /// Adds <paramref name="by"/> to each coordinates' magnitudes (adds when positive, subtracts when negative).
+    /// </summary>
+    public static void Expand(this ref Vector3 v3, float by)
+    {
+        if (v3.x < 0)
+            v3.x -= by;
+        else if (v3.x > 0)
+            v3.x += by;
+
+        if (v3.y < 0)
+            v3.y -= by;
+        else if (v3.y > 0)
+            v3.y += by;
+
+        if (v3.z < 0)
+            v3.z -= by;
+        else if (v3.z > 0)
+            v3.z += by;
+    }
+
 }
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
@@ -997,30 +1345,54 @@ public sealed class CreateDirectoryAttribute : Attribute
                 continue;
             if (typeof(string).IsAssignableFrom(field.FieldType))
             {
-                string? path = (string?)field.GetValue(null);
-                if (path == null)
-                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
-                else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, field);
+                try
+                {
+                    string? path = (string?)field.GetValue(null);
+                    if (path == null)
+                        Logger.LogWarning($"Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.", method: "CHECK DIR");
+                    else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, field);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Unable to check directory for {field.Format()}, type initializer threw exception.", method: "CHECK DIR");
+                    Logger.LogError(ex, method: "CHECK DIR");
+                }
             }
             else if (typeof(FileInfo).IsAssignableFrom(field.FieldType))
             {
-                FileInfo? fileInfo = (FileInfo?)field.GetValue(null);
-                cdir.RelativeToGameDir = false;
-                string? file = fileInfo?.DirectoryName;
-                if (file == null)
+                try
                 {
-                    if (fileInfo == null)
-                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
+                    FileInfo? fileInfo = (FileInfo?)field.GetValue(null);
+                    cdir.RelativeToGameDir = false;
+                    string? file = fileInfo?.DirectoryName;
+                    if (file == null)
+                    {
+                        if (fileInfo == null)
+                            Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
+                    }
+                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, field);
                 }
-                else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, field);
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Unable to check directory for {field.Format()}, type initializer threw exception.", method: "CHECK DIR");
+                    Logger.LogError(ex, method: "CHECK DIR");
+                }
             }
             else if (typeof(DirectoryInfo).IsAssignableFrom(field.FieldType))
             {
-                string? dir = ((DirectoryInfo?)field.GetValue(null))?.FullName;
-                cdir.RelativeToGameDir = false;
-                if (dir == null)
-                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
-                else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, field);
+                try
+                {
+                    string? dir = ((DirectoryInfo?)field.GetValue(null))?.FullName;
+                    cdir.RelativeToGameDir = false;
+                    if (dir == null)
+                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
+                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, field);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Unable to check directory for {field.Format()}, type initializer threw exception.", method: "CHECK DIR");
+                    Logger.LogError(ex, method: "CHECK DIR");
+                }
             }
             else
             {
@@ -1037,28 +1409,52 @@ public sealed class CreateDirectoryAttribute : Attribute
                 continue;
             if (typeof(string).IsAssignableFrom(property.PropertyType))
             {
-                string? path = (string?)property.GetMethod?.Invoke(null, Array.Empty<object>());
-                if (path == null)
-                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
-                else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, property);
+                try
+                {
+                    string? path = (string?)property.GetMethod?.Invoke(null, Array.Empty<object>());
+                    if (path == null)
+                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
+                    else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, property);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Unable to check directory for {property.Format()}, property getter or type initializer threw exception.", method: "CHECK DIR");
+                    Logger.LogError(ex, method: "CHECK DIR");
+                }
             }
             else if (typeof(FileInfo).IsAssignableFrom(property.PropertyType))
             {
-                FileInfo? fileInfo = (FileInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>());
-                string? file = fileInfo?.DirectoryName;
-                if (file == null)
+                try
                 {
-                    if (fileInfo == null)
-                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
+                    FileInfo? fileInfo = (FileInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>());
+                    string? file = fileInfo?.DirectoryName;
+                    if (file == null)
+                    {
+                        if (fileInfo == null)
+                            Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
+                    }
+                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, property);
                 }
-                else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, property);
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Unable to check directory for {property.Format()}, property getter or type initializer threw exception.", method: "CHECK DIR");
+                    Logger.LogError(ex, method: "CHECK DIR");
+                }
             }
             else if (typeof(DirectoryInfo).IsAssignableFrom(property.PropertyType))
             {
-                string? dir = ((DirectoryInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>()))?.FullName;
-                if (dir == null)
-                    Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
-                else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, property);
+                try
+                {
+                    string? dir = ((DirectoryInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>()))?.FullName;
+                    if (dir == null)
+                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
+                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, property);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning($"Unable to check directory for {property.Format()}, property getter or type initializer threw exception.", method: "CHECK DIR");
+                    Logger.LogError(ex, method: "CHECK DIR");
+                }
             }
             else
             {

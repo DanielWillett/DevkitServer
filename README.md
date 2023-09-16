@@ -62,6 +62,16 @@ If you are not starting with an empty map, configure the `new_level_info` sectio
 * `map_owner`: Steam ID of the owner of the map. This defaults to the first admin on the server if it's not defined.
   + This only sets the owner in the map metadata, which decides who can edit the map without a `.unlocker` file.
 
+## Further Configuring New Map
+After running the server at least once, navigate to `U3DS\Maps\<Map Name>` to see the map template files.
+
+Open up `English.dat` to configure localized name, description, and tips. You can also add keys for locations here.
+
+The template comes with one tip, which you'll probably want to change.
+
+Next open `Config.json` to configure map contributors (feel free to remove DevkitServer from the Thanks section).
+This is also where you should set `Tips` to the number of tips you have in `English.dat`.
+
 ## TCP Server Setup
 If possible, it is highly recommended to set up the TCP (sometimes called high-speed) server port.
 
@@ -86,8 +96,8 @@ Ensure you have .NET Framework 4.8.1 installed.
 
 ## Strong Naming
 
-This assembly is strongly signed. The public key is located at `~\devkitserver.dll.publickey`.
-To compile it, you will need to either disable strong naming in the **Build -> Strong Naming** settings, or generate your own key.
+This assembly is strongly signed (when built in Release mode). The public key is located at `~\devkitserver.dll.publickey`.
+To compile it, you will need to either build in debug mode, disable strong naming in the **Build -> Strong Naming** settings, or generate your own key.
 
 ### Generating a Strong Name Key/Pair
 

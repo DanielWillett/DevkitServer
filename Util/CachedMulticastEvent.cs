@@ -1,5 +1,4 @@
-﻿using JetBrains.Annotations;
-using System.Reflection;
+﻿using System.Reflection;
 using System.Reflection.Emit;
 
 namespace DevkitServer.Util;
@@ -11,15 +10,18 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
     public string ErrorMessage { get; set; }
     public string Name { get; }
     public Type DeclaringType { get; }
-    public bool IsEmpty => Invocations.Length == 0;
+    public bool IsEmpty
+    {
+        get
+        {
+            lock (this)
+                return _delegates.Length == 0;
+        }
+    }
+
     public TDelegate TryInvoke { get; }
     public bool IsCancellable { get; private set; }
     public bool DefaultShouldAllow { get; }
-    public TDelegate[] Invocations
-    {
-        get => _delegates;
-        private set => _delegates = value;
-    }
     public CachedMulticastEvent(Type declaringType, string name, bool shouldAllowDefault = true)
     {
         Name = name;
@@ -29,7 +31,47 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         DefaultShouldAllow = shouldAllowDefault;
         TryInvoke = GetInvokeMethod(this);
     }
+    public void TransferTo(CachedMulticastEvent<TDelegate> other, bool union = false)
+    {
+        lock (this)
+        {
+            lock (other)
+            {
+                if (!union)
+                {
+                    other._multicast = null;
+                    other._delegates = Array.Empty<TDelegate>();
+                }
 
+                foreach (TDelegate @delegate in _delegates)
+                {
+                    if (union)
+                        other._multicast = (TDelegate?)Delegate.Remove(other._multicast, @delegate);
+                    other._multicast = (TDelegate)Delegate.Combine(other._multicast, @delegate);
+                }
+
+                Delegate[]? dele = other._multicast?.GetInvocationList();
+                if (dele != null)
+                {
+                    if (other._delegates.Length != dele.Length)
+                        other._delegates = new TDelegate[dele.Length];
+                    for (int i = 0; i < dele.Length; ++i)
+                        other._delegates[i] = (TDelegate)dele[i];
+                }
+                else other._delegates = Array.Empty<TDelegate>();
+            }
+        }
+    }
+    public TDelegate[] GetInvocationList()
+    {
+        lock (this)
+        {
+            TDelegate[] newArr = _delegates.Length == 0 ? Array.Empty<TDelegate>() : new TDelegate[_delegates.Length];
+            for (int i = 0; i < newArr.Length; ++i)
+                newArr[i] = _delegates[i];
+            return newArr;
+        }
+    }
     public void Add(TDelegate @delegate)
     {
         if (@delegate == null) return;
@@ -37,9 +79,10 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         {
             _multicast = (TDelegate)Delegate.Combine(_multicast, @delegate);
             Delegate[] dele = _multicast.GetInvocationList();
-            Invocations = new TDelegate[dele.Length];
+            if (_delegates.Length != dele.Length)
+                _delegates = new TDelegate[dele.Length];
             for (int i = 0; i < dele.Length; ++i)
-                Invocations[i] = (TDelegate)dele[i];
+                _delegates[i] = (TDelegate)dele[i];
         }
     }
     public void Remove(TDelegate @delegate)
@@ -50,11 +93,12 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
             Delegate[]? dele = _multicast?.GetInvocationList();
             if (dele != null)
             {
-                Invocations = new TDelegate[dele.Length];
+                if (_delegates.Length != dele.Length)
+                    _delegates = new TDelegate[dele.Length];
                 for (int i = 0; i < dele.Length; ++i)
-                    Invocations[i] = (TDelegate)dele[i];
+                    _delegates[i] = (TDelegate)dele[i];
             }
-            else Invocations = Array.Empty<TDelegate>();
+            else _delegates = Array.Empty<TDelegate>();
         }
     }
     public static TDelegate GetInvokeMethod(CachedMulticastEvent<TDelegate> wrapper)

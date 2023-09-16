@@ -1,7 +1,6 @@
 ﻿#if CLIENT
 using DevkitServer.Players;
 using HarmonyLib;
-using JetBrains.Annotations;
 using SDG.Framework.Devkit.Transactions;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -73,14 +72,20 @@ internal static class TransactionPatches
     internal static void OnUndoRequested()
     {
         if (!DevkitServerModule.IsEditing)
+        {
+            DevkitTransactionManager.undo();
             return;
+        }
         if (EditorUser.User != null && EditorUser.User.Transactions != null)
             EditorUser.User.Transactions.RequestUndo();
     }
     internal static void OnRedoRequested()
     {
         if (!DevkitServerModule.IsEditing)
+        {
+            DevkitTransactionManager.redo();
             return;
+        }
         if (EditorUser.User != null && EditorUser.User.Transactions != null)
             EditorUser.User.Transactions.RequestRedo();
     }

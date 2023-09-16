@@ -1,7 +1,13 @@
-﻿using System.Reflection;
+﻿using SDG.Framework.Modules;
+using System.Reflection;
 using System.Reflection.Emit;
+using Cysharp.Threading.Tasks;
+using Module = SDG.Framework.Modules.Module;
 
 namespace DevkitServer.Util;
+
+public delegate UniTask BeginLevelLoading(LevelInfo level, CancellationToken token);
+
 [EarlyTypeInit]
 public static class AssetUtil
 {
@@ -15,6 +21,41 @@ public static class AssetUtil
     private static readonly Action<MasterBundleConfig>? CheckOwnerCustomDataAndMaybeUnload;
     private static readonly StaticGetter<List<MasterBundleConfig>>? AllMasterBundlesGetter;
 
+    private static readonly InstanceGetter<Asset, AssetOrigin>? GetAssetOrigin = Accessor.GenerateInstanceGetter<Asset, AssetOrigin>("origin");
+    private static readonly InstanceGetter<NPCRewardsList, INPCReward[]>? GetRewardsFromList = Accessor.GenerateInstanceGetter<NPCRewardsList, INPCReward[]>("rewards");
+    private static readonly InstanceGetter<Module, List<IModuleNexus>>? GetNexii = Accessor.GenerateInstanceGetter<Module, List<IModuleNexus>>("nexii");
+
+    public static event BeginLevelLoading? OnBeginLevelLoading;
+
+    /// <returns>The origin of the asset, or <see langword="null"/> in the case of a reflection failure.</returns>
+    [Pure]
+    public static AssetOrigin? GetOrigin(this Asset asset)
+    {
+        return asset == null ? null : GetAssetOrigin?.Invoke(asset);
+    }
+
+    /// <remarks><see cref="ItemPantsAsset"/> and <see cref="ItemShirtAsset"/> takes a <see cref="Texture2D"/> instead of a <see cref="GameObject"/> so they are not included in this method.</remarks>
+    [Pure]
+    public static GameObject? GetItemInstance(ItemAsset asset)
+    {
+        return asset switch
+        {
+            ItemBackpackAsset a => a.backpack,
+            ItemBarrelAsset a => a.barrel,
+            ItemBarricadeAsset a => a.barricade,
+            ItemGlassesAsset a => a.glasses,
+            ItemGripAsset a => a.grip,
+            ItemHatAsset a => a.hat,
+            ItemMagazineAsset a => a.magazine,
+            ItemMaskAsset a => a.mask,
+            ItemSightAsset a => a.sight,
+            ItemStructureAsset a => a.structure,
+            ItemTacticalAsset a => a.tactical,
+            ItemThrowableAsset a => a.throwable,
+            ItemVestAsset a => a.vest,
+            _ => null
+        };
+    }
     /// <summary>
     /// Returns the asset category (<see cref="EAssetType"/>) of <typeparamref name="TAsset"/>. Effeciently cached.
     /// </summary>
@@ -24,6 +65,7 @@ public static class AssetUtil
     /// <summary>
     /// Returns a read-only list of all loaded master bundles, or empty in the case of a reflection failure.
     /// </summary>
+    [Pure]
     public static IReadOnlyList<MasterBundleConfig> GetAllMasterBundles() => AllMasterBundlesGetter == null ? Array.Empty<MasterBundleConfig>() : AllMasterBundlesGetter().AsReadOnly();
 
     /// <summary>
@@ -34,6 +76,8 @@ public static class AssetUtil
         ThreadUtil.assertIsGameThread();
 
         path = Path.GetFullPath(path);
+        if (!Assets.shouldLoadAnyAssets)
+            return;
         if (LoadFile == null)
         {
             Logger.LogWarning($"Unable to load file from origin {origin.name.Format(false)}: {path.Format()}.", method: Source);
@@ -56,6 +100,8 @@ public static class AssetUtil
     /// </summary>
     public static void LoadMasterBundleSync(string masterBundleDatFilePath, AssetOrigin origin)
     {
+        if (!Assets.shouldLoadAnyAssets)
+            return;
         DatDictionary dict = ReadFileWithoutHash(masterBundleDatFilePath);
         MasterBundleConfig config = new MasterBundleConfig(Path.GetDirectoryName(masterBundleDatFilePath), dict, origin);
         byte[] data;
@@ -85,6 +131,8 @@ public static class AssetUtil
     /// <remarks>Do not reuse <paramref name="origin"/>.</remarks>
     public static void LoadAssetsSync(string directory, AssetOrigin origin, bool includeSubDirectories = true, bool loadMasterBundles = true)
     {
+        if (!Assets.shouldLoadAnyAssets)
+            return;
         LoadAssetsSyncIntl(directory, origin, includeSubDirectories, loadMasterBundles, true);
     }
 
@@ -112,6 +160,25 @@ public static class AssetUtil
         using FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         using StreamReader inputReader = new StreamReader(fileStream);
         return Parser.Parse(inputReader);
+    }
+    /// <summary>
+    /// Get internal reward array from an <see cref="NPCRewardsList"/>.
+    /// </summary>
+    /// <returns><see langword="null"/> in the case of a refelction error, otherwise the internal list of NPC rewards.</returns>
+    [Pure]
+    public static INPCReward[]? GetRewards(NPCRewardsList list)
+    {
+        return GetRewardsFromList?.Invoke(list);
+    }
+
+    /// <summary>
+    /// Gets a list of <see cref="IModuleNexus"/> loaded by a <see cref="Module"/>.
+    /// </summary>
+    /// <returns><see langword="null"/> in the case of a refelction error, otherwise the list of nexii.</returns>
+    [Pure]
+    public static IReadOnlyList<IModuleNexus>? GetModuleNexii(Module module)
+    {
+        return GetNexii?.Invoke(module);
     }
 
     private static void LoadAssetsSyncIntl(string directory, AssetOrigin origin, bool includeSubDirectories, bool loadMasterBundles, bool apply)
@@ -183,6 +250,9 @@ public static class AssetUtil
             translationData = ReadFileWithoutHash(englishLang);
     }
 #if CLIENT
+    /// <summary>
+    /// Refreshes the Levels UI for singleplayer, editor, and server browser menu.
+    /// </summary>
     public static void RefreshLevelsUI()
     {
         Level.broadcastLevelsRefreshed();
@@ -379,5 +449,28 @@ public static class AssetUtil
             else
                 Category = EAssetType.NONE;
         }
+    }
+
+    internal static async UniTask InvokeOnBeginLevelLoading(CancellationToken token)
+    {
+        if (OnBeginLevelLoading == null)
+            return;
+        LoadingUI.SetLoadingText("DevkitServer Initialization");
+        LoadingUI.NotifyLevelLoadingProgress(0.00001f);
+        LevelInfo info = Level.info;
+        foreach (BeginLevelLoading dele in OnBeginLevelLoading.GetInvocationList().Cast<BeginLevelLoading>())
+        {
+            try
+            {
+                await dele(info, token);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Caller threw an error in " + typeof(AssetUtil).Format() + "." + nameof(OnBeginLevelLoading).Colorize(ConsoleColor.White) + ".");
+                Logger.LogError(ex);
+            }
+        }
+        LoadingUI.NotifyLevelLoadingProgress(1f / 30f);
+        LoadingUI.updateScene();
     }
 }

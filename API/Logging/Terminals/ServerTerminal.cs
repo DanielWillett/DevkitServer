@@ -1,7 +1,7 @@
 ﻿#if SERVER
 using DevkitServer.Commands.Subsystem;
 
-namespace DevkitServer.Util.Terminals;
+namespace DevkitServer.API.Logging.Terminals;
 internal class ServerTerminal : MonoBehaviour, ITerminal
 {
     private bool _writing;
@@ -11,7 +11,7 @@ internal class ServerTerminal : MonoBehaviour, ITerminal
     public Action<CommandWindow, string>? LogWarnIntl;
     public Action<CommandWindow, string>? LogErrorIntl;
     private bool _init;
-    public bool IsCommitingToUnturnedLog => _writing;
+    public bool IsComittingToUnturnedLog => _writing;
     private void CheckInit()
     {
         if (_init) return;

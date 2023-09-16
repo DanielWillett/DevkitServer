@@ -87,7 +87,7 @@ public interface IPermissionHandler
     /// Called when a <see cref="PermissionGroup"/> is updated (by /p command, plugin, etc).
     /// </summary>
     /// <remarks>Will replicate any updates to clients.</remarks>
-    void SavePermissionGroup(PermissionGroup group);
+    void SavePermissionGroup(PermissionGroup group, bool priorityChanged);
 #endif
 }
 
@@ -268,7 +268,7 @@ public static class PermissionsEx
     /// </summary>
     public static bool ClientHasPermissionToRun(this Command command)
     {
-        return false;
+        return !DevkitServerModule.IsEditing;
     }
 #endif
 #if SERVER

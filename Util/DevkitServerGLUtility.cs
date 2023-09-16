@@ -26,8 +26,7 @@ public static class DevkitServerGLUtility
     }
     private static void OnRender()
     {
-        if (DevkitServerModule.IsEditing)
-            EventOnRenderAny.TryInvoke();
+        EventOnRenderAny.TryInvoke();
     }
     public static void DrawTerrainBounds(LandscapeCoord tile, int xMin, int xMax, int yMin, int yMax, bool splatmap, Color? constColor = null)
     {
@@ -147,6 +146,36 @@ public static class DevkitServerGLUtility
                 GL.Vertex3(cx + sx, cy + sy, cz - sz);
             }
         }
+    }
+    public static void DrawSelectBox(Vector3 begin, Vector3 end)
+    {
+        GLUtility.LINE_FLAT_COLOR.SetPass(0);
+        GL.Begin(1);
+        GL.Color(Color.yellow);
+        GLUtility.matrix = MathUtility.IDENTITY_MATRIX;
+        begin.z = 16f;
+        end.z = 16f;
+        Vector3 corner3 = begin with
+        {
+            x = end.x
+        };
+        Vector3 corner4 = end with
+        {
+            x = begin.x
+        };
+        begin = MainCamera.instance.ViewportToWorldPoint(begin);
+        corner3 = MainCamera.instance.ViewportToWorldPoint(corner3);
+        corner4 = MainCamera.instance.ViewportToWorldPoint(corner4);
+        end = MainCamera.instance.ViewportToWorldPoint(end);
+        GL.Vertex(begin);
+        GL.Vertex(corner3);
+        GL.Vertex(corner3);
+        GL.Vertex(end);
+        GL.Vertex(end);
+        GL.Vertex(corner4);
+        GL.Vertex(corner4);
+        GL.Vertex(begin);
+        GL.End();
     }
 }
 #endif

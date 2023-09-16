@@ -1,4 +1,5 @@
-﻿using DevkitServer.API.Permissions;
+﻿using DevkitServer.API.Abstractions;
+using DevkitServer.API.Permissions;
 using DevkitServer.Plugins;
 #if CLIENT
 using DevkitServer.Players.UI;
@@ -6,7 +7,7 @@ using DevkitServer.API.UI;
 #endif
 
 namespace DevkitServer.API;
-public abstract class Plugin : IDevkitServerColorPlugin
+public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourcePlugin, IReflectionDoneListenerDevkitServerPlugin
 {
     public static readonly Color DefaultColor = new Color32(204, 153, 255, 255);
     private readonly string _defaultName;
@@ -40,13 +41,16 @@ public abstract class Plugin : IDevkitServerColorPlugin
     /// <inheritdoc/>
     public string PermissionPrefix { get; set; }
 
+    /// <inheritdoc/>
+    public abstract bool DeveloperMode { get; }
+
     protected Plugin()
     {
         string asmName = GetType().Assembly.GetName().Name;
         _defaultName = asmName + "/" + GetType().Name;
         // ReSharper disable once VirtualMemberCallInConstructor (Reason: expecting literal string override)
         string name = Name ?? _defaultName;
-        DataDirectory = Path.Combine(PluginLoader.PluginDirectory, asmName + "." + name);
+        DataDirectory = Path.Combine(PluginLoader.PluginsDirectory, asmName + "." + name);
         LocalizationDirectory = Path.Combine(DataDirectory, "Localization");
         MainLocalizationDirectory = Path.Combine(LocalizationDirectory, "Main");
         Translations = Localization.tryRead(MainLocalizationDirectory, false);
@@ -55,6 +59,7 @@ public abstract class Plugin : IDevkitServerColorPlugin
             PermissionPrefix = attr.Prefix;
     }
     protected virtual LocalDatDictionary DefaultLocalization => new LocalDatDictionary();
+
 
     /// <inheritdoc/>
     void IDevkitServerPlugin.Load()
@@ -68,10 +73,20 @@ public abstract class Plugin : IDevkitServerColorPlugin
     /// <inheritdoc/>
     void IDevkitServerPlugin.Unload() => Unload();
 
+    void IReflectionDoneListenerDevkitServerPlugin.OnReflectionDone(PluginAssembly assembly, bool isFirstPluginInAssembly)
+    {
+        OnReflectionDone(assembly, isFirstPluginInAssembly);
+    }
+
     /// <summary>
     /// Called to load the plugin.
     /// </summary>
     protected abstract void Load();
+
+    /// <summary>
+    /// Called when reflection for the plugin's assembly is ran. Will only call once shortly after <see cref="IDevkitServerPlugin.Load"/>.
+    /// </summary>
+    protected virtual void OnReflectionDone(PluginAssembly assembly, bool isFirstPluginInAssembly) { }
 
     /// <summary>
     /// Called to unload the plugin.
@@ -90,23 +105,23 @@ public abstract class Plugin : IDevkitServerColorPlugin
 
     /// <inheritdoc/>
     public void LogDebug(string message, ConsoleColor color = ConsoleColor.DarkGray) =>
-        Logger.LogDebug("[" + Name.ToUpperInvariant().Colorize(Color) + "] " + message, color);
+        Logger.LogDebug("[" + this.GetSource() + "] " + message, color);
 
     /// <inheritdoc/>
     public void LogInfo(string message, ConsoleColor color = ConsoleColor.DarkCyan) =>
-        Logger.LogInfo("[" + Name.ToUpperInvariant().Colorize(Color) + "] " + message, color);
+        Logger.LogInfo("[" + this.GetSource() + "] " + message, color);
 
     /// <inheritdoc/>
     public void LogWarning(string message, ConsoleColor color = ConsoleColor.Yellow) =>
-        Logger.LogWarning(message, color, method: Name.ToUpperInvariant().Colorize(Color));
+        Logger.LogWarning(message, color, method: this.GetSource());
 
     /// <inheritdoc/>
     public void LogError(string message, ConsoleColor color = ConsoleColor.Red) =>
-        Logger.LogError(message, color, method: Name.ToUpperInvariant().Colorize(Color));
+        Logger.LogError(message, color, method: this.GetSource());
 
     /// <inheritdoc/>
     public void LogError(Exception ex) =>
-        Logger.LogError(ex, method: Name.ToUpperInvariant().Colorize(Color));
+        Logger.LogError(ex, method: this.GetSource());
 #if CLIENT
     public void RegisterUIExtension(Type implementationType, Type parentUIType, int priority)
     {
@@ -117,6 +132,9 @@ public abstract class Plugin : IDevkitServerColorPlugin
         UIExtensionManager.DeregisterExtension(implementationType);
     }
 #endif
+#nullable disable
+    ITranslationSource ICachedTranslationSourcePlugin.TranslationSource { get; set; }
+#nullable restore
 }
 
 public abstract class Plugin<TConfig> : Plugin, IDevkitServerPlugin<TConfig> where TConfig : class, new()
@@ -127,7 +145,7 @@ public abstract class Plugin<TConfig> : Plugin, IDevkitServerPlugin<TConfig> whe
     protected Plugin()
     {
         // ReSharper disable once VirtualMemberCallInConstructor (Reason: expecting literal string override)
-        _config = new JsonConfigurationFile<TConfig>(Path.Combine(DataDirectory, RelativeMainConfigFileName));
+        _config = new JsonConfigurationFile<TConfig>(Path.Combine(DataDirectory, RelativeMainConfigFileName)) { Faultable = true };
 
         _config.ReloadConfig();
     }

@@ -6,11 +6,14 @@ using DevkitServer.Models;
 using DevkitServer.Multiplayer.Sync;
 using System.Reflection;
 using Cysharp.Threading.Tasks;
+using Unturned.SystemEx;
 #if CLIENT
 using DevkitServer.AssetTools;
 using DevkitServer.Configuration;
 using DevkitServer.Util.Debugging;
 using System.Diagnostics;
+using DevkitServer.Players;
+using SDG.Framework.Devkit;
 #endif
 
 namespace DevkitServer.Core.Commands;
@@ -62,7 +65,8 @@ internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFil
             {
                 if (CommandTests.Commands[i].Method.Name.Equals(method, StringComparison.InvariantCultureIgnoreCase))
                 {
-                    ctx.AssertPermissionsOr(TestAll, SyncSubcommandPermissions[i]);
+                    if (DevkitServerModule.IsEditing)
+                        ctx.AssertPermissionsOr(TestAll, SyncSubcommandPermissions[i]);
 
                     ++ctx.ArgumentOffset;
                     try
@@ -89,7 +93,8 @@ internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFil
             {
                 if (CommandTests.AsyncCommands[i].Method.Name.Equals(method, StringComparison.InvariantCultureIgnoreCase))
                 {
-                    ctx.AssertPermissionsOr(TestAll, AsyncSubcommandPermissions[i]);
+                    if (DevkitServerModule.IsEditing)
+                        ctx.AssertPermissionsOr(TestAll, AsyncSubcommandPermissions[i]);
 
                     ++ctx.ArgumentOffset;
                     try
@@ -139,9 +144,42 @@ internal static class CommandTests
 #if CLIENT
     private static void grab(CommandContext ctx)
     {
+        if (ctx.HasArgsExact(0))
+        {
+            if (Level.isEditor && DevkitSelectionManager.selection.Count == 1)
+            {
+                GameObject obj = DevkitSelectionManager.selection.EnumerateFirst().gameObject;
+                if (obj != null)
+                {
+                    string dir = Path.Combine(DevkitServerConfig.Directory, "AssetExports", "Selection", obj.name);
+                    if (Directory.Exists(dir))
+                        Directory.Delete(dir, true);
+                    Directory.CreateDirectory(dir);
+
+                    if (Grabber.Save<Object>(obj, dir))
+                        ctx.ReplyString("Saved <#ddd>" + obj.name + "</color> to <#fff>" + dir + "</color>.");
+                    else
+                        ctx.ReplyString("<#ffae3d>Couldn't save.");
+                    return;
+                }
+            }
+            if (Physics.Raycast(UserInput.GetLocalLookRay(), out RaycastHit hit, 8192f, unchecked((int)0xFFFFFFFF), QueryTriggerInteraction.Ignore))
+            {
+                string dir = Path.Combine(DevkitServerConfig.Directory, "AssetExports", "Look", hit.transform.name);
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, true);
+                Directory.CreateDirectory(dir);
+
+                if (Grabber.Save<Object>(hit.transform.gameObject, dir))
+                    ctx.ReplyString("Saved <#ddd>" + hit.transform.gameObject.name + "</color> to <#fff>" + dir + "</color>.");
+                else
+                    ctx.ReplyString("<#ffae3d>Couldn't save.");
+                return;
+            }
+        }
         if (ctx.HasArgsExact(1) && ctx.TryGet(0, out string resourcePath))
         {
-            string actualPath = Path.Combine(DevkitServerConfig.Directory, "AssetExports", resourcePath);
+            string actualPath = Path.Combine(DevkitServerConfig.Directory, "AssetExports", "Unity Resources", resourcePath);
             if (Grabber.DownloadResource<Object>(resourcePath, actualPath))
             {
                 ctx.ReplyString("Saved to <#fff>" + actualPath + "</color>.");
@@ -168,7 +206,7 @@ internal static class CommandTests
                 bundle.unload();
             }
         }
-        else ctx.SendCorrectUsage("/test savetexture <resource>");
+        else ctx.SendCorrectUsage("/test grab <resource>");
     }
 #if DEBUG
     private static void tiledebug(CommandContext ctx)
@@ -186,6 +224,8 @@ internal static class CommandTests
 #endif
     private static void syncall(CommandContext ctx)
     {
+        ctx.AssertDevkitServerClient();
+
         TileSync? tileSyncAuth = TileSync.GetAuthority();
 #if CLIENT
         if (tileSyncAuth == null || !tileSyncAuth.IsOwner)

@@ -2,6 +2,10 @@
 using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.Multiplayer.Networking;
+
+/// <summary>
+/// Create with <see cref="CreateFromCaller"/>.
+/// </summary>
 public readonly struct MessageContext
 {
     public static readonly MessageContext Nil = new MessageContext(null!, new MessageOverhead(MessageFlags.None, 0, 0), false);
@@ -19,7 +23,7 @@ public readonly struct MessageContext
     public bool IsLayered => (Overhead.Flags & MessageFlags.RunOriginalMethodOnRequest) != 0;
     public bool IsResponse => (Overhead.Flags & MessageFlags.RequestResponse) != 0;
     public bool IsAckRequest => (Overhead.Flags & MessageFlags.AcknowledgeRequest) != 0;
-    public MessageContext(
+    internal MessageContext(
 #if SERVER
         ITransportConnection
 #else

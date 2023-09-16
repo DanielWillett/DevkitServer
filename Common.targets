@@ -29,10 +29,6 @@
         <Reference Include="UniTask">
             <HintPath>$(IncludedLibrariesPath)\UniTask.dll</HintPath>
         </Reference>
-    </ItemGroup>
-
-    <!-- Server References -->
-    <ItemGroup Condition="$(DefineConstants.Contains(SERVER))">
 
         <!-- System.IO.Compression -->
         <Reference Include="System.Data.DataSetExtensions" />
@@ -40,6 +36,10 @@
         <Reference Include="System.IO.Compression.FileSystem">
             <HintPath>$(IncludedLibrariesPath)\System.IO.Compression.FileSystem.dll</HintPath>
         </Reference>
+    </ItemGroup>
+
+    <!-- Server References -->
+    <ItemGroup Condition="$(DefineConstants.Contains(SERVER))">
         
         <!-- Unturned -->
         <Reference Include="Assembly-CSharp">
@@ -83,6 +83,9 @@
         <Reference Include="UnityEngine.AssetBundleModule">
             <HintPath>$(ServerPath)\Unturned_Data\Managed\UnityEngine.AssetBundleModule.dll</HintPath>
         </Reference>
+        <Reference Include="UnityEngine.UnityWebRequestModule">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
+        </Reference>
     </ItemGroup>
 
 
@@ -107,6 +110,9 @@
         </Reference>
         <Reference Include="SDG.Glazier.Runtime">
             <HintPath>$(ClientPath)\Unturned_Data\Managed\SDG.Glazier.Runtime.dll</HintPath>
+        </Reference>
+        <Reference Include="HighlightingSystem">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\HighlightingSystem.dll</HintPath>
         </Reference>
 
         <!-- Unity -->
@@ -146,6 +152,15 @@
         <Reference Include="UnityEngine.UI">
             <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.UI.dll</HintPath>
         </Reference>
+        <Reference Include="UnityEngine.TextRenderingModule">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.InputLegacyModule">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.UnityWebRequestModule">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
+        </Reference>
     </ItemGroup>
 
 
@@ -181,6 +196,9 @@
         <Using Include="System.Action">
             <Alias>Action</Alias>
         </Using>
+      <Using Include="DevkitServer.API.Logging.Logger">
+        <Alias>Logger</Alias>
+      </Using>
 
     </ItemGroup>
 

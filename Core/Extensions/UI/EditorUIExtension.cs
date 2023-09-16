@@ -6,39 +6,52 @@ using DevkitServer.Players;
 namespace DevkitServer.Core.Extensions.UI;
 
 [UIExtension(typeof(EditorUI))]
-internal class EditorUIExtension : UIExtension, IDisposable
+internal class EditorUIExtension : ContainerUIExtension
 {
     private readonly List<Nametag> _nametags = new List<Nametag>(16);
-#nullable disable
-    [ExistingUIMember(nameof(EditorUI.window))]
-    public SleekWindow Window { get; }
-#nullable restore
-    public SleekFullscreenBox Container { get; set; }
-    public EditorUIExtension()
+    private bool _subbed;
+    protected override SleekWindow Parent => EditorUI.window;
+    protected override void Opened()
     {
-        UserManager.OnUserConnected += OnUserConnected;
-        UserManager.OnUserDisconnected += OnUserDisconnected;
-        UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
-
-        Container = new SleekFullscreenBox
+        if (!_subbed)
         {
-            sizeScale_X = 1f,
-            sizeScale_Y = 1f
-        };
-        Window.AddChild(Container);
+            UserManager.OnUserConnected += OnUserConnected;
+            UserManager.OnUserDisconnected += OnUserDisconnected;
+            UserInput.OnUserEditorPositionUpdated += OnUserEditorPositionUpdated;
+            _subbed = true;
+        }
         UpdateAllNametags();
-    }
-    public void Dispose()
-    {
-        UserManager.OnUserConnected -= OnUserConnected;
-        UserManager.OnUserDisconnected -= OnUserDisconnected;
-        UserInput.OnUserPositionUpdated -= OnUserPositionUpdated;
-        
-        Window?.RemoveChild(Container);
+        base.Opened();
     }
 
-    internal void OnUserPositionUpdated(EditorUser user)
+    protected override void Closed()
     {
+        base.Closed();
+        if (_subbed)
+        {
+            UserManager.OnUserConnected -= OnUserConnected;
+            UserManager.OnUserDisconnected -= OnUserDisconnected;
+            UserInput.OnUserEditorPositionUpdated -= OnUserEditorPositionUpdated;
+            _subbed = false;
+        }
+    }
+
+    public override void Dispose()
+    {
+        if (_subbed)
+        {
+            UserManager.OnUserConnected -= OnUserConnected;
+            UserManager.OnUserDisconnected -= OnUserDisconnected;
+            UserInput.OnUserEditorPositionUpdated -= OnUserEditorPositionUpdated;
+            _subbed = false;
+        }
+        base.Dispose();
+    }
+
+    private void OnUserEditorPositionUpdated(EditorUser user)
+    {
+        if (Container == null)
+            return;
         if (user == EditorUser.User)
         {
             UpdateAllNametags();
@@ -57,6 +70,8 @@ internal class EditorUIExtension : UIExtension, IDisposable
     }
     private void CreateNametag(EditorUser user)
     {
+        if (Container == null)
+            return;
         // PlayerGroupUI.addGroup
         ISleekLabel label = Glazier.Get().CreateLabel();
         label.positionOffset_X = -100;
@@ -73,6 +88,8 @@ internal class EditorUIExtension : UIExtension, IDisposable
 
     private void UpdateNametag(ISleekLabel nametag, EditorUser user)
     {
+        if (Container == null)
+            return;
         GameObject? ctrl = user.Input.ControllerObject;
         if (ctrl == null)
             return;
@@ -94,11 +111,13 @@ internal class EditorUIExtension : UIExtension, IDisposable
 
     private void OnUserConnected(EditorUser user)
     {
-        OnUserPositionUpdated(user);
+        OnUserEditorPositionUpdated(user);
     }
 
     private void OnUserDisconnected(EditorUser user)
     {
+        if (Container == null)
+            return;
         for (int i = 0; i < _nametags.Count; ++i)
         {
             if (_nametags[i].Player == user.SteamId.m_SteamID)
@@ -112,6 +131,8 @@ internal class EditorUIExtension : UIExtension, IDisposable
     }
     internal void UpdateAllNametags()
     {
+        if (Container == null)
+            return;
         for (int p = 0; p < UserManager.Users.Count; ++p)
         {
             bool found = false;

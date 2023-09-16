@@ -4,8 +4,11 @@ using System.Reflection;
 using System.Reflection.Emit;
 using DevkitServer.Multiplayer.Levels;
 #if CLIENT
+using DevkitServer.Configuration;
+using DevkitServer.Core.Extensions.UI;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Players;
 using DevkitServer.Players.UI;
 using SDG.Framework.Devkit.Transactions;
 using SDG.Framework.Utilities;
@@ -22,7 +25,7 @@ internal static class LevelObjectPatches
     internal static bool IsSyncing;
     private static bool IsFinalTransform;
     private static readonly Action? CallCalculateHandleOffsets =
-        Accessor.GenerateStaticCaller<EditorObjects, Action>("calculateHandleOffsets", Array.Empty<Type>());
+        Accessor.GenerateStaticCaller<EditorObjects, Action>("calculateHandleOffsets", allowUnsafeTypeBinding: true);
 
     private static readonly List<LevelObject> PendingMaterialUpdates = new List<LevelObject>(LevelObjectUtil.MaxUpdateObjectsPacketSize);
 
@@ -71,8 +74,6 @@ internal static class LevelObjectPatches
         Type eo = typeof(EditorObjects);
         Type lo = typeof(LevelObjects);
         Type dtu = typeof(DevkitTransactionUtility);
-        // Type vp = typeof(VanillaPermissions);
-        
 
         MethodInfo? pointSelection = eo.GetMethod("pointSelection", BindingFlags.Static | BindingFlags.Public, null, Array.Empty<Type>(), null);
         if (pointSelection == null)
@@ -166,8 +167,6 @@ internal static class LevelObjectPatches
             DevkitServerModule.Fault();
         }
 
-        // Label stLbl = generator.DefineLabel();
-
         int patchedReun = 0;
         bool patchedCopy = false;
         bool patchedPaste = false;
@@ -178,14 +177,13 @@ internal static class LevelObjectPatches
         bool patchedTranslate = false;
 
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
-        int i = 0;
-        // PatchUtil.InsertActionRateLimiter(ref i, stLbl, ins);
-        for (; i < ins.Count; ++i)
+        ins.Insert(0, new CodeInstruction(OpCodes.Call, Accessor.GetMethod(OnUpdate)));
+        for (int i = 1; i < ins.Count; ++i)
         {
             // cancel reun operation
             if (i < ins.Count - 1 && clearSelection != null && ins[i].Calls(clearSelection) && (redo != null && ins[i + 1].Calls(redo) || undo != null && ins[i + 1].Calls(undo)))
             {
-                MethodInfo invoker = (redo != null && ins[i + 1].Calls(redo) ? new Action(TransactionPatches.OnRedoRequested) : TransactionPatches.OnUndoRequested).Method;
+                MethodInfo? invoker = redo != null && ins[i + 1].Calls(redo) ? Accessor.GetMethod(TransactionPatches.OnRedoRequested) : Accessor.GetMethod(TransactionPatches.OnUndoRequested);
                 MethodBase? original = ins[i + 1].operand as MethodBase;
                 ins.RemoveAt(i + 1);
                 ins[i] = new CodeInstruction(OpCodes.Call, invoker);
@@ -212,7 +210,7 @@ internal static class LevelObjectPatches
             // translate with E
             if (!patchedTranslate && patchedHandleDown && patchedPasteTransform && pointSelection != null && ins[i].Calls(pointSelection))
             {
-                ins.Insert(i + 1, new CodeInstruction(OpCodes.Call, new Action(PreIsFinalExternallyTransforming).Method));
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Call, Accessor.GetMethod(PreIsFinalExternallyTransforming)));
                 patchedTranslate = true;
             }
 
@@ -315,12 +313,12 @@ internal static class LevelObjectPatches
                 ins[i + 1].labels.Clear();
                 i += 6;
                 PatchUtil.ContinueUntil(ins, ref i, x => x.Calls(calculateHandleOffsets), false);
-                CodeInstruction instr = new CodeInstruction(OpCodes.Call, new Action(OnMoveOneObject).Method);
+                CodeInstruction instr = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(OnMoveOneObject));
                 ins.Insert(i++, instr);
                 instr.labels.AddRange(ins[i].labels);
                 ins[i].labels.Clear();
                 PatchUtil.ContinueUntil(ins, ref i, x => x.opcode.IsBrAny(), false);
-                instr = new CodeInstruction(OpCodes.Call, new Action(PreIsFinalExternallyTransforming).Method);
+                instr = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(PreIsFinalExternallyTransforming));
                 ins.Insert(i++, instr);
                 instr.labels.AddRange(ins[i].labels);
                 ins[i].labels.Clear();
@@ -388,7 +386,7 @@ internal static class LevelObjectPatches
             Logger.LogWarning($"Patched {patchedReun.Format()}/{2.Format()} undo/redo operations in {method.Format()}.", method: Source);
             DevkitServerModule.Fault();
         }
-
+        
         return ins;
     }
 
@@ -510,6 +508,69 @@ internal static class LevelObjectPatches
         finally
         {
             ListPool<FinalTransformation>.release(transformations);
+        }
+    }
+
+    private static Transform? _hover;
+    private static void OnUpdate()
+    {
+        // highlight fade time seconds
+        const float fade = 0.1f;
+
+        if (!EditorObjects.isBuilding)
+        {
+            if (_hover != null)
+            {
+                HighlighterUtil.Unhighlight(_hover, fade);
+                _hover = null;
+            }
+            return;
+        }
+
+        if (DevkitServerConfig.Config.EnableObjectUIExtension)
+            EditorLevelObjectsUIExtension.OnUpdate();
+
+        bool midClick = InputEx.GetKeyDown(KeyCode.Mouse2);
+
+        if ((!DevkitServerConfig.Config.RemoveCosmeticImprovements || midClick) && EditorInteractEx.TryGetWorldHit(out RaycastHit hit) && (hit.transform.CompareTag("Large") || hit.transform.CompareTag("Medium") ||
+                hit.transform.CompareTag("Small") || hit.transform.CompareTag("Barricade") ||
+                hit.transform.CompareTag("Structure")) &&
+            LevelObjectUtil.TryFindObjectOrBuildable(hit.transform, out LevelObject? @object, out LevelBuildableObject? buildable, true))
+        {
+            Asset? asset = @object?.asset ?? (Asset?)buildable?.asset;
+
+            if (midClick)
+                LevelObjectUtil.SelectObjectType(asset);
+
+            if (DevkitServerConfig.Config.RemoveCosmeticImprovements)
+                return;
+            // object hover highlights
+            bool dif = _hover != hit.transform;
+            if (_hover is not null && dif)
+            {
+                if (_hover != null && !LevelObjectUtil.IsSelected(_hover))
+                    HighlighterUtil.Unhighlight(_hover, fade);
+                
+                _hover = null;
+            }
+
+            if (dif)
+            {
+                if (!LevelObjectUtil.IsSelected(hit.transform))
+                    HighlighterUtil.Highlight(hit.transform, Color.black, fade);
+                
+                _hover = hit.transform;
+            }
+
+            return;
+        }
+        
+        if (_hover != null)
+        {
+            if (!LevelObjectUtil.IsSelected(_hover))
+                HighlighterUtil.Unhighlight(_hover, fade);
+
+            _hover = null!;
         }
     }
     private static void OnInstantiate(Vector3 position, Quaternion rotation, Vector3 scale, ObjectAsset objectAsset, ItemAsset buildableAsset)

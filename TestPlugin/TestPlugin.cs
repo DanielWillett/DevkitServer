@@ -15,6 +15,13 @@ public class TestPlugin : Plugin<TestPluginConfig>
         Instance?.LogInfo($"Received test net call: {val.Format()}.");
     }
     public override string Name => "TestPlugin.Core";
+
+#if DEBUG
+    public override bool DeveloperMode => true;
+#else
+    public override bool DeveloperMode => false;
+#endif
+
     protected override void Load()
     {
         Instance = this;

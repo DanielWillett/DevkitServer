@@ -15,7 +15,7 @@ public static class LandscapeUtil
         Accessor.GenerateStaticGetter<Landscape, Dictionary<LandscapeCoord, LandscapeTile>>("tiles", throwOnError: true)!;
 
     private static readonly Action<LandscapeTile>? CallReadHoles =
-        Accessor.GenerateInstanceCaller<LandscapeTile, Action<LandscapeTile>>("ReadHoles", Array.Empty<Type>());
+        Accessor.GenerateInstanceCaller<LandscapeTile, Action<LandscapeTile>>("ReadHoles", allowUnsafeTypeBinding: true);
 
     /// <returns>A readonly value collection used to loop through all the existing tiles.</returns>
     public static IReadOnlyCollection<LandscapeTile> Tiles => GetTiles().Values;

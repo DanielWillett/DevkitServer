@@ -78,23 +78,24 @@ internal sealed class RegionDebug : MonoBehaviour
     {
         float height = DebugStyle.CalcHeight(new GUIContent(content), 1024f);
         GUI.Label(new Rect(6, y + 1, 1024f, height + 5f), FormattingUtil.RemoveRichText(content,
-            options: FormattingUtil.RemoveRichTextOptions.Color | FormattingUtil.RemoveRichTextOptions.Mark), DebugShadowStyle);
+            options: RemoveRichTextOptions.Color | RemoveRichTextOptions.Mark), DebugShadowStyle);
         GUI.Label(new Rect(5, y, 1024f, height + 5f), content, DebugStyle);
         y += height + 5f;
     }
     [UsedImplicitly]
     private void OnGUI()
     {
-        if (!_tilesEnabled && !_regionsEnabled) return;
-        if (!DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null)
+        if (!Level.isEditor || !_tilesEnabled && !_regionsEnabled || LoadingUI.isBlocked)
             return;
-        Transform ctrlTransform = EditorUser.User.Input.ControllerObject.transform;
+
+        Transform? ctrlTransform = !DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null ? MainCamera.instance.transform.parent : EditorUser.User.Input.ControllerObject.transform;
+        if (ctrlTransform == null) return;
         float yaw = ctrlTransform.rotation.eulerAngles.y;
         yaw %= 360;
         if (yaw < 0) yaw += 360;
         float y = 80;
         Label("<b>Position</b>: " + ctrlTransform.position.ToString("F2") + ", Yaw: " + yaw.ToString("F2") + "°", ref y);
-        Transform? aim = EditorUser.User.Input.Aim;
+        Transform? aim = (!DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null ? MainCamera.instance.transform : EditorUser.User.Input.Aim);
         if (aim != null)
         {
             string facing;
@@ -130,7 +131,9 @@ internal sealed class RegionDebug : MonoBehaviour
     
     private static void HandleGLRender()
     {
-        if (UserInput.LocalController != CameraController.Editor) return;
+        if (LoadingUI.isBlocked || !Level.isLoaded || UserInput.LocalController != CameraController.Editor)
+            return;
+
         GLUtility.matrix = Matrix4x4.identity;
         GLUtility.LINE_FLAT_COLOR.SetPass(0);
         GL.Begin(GL.LINES);
@@ -143,7 +146,10 @@ internal sealed class RegionDebug : MonoBehaviour
             _tileCorners = new Vector3[tiles.Count, 4];
             foreach (LandscapeTile tile in tiles)
             {
-                GetCornersTile(tile, out Vector3 corner1, out Vector3 corner2, out Vector3 corner3, out Vector3 corner4);
+                Vector3 corner1 = Landscape.getWorldPosition(tile.coord, default, tile.heightmap[0, 0]);
+                Vector3 corner2 = Landscape.getWorldPosition(tile.coord, new HeightmapCoord(0, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE), tile.heightmap[0, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE]);
+                Vector3 corner3 = Landscape.getWorldPosition(tile.coord, new HeightmapCoord(Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE), tile.heightmap[Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE]);
+                Vector3 corner4 = Landscape.getWorldPosition(tile.coord, new HeightmapCoord(Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, 0), tile.heightmap[Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, 0]);
                 _tileCorners[++index, 0] = corner1;
                 _tileCorners[index, 1] = corner2;
                 _tileCorners[index, 2] = corner3;
@@ -153,9 +159,10 @@ internal sealed class RegionDebug : MonoBehaviour
             _avgLineHeight = avgLineHeight = Mathf.RoundToInt(y / ((index + 1) * 4f));
             index = -1;
         }
+        Transform? ctrlTransform = !DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null ? MainCamera.instance.transform.parent : EditorUser.User.Input.ControllerObject.transform;
         if (_tilesEnabled)
         {
-            LandscapeTile? current = EditorUser.User!.Input.ControllerObject == null ? null : Landscape.getTile(EditorUser.User.Input.ControllerObject.transform.position);
+            LandscapeTile? current = ctrlTransform == null ? null : Landscape.getTile(ctrlTransform.position);
             bool lastWasCurrent = false;
 
             foreach (LandscapeTile tile in tiles)
@@ -197,8 +204,8 @@ internal sealed class RegionDebug : MonoBehaviour
         {
             byte worldSize = Regions.WORLD_SIZE;
             byte cx = 0, cy = 0;
-            bool isInRegion = EditorUser.User!.Input.ControllerObject != null;
-            Vector3 position = !isInRegion ? Vector3.zero : EditorUser.User.Input.ControllerObject!.transform.position;
+            bool isInRegion = ctrlTransform != null;
+            Vector3 position = !isInRegion ? Vector3.zero : ctrlTransform!.position;
             isInRegion = isInRegion && Regions.tryGetCoordinate(position, out cx, out cy);
             float lvlSizeX = Mathf.Min(4096, Mathf.Max(Mathf.Abs(CartographyUtil.CaptureBounds.max.x), Mathf.Abs(CartographyUtil.CaptureBounds.min.x)));
             float lvlSizeZ = Mathf.Min(4096, Mathf.Max(Mathf.Abs(CartographyUtil.CaptureBounds.max.z), Mathf.Abs(CartographyUtil.CaptureBounds.min.z)));
@@ -251,14 +258,6 @@ internal sealed class RegionDebug : MonoBehaviour
             }
         }
         GL.End();
-
-        void GetCornersTile(LandscapeTile tile, out Vector3 corner1, out Vector3 corner2, out Vector3 corner3, out Vector3 corner4)
-        {
-            corner1 = Landscape.getWorldPosition(tile.coord, default, tile.heightmap[0, 0]);
-            corner2 = Landscape.getWorldPosition(tile.coord, new HeightmapCoord(0, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE), tile.heightmap[0, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE]);
-            corner3 = Landscape.getWorldPosition(tile.coord, new HeightmapCoord(Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE), tile.heightmap[Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE]);
-            corner4 = Landscape.getWorldPosition(tile.coord, new HeightmapCoord(Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, 0), tile.heightmap[Landscape.HEIGHTMAP_RESOLUTION_MINUS_ONE, 0]);
-        }
     }
 }
 #endif

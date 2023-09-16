@@ -37,10 +37,16 @@ public static class LevelObjectNetIdDatabase
 #endif
     private static void OnBuildableRemoved(LevelBuildableObject buildable, RegionIdentifier id)
     {
+        if (!DevkitServerModule.IsEditing)
+            return;
+
         RemoveIdentifier(id, buildable, true);
     }
     private static void OnBuildableRegionUpdated(LevelBuildableObject buildable, RegionIdentifier from, RegionIdentifier to)
     {
+        if (!DevkitServerModule.IsEditing)
+            return;
+
         NetId netId = RemoveIdentifier(from, buildable, false);
         if (netId != NetId.INVALID)
             BuildableAssignments[to] = netId;

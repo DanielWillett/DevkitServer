@@ -4,6 +4,9 @@
 public struct SurroundingRegionsIterator : IEnumerator<RegionCoord>, IEnumerable<RegionCoord>
 {
     private static readonly int[] LayerIndices = new int[Regions.WORLD_SIZE + 1];
+    public readonly byte StartX;
+    public readonly byte StartY;
+    public readonly byte MaxRegionDistance;
     static SurroundingRegionsIterator()
     {
         LayerIndices[1] = 1;
@@ -13,15 +16,14 @@ public struct SurroundingRegionsIterator : IEnumerator<RegionCoord>, IEnumerable
         }
     }
     private RegionCoord _current;
-    private readonly byte _startX;
-    private readonly byte _startY;
     private int _index;
     private int _layer;
     private int _nextLayerIndex;
-    public SurroundingRegionsIterator(byte x, byte y)
+    public SurroundingRegionsIterator(byte x, byte y, byte maxRegionDistance = 255)
     {
-        _startX = x;
-        _startY = y;
+        MaxRegionDistance = maxRegionDistance;
+        StartX = x;
+        StartY = y;
         _index = -1;
         _layer = 0;
         _nextLayerIndex = 1;
@@ -45,15 +47,15 @@ public struct SurroundingRegionsIterator : IEnumerator<RegionCoord>, IEnumerable
         ++_index;
         if (_index == 0)
         {
-            x = _startX;
-            y = _startY;
+            x = StartX;
+            y = StartY;
             return true;
         }
 
         if (_index >= _nextLayerIndex)
         {
             ++_layer;
-            if (_layer >= Regions.WORLD_SIZE)
+            if (_layer >= Regions.WORLD_SIZE || _layer > MaxRegionDistance)
             {
                 x = 0;
                 y = 0;
@@ -99,8 +101,8 @@ public struct SurroundingRegionsIterator : IEnumerator<RegionCoord>, IEnumerable
                 break;
         }
 
-        x += _startX;
-        y += _startY;
+        x += StartX;
+        y += StartY;
 
         return true;
     }
@@ -115,7 +117,7 @@ public struct SurroundingRegionsIterator : IEnumerator<RegionCoord>, IEnumerable
 
     public RegionCoord Current => _current;
     object IEnumerator.Current => Current;
-    public SurroundingRegionsIterator GetEnumerator() => new SurroundingRegionsIterator(_startX, _startY);
-    IEnumerator<RegionCoord> IEnumerable<RegionCoord>.GetEnumerator() => new SurroundingRegionsIterator(_startX, _startY);
-    IEnumerator IEnumerable.GetEnumerator() => new SurroundingRegionsIterator(_startX, _startY);
+    public SurroundingRegionsIterator GetEnumerator() => new SurroundingRegionsIterator(StartX, StartY, MaxRegionDistance);
+    IEnumerator<RegionCoord> IEnumerable<RegionCoord>.GetEnumerator() => new SurroundingRegionsIterator(StartX, StartY, MaxRegionDistance);
+    IEnumerator IEnumerable.GetEnumerator() => new SurroundingRegionsIterator(StartX, StartY, MaxRegionDistance);
 }

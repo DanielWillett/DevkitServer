@@ -1,5 +1,4 @@
-﻿
-#if CLIENT
+﻿#if CLIENT
 #if DEBUG
 
 /*
@@ -21,6 +20,9 @@ using System.Reflection.Emit;
 using System.Runtime.Serialization;
 
 namespace DevkitServer.Players.UI;
+/// <summary>
+/// Manages UI extensions, which is a system designed to easily extend vanilla UIs.
+/// </summary>
 public static class UIExtensionManager
 {
     internal const string Source = "UI EXT MNGR";
@@ -29,17 +31,59 @@ public static class UIExtensionManager
     private static readonly Dictionary<Type, UIExtensionParentTypeInfo> ParentTypeInfoIntl = new Dictionary<Type, UIExtensionParentTypeInfo>(8);
     private static readonly Dictionary<MethodBase, UIExtensionPatch> Patches = new Dictionary<MethodBase, UIExtensionPatch>(64);
     private static readonly Dictionary<MethodBase, UIExtensionExistingMemberPatchInfo> PatchInfo = new Dictionary<MethodBase, UIExtensionExistingMemberPatchInfo>(64);
+    private static Action<object>? _onDestroy;
+    private static Action<object>? _onAdd;
+    /// <summary>
+    /// List of all registered UI Extensions (info, not instances themselves).
+    /// </summary>
     public static IReadOnlyList<UIExtensionInfo> Extensions { get; } = ExtensionsIntl.AsReadOnly();
+
+    /// <summary>
+    /// Dictionary of all parent types. Parent types references the vanilla UI type backend. (i.e. <see cref="PlayerDashboardCraftingUI"/>)
+    /// </summary>
     public static IReadOnlyDictionary<Type, UIExtensionParentTypeInfo> ParentTypeInfo { get; } = new ReadOnlyDictionary<Type, UIExtensionParentTypeInfo>(ParentTypeInfoIntl);
-    
+
+    /// <summary>
+    /// Gets the last created instance of <typeparamref name="T"/> (which should be a UI extension), or <see langword="null"/> if one isn't registered.
+    /// </summary>
+    /// <remarks>Lazily cached.</remarks>
+    public static T? GetInstance<T>() where T : class => InstanceCache<T>.Instance;
+
     [Conditional("UI_EXT_DEBUG")]
-    internal static void LogDebug(string message, IDevkitServerPlugin? plugin = null)
+    internal static void LogDebug(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
-        message = $"[{Source}] " + message;
         if (plugin == null)
-            Logger.LogDebug(message);
+            Logger.LogDebug(assembly == null ? "[" + Source + "] " + message : ("[" + Source + " | " + assembly.GetName().Name.ToUpperInvariant() + "] " + message));
         else
             plugin.LogDebug(message);
+    }
+    internal static void LogInfo(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
+    {
+        if (plugin == null)
+            Logger.LogWarning(message, method: assembly == null ? Source : (Source + " | " + assembly.GetName().Name.ToUpperInvariant()));
+        else
+            plugin.LogWarning(message);
+    }
+    internal static void LogWarning(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
+    {
+        if (plugin == null)
+            Logger.LogWarning(message, method: assembly == null ? Source : (Source + " | " + assembly.GetName().Name.ToUpperInvariant()));
+        else
+            plugin.LogWarning(message);
+    }
+    internal static void LogError(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
+    {
+        if (plugin == null)
+            Logger.LogError(message, method: assembly == null ? Source : (Source + " | " + assembly.GetName().Name.ToUpperInvariant()));
+        else
+            plugin.LogError(message);
+    }
+    internal static void LogError(Exception ex, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
+    {
+        if (plugin == null)
+            Logger.LogError(ex, method: assembly == null ? Source : (Source + " | " + assembly.GetName().Name.ToUpperInvariant()));
+        else
+            plugin.LogError(ex);
     }
 
     internal static void Reflect(Assembly assembly)
@@ -59,9 +103,9 @@ public static class UIExtensionManager
                 plugin = PluginLoader.FindPluginForMember(type);
                 if (plugin == null)
                 {
-                    Logger.LogWarning($"Unable to link {type.Format()} UI extension to a plugin. Use the {typeof(PluginIdentifierAttribute).Format()} on the " +
+                    LogWarning($"Unable to link {type.Format()} UI extension to a plugin. Use the {typeof(PluginIdentifierAttribute).Format()} on the " +
                                       "field to link an invoker to a " +
-                                      "plugin when multiple plugins are loaded from an assembly.", method: Source);
+                                      "plugin when multiple plugins are loaded from an assembly.", null, type.Assembly);
                     continue;
                 }
             }
@@ -77,21 +121,12 @@ public static class UIExtensionManager
             }
             catch (Exception ex)
             {
-                if (plugin != null)
-                {
-                    plugin.LogError($"Error initializing UI extension: {type.Format()}.");
-                    plugin.LogError(ex);
-                }
-                else
-                {
-                    Logger.LogError($"Error initializing UI extension: {type.Format()}.", method: Source);
-                    Logger.LogError(ex, method: Source);
-                }
-
+                LogError($"Error initializing UI extension: {type.Format()}.", plugin, type.Assembly);
+                LogError(ex, plugin, type.Assembly);
                 continue;
             }
 
-            LogDebug($"Registered UI extension: {type.Format()}.", plugin);
+            LogDebug($"Registered UI extension: {type.Format()}.", plugin, type.Assembly);
         }
     }
 
@@ -100,6 +135,35 @@ public static class UIExtensionManager
         if (instance != null)
             type = instance.GetType();
         LogDebug($"Opened: {type.Format()}.");
+        if (!ParentTypeInfoIntl.TryGetValue(type!, out UIExtensionParentTypeInfo parentTypeInfo))
+        {
+            LogWarning($"Unable to find parent type info while opening {type.Format()}.");
+            return;
+        }
+        
+        bool found = false;
+        for (int i = 0; i < parentTypeInfo.VanillaInstancesIntl.Count; ++i)
+        {
+            UIExtensionVanillaInstanceInfo instanceInfo = parentTypeInfo.VanillaInstancesIntl[i];
+            if (ReferenceEquals(instanceInfo.Instance, instance) || parentTypeInfo.VanillaInstancesIntl.Count == 1 && parentTypeInfo.ParentTypeInfo.IsInstanceUI)
+            {
+                if (instanceInfo.IsOpen)
+                {
+                    LogDebug($"Already open: {type.Format()}.");
+                    return;
+                }
+
+                found = true;
+                instanceInfo.IsOpen = true;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            LogWarning($"Unable to find vanilla instance info while opening {type.Format()}.");
+            return;
+        }
         for (int i = 0; i < ExtensionsIntl.Count; i++)
         {
             UIExtensionInfo info = ExtensionsIntl[i];
@@ -112,16 +176,16 @@ public static class UIExtensionManager
                 {
                     try
                     {
-                        ext.InvokeOnClosed();
+                        ext.InvokeOnOpened();
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"Error invoking OnOpened from {instantiation.GetType().Format()}.", method: Source);
-                        Logger.LogError(ex, method: Source);
+                        LogError($"Error invoking OnOpened from {instantiation.GetType().Format()}.", info.Plugin, info.Assembly);
+                        LogError(ex, info.Plugin, info.Assembly);
                     }
                 }
             }
-            LogDebug($"* Invoked Opened: {info.ImplementationType.Format()}.", info.Plugin);
+            LogDebug($"* Invoked Opened: {info.ImplementationType.Format()}.", info.Plugin, info.Assembly);
         }
     }
     private static void OnClosed(Type? type, object? instance)
@@ -129,6 +193,35 @@ public static class UIExtensionManager
         if (instance != null)
             type = instance.GetType();
         LogDebug($"Closed: {type.Format()}.");
+        if (!ParentTypeInfoIntl.TryGetValue(type!, out UIExtensionParentTypeInfo parentTypeInfo))
+        {
+            LogWarning($"Unable to find parent type info while closing {type.Format()}.");
+            return;
+        }
+        
+        bool found = false;
+        for (int i = 0; i < parentTypeInfo.VanillaInstancesIntl.Count; ++i)
+        {
+            UIExtensionVanillaInstanceInfo instanceInfo = parentTypeInfo.VanillaInstancesIntl[i];
+            if (ReferenceEquals(instanceInfo.Instance, instance) || parentTypeInfo.VanillaInstancesIntl.Count == 1 && parentTypeInfo.ParentTypeInfo.IsInstanceUI)
+            {
+                if (!instanceInfo.IsOpen)
+                {
+                    LogDebug($"Already closed: {type.Format()}.");
+                    return;
+                }
+
+                found = true;
+                instanceInfo.IsOpen = false;
+                break;
+            }
+        }
+        if (!found)
+        {
+            LogWarning($"Unable to find vanilla instance info while closing {type.Format()}.");
+            return;
+        }
+
         for (int i = 0; i < ExtensionsIntl.Count; i++)
         {
             UIExtensionInfo info = ExtensionsIntl[i];
@@ -145,12 +238,12 @@ public static class UIExtensionManager
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"Error invoking OnClosed from {instantiation.GetType().Format()}.", method: Source);
-                        Logger.LogError(ex, method: Source);
+                        LogError($"Error invoking OnClosed from {instantiation.GetType().Format()}.", info.Plugin, info.Assembly);
+                        LogError(ex, info.Plugin, info.Assembly);
                     }
                 }
             }
-            LogDebug($"* Invoked Closed: {info.ImplementationType.Format()}.", info.Plugin);
+            LogDebug($"* Invoked Closed: {info.ImplementationType.Format()}.", info.Plugin, info.Assembly);
         }
     }
     private static void OnInitialized(Type? type, object? instance)
@@ -158,6 +251,7 @@ public static class UIExtensionManager
         if (instance != null)
             type = instance.GetType();
         LogDebug($"Initialized: {type.Format()}.");
+
         for (int i = 0; i < ExtensionsIntl.Count; i++)
         {
             UIExtensionInfo info = ExtensionsIntl[i];
@@ -165,7 +259,7 @@ public static class UIExtensionManager
             object? ext = CreateExtension(info, instance);
             if (ext == null) continue;
             info.InstantiationsIntl.Add(ext);
-            LogDebug($"* Initialized: {info.ImplementationType.Format()}.", info.Plugin);
+            LogDebug($"* Initialized: {info.ImplementationType.Format()}.", info.Plugin, info.Assembly);
             if ((info.TypeInfo.OpenOnInitialize || info.TypeInfo.DefaultOpenState) && instance is UIExtension ext2)
             {
                 try
@@ -174,8 +268,8 @@ public static class UIExtensionManager
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError($"Error invoking OnOpened from {ext.GetType().Format()}.", method: Source);
-                    Logger.LogError(ex, method: Source);
+                    LogError($"Error invoking OnOpened from {ext.GetType().Format()}.", info.Plugin, info.Assembly);
+                    LogError(ex, info.Plugin, info.Assembly);
                 }
             }
         }
@@ -188,10 +282,46 @@ public static class UIExtensionManager
         LogDebug($"Destroyed: {type.Format()}.");
         foreach (UITypeInfo otherTypeInfo in UIAccessTools.TypeInfo.Values)
         {
-            if (otherTypeInfo.DestroyedByParent && otherTypeInfo.Parent == type)
+            if (otherTypeInfo.DestroyWhenParentDestroys && otherTypeInfo.Type != type && otherTypeInfo.Parent == type)
             {
                 LogDebug($"* Destroying child: {otherTypeInfo.Type.Format()}.");
                 OnDestroy(otherTypeInfo.Type, null);
+            }
+        }
+        if (!ParentTypeInfoIntl.TryGetValue(type!, out UIExtensionParentTypeInfo parentTypeInfo))
+        {
+            LogDebug($"Unable to find parent type info while destroying {type.Format()}.");
+        }
+        bool close = true;
+        if (parentTypeInfo != null)
+        {
+            close = parentTypeInfo.ParentTypeInfo.CloseOnDestroy;
+            if (close)
+            {
+                bool found = false;
+                for (int i = 0; i < parentTypeInfo.VanillaInstancesIntl.Count; ++i)
+                {
+                    UIExtensionVanillaInstanceInfo instanceInfo = parentTypeInfo.VanillaInstancesIntl[i];
+                    if (ReferenceEquals(instanceInfo.Instance, instance) || parentTypeInfo.VanillaInstancesIntl.Count == 1 && parentTypeInfo.ParentTypeInfo.IsInstanceUI)
+                    {
+                        if (!instanceInfo.IsOpen)
+                        {
+                            LogDebug($"Already closed: {type.Format()}.");
+                            close = false;
+                        }
+                        else instanceInfo.IsOpen = false;
+
+                        found = true;
+                        parentTypeInfo.VanillaInstancesIntl.RemoveAt(i);
+                        break;
+                    }
+                }
+
+                if (!found)
+                {
+                    LogWarning($"Unable to find vanilla instance info while closing (destroying) {type.Format()}.");
+                    close = false;
+                }
             }
         }
 
@@ -202,7 +332,7 @@ public static class UIExtensionManager
             for (int j = 0; j < info.InstantiationsIntl.Count; j++)
             {
                 object instantiation = info.InstantiationsIntl[j];
-                if (info.TypeInfo.CloseOnDestroy && instantiation is UIExtension ext)
+                if (close && instantiation is UIExtension ext)
                 {
                     try
                     {
@@ -210,8 +340,8 @@ public static class UIExtensionManager
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"Error invoking OnClosed from {instantiation.GetType().Format()}.", method: Source);
-                        Logger.LogError(ex, method: Source);
+                        LogError($"Error invoking OnClosed from {instantiation.GetType().Format()} while destroying.", info.Plugin, info.Assembly);
+                        LogError(ex, info.Plugin, info.Assembly);
                     }
                 }
                 if (instantiation is IDisposable disposable)
@@ -219,17 +349,21 @@ public static class UIExtensionManager
                     try
                     {
                         disposable.Dispose();
-                        LogDebug($"* Disposed: {info.ImplementationType.Format()}.", info.Plugin);
+                        LogDebug($"* Disposed: {info.ImplementationType.Format()}.", info.Plugin, info.Assembly);
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"Error disposing UI extension: {info.ImplementationType.Format()}.", method: Source);
-                        Logger.LogError(ex, method: Source);
+                        LogError($"Error disposing UI extension: {info.ImplementationType.Format()}.", info.Plugin, info.Assembly);
+                        LogError(ex, info.Plugin, info.Assembly);
                     }
                 }
+
+                _onDestroy?.Invoke(instantiation);
+                if (ParentTypeInfo.TryGetValue(info.ParentType, out UIExtensionParentTypeInfo parentInfo))
+                    parentInfo.InstancesIntl.RemoveAll(x => x.Instance == instance);
             }
             info.InstantiationsIntl.Clear();
-            LogDebug($"* Destroyed Instances: {info.ImplementationType.Format()}.", info.Plugin);
+            LogDebug($"* Destroyed Instances: {info.ImplementationType.Format()}.", info.Plugin, info.Assembly);
         }
     }
     internal static bool RegisterExtension(UIExtensionInfo info)
@@ -242,21 +376,12 @@ public static class UIExtensionManager
         }
         catch (Exception ex)
         {
-            if (info.Plugin != null)
-            {
-                info.Plugin.LogError($"Error initializing UI extension: {info.ImplementationType.Format()}.");
-                info.Plugin.LogError(ex);
-            }
-            else
-            {
-                Logger.LogError($"Error initializing UI extension: {info.ImplementationType.Format()}.", method: Source);
-                Logger.LogError(ex, method: Source);
-            }
-
+            LogError($"Error initializing UI extension: {info.ImplementationType.Format()}.", info.Plugin, info.Assembly);
+            LogError(ex, info.Plugin, info.Assembly);
             return false;
         }
 
-        LogDebug($"Registered UI extension: {info.ImplementationType.Format()}.", info.Plugin);
+        LogDebug($"Registered UI extension: {info.ImplementationType.Format()}.", info.Plugin, info.Assembly);
         return true;
     }
 
@@ -266,10 +391,10 @@ public static class UIExtensionManager
         
         if (ExtensionsDictIntl.TryGetValue(implementation, out UIExtensionInfo extInfo))
         {
-            ExtensionsIntl.Remove(extInfo);
             for (int i = 0; i < extInfo.InstantiationsIntl.Count; ++i)
             {
-                if (extInfo.InstantiationsIntl[i] is IDisposable disposable)
+                object instance = extInfo.InstantiationsIntl[i];
+                if (instance is IDisposable disposable)
                 {
                     try
                     {
@@ -277,10 +402,13 @@ public static class UIExtensionManager
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"Error disposing UI extension: {extInfo.ImplementationType.Format()}.", method: Source);
-                        Logger.LogError(ex, method: Source);
+                        LogError($"Error disposing UI extension: {extInfo.ImplementationType.Format()}.", extInfo.Plugin, extInfo.Assembly);
+                        LogError(ex, extInfo.Plugin, extInfo.Assembly);
                     }
                 }
+                ExtensionsIntl.Remove(extInfo);
+                if (ParentTypeInfo.TryGetValue(extInfo.ParentType, out UIExtensionParentTypeInfo parentInfo))
+                    parentInfo.InstancesIntl.RemoveAll(x => x.Instance == instance);
             }
             LogDebug($"Deregistered UI extension: {implementation.Format()}.", extInfo.Plugin);
         }
@@ -303,32 +431,26 @@ public static class UIExtensionManager
     {
         if (!info.SuppressUIExtensionParentWarning && !typeof(UIExtension).IsAssignableFrom(info.ImplementationType))
         {
-            if (info.Plugin != null)
-                info.Plugin.LogWarning($"It's recommended to derive UI extensions from the {typeof(UIExtension).Format()} class (unlike {info.ImplementationType.Format()}).");
-            else
-                Logger.LogWarning($"It's recommended to derive UI extensions from the {typeof(UIExtension).Format()} class (unlike {info.ImplementationType.Format()}).", method: Source);
+            LogWarning($"It's recommended to derive UI extensions from the {typeof(UIExtension).Format()} class (unlike {info.ImplementationType.Format()}).", info.Plugin, info.Assembly);
+            LogInfo($"Alternatively set {"SuppressUIExtensionParentWarning".Colorize(FormattingColorType.Property)} to {true.Format()} in a {typeof(UIExtensionAttribute).Format()} on the extension class.", info.Plugin, info.Assembly);
         }
 
         if (!UIAccessTools.TryGetUITypeInfo(info.ParentType, out UITypeInfo? typeInfo))
         {
-            if (info.Plugin != null)
-                info.Plugin.LogWarning($"No type info for parent UI type: {info.ParentType.Format()}, {info.ImplementationType.Format()} UI extension may not behave as expected. Any warnings below:");
-            else
-                Logger.LogWarning($"No type info for parent UI type: {info.ParentType.Format()}, {info.ImplementationType.Format()} UI extension may not behave as expected. Any warnings below:", method: Source);
+            LogWarning($"No type info for parent UI type: {info.ParentType.Format()}, {info.ImplementationType.Format()} UI extension may not behave as expected. Any warnings below:", info.Plugin, info.Assembly);
         }
 
         if (typeInfo == null)
         {
             typeInfo = new UITypeInfo(info.ParentType);
-            Logger.LogInfo($"[{Source}] Created UI type info for {info.ParentType.Format()}: {typeInfo.OpenMethods.Length.Format()} open method(s), " +
-                           $"{typeInfo.CloseMethods.Length.Format()} close method(s), {typeInfo.InitializeMethods.Length.Format()} initialize method(s), " +
-                           $"{typeInfo.DestroyMethods.Length.Format()} destroy method(s).");
+            LogInfo($"Created UI type info for {info.ParentType.Format()}: {typeInfo.OpenMethods.Length.Format()} open method(s), " +
+                    $"{typeInfo.CloseMethods.Length.Format()} close method(s), {typeInfo.InitializeMethods.Length.Format()} initialize method(s), " +
+                    $"{typeInfo.DestroyMethods.Length.Format()} destroy method(s).", info.Plugin, info.Assembly);
         }
 
         info.TypeInfo = typeInfo;
 
         bool staticUI = !info.ParentType.GetIsStatic() && typeInfo.IsStaticUI;
-        info.IsEmittable = !staticUI;
 
         List<Exception>? exceptions = null;
 
@@ -341,9 +463,10 @@ public static class UIExtensionManager
                 (exceptions ??= new List<Exception>()).Add(new InvalidOperationException("Type " + info.ImplementationType.Name + " does not have a parameterless constructor or an instance input constructor."));
         }
 
-        foreach (MemberInfo member in info.ImplementationType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                     .Concat<MemberInfo>(info.ImplementationType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
-                     .Concat(info.ImplementationType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Where(x => !x.IsSpecialName))
+        foreach (MemberInfo member in info.ImplementationType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+                     .Concat<MemberInfo>(info.ImplementationType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.FlattenHierarchy))
+                     .Concat(info.ImplementationType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+                         .Where(x => !x.IsSpecialName))
                      .OrderByDescending(Accessor.GetPriority)
                      .ThenBy(x => x.Name))
         {
@@ -479,26 +602,58 @@ public static class UIExtensionManager
     [UsedImplicitly]
     private static void AddInstance(object? uiInstance, object instance)
     {
-        UIExtensionParentTypeInfo? parentInfo = null;
         Type? type;
+        UIExtensionInfo? extInfo = null;
         if (uiInstance == null)
         {
             type = instance.GetType();
-            UIExtensionInfo? extInfo = null;
-            for (; type != null && !ExtensionsDictIntl.TryGetValue(type, out extInfo); type = type.BaseType) { }
+            type.ForEachBaseType((type, _) => !ExtensionsDictIntl.TryGetValue(type, out extInfo));
             type = extInfo?.ParentType;
         }
         else type = uiInstance.GetType();
 
-        for (; type != null && !ParentTypeInfoIntl.TryGetValue(type, out parentInfo); type = type.BaseType) { }
+        UIExtensionParentTypeInfo? parentInfo = null;
+        type?.ForEachBaseType((type, _) => !ParentTypeInfoIntl.TryGetValue(type, out parentInfo));
 
         if (parentInfo == null)
         {
-            Logger.LogWarning($"Failed to find parent info for extension: {instance.GetType().Format()}.", method: Source);
+            LogWarning($"Failed to find parent info for extension: {instance.GetType().Format()}.", extInfo?.Plugin, extInfo?.Assembly);
             return;
         }
+
+        UIExtensionVanillaInstanceInfo? info = null;
+        List<UIExtensionVanillaInstanceInfo> vanillaInstances = parentInfo.VanillaInstancesIntl;
+
+        if (vanillaInstances.Count != 0 && (parentInfo.ParentTypeInfo.IsInstanceUI || parentInfo.ParentTypeInfo.IsStaticUI) && (vanillaInstances.Count != 1 || !ReferenceEquals(vanillaInstances[0].Instance, instance)))
+        {
+            vanillaInstances.Clear();
+            info = new UIExtensionVanillaInstanceInfo(parentInfo.ParentTypeInfo.IsStaticUI ? null : uiInstance, parentInfo.ParentTypeInfo.OpenOnInitialize || parentInfo.ParentTypeInfo.DefaultOpenState);
+            vanillaInstances.Add(info);
+            LogDebug($"Replaced vanilla instance info: {parentInfo.ParentType.Format()}.");
+        }
+        else
+        {
+            for (int i = 0; i < vanillaInstances.Count; ++i)
+            {
+                if (ReferenceEquals(vanillaInstances[i].Instance, uiInstance))
+                {
+                    info = vanillaInstances[i];
+                    LogDebug($"Found vanilla instance info: {parentInfo.ParentType.Format()}.");
+                    break;
+                }
+            }
+
+            if (info == null)
+            {
+                info = new UIExtensionVanillaInstanceInfo(parentInfo.ParentTypeInfo.IsStaticUI ? null : uiInstance, parentInfo.ParentTypeInfo.OpenOnInitialize || parentInfo.ParentTypeInfo.DefaultOpenState);
+                vanillaInstances.Add(info);
+                LogDebug($"Added vanilla instance info: {parentInfo.ParentType.Format()}.");
+            }
+        }
+
         
-        parentInfo.InstancesIntl.Add(new UIExtensionInstanceInfo(instance, uiInstance));
+        parentInfo.InstancesIntl.Add(new UIExtensionInstanceInfo(instance, info));
+        _onAdd?.Invoke(instance);
     }
     internal static object? CreateExtension(UIExtensionInfo info, object? uiInstance)
     {
@@ -506,31 +661,27 @@ public static class UIExtensionManager
         {
             object? instance = info.CreateCallback(uiInstance);
 
-            LogDebug($"Created {instance.Format()} for {info.ParentType.Format()}.", info.Plugin);
+            LogDebug($"Created {instance.Format()} for {info.ParentType.Format()}.", info.Plugin, info.Assembly);
 
             return instance;
         }
         catch (Exception ex)
         {
-            if (info.Plugin == null)
-            {
-                Logger.LogError($"Error initializing {info.ImplementationType.Format()}.", method: Source);
-                Logger.LogError(ex, method: Source);
-            }
-            else
-            {
-                info.Plugin.LogError($"Error initializing {info.ImplementationType.Format()}.");
-                info.Plugin.LogError(ex);
-            }
-
+            LogError($"Error initializing {info.ImplementationType.Format()}.", info.Plugin, info.Assembly);
+            LogError(ex, info.Plugin, info.Assembly);
             return null;
         }
     }
-
+    internal static void TellDestroyed(Type? type, object? instance)
+    {
+        OnDestroy(type, instance);
+    }
     private static void TryInitializeMember(UIExtensionInfo info, MemberInfo member)
     {
         if (Attribute.GetCustomAttribute(member, typeof(ExistingUIMemberAttribute)) is not ExistingUIMemberAttribute existingMemberAttribute)
             return;
+
+        ExistingMemberFailureBehavior failureMode = existingMemberAttribute.FailureBehavior;
 
         FieldInfo? field = member as FieldInfo;
         PropertyInfo? property = member as PropertyInfo;
@@ -541,7 +692,7 @@ public static class UIExtensionManager
 
         bool isStatic = member.GetIsStatic();
         if (isStatic)
-            throw new Exception($"UI extensions should not have static existing members, such as {member.Name}.");
+            throw new Exception($"UI extensions should not have static existing members, such as \"{member.Name}\".");
 
         Type owningType = existingMemberAttribute.OwningType ?? info.ParentType;
 
@@ -556,7 +707,12 @@ public static class UIExtensionManager
              existingProperty.GetIndexParameters().Length > 0) &&
             (existingMethod == null || existingMethod.ReturnType == typeof(void) || existingMethod.GetParameters().Length > 0))
         {
-            throw new MemberAccessException($"Unable to match \"{owningType.FullName}.{existingMemberAttribute.MemberName}\" to a field, get-able property, or no-argument, non-void-returning method.");
+            string msg = $"Unable to match \"{owningType.Format()}.{existingMemberAttribute.MemberName.Colorize(FormattingColorType.Property)}\" to a field, get-able property, or no-argument, non-void-returning method.";
+            if (failureMode != ExistingMemberFailureBehavior.Ignore)
+                throw new MemberAccessException(msg);
+            
+            LogDebug(msg, info.Plugin, info.Assembly);
+            return;
         }
         MemberInfo existingMember = ((MemberInfo?)existingField ?? existingProperty) ?? existingMethod!;
 
@@ -570,22 +726,50 @@ public static class UIExtensionManager
             {
                 // setter
                 if (parameters.Length == 0 || !parameters[0].ParameterType.IsAssignableFrom(existingMemberType))
-                    throw new Exception($"Unable to assign existing method parameter type: \"{existingMemberType.FullName}\" to expected member type: \"{parameters[0].ParameterType.FullName}\".");
+                {
+                    string msg = $"Unable to assign existing method parameter type: \"{existingMemberType.FullName}\" to expected member type: \"{parameters[0].ParameterType.FullName}\" for existing member \"{member.Name}\".";
+                    if (failureMode != ExistingMemberFailureBehavior.Ignore)
+                        throw new Exception(msg);
+
+                    LogDebug(msg, info.Plugin, info.Assembly);
+                    return;
+                }
             }
             else
             {
                 // getter
                 if (parameters.Length != 0 || !memberType.IsAssignableFrom(existingMemberType))
-                    throw new Exception($"Unable to assign existing method parameter type: \"{existingMemberType.FullName}\" to expected member type: \"{memberType.FullName}\".");
+                {
+                    string msg = $"Unable to assign existing method parameter type: \"{existingMemberType.FullName}\" to expected member type: \"{memberType.FullName}\" for existing member \"{member.Name}\".";
+                    if (failureMode != ExistingMemberFailureBehavior.Ignore)
+                        throw new Exception(msg);
+
+                    LogDebug(msg, info.Plugin, info.Assembly);
+                    return;
+                }
             }
         }
         else if (!memberType.IsAssignableFrom(existingMemberType))
-            throw new Exception($"Unable to assign existing member type: \"{existingMemberType.FullName}\" to expected member type: \"{memberType.FullName}\".");
+        {
+            string msg = $"Unable to assign existing member type: \"{existingMemberType.FullName}\" to expected member type: \"{memberType.FullName}\" for existing member \"{member.Name}\".";
+            if (failureMode != ExistingMemberFailureBehavior.Ignore)
+                throw new Exception(msg);
+
+            LogDebug(msg, info.Plugin, info.Assembly);
+            return;
+        }
         
         bool existingIsStatic = existingMember.GetIsStatic();
 
         if (!existingIsStatic && info.TypeInfo.IsStaticUI)
-            throw new InvalidOperationException($"Requeste instance variable ({existingMember.Name}) from static UI: {info.ParentType.Name}.");
+        {
+            string msg = $"Requested instance variable ({existingMember.Name}) from static UI: {info.ParentType.Name} for existing member \"{member.Name}\".";
+            if (failureMode != ExistingMemberFailureBehavior.Ignore)
+                throw new InvalidOperationException(msg);
+
+            LogDebug(msg, info.Plugin, info.Assembly);
+            return;
+        }
 
         bool initialized;
         if (existingMemberAttribute.InitializeMode is ExistingMemberInitializeMode.InitializeOnConstruct or ExistingMemberInitializeMode.PatchGetter)
@@ -593,25 +777,25 @@ public static class UIExtensionManager
             initialized = existingMemberAttribute.InitializeMode == ExistingMemberInitializeMode.InitializeOnConstruct;
             if (!initialized && field != null)
             {
-                Logger.LogWarning($"Fields can not be non-initialized (as indicated for {field.Format()}).", method: Source);
+                LogWarning($"Fields can not be non-initialized (as indicated for {field.Format()}).", info.Plugin, info.Assembly);
                 initialized = true;
             }
             if (initialized && property != null && property.GetSetMethod(true) == null)
             {
-                Logger.LogWarning($"Properties without a setter can not be initialized (as indicated for {property.Format()}).", method: Source);
+                LogWarning($"Properties without a setter can not be initialized (as indicated for {property.Format()}).", info.Plugin, info.Assembly);
                 initialized = false;
             }
             if (!initialized && method != null && method.ReturnType == typeof(void))
             {
-                Logger.LogWarning($"Void-returning methods can not be non-initialized (as indicated for {method.Format()}).", method: Source);
+                LogWarning($"Void-returning methods can not be non-initialized (as indicated for {method.Format()}).", info.Plugin, info.Assembly);
                 initialized = true;
             }
             if (initialized && method != null && method.GetParameters().Length == 0)
             {
-                Logger.LogWarning($"Parameterless methods can not be initialized (as indicated for {method.Format()}).", method: Source);
+                LogWarning($"Parameterless methods can not be initialized (as indicated for {method.Format()}).", info.Plugin, info.Assembly);
                 initialized = false;
             }
-            LogDebug($"Set initialized setting for existing member: {member.Format()}: {initialized.Format()}.", info.Plugin);
+            LogDebug($"Set initialized setting for existing member: {member.Format()}: {initialized.Format()}.", info.Plugin, info.Assembly);
         }
         else
         {
@@ -623,11 +807,11 @@ public static class UIExtensionManager
                 initialized = true;
             else
                 initialized = false;
-            LogDebug($"Assumed initialized setting for existing member: {member.Format()}: {initialized.Format()}.", info.Plugin);
+            LogDebug($"Assumed initialized setting for existing member: {member.Format()}: {initialized.Format()}.", info.Plugin, info.Assembly);
         }
 
         if (!initialized && existingProperty != null && existingProperty.GetSetMethod(true) != null)
-            Logger.LogWarning($"Setter on {existingProperty.Format()} can not be used to set the original value.", method: Source);
+            LogWarning($"Setter on {existingProperty.Format()} can not be used to set the original value. Recommended to make the property get-only (readonly).", info.Plugin, info.Assembly);
 
         info.ExistingMembersIntl.Add(new UIExistingMemberInfo(member, existingMember, existingIsStatic, initialized));
     }
@@ -638,21 +822,21 @@ public static class UIExtensionManager
             UIExistingMemberInfo member = info.ExistingMembersIntl[i];
             if (member.IsInitialized || member.Member is not PropertyInfo property)
             {
-                LogDebug($"Skipping initialized member: {member.Member.Format()}.", info.Plugin);
+                LogDebug($"Skipping initialized member: {member.Member.Format()}.", info.Plugin, info.Assembly);
                 continue;
             }
             MethodInfo? getter = property.GetGetMethod(true);
             MethodInfo? setter = property.GetSetMethod(true);
             if (getter == null)
             {
-                Logger.LogWarning($"Unable to find getter for {property.Format()}.", method: Source);
+                LogWarning($"Unable to find getter for {property.Format()}.", info.Plugin, info.Assembly);
                 continue;
             }
             if (setter == null)
-                LogDebug($"Unable to find setter for {property.Format()}, not an issue.", info.Plugin);
+                LogDebug($"Unable to find setter for {property.Format()}, not an issue.", info.Plugin, info.Assembly);
             if (Patches.ContainsKey(getter))
             {
-                LogDebug($"{getter.Format()} has already been transpiled.", info.Plugin);
+                LogDebug($"{getter.Format()} has already been transpiled.", info.Plugin, info.Assembly);
             }
             else
             {
@@ -667,7 +851,7 @@ public static class UIExtensionManager
             {
                 if (Patches.ContainsKey(setter))
                 {
-                    LogDebug($"{setter.Format()} has already been transpiled.", info.Plugin);
+                    LogDebug($"{setter.Format()} has already been transpiled.", info.Plugin, info.Assembly);
                 }
                 else
                 {
@@ -680,25 +864,25 @@ public static class UIExtensionManager
             }
         }
     }
-    private static UIExtensionParentTypeInfo GetOrAddParentTypeInfo(Type parentType)
+    private static UIExtensionParentTypeInfo GetOrAddParentTypeInfo(Type parentType, UITypeInfo typeInfo)
     {
         if (!ParentTypeInfoIntl.TryGetValue(parentType, out UIExtensionParentTypeInfo parentTypeInfo))
         {
-            parentTypeInfo = new UIExtensionParentTypeInfo(parentType);
+            parentTypeInfo = new UIExtensionParentTypeInfo(parentType, typeInfo);
             ParentTypeInfoIntl.Add(parentType, parentTypeInfo);
         }
         return parentTypeInfo;
     }
     private static void InitializeParentPatches(UIExtensionInfo info)
     {
-        UIExtensionParentTypeInfo parentTypeInfo = GetOrAddParentTypeInfo(info.ParentType);
+        UIExtensionParentTypeInfo parentTypeInfo = GetOrAddParentTypeInfo(info.ParentType, info.TypeInfo);
 
-        PatchParentOnOpen(info.TypeInfo, parentTypeInfo, info.Plugin);
-        PatchParentOnClose(info.TypeInfo, parentTypeInfo, info.Plugin);
-        PatchParentOnInitialize(info.TypeInfo, parentTypeInfo, info.Plugin);
-        PatchParentOnDestroy(info.TypeInfo, parentTypeInfo, info.Plugin);
+        PatchParentOnOpen(info.TypeInfo, parentTypeInfo, info.Plugin, info.Assembly);
+        PatchParentOnClose(info.TypeInfo, parentTypeInfo, info.Plugin, info.Assembly);
+        PatchParentOnInitialize(info.TypeInfo, parentTypeInfo, info.Plugin, info.Assembly);
+        PatchParentOnDestroy(info.TypeInfo, parentTypeInfo, info.Plugin, info.Assembly);
     }
-    private static void PatchParentOnOpen(UITypeInfo typeInfo, UIExtensionParentTypeInfo parentTypeInfo, IDevkitServerPlugin? plugin)
+    private static void PatchParentOnOpen(UITypeInfo typeInfo, UIExtensionParentTypeInfo parentTypeInfo, IDevkitServerPlugin? plugin, Assembly assembly)
     {
         if (typeInfo.CustomOnOpen != null)
         {
@@ -719,13 +903,13 @@ public static class UIExtensionManager
             {
                 if (parentTypeInfo.OpenPatchesIntl.Any(x => x.Original == openMethod.Method))
                 {
-                    LogDebug($"Skipped finalizer for {openMethod.Method.Format()}, already done from this extension.", plugin);
+                    LogDebug($"Skipped finalizer for {openMethod.Method.Format()}, already done from this extension.", plugin, assembly);
                     continue;
                 }
 
                 if (Patches.TryGetValue(openMethod.Method, out UIExtensionPatch patchInfo))
                 {
-                    LogDebug($"Skipped finalizer for {openMethod.Method.Format()}, already done from another extension.", plugin);
+                    LogDebug($"Skipped finalizer for {openMethod.Method.Format()}, already done from another extension.", plugin, assembly);
                     parentTypeInfo.OpenPatchesIntl.Add(patchInfo);
                     continue;
                 }
@@ -739,7 +923,7 @@ public static class UIExtensionManager
                     patchInfo = new UIExtensionPatch(openMethod.Method, finalizer, HarmonyPatchType.Finalizer);
                     parentTypeInfo.OpenPatchesIntl.Add(patchInfo);
                     Patches.Add(openMethod.Method, patchInfo);
-                    LogDebug($"Added finalizer for {openMethod.Method.Format()}: {finalizer.Format()}.", plugin);
+                    LogDebug($"Added finalizer for {openMethod.Method.Format()}: {finalizer.Format()}.", plugin, assembly);
                 }
                 else if (openMethod.Method.IsStatic)
                 {
@@ -748,7 +932,7 @@ public static class UIExtensionManager
             }
         }
     }
-    private static void PatchParentOnClose(UITypeInfo typeInfo, UIExtensionParentTypeInfo parentTypeInfo, IDevkitServerPlugin? plugin)
+    private static void PatchParentOnClose(UITypeInfo typeInfo, UIExtensionParentTypeInfo parentTypeInfo, IDevkitServerPlugin? plugin, Assembly assembly)
     {
         if (typeInfo.CustomOnClose != null)
         {
@@ -769,13 +953,13 @@ public static class UIExtensionManager
             {
                 if (parentTypeInfo.ClosePatchesIntl.Any(x => x.Original == closeMethod.Method))
                 {
-                    LogDebug($"Skipped finalizer for {closeMethod.Method.Format()}, already done from this extension.", plugin);
+                    LogDebug($"Skipped finalizer for {closeMethod.Method.Format()}, already done from this extension.", plugin, assembly);
                     continue;
                 }
 
                 if (Patches.TryGetValue(closeMethod.Method, out UIExtensionPatch patchInfo))
                 {
-                    LogDebug($"Skipped finalizer for {closeMethod.Method.Format()}, already done from another extension.", plugin);
+                    LogDebug($"Skipped finalizer for {closeMethod.Method.Format()}, already done from another extension.", plugin, assembly);
                     parentTypeInfo.ClosePatchesIntl.Add(patchInfo);
                     continue;
                 }
@@ -789,7 +973,7 @@ public static class UIExtensionManager
                     patchInfo = new UIExtensionPatch(closeMethod.Method, finalizer, HarmonyPatchType.Finalizer);
                     parentTypeInfo.ClosePatchesIntl.Add(patchInfo);
                     Patches.Add(closeMethod.Method, patchInfo);
-                    LogDebug($"Added finalizer for {closeMethod.Method.Format()}: {finalizer.Format()}.", plugin);
+                    LogDebug($"Added finalizer for {closeMethod.Method.Format()}: {finalizer.Format()}.", plugin, assembly);
                 }
                 else if (closeMethod.Method.IsStatic)
                 {
@@ -798,7 +982,7 @@ public static class UIExtensionManager
             }
         }
     }
-    private static void PatchParentOnInitialize(UITypeInfo typeInfo, UIExtensionParentTypeInfo parentTypeInfo, IDevkitServerPlugin? plugin)
+    private static void PatchParentOnInitialize(UITypeInfo typeInfo, UIExtensionParentTypeInfo parentTypeInfo, IDevkitServerPlugin? plugin, Assembly assembly)
     {
         if (typeInfo.CustomOnInitialize != null)
         {
@@ -819,13 +1003,13 @@ public static class UIExtensionManager
             {
                 if (parentTypeInfo.InitializePatchesIntl.Any(x => x.Original == initializeMethod.Method))
                 {
-                    LogDebug($"Skipped finalizer for {initializeMethod.Method.Format()}, already done from this extension.", plugin);
+                    LogDebug($"Skipped finalizer for {initializeMethod.Method.Format()}, already done from this extension.", plugin, assembly);
                     continue;
                 }
 
                 if (Patches.TryGetValue(initializeMethod.Method, out UIExtensionPatch patchInfo))
                 {
-                    LogDebug($"Skipped finalizer for {initializeMethod.Method.Format()}, already done from another extension.", plugin);
+                    LogDebug($"Skipped finalizer for {initializeMethod.Method.Format()}, already done from another extension.", plugin, assembly);
                     parentTypeInfo.InitializePatchesIntl.Add(patchInfo);
                     continue;
                 }
@@ -837,7 +1021,7 @@ public static class UIExtensionManager
                     patchInfo = new UIExtensionPatch(initializeMethod.Method, finalizer, HarmonyPatchType.Finalizer);
                     parentTypeInfo.InitializePatchesIntl.Add(patchInfo);
                     Patches.Add(initializeMethod.Method, patchInfo);
-                    LogDebug($"Added finalizer for {initializeMethod.Method.Format()}: {finalizer.Format()}.", plugin);
+                    LogDebug($"Added finalizer for {initializeMethod.Method.Format()}: {finalizer.Format()}.", plugin, assembly);
                 }
                 else if (initializeMethod.Method.IsStatic)
                 {
@@ -846,10 +1030,10 @@ public static class UIExtensionManager
             }
         }
     }
-    private static void PatchParentOnDestroy(UITypeInfo typeInfo, UIExtensionParentTypeInfo parentTypeInfo, IDevkitServerPlugin? plugin)
+    private static void PatchParentOnDestroy(UITypeInfo typeInfo, UIExtensionParentTypeInfo parentTypeInfo, IDevkitServerPlugin? plugin, Assembly assembly)
     {
-        if (typeInfo.DestroyedByParent && typeInfo.Parent != null && UIAccessTools.TryGetUITypeInfo(typeInfo.Parent, out UITypeInfo parentUITypeInfo))
-            PatchParentOnDestroy(parentUITypeInfo, GetOrAddParentTypeInfo(parentUITypeInfo.Type), plugin);
+        if (typeInfo.DestroyWhenParentDestroys && typeInfo.Parent != null && UIAccessTools.TryGetUITypeInfo(typeInfo.Parent, out UITypeInfo parentUITypeInfo))
+            PatchParentOnDestroy(parentUITypeInfo, GetOrAddParentTypeInfo(parentUITypeInfo.Type, typeInfo), plugin, assembly);
         
         if (typeInfo.CustomOnDestroy != null)
         {
@@ -870,13 +1054,13 @@ public static class UIExtensionManager
             {
                 if (parentTypeInfo.DestroyPatchesIntl.Any(x => x.Original == destroyMethod.Method))
                 {
-                    LogDebug($"[{Source}] Skipped finalizer for {destroyMethod.Method.Format()}, already done from this extension.", plugin);
+                    LogDebug($"[{Source}] Skipped finalizer for {destroyMethod.Method.Format()}, already done from this extension.", plugin, assembly);
                     continue;
                 }
 
                 if (Patches.TryGetValue(destroyMethod.Method, out UIExtensionPatch patchInfo))
                 {
-                    LogDebug($"[{Source}] Skipped finalizer for {destroyMethod.Method.Format()}, already done from another extension.", plugin);
+                    LogDebug($"[{Source}] Skipped finalizer for {destroyMethod.Method.Format()}, already done from another extension.", plugin, assembly);
                     parentTypeInfo.DestroyPatchesIntl.Add(patchInfo);
                     continue;
                 }
@@ -890,7 +1074,7 @@ public static class UIExtensionManager
                             : InstanceDestroyMethodPrefixMethod;
                         PatchesMain.Patcher.Patch(destroyMethod.Method, prefix: new HarmonyMethod(prefix));
                         patchInfo = new UIExtensionPatch(destroyMethod.Method, prefix, HarmonyPatchType.Prefix);
-                        LogDebug($"[{Source}] Added prefix for {destroyMethod.Method.Format()}: {prefix.Format()}.", plugin);
+                        LogDebug($"[{Source}] Added prefix for {destroyMethod.Method.Format()}: {prefix.Format()}.", plugin, assembly);
                     }
                     else
                     {
@@ -899,7 +1083,7 @@ public static class UIExtensionManager
                             : InstanceDestroyMethodFinalizerMethod;
                         PatchesMain.Patcher.Patch(destroyMethod.Method, finalizer: new HarmonyMethod(finalizer));
                         patchInfo = new UIExtensionPatch(destroyMethod.Method, finalizer, HarmonyPatchType.Finalizer);
-                        LogDebug($"[{Source}] Added finalizer for {destroyMethod.Method.Format()}: {finalizer.Format()}.", plugin);
+                        LogDebug($"[{Source}] Added finalizer for {destroyMethod.Method.Format()}: {finalizer.Format()}.", plugin, assembly);
                     }
                     parentTypeInfo.DestroyPatchesIntl.Add(patchInfo);
                     Patches.Add(destroyMethod.Method, patchInfo);
@@ -917,7 +1101,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal || __exception != null)
             return;
-        OnOpened(__originalMethod.DeclaringType!, null);
+        if (DevkitServerModule.IsMainThread)
+            OnOpened(__originalMethod.DeclaringType!, null);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnOpened(__originalMethod.DeclaringType!, null));
     }
 
     private static readonly MethodInfo StaticCloseMethodFinalizerMethod = typeof(UIExtensionManager).GetMethod(nameof(StaticCloseMethodFinalizer), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -925,7 +1112,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal || __exception != null)
             return;
-        OnClosed(__originalMethod.DeclaringType!, null);
+        if (DevkitServerModule.IsMainThread)
+            OnClosed(__originalMethod.DeclaringType!, null);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnClosed(__originalMethod.DeclaringType!, null));
     }
 
     private static readonly MethodInfo StaticDestroyMethodPrefixMethod = typeof(UIExtensionManager).GetMethod(nameof(StaticDestroyMethodPrefix), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -933,7 +1123,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal)
             return;
-        OnDestroy(__originalMethod.DeclaringType!, null);
+        if (DevkitServerModule.IsMainThread)
+            OnDestroy(__originalMethod.DeclaringType!, null);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnDestroy(__originalMethod.DeclaringType!, null));
     }
 
     private static readonly MethodInfo StaticDestroyMethodFinalizerMethod = typeof(UIExtensionManager).GetMethod(nameof(StaticDestroyMethodFinalizer), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -941,7 +1134,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal || __exception != null)
             return;
-        OnDestroy(__originalMethod.DeclaringType!, null);
+        if (DevkitServerModule.IsMainThread)
+            OnDestroy(__originalMethod.DeclaringType!, null);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnDestroy(__originalMethod.DeclaringType!, null));
     }
 
     private static readonly MethodInfo InstanceOpenMethodFinalizerMethod = typeof(UIExtensionManager).GetMethod(nameof(InstanceOpenMethodFinalizer), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -949,7 +1145,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal || __exception != null)
             return;
-        OnOpened(null, __instance);
+        if (DevkitServerModule.IsMainThread)
+            OnOpened(null, __instance);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnOpened(null, __instance));
     }
 
     private static readonly MethodInfo InstanceCloseMethodFinalizerMethod = typeof(UIExtensionManager).GetMethod(nameof(InstanceCloseMethodFinalizer), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -957,7 +1156,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal || __exception != null)
             return;
-        OnClosed(null, __instance);
+        if (DevkitServerModule.IsMainThread)
+            OnClosed(null, __instance);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnClosed(null, __instance));
     }
 
 
@@ -966,7 +1168,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal || __exception != null)
             return;
-        OnDestroy(null, __instance);
+        if (DevkitServerModule.IsMainThread)
+            OnDestroy(null, __instance);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnDestroy(null, __instance));
     }
 
     private static readonly MethodInfo InstanceDestroyMethodPrefixMethod = typeof(UIExtensionManager).GetMethod(nameof(InstanceDestroyMethodPrefix), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -974,7 +1179,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal)
             return;
-        OnDestroy(null, __instance);
+        if (DevkitServerModule.IsMainThread)
+            OnDestroy(null, __instance);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnDestroy(null, __instance));
     }
 
     private static readonly MethodInfo InstanceInitializeMethodFinalizerMethod = typeof(UIExtensionManager).GetMethod(nameof(InstanceInitializeMethodFinalizer), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -982,7 +1190,10 @@ public static class UIExtensionManager
     {
         if (!__runOriginal || __exception != null || __originalMethod.DeclaringType != __instance.GetType())
             return;
-        OnInitialized(null, __instance);
+        if (DevkitServerModule.IsMainThread)
+            OnInitialized(null, __instance);
+        else
+            DevkitServerUtility.QueueOnMainThread(() => OnInitialized(null, __instance));
     }
     
     private static readonly MethodInfo TranspileGetterPropertyMethod = typeof(UIExtensionManager).GetMethod(nameof(TranspileGetterProperty), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -993,7 +1204,7 @@ public static class UIExtensionManager
         Type declType = method.DeclaringType!;
         if (!PatchInfo.TryGetValue(method, out UIExtensionExistingMemberPatchInfo info))
         {
-            Logger.LogWarning($"Unable to patch {method.Format()}: Could not find existing member info for {declType.Format()}.");
+            LogWarning($"Unable to patch {method.Format()}: Could not find existing member info for {declType.Format()}.", null, method.DeclaringType?.Assembly);
             return PatchUtil.Throw<InvalidOperationException>($"Could not find existing member info for {declType.Name}.");
         }
         List<CodeInstruction> inst = new List<CodeInstruction>();
@@ -1018,7 +1229,7 @@ public static class UIExtensionManager
         info.MemberInfo.EmitGet(il, true);
 
         il.Emit(OpCodes.Ret);
-        LogDebug($"[{Source}] Transpiled {method.Format()} for extension for {info.Extension.ParentType.Format()}.", info.Extension.Plugin);
+        LogDebug($"[{Source}] Transpiled {method.Format()} for extension for {info.Extension.ParentType.Format()}.", info.Extension.Plugin, info.Extension.Assembly);
         return inst;
     }
     private static readonly MethodInfo TranspileSetterPropertyMethod = typeof(UIExtensionManager).GetMethod(nameof(TranspileSetterProperty), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -1035,5 +1246,36 @@ public static class UIExtensionManager
             MemberInfo = memberInfo;
         }
     }
+    private static class InstanceCache<T> where T : class
+    {
+        public static T? Instance;
+        static InstanceCache()
+        {
+            Recache();
+            _onDestroy += OnDestroyed;
+            _onAdd += OnAdded;
+        }
+        private static void Recache()
+        {
+            UIExtensionInfo? info = Extensions.FirstOrDefault(x => x.ImplementationType == typeof(T));
+
+            if (info == null)
+                return;
+            Instance = info.Instantiations.OfType<T>().LastOrDefault();
+        }
+        private static void OnDestroyed(object instance)
+        {
+            if (ReferenceEquals(Instance, instance))
+                Instance = null;
+            Recache();
+        }
+        private static void OnAdded(object obj)
+        {
+            if (obj is T)
+                Recache();
+        }
+    }
+
+    internal delegate object? CreateUIExtension(object? uiInstance);
 }
 #endif

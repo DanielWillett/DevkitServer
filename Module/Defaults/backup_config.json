@@ -1,0 +1,109 @@
+{
+  "$schema": "https://github.com/DanielWillett/DevkitServer/tree/master/Module/Schemas/backup_schema.json",
+
+  /*
+   *  Backup Behaviors
+   *   Disabled     - No Backups (not recommended).
+   *   Scheduled    - Backups follow the schedule defined by "backup_schedule" and "backup_schedule_interval".
+   *   Interval     - Backups are ran on the time interval defined in "backup_interval" (HH:MM:SS).
+   *   OnDisconnect - Backups are made when someone disconnects.
+   *
+   *  Default: Scheduled
+   */
+  "backup_behavior": "Scheduled",
+
+  /*
+   *  How often a backup is made (HH:MM:SS).
+   *
+   *  "backup_behavior" must be set to "Interval"
+   *  Default: 03:00:00
+   */
+  "backup_interval": "03:00:00",
+
+  /*
+   *  A list of dates and times. Only some components will be used, depending on "backup_schedule_interval".
+   *  In the example below, only the time is specified, since the interval is daily.
+   *
+   *  "backup_behavior" must be set to "Scheduled"
+   *  Default: Every 3 hours (from midnight)
+   */
+  "backup_schedule": [
+    "0001-01-01 00:00",
+    "0001-01-01 03:00",
+    "0001-01-01 06:00",
+    "0001-01-01 09:00",
+    "0001-01-01 12:00",
+    "0001-01-01 15:00",
+    "0001-01-01 18:00",
+    "0001-01-01 21:00"
+  ],
+
+  /*
+   *  Backup Schedule Intervals
+   *   None    - Dates are taken literally. Schedule is only valid until the last date.
+   *   Daily   - Only hours, minutes, and seconds are considered from the dates.
+   *   Weekly  - The day should be from 1 - 7, which is then added from the most recent Sunday.
+   *   Monthly - Only days, hours, minutes, and seconds are considered from the dates.
+   *   Yearly  - Only months, days, hours, minutes, and seconds are considered from the dates.
+   *
+   *  "backup_behavior" must be set to "Scheduled"
+   *  Default: Daily
+   */
+  "backup_schedule_interval": "Daily",
+
+  /*
+   *  Set to true to interpret the dates in the backup schedule in UTC instead of local time.
+   *
+   *  "backup_behavior" must be set to "Interval"
+   *  Default: false
+   */
+  "backup_schedule_is_utc": false,
+
+  /*
+   *  Should a backup be saved on startup?
+   *
+   *  Default: true
+   */
+  "save_backup_on_startup": true,
+
+  /*
+   *  If a backup was saved less than this long ago (HH:MM:SS), a startup backup will not be made.
+   *
+   *  Default: 03:00:00
+   */
+  "backup_on_startup_cooldown": "03:00:00",
+
+  /*
+   *  Maximum number of backups to store.
+   *  When this number is reached, the oldest backups will be deleted and replaced by the current backup.
+   *  Set to -1 to not count backups.
+   *
+   *  Having both "max_backups" and "max_total_backup_size_mb" at -1 is not recommended, but will allow unlimited backups.
+   *  Default: 24
+   */
+  "max_backups": 24,
+
+  /*
+   *  Maximum total size of all backups in MB (metric).
+   *  When this number is reached, the oldest backups will be deleted and replaced by the current backup.
+   *  Set to -1 to not count backup sizes.
+   *
+   *  Having both "max_backups" and "max_total_backup_size_mb" at -1 is not recommended, but will allow unlimited backups.
+   *  Default: 2 MiB
+   */
+  "max_total_backup_size_mb": 2097.152,
+
+  /*
+   *  Skip backups where no users were online.
+   *
+   *  Default: true
+   */
+  "skip_inactive_backup": false,
+
+  /*
+   *  Save extra logging information with the backup.
+   *
+   *  Default: true
+   */
+  "save_backup_logs": true
+}

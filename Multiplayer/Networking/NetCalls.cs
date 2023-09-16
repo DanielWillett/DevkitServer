@@ -11,7 +11,7 @@ internal enum NetCalls : ushort
     SendSteamVerificationToken = 8,
     OpenHighSpeedClient = 9,
     SendPending = 10,
-    SendInitialPosition = 11,
+    SendTransform = 11,
     SendClientInfo = 12,
     SendPermissionState = 13,
     SendClearPermissions = 14,
@@ -37,4 +37,7 @@ internal enum NetCalls : ushort
     SendObjectSyncData = 35,
     SendBindHierarchyItem = 36,
     SendHierarchySyncData = 37,
+    TranslatableEditorUIMessage = 38,
+    AskSave = 39,
+    SendBindSpawnpoint = 40
 }

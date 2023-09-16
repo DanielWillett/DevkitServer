@@ -1,5 +1,6 @@
 ﻿using Cysharp.Threading.Tasks;
 using DevkitServer.API;
+using DevkitServer.API.Abstractions;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
 #if SERVER
@@ -9,7 +10,7 @@ using DevkitServer.Players;
 namespace DevkitServer.Commands.Subsystem;
 
 [Ignore]
-internal sealed class VanillaCommand : IExecutableCommand
+internal sealed class VanillaCommand : ICachedTranslationSourceCommand
 {
     public Command Command { get; }
     bool IExecutableCommand.AnyPermissions => true;
@@ -35,4 +36,5 @@ internal sealed class VanillaCommand : IExecutableCommand
 #else
     public bool CheckPermission() => Command.ClientHasPermissionToRun();
 #endif
+    ITranslationSource ICachedTranslationSourceCommand.TranslationSource { get; set; }
 }

@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace DevkitServer.API;
+﻿namespace DevkitServer.API;
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class LoadPriorityAttribute : Attribute
@@ -16,7 +10,7 @@ public sealed class LoadPriorityAttribute : Attribute
         Priority = priority;
     }
 }
-[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+[AttributeUsage(AttributeTargets.All, Inherited = false)]
 public sealed class IgnoreAttribute : Attribute { }
 
 [AttributeUsage(AttributeTargets.All, Inherited = false)]

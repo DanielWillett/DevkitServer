@@ -11,6 +11,9 @@ namespace DevkitServer.Multiplayer;
 [EarlyTypeInit]
 public static class UserManager
 {
+#if CLIENT
+    internal static readonly CachedMulticastEvent<Action> EventOnConnectedToServer = new CachedMulticastEvent<Action>(typeof(UserManager), nameof(OnConnectedToServer));
+#endif
     private static readonly CachedMulticastEvent<Action<EditorUser>> EventOnUserConnected = new CachedMulticastEvent<Action<EditorUser>>(typeof(UserManager), nameof(OnUserConnected));
     private static readonly CachedMulticastEvent<Action<EditorUser>> EventOnUserDisconnected = new CachedMulticastEvent<Action<EditorUser>>(typeof(UserManager), nameof(OnUserDisconnected));
     public static event Action<EditorUser> OnUserConnected
@@ -23,6 +26,13 @@ public static class UserManager
         add => EventOnUserDisconnected.Add(value);
         remove => EventOnUserDisconnected.Remove(value);
     }
+#if CLIENT
+    public static event Action OnConnectedToServer
+    {
+        add => EventOnConnectedToServer.Add(value);
+        remove => EventOnConnectedToServer.Remove(value);
+    }
+#endif
     private static readonly List<EditorUser> UsersIntl = new List<EditorUser>(16);
     public static IReadOnlyList<EditorUser> Users { get; } = UsersIntl.AsReadOnly();
     public static EditorUser? FromId(ulong id)
@@ -105,11 +115,26 @@ public static class UserManager
     {
         lock (UsersIntl)
         {
-            if (pl.player.gameObject.TryGetComponent(out EditorUser user))
+            if (!pl.player.gameObject.TryGetComponent(out EditorUser user))
+                return false;
+
+            user.IsOnline = true;
+            bool added = false;
+            ulong s64 = pl.playerID.steamID.m_SteamID;
+            for (int j = 0; j < UsersIntl.Count; ++j)
             {
-                user.IsOnline = true;
-                bool added = false;
-                ulong s64 = pl.playerID.steamID.m_SteamID;
+                EditorUser u = UsersIntl[j];
+                if (u.SteamId.m_SteamID == user.SteamId.m_SteamID)
+                {
+                    Logger.LogWarning("User {" + user.SteamId.m_SteamID.Format() + "} was already online.", method: "USERS");
+                    RemoveUser(u);
+                    UsersIntl[j] = user;
+                    added = true;
+                    break;
+                }
+            }
+            if (!added)
+            {
                 for (int j = 0; j < UsersIntl.Count; ++j)
                 {
                     EditorUser u = UsersIntl[j];
@@ -119,33 +144,25 @@ public static class UserManager
                         added = true;
                         break;
                     }
-                    if (u.SteamId.m_SteamID == user.SteamId.m_SteamID)
-                    {
-                        Logger.LogWarning("User {" + user.SteamId.m_SteamID.Format() + "} was already online.", method: "USERS");
-                        RemoveUser(u);
-                        UsersIntl[j] = user;
-                        added = true;
-                        break;
-                    }
                 }
-                if (!added) UsersIntl.Add(user);
+            }
+            if (!added) UsersIntl.Add(user);
 
-                user.Player = pl;
-                user.IsOnline = true;
+            user.Player = pl;
+            user.IsOnline = true;
 #if SERVER
-                user.Connection = pl.transportConnection;
+            user.Connection = pl.transportConnection;
 #endif
-                user.Init();
-                EventOnUserConnected.TryInvoke(user);
+            user.Init();
+            EventOnUserConnected.TryInvoke(user);
 #if SERVER
                 Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + user.Connection.Format() + ".");
 #else
-                Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + (user.Connection != null ? "Current Session" : "Remote Session") + ".");
+            Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + (user.Connection != null ? "Current Session" : "Remote Session") + ".");
+            UserInput.SetActiveMainCamera(user.gameObject.transform);
 #endif
-                return true;
-            }
+            return true;
 
-            return false;
         }
     }
 #if CLIENT

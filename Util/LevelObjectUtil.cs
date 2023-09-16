@@ -9,6 +9,7 @@ using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players.UI;
 using DevkitServer.Util.Region;
 #if CLIENT
+using DevkitServer.Core.Extensions.UI;
 using DevkitServer.Patches;
 using DevkitServer.Players;
 using System.Reflection;
@@ -18,10 +19,17 @@ using DevkitServer.Players;
 #endif
 
 namespace DevkitServer.Util;
+
+/// <summary>
+/// Contains utilities for working with <see cref="LevelObject"/>s, <see cref="LevelBuildableObject"/>s, and the object editor.
+/// </summary>
 public static class LevelObjectUtil
 {
     private const string Source = "LEVEL OBJECTS";
 
+    /// <summary>
+    /// The default rotation an object is placed at.
+    /// </summary>
     public static readonly Quaternion DefaultObjectRotation = Quaternion.Euler(-90f, 0.0f, 0.0f);
 
     public const int MaxDeletePacketSize = 64;
@@ -39,31 +47,54 @@ public static class LevelObjectUtil
     internal static CachedMulticastEvent<BuildableRemoved> EventOnBuildableRemoved = new CachedMulticastEvent<BuildableRemoved>(typeof(LevelObjectUtil), nameof(OnBuildableRemoved));
     internal static CachedMulticastEvent<LevelObjectRemoved> EventOnLevelObjectRemoved = new CachedMulticastEvent<LevelObjectRemoved>(typeof(LevelObjectUtil), nameof(OnLevelObjectRemoved));
 
+    /// <summary>
+    /// Called when the <see cref="RegionCoord"/> of a buildable changes.
+    /// </summary>
     public static event BuildableRegionUpdated OnBuildableRegionUpdated
     {
         add => EventOnBuildableRegionUpdated.Add(value);
         remove => EventOnBuildableRegionUpdated.Remove(value);
     }
+
+    /// <summary>
+    /// Called when the <see cref="RegionCoord"/> of a level object changes.
+    /// </summary>
     public static event LevelObjectRegionUpdated OnLevelObjectRegionUpdated
     {
         add => EventOnLevelObjectRegionUpdated.Add(value);
         remove => EventOnLevelObjectRegionUpdated.Remove(value);
     }
+
+    /// <summary>
+    /// Called when the position of a buildable changes.
+    /// </summary>
     public static event BuildableMoved OnBuildableMoved
     {
         add => EventOnBuildableMoved.Add(value);
         remove => EventOnBuildableMoved.Remove(value);
     }
+
+    /// <summary>
+    /// Called when the position of a level object changes.
+    /// </summary>
     public static event LevelObjectMoved OnLevelObjectMoved
     {
         add => EventOnLevelObjectMoved.Add(value);
         remove => EventOnLevelObjectMoved.Remove(value);
     }
+
+    /// <summary>
+    /// Called when a buildable is deleted.
+    /// </summary>
     public static event BuildableRemoved OnBuildableRemoved
     {
         add => EventOnBuildableRemoved.Add(value);
         remove => EventOnBuildableRemoved.Remove(value);
     }
+
+    /// <summary>
+    /// Called when a level object is deleted.
+    /// </summary>
     public static event LevelObjectRemoved OnLevelObjectRemoved
     {
         add => EventOnLevelObjectRemoved.Add(value);
@@ -83,10 +114,10 @@ public static class LevelObjectUtil
 
 #if CLIENT
     private static readonly Action<CullingVolume>? ClearCullingVolumeObjects =
-        Accessor.GenerateInstanceCaller<CullingVolume, Action<CullingVolume>>("ClearObjects", Array.Empty<Type>());
+        Accessor.GenerateInstanceCaller<CullingVolume, Action<CullingVolume>>("ClearObjects", allowUnsafeTypeBinding: true);
 
     private static readonly Action<CullingVolume>? FindCullingVolumeObjects =
-        Accessor.GenerateInstanceCaller<CullingVolume, Action<CullingVolume>>("FindObjectsInsideVolume", Array.Empty<Type>());
+        Accessor.GenerateInstanceCaller<CullingVolume, Action<CullingVolume>>("FindObjectsInsideVolume", allowUnsafeTypeBinding: true);
 #endif
 
     private static readonly InstanceGetter<LevelObject, AssetReference<MaterialPaletteAsset>>? GetCustomMaterialOverrideIntl =
@@ -102,24 +133,49 @@ public static class LevelObjectUtil
         Accessor.GenerateInstanceSetter<LevelObject, int>("materialIndexOverride");
 
     private static readonly Action<LevelObject>? CallReapplyMaterialOverridesIntl =
-        Accessor.GenerateInstanceCaller<LevelObject, Action<LevelObject>>("ReapplyMaterialOverrides");
+        Accessor.GenerateInstanceCaller<LevelObject, Action<LevelObject>>("ReapplyMaterialOverrides", allowUnsafeTypeBinding: true);
 
 
 #if CLIENT
     private static List<EditorSelection>? _selections;
     private static TransformHandles? _handles;
     private static List<EditorCopy>? _copies;
+
+    /// <summary>
+    /// Selected object or item asset (the one that will get placed when you press [E]).
+    /// </summary>
+    /// <remarks>Will be an <see cref="ItemBarricadeAsset"/>, <see cref="ItemStructureAsset"/>, <see cref="ObjectAsset"/>, or <see langword="null"/>.</remarks>
+    public static Asset? SelectedAsset => EditorObjects.isBuilding ? (Asset?)EditorObjects.selectedObjectAsset ?? EditorObjects.selectedItemAsset : null;
+
+    /// <summary>
+    /// List of copied world objects.
+    /// </summary>
     public static List<EditorCopy> EditorObjectCopies => _copies ??=
         (List<EditorCopy>?)typeof(EditorObjects).GetField("copies", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null)
         ?? throw new MemberAccessException("Unable to find field: EditorObjects.copies.");
+
+    /// <summary>
+    /// List of selected world objects.
+    /// </summary>
     public static List<EditorSelection> EditorObjectSelection => _selections ??=
         (List<EditorSelection>?)typeof(EditorObjects).GetField("selection", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null)
         ?? throw new MemberAccessException("Unable to find field: EditorObjects.selection.");
+
+    /// <summary>
+    /// Transform handles used for the object editor.
+    /// </summary>
     public static TransformHandles EditorObjectHandles => _handles ??=
         (TransformHandles?)typeof(EditorObjects).GetField("handles", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null)
         ?? throw new MemberAccessException("Unable to find field: EditorObjects.handles.");
+
+    /// <summary>
+    /// Sends a request to the server to instantiate an object.
+    /// </summary>
+    /// <param name="asset">Guid of an <see cref="ItemBarricadeAsset"/>, <see cref="ItemStructureAsset"/>, or <see cref="ObjectAsset"/>.</param>
+    /// <exception cref="InvalidOperationException">Thrown when not on a DevkitServer server.</exception>
     public static void RequestInstantiation(Guid asset, Vector3 position, Quaternion rotation, Vector3 scale)
     {
+        DevkitServerModule.AssertIsDevkitServerClient();
         SendRequestInstantiation.Invoke(asset, position, rotation, scale);
     }
 
@@ -150,7 +206,7 @@ public static class LevelObjectUtil
                 InitializeBuildable(newBuildable, out RegionIdentifier id, netId);
 
                 if (owner == Provider.client.m_SteamID)
-                    BuildableResponsibilities.Set(id, true, false);
+                    BuildableResponsibilities.Set(id, true);
                 SyncIfAuthority(id);
             }
             catch (Exception ex)
@@ -192,6 +248,26 @@ public static class LevelObjectUtil
 
         return StandardErrorCode.Success;
     }
+
+    /// <summary>
+    /// Check if a <see cref="Transform"/> is selected in the local object editor.
+    /// </summary>
+    [Pure]
+    public static bool IsSelected(Transform transform)
+    {
+        List<EditorSelection> selection = EditorObjectSelection;
+        for (int i = 0; i < selection.Count; ++i)
+        {
+            if (ReferenceEquals(selection[i].transform, transform))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Removes all local object selections.
+    /// </summary>
     public static void ClearSelection()
     {
         ThreadUtil.assertIsGameThread();
@@ -203,12 +279,36 @@ public static class LevelObjectUtil
         }
 
         List<EditorSelection> selection = EditorObjectSelection;
-        for (int i = selection.Count - 1; i >= 0; ++i)
+        for (int i = selection.Count - 1; i >= 0; --i)
             EditorObjects.removeSelection(selection[i].transform);
     }
+
+    /// <summary>
+    /// Clears your local asset selection. (<see cref="SelectedAsset"/>).
+    /// </summary>
+    public static void DeselectObjectType() => SelectObjectType(null);
+
+    /// <summary>
+    /// Set your local asset selection. (<see cref="SelectedAsset"/>).
+    /// </summary>
+    /// <param name="asset">The asset to select. It must be an <see cref="ItemBarricadeAsset"/>, <see cref="ItemStructureAsset"/>, or <see cref="ObjectAsset"/>. If it's anything else, the selection will be cleared.</param>
+    public static void SelectObjectType(Asset? asset)
+    {
+        if (asset is not ObjectAsset and not ItemBarricadeAsset and not ItemStructureAsset)
+            asset = null;
+        EditorObjects.selectedItemAsset = asset as ItemAsset;
+        EditorObjects.selectedObjectAsset = asset as ObjectAsset;
+        EditorLevelObjectsUIExtension.UpdateSelection(EditorObjects.selectedObjectAsset, EditorObjects.selectedItemAsset);
+    }
+
 #elif SERVER
+    /// <summary>
+    /// Simulate a request for an instantiation of an object or buildable.
+    /// </summary>
+    /// <param name="ctx">Create using <see cref="MessageContext.CreateFromCaller"/>.</param>
+    /// <param name="guid">Guid of an <see cref="ItemBarricadeAsset"/>, <see cref="ItemStructureAsset"/>, or <see cref="ObjectAsset"/>.</param>
     [NetCall(NetCallSource.FromClient, NetCalls.RequestLevelObjectInstantiation)]
-    public static void ReceiveLevelObjectInstantiation(MessageContext ctx, Guid guid, Vector3 position, Quaternion rotation, Vector3 scale)
+    public static void ReceiveLevelObjectInstantiationRequest(MessageContext ctx, Guid guid, Vector3 position, Quaternion rotation, Vector3 scale)
     {
         EditorUser? user = ctx.GetCaller();
         if (user == null || !user.IsOnline)
@@ -333,11 +433,19 @@ public static class LevelObjectUtil
         id = RegionIdentifier.Invalid;
         Logger.LogWarning($"Did not find buildable of transform {transform.name.Format()}.", method: Source);
     }
+    
+    /// <summary>
+    /// Returns the material index override in a <see cref="MaterialPaletteAsset"/> for a <see cref="LevelObject"/>.
+    /// </summary>
     [Pure]
     public static int GetMaterialIndexOverride(this LevelObject levelObject)
     {
         return GetMaterialIndexOverrideIntl == null ? -1 : GetMaterialIndexOverrideIntl(levelObject);
     }
+
+    /// <summary>
+    /// Returns the custom <see cref="MaterialPaletteAsset"/> override for a <see cref="LevelObject"/>.
+    /// </summary>
     [Pure]
     public static AssetReference<MaterialPaletteAsset> GetCustomMaterialOverride(this LevelObject levelObject)
     {
@@ -377,6 +485,11 @@ public static class LevelObjectUtil
 #endif
         return true;
     }
+
+    /// <summary>
+    /// Sets the material index override in a <see cref="MaterialPaletteAsset"/> for a <see cref="LevelObject"/> and networks it to connected clients or the server.
+    /// </summary>
+    /// <returns><see langword="False"/> in the case of a reflection error.</returns>
     public static bool SetMaterialIndexOverride(this LevelObject levelObject, int materialIndexOverride
 #if CLIENT
         , bool reapply = true
@@ -405,6 +518,11 @@ public static class LevelObjectUtil
 #endif
         return true;
     }
+
+    /// <summary>
+    /// Sets the custom <see cref="MaterialPaletteAsset"/> override for a <see cref="LevelObject"/> and networks it to connected clients or the server.
+    /// </summary>
+    /// <returns><see langword="False"/> in the case of a reflection error.</returns>
     public static bool SetCustomMaterialPaletteOverride(this LevelObject levelObject, AssetReference<MaterialPaletteAsset> customMaterialPaletteOverride
 #if CLIENT
         , bool reapply = true
@@ -434,6 +552,10 @@ public static class LevelObjectUtil
         return true;
     }
 #if CLIENT
+    /// <summary>
+    /// Force applies set material overrides. Use after calling both <see cref="SetCustomMaterialPaletteOverride"/> and <see cref="SetMaterialIndexOverride"/> with reapply set to false.
+    /// </summary>
+    /// <returns><see langword="False"/> in the case of a reflection error.</returns>
     public static bool ReapplyMaterialOverrides(this LevelObject levelObject)
     {
         ThreadUtil.assertIsGameThread();
@@ -444,6 +566,11 @@ public static class LevelObjectUtil
         return true;
     }
 #endif
+    /// <summary>
+    /// Try getting an item or object asset and verify its validity.
+    /// </summary>
+    /// <remarks>If <see langword="true"/> is returned, either <paramref name="object"/> or <paramref name="buildable"/> will not be <see langword="null"/>.</remarks>
+    /// <returns><see langword="True"/> if the asset was found and if it was a correct type.</returns>
     public static bool GetObjectOrBuildableAsset(Guid guid, out ObjectAsset? @object, out ItemAsset? buildable)
     {
         Asset asset = Assets.find(guid);
@@ -465,6 +592,10 @@ public static class LevelObjectUtil
 #endif
         return true;
     }
+
+    /// <summary>
+    /// Queues the level object to sync if local has authority over <see cref="ObjectSync"/>.
+    /// </summary>
     public static bool SyncIfAuthority(LevelObject levelObject)
     {
         if (!CheckSync(out ObjectSync sync))
@@ -472,6 +603,10 @@ public static class LevelObjectUtil
         sync.EnqueueSync(levelObject);
         return true;
     }
+
+    /// <summary>
+    /// Queues the buildable to sync if local has authority over <see cref="ObjectSync"/>.
+    /// </summary>
     public static bool SyncIfAuthority(LevelBuildableObject buildable)
     {
         if (!CheckSync(out ObjectSync sync))
@@ -479,6 +614,10 @@ public static class LevelObjectUtil
         sync.EnqueueSync(buildable);
         return true;
     }
+
+    /// <summary>
+    /// Queues the buildable to sync if local has authority over <see cref="ObjectSync"/>.
+    /// </summary>
     public static bool SyncIfAuthority(RegionIdentifier buildable)
     {
         if (!CheckSync(out ObjectSync sync))
@@ -486,6 +625,10 @@ public static class LevelObjectUtil
         sync.EnqueueSync(buildable);
         return true;
     }
+
+    /// <summary>
+    /// Queues the buildable or level object to sync if local has authority over <see cref="ObjectSync"/>.
+    /// </summary>
     public static bool SyncIfAuthority(NetId buildableOrObject)
     {
         if (!CheckSync(out ObjectSync sync))
@@ -493,6 +636,10 @@ public static class LevelObjectUtil
         sync.EnqueueSync(buildableOrObject);
         return true;
     }
+
+    /// <summary>
+    /// Get any valid transform of a level object. (Checks primary, skybox, and placeholder).
+    /// </summary>
     [Pure]
     public static Transform? GetTransform(this LevelObject obj)
     {
@@ -507,14 +654,67 @@ public static class LevelObjectUtil
 
         return null;
     }
+
+    /// <summary>
+    /// Find an object by transform.
+    /// </summary>
+    /// <param name="checkSkyboxAndPlaceholder">Whether or not to check the skybox and placeholder transforms.</param>
+    [Pure]
     public static LevelObject? FindObject(Transform transform, bool checkSkyboxAndPlaceholder = false) => TryFindObject(transform, out LevelObject obj, checkSkyboxAndPlaceholder) ? obj : null;
+
+    /// <summary>
+    /// Find an object by instance id.
+    /// </summary>
+    /// <remarks>Use <see cref="FindObject(Vector3,uint)"/> when possible, as it will be faster.</remarks>
+    [Pure]
     public static LevelObject? FindObject(uint instanceId) => TryFindObject(instanceId, out LevelObject obj) ? obj : null;
+
+    /// <summary>
+    /// Find an object by instance id with a position to help find it quicker.
+    /// </summary>
+    /// <remarks>Use <see cref="FindObject(uint)"/> if you don't know the position.</remarks>
+    [Pure]
     public static LevelObject? FindObject(Vector3 expectedPosition, uint instanceId) => TryFindObject(expectedPosition, instanceId, out LevelObject obj) ? obj : null;
+
+    /// <summary>
+    /// Find a buildable by transform.
+    /// </summary>
+    /// <remarks>This only works in the editor.</remarks>
+    [Pure]
     public static LevelBuildableObject? FindBuildable(Transform transform) => TryFindBuildable(transform, out LevelBuildableObject obj) ? obj : null;
+
+    /// <summary>
+    /// Find an object's region identifier by transform.
+    /// </summary>
+    /// <param name="checkSkyboxAndPlaceholder">Whether or not to check the skybox and placeholder transforms.</param>
+    [Pure]
     public static RegionIdentifier FindObjectCoordinates(Transform transform, bool checkSkyboxAndPlaceholder = false) => TryFindObject(transform, out RegionIdentifier regionId, checkSkyboxAndPlaceholder) ? regionId : RegionIdentifier.Invalid;
+
+    /// <summary>
+    /// Find an object's region identifier by instance id.
+    /// </summary>
+    /// <remarks>Use <see cref="FindObjectCoordinates(Vector3,uint)"/> when possible, as it will be faster. This only works in the editor.</remarks>
+    [Pure]
     public static RegionIdentifier FindObjectCoordinates(uint instanceId) => TryFindObject(instanceId, out RegionIdentifier regionId) ? regionId : RegionIdentifier.Invalid;
+
+    /// <summary>
+    /// Find an object's region identifier by instance id with a position to help find it quicker.
+    /// </summary>
+    /// <remarks>Use <see cref="FindObjectCoordinates(uint)"/> if you don't know the position. This only works in the editor.</remarks>
+    [Pure]
     public static RegionIdentifier FindObjectCoordinates(Vector3 expectedPosition, uint instanceId) => TryFindObject(expectedPosition, instanceId, out RegionIdentifier regionId) ? regionId : RegionIdentifier.Invalid;
+
+    /// <summary>
+    /// Find a buildable's region identifier by transform.
+    /// </summary>
+    /// <remarks>This only works in the editor.</remarks>
+    [Pure]
     public static RegionIdentifier FindBuildableCoordinates(Transform transform) => TryFindBuildable(transform, out RegionIdentifier regionId) ? regionId : RegionIdentifier.Invalid;
+
+    /// <summary>
+    /// Find an object by transform.
+    /// </summary>
+    /// <param name="checkSkyboxAndPlaceholder">Whether or not to check the skybox and placeholder transforms.</param>
     public static bool TryFindObject(Transform transform, out LevelObject levelObject, bool checkSkyboxAndPlaceholder = false)
     {
         if (transform == null)
@@ -527,6 +727,11 @@ public static class LevelObjectUtil
         levelObject = found!;
         return found != null;
     }
+
+    /// <summary>
+    /// Find an object's region identifier by transform.
+    /// </summary>
+    /// <param name="checkSkyboxAndPlaceholder">Whether or not to check the skybox and placeholder transforms.</param>
     public static bool TryFindObject(Transform transform, out RegionIdentifier regionId, bool checkSkyboxAndPlaceholder = false)
     {
         if (transform == null)
@@ -539,6 +744,11 @@ public static class LevelObjectUtil
         regionId = r;
         return !r.IsInvalid;
     }
+
+    /// <summary>
+    /// Find an object by instance id.
+    /// </summary>
+    /// <remarks>Use <see cref="TryFindObject(Vector3,uint,out LevelObject)"/> when possible, as it will be faster.</remarks>
     public static bool TryFindObject(uint instanceId, out LevelObject levelObject)
     {
         LevelObject? found = null;
@@ -546,6 +756,11 @@ public static class LevelObjectUtil
         levelObject = found!;
         return found != null;
     }
+
+    /// <summary>
+    /// Find an object's region identifier by instance id.
+    /// </summary>
+    /// <remarks>Use <see cref="TryFindObject(Vector3,uint,out RegionIdentifier)"/> when possible, as it will be faster.</remarks>
     public static bool TryFindObject(uint instanceId, out RegionIdentifier regionId)
     {
         RegionIdentifier r = RegionIdentifier.Invalid;
@@ -553,6 +768,11 @@ public static class LevelObjectUtil
         regionId = r;
         return !r.IsInvalid;
     }
+
+    /// <summary>
+    /// Find an object by instance id with a position to help find it quicker.
+    /// </summary>
+    /// <remarks>Use <see cref="TryFindObject(uint, out LevelObject)"/> if you don't know the position.</remarks>
     public static bool TryFindObject(Vector3 expectedPosition, uint instanceId, out LevelObject levelObject)
     {
         LevelObject? found = null;
@@ -560,6 +780,11 @@ public static class LevelObjectUtil
         levelObject = found!;
         return found != null;
     }
+
+    /// <summary>
+    /// Find an object's region identifier by instance id with a position to help find it quicker.
+    /// </summary>
+    /// <remarks>Use <see cref="TryFindObject(uint, out RegionIdentifier)"/> if you don't know the position.</remarks>
     public static bool TryFindObject(Vector3 expectedPosition, uint instanceId, out RegionIdentifier regionId)
     {
         RegionIdentifier r = RegionIdentifier.Invalid;
@@ -567,6 +792,11 @@ public static class LevelObjectUtil
         regionId = r;
         return !r.IsInvalid;
     }
+
+    /// <summary>
+    /// Find an object in a region by transform.
+    /// </summary>
+    /// <param name="checkSkyboxAndPlaceholder">Whether or not to check the skybox and placeholder transforms.</param>
     public static bool TryFindObject(Transform transform, RegionCoord region, out LevelObject levelObject, bool checkSkyboxAndPlaceholder = false)
     {
         List<LevelObject> objRegion = LevelObjects.objects[region.x, region.y];
@@ -602,6 +832,11 @@ public static class LevelObjectUtil
         levelObject = null!;
         return false;
     }
+
+    /// <summary>
+    /// Find an object's region identifier in a region by transform.
+    /// </summary>
+    /// <param name="checkSkyboxAndPlaceholder">Whether or not to check the skybox and placeholder transforms.</param>
     public static bool TryFindObject(Transform transform, RegionCoord region, out RegionIdentifier regionId, bool checkSkyboxAndPlaceholder = false)
     {
         List<LevelObject> objRegion = LevelObjects.objects[region.x, region.y];
@@ -637,6 +872,10 @@ public static class LevelObjectUtil
         regionId = RegionIdentifier.Invalid;
         return false;
     }
+
+    /// <summary>
+    /// Find an object's region identifier in a region by instance id.
+    /// </summary>
     public static bool TryFindObject(uint instanceId, RegionCoord region, out RegionIdentifier regionId)
     {
         List<LevelObject> objRegion = LevelObjects.objects[region.x, region.y];
@@ -653,6 +892,10 @@ public static class LevelObjectUtil
         regionId = RegionIdentifier.Invalid;
         return false;
     }
+
+    /// <summary>
+    /// Find an object in a region by instance id.
+    /// </summary>
     public static bool TryFindObject(uint instanceId, RegionCoord region, out LevelObject levelObject)
     {
         List<LevelObject> objRegion = LevelObjects.objects[region.x, region.y];
@@ -669,6 +912,11 @@ public static class LevelObjectUtil
         levelObject = null!;
         return false;
     }
+
+    /// <summary>
+    /// Find a buildable by transform.
+    /// </summary>
+    /// <remarks>This only works in the editor.</remarks>
     public static bool TryFindBuildable(Transform transform, out LevelBuildableObject buildable)
     {
         LevelBuildableObject? found = null;
@@ -676,6 +924,11 @@ public static class LevelObjectUtil
         buildable = found!;
         return found != null;
     }
+
+    /// <summary>
+    /// Find a buildable's region identifier by transform.
+    /// </summary>
+    /// <remarks>This only works in the editor.</remarks>
     public static bool TryFindBuildable(Transform transform, out RegionIdentifier regionId)
     {
         RegionIdentifier r = RegionIdentifier.Invalid;
@@ -683,6 +936,11 @@ public static class LevelObjectUtil
         regionId = r;
         return !r.IsInvalid;
     }
+
+    /// <summary>
+    /// Find a buildable by transform in a region.
+    /// </summary>
+    /// <remarks>This only works in the editor.</remarks>
     public static bool TryFindBuildable(Transform transform, RegionCoord region, out LevelBuildableObject buildable)
     {
         List<LevelBuildableObject> buildableRegion = LevelObjects.buildables[region.x, region.y];
@@ -699,6 +957,11 @@ public static class LevelObjectUtil
         buildable = null!;
         return false;
     }
+
+    /// <summary>
+    /// Find a buildable's region identifier by transform in a region.
+    /// </summary>
+    /// <remarks>This only works in the editor.</remarks>
     public static bool TryFindBuildable(Transform transform, RegionCoord region, out RegionIdentifier regionId)
     {
         List<LevelBuildableObject> buildableRegion = LevelObjects.buildables[region.x, region.y];
@@ -715,13 +978,18 @@ public static class LevelObjectUtil
         regionId = RegionIdentifier.Invalid;
         return false;
     }
-    public static bool TryFindObjectOrBuildable(Transform transform, out LevelObject? @object, out LevelBuildableObject? buildable)
+
+    /// <summary>
+    /// Find an object or a buildable by transform.
+    /// </summary>
+    /// <param name="checkSkyboxAndPlaceholder">Whether or not to check the skybox and placeholder transforms on objects.</param>
+    public static bool TryFindObjectOrBuildable(Transform transform, out LevelObject? @object, out LevelBuildableObject? buildable, bool checkSkyboxAndPlaceholder = false)
     {
         RegionIdentifier r = RegionIdentifier.Invalid;
         bool isBuildable = false;
         RegionUtil.ForEachRegion(transform.position, coord =>
         {
-            if (!TryFindObject(transform, coord, out r, false))
+            if (!TryFindObject(transform, coord, out r, checkSkyboxAndPlaceholder))
             {
                 if (!TryFindBuildable(transform, coord, out r))
                     return true;
@@ -742,7 +1010,7 @@ public static class LevelObjectUtil
     }
 #if SERVER
     [Pure]
-    public static bool CheckMovePermission(uint instanceId, ulong user)
+    internal static bool CheckMovePermission(uint instanceId, ulong user)
     {
         return VanillaPermissions.EditObjects.Has(user, true) ||
                VanillaPermissions.MoveUnownedObjects.Has(user, false) ||
@@ -750,20 +1018,20 @@ public static class LevelObjectUtil
                LevelObjectResponsibilities.IsPlacer(instanceId, user);
     }
     [Pure]
-    public static bool CheckPlacePermission(ulong user)
+    internal static bool CheckPlacePermission(ulong user)
     {
         return VanillaPermissions.EditObjects.Has(user, true) ||
                VanillaPermissions.PlaceObjects.Has(user, false);
     }
     [Pure]
-    public static bool CheckDeletePermission(uint instanceId, ulong user)
+    internal static bool CheckDeletePermission(uint instanceId, ulong user)
     {
         return VanillaPermissions.EditObjects.Has(user, true) ||
                VanillaPermissions.RemoveUnownedObjects.Has(user, false) ||
                VanillaPermissions.PlaceObjects.Has(user, false) && HierarchyResponsibilities.IsPlacer(instanceId, user);
     }
     [Pure]
-    public static bool CheckMoveBuildablePermission(RegionIdentifier id, ulong user)
+    internal static bool CheckMoveBuildablePermission(RegionIdentifier id, ulong user)
     {
         return VanillaPermissions.EditObjects.Has(user, true) ||
                VanillaPermissions.MoveUnownedObjects.Has(user, false) ||
@@ -771,7 +1039,7 @@ public static class LevelObjectUtil
                BuildableResponsibilities.IsPlacer(id, user);
     }
     [Pure]
-    public static bool CheckDeleteBuildablePermission(RegionIdentifier id, ulong user)
+    internal static bool CheckDeleteBuildablePermission(RegionIdentifier id, ulong user)
     {
         return VanillaPermissions.EditObjects.Has(user, true) ||
                VanillaPermissions.RemoveUnownedObjects.Has(user, false) ||
@@ -780,7 +1048,7 @@ public static class LevelObjectUtil
     }
 #elif CLIENT
     [Pure]
-    public static bool CheckMovePermission(uint instanceId)
+    internal static bool CheckMovePermission(uint instanceId)
     {
         return VanillaPermissions.EditObjects.Has(true) ||
                VanillaPermissions.MoveUnownedObjects.Has(false) ||
@@ -788,20 +1056,20 @@ public static class LevelObjectUtil
                LevelObjectResponsibilities.IsPlacer(instanceId);
     }
     [Pure]
-    public static bool CheckPlacePermission()
+    internal static bool CheckPlacePermission()
     {
         return VanillaPermissions.EditObjects.Has(true) ||
                VanillaPermissions.PlaceObjects.Has(false);
     }
     [Pure]
-    public static bool CheckDeletePermission(uint instanceId)
+    internal static bool CheckDeletePermission(uint instanceId)
     {
         return VanillaPermissions.EditObjects.Has(true) ||
                VanillaPermissions.RemoveUnownedObjects.Has(false) ||
                VanillaPermissions.PlaceObjects.Has(false) && HierarchyResponsibilities.IsPlacer(instanceId);
     }
     [Pure]
-    public static bool CheckMoveBuildablePermission(RegionIdentifier id)
+    internal static bool CheckMoveBuildablePermission(RegionIdentifier id)
     {
         return VanillaPermissions.EditObjects.Has(true) ||
                VanillaPermissions.MoveUnownedObjects.Has(false) ||
@@ -809,7 +1077,7 @@ public static class LevelObjectUtil
                BuildableResponsibilities.IsPlacer(id);
     }
     [Pure]
-    public static bool CheckDeleteBuildablePermission(RegionIdentifier id)
+    internal static bool CheckDeleteBuildablePermission(RegionIdentifier id)
     {
         return VanillaPermissions.EditObjects.Has(true) ||
                VanillaPermissions.RemoveUnownedObjects.Has(false) ||
@@ -817,6 +1085,11 @@ public static class LevelObjectUtil
                BuildableResponsibilities.IsPlacer(id);
     }
 #endif
+
+    /// <summary>
+    /// Safely get a buildable from a region identifier.
+    /// </summary>
+    /// <returns>The buildable, or <see langword="null"/> if it's not found.</returns>
     [Pure]
     public static LevelBuildableObject? GetBuildable(RegionIdentifier id)
     {
@@ -825,8 +1098,18 @@ public static class LevelObjectUtil
         List<LevelBuildableObject> buildables = LevelObjects.buildables[id.X, id.Y];
         return buildables.Count > id.Index ? buildables[id.Index] : null;
     }
+
+    /// <summary>
+    /// Unsafely get a buildable from a region identifier.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">One of the coordinates is out of range of world size or the index is out of range of it's region.</exception>
     [Pure]
     public static LevelBuildableObject GetBuildableUnsafe(RegionIdentifier id) => LevelObjects.buildables[id.X, id.Y][id.Index];
+
+    /// <summary>
+    /// Safely get an object from a region identifier.
+    /// </summary>
+    /// <returns>The object, or <see langword="null"/> if it's not found.</returns>
     [Pure]
     public static LevelObject? GetObject(RegionIdentifier id)
     {
@@ -835,10 +1118,25 @@ public static class LevelObjectUtil
         List<LevelObject> objects = LevelObjects.objects[id.X, id.Y];
         return objects.Count > id.Index ? objects[id.Index] : null;
     }
+
+    /// <summary>
+    /// Unsafely get an object from a region identifier.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">One of the coordinates is out of range of world size or the index is out of range of it's region.</exception>
     [Pure]
     public static LevelObject GetObjectUnsafe(RegionIdentifier id) => LevelObjects.objects[id.X, id.Y][id.Index];
+
+    /// <summary>
+    /// Get the asset of a <see cref="EditorCopy"/> object.
+    /// </summary>
+    /// <param name="copy"></param>
+    /// <returns>An <see cref="ItemBarricadeAsset"/>, <see cref="ItemStructureAsset"/>, <see cref="ObjectAsset"/>, or <see langword="null"/> if it wasn't set.</returns>
     public static Asset? GetAsset(this EditorCopy copy) => copy.objectAsset ?? (Asset)copy.itemAsset;
 #if CLIENT
+
+    /// <summary>
+    /// Clears and refinds all the objects in a culling volume.
+    /// </summary>
     public static bool UpdateCulledObjects(CullingVolume volume)
     {
         if (ClearCullingVolumeObjects == null || FindCullingVolumeObjects == null)
@@ -848,6 +1146,10 @@ public static class LevelObjectUtil
         FindCullingVolumeObjects(volume);
         return true;
     }
+
+    /// <summary>
+    /// Clears and refinds all the objects all culling volumes a move could have moved out of or in to based on a start and end position.
+    /// </summary>
     public static void UpdateContainingCullingVolumesForMove(Vector3 from, Vector3 to)
     {
         foreach (CullingVolume volume in CullingVolumeManager.Get().GetAllVolumes())
@@ -856,6 +1158,10 @@ public static class LevelObjectUtil
                 UpdateCulledObjects(volume);
         }
     }
+
+    /// <summary>
+    /// Clears and refinds all the objects all culling volumes a <paramref name="position"/> is inside of.
+    /// </summary>
     public static void UpdateContainingCullingVolumes(Vector3 position)
     {
         foreach (CullingVolume volume in CullingVolumeManager.Get().GetAllVolumes())
@@ -864,20 +1170,21 @@ public static class LevelObjectUtil
                 UpdateCulledObjects(volume);
         }
     }
-    internal static void ClientInstantiateObjectsAndLock(EditorCopy[] copies)
+
+    internal static void ClientInstantiateObjectsAndLock(IReadOnlyList<EditorCopy> copies)
     {
         LevelObjectPatches.IsSyncing = true;
         UIMessage.SendEditorMessage("Syncing");
         DevkitServerModule.ComponentHost.StartCoroutine(PasteObjectsCoroutine(copies));
     }
-    private static IEnumerator PasteObjectsCoroutine(EditorCopy[] copies)
+    private static IEnumerator PasteObjectsCoroutine(IReadOnlyList<EditorCopy> copies)
     {
         try
         {
             EditorUser? user = EditorUser.User;
             if (user == null)
                 yield break;
-            for (int i = 0; i < copies.Length && DevkitServerModule.IsEditing && Level.isEditor; ++i)
+            for (int i = 0; i < copies.Count && DevkitServerModule.IsEditing && Level.isEditor; ++i)
             {
                 if (!user.IsOnline)
                     break;

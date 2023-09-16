@@ -3,6 +3,10 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+#if CLIENT
+using System.Globalization;
+#endif
+
 namespace DevkitServer.Configuration;
 [EarlyTypeInit(-1)]
 public class DevkitServerConfig
@@ -60,20 +64,25 @@ public class DevkitServerConfig
         }
     }
 
+
 #if CLIENT
     internal static string? SeverFolderIntl;
     [CreateDirectory]
     public static readonly string Directory = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer");
     public static readonly string ConfigFilePath = Path.Combine(Directory, "client_config.json");
-    public static string ServerFolder => SeverFolderIntl ??= Path.Combine(Directory, "Temp_" + Parser.getIPFromUInt32(Provider.currentServerInfo.ip) + "_" + Provider.currentServerInfo.connectionPort);
+    public static string ServerFolder => SeverFolderIntl ??= Path.Combine(Directory, "Temp_" + Parser.getIPFromUInt32(Provider.currentServerInfo.ip) + "_" + Provider.currentServerInfo.connectionPort.ToString(CultureInfo.InvariantCulture));
 #else
     [CreateDirectory]
-    public static readonly string Directory = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer", Provider.serverID);
+    public static readonly string Directory = Path.Combine(UnturnedPaths.RootDirectory.FullName, "Servers", Provider.serverID, "DevkitServer");
 
     public static readonly string ConfigFilePath = Path.Combine(Directory, "server_config.json");
     public static readonly string PermissionGroupsPath = Path.Combine(Directory, "permission_groups.json");
     public static string ServerFolder = Directory;
 #endif
+
+    [CreateDirectory]
+    public static readonly string TempFolder = Path.Combine(Directory, "Temp");
+
     private static string? _lvl;
     private static LevelInfo? _lvlInfo;
     public static string LevelDirectory
@@ -269,9 +278,75 @@ public class DevkitServerConfig
             return config;
         }
     }
+    /// <summary>
+    /// Recursively deletes all files and folders in <see cref="TempFolder"/>.
+    /// </summary>
+    public static void ClearTempFolder()
+    {
+        try
+        {
+            string tempFolder = TempFolder;
+            if (!System.IO.Directory.Exists(tempFolder))
+            {
+                System.IO.Directory.CreateDirectory(tempFolder);
+                return;
+            }
+            DirectoryInfo dir = new DirectoryInfo(tempFolder);
+            TryDeleteRecursive(dir, false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error clearing temp folder.", method: Source);
+            Logger.LogError(ex, method: Source);
+        }
+    }
+    private static bool TryDeleteRecursive(DirectoryInfo dir, bool del)
+    {
+        try
+        {
+            bool anyFail = false;
+            foreach (FileSystemInfo entry in dir.EnumerateFileSystemInfos("*", SearchOption.TopDirectoryOnly))
+            {
+                if (entry is DirectoryInfo dir2)
+                {
+                    anyFail |= TryDeleteRecursive(dir2, true);
+                }
+                else if (entry is FileInfo file)
+                {
+                    try
+                    {
+                        file.Delete();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($" • Error deleting file: {file.FullName.Format(true)}.", method: Source);
+                        Logger.LogError($"   + {ex.GetType().Format()} - {ex.Message.Format(false)}{(ex.Message.EndsWith(".") ? string.Empty : ".")}", method: Source);
+                        anyFail = true;
+                    }
+                }
+            }
+
+            if (!anyFail && del)
+                dir.Delete(false);
+            
+            return anyFail;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($" • Error deleting folder: {dir.FullName.Format(true)}.", method: Source);
+            Logger.LogError($"   + {ex.GetType().Format()} - {ex.Message.Format(false)}{(ex.Message.EndsWith(".") ? string.Empty : ".")}", method: Source);
+            return true;
+        }
+    }
 }
-public class SystemConfig
+public class SystemConfig : SchemaConfiguration
 {
+#if SERVER
+    public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/server_config_schema.json");
+#else
+    public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/client_config_schema.json");
+#endif
+
 #nullable disable
     [JsonPropertyName("extended_visual_ansi_support")]
     public bool ConsoleExtendedVisualANSISupport { get; set; }
@@ -285,6 +360,9 @@ public class SystemConfig
 #if CLIENT
     [JsonPropertyName("enable_object_ui_extension")]
     public bool EnableObjectUIExtension { get; set; }
+
+    [JsonPropertyName("enable_better_map_creation")]
+    public bool EnableBetterLevelCreation { get; set; }
 #endif
 
 #if SERVER
@@ -317,6 +395,7 @@ public class SystemConfig
         RemoveCosmeticImprovements = false;
 #if CLIENT
         EnableObjectUIExtension = true;
+        EnableBetterLevelCreation = true;
 #endif
 #if SERVER
         NewLevelInfo = NewLevelCreationOptions.Default;

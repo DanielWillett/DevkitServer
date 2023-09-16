@@ -1,4 +1,5 @@
 ﻿using Cysharp.Threading.Tasks;
+using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
 #if SERVER
 using DevkitServer.Players;
@@ -88,6 +89,7 @@ public interface ILocalizedCommand : IExecutableCommand
     Local Translations { get; set; }
 }
 
+
 /// <summary>
 /// Allows a command to specify it's own localization file.
 /// </summary>
@@ -103,4 +105,8 @@ public interface ICommandLocalizationFile : ILocalizedCommand
     /// </summary>
     /// <remarks>This getter is only ran once during registration.</remarks>
     LocalDatDictionary DefaultTranslations { get; }
+}
+internal interface ICachedTranslationSourceCommand : IExecutableCommand
+{
+    ITranslationSource TranslationSource { get; set; }
 }

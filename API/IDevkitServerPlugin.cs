@@ -1,4 +1,5 @@
-﻿using DevkitServer.Plugins;
+﻿using DevkitServer.API.Abstractions;
+using DevkitServer.Plugins;
 
 namespace DevkitServer.API;
 public interface IDevkitServerPlugin<out TConfig> : IReloadableDevkitServerPlugin, IConfigProvider<TConfig> where TConfig : class, new() { }
@@ -43,6 +44,13 @@ public interface IDevkitServerPlugin
     Local Translations { get; }
 
     /// <summary>
+    /// Whether the plugin is actively in development. Recommended to use <c>#if DEBUG</c>/<c>#else</c>/<c>#endif</c>
+    /// flags to set this to <see langword="true"/> during debug and <see langword="false"/> in release.
+    /// </summary>
+    /// <remarks>Used to disable various readonly restrictions to plugin files (like object icons).</remarks>
+    bool DeveloperMode { get; }
+
+    /// <summary>
     /// Send a debug message to the log. Shoud be ignored when not building with the DEBUG flag.
     /// </summary>
     void LogDebug(string message, ConsoleColor color = ConsoleColor.DarkGray);
@@ -84,6 +92,13 @@ public interface IReloadableDevkitServerPlugin : IDevkitServerPlugin
     /// </summary>
     void Reload();
 }
+public interface IReflectionDoneListenerDevkitServerPlugin : IDevkitServerPlugin
+{
+    /// <summary>
+    /// Called when reflection for the plugin's assembly is ran. Will only call once shortly after <see cref="IDevkitServerPlugin.Load"/>.
+    /// </summary>
+    void OnReflectionDone(PluginAssembly assembly, bool isFirstPluginInAssembly);
+}
 
 public interface IDevkitServerColorPlugin : IDevkitServerPlugin
 {
@@ -92,4 +107,8 @@ public interface IDevkitServerColorPlugin : IDevkitServerPlugin
     /// </summary>
     /// <remarks>Default: rgb(204, 153, 255), <see cref="Plugin.DefaultColor"/>.</remarks>
     Color Color { get; }
+}
+internal interface ICachedTranslationSourcePlugin : IDevkitServerPlugin
+{
+    ITranslationSource TranslationSource { get; set; }
 }
