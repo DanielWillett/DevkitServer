@@ -1,0 +1,70 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ProjectGuid>5b03e97d-9e96-4f25-9200-33035ccd1902</ProjectGuid>
+    <TargetFramework>net481</TargetFramework>
+    <AssemblyTitle>DevkitServer.Launcher</AssemblyTitle>
+    <Product>DevkitServer.Launcher</Product>
+    <Copyright>Copyright ©  2023</Copyright>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <LangVersion>preview</LangVersion>
+    <Nullable>enable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <PackageId>DevkitServer.Launcher</PackageId>
+    <Title>DevkitServer.Launcher</Title>
+    <Version>1.0.0</Version>
+    <Authors>DanielWillett</Authors>
+    <Company />
+    <Description>Launcher/updater for DevkitServer, a multiplayer map editor module for Unturned.</Description>
+    <PackageProjectUrl>https://github.com/DanielWillett/DevkitServer</PackageProjectUrl>
+    <PackageTags>unturned, module, map, editor, multiplayer, launcher, bootstrapper</PackageTags>
+    <PackageReleaseNotes>https://github.com/DanielWillett/DevkitServer/releases</PackageReleaseNotes>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
+    <IncludeSymbols>True</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <AssemblyName>DevkitServer.Launcher</AssemblyName>
+    <RootNamespace>DevkitServer.Launcher</RootNamespace>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'ClientDebug' ">
+    <DebugType>full</DebugType>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'ServerDebug' ">
+    <DebugType>full</DebugType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='ClientRelease'">
+    <Optimize>True</Optimize>
+    <DebugType>pdbonly</DebugType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='ServerRelease'">
+    <Optimize>True</Optimize>
+    <DebugType>pdbonly</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NuGet.Protocol" Version="6.7.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DevkitServer.csproj" />
+  </ItemGroup>
+
+  <Import Project="$(SolutionDir)\Common.targets" Condition="exists('$(SolutionDir)\Common.targets')" />
+  
+  <!-- Signing -->
+  <PropertyGroup Condition="'$(Configuration)'=='ClientRelease' Or '$(Configuration)'=='ServerRelease'">
+    <SignAssembly>True</SignAssembly>
+    <AssemblyOriginatorKeyFile>C:\Users\danny\OneDrive\Documents\DevkitServer\devkitserver.launcher.dll.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+</Project>

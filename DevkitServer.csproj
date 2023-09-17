@@ -1,5 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <ProjectGuid>064df380-f0f3-4f32-b0ab-ba75efb11a46</ProjectGuid>
     <TargetFramework>net481</TargetFramework>
     <AssemblyTitle>DevkitServer</AssemblyTitle>
     <Product>DevkitServer</Product>
@@ -23,7 +24,7 @@
     <Version>0.1.0</Version>
     <Authors>DanielWillett</Authors>
     <Company />
-    <Description>Module for Unturned method: Assembly.GetName().Name.ToUpperInvariant() that enables multi-user map editing.</Description>
+    <Description>Module for Unturned that enables multi-user map editing.</Description>
     <PackageProjectUrl>https://github.com/DanielWillett/DevkitServer</PackageProjectUrl>
     <PackageTags>unturned, module, map, editor, multiplayer</PackageTags>
     <PackageReleaseNotes>https://github.com/DanielWillett/DevkitServer/releases</PackageReleaseNotes>
@@ -44,12 +45,19 @@
     <AssemblyOriginatorKeyFile>C:\Users\danny\OneDrive\Documents\DevkitServer\devkitserver.dll.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
+  <PropertyGroup Condition=" '$(Configuration)' == 'ClientDebug' ">
+    <DebugType>full</DebugType>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'ServerDebug' ">
+    <DebugType>full</DebugType>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='ClientRelease'">
     <Optimize>True</Optimize>
+    <DebugType>pdbonly</DebugType>
   </PropertyGroup>
-
   <PropertyGroup Condition="'$(Configuration)'=='ServerRelease'">
     <Optimize>True</Optimize>
+    <DebugType>pdbonly</DebugType>
   </PropertyGroup>
 
   <Import Project="$(SolutionDir)Common.targets" Condition="exists('$(SolutionDir)Common.targets')" />
@@ -58,10 +66,12 @@
   </Target>
   <ItemGroup>
     <Compile Remove="DevkitServer.Tests\**" />
+    <Compile Remove="DevkitServer.Launcher\**" />
     <Compile Remove="Module\**" />
     <Compile Remove="packages\**" />
     <Compile Remove="TestPlugin\**" />
     <EmbeddedResource Remove="DevkitServer.Tests\**" />
+    <EmbeddedResource Remove="DevkitServer.Launcher\**" />
     <EmbeddedResource Remove="Module\**" />
     <EmbeddedResource Remove="packages\**" />
     <EmbeddedResource Remove="TestPlugin\**" />
