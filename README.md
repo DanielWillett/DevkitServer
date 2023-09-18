@@ -120,7 +120,7 @@ Expected installations:
 Unturned Client - `C:\Program Files (x86)\Steam\steamapps\common\Unturned`<br>
 U3DS - `C:\SteamCMD\steamapps\common\U3DS`
 
-Locations can be changed in `~\Common.targets`, which will apply to all 3 projects:
+Locations can be changed in `~\Unturned.targets`, which will apply to all 3 projects:
 ```xml
 <!-- Installations | CONFIGURE YOUR INSTALLATION PATHS HERE -->
 <PropertyGroup>
@@ -136,7 +136,7 @@ The assemblies, symbol files, and documentation files will be copied to the foll
 ClientDebug, ClientRelease: `C:\Program Files (x86)\Steam\steamapps\common\Unturned\Modules\DevkitServer\Bin\`<br>
 ServerDebug, ServerRelease: `C:\SteamCMD\steamapps\common\U3DS\Modules\DevkitServer\Bin\`<br>
 
-These can be changed in the `~\Common.targets` the same way described above.
+These can be changed in the `~\Unturned.targets` the same way described above.
 
 I suggest setting up Batch Build to build both ClientDebug and ServerDebug (or the release variants if desired).
 

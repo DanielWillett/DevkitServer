@@ -17,7 +17,7 @@ public readonly struct TranslationData
     /// </summary>
     public ITranslationSource Source { get; }
     /// <summary>
-    /// Formatting argumens, similar to how <see cref="string.Format"/> works. Use <see cref="Array.Empty"/> if you dont need to pass any formatting parameters.
+    /// Formatting argumens, similar to how <see cref="string.Format(string,object[])"/> works. Use <see cref="Array.Empty"/> if you dont need to pass any formatting parameters.
     /// </summary>
     public object?[] FormattingArguments { get; }
 

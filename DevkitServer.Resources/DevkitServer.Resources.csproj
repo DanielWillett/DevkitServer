@@ -1,0 +1,69 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ProjectGuid>58A685A9-9ACA-4592-8F91-FF574C88C3DD</ProjectGuid>
+    <TargetFramework>net481</TargetFramework>
+    <AssemblyTitle>DevkitServer.Resources</AssemblyTitle>
+    <Product>DevkitServer.Resources</Product>
+    <Copyright>Copyright ©  2023</Copyright>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>preview</LangVersion>
+    <Nullable>enable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <PackageId>DevkitServer.Resources</PackageId>
+    <Title>DevkitServer.Resources</Title>
+    <Version>0.0.3</Version>
+    <Authors>DanielWillett</Authors>
+    <Company>DanielWillett</Company>
+    <Description>Module config resources for DevkitServer, a multiplayer map editor module for nturned.</Description>
+    <PackageProjectUrl>https://github.com/DanielWillett/DevkitServer</PackageProjectUrl>
+    <PackageTags>unturned, module, map, editor, multiplayer, launcher, bootstrapper, resources</PackageTags>
+    <PackageReleaseNotes>https://github.com/DanielWillett/DevkitServer/releases</PackageReleaseNotes>
+    <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
+    <IncludeSymbols>True</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <AssemblyName>DevkitServer.Resources</AssemblyName>
+    <RootNamespace>DevkitServer.Resources</RootNamespace>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <AssemblyVersion>$(Version).0</AssemblyVersion>
+    <FileVersion>$(Version).0</FileVersion>
+    <Configurations>ClientDebug;ClientRelease;ServerDebug;ServerRelease</Configurations>
+    <DefaultNamespace>DevkitServer.Resources</DefaultNamespace>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <Import Project="$(SolutionDir)Unturned.targets"/>
+
+  <ItemGroup>
+    <Compile Remove="Module\**" />
+    <EmbeddedResource Remove="Module\**" />
+    <None Remove="Module\**" />
+    <None Include="README.md" Pack="true" PackagePath="\"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+  
+  <!-- Signing -->
+  <PropertyGroup Condition="'$(Configuration)'=='ClientRelease' Or '$(Configuration)'=='ServerRelease'">
+    <SignAssembly>True</SignAssembly>
+    <AssemblyOriginatorKeyFile>C:\Users\danny\OneDrive\Documents\DevkitServer\devkitserver.resources.dll.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+</Project>

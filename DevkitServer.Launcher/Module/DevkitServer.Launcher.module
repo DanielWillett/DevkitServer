@@ -1,0 +1,20 @@
+{
+	"IsEnabled": true,
+	"Name": "DevkitServer.Launcher",
+	"Version": "1.0.0.0",
+	"Assemblies":
+	[
+		{
+			"Path": "/Libraries/Nuget.Protocol.dll",
+			"Role": "Both_Optional"
+		},
+		{
+			"Path": "/Bin/DevkitServer.Launcher.dll",
+			"Role": "Client"
+		},
+		{
+			"Path": "/Bin/DevkitServer.Launcher.dll",
+			"Role": "Server"
+		}
+	]
+}

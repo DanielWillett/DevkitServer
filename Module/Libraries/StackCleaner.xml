@@ -1,0 +1,1119 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>StackCleaner</name>
+    </assembly>
+    <members>
+        <member name="T:StackCleaner.StackCleanerConfiguration">
+            <summary>
+            Used to configure properties of the StackCleaner including color and behavior flags.
+            </summary>
+        </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.Default">
+            <summary>
+            Default implementation of <see cref="T:StackCleaner.StackCleanerConfiguration"/>.
+            </summary>
+        </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.Colors">
+            <summary>
+            Instance of <see cref="T:StackCleaner.Color4Config"/>, <see cref="T:StackCleaner.Color32Config"/>, or override <see cref="T:StackCleaner.ColorConfig"/> and make your own color provider.<br/>
+            Default value is <see cref="P:StackCleaner.Color4Config.Default"/>.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.Locale">
+            <summary>
+            Used to convert line numbers, column numbers, and IL offsets to strings.<br/>
+            Default value is <see cref="P:System.Globalization.CultureInfo.InvariantCulture"/>.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.IncludeSourceData">
+            <summary>
+            Source data includes line number, column number, IL offset, and file name when available.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.WarnForHiddenLines">
+            <summary>
+            Appends a warning to the end of the stack trace that lines were removed for visibility.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.PutSourceDataOnNewLine">
+            <summary>
+            Source data is put on the line after the stack frame declaration.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.IncludeNamespaces">
+            <summary>
+            Namespaces are included in the method declaration.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.IncludeILOffset">
+            <summary>
+            IL offsets are included in the source data.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.IncludeLineData">
+            <summary>
+            Line and column numbers are included in the source data.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.IncludeFileData">
+            <summary>
+            Relative source file path will be included in the source data.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.UseTypeAliases">
+            <summary>
+            Primitive types will use their aliases.
+            </summary>
+            <remarks>ex. <see cref="T:System.Int32"/> instead of <see cref="T:System.Int32">Int32</see>.</remarks>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.HtmlUseClassNames">
+            <summary>
+            If <see cref="P:StackCleaner.StackCleanerConfiguration.ColorFormatting"/> is set to <see cref="F:StackCleaner.StackColorFormatType.Html"/>,
+            use css class names (defined as public constants in <see cref="T:StackCleaner.StackTraceCleaner"/>) instead of style tags.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.HtmlWriteOuterDiv">
+            <summary>
+            If <see cref="P:StackCleaner.StackCleanerConfiguration.ColorFormatting"/> is set to <see cref="F:StackCleaner.StackColorFormatType.Html"/>,
+            write an outer &lt;div&gt; with a background color around the output HTML.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.ColorFormatting">
+            <summary>
+            Describes how colors will be handled by the formatter.
+            </summary>
+            <remarks>Default value is <see cref="F:StackCleaner.StackColorFormatType.ConsoleColor"/>.</remarks>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">Value is out of range of <see cref="T:StackCleaner.StackColorFormatType"/>.</exception>
+        </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.HiddenTypes">
+            <summary>
+            Override types who's methods will be skipped in stack traces.<br/>
+            Default values:<br/><br/>
+            <see cref="T:System.Threading.ExecutionContext"/><br/>
+            <see cref="T:System.Runtime.CompilerServices.TaskAwaiter"/><br/>
+            <see cref="T:System.Runtime.CompilerServices.TaskAwaiter`1"/><br/>
+            <see cref="T:System.Runtime.CompilerServices.ConfiguredTaskAwaitable.ConfiguredTaskAwaiter"/><br/>
+            <see cref="T:System.Runtime.CompilerServices.ConfiguredTaskAwaitable`1.ConfiguredTaskAwaiter"/><br/>
+            <see cref="T:System.Runtime.ExceptionServices.ExceptionDispatchInfo"/><br/>
+            Use <see cref="M:StackCleaner.StackCleanerConfiguration.GetHiddenTypes"/> to <see langword="get"/> the value.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+            <remarks>Setting a <see langword="null"/> value will be converted to an empty array.</remarks>
+        </member>
+        <member name="M:StackCleaner.StackCleanerConfiguration.#ctor">
+            <summary>As close as possible to Visual Studio default formatting.</summary>
+        </member>
+        <member name="M:StackCleaner.StackCleanerConfiguration.Clone">
+            <summary>
+            Creates a non-frozen clone of this <see cref="T:StackCleaner.StackCleanerConfiguration"/>.
+            </summary>
+            <returns>An exact copy of this <see cref="T:StackCleaner.StackCleanerConfiguration"/>, safe to cast. Never is frozen.</returns>
+        </member>
+        <member name="M:StackCleaner.StackCleanerConfiguration.GetHiddenTypes">
+            <returns>A readonly array representing the current hidden types. May equal <see cref="F:StackCleaner.StackTraceCleaner.DefaultHiddenTypes"/> </returns>
+        </member>
+        <member name="T:StackCleaner.StackColorFormatType">
+            <summary>
+            Describes the color formatting behavior of <see cref="T:StackCleaner.StackTraceCleaner"/>
+            </summary>
+        </member>
+        <member name="F:StackCleaner.StackColorFormatType.None">
+            <summary>
+            No color formatting, just raw text.
+            </summary>
+        </member>
+        <member name="F:StackCleaner.StackColorFormatType.ConsoleColor">
+            <summary>
+            Sets the <see cref="P:System.Console.ForegroundColor"/> for each section. Only applicable when printed to console.
+            </summary>
+        </member>
+        <member name="F:StackCleaner.StackColorFormatType.UnityRichText">
+            <summary>
+            UnityEngine rich text tags.<br/>
+            <seealso href="https://docs.unity3d.com/Packages/com.unity.ugui@1.0/manual/StyledText.html"/>
+            </summary>
+        </member>
+        <member name="F:StackCleaner.StackColorFormatType.TextMeshProRichText">
+            <summary>
+            TextMeshPro rich text tags.<br/>
+            <seealso href="http://digitalnativestudios.com/textmeshpro/docs/rich-text/"/>
+            </summary>
+        </member>
+        <member name="F:StackCleaner.StackColorFormatType.ANSIColor">
+            <summary>
+            ANSI Text formatting codes.<br/>
+            <seealso href="https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences?redirectedfrom=MSDN#text-formatting"/>
+            </summary>
+        </member>
+        <member name="F:StackCleaner.StackColorFormatType.ExtendedANSIColor">
+            <summary>
+            Will not work on all terminals.<br/>
+            <seealso href="https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences?redirectedfrom=MSDN#extended-colors"/>
+            </summary>
+        </member>
+        <member name="F:StackCleaner.StackColorFormatType.Html">
+            <summary>
+            Text is colored with &lt;span&gt; tags.
+            </summary>
+            <remarks>Use classes instead of constant CSS styles by setting <see cref="P:StackCleaner.StackCleanerConfiguration.HtmlUseClassNames"/> to <see langword="true"/>.</remarks>
+        </member>
+        <member name="T:StackCleaner.ColorConfig">
+            <summary>
+            Base class for all color configurations.<br/>
+            To use your own source of colors, override this class and set the values of the color fields to a 32 bit ARGB integer.
+            <code>
+            Alpha = (argb &gt;&gt; 24) &amp; 0xFF
+            Red   = (argb &gt;&gt; 16) &amp; 0xFF
+            Green = (argb &gt;&gt; 8 ) &amp; 0xFF
+            Blue  = (argb &gt;&gt; 0 ) &amp; 0xFF
+            </code>
+            </summary>
+        </member>
+        <member name="F:StackCleaner.ColorConfig.FrozenErrorText">
+            <summary>Error text used to throw a <see cref="T:System.NotSupportedException"/> when the config is frozen.</summary>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.Frozen">
+            <summary>
+            This property is set to <see langword="true"/> after the config is passed to a <see cref="T:StackCleaner.StackTraceCleaner"/> so it can not be modified.
+            </summary>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.KeywordColor">
+            <summary>
+            Color of keywords including types: <br/><see langword="null"/>, <see langword="bool"/>,
+            <see langword="byte"/>, <see langword="char"/>, <see langword="double"/>,
+            <see langword="decimal"/>, <see langword="float"/>, <see langword="int"/>, <see langword="long"/>,
+            <see langword="sbyte"/>, <see langword="short"/>, <see langword="object"/>, <see langword="string"/>,
+            <see langword="uint"/>, <see langword="bool"/>, <see langword="ulong"/>, <see langword="ushort"/>,
+            <see langword="void"/><br/>
+            method keywords: <br/><see langword="static"/>, <see langword="async"/>, <see langword="enumerator"/>,
+            <see langword="get"/>, <see langword="set"/>, <see langword="anonymous"/><br/>
+            and the <see langword="global"/> and <see langword="params"/> keywords.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.MethodColor">
+            <summary>
+            Color of method names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.PropertyColor">
+            <summary>
+            Color of property names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.ParameterColor">
+            <summary>
+            Color of parameter names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.ClassColor">
+            <summary>
+            Color of class type names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.StructColor">
+            <summary>
+            Color of value type names (not including enums).
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.FlowKeywordColor">
+            <summary>
+            Color of flow keywords, currently only used for the 'at' at the beginning of each declaration.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.InterfaceColor">
+            <summary>
+            Color of interface type names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.GenericParameterColor">
+            <summary>
+            Color of generic parameter names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.EnumColor">
+            <summary>
+            Color of enum type names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.NamespaceColor">
+            <summary>
+            Color of namespaces.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.PunctuationColor">
+            <summary>
+            Color of any punctuation: periods, commas, parenthesis, etc.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.ExtraDataColor">
+            <summary>
+            Color of the source data (line number, column number, IL offset, and file name).
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.LinesHiddenWarningColor">
+            <summary>
+            Color of the warning optionally shown when unnecessary lines are removed.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.ColorConfig.HtmlBackgroundColor">
+            <summary>
+            Color of the optionally added background when writing as HTML.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="T:StackCleaner.Color4Config">
+            <summary>
+            Provides colors in the <see cref="T:System.ConsoleColor"/> format.
+            </summary>
+        </member>
+        <member name="P:StackCleaner.Color4Config.Default">
+            <summary>
+            Default values of <see cref="T:StackCleaner.Color4Config"/>. Frozen.
+            </summary>
+        </member>
+        <member name="P:StackCleaner.Color4Config.KeywordColor">
+            <summary>
+            Color of keywords including types: <br/><see langword="null"/>, <see langword="bool"/>,
+            <see langword="byte"/>, <see langword="char"/>, <see langword="double"/>,
+            <see langword="decimal"/>, <see langword="float"/>, <see langword="int"/>, <see langword="long"/>,
+            <see langword="sbyte"/>, <see langword="short"/>, <see langword="object"/>, <see langword="string"/>,
+            <see langword="uint"/>, <see langword="bool"/>, <see langword="ulong"/>, <see langword="ushort"/>,
+            <see langword="void"/><br/>
+            method keywords: <br/><see langword="static"/>, <see langword="async"/>, <see langword="enumerator"/>,
+            <see langword="get"/>, <see langword="set"/>, <see langword="anonymous"/><br/>
+            and the <see langword="global"/> and <see langword="params"/> keywords.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color4Config.MethodColor">
+            <summary>
+            Color of method names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color4Config.PropertyColor">
+            <summary>
+            Color of property names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color4Config.ParameterColor">
+            <summary>
+            Color of parameter names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color4Config.ClassColor">
+            <summary>
+            Color of class type names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color4Config.StructColor">
+            <summary>
+            Color of value type names (not including enums).
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color4Config.FlowKeywordColor">
+            <summary>
+            Color of flow keywords, currently only used for the 'at' at the beginning of each declaration.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color4Config.InterfaceColor">
+            <summary>
+            Color of interface type names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color4Config.GenericParameterColor">
+            <summary>
+            Color of generic parameter names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color4Config.EnumColor">
+            <summary>
+            Color of enum type names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color4Config.NamespaceColor">
+            <summary>
+            Color of namespaces.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color4Config.PunctuationColor">
+            <summary>
+            Color of any punctuation: periods, commas, parenthesis, etc.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color4Config.ExtraDataColor">
+            <summary>
+            Color of the source data (line number, column number, IL offset, and file name).
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color4Config.LinesHiddenWarningColor">
+            <summary>
+            Color of the warning optionally shown when unnecessary lines are removed.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color4Config.HtmlBackgroundColor">
+            <summary>
+            Color of the optionally added background when writing as HTML.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="M:StackCleaner.Color4Config.#ctor">
+            <summary>
+            Sets the default values for <see cref="T:StackCleaner.Color4Config"/>.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.Color4Config.ToConsoleColor(System.Int32)">
+            <summary>
+            Convert ARGB data to <see cref="T:System.ConsoleColor"/> (picks the closest).
+            </summary>
+        </member>
+        <member name="T:StackCleaner.Color32Config">
+            <summary>
+            Provides colors in the <see cref="T:System.Drawing.Color"/> format.
+            </summary>
+        </member>
+        <member name="P:StackCleaner.Color32Config.Default">
+            <summary>
+            Default values of <see cref="T:StackCleaner.Color32Config"/>. Frozen.
+            </summary>
+        </member>
+        <member name="P:StackCleaner.Color32Config.KeywordColor">
+            <summary>
+            Color of keywords including types: <br/><see langword="null"/>, <see langword="bool"/>,
+            <see langword="byte"/>, <see langword="char"/>, <see langword="double"/>,
+            <see langword="decimal"/>, <see langword="float"/>, <see langword="int"/>, <see langword="long"/>,
+            <see langword="sbyte"/>, <see langword="short"/>, <see langword="object"/>, <see langword="string"/>,
+            <see langword="uint"/>, <see langword="bool"/>, <see langword="ulong"/>, <see langword="ushort"/>,
+            <see langword="void"/><br/>
+            method keywords: <br/><see langword="static"/>, <see langword="async"/>, <see langword="enumerator"/>,
+            <see langword="get"/>, <see langword="set"/>, <see langword="anonymous"/><br/>
+            and the <see langword="global"/> and <see langword="params"/> keywords.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color32Config.MethodColor">
+            <summary>
+            Color of method names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color32Config.PropertyColor">
+            <summary>
+            Color of property names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color32Config.ParameterColor">
+            <summary>
+            Color of parameter names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color32Config.ClassColor">
+            <summary>
+            Color of class type names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color32Config.StructColor">
+            <summary>
+            Color of value type names (not including enums).
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color32Config.FlowKeywordColor">
+            <summary>
+            Color of flow keywords, currently only used for the 'at' at the beginning of each declaration.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color32Config.InterfaceColor">
+            <summary>
+            Color of interface type names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color32Config.GenericParameterColor">
+            <summary>
+            Color of generic parameter names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color32Config.EnumColor">
+            <summary>
+            Color of enum type names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color32Config.NamespaceColor">
+            <summary>
+            Color of namespaces.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color32Config.PunctuationColor">
+            <summary>
+            Color of any punctuation: periods, commas, parenthesis, etc.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color32Config.ExtraDataColor">
+            <summary>
+            Color of the source data (line number, column number, IL offset, and file name).
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color32Config.LinesHiddenWarningColor">
+            <summary>
+            Color of the warning optionally shown when unnecessary lines are removed.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.Color32Config.HtmlBackgroundColor">
+            <summary>
+            Color of the optionally added background when writing as HTML.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="M:StackCleaner.Color32Config.#ctor">
+            <summary>
+            Sets the default values for <see cref="T:StackCleaner.Color32Config"/>.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.Color32Config.ToColor(System.ConsoleColor)">
+            <summary>
+            Convert <see cref="T:System.ConsoleColor"/> to <see cref="T:System.Drawing.Color"/>.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.Color32Config.ToConsoleColor(System.Drawing.Color)">
+            <summary>
+            Convert ARGB data to <see cref="T:System.Drawing.Color"/>.
+            </summary>
+        </member>
+        <member name="T:StackCleaner.StackTraceCleaner">
+            <summary>
+            Tool that clears up stack traces to make them much more readable during debugging.<br/>
+            Supports highly customizable color formatting in the following formats:<br/>
+            <br/>
+            • <see cref="T:System.ConsoleColor"/><br/>
+            • ANSI color codes (4-bit)<br/>
+            • Extended ANSI color codes (32-bit where supported)<br/>
+            • Unity Rich Text<br/>
+            • Unity TextMeshPro Rich Text<br/>
+            • Html (with tags)<br/>
+            </summary>
+        </member>
+        <member name="F:StackCleaner.StackTraceCleaner.BackgroundClassName">
+            <summary>Html class for the background div.</summary>
+        </member>
+        <member name="F:StackCleaner.StackTraceCleaner.KeywordClassName">
+            <summary>Html class for keywords.</summary>
+        </member>
+        <member name="F:StackCleaner.StackTraceCleaner.MethodClassName">
+            <summary>Html class for methods.</summary>
+        </member>
+        <member name="F:StackCleaner.StackTraceCleaner.PropertyClassName">
+            <summary>Html class for properties.</summary>
+        </member>
+        <member name="F:StackCleaner.StackTraceCleaner.ParameterClassName">
+            <summary>Html class for parameters.</summary>
+        </member>
+        <member name="F:StackCleaner.StackTraceCleaner.ClassClassName">
+            <summary>Html class for classes.</summary>
+        </member>
+        <member name="F:StackCleaner.StackTraceCleaner.StructClassName">
+            <summary>Html class for structs.</summary>
+        </member>
+        <member name="F:StackCleaner.StackTraceCleaner.FlowKeywordClassName">
+            <summary>Html class for flow keywords.</summary>
+        </member>
+        <member name="F:StackCleaner.StackTraceCleaner.InterfaceClassName">
+            <summary>Html class for interface.</summary>
+        </member>
+        <member name="F:StackCleaner.StackTraceCleaner.GenericParameterClassName">
+            <summary>Html class for generic parameters.</summary>
+        </member>
+        <member name="F:StackCleaner.StackTraceCleaner.EnumClassName">
+            <summary>Html class for enums.</summary>
+        </member>
+        <member name="F:StackCleaner.StackTraceCleaner.NamespaceClassName">
+            <summary>Html class for namespaces.</summary>
+        </member>
+        <member name="F:StackCleaner.StackTraceCleaner.PunctuationClassName">
+            <summary>Html class for punctuation.</summary>
+        </member>
+        <member name="F:StackCleaner.StackTraceCleaner.ExtraDataClassName">
+            <summary>Html class for extra data (source data).</summary>
+        </member>
+        <member name="F:StackCleaner.StackTraceCleaner.LinesHiddenWarningClassName">
+            <summary>Html class for the lines hidden warning.</summary>
+        </member>
+        <member name="P:StackCleaner.StackTraceCleaner.Default">
+            <summary>
+            Default implementation of <see cref="T:StackCleaner.StackTraceCleaner"/>.
+            </summary>
+        </member>
+        <member name="P:StackCleaner.StackTraceCleaner.Configuration">
+            <summary>Active configuration instance being used by this <see cref="T:StackCleaner.StackTraceCleaner"/>.</summary>
+            <remarks>
+            This value and all it's properties are <see langword="readonly"/>. Trying to modify them will throw a <see cref="T:System.NotSupportedException"/>.
+            </remarks>>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.#ctor">
+            <summary>
+            Use <see cref="P:StackCleaner.StackTraceCleaner.Default"/> to get a default implementation.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.#ctor(StackCleaner.StackCleanerConfiguration)">
+            <summary>
+            Load a new <see cref="T:StackCleaner.StackTraceCleaner"/> with the specified <paramref name="config"/>.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetStackTrace(System.Exception,System.Boolean)">
+            <summary>
+            Conerts an <see cref="T:System.Exception"/> to a stack trace, just calls <see cref="M:System.Diagnostics.StackTrace.#ctor(System.Exception,System.Boolean)"/> if a stack trace has been added.
+            </summary>
+            <remarks><see cref="P:System.Exception.StackTrace"/> only gets set after calling <see langword="throw"/> on the <see cref="T:System.Exception"/>.</remarks>
+            <param name="fetchSourceInfo">Whether or not to capture the file name, line number, and column number of the exception. 
+            If this isn't needed it's best to set it to false to save computing time.</param>
+            <param name="ex">Exception to fetch <see cref="T:System.Diagnostics.StackTrace"/> from. This will only work after calling <see langword="throw"/> on it.</param>
+            <returns>A <see cref="T:System.Diagnostics.StackTrace"/> representing the source of the exception if present, otherwise <see langword="null"/>.</returns>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetString(System.Exception)">
+            <summary>
+            Formats the <paramref name="exception"/>'s stack (and it's remote stacks when applicable) and returns it as a <see cref="T:System.String"/> using the runtime's default encoding.
+            </summary>
+            <exception cref="T:System.ArgumentNullException"/>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetString(System.Diagnostics.StackTrace)">
+            <summary>
+            Formats the <paramref name="stackTrace"/> and returns it as a <see cref="T:System.String"/> using the runtime's default encoding.
+            </summary>
+            <exception cref="T:System.ArgumentNullException"/>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToStream(System.IO.Stream,System.Diagnostics.StackTrace,System.Text.Encoding)">
+            <summary>
+            Formats the <paramref name="stackTrace"/> and writes it to <paramref name="stream"/> using <paramref name="encoding"/> to encode it.
+            </summary>
+            <remarks>If <paramref name="encoding"/> is <see langword="null"/>, it's set to <see cref="P:System.Text.Encoding.Default"/> instead.</remarks>
+            <exception cref="T:System.ArgumentNullException"/>
+            <exception cref="T:System.ArgumentException"><paramref name="stream"/> is unable to be written to.</exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToStream(System.IO.Stream,System.Exception,System.Text.Encoding)">
+            <summary>
+            Formats the <paramref name="exception"/>'s stack (and it's remote stacks when applicable) and writes it to <paramref name="stream"/> using <paramref name="encoding"/> to encode it.
+            </summary>
+            <remarks>If <paramref name="encoding"/> is <see langword="null"/>, it's set to <see cref="P:System.Text.Encoding.Default"/> instead.</remarks>
+            <exception cref="T:System.ArgumentNullException"/>
+            <exception cref="T:System.ArgumentException"><paramref name="stream"/> is unable to be written to.</exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToFile(System.String,System.Diagnostics.StackTrace,System.Text.Encoding)">
+            <summary>
+            Formats the <paramref name="stackTrace"/> and writes it to a file at <paramref name="path"/> using <paramref name="encoding"/> to encode it.<br/>
+            If the file exists, it'll be overwritten, otherwise it'll be created.
+            </summary>
+            <remarks>If <paramref name="encoding"/> is <see langword="null"/>, it's set to <see cref="P:System.Text.Encoding.Default"/> instead.</remarks>
+            <exception cref="T:System.ArgumentNullException"/>
+            <exception cref="T:System.IO.IOException"/>
+            <exception cref="T:System.NotSupportedException"><paramref name="path"/> is not a valid writable file.</exception>
+            <exception cref="T:System.ArgumentException"><paramref name="path"/> is not a valid writable file.</exception>
+            <exception cref="T:System.Security.SecurityException">Missing file access.</exception>
+            <exception cref="T:System.UnauthorizedAccessException">Missing file write access.</exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToFile(System.String,System.Exception,System.Text.Encoding)">
+            <summary>
+            Formats the <paramref name="exception"/>'s stack (and it's remote stacks when applicable) and writes it to a file at <paramref name="path"/> using <paramref name="encoding"/> to encode it.<br/>
+            If the file exists, it'll be overwritten, otherwise it'll be created.
+            </summary>
+            <remarks>If <paramref name="encoding"/> is <see langword="null"/>, it's set to <see cref="P:System.Text.Encoding.Default"/> instead.</remarks>
+            <exception cref="T:System.ArgumentNullException"/>
+            <exception cref="T:System.IO.IOException"/>
+            <exception cref="T:System.NotSupportedException"><paramref name="path"/> is not a valid writable file.</exception>
+            <exception cref="T:System.ArgumentException"><paramref name="path"/> is not a valid writable file.</exception>
+            <exception cref="T:System.Security.SecurityException">Missing file access.</exception>
+            <exception cref="T:System.UnauthorizedAccessException">Missing file write access.</exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToStreamAsync(System.IO.Stream,System.Diagnostics.StackTrace,System.Text.Encoding,System.Threading.CancellationToken)">
+            <summary>
+            Formats the <paramref name="stackTrace"/> and writes it to <paramref name="stream"/> asynchronously using <paramref name="encoding"/> to encode it.
+            </summary>
+            <remarks>If <paramref name="encoding"/> is <see langword="null"/>, it's set to <see cref="P:System.Text.Encoding.Default"/> instead.</remarks>
+            <exception cref="T:System.ArgumentNullException"/>
+            <exception cref="T:System.ArgumentException"><paramref name="stream"/> is unable to be written to.</exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToStreamAsync(System.IO.Stream,System.Exception,System.Text.Encoding,System.Threading.CancellationToken)">
+            <summary>
+            Formats the <paramref name="exception"/>'s stack (and it's remote stacks when applicable) and writes it to <paramref name="stream"/> asynchronously using <paramref name="encoding"/> to encode it.
+            </summary>
+            <remarks>If <paramref name="encoding"/> is <see langword="null"/>, it's set to <see cref="P:System.Text.Encoding.Default"/> instead.</remarks>
+            <exception cref="T:System.ArgumentNullException"/>
+            <exception cref="T:System.ArgumentException"><paramref name="stream"/> is unable to be written to.</exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToConsole(System.Diagnostics.StackTrace,System.Boolean)">
+            <summary>
+            Output the stack trace to <see cref="T:System.Console"/> using the appropriate color format.
+            </summary>
+            <param name="stackTrace">Stack trace to write.</param>
+            <param name="writeToConsoleBuffer">Only set this to <see langword="true"/> if memory is a huge concern, writing to the console per span takes significantly (~5x) longer than writing to a memory buffer then writing the entire buffer to the console at once.</param>
+            <exception cref="T:System.ArgumentNullException"></exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToConsole(System.Exception,System.Boolean)">
+            <summary>
+            Output the <paramref name="exception"/>'s stack (and it's remote stacks when applicable) to <see cref="T:System.Console"/> using the appropriate color format.
+            </summary>
+            <param name="exception">Exception to write.</param>
+            <param name="writeToConsoleBuffer">Only set this to <see langword="true"/> if memory is a huge concern, writing to the console per span takes significantly (~5x) longer than writing to a memory buffer then writing the entire buffer to the console at once.</param>
+            <exception cref="T:System.ArgumentNullException"></exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriter(System.Diagnostics.StackTrace,System.IO.TextWriter)">
+            <summary>
+            Formats the <paramref name="stackTrace"/> and writes it to <paramref name="writer"/>.
+            </summary>
+            <exception cref="T:System.ArgumentNullException"/>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriter(System.Exception,System.IO.TextWriter)">
+            <summary>
+            Formats the <paramref name="exception"/>'s stack (and it's remote stacks when applicable) and writes it to <paramref name="writer"/>.
+            </summary>
+            <exception cref="T:System.ArgumentNullException"/>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriterAsync(System.Diagnostics.StackTrace,System.IO.TextWriter,System.Threading.CancellationToken)">
+            <summary>
+            Formats the <paramref name="stackTrace"/> and writes it to <paramref name="writer"/> asynchronously.
+            </summary>
+            <exception cref="T:System.ArgumentNullException"/>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriterAsync(System.Exception,System.IO.TextWriter,System.Threading.CancellationToken)">
+            <summary>
+            Formats the <paramref name="exception"/>'s stack (and it's remote stacks when applicable) and writes it to <paramref name="writer"/> asynchronously.
+            </summary>
+            <exception cref="T:System.ArgumentNullException"/>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriterIntl(System.Diagnostics.StackTrace,System.IO.TextWriter,System.Boolean)">
+            <summary>
+            Formats the <paramref name="trace"/> and writes it to <paramref name="writer"/>.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriterIntlAsync(System.Diagnostics.StackTrace,System.IO.TextWriter,System.Boolean,System.Threading.CancellationToken)">
+            <summary>
+            Formats the <paramref name="trace"/> and writes it to <paramref name="writer"/> asynchronously.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetString(System.Type)">
+            <summary>
+            Formats the <paramref name="typedef"/> and returns it as a <see cref="T:System.String"/> using the runtime's default encoding.
+            </summary>
+            <exception cref="T:System.ArgumentNullException"/>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToStream(System.IO.Stream,System.Type,System.Text.Encoding)">
+            <summary>
+            Formats the <paramref name="typedef"/> and writes it to <paramref name="stream"/> using <paramref name="encoding"/> to encode it.
+            </summary>
+            <remarks>If <paramref name="encoding"/> is <see langword="null"/>, it's set to <see cref="P:System.Text.Encoding.Default"/> instead.</remarks>
+            <exception cref="T:System.ArgumentNullException"/>
+            <exception cref="T:System.ArgumentException"><paramref name="stream"/> is unable to be written to.</exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToFile(System.String,System.Type,System.Text.Encoding)">
+            <summary>
+            Formats the <paramref name="typedef"/> and writes it to a file at <paramref name="path"/> using <paramref name="encoding"/> to encode it.<br/>
+            If the file exists, it'll be overwritten, otherwise it'll be created.
+            </summary>
+            <remarks>If <paramref name="encoding"/> is <see langword="null"/>, it's set to <see cref="P:System.Text.Encoding.Default"/> instead.</remarks>
+            <exception cref="T:System.ArgumentNullException"/>
+            <exception cref="T:System.IO.IOException"/>
+            <exception cref="T:System.NotSupportedException"><paramref name="path"/> is not a valid writable file.</exception>
+            <exception cref="T:System.ArgumentException"><paramref name="path"/> is not a valid writable file.</exception>
+            <exception cref="T:System.Security.SecurityException">Missing file access.</exception>
+            <exception cref="T:System.UnauthorizedAccessException">Missing file write access.</exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToStreamAsync(System.IO.Stream,System.Type,System.Text.Encoding,System.Threading.CancellationToken)">
+            <summary>
+            Formats the <paramref name="typedef"/> and writes it to <paramref name="stream"/> asynchronously using <paramref name="encoding"/> to encode it.
+            </summary>
+            <remarks>If <paramref name="encoding"/> is <see langword="null"/>, it's set to <see cref="P:System.Text.Encoding.Default"/> instead.</remarks>
+            <exception cref="T:System.ArgumentNullException"/>
+            <exception cref="T:System.ArgumentException"><paramref name="stream"/> is unable to be written to.</exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToConsole(System.Type,System.Boolean)">
+            <summary>
+            Output the type definition to <see cref="T:System.Console"/> using the appropriate color format.
+            </summary>
+            <param name="typedef">Type to write.</param>
+            <param name="writeToConsoleBuffer">Only set this to <see langword="true"/> if memory is a huge concern, writing to the console per span takes significantly (~5x) longer than writing to a memory buffer then writing the entire buffer to the console at once.</param>
+            <exception cref="T:System.ArgumentNullException"></exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriter(System.Type,System.IO.TextWriter)">
+            <summary>
+            Formats the <paramref name="typedef"/> and writes it to <paramref name="writer"/>.
+            </summary>
+            <exception cref="T:System.ArgumentNullException"/>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriterAsync(System.Type,System.IO.TextWriter,System.Threading.CancellationToken)">
+            <summary>
+            Formats the <paramref name="typedef"/> and writes it to <paramref name="writer"/> asynchronously.
+            </summary>
+            <exception cref="T:System.ArgumentNullException"/>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriterIntl(System.Type,System.IO.TextWriter,System.Boolean)">
+            <summary>
+            Formats the <paramref name="typedef"/> and writes it to <paramref name="writer"/>.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriterIntlAsync(System.Type,System.IO.TextWriter,System.Boolean,System.Threading.CancellationToken)">
+            <summary>
+            Formats the <paramref name="typedef"/> and writes it to <paramref name="writer"/> asynchronously.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetString(System.Reflection.MethodBase)">
+            <summary>
+            Formats the <paramref name="method"/> and returns it as a <see cref="T:System.String"/> using the runtime's default encoding.
+            </summary>
+            <exception cref="T:System.ArgumentNullException"/>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToStream(System.IO.Stream,System.Reflection.MethodBase,System.Text.Encoding)">
+            <summary>
+            Formats the <paramref name="method"/> and writes it to <paramref name="stream"/> using <paramref name="encoding"/> to encode it.
+            </summary>
+            <remarks>If <paramref name="encoding"/> is <see langword="null"/>, it's set to <see cref="P:System.Text.Encoding.Default"/> instead.</remarks>
+            <exception cref="T:System.ArgumentNullException"/>
+            <exception cref="T:System.ArgumentException"><paramref name="stream"/> is unable to be written to.</exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToFile(System.String,System.Reflection.MethodBase,System.Text.Encoding)">
+            <summary>
+            Formats the <paramref name="method"/> and writes it to a file at <paramref name="path"/> using <paramref name="encoding"/> to encode it.<br/>
+            If the file exists, it'll be overwritten, otherwise it'll be created.
+            </summary>
+            <remarks>If <paramref name="encoding"/> is <see langword="null"/>, it's set to <see cref="P:System.Text.Encoding.Default"/> instead.</remarks>
+            <exception cref="T:System.ArgumentNullException"/>
+            <exception cref="T:System.IO.IOException"/>
+            <exception cref="T:System.NotSupportedException"><paramref name="path"/> is not a valid writable file.</exception>
+            <exception cref="T:System.ArgumentException"><paramref name="path"/> is not a valid writable file.</exception>
+            <exception cref="T:System.Security.SecurityException">Missing file access.</exception>
+            <exception cref="T:System.UnauthorizedAccessException">Missing file write access.</exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToStreamAsync(System.IO.Stream,System.Reflection.MethodBase,System.Text.Encoding,System.Threading.CancellationToken)">
+            <summary>
+            Formats the <paramref name="method"/> and writes it to <paramref name="stream"/> asynchronously using <paramref name="encoding"/> to encode it.
+            </summary>
+            <remarks>If <paramref name="encoding"/> is <see langword="null"/>, it's set to <see cref="P:System.Text.Encoding.Default"/> instead.</remarks>
+            <exception cref="T:System.ArgumentNullException"/>
+            <exception cref="T:System.ArgumentException"><paramref name="stream"/> is unable to be written to.</exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToConsole(System.Reflection.MethodBase,System.Boolean)">
+            <summary>
+            Output the method definition to <see cref="T:System.Console"/> using the appropriate color format.
+            </summary>
+            <param name="method">Method to write.</param>
+            <param name="writeToConsoleBuffer">Only set this to <see langword="true"/> if memory is a huge concern, writing to the console per span takes significantly (~5x) longer than writing to a memory buffer then writing the entire buffer to the console at once.</param>
+            <exception cref="T:System.ArgumentNullException"></exception>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriter(System.Reflection.MethodBase,System.IO.TextWriter)">
+            <summary>
+            Formats the <paramref name="method"/> and writes it to <paramref name="writer"/>.
+            </summary>
+            <exception cref="T:System.ArgumentNullException"/>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriterAsync(System.Reflection.MethodBase,System.IO.TextWriter,System.Threading.CancellationToken)">
+            <summary>
+            Formats the <paramref name="method"/> and writes it to <paramref name="writer"/> asynchronously.
+            </summary>
+            <exception cref="T:System.ArgumentNullException"/>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriterIntl(System.Reflection.MethodBase,System.IO.TextWriter,System.Boolean)">
+            <summary>
+            Formats the <paramref name="method"/> and writes it to <paramref name="writer"/>.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriterIntlAsync(System.Reflection.MethodBase,System.IO.TextWriter,System.Boolean,System.Threading.CancellationToken)">
+            <summary>
+            Formats the <paramref name="method"/> and writes it to <paramref name="writer"/> asynchronously.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetKeyword(System.Type)">
+            <summary>
+            Converts a 'primitive' type to it's corresponding keyword (void, int, string, etc.)
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetTypeColor(System.Type)">
+            <summary>
+            Get what token color a type name's span should be.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetANSIResetString">
+            <summary>
+            Get the ANSI reset string for a terminal to reset to its default color and highlight.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetANSIForegroundString(System.ConsoleColor)">
+            <summary>
+            Returns ANSI text format codes for each <see cref="T:System.ConsoleColor"/> formatted as <code>
+            ESC[*code*m
+            </code> where 'ESC' is '\u001b'.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetExtANSIForegroundString(System.Int32)">
+            <summary>
+            Returns extended ANSI text format codes for 32 bit ARGB data formatted as <code>
+            ESC[38;2;*r*;*g*;*b*m
+            </code> where 'ESC' is '\u001b'.
+            </summary>
+            <param name="argb">32 bit ARGB data, convert using <see cref="M:System.Drawing.Color.ToArgb"/> and <see cref="M:System.Drawing.Color.FromArgb(System.Int32)"/>.</param>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetHtmlStartTag(StackCleaner.StackTraceCleaner.TokenType)">
+            <summary>
+            Returns an opening span tag for 32 bit ARGB data formatted as: <code>
+            &lt;span style="color:#xxxxxx;"&gt;
+            </code>
+            or <code>
+            &lt;span class="class"&gt;
+            </code>
+            (depending on the value of <see cref="P:StackCleaner.StackCleanerConfiguration.HtmlUseClassNames"/>)
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetDivTag">
+            <summary>
+            Returns the opening div tag for <see cref="F:StackCleaner.StackColorFormatType.Html"/> formatting in the format: <code>
+            &lt;div style="background-color:#xxxxxx;"&gt;
+            </code>
+            or <code>
+            &lt;div class="st_bkgr"&gt;
+            </code>
+            (depending on the value of <see cref="P:StackCleaner.StackCleanerConfiguration.HtmlUseClassNames"/>)
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetUnityString(System.Int32)">
+            <summary>
+            Returns a unity opening color tag for 32 bit ARGB data formatted as: <code>
+            &lt;color=#xxxxxx&gt;
+            </code>
+            </summary>
+            <param name="argb">32 bit ARGB data, convert using <see cref="M:System.Drawing.Color.ToArgb"/> and <see cref="M:System.Drawing.Color.FromArgb(System.Int32)"/>.</param>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetTMProString(System.Int32)">
+            <summary>
+            Returns a TextMeshPro-compatible unity opening color tag for 32 bit ARGB data formatted as: <code>
+            &lt;#xxxxxx&gt;
+            </code>
+            </summary>
+            <param name="argb">32 bit ARGB data, convert using <see cref="M:System.Drawing.Color.ToArgb"/> and <see cref="M:System.Drawing.Color.FromArgb(System.Int32)"/>.</param>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetHex(System.Int32,System.Char*)">
+            <summary>
+            Helper function to append 6 characters of hex (first 24 bits of <paramref name="argb"/>) to <paramref name="chrs"/>.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetColor(StackCleaner.StackTraceCleaner.TokenType)">
+            <summary>
+            Helper function to return the corresponding color of the token from config.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetColorString(StackCleaner.StackTraceCleaner.TokenType)">
+            <summary>
+            Returns the correct start tag based on <paramref name="token"/> and the current configuration.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.GetEndTag">
+            <summary>
+            Returns the correct end tag based on the current configuration
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.TryGetMethod(System.Type)">
+            <summary>
+            Caches the associations between compiler-generated classes and their source methods of the
+            entire assembly that <paramref name="compGenType"/> is from, then returns the associated method for <paramref name="compGenType"/>.
+            </summary>
+            <param name="compGenType">A compiler-generated state machine type.</param>
+            <returns>The method that contains the code in the state machine,
+            whether it's an <see langword="async"/> method, <see cref="T:System.Collections.IEnumerator"/>, or an async enumerator.</returns>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.ShouldWriteEnd(StackCleaner.StackTraceCleaner.TokenType)">
+            <summary>
+            Helper method to determine whether writing an end color tag is needed.
+            </summary>
+            <param name="token"></param>
+            <returns></returns>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.EnumerateSpans(System.Diagnostics.StackTrace,System.Boolean)">
+            <summary>
+            Enumerates through the spans in a <see cref="T:System.Diagnostics.StackTrace"/>.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.StackTraceCleaner.EnumerateTypeName(System.Type,System.Boolean)">
+            <summary>
+            Enumerates through the spans in a type name declaration.
+            </summary>
+            <remarks>Most of the time this only returns one span
+            but can be more if the type is generic or has an element type (pointers, arrays, nullable value types).</remarks>
+            <param name="type">Type to format.</param>
+            <param name="isOut">For parameter declarations, replaces <see langword="ref"/> with <see langword="out"/> in byref types.</param>
+        </member>
+        <member name="T:StackCleaner.UnityColor32Config">
+            <remarks>
+            This is the only class that will try to load UnityEngine.CoreModule.dll.
+            </remarks>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.Default">
+            <summary>
+            Default values of <see cref="T:StackCleaner.UnityColor32Config"/>. Frozen.
+            </summary>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.KeywordColor">
+            <summary>
+            Color of keywords including types: <br/><see langword="null"/>, <see langword="bool"/>,
+            <see langword="byte"/>, <see langword="char"/>, <see langword="double"/>,
+            <see langword="decimal"/>, <see langword="float"/>, <see langword="int"/>, <see langword="long"/>,
+            <see langword="sbyte"/>, <see langword="short"/>, <see langword="object"/>, <see langword="string"/>,
+            <see langword="uint"/>, <see langword="bool"/>, <see langword="ulong"/>, <see langword="ushort"/>,
+            <see langword="void"/><br/>
+            method keywords: <br/><see langword="static"/>, <see langword="async"/>, <see langword="enumerator"/>,
+            <see langword="get"/>, <see langword="set"/>, <see langword="anonymous"/><br/>
+            and the <see langword="global"/> and <see langword="params"/> keywords.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.MethodColor">
+            <summary>
+            Color of method names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.PropertyColor">
+            <summary>
+            Color of property names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.ParameterColor">
+            <summary>
+            Color of parameter names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.ClassColor">
+            <summary>
+            Color of class type names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.StructColor">
+            <summary>
+            Color of value type names (not including enums).
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.FlowKeywordColor">
+            <summary>
+            Color of flow keywords, currently only used for the 'at' at the beginning of each declaration.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.InterfaceColor">
+            <summary>
+            Color of interface type names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.GenericParameterColor">
+            <summary>
+            Color of generic parameter names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.EnumColor">
+            <summary>
+            Color of enum type names.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.NamespaceColor">
+            <summary>
+            Color of namespaces.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.PunctuationColor">
+            <summary>
+            Color of any punctuation: periods, commas, parenthesis, etc.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.ExtraDataColor">
+            <summary>
+            Color of the source data (line number, column number, IL offset, and file name).
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.LinesHiddenWarningColor">
+            <summary>
+            Color of the warning optionally shown when unnecessary lines are removed.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="P:StackCleaner.UnityColor32Config.HtmlBackgroundColor">
+            <summary>
+            Color of the optionally added background when writing as HTML.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
+        <member name="M:StackCleaner.UnityColor32Config.#ctor">
+            <summary>
+            Sets the default values for <see cref="T:StackCleaner.UnityColor32Config"/>.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.UnityColor32Config.ToColor(System.ConsoleColor)">
+            <summary>
+            Convert <see cref="T:System.ConsoleColor"/> to <see cref="T:UnityEngine.Color"/>.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.UnityColor32Config.FromArgb(System.Int32)">
+            <summary>
+            Convert ARGB data to <see cref="T:UnityEngine.Color"/>.
+            </summary>
+        </member>
+        <member name="M:StackCleaner.UnityColor32Config.ToArgb(UnityEngine.Color)">
+            <summary>
+            Convert to <see cref="T:UnityEngine.Color"/> to ARGB data.
+            </summary>
+        </member>
+    </members>
+</doc>

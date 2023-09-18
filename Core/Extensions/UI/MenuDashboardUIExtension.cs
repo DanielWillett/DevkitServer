@@ -31,7 +31,11 @@ internal class MenuDashboardUIExtension : UIExtension, IDisposable
 
     private static void OnClickedDevkitServerGithubButton(ISleekElement button)
     {
-        Process.Start("https://github.com/DanielWillett/DevkitServer");
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = DevkitServerModule.RepositoryUrl,
+            UseShellExecute = true
+        });
     }
 
     public void Dispose()

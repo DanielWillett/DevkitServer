@@ -14,8 +14,9 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Configurations>ServerRelease;ServerDebug;ClientDebug;ClientRelease</Configurations>
+    <UserSecretsId>4c764434-f553-478a-85a4-097ac2bea241</UserSecretsId>
   </PropertyGroup>
-  <Import Project="$(SolutionDir)Common.targets" Condition="exists('$(SolutionDir)Common.targets')" />
+  <Import Project="$(SolutionDir)Common.targets"/>
   <Import Project="$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets" Condition="Exists('$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets')" />
   <ItemGroup>
     <PackageReference Include="MSTest.TestAdapter" Version="2.2.10" />

@@ -6,19 +6,17 @@
     <Product>DevkitServer.Launcher</Product>
     <Copyright>Copyright ©  2023</Copyright>
     <OutputPath>bin\$(Configuration)\</OutputPath>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>preview</LangVersion>
     <Nullable>enable</Nullable>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-  </PropertyGroup>
-
-  <PropertyGroup>
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
     <PackageId>DevkitServer.Launcher</PackageId>
     <Title>DevkitServer.Launcher</Title>
     <Version>1.0.0</Version>
     <Authors>DanielWillett</Authors>
-    <Company />
+    <Company>DanielWillett</Company>
     <Description>Launcher/updater for DevkitServer, a multiplayer map editor module for Unturned.</Description>
     <PackageProjectUrl>https://github.com/DanielWillett/DevkitServer</PackageProjectUrl>
     <PackageTags>unturned, module, map, editor, multiplayer, launcher, bootstrapper</PackageTags>
@@ -32,38 +30,34 @@
     <NeutralLanguage>en-US</NeutralLanguage>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
+    <Configurations>ClientDebug;ClientRelease;ServerDebug;ServerRelease</Configurations>
   </PropertyGroup>
 
-  <PropertyGroup Condition=" '$(Configuration)' == 'ClientDebug' ">
-    <DebugType>full</DebugType>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)' == 'ServerDebug' ">
-    <DebugType>full</DebugType>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)'=='ClientRelease'">
-    <Optimize>True</Optimize>
-    <DebugType>pdbonly</DebugType>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)'=='ServerRelease'">
-    <Optimize>True</Optimize>
-    <DebugType>pdbonly</DebugType>
-  </PropertyGroup>
+  <Import Project="$(SolutionDir)Common.targets" />
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="SET &quot;sourcedir=$(OutDir)&#xD;&#xA;SET &quot;config=$(ConfigurationName)&#xD;&#xA;ECHO Building %25config%25&#xD;&#xA;XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;$(ClientPath)\Modules\DevkitServer.Launcher\Bin\$(ProjectName).dll*&quot;&#xD;&#xA;XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;$(ClientPath)\Modules\DevkitServer.Launcher\Bin\$(ProjectName).pdb*&quot;&#xD;&#xA;XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;$(ServerPath)\Modules\DevkitServer.Launcher\Bin\$(ProjectName).dll*&quot;&#xD;&#xA;XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;$(ServerPath)\Modules\DevkitServer.Launcher\Bin\$(ProjectName).pdb*&quot;" />
+  </Target>
+
   <ItemGroup>
-    <PackageReference Include="NuGet.Protocol" Version="6.7.0" />
+    <Compile Remove="Module\**" />
+    <EmbeddedResource Remove="Module\**" />
+    <None Remove="Module\**" />
   </ItemGroup>
+
   <ItemGroup>
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Net.Http" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\DevkitServer.csproj" />
+
+    <PackageReference Include="NuGet.Protocol" Version="6.7.0" />
   </ItemGroup>
 
-  <Import Project="$(SolutionDir)\Common.targets" Condition="exists('$(SolutionDir)\Common.targets')" />
+  <ItemGroup>
+    <ProjectReference Include="..\DevkitServer.Resources\DevkitServer.Resources.csproj" />
+  </ItemGroup>
   
   <!-- Signing -->
-  <PropertyGroup Condition="'$(Configuration)'=='ClientRelease' Or '$(Configuration)'=='ServerRelease'">
+  <PropertyGroup>
     <SignAssembly>True</SignAssembly>
     <AssemblyOriginatorKeyFile>C:\Users\danny\OneDrive\Documents\DevkitServer\devkitserver.launcher.dll.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>

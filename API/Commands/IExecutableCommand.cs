@@ -106,7 +106,9 @@ public interface ICommandLocalizationFile : ILocalizedCommand
     /// <remarks>This getter is only ran once during registration.</remarks>
     LocalDatDictionary DefaultTranslations { get; }
 }
+#nullable disable
 internal interface ICachedTranslationSourceCommand : IExecutableCommand
 {
     ITranslationSource TranslationSource { get; set; }
 }
+#nullable restore

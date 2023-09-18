@@ -2,6 +2,13 @@
 	"IsEnabled": true,
 	"Name": "DevkitServer",
 	"Version": "0.0.0.1",
+	"Dependencies":
+	[
+		{
+			"Name": "DevkitServer.Launcher",
+			"Version": "1.0.0.0"
+		}
+	],
 	"Assemblies":
 	[
 		{

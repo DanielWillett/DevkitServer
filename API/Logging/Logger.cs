@@ -113,7 +113,7 @@ public static class Logger
             {
                 List<Type> hiddenTypes = new List<Type>(config.GetHiddenTypes())
                 {
-                    typeof(UniTask),
+                    typeof(UniTask)
                 };
                 Type? type = typeof(UniTask).Assembly.GetType("Cysharp.Threading.Tasks.EnumeratorAsyncExtensions+EnumeratorPromise", false, false);
 

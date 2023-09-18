@@ -159,7 +159,7 @@ public static class UserManager
                 Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + user.Connection.Format() + ".");
 #else
             Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + (user.Connection != null ? "Current Session" : "Remote Session") + ".");
-            UserInput.SetActiveMainCamera(user.gameObject.transform);
+            // UserInput.SetActiveMainCamera(user.gameObject.transform);
 #endif
             return true;
 

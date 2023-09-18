@@ -1,0 +1,186 @@
+<Project>
+  
+    <!-- Installations | CONFIGURE YOUR INSTALLATION PATHS HERE -->
+    <PropertyGroup>
+        <ServerPath>C:\SteamCMD\steamapps\common\U3DS</ServerPath>
+        <ClientPath>C:\Program Files (x86)\Steam\steamapps\common\Unturned</ClientPath>
+        <IncludedLibrariesPath>$(SolutionDir)Libraries</IncludedLibrariesPath>
+    </PropertyGroup>
+
+  
+    <!-- Defines -->
+    <PropertyGroup Condition="'$(Configuration)'=='ClientDebug'">
+        <DefineConstants>$(DefineConstants);DEBUG;CLIENT</DefineConstants>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Configuration)'=='ClientRelease'">
+        <DefineConstants>$(DefineConstants);RELEASE;CLIENT</DefineConstants>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Configuration)'=='ServerDebug'">
+        <DefineConstants>$(DefineConstants);DEBUG;SERVER</DefineConstants>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Configuration)'=='ServerRelease'">
+        <DefineConstants>$(DefineConstants);RELEASE;SERVER</DefineConstants>
+    </PropertyGroup>
+  
+    <!-- System References -->
+    <ItemGroup>
+        <Reference Include="System" />
+        <Reference Include="System.Core" />
+        <Reference Include="Microsoft.CSharp" />
+    </ItemGroup>
+
+  
+    <!-- Other Libraries -->
+    <ItemGroup>
+        <Reference Include="StackCleaner">
+            <HintPath>$(IncludedLibrariesPath)\StackCleaner.dll</HintPath>
+        </Reference>
+        <Reference Include="UniTask">
+            <HintPath>$(IncludedLibrariesPath)\UniTask.dll</HintPath>
+        </Reference>
+
+        <!-- System.IO.Compression -->
+        <Reference Include="System.Data.DataSetExtensions" />
+        <Reference Include="System.IO.Compression" />
+        <Reference Include="System.IO.Compression.FileSystem">
+            <HintPath>$(IncludedLibrariesPath)\System.IO.Compression.FileSystem.dll</HintPath>
+        </Reference>
+    </ItemGroup>
+
+  
+    <!-- Build Settings -->
+    <PropertyGroup Condition="$(DefineConstants.Contains(DEBUG))">
+        <DebugType>full</DebugType>
+        <DebugType>pdbonly</DebugType>
+    </PropertyGroup>
+    <PropertyGroup Condition="$(DefineConstants.Contains(RELEASE))">
+        <Optimize>True</Optimize>
+        <DebugType>portable</DebugType>
+    </PropertyGroup>
+
+
+    <!-- Server References -->
+    <ItemGroup Condition="$(DefineConstants.Contains(SERVER))">
+
+      <!-- Unturned -->
+        <Reference Include="Assembly-CSharp">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\Assembly-CSharp.dll</HintPath>
+        </Reference>
+        <Reference Include="com.rlabrecque.steamworks.net">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\com.rlabrecque.steamworks.net.dll</HintPath>
+        </Reference>
+        <Reference Include="SDG.NetTransport">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\SDG.NetTransport.dll</HintPath>
+        </Reference>
+        <Reference Include="SDG.NetPak.Runtime">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\SDG.NetPak.Runtime.dll</HintPath>
+        </Reference>
+        <Reference Include="SystemEx">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\SystemEx.dll</HintPath>
+        </Reference>
+
+        <!-- Unity -->
+        <Reference Include="UnityEngine">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\UnityEngine.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.CoreModule">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEx">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\UnityEx.dll</HintPath>
+        </Reference>
+        <Reference Include="UnturnedDat">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\UnturnedDat.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.ImageConversionModule">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.PhysicsModule">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.TerrainModule">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\UnityEngine.TerrainModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.AssetBundleModule">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\UnityEngine.AssetBundleModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.UnityWebRequestModule">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
+        </Reference>
+    </ItemGroup>
+
+
+    <!-- Client References -->
+    <ItemGroup Condition="$(DefineConstants.Contains(CLIENT))">
+
+        <!-- Unturned -->
+        <Reference Include="Assembly-CSharp">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\Assembly-CSharp.dll</HintPath>
+        </Reference>
+        <Reference Include="com.rlabrecque.steamworks.net">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\com.rlabrecque.steamworks.net.dll</HintPath>
+        </Reference>
+        <Reference Include="SDG.NetTransport">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\SDG.NetTransport.dll</HintPath>
+        </Reference>
+        <Reference Include="SDG.NetPak.Runtime">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\SDG.NetPak.Runtime.dll</HintPath>
+        </Reference>
+        <Reference Include="SystemEx">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\SystemEx.dll</HintPath>
+        </Reference>
+        <Reference Include="SDG.Glazier.Runtime">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\SDG.Glazier.Runtime.dll</HintPath>
+        </Reference>
+        <Reference Include="HighlightingSystem">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\HighlightingSystem.dll</HintPath>
+        </Reference>
+
+        <!-- Unity -->
+        <Reference Include="UnityEngine">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.CoreModule">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEx">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEx.dll</HintPath>
+        </Reference>
+        <Reference Include="UnturnedDat">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnturnedDat.dll</HintPath>
+        </Reference>
+        <Reference Include="Unity.TextMeshPro">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.ImageConversionModule">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.IMGUIModule">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.InputModule">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.InputModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.PhysicsModule">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.TerrainModule">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.TerrainModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.AssetBundleModule">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.AssetBundleModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.UI">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.UI.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.TextRenderingModule">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.InputLegacyModule">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+        </Reference>
+        <Reference Include="UnityEngine.UnityWebRequestModule">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
+        </Reference>
+    </ItemGroup>
+</Project>
