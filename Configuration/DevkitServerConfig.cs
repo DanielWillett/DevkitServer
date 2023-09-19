@@ -183,6 +183,9 @@ public class DevkitServerConfig
 #endif
                         if (modulePath != null)
                         {
+                            string? dir = Path.GetDirectoryName(path);
+                            if (dir != null)
+                                System.IO.Directory.CreateDirectory(dir);
                             File.Copy(modulePath, path, false);
 
                             if (DevkitServerModule.InitializedLogging)

@@ -20,7 +20,7 @@ Ensure the folder structure looks like this:
 Remember that for client-side, you must launch without BattlEye enabled for modules to run.
 Make sure you have an internet connection when launching, at least for the first time.
 
-DevkitServer will be downloaded from the following three NuGet packages:
+DevkitServer will be downloaded from the following three NuGet packages if it's missing or if it has an available update:
 * [DevkitServer.Resources](https://www.nuget.org/packages/DevkitServer.Resources) - Both Platforms (< 5 MB)
 * [DevkitServer.Server](https://www.nuget.org/packages/DevkitServer.Server) - Dedicated Server (< 1 MB)
 * [DevkitServer.Client](https://www.nuget.org/packages/DevkitServer.Client) - Client (< 1 MB)
@@ -30,32 +30,38 @@ It supports the following launch options.
 
 * `-DontUpdateDevkitServer` - Will install DevkitServer if it's missing, but won't try to keep it updated.
 * `-ForceDevkitServerReinstall` - Reinstalls DevkitServer each launch. Good for fixing corrupted module files or forcing an update. You will not lose any savedata.
+* `-DontCheckForDevkitServerUpdates` - Stops the automatic checking for updates after startup. (checking does not mean restarting, it will just log a message)
+* `-AutoRestartDevkitServerUpdates` - Automatically restarts the server after an update is pushed. Yes this works for the client, although not really recommended.
+* `-DevkitServerCheckUpdateInterval <seconds>` - Amount of seconds between update checks. *Default is 2 minutes*
+* `-DevkitServerCheckUpdateShutdownDelay <seconds>` - Amount of seconds between when an update is found and when the shutdown occurs. *Default is 2 minutes*
 
-# Client Installation (Without Launcher)
+Plugins can override the auto-restart behavior by referencing the Launcher and listening to the `DevkitServerAutoUpdateComponent.OnUpdateReady` event.
+This event will not be called if the `DontCheckForDevkitServerUpdates` flag is present in the launch options.
+
+# Manual Installation (Without Launcher)
 
 ## Download Module Zip
-Download the latest release of the module zip file from the Releases section.
+Download the latest release of the module from GitHub: `DevkitServer.ManualInstallation.zip`.
 
-Copy it to your `Unturned\Modules` folder as `DevkitServer.zip` and click **Extract Here**.
-
-Ensure the folder structure looks like this:
-`Unturned\Modules\DevkitServer\Bin\DevkitServer.dll`
-
-It's been installed. After first launch you can configure client-side settings at `Unturned\DevkitServer\client_config.json`.
-
-Remember that you must launch without BattlEye enabled for modules to run.
-
-# Server Installation (Without Launcher)
-Download the latest release of the module zip file from the Releases section.
-
-Copy it to your `U3DS\Modules` folder as `DevkitServer.zip` and click **Extract Here**.
+Copy it to your `Unturned\Modules` or `U3DS\Modules` folder as `DevkitServer.zip` and click **Extract Here**.
 
 Ensure the folder structure looks like this:
-`U3DS\Modules\DevkitServer\Bin\DevkitServer.dll`
+`Modules\DevkitServer\Bin\DevkitServer.dll`
 
-It's been installed. After first launch you can configure server-side settings at `U3DS\DevkitServer\server_config.json`.
+Remove the `Dependencies` section from the `Modules\DevkitServer\DevkitServer.module` file:
+```jsonc
+"Dependencies":
+[
+	{
+		"Name": "DevkitServer.Launcher",
+		"Version": "1.0.0.0"
+	}
+],
+```
 
-Go to **Server Setup** to set up your server.
+It's been installed. After first launch you can configure client-side settings at `Unturned\DevkitServer\client_config.json`, or server-side settings at `U3DS\Servers\<server id>\DevkitServer`.
+
+Remember that for client-side, you must launch without BattlEye enabled for modules to run.
 
 # Server Setup
 Create a normal vanilla server using U3DS and SteamCMD. There are numerous tutorials online for this.
@@ -69,13 +75,14 @@ Set the map name in Commands.dat like a vanilla server (i.e. `Map PEI`). If you 
 Make sure you disable the BattlEye requirement in the config file.
 
 ## Configure DevkitServer Settings
-Create the folder `U3DS\DevkitServer` if it doesn't already exist.
+Create the folder `U3DS\Servers\<server id>\DevkitServer` if it doesn't already exist.
 
 Copy `server_config.json` from `U3DS\Modules\Defaults` into the new folder and open it with your favorite IDE (like Visual Studio Code).
+(this will happen automatically after the first launch)
 
 If available use `JSONC` or **Json with Comments** as the file type.
 
-If you are not starting with an empty map, configure the `new_level_info` section:
+Configure the `new_level_info` section:
 * `gamemode_type`: Survival (default), Horde, Arena
 * `start_size`: Tiny, Small, Medium (default), Large, Insane
 * `map_owner`: Steam ID of the owner of the map. This defaults to the first admin on the server if it's not defined.
@@ -95,7 +102,7 @@ This is also where you should set `Tips` to the number of tips you have in `Engl
 If possible, it is highly recommended to set up the TCP (sometimes called high-speed) server port.
 
 You will need access to port-forwarding on your server machine, and some hosts may not offer this.
-You can attempt to contact support but it's unlikely they will agree to port-forward it for you.
+You can attempt to contact support but it's possible they won't agree to port-forward it for you.
 
 In the `server_config.json` file, the `high_speed` section can be configured to enable a much faster data transfer protocol than possible with Steam servers.
 
@@ -139,7 +146,7 @@ Expected installations:
 Unturned Client - `C:\Program Files (x86)\Steam\steamapps\common\Unturned`<br>
 U3DS - `C:\SteamCMD\steamapps\common\U3DS`
 
-Locations can be changed in `~\Unturned.targets`, which will apply to all 3 projects:
+Locations can be changed in `~\Unturned.targets`, which will apply to all 5 projects:
 ```xml
 <!-- Installations | CONFIGURE YOUR INSTALLATION PATHS HERE -->
 <PropertyGroup>

@@ -1,5 +1,6 @@
 ﻿using NuGet.Common;
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using ILogger = NuGet.Common.ILogger;
 
@@ -51,10 +52,13 @@ internal class DevkitServerLauncherLogger : ILogger
         else
             CommandWindow.Log(data);
     }
+    [Conditional("DEBUG")]
     public void LogDebug(string data)
     {
         Log(LogLevel.Debug, data);
     }
+
+    void ILogger.LogDebug(string data) => LogDebug(data);
 
     public void LogVerbose(string data)
     {

@@ -708,7 +708,7 @@ public static class EditorLevel
         ServerPendingLevelData = LevelData.Read(payload);
         Folder folder = ServerPendingLevelData.LevelFolderContent;
         Logger.LogDebug("[RECEIVE LEVEL] Writing level folder.");
-        folder.WriteContentsToDisk(dir);
+        folder.WriteContentsToDisk(dir, true);
         LoadingUI.NotifyDownloadProgress(1f);
         Logger.LogInfo($"[RECEIVE LEVEL] Finished receiving level data ({DevkitServerUtility.FormatBytes(_pendingLevelLength)}) for level {_pendingLevelName}.", ConsoleColor.DarkCyan);
         yield return null;

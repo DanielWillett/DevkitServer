@@ -285,6 +285,36 @@ public static class Logger
         line = FormattingUtil.RemoveANSIFormatting(line);
         string msg2 = line;
         TryRemoveDateFromLine(ref msg2);
+        if (msg2.IndexOf("[DEVKITSERVER.LAUNCHER]", StringComparison.Ordinal) != -1)
+        {
+            ConsoleColor color = ConsoleColor.DarkCyan;
+            Severity severity = Severity.Info;
+            if (msg2.IndexOf("[INFO]", StringComparison.Ordinal) == -1)
+            {
+                if (msg2.IndexOf("[DEBUG]", StringComparison.Ordinal) != -1)
+                {
+                    color = ConsoleColor.DarkGray;
+                    severity = Severity.Debug;
+                }
+                else if (msg2.IndexOf("[WARN]", StringComparison.Ordinal) != -1)
+                {
+                    color = ConsoleColor.Yellow;
+                    severity = Severity.Warning;
+                }
+                else if (msg2.IndexOf("[ERROR]", StringComparison.Ordinal) != -1)
+                {
+                    color = ConsoleColor.Red;
+                    severity = Severity.Error;
+                }
+            }
+            else if (msg2.IndexOf("Update available", StringComparison.Ordinal) != -1)
+            {
+                color = ConsoleColor.Green;
+            }
+
+            Terminal.Write(msg2, color, false, severity);
+            return;
+        }
         Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] [UNTURNED]      [LOG]   " + msg2, ConsoleColor.DarkGray, false, Severity.Info);
     }
 #endif

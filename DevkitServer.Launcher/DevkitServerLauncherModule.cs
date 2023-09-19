@@ -2,7 +2,6 @@
 using DevkitServer.Resources;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
-using NuGet.Packaging.Signing;
 using NuGet.Versioning;
 using SDG.Framework.IO;
 using SDG.Framework.Modules;
@@ -23,12 +22,17 @@ namespace DevkitServer.Launcher;
 public class DevkitServerLauncherModule : IModuleNexus
 {
     public const string ResourcePackageId = "DevkitServer.Resources";
-    private const string NugetAPIIndex = "https://api.nuget.org/v3/index.json";
+    public const string NugetAPIIndex = "https://api.nuget.org/v3/index.json";
+    private static GameObject? _dsLaunchHost;
+    public static string MainPackageId => Dedicator.isStandaloneDedicatedServer ? "DevkitServer.Server" : "DevkitServer.Client";
+
     void IModuleNexus.initialize()
     {
         try
         {
-            Load(new CommandLineFlag(false, "-ForceDevkitServerReinstall").value, new CommandLineFlag(false, "-DontUpdateDevkitServer").value);
+            Load(new CommandLineFlag(false, "-ForceDevkitServerReinstall").value,
+                new CommandLineFlag(false, "-DontUpdateDevkitServer").value,
+                new CommandLineFlag(false, "-DontCheckForDevkitServerUpdates").value);
         }
         catch (Exception ex)
         {
@@ -39,13 +43,16 @@ public class DevkitServerLauncherModule : IModuleNexus
     }
     void IModuleNexus.shutdown()
     {
-        new DevkitServerLauncherLogger().LogInformation("Shutting down.");
+        if (_dsLaunchHost != null)
+        {
+            Object.Destroy(_dsLaunchHost);
+        }
     }
-    private static void Load(bool forceReinstall, bool dontUpdate)
+    private static void Load(bool forceReinstall, bool dontUpdate, bool dontCheckForUpdates)
     {
-        string mainPackageId = Dedicator.isStandaloneDedicatedServer ? "DevkitServer.Server" : "DevkitServer.Client";
+        string mainPackageId = MainPackageId;
 
-        ILogger logger = new DevkitServerLauncherLogger();
+        DevkitServerLauncherLogger logger = new DevkitServerLauncherLogger();
         Assembly thisAssembly = Assembly.GetExecutingAssembly();
 
         Module thisModule = ModuleHook.modules.Find(x => Array.IndexOf(x.assemblies, thisAssembly) != -1) ??
@@ -60,7 +67,7 @@ public class DevkitServerLauncherModule : IModuleNexus
 
         // discover existing modules
 
-        Module? devkitServerModule = ModuleHook.modules.Find(x => Path.GetFileName(x.config.DirectoryPath).Equals("DevkitServer", StringComparison.Ordinal));
+        Module? devkitServerModule = ModuleHook.modules.Find(x => x.config.Name.Equals("DevkitServer", StringComparison.Ordinal));
         AssemblyName? devkitServerAssembly = null;
         Version? devkitServerVersion = null;
 
@@ -198,7 +205,7 @@ public class DevkitServerLauncherModule : IModuleNexus
             else
             {
                 logger.LogInformation($"{ResourcePackageId} is already up to date ({oldVersion}).");
-                if (!File.Exists(resourcesDllPath))
+                if (!CheckAtLeastIsVersion(resourcesDllPath, highestResourceVersion))
                     unpack = true;
             }
             
@@ -243,7 +250,7 @@ public class DevkitServerLauncherModule : IModuleNexus
             else
             {
                 logger.LogInformation($"{mainPackageId} is already up to date ({oldVersion}).");
-                if (!File.Exists(mainDllPath))
+                if (!CheckAtLeastIsVersion(mainDllPath, highestMainVersion))
                     unpack = true;
             }
 
@@ -251,6 +258,33 @@ public class DevkitServerLauncherModule : IModuleNexus
             {
                 Break();
                 return;
+            }
+
+            if (devkitServerModule != null)
+            {
+                try
+                {
+                    string moduleConfigFile = devkitServerModule.config.FilePath;
+
+                    AssemblyName asn = AssemblyName.GetAssemblyName(mainDllPath);
+                    string v = Math.Min(asn.Version.Major, 255) + "." +
+                               Math.Min(asn.Version.Minor, 255) + "." +
+                               Math.Min(asn.Version.Build, 255) + ".0";
+                    uint intl = Parser.getUInt32FromIP(v);
+                    logger.LogDebug("Checking module file version.");
+                    if (!File.Exists(moduleConfigFile) || intl != devkitServerModule.config.Version_Internal)
+                    {
+                        logger.LogDebug($"  Updating ({devkitServerModule.config.Version} -> {v}).");
+                        devkitServerModule.config.Version = v;
+                        devkitServerModule.config.Version_Internal = intl;
+                        IOUtility.jsonSerializer.serialize(devkitServerModule.config, moduleConfigFile, true);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning("Unable to update module config version.");
+                    logger.LogWarning(ex.ToString());
+                }
             }
 
             if (devkitServerModule == null)
@@ -281,6 +315,32 @@ public class DevkitServerLauncherModule : IModuleNexus
                 int moduleIndex = ModuleHook.modules.IndexOf(thisModule);
                 foreach (ModuleConfig config in modules)
                 {
+                    try
+                    {
+                        string configFile = config.FilePath;
+                        if (File.Exists(configFile))
+                        {
+                            AssemblyName asn = AssemblyName.GetAssemblyName(mainDllPath);
+                            string v = Math.Min(asn.Version.Major, 255) + "." +
+                                       Math.Min(asn.Version.Minor, 255) + "." +
+                                       Math.Min(asn.Version.Build, 255) + ".0";
+                            uint intl = Parser.getUInt32FromIP(v);
+                            logger.LogDebug("Checking module file version.");
+                            if (intl != config.Version_Internal)
+                            {
+                                logger.LogDebug($"  Updating ({config.Version} -> {v}).");
+                                config.Version = v;
+                                config.Version_Internal = intl;
+                                IOUtility.jsonSerializer.serialize(config, configFile, true);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning("Unable to update module config version.");
+                        logger.LogWarning(ex.ToString());
+                    }
+
                     logger.LogInformation($"Registering new module: {config.Name} ({config.Version}).");
                     for (int i = config.Assemblies.Count - 1; i >= 0; i--)
                     {
@@ -326,7 +386,14 @@ public class DevkitServerLauncherModule : IModuleNexus
                 logger.LogWarning($"Unable to install {mainPackageId} from NuGet servers. An error occured ({ex.GetType().Name}).");
                 logger.LogError(ex.ToString());
                 Break();
+                return;
             }
+        }
+
+        if (!dontCheckForUpdates)
+        {
+            _dsLaunchHost = new GameObject("DevkitServerLauncher", typeof(DevkitServerAutoUpdateComponent));
+            Object.DontDestroyOnLoad(_dsLaunchHost);
         }
     }
     public static string GetAbsolutePath(ModuleConfig config, ModuleAssembly assembly)
@@ -540,41 +607,41 @@ public class DevkitServerLauncherModule : IModuleNexus
 
         resources.ReleaseAll();
     }
-    private static PackageIdentity? ReadPackage(string path, ILogger logger)
+    internal static PackageIdentity? ReadPackage(string path, ILogger logger)
     {
         path += ".nupkg";
         if (!File.Exists(path))
             return null;
         using FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         using PackageArchiveReader reader = new PackageArchiveReader(stream, true);
-        try
-        {
-            PrimarySignature? primarySignature = reader.GetPrimarySignatureAsync(CancellationToken.None).Result;
+        //try
+        //{
+        //    PrimarySignature? primarySignature = reader.GetPrimarySignatureAsync(CancellationToken.None).Result;
 
-            if (primarySignature != null)
-            {
-                logger.LogInformation($"Validating signature of {Path.GetFileNameWithoutExtension(path)}...");
-                try
-                {
-                    reader.ValidateIntegrityAsync(primarySignature.SignatureContent, CancellationToken.None).Wait();
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError($"  Unable to verify package signature at: \"{path}\".");
-                    logger.LogError(ex.ToString());
-                    return null;
-                }
-                logger.LogInformation("  Done.");
-            }
-            else
-            {
-                logger.LogInformation($"Skipping signature validation, {Path.GetFileNameWithoutExtension(path)} is not signed.");
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogDebug(ex.InnerException?.Message ?? ex.Message);
-        }
+        //    if (primarySignature != null)
+        //    {
+        //        logger.LogInformation($"Validating signature of {Path.GetFileNameWithoutExtension(path)}...");
+        //        try
+        //        {
+        //            reader.ValidateIntegrityAsync(primarySignature.SignatureContent, CancellationToken.None).Wait();
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            logger.LogError($"  Unable to verify package signature at: \"{path}\".");
+        //            logger.LogError(ex.ToString());
+        //            return null;
+        //        }
+        //        logger.LogInformation("  Done.");
+        //    }
+        //    else
+        //    {
+        //        logger.LogInformation($"Skipping signature validation, {Path.GetFileNameWithoutExtension(path)} is not signed.");
+        //    }
+        //}
+        //catch (Exception ex)
+        //{
+        //    logger.LogDebug(ex.InnerException?.Message ?? ex.Message);
+        //}
 
 
         return reader.GetIdentity();
@@ -700,5 +767,33 @@ public class DevkitServerLauncherModule : IModuleNexus
 
         rtn:
         return !err ? request : throw new Exception(request.error);
+    }
+    private static bool CheckAtLeastIsVersion(string filePath, SemanticVersion version)
+    {
+        if (!File.Exists(filePath))
+            return false;
+        try
+        {
+            AssemblyName name = AssemblyName.GetAssemblyName(filePath);
+            if (name == null)
+                return false;
+            Version v = name.Version;
+            if (v.Major > version.Major)
+                return true;
+            if (v.Major < version.Major)
+                return false;
+            if (v.Minor > version.Minor)
+                return true;
+            if (v.Minor < version.Minor)
+                return false;
+            if (v.Build > version.Patch)
+                return true;
+            
+            return v.Build >= version.Patch;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

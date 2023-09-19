@@ -1,4 +1,6 @@
-﻿using System.Text;
+﻿using System.Collections.ObjectModel;
+using System.Security;
+using System.Text;
 using DevkitServer.Util.Encoding;
 using SDG.Framework.Utilities;
 
@@ -6,9 +8,66 @@ namespace DevkitServer.Multiplayer.Networking;
 
 public struct Folder
 {
+    private static HashSet<string>? _restrictedFileTypes;
+    private static IReadOnlyList<string>? _restrictedFileTypesRo;
     public string FolderName;
     public string[] Folders;
     public File[] Files;
+    public static IReadOnlyList<string> RestrictedFileTypes => _restrictedFileTypesRo ??= new List<string>(RestrictedFileTypesIntl).AsReadOnly();
+    private static HashSet<string> RestrictedFileTypesIntl => _restrictedFileTypes ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ".exe",
+        ".msi",
+        ".msp",
+        ".pif",
+        ".gadget",
+        ".application",
+        ".com",
+        ".scr",
+        ".hta",
+        ".cpl",
+        ".msc",
+        ".jar",
+        ".cmd",
+        ".vb",
+        ".vbs",
+        ".js",
+        ".jse",
+        ".ws",
+        ".wsf",
+        ".wsc",
+        ".wsh",
+        ".sh",
+        ".bat",
+        ".dll",
+        ".asm",
+        ".cs",
+        ".c",
+        ".cpp",
+        ".h",
+        ".py",
+        ".bin",
+        ".zip",
+        ".rar",
+        ".7z",
+        ".nupkg",
+        ".snupkg",
+        ".docx",
+        ".doc",
+        ".xls",
+        ".xlsx",
+        ".ppt",
+        ".pptx",
+        ".pdf",
+        ".iso",
+        ".img",
+        ".inf",
+        ".lnk",
+        ".scf",
+        ".reg",
+        ".ics",
+        ".ico"
+    };
     public struct File
     {
         public byte[] Content;
@@ -124,26 +183,51 @@ public struct Folder
     {
         return Path.DirectorySeparatorChar == '\\' ? path : path.Replace('\\', Path.DirectorySeparatorChar);
     }
-    public readonly void WriteContentsToDisk(string directory)
+    public readonly void WriteContentsToDisk(string directory, bool restrictUnexpectedFileTypes)
     {
         for (int i = 0; i < Folders.Length; ++i)
         {
-            Directory.CreateDirectory(Path.Combine(directory, Folders[i]));
+            string p = Folders[i];
+            if (p.IndexOf("..", StringComparison.Ordinal) != -1)
+            {
+                Logger.LogWarning($"Skipping directory: {p} because it contains a 'move up' path element (..).");
+                continue;
+            }
+            Directory.CreateDirectory(Path.Combine(directory, p));
         }
         for (int i = 0; i < Files.Length; i++)
         {
             ref File file = ref Files[i];
-            string path = Path.Combine(directory, file.Path);
-            string? dir = Path.GetDirectoryName(file.Path);
-            if (dir != null) Directory.CreateDirectory(dir);
+            string p = file.Path;
+            if (p.IndexOf("..", StringComparison.Ordinal) != -1)
+            {
+                Logger.LogWarning($"Skipping file: {p} because it contains a 'move up' path element (..).");
+                continue;
+            }
+
+            string path = Path.Combine(directory, p);
+            string? dir = Path.GetDirectoryName(p);
+
+            string ext = Path.GetExtension(p);
+            if (restrictUnexpectedFileTypes && !string.IsNullOrEmpty(ext) && RestrictedFileTypesIntl.Contains(ext))
+            {
+                Logger.LogWarning($"Skipping file: {p} because of it's file type.");
+                continue;
+            }
+
+            if (dir != null)
+                Directory.CreateDirectory(dir);
+
             using FileStream stream = new FileStream(path, System.IO.File.Exists(path) ? FileMode.Truncate : FileMode.Create, FileAccess.Write, FileShare.Read);
             stream.Write(file.Content, 0, file.Content.Length);
         }
     }
-    public readonly void WriteToDisk(string directory)
+    public readonly void WriteToDisk(string directory, bool restrictUnexpectedFileTypes)
     {
+        if (FolderName.IndexOf("..", StringComparison.Ordinal) != -1)
+            throw new SecurityException($"Folder name ({FolderName}) contains a 'move up' path element.");
         string b = Directory.CreateDirectory(Path.Combine(directory, FolderName)).FullName;
-        WriteContentsToDisk(b);
+        WriteContentsToDisk(b, restrictUnexpectedFileTypes);
     }
     public static Folder Read(ByteReader reader)
     {
@@ -203,13 +287,14 @@ public struct Folder
             writer.WriteLong(file.Content);
         }
     }
-    // https://stackoverflow.com/questions/51179331/is-it-possible-to-use-path-getrelativepath-net-core2-in-winforms-proj-targeti
+    // https://stackoverflow.com/questions/51179331
     private static string GetRelativePath(string relativeTo, string path)
     {
         Uri uri = new Uri(relativeTo);
         string rel = Uri.UnescapeDataString(uri.MakeRelativeUri(new Uri(path)).ToString()).Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
-        if (!rel.Contains(Path.DirectorySeparatorChar.ToString()))
-            rel = "." + Path.DirectorySeparatorChar + rel;
+        string ch = Path.DirectorySeparatorChar.ToString();
+        if (!rel.Contains(ch))
+            rel = "." + ch + rel;
         
         return rel;
     }

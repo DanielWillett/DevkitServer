@@ -70,7 +70,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static bool MonoLoaded { get; }
     public static bool UnityLoaded { get; }
     public static bool UnturnedLoaded { get; }
-    public static bool InitializedLogging { get; set; }
+    public static bool InitializedLogging { get; private set; }
     public static string AssemblyPath => _asmPath ??= Accessor.DevkitServer.Location;
     public static bool IsAuthorityEditor =>
 #if CLIENT
@@ -134,7 +134,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static AssetOrigin BundleOrigin { get; }
     static DevkitServerModule()
     {
-        BundleOrigin = new AssetOrigin { name = ModuleName, workshopFileId = 0ul };
+        BundleOrigin = AssetUtil.CreateAssetOrigin(ModuleName, 0ul, true); new AssetOrigin { name = ModuleName, workshopFileId = 0ul };
         SetOverrideIDs?.Invoke(BundleOrigin, true);
 
         MonoLoaded = Type.GetType("Mono.Runtime", false, false) != null;
@@ -198,15 +198,21 @@ public sealed class DevkitServerModule : IModuleNexus
             MovementUtil.Init();
             Logger.PostPatcherSetupInitLogger();
 #endif
-            GetAssetsInstance = Accessor.GenerateStaticGetter<Assets, Assets>("instance");
-            SetOverrideIDs = Accessor.GenerateInstanceSetter<AssetOrigin, bool>("shouldAssetsOverrideExistingIds");
         }
         catch (Exception ex)
         {
             if (InitializedLogging)
             {
-                Logger.LogError($"Error setting up {ModuleName.Colorize(ModuleColor)}");
-                Logger.LogError(ex);
+                try
+                {
+                    Logger.LogError($"Error setting up {ModuleName.Colorize(ModuleColor)}");
+                    Logger.LogError(ex);
+                }
+                catch
+                {
+                    CommandWindow.LogError($"Error setting up {ModuleName}.");
+                    CommandWindow.LogError(ex);
+                }
             }
             else
             {

@@ -1,7 +1,7 @@
-﻿using SDG.Framework.Modules;
+﻿using Cysharp.Threading.Tasks;
+using SDG.Framework.Modules;
 using System.Reflection;
 using System.Reflection.Emit;
-using Cysharp.Threading.Tasks;
 using Module = SDG.Framework.Modules.Module;
 
 namespace DevkitServer.Util;
@@ -24,8 +24,15 @@ public static class AssetUtil
     private static readonly InstanceGetter<Asset, AssetOrigin>? GetAssetOrigin = Accessor.GenerateInstanceGetter<Asset, AssetOrigin>("origin");
     private static readonly InstanceGetter<NPCRewardsList, INPCReward[]>? GetRewardsFromList = Accessor.GenerateInstanceGetter<NPCRewardsList, INPCReward[]>("rewards");
     private static readonly InstanceGetter<Module, List<IModuleNexus>>? GetNexii = Accessor.GenerateInstanceGetter<Module, List<IModuleNexus>>("nexii");
+    private static readonly StaticGetter<Assets>? GetAssetsInstance = Accessor.GenerateStaticGetter<Assets, Assets>("instance");
+    private static readonly InstanceSetter<AssetOrigin, bool>? SetOverrideIDs = Accessor.GenerateInstanceSetter<AssetOrigin, bool>("shouldAssetsOverrideExistingIds");
 
     public static event BeginLevelLoading? OnBeginLevelLoading;
+
+    /// <summary>
+    /// Singleton instance of the <see cref="Assets"/> class, or <see langword="null"/> in the case of a reflection failure.
+    /// </summary>
+    public static Assets? AssetsInstance => GetAssetsInstance?.Invoke();
 
     /// <returns>The origin of the asset, or <see langword="null"/> in the case of a reflection failure.</returns>
     [Pure]
@@ -179,6 +186,25 @@ public static class AssetUtil
     public static IReadOnlyList<IModuleNexus>? GetModuleNexii(Module module)
     {
         return GetNexii?.Invoke(module);
+    }
+
+    /// <summary>
+    /// Creates a <see cref="AssetOrigin"/> with the provided properties. This has the capability to set the internal field, 'shouldAssetsOverrideExistingIds'.
+    /// </summary>
+    [Pure]
+    public static AssetOrigin CreateAssetOrigin(string name, ulong workshopFileId, bool shouldAssetsOverrideExistingIds)
+    {
+        AssetOrigin origin = new AssetOrigin { name = name, workshopFileId = workshopFileId };
+
+        if (shouldAssetsOverrideExistingIds)
+        {
+            if (SetOverrideIDs == null)
+                Logger.LogWarning($"Unable to set asset origin field, 'shouldAssetsOverrideExistingIds' to true: {origin.name.Format()}.", method: Source);
+            else
+                SetOverrideIDs.Invoke(origin, shouldAssetsOverrideExistingIds);
+        }
+
+        return origin;
     }
 
     private static void LoadAssetsSyncIntl(string directory, AssetOrigin origin, bool includeSubDirectories, bool loadMasterBundles, bool apply)
