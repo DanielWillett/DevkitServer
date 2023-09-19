@@ -1,8 +1,10 @@
-﻿using Cysharp.Threading.Tasks;
-using DevkitServer.Launcher.Models;
+﻿using DevkitServer.Launcher.Models;
 using DevkitServer.Resources;
 using NuGet.Packaging;
+using NuGet.Packaging.Core;
+using NuGet.Packaging.Signing;
 using NuGet.Versioning;
+using SDG.Framework.IO;
 using SDG.Framework.Modules;
 using System;
 using System.Collections.Generic;
@@ -10,12 +12,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json;
 using System.Threading;
 using UnityEngine.Networking;
 using ILogger = NuGet.Common.ILogger;
 using Module = SDG.Framework.Modules.Module;
-using NuGetVersionConverter = DevkitServer.Launcher.Models.NuGetVersionConverter;
 using Version = System.Version;
 
 namespace DevkitServer.Launcher;
@@ -23,28 +23,28 @@ namespace DevkitServer.Launcher;
 public class DevkitServerLauncherModule : IModuleNexus
 {
     public const string ResourcePackageId = "DevkitServer.Resources";
-    public const string PackageId = "DevkitServer";
     private const string NugetAPIIndex = "https://api.nuget.org/v3/index.json";
-    private readonly CommandLineFlag _forceReinstall = new CommandLineFlag(false, "ForceDevkitServerReinstall");
     void IModuleNexus.initialize()
     {
         try
         {
-            Load(_forceReinstall.value);
+            Load(new CommandLineFlag(false, "-ForceDevkitServerReinstall").value, new CommandLineFlag(false, "-DontUpdateDevkitServer").value);
         }
         catch (Exception ex)
         {
             CommandWindow.LogError("DevkitServer.Launcher threw an error.");
             CommandWindow.LogError(ex.ToString());
-            throw new Exception();
+            throw new Exception("^ Unable to launch DevkitServer.Launcher. See above ^");
         }
     }
     void IModuleNexus.shutdown()
     {
-
+        new DevkitServerLauncherLogger().LogInformation("Shutting down.");
     }
-    private static void Load(bool forceReinstall)
+    private static void Load(bool forceReinstall, bool dontUpdate)
     {
+        string mainPackageId = Dedicator.isStandaloneDedicatedServer ? "DevkitServer.Server" : "DevkitServer.Client";
+
         ILogger logger = new DevkitServerLauncherLogger();
         logger.LogInformation("Checking for updates...");
         Assembly thisAssembly = Assembly.GetExecutingAssembly();
@@ -59,15 +59,17 @@ public class DevkitServerLauncherModule : IModuleNexus
         if ((dir.Attributes & FileAttributes.Hidden) == 0)
             dir.Attributes |= FileAttributes.Hidden;
 
-        Module? devkitServerModule = ModuleHook.modules.Find(x => Path.GetFileName(x.config.DirectoryPath).Equals(PackageId, StringComparison.Ordinal));
+        // discover existing modules
+
+        Module? devkitServerModule = ModuleHook.modules.Find(x => Path.GetFileName(x.config.DirectoryPath).Equals("DevkitServer", StringComparison.Ordinal));
         AssemblyName? devkitServerAssembly = null;
         Version? devkitServerVersion = null;
 
-        string mainModuleFolder = devkitServerModule != null ? devkitServerModule.config.DirectoryPath : Path.Combine(Path.GetDirectoryName(thisModule.config.DirectoryPath)!, PackageId);
+        string mainModuleFolder = devkitServerModule != null ? devkitServerModule.config.DirectoryPath : Path.Combine(Path.GetDirectoryName(thisModule.config.DirectoryPath)!, "DevkitServer");
 
         Directory.CreateDirectory(mainModuleFolder);
 
-        logger.LogDebug($"Modules folder: \"{mainModuleFolder}\".");
+        logger.LogDebug($"DevkitServer module folder: \"{mainModuleFolder}\".");
 
         if (devkitServerModule == null)
         {
@@ -75,16 +77,18 @@ public class DevkitServerLauncherModule : IModuleNexus
         }
         else
         {
+            // try to find the existing assembly
             EModuleRole role = Dedicator.isStandaloneDedicatedServer ? EModuleRole.Server : EModuleRole.Client;
             for (int i = devkitServerModule.config.Assemblies.Count - 1; i >= 0; i--)
             {
                 ModuleAssembly assembly = devkitServerModule.config.Assemblies[i];
-                if (assembly.Role != role)
+                string path = GetAbsolutePath(devkitServerModule.config, assembly);
+                if (assembly.Role != role || !File.Exists(path))
                     continue;
                 try
                 {
-                    AssemblyName name = AssemblyName.GetAssemblyName(assembly.Path);
-                    if (name.Name.Equals(PackageId, StringComparison.Ordinal))
+                    AssemblyName name = AssemblyName.GetAssemblyName(path);
+                    if (name.Name.Equals("DevkitServer", StringComparison.Ordinal))
                     {
                         devkitServerAssembly = name;
                         devkitServerVersion = name.Version;
@@ -110,18 +114,13 @@ public class DevkitServerLauncherModule : IModuleNexus
 
         try
         {
-            JsonSerializerOptions jsonOptions = new JsonSerializerOptions
-            {
-                Converters = { new NuGetVersionConverter() },
-                WriteIndented = true
-            };
+            // query the v3 API index
 
             logger.LogInformation($"Getting NuGet index from: {NugetAPIIndex}.");
             UnityWebRequest getIndexRequest = ExecuteUnityWebRequestSync(logger, UnityWebRequest.Get(NugetAPIIndex));
-            Utf8JsonReader jsonReader = new Utf8JsonReader(getIndexRequest.downloadHandler.data);
-            NuGetIndex? index = JsonSerializer.Deserialize<NuGetIndex>(ref jsonReader, jsonOptions);
+            NuGetIndex? index = IOUtility.jsonDeserializer.deserialize<NuGetIndex>(getIndexRequest.downloadHandler.data, 0);
 
-            if (index?.Resources == null || index.Version is not { Major: 3 })
+            if (index?.Resources == null || (index.Version == null ? null : NuGetVersion.Parse(index.Version)) is not { Major: 3 })
             {
                 logger.LogError($"Invalid NuGet index receieved from: {NugetAPIIndex}.");
                 if (devkitServerModule != null)
@@ -129,6 +128,8 @@ public class DevkitServerLauncherModule : IModuleNexus
                 Break();
                 return;
             }
+
+            // get the PackageBaseAddress resource URL
 
             NuGetResource? packageBaseAddress = Array.Find(index.Resources, x => string.Equals(x.Type, "PackageBaseAddress/3.0.0", StringComparison.Ordinal)) ??
                                       Array.Find(index.Resources, x => x.Type != null && x.Type.StartsWith("PackageBaseAddress", StringComparison.Ordinal));
@@ -142,8 +143,19 @@ public class DevkitServerLauncherModule : IModuleNexus
                 return;
             }
 
-            NuGetVersion[]? resourcesVersions = GetVersions(logger, packageBaseAddress, ResourcePackageId, jsonOptions);
-            if (resourcesVersions == null)
+            // get the available versions for all the packages and calculate the highest available version
+
+            NuGetVersion[]? resourcesVersions = GetVersions(logger, packageBaseAddress, ResourcePackageId);
+            if (resourcesVersions is not { Length: > 0 })
+            {
+                if (devkitServerModule != null)
+                    goto main2;
+                Break();
+                return;
+            }
+
+            NuGetVersion[]? mainVersions = GetVersions(logger, packageBaseAddress, mainPackageId);
+            if (mainVersions is not { Length: > 0 })
             {
                 if (devkitServerModule != null)
                     goto main2;
@@ -152,32 +164,24 @@ public class DevkitServerLauncherModule : IModuleNexus
             }
 
             NuGetVersion highestResourceVersion = resourcesVersions.Max();
-
-            NuGetVersion[]? mainVersions = GetVersions(logger, packageBaseAddress, PackageId, jsonOptions);
-            if (mainVersions == null)
-            {
-                if (devkitServerModule != null)
-                    goto main2;
-                Break();
-                return;
-            }
-
             NuGetVersion highestMainVersion = mainVersions.Max();
 
-            string rscPath = Path.Combine(packagePath, ResourcePackageId + ".nupkg");
-            NuspecReader? resourcesPackage = ReadPackage(rscPath);
-            SemanticVersion? oldVersion = resourcesPackage?.GetVersion();
+            // Resources
+
+            string rscPath = Path.Combine(packagePath, ResourcePackageId);
+            PackageIdentity? resourcesPackage = ReadPackage(rscPath, logger);
+            SemanticVersion? oldVersion = resourcesPackage?.Version;
             string resourcesDllPath = Path.Combine(modulePath, "Bin", "DevkitServer.Resources.dll");
             bool unpack = false;
-            if (forceReinstall || oldVersion == null || oldVersion < highestResourceVersion)
+            if (forceReinstall || oldVersion == null || (!dontUpdate && oldVersion < highestResourceVersion))
             {
                 if (!DownloadPackage(logger, packageBaseAddress, highestResourceVersion, ResourcePackageId, rscPath))
                 {
                     Break();
                     return;
                 }
-                resourcesPackage = ReadPackage(rscPath);
-                if (resourcesPackage == null || resourcesPackage.GetVersion() < highestResourceVersion)
+                resourcesPackage = ReadPackage(rscPath, logger);
+                if (resourcesPackage == null || resourcesPackage.Version < highestResourceVersion)
                 {
                     logger.LogError($"Unable to update {ResourcePackageId}.");
                     if (resourcesPackage != null)
@@ -199,47 +203,48 @@ public class DevkitServerLauncherModule : IModuleNexus
                 if (!File.Exists(resourcesDllPath))
                     unpack = true;
             }
-
+            
             if (unpack && !UnpackResourceAssembly(logger, rscPath, resourcesDllPath))
                 goto main;
 
             Assembly.Load(File.ReadAllBytes(resourcesDllPath));
 
-            WriteResources(logger, mainModuleFolder, oldVersion);
+            WriteResources(logger, mainModuleFolder, oldVersion, forceReinstall);
 
             main:;
-            string mainPath = Path.Combine(packagePath, PackageId + ".nupkg");
-            NuspecReader? mainPackage = ReadPackage(mainPath);
-            oldVersion = mainPackage?.GetVersion();
+
+            // Main assembly
+
+            string mainPath = Path.Combine(packagePath, mainPackageId);
+            PackageIdentity? mainPackage = ReadPackage(mainPath, logger);
+            oldVersion = mainPackage?.Version;
             string mainDllPath = Path.Combine(mainModuleFolder, "Bin", Dedicator.isStandaloneDedicatedServer ? "DevkitServer_Server.dll" : "DevkitServer_Client.dll");
             unpack = false;
-            if (forceReinstall || oldVersion == null || oldVersion < highestMainVersion)
+            if (forceReinstall || oldVersion == null || (!dontUpdate && oldVersion < highestMainVersion))
             {
-                if (!DownloadPackage(logger, packageBaseAddress, highestMainVersion, PackageId, mainPath))
+                if (!DownloadPackage(logger, packageBaseAddress, highestMainVersion, mainPackageId, mainPath))
                 {
                     Break();
                     return;
                 }
-                mainPackage = ReadPackage(mainPath);
-                if (mainPackage == null || mainPackage.GetVersion() < highestMainVersion)
+                mainPackage = ReadPackage(mainPath, logger);
+                if (mainPackage == null || mainPackage.Version < highestMainVersion)
                 {
-                    logger.LogError($"Unable to update {PackageId}.");
-                    if (resourcesPackage != null)
+                    logger.LogError($"Unable to update {mainPackageId}.");
+                    if (mainPackage != null)
                         logger.LogInformation($"  It's still installed at version {oldVersion}.");
                     else
                     {
                         Break();
                         return;
                     }
-
-                    goto main2;
                 }
-
-                unpack = true;
+                else
+                    unpack = true;
             }
             else
             {
-                logger.LogInformation($"{PackageId} is already up to date ({oldVersion}).");
+                logger.LogInformation($"{mainPackageId} is already up to date ({oldVersion}).");
                 if (!File.Exists(mainDllPath))
                     unpack = true;
             }
@@ -261,7 +266,7 @@ public class DevkitServerLauncherModule : IModuleNexus
 
                 if (method == null || providerInstance == null || providerInstance.GetValue(null) is not Provider provider || provider == null || !provider.gameObject.TryGetComponent(out ModuleHook moduleHook))
                 {
-                    logger.LogError($"Unable to automatically install {PackageId}. Restart your {(Dedicator.isStandaloneDedicatedServer ? "server" : "game")} to load it. Closing in 10 seconds.");
+                    logger.LogError($"Unable to automatically install {mainPackageId}. Restart your {(Dedicator.isStandaloneDedicatedServer ? "server" : "game")} to load it. Closing in 10 seconds.");
                     Break();
                     return;
                 }
@@ -270,7 +275,7 @@ public class DevkitServerLauncherModule : IModuleNexus
 
                 if (modules.Count < 1)
                 {
-                    logger.LogError($"Unable to discover {PackageId} module file. You may have to do a manual installation if restarting doesn't fix it.");
+                    logger.LogError($"Unable to discover {mainPackageId} module file. You may have to do a manual installation if restarting doesn't fix it.");
                     Break();
                     return;
                 }
@@ -279,32 +284,62 @@ public class DevkitServerLauncherModule : IModuleNexus
                 foreach (ModuleConfig config in modules)
                 {
                     logger.LogInformation($"Registering new module: {config.Name} ({config.Version}).");
+                    for (int i = config.Assemblies.Count - 1; i >= 0; i--)
+                    {
+                        ModuleAssembly assembly = config.Assemblies[i];
+                        string path = GetAbsolutePath(config, assembly);
+                        if (File.Exists(path))
+                            continue;
+
+                        config.Assemblies.RemoveAt(i);
+
+                        if (!Path.GetFileName(path).Equals(Dedicator.isStandaloneDedicatedServer ? "DevkitServer_Client.dll" : "DevkitServer_Server.dll", StringComparison.Ordinal))
+                        {
+                            logger.LogError($"Missing assembly: \"{path}\".");
+                            Break();
+                            return;
+                        }
+                    }
+
                     ModuleHook.modules.Insert(++moduleIndex, new Module(config));
                 }
             }
 
-            if (oldVersion != null)
-                logger.LogInformation($"DevkitServer updated from version {oldVersion} to {highestMainVersion} (with resources version {highestResourceVersion}).");
-            else
-                logger.LogInformation($"DevkitServer version {highestMainVersion} installed (with resources version {highestResourceVersion}).");
+            if (unpack)
+            {
+                if (oldVersion != null)
+                    logger.LogInformation($"DevkitServer updated from version {oldVersion} to {highestMainVersion} (with resources version {highestResourceVersion}).");
+                else
+                    logger.LogInformation($"DevkitServer version {highestMainVersion} installed (with resources version {highestResourceVersion}).");
+            }
 
             main2:
             logger.LogInformation("Finished checking for updates.");
         }
         catch (Exception ex)
         {
-            if (ModuleHook.getModuleByName(PackageId) is { } module)
+            if (ModuleHook.getModuleByName("DevkitServer") is { } module)
             {
                 logger.LogWarning($"Unable to check for updates for {module.config.Name} ({module.config.DirectoryPath}). An error occured ({ex.GetType().Name}).");
                 logger.LogError(ex.ToString());
             }
             else
             {
-                logger.LogWarning($"Unable to install {PackageId} from NuGet servers. An error occured ({ex.GetType().Name}).");
+                logger.LogWarning($"Unable to install {mainPackageId} from NuGet servers. An error occured ({ex.GetType().Name}).");
                 logger.LogError(ex.ToString());
                 Break();
             }
         }
+    }
+    public static string GetAbsolutePath(ModuleConfig config, ModuleAssembly assembly)
+    {
+        string path = assembly.Path;
+        if (string.IsNullOrEmpty(path))
+            return string.Empty;
+        if (path[0] == Path.DirectorySeparatorChar || path[0] == Path.AltDirectorySeparatorChar)
+            path = path.Substring(1);
+        path = Path.Combine(config.DirectoryPath, path);
+        return path;
     }
     private static void Break()
     {
@@ -317,78 +352,200 @@ public class DevkitServerLauncherModule : IModuleNexus
     }
     private static bool UnpackResourceAssembly(ILogger logger, string path, string dllPath)
     {
-        using FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        using PackageArchiveReader reader = new PackageArchiveReader(stream, true);
-        
-        string? asmFile = reader.GetLibItems().SelectMany(x => x.Items).FirstOrDefault(x => Path.GetFileName(x).Equals("DevkitServer.Resources.dll", StringComparison.Ordinal));
-        if (asmFile == null)
+        using (FileStream stream = new FileStream(path + ".nupkg", FileMode.Open, FileAccess.Read, FileShare.Read))
         {
-            logger.LogError("Unable to find resources file in package.");
-            return false;
+            using PackageArchiveReader reader = new PackageArchiveReader(stream, true);
+
+            PackageIdentity id = reader.NuspecReader.GetIdentity();
+
+            string? asmFile = reader.GetLibItems().SelectMany(x => x.Items).FirstOrDefault(x => Path.GetFileName(x)
+                .Equals("DevkitServer.Resources.dll", StringComparison.Ordinal));
+
+            if (asmFile == null)
+            {
+                logger.LogError("Unable to find DevkitServer.Resources assembly in package.");
+                return false;
+            }
+
+            logger.LogInformation($"Unpacking assembly: \"{id}://{asmFile}\" -> \"{dllPath}\".");
+            reader.ExtractFile(asmFile, dllPath, logger);
+
+            try
+            {
+                FileAttributes resxFileAttr = File.GetAttributes(dllPath);
+                if ((resxFileAttr & FileAttributes.Hidden) == 0)
+                    File.SetAttributes(dllPath, resxFileAttr | FileAttributes.Hidden);
+            }
+            catch
+            {
+                // ignored
+            }
         }
 
-        reader.ExtractFile(asmFile, dllPath, logger);
+        if (!File.Exists(path + ".snupkg"))
+            return true;
 
-        try
+        using (FileStream stream = new FileStream(path + ".snupkg", FileMode.Open, FileAccess.Read, FileShare.Read))
         {
-            FileAttributes resxFileAttr = File.GetAttributes(dllPath);
-            if ((resxFileAttr & FileAttributes.Hidden) == 0)
-                File.SetAttributes(dllPath, resxFileAttr | FileAttributes.Hidden);
-        }
-        catch
-        {
-            // ignored
+            using PackageArchiveReader reader = new PackageArchiveReader(stream, true);
+
+            PackageIdentity id = reader.NuspecReader.GetIdentity();
+
+            string? symFile = reader.GetLibItems().SelectMany(x => x.Items).FirstOrDefault(x => Path.GetFileName(x)
+                .Equals("DevkitServer.Resources.pdb", StringComparison.Ordinal));
+
+            if (symFile == null)
+            {
+                logger.LogWarning("Unable to find DevkitServer.Resources symbols file in package.");
+                return true;
+            }
+
+            string p = Path.Combine(Path.GetDirectoryName(dllPath) ?? string.Empty, Path.GetFileNameWithoutExtension(dllPath) + ".pdb");
+            logger.LogInformation($"Unpacking symbols: \"{id}://{symFile}\" -> \"{p}\".");
+            reader.ExtractFile(symFile, p, logger);
+
+            try
+            {
+                FileAttributes resxFileAttr = File.GetAttributes(p);
+                if ((resxFileAttr & FileAttributes.Hidden) == 0)
+                    File.SetAttributes(p, resxFileAttr | FileAttributes.Hidden);
+            }
+            catch
+            {
+                // ignored
+            }
         }
 
         return true;
     }
     private static bool UnpackMainAssembly(ILogger logger, string path, string dllPath)
     {
-        using FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        using PackageArchiveReader reader = new PackageArchiveReader(stream, true);
-        
-        string? asmFile = reader.GetLibItems().SelectMany(x => x.Items).FirstOrDefault(x => Path.GetFileName(x)
-            .Equals(Dedicator.isStandaloneDedicatedServer ? "DevkitServer_Server.dll" : "DevkitServer_Client.dll", StringComparison.Ordinal));
-
-        if (asmFile == null)
+        using (FileStream stream = new FileStream(path + ".nupkg", FileMode.Open, FileAccess.Read, FileShare.Read))
         {
-            logger.LogError("Unable to find resources file in package.");
-            return false;
+            using PackageArchiveReader reader = new PackageArchiveReader(stream, true);
+
+            PackageIdentity id = reader.NuspecReader.GetIdentity();
+
+            string? asmFile = reader.GetLibItems().SelectMany(x => x.Items).FirstOrDefault(x => Path.GetFileName(x)
+                .Equals("DevkitServer.dll", StringComparison.Ordinal));
+
+            if (asmFile == null)
+            {
+                logger.LogError("Unable to find DevkitServer assembly in package.");
+                return false;
+            }
+            
+            foreach (string file in reader.GetContentItems().SelectMany(x => x.Items))
+            {
+                string fn = Path.GetFileName(file);
+                logger.LogDebug(file);
+                if (fn.Equals("DevkitServer.xml", StringComparison.Ordinal))
+                {
+                    string p = Path.Combine(Path.GetDirectoryName(dllPath) ?? string.Empty, Path.GetFileNameWithoutExtension(dllPath) + ".xml");
+                    logger.LogInformation($"Unpacking xml documentation: \"{id}://{file}\" -> \"{p}\".");
+                    reader.ExtractFile(file, p, logger);
+                    break;
+                }
+            }
+
+            logger.LogInformation($"Unpacking assembly: \"{id}://{asmFile}\" -> \"{dllPath}\".");
+            reader.ExtractFile(asmFile, dllPath, logger);
         }
 
-        reader.ExtractFile(asmFile, dllPath, logger);
+        if (!File.Exists(path + ".snupkg"))
+            return true;
+
+        using (FileStream stream = new FileStream(path + ".snupkg", FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            using PackageArchiveReader reader = new PackageArchiveReader(stream, true);
+
+            PackageIdentity id = reader.NuspecReader.GetIdentity();
+
+            string? symFile = reader.GetLibItems().SelectMany(x => x.Items).FirstOrDefault(x => Path.GetFileName(x)
+                .Equals("DevkitServer.pdb", StringComparison.Ordinal));
+
+            if (symFile == null)
+            {
+                logger.LogWarning("Unable to find DevkitServer symbols file in package.");
+                return true;
+            }
+
+            string p = Path.Combine(Path.GetDirectoryName(dllPath) ?? string.Empty, Path.GetFileNameWithoutExtension(dllPath) + ".pdb");
+            logger.LogInformation($"Unpacking symbols: \"{id}://{symFile}\" -> \"{p}\".");
+            reader.ExtractFile(symFile, p, logger);
+        }
 
         return true;
     }
-    private static void WriteResources(ILogger logger, string modulesFolder, SemanticVersion? lastVersion)
+    private static void WriteResources(ILogger logger, string modulesFolder, SemanticVersion? lastVersion, bool forceReinstall)
     {
         DevkitServerResources resources = new DevkitServerResources();
 
         Version oldVersion = lastVersion == null ? new Version(0, 0, 0, 0) : new Version(lastVersion.Major, lastVersion.Minor, lastVersion.Patch, 0);
 
-        logger.LogDebug($"Checking for resources that have been updated since version {oldVersion}.");
+        if (!forceReinstall)
+            logger.LogInformation($"Checking for resources that have been updated since version {oldVersion}.");
+        else
+            logger.LogInformation($"Re-installing {resources.Resources.Count} resources.");
         foreach (IDevkitServerResource resource in resources.Resources)
         {
-            if (resource.LastUpdated <= oldVersion)
+            bool applyingAnyways = false;
+            if (!forceReinstall && resource.LastUpdated <= oldVersion && !(applyingAnyways = resource.ShouldApplyAnyways(modulesFolder)))
             {
-                logger.LogDebug($"Resource up to date: {resource} (Last updated in version {resource.LastUpdated.ToString(3)}).");
+                logger.LogDebug($"Resource up to date: {resource}.");
                 continue;
             }
+
+            if (forceReinstall)
+                logger.LogDebug($"Installing resource {resource}.");
+            else if (applyingAnyways)
+                logger.LogDebug($"Installing missing resource {resource}.");
+            else    
+                logger.LogDebug($"Installing out of date resource {resource}.");
 
             resource.Apply(modulesFolder);
         }
 
         resources.ReleaseAll();
     }
-    private static NuspecReader? ReadPackage(string path)
+    private static PackageIdentity? ReadPackage(string path, ILogger logger)
     {
+        path += ".nupkg";
         if (!File.Exists(path))
             return null;
         using FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         using PackageArchiveReader reader = new PackageArchiveReader(stream, true);
-        NuspecReader nuspec = reader.NuspecReader;
-        _ = nuspec.GetVersion(); // cache stuff
-        return nuspec;
+        try
+        {
+            PrimarySignature? primarySignature = reader.GetPrimarySignatureAsync(CancellationToken.None).Result;
+
+            if (primarySignature != null)
+            {
+                logger.LogInformation($"Validating signature of {Path.GetFileNameWithoutExtension(path)}...");
+                try
+                {
+                    reader.ValidateIntegrityAsync(primarySignature.SignatureContent, CancellationToken.None).Wait();
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError($"  Unable to verify package signature at: \"{path}\".");
+                    logger.LogError(ex.ToString());
+                    return null;
+                }
+                logger.LogInformation("  Done.");
+            }
+            else
+            {
+                logger.LogInformation($"Skipping signature validation, {Path.GetFileNameWithoutExtension(path)} is not signed.");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex.InnerException?.Message ?? ex.Message);
+        }
+
+
+        return reader.GetIdentity();
     }
     private static bool DownloadPackage(ILogger logger, NuGetResource packageBaseAddress, SemanticVersion version, string packageId, string path)
     {
@@ -396,9 +553,9 @@ public class DevkitServerLauncherModule : IModuleNexus
         string id = packageId.ToLowerInvariant();
         Uri getNupkgUri = new Uri(new Uri(packageBaseAddress.Id), $"{id}/{v}/{id}.{v}.nupkg");
 
-        logger.LogInformation($"Downloading: {packageId} (Version: {v})...");
+        logger.LogInformation($"Downloading: {packageId} package (Version: {v})...");
         Stopwatch stopwatch = Stopwatch.StartNew();
-        UnityWebRequest getNupkgRequest = ExecuteUnityWebRequestSync(logger, UnityWebRequest.Get(getNupkgUri));
+        using UnityWebRequest getNupkgRequest = ExecuteUnityWebRequestSync(logger, UnityWebRequest.Get(getNupkgUri));
         stopwatch.Stop();
         logger.LogInformation($"  Done ({stopwatch.ElapsedMilliseconds} ms).");
 
@@ -410,13 +567,51 @@ public class DevkitServerLauncherModule : IModuleNexus
 
         byte[] bytes = getNupkgRequest.downloadHandler.data;
 
-        using (FileStream stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read))
+        using (FileStream stream = new FileStream(path + ".nupkg", FileMode.Create, FileAccess.Write, FileShare.Read))
             stream.Write(bytes, 0, bytes.Length);
 
-        getNupkgRequest.Dispose();
+        try
+        {
+            logger.LogInformation($"Downloading: {packageId} symbols (Version: {v})...");
+            getNupkgUri = new Uri($"https://globalcdn.nuget.org/symbol-packages/{id}.{v}.snupkg");
+            stopwatch.Restart();
+            using UnityWebRequest getSymNupkgRequest = ExecuteUnityWebRequestSync(logger, UnityWebRequest.Get(getNupkgUri));
+            stopwatch.Stop();
+            logger.LogInformation($"  Done ({stopwatch.ElapsedMilliseconds} ms).");
+
+            if (getSymNupkgRequest.responseCode == 404L)
+            {
+                logger.LogDebug($"Package {packageId} symbols not found.");
+                string p = path + ".snupkg";
+                if (File.Exists(p))
+                    File.Delete(p);
+                return true;
+            }
+
+            bytes = getSymNupkgRequest.downloadHandler.data;
+
+            using FileStream stream = new FileStream(path + ".snupkg", FileMode.Create, FileAccess.Write, FileShare.Read);
+            stream.Write(bytes, 0, bytes.Length);
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug($"Unable to download symbol package for {packageId} from {getNupkgUri}. This is not a huge issue.");
+            logger.LogDebug(ex.ToString());
+            try
+            {
+                string p = path + ".snupkg";
+                if (File.Exists(p))
+                    File.Delete(p);
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+
         return true;
     }
-    private static NuGetVersion[]? GetVersions(ILogger logger, NuGetResource packageBaseAddress, string packageId, JsonSerializerOptions jsonOptions)
+    private static NuGetVersion[]? GetVersions(ILogger logger, NuGetResource packageBaseAddress, string packageId)
     {
         Uri getVersionsUri = new Uri(new Uri(packageBaseAddress.Id), packageId.ToLowerInvariant() + "/index.json");
 
@@ -427,9 +622,8 @@ public class DevkitServerLauncherModule : IModuleNexus
             logger.LogError($"Package {packageId} not found.");
             return null;
         }
-
-        Utf8JsonReader jsonReader = new Utf8JsonReader(getVersionsRequest.downloadHandler.data);
-        NuGetVersionsResponse? versions = JsonSerializer.Deserialize<NuGetVersionsResponse>(ref jsonReader, jsonOptions);
+        
+        NuGetVersionsResponse? versions = IOUtility.jsonDeserializer.deserialize<NuGetVersionsResponse>(getVersionsRequest.downloadHandler.data, 0);
 
         if (versions?.Versions == null)
         {
@@ -438,12 +632,16 @@ public class DevkitServerLauncherModule : IModuleNexus
             return null;
         }
 
-        logger.LogInformation($"Found versions of {packageId}: {string.Join<NuGetVersion>(", ", versions.Versions)}.");
+        logger.LogInformation($"Found versions of {packageId}: {string.Join(", ", versions.Versions)}.");
         getVersionsRequest.Dispose();
-        return versions.Versions;
+        NuGetVersion[] versionsRtn = new NuGetVersion[versions.Versions.Length];
+        for (int i = 0; i < versions.Versions.Length; ++i)
+            versionsRtn[i] = NuGetVersion.Parse(versions.Versions[i]);
+        return versionsRtn;
     }
     private static UnityWebRequest ExecuteUnityWebRequestSync(ILogger logger, UnityWebRequest request, bool retry = true)
     {
+        request.SetRequestHeader("User-Agent", "DevkitServer.Launcher/" + typeof(DevkitServerLauncherModule).Assembly.GetName().Version.ToString(3));
         UnityWebRequestAsyncOperation operation = request.SendWebRequest();
 
         while (!operation.isDone)
@@ -459,8 +657,9 @@ public class DevkitServerLauncherModule : IModuleNexus
 
         logger.LogInformation("Retrying in 5 seconds...");
         Thread.Sleep(5000);
-
+        
         request = new UnityWebRequest(request.uri, request.method, request.downloadHandler, request.uploadHandler);
+        request.SetRequestHeader("User-Agent", "DevkitServer.Launcher/" + typeof(DevkitServerLauncherModule).Assembly.GetName().Version.ToString(3));
         operation = request.SendWebRequest();
 
         while (!operation.isDone)
@@ -469,6 +668,6 @@ public class DevkitServerLauncherModule : IModuleNexus
         err = request.result is UnityWebRequest.Result.ConnectionError or UnityWebRequest.Result.DataProcessingError or UnityWebRequest.Result.ProtocolError;
 
         rtn:
-        return !err ? request : throw new UnityWebRequestException(request);
+        return !err ? request : throw new Exception(request.error);
     }
 }

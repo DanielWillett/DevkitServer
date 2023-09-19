@@ -5,7 +5,35 @@
 	"Assemblies":
 	[
 		{
-			"Path": "/Libraries/Nuget.Protocol.dll",
+			"Path": "/Libraries/NuGet.Common.dll",
+			"Role": "Both_Optional"
+		},
+		{
+			"Path": "/Libraries/NuGet.Versioning.dll",
+			"Role": "Both_Optional"
+		},
+		{
+			"Path": "/Libraries/NuGet.Configuration.dll",
+			"Role": "Both_Optional"
+		},
+		{
+			"Path": "/Libraries/NuGet.Packaging.dll",
+			"Role": "Both_Optional"
+		},
+		{
+			"Path": "/Libraries/NuGet.Frameworks.dll",
+			"Role": "Both_Optional"
+		},
+		{
+			"Path": "/Libraries/System.Xml.Linq.dll",
+			"Role": "Both_Optional"
+		},
+		{
+			"Path": "/Libraries/System.IO.Compression.dll",
+			"Role": "Both_Optional"
+		},
+		{
+			"Path": "/Libraries/System.IO.Compression.FileSystem.dll",
 			"Role": "Both_Optional"
 		},
 		{

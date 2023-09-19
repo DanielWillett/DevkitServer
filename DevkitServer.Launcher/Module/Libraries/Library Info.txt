@@ -1,0 +1,15 @@
+NuGet by Microsoft, NuGet - 6.7.0
+https://www.nuget.org/packages/NuGet.Common
+https://www.nuget.org/packages/NuGet.Configuration
+https://www.nuget.org/packages/NuGet.Frameworks
+https://www.nuget.org/packages/NuGet.Packaging
+https://www.nuget.org/packages/NuGet.Versioning
+
+System.IO.Compression by Microsoft (dotnet) - 4.8.9032.0 - .NET Framework v4.8.1 Redistributable
+ # This assembly is compatible with Unity, most others available are not.
+
+System.IO.Compression.FileSystem by Microsoft (dotnet) - 4.8.9032.0 - .NET Framework v4.8.1 Redistributable
+ # This assembly is compatible with Unity, most others available are not.
+
+System.Xml.Linq (mono port) by Microsoft (dotnet), b0at - 3.5.21022.801 - https://www.nuget.org/packages/System.Xml.Linq/3.5.21022.801
+ # This assembly is compatible with Unity, most others available are not.

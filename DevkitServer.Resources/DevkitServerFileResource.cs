@@ -20,17 +20,15 @@ internal class DevkitServerFileResource : IDevkitServerResource
         this(Path.GetFileNameWithoutExtension(filePath), filePath, lastUpdated) { }
 
     public byte[]? GetResourceData() => Properties.Resources.ResourceManager.GetObject(ResourceName) as byte[];
-    public void Apply(string moduleDirectory)
+    public bool Apply(string moduleDirectory)
     {
         byte[]? data = GetResourceData();
         if (data == null)
         {
             CommandWindow.LogError($"[DEVKITSERVER.RESOURCES] [ERROR] Unable to find required resource: \"{FilePath}\".");
-            return;
+            return false;
         }
-
-        CommandWindow.Log($"[DEVKITSERVER.RESOURCES] [INFO]  Writing required resource: \"{FilePath}\"...");
-
+        
         try
         {
             string path = Path.Combine(moduleDirectory, FilePath);
@@ -42,14 +40,17 @@ internal class DevkitServerFileResource : IDevkitServerResource
             using FileStream stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
             stream.Write(data, 0, data.Length);
             stream.Flush(true);
-            CommandWindow.Log("[DEVKITSERVER.RESOURCES] [INFO]    Done.");
+            return true;
         }
         catch (Exception ex)
         {
             CommandWindow.LogError("[DEVKITSERVER.RESOURCES] [ERROR]   Unexpected error.");
             CommandWindow.LogError(ex);
+            return false;
         }
     }
+    public bool ShouldApplyAnyways(string moduleDirectory) => !File.Exists(Path.Combine(moduleDirectory, FilePath));
+    public override string ToString() => $"{{ File | Last Updated in {LastUpdated} | '{FilePath}' }}";
 }
 
 internal class DevkitServerDirectoryResource : IDevkitServerResource
@@ -62,33 +63,36 @@ internal class DevkitServerDirectoryResource : IDevkitServerResource
         DirectoryName = directoryName;
         LastUpdated = lastUpdated;
     }
-    public void Apply(string moduleDirectory)
+    public bool Apply(string moduleDirectory)
     {
         string path = Path.Combine(moduleDirectory, DirectoryName);
 
         if (Directory.Exists(path))
         {
             CommandWindow.Log($"[DEVKITSERVER.RESOURCES] [DEBUG] Required directory: \"{DirectoryName}\" already exists.");
-            return;
+            return false;
         }
-
-        CommandWindow.Log($"[DEVKITSERVER.RESOURCES] [INFO]  Creating required directory: \"{DirectoryName}\"...");
-
+        
         try
         {
             Directory.CreateDirectory(path);
-            CommandWindow.Log("[DEVKITSERVER.RESOURCES] [INFO]    Done.");
+            return true;
         }
         catch (Exception ex)
         {
             CommandWindow.LogError("[DEVKITSERVER.RESOURCES] [ERROR]   Unexpected error.");
             CommandWindow.LogError(ex);
+            return false;
         }
     }
+
+    public bool ShouldApplyAnyways(string moduleDirectory) => !Directory.Exists(Path.Combine(moduleDirectory, DirectoryName));
+    public override string ToString() => $"{{ Directory | Last Updated in {LastUpdated} | '{DirectoryName}' }}";
 }
 
 internal interface IDevkitServerResource
 {
     Version LastUpdated { get; }
-    void Apply(string moduleDirectory);
+    bool Apply(string moduleDirectory);
+    bool ShouldApplyAnyways(string moduleDirectory);
 }

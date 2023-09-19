@@ -10,12 +10,31 @@ The server runs from U3DS (Unturned 3 Dedicated Server) as a normal Steam server
 The client must also install the module, but no further setup is required.
 
 # Installation (Launcher - recommended)
-`todo`
+Download the latest release of the launcher module zip file from the Releases section.
+
+Copy it to your `Unturned\Modules` or `U3DS\Modules` folder as `DevkitServer.Launcher.zip` and click **Extract Here**.
+
+Ensure the folder structure looks like this:
+`Modules\DevkitServer.Launcher\Bin\DevkitServer.Launcher.dll`
+
+Remember that for client-side, you must launch without BattlEye enabled for modules to run.
+Make sure you have an internet connection when launching, at least for the first time.
+
+DevkitServer will be downloaded from the following three NuGet packages:
+* [DevkitServer.Resources](https://www.nuget.org/packages/DevkitServer.Resources) - Both Platforms (< 5 MB)
+* [DevkitServer.Server](https://www.nuget.org/packages/DevkitServer.Server) - Dedicated Server (< 1 MB)
+* [DevkitServer.Client](https://www.nuget.org/packages/DevkitServer.Client) - Client (< 1 MB)
+
+The launcher will keep DevkitServer up to date.
+It supports the following launch options.
+
+* `-DontUpdateDevkitServer` - Will install DevkitServer if it's missing, but won't try to keep it updated.
+* `-ForceDevkitServerReinstall` - Reinstalls DevkitServer each launch. Good for fixing corrupted module files or forcing an update. You will not lose any savedata.
 
 # Client Installation (Without Launcher)
 
 ## Download Module Zip
-Download the latest release of the module zip file.
+Download the latest release of the module zip file from the Releases section.
 
 Copy it to your `Unturned\Modules` folder as `DevkitServer.zip` and click **Extract Here**.
 
@@ -27,7 +46,7 @@ It's been installed. After first launch you can configure client-side settings a
 Remember that you must launch without BattlEye enabled for modules to run.
 
 # Server Installation (Without Launcher)
-Download the latest release of the module zip file.
+Download the latest release of the module zip file from the Releases section.
 
 Copy it to your `U3DS\Modules` folder as `DevkitServer.zip` and click **Extract Here**.
 

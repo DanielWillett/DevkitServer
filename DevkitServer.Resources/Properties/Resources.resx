@@ -118,8 +118,14 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
+  <data name="Library Info" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\Library Info.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="0Harmony" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\0Harmony.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="0Harmony.dll license" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\0Harmony.dll license.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="backup_config" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Defaults\backup_config.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
@@ -166,6 +172,9 @@
   <data name="Microsoft.Bcl.AsyncInterfaces" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\Microsoft.Bcl.AsyncInterfaces.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="Microsoft.Bcl.AsyncInterfaces.dll license" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\Microsoft.Bcl.AsyncInterfaces.dll license.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="Object Icon Presets (Vanilla)" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Data\Object Icon Presets (Vanilla).json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
@@ -184,37 +193,85 @@
   <data name="StackCleaner" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\StackCleaner.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="StackCleaner.pdb" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\StackCleaner.pdb;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="StackCleaner.xml" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\StackCleaner.xml;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="StackCleaner.dll license" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\StackCleaner.dll license.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="System.Buffers" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.Buffers.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="System.Buffers.dll license" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\System.Buffers.dll license.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="System.IO.Compression" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.IO.Compression.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="System.IO.Compression.dll license" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\System.IO.Compression.dll license.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="System.IO.Compression.FileSystem" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.IO.Compression.FileSystem.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="System.IO.Compression.FileSystem.dll license" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\System.IO.Compression.FileSystem.dll license.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="System.Memory" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.Memory.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="System.Memory.dll license" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\System.Memory.dll license.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="System.Numerics.Vectors" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.Numerics.Vectors.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="System.Numerics.Vectors.dll license" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\System.Numerics.Vectors.dll license.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="System.Runtime.CompilerServices.Unsafe" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.Runtime.CompilerServices.Unsafe.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="System.Runtime.CompilerServices.Unsafe.dll license" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\System.Runtime.CompilerServices.Unsafe.dll license.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="System.Text.Encodings.Web" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.Text.Encodings.Web.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="System.Text.Encodings.Web.dll license" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\System.Text.Encodings.Web.dll license.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="System.Text.Json" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.Text.Json.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="System.Text.Json.dll license" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\System.Text.Json.dll license.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="System.Threading.Tasks.Extensions" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.Threading.Tasks.Extensions.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="System.Threading.Tasks.Extensions.dll license" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\System.Threading.Tasks.Extensions.dll license.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="System.ValueTuple" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\System.ValueTuple.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="System.ValueTuple.dll license" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\System.ValueTuple.dll license.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="UniTask" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\UniTask.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="UniTask.pdb" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\UniTask.pdb;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="UniTask.xml" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\UniTask.xml;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="UniTask.dll license" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\UniTask.dll license.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
 </root>

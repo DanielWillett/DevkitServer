@@ -2,10 +2,9 @@
   <PropertyGroup>
     <ProjectGuid>C0FAB04D-A5EF-4A40-88EC-4F8F9FB24180</ProjectGuid>
     <TargetFramework>net481</TargetFramework>
-    <AssemblyTitle>$(DSName)</AssemblyTitle>
-    <Product>$(DSName)</Product>
+    <AssemblyTitle>DevkitServer</AssemblyTitle>
+    <Product>DevkitServer</Product>
     <Copyright>Copyright ©  2023</Copyright>
-    <OutputPath>bin\$(Configuration)\</OutputPath>
     <LangVersion>preview</LangVersion>
     <Nullable>enable</Nullable>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
@@ -19,9 +18,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
-    <PackageId>$(DSName)</PackageId>
-    <Title>$(DSName)</Title>
-    <Version>0.0.1</Version>
+    <Version>0.0.3</Version>
     <Authors>DanielWillett</Authors>
     <Company>DanielWillett</Company>
     <Description>Module for Unturned that enables multi-user map editing.</Description>
@@ -35,59 +32,62 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>True</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <AssemblyName>$(DSName)</AssemblyName>
+    <AssemblyName>DevkitServer</AssemblyName>
     <RootNamespace>DevkitServer</RootNamespace>
     <NeutralLanguage>en-US</NeutralLanguage>
-    <AssemblyVersion>$(Version).0</AssemblyVersion>
-    <FileVersion>$(Version).0</FileVersion>
   </PropertyGroup>
-  
+
+  <Import Project="$(SolutionDir)Common.targets" />
+
   <PropertyGroup Condition="$(DefineConstants.Contains(SERVER))">
-    <DSName>DevkitServer.Server</DSName>
+    <Title>DevkitServer (Server Build)</Title>
+    <OutputPath>bin\DevkitServer.Server\</OutputPath>
+    <AssemblyVersion>$(Version).1</AssemblyVersion>
+    <FileVersion>$(Version).1</FileVersion>
+    <PackageId>DevkitServer.Server</PackageId>
+    <PackageVersion>$(Version)-server</PackageVersion>
   </PropertyGroup>
   <PropertyGroup Condition="$(DefineConstants.Contains(CLIENT))">
-    <DSName>DevkitServer.Client</DSName>
+    <Title>DevkitServer (Client Build)</Title>
+    <OutputPath>bin\DevkitServer.Client\</OutputPath>
+    <AssemblyVersion>$(Version).0</AssemblyVersion>
+    <FileVersion>$(Version).0</FileVersion>
+    <PackageId>DevkitServer.Client</PackageId>
+    <PackageVersion>$(Version)-client</PackageVersion>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="$(OutputPath)\DevkitServer.xml">
+      <Pack>true</Pack>
+      <PackagePath>contentFiles\</PackagePath>
+      <BuildAction>None</BuildAction>
+    </Content>
+  </ItemGroup>
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <!-- Signing -->
-  <PropertyGroup Condition="'$(Configuration)'=='ClientRelease' Or '$(Configuration)'=='ServerRelease'">
+  <PropertyGroup Condition="$(DefineConstants.Contains(RELEASE))">
     <SignAssembly>True</SignAssembly>
     <AssemblyOriginatorKeyFile>C:\Users\danny\OneDrive\Documents\DevkitServer\devkitserver.dll.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ClientDebug|AnyCPU'">
-    <DebugType>portable</DebugType>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ClientRelease|AnyCPU'">
-    <DebugType>portable</DebugType>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ServerDebug|AnyCPU'">
-    <DebugType>portable</DebugType>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ServerRelease|AnyCPU'">
-    <DebugType>portable</DebugType>
-  </PropertyGroup>
-
-  <Import Project="$(SolutionDir)Common.targets" />
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
     <Exec Command="SET &quot;sourcedir=$(OutDir)&#xD;&#xA;SET &quot;config=$(ConfigurationName)&#xD;&#xA;ECHO Building %25config%25&#xD;&#xA;IF %25config%25 == ClientDebug (&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;$(ClientPath)\Modules\DevkitServer\Bin\$(ProjectName)_Client.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;$(ClientPath)\Modules\DevkitServer\Bin\$(ProjectName)_Client.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;$(ClientPath)\Modules\DevkitServer\Bin\$(ProjectName)_Client.xml*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;$(ServerPath)\Modules\DevkitServer\Bin\$(ProjectName)_Client.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;$(ServerPath)\Modules\DevkitServer\Bin\$(ProjectName)_Client.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;$(ServerPath)\Modules\DevkitServer\Bin\$(ProjectName)_Client.xml*&quot;&#xD;&#xA;) ELSE IF %25config%25 == ClientRelease (&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;$(ClientPath)\Modules\DevkitServer\Bin\$(ProjectName)_Client.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;$(ClientPath)\Modules\DevkitServer\Bin\$(ProjectName)_Client.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;$(ClientPath)\Modules\DevkitServer\Bin\$(ProjectName)_Client.xml*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;$(ServerPath)\Modules\DevkitServer\Bin\$(ProjectName)_Client.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;$(ServerPath)\Modules\DevkitServer\Bin\$(ProjectName)_Client.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;$(ServerPath)\Modules\DevkitServer\Bin\$(ProjectName)_Client.xml*&quot;&#xD;&#xA;) ELSE IF %25config%25 == ServerDebug (&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;$(ClientPath)\Modules\DevkitServer\Bin\$(ProjectName)_Server.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;$(ClientPath)\Modules\DevkitServer\Bin\$(ProjectName)_Server.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;$(ClientPath)\Modules\DevkitServer\Bin\$(ProjectName)_Server.xml*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;$(ServerPath)\Modules\DevkitServer\Bin\$(ProjectName)_Server.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;$(ServerPath)\Modules\DevkitServer\Bin\$(ProjectName)_Server.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;$(ServerPath)\Modules\DevkitServer\Bin\$(ProjectName)_Server.xml*&quot;&#xD;&#xA;) ELSE IF %25config%25 == ServerRelease (&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;$(ClientPath)\Modules\DevkitServer\Bin\$(ProjectName)_Server.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;$(ClientPath)\Modules\DevkitServer\Bin\$(ProjectName)_Server.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;$(ClientPath)\Modules\DevkitServer\Bin\$(ProjectName)_Server.xml*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;$(ServerPath)\Modules\DevkitServer\Bin\$(ProjectName)_Server.dll*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;$(ServerPath)\Modules\DevkitServer\Bin\$(ProjectName)_Server.pdb*&quot;&#xD;&#xA; XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).xml*&quot; &quot;$(ServerPath)\Modules\DevkitServer\Bin\$(ProjectName)_Server.xml*&quot;&#xD;&#xA;) ELSE (&#xD;&#xA; ECHO No files copied.&#xD;&#xA;)" />
   </Target>
 
   <ItemGroup>
+    <Compile Remove="DevkitServer.Launcher\**" />
     <Compile Remove="DevkitServer.Resources\**" />
     <Compile Remove="DevkitServer.Tests\**" />
-    <Compile Remove="DevkitServer.Launcher\**" />
     <Compile Remove="Module\**" />
     <Compile Remove="packages\**" />
     <Compile Remove="TestPlugin\**" />
     <Compile Remove="Common.targets" />
+    <EmbeddedResource Remove="DevkitServer.Launcher\**" />
     <EmbeddedResource Remove="DevkitServer.Resources\**" />
     <EmbeddedResource Remove="DevkitServer.Tests\**" />
-    <EmbeddedResource Remove="DevkitServer.Launcher\**" />
     <EmbeddedResource Remove="Module\**" />
     <EmbeddedResource Remove="packages\**" />
     <EmbeddedResource Remove="TestPlugin\**" />
@@ -100,18 +100,6 @@
     <None Remove="TestPlugin\**" />
     <None Remove="Common.targets" />
     <None Remove="Unturned.targets" />
-  </ItemGroup>
-
-  <!-- Newtonsoft.Json -->
-  <ItemGroup Condition="$(DefineConstants.Contains(SERVER))">
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>$(ServerPath)\Unturned_Data\Managed\Newtonsoft.Json.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-  <ItemGroup Condition="$(DefineConstants.Contains(CLIENT))">
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>$(ClientPath)\Unturned_Data\Managed\Newtonsoft.Json.dll</HintPath>
-    </Reference>
   </ItemGroup>
 
 </Project>

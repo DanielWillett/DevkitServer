@@ -34,16 +34,14 @@
 
 
     <!-- Debug Output -->
-    <Target Name="DevkitServer Module Debug Output" AfterTargets="Build" >
-        <Message Text="Compiling DevkitServer Module..." Importance="high"/>
+    <Target Name="DevkitServer Module Debug Output" AfterTargets="Build" Condition="true">
+        <Message Text="Building server module... $(PackageId)" Importance="high" Condition="$(DefineConstants.Contains(SERVER))"/>
+        <Message Text="Building client module... $(PackageId)" Importance="high" Condition="$(DefineConstants.Contains(CLIENT))"/>
         <Message Text="Client Location: &quot;$(ClientPath)&quot;." Importance="high"/>
         <Message Text="Server Location: &quot;$(ServerPath)&quot;." Importance="high"/>
         <Message Text="Library Location: &quot;$(IncludedLibrariesPath)&quot;." Importance="high"/>
         <Message Text="Solution Location: &quot;$(SolutionDir)&quot;." Importance="high"/>
         <Message Text="Defines: $(DefineConstants)." Importance="high"/>
-        <Message Text="Packages" Importance="high"/>
-        <Message Text=" • %(PackageReference.Identity)." Importance="high"/>
-        <Message Text="Assembly References" Importance="high"/>
-        <Message Text=" • %(Reference.Identity) | Path: &quot;%(Reference.HintPath)&quot;" Importance="high"/>
     </Target>
+
 </Project>

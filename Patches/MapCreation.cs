@@ -1,4 +1,5 @@
-﻿using DevkitServer.Configuration;
+﻿extern alias NSJ;
+using DevkitServer.Configuration;
 using SDG.Framework.Devkit;
 using SDG.Framework.Foliage;
 using SDG.Framework.IO.FormattedFiles.KeyValueTables;
@@ -462,7 +463,7 @@ public static class MapCreation
 
         writer.WriteStartObject();
 
-        foreach (FieldInfo field in fields.Where(x => !Attribute.IsDefined(x, typeof(Newtonsoft.Json.JsonIgnoreAttribute))))
+        foreach (FieldInfo field in fields.Where(x => !Attribute.IsDefined(x, typeof(NSJ::Newtonsoft.Json.JsonIgnoreAttribute))))
         {
             object defaultValue = field.GetValue(defaultValues);
             object value = field.GetValue(data);

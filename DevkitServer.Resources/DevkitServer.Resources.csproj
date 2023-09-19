@@ -5,7 +5,7 @@
     <AssemblyTitle>DevkitServer.Resources</AssemblyTitle>
     <Product>DevkitServer.Resources</Product>
     <Copyright>Copyright ©  2023</Copyright>
-    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <OutputPath>bin\DevkitServer.Resources\</OutputPath>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>preview</LangVersion>
     <Nullable>enable</Nullable>
@@ -14,7 +14,7 @@
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
     <PackageId>DevkitServer.Resources</PackageId>
     <Title>DevkitServer.Resources</Title>
-    <Version>0.0.3</Version>
+    <Version>0.0.6</Version>
     <Authors>DanielWillett</Authors>
     <Company>DanielWillett</Company>
     <Description>Module config resources for DevkitServer, a multiplayer map editor module for nturned.</Description>

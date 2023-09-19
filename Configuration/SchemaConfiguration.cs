@@ -1,7 +1,10 @@
-﻿using System.Text.Json.Serialization;
-using Newtonsoft.Json;
+﻿extern alias NSJ;
+
+using System.Text.Json.Serialization;
+using NSJ::Newtonsoft.Json;
 
 namespace DevkitServer.Configuration;
+
 
 /// <summary>
 /// Allows easily adding a schema to your configuration file by deriving your class from this class.

@@ -283,6 +283,36 @@ public sealed class DevkitServerModule : IModuleNexus
             Provider.onServerConnected += UserManager.AddUser;
             Provider.onEnemyConnected += UserManager.OnAccepted;
             Provider.onServerDisconnected += UserManager.RemoveUser;
+
+            GameObject? editor = (GameObject?)Resources.Load("Edit/Editor");
+            if (editor != null)
+            {
+                Component comp = editor.GetComponentInChildren(Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"));
+                if (comp != null)
+                    Object.DestroyImmediate(comp);
+                else
+                    Logger.LogWarning("Unable to destroy EditorInteract.");
+                comp = editor.GetComponentInChildren(typeof(EditorMovement));
+                if (comp != null)
+                    Object.DestroyImmediate(comp);
+                else
+                    Logger.LogWarning("Unable to destroy EditorMovement.");
+                comp = editor.GetComponentInChildren(typeof(EditorLook));
+                if (comp != null)
+                    Object.DestroyImmediate(comp);
+                else
+                    Logger.LogWarning("Unable to destroy EditorLook.");
+                comp = editor.GetComponentInChildren(typeof(EditorArea));
+                if (comp != null)
+                    Object.DestroyImmediate(comp);
+                else
+                    Logger.LogWarning("Unable to destroy EditorArea.");
+
+                Logger.LogDebug($"Destroyed client-side editor components.");
+            }
+            else
+                Logger.LogWarning("Unable to destroy client-side editor components.");
+
 #if USERINPUT_DEBUG
             Players.UserInput.OnUserPositionUpdated += OnUserPositionUpdated;
 #endif
@@ -727,20 +757,6 @@ public sealed class DevkitServerModule : IModuleNexus
         Provider.modeConfigData.Gameplay.Timer_Home = 0;
         Provider.modeConfigData.Gameplay.Timer_Home = 0;
         Provider.hasCheats = true;
-        Assembly sdg = Accessor.AssemblyCSharp;
-        Component comp = Level.editing.GetComponentInChildren(sdg.GetType("SDG.Unturned.EditorInteract"));
-        if (comp != null)
-            Object.Destroy(comp);
-        if (comp != null)
-            comp = Level.editing.GetComponentInChildren(typeof(EditorMovement));
-        Object.Destroy(comp);
-        if (comp != null)
-            comp = Level.editing.GetComponentInChildren(typeof(EditorLook));
-        Object.Destroy(comp);
-        if (comp != null)
-            comp = Level.editing.GetComponentInChildren(typeof(EditorArea));
-        if (comp != null)
-            Object.Destroy(comp);
 #endif
     }
     private static void OnPreSaved()

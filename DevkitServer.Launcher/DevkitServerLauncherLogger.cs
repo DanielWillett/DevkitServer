@@ -26,6 +26,10 @@ internal class DevkitServerLauncherLogger : ILogger
                                                                     };
     public void Log(LogLevel level, string data)
     {
+#if !DEBUG
+        if (level == LogLevel.Debug)
+            return;
+#endif
         if (level == LogLevel.Warning)
             LogWarning(data);
         else if (level == LogLevel.Error)
