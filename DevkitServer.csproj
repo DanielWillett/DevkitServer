@@ -57,14 +57,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="$(OutputPath)\DevkitServer.xml">
-      <Pack>true</Pack>
-      <PackagePath>contentFiles\</PackagePath>
-      <BuildAction>None</BuildAction>
-    </Content>
-  </ItemGroup>
-
-  <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
