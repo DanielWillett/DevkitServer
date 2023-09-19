@@ -52,10 +52,10 @@ Remove the `Dependencies` section from the `Modules\DevkitServer\DevkitServer.mo
 ```jsonc
 "Dependencies":
 [
-	{
-		"Name": "DevkitServer.Launcher",
-		"Version": "1.0.0.0"
-	}
+  {
+    "Name": "DevkitServer.Launcher",
+    "Version": "1.0.0.0"
+  }
 ],
 ```
 
