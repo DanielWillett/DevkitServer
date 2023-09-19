@@ -35,6 +35,7 @@
     <DefaultNamespace>DevkitServer.Resources</DefaultNamespace>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <DebugType>portable</DebugType>
   </PropertyGroup>
 
   <Import Project="$(SolutionDir)Unturned.targets"/>
