@@ -30,6 +30,7 @@ using DevkitServer.API.Logging;
 using DevkitServer.Core.Tools;
 using DevkitServer.Players;
 using DevkitServer.Players.UI;
+using SDG.Framework.Utilities;
 #if DEBUG
 using DevkitServer.Util.Debugging;
 #endif
@@ -45,8 +46,6 @@ public sealed class DevkitServerModule : IModuleNexus
     internal static readonly Color32 ModuleColor = new Color32(0, 255, 153, 255);
     internal static readonly Color32 UnturnedColor = new Color32(99, 123, 99, 255);
     internal static NetCall ClientAskSave = new NetCall(NetCalls.AskSave);
-    private static StaticGetter<Assets>? GetAssetsInstance;
-    private static InstanceSetter<AssetOrigin, bool>? SetOverrideIDs;
     private static CancellationTokenSource? _tknSrc;
     private static string? _asmPath;
     private static IReadOnlyList<string>? _searchLocations;
@@ -134,8 +133,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static AssetOrigin BundleOrigin { get; }
     static DevkitServerModule()
     {
-        BundleOrigin = AssetUtil.CreateAssetOrigin(ModuleName, 0ul, true); new AssetOrigin { name = ModuleName, workshopFileId = 0ul };
-        SetOverrideIDs?.Invoke(BundleOrigin, true);
+        BundleOrigin = AssetUtil.CreateAssetOrigin(ModuleName, 0ul, true);
 
         MonoLoaded = Type.GetType("Mono.Runtime", false, false) != null;
         if (!MonoLoaded)
@@ -743,11 +741,15 @@ public sealed class DevkitServerModule : IModuleNexus
         {
             LoadFaulted = true;
             Logger.LogWarning("DevkitServer terminated.");
-            Assets? instance = GetAssetsInstance?.Invoke();
+            Assets? instance = AssetUtil.AssetsInstance;
             if (instance != null)
                 instance.StopAllCoroutines();
             Logger.ClearLoadingErrors();
+#if SERVER
             Provider.shutdown(10, "DevkitServer failed to load.");
+#else
+            TimeUtility.InvokeAfterDelay(() => Provider.QuitGame("DevkitServer failed to load."), 10f);
+#endif
         }
     }
 
@@ -761,10 +763,10 @@ public sealed class DevkitServerModule : IModuleNexus
         Provider.modeConfigData.Gameplay.Compass = true;
         Provider.modeConfigData.Gameplay.Timer_Exit = 0;
         Provider.modeConfigData.Gameplay.Timer_Home = 0;
-        Provider.modeConfigData.Gameplay.Timer_Home = 0;
         Provider.hasCheats = true;
 #endif
     }
+
     private static void OnPreSaved()
     {
         Logger.LogInfo("Saving...");

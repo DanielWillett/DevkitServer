@@ -156,10 +156,9 @@ public static class UserManager
             user.Init();
             EventOnUserConnected.TryInvoke(user);
 #if SERVER
-                Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + user.Connection.Format() + ".");
+            Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + user.Connection.Format() + ".");
 #else
             Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + (user.Connection != null ? "Current Session" : "Remote Session") + ".");
-            // UserInput.SetActiveMainCamera(user.gameObject.transform);
 #endif
             return true;
 

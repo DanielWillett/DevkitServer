@@ -6,7 +6,6 @@ using DevkitServer.Configuration;
 using DevkitServer.Players;
 using SDG.Framework.Landscapes;
 using System.Reflection.Emit;
-using System.Runtime.CompilerServices;
 using Cysharp.Threading.Tasks;
 using Version = System.Version;
 #if CLIENT
@@ -154,6 +153,22 @@ internal static class PatchesMain
             Logger.LogWarning($"Failed to patch coroutine: {FormattingUtil.FormatMethod(typeof(IEnumerator), typeof(Level), nameof(Level.init), namedArguments: new (Type, string?)[] { (typeof(int), "id") })}.", method: Source);
             Logger.LogError(ex, method: Source);
         }
+#if CLIENT
+        // EditorInteract.Update
+        try
+        {
+            MethodInfo? method = Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract")?.GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+            if (method != null)
+                Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(EditorInteractUpdatePrefix)));
+            else
+                Logger.LogWarning($"Method not found to patch editor looking while not in Editor controller: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Array.Empty<Type>())}.", method: Source);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Array.Empty<Type>())}.", method: Source);
+            Logger.LogError(ex, method: Source);
+        }
+#endif
     }
     private static void DoManualUnpatches()
     {
@@ -186,6 +201,23 @@ internal static class PatchesMain
             Logger.LogWarning($"Failed to unpatch coroutine: {FormattingUtil.FormatMethod(typeof(IEnumerator), typeof(Level), nameof(Level.init), namedArguments: new (Type, string?)[] { (typeof(int), "id") })}.", method: Source);
             Logger.LogError(ex, method: Source);
         }
+
+#if CLIENT
+        // EditorInteract.Update
+        try
+        {
+            MethodInfo? method = Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract")?.GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+            if (method != null)
+            {
+                Patcher.Unpatch(method, Accessor.GetMethod(EditorInteractUpdatePrefix));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning($"Failed to unpatch method: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Array.Empty<Type>())}.", method: Source);
+            Logger.LogError(ex, method: Source);
+        }
+#endif
     }
     private static bool OnLevelSaving()
     {
@@ -205,7 +237,12 @@ internal static class PatchesMain
     {
         return !Level.isLoaded;
     }
-
+#if CLIENT
+    private static bool EditorInteractUpdatePrefix()
+    {
+        return UserInput.LocalController is CameraController.Editor or CameraController.None;
+    }
+#endif
     private static bool IsEditorMode(PlayerCaller caller)
     {
         if (!DevkitServerModule.IsEditing)

@@ -1077,12 +1077,13 @@ public class ScheduleConverter : JsonConverter<DateTime[]?>
         }
 
         writer.WriteStartArray();
+        int minYear = DateTime.Now.Subtract(TimeSpan.FromHours(14d)).Year;
         for (int i = 0; i < value.Length; ++i)
         {
             try
             {
                 DateTime current = value[i];
-                _sb.Append((current.Year < 2023 ? 2023 : current.Year).ToString("D4", CultureInfo.InvariantCulture)).Append('-');
+                _sb.Append((current.Year < minYear ? minYear : current.Year).ToString("D4", CultureInfo.InvariantCulture)).Append('-');
                 _sb.Append(current.Month.ToString("D2", CultureInfo.InvariantCulture)).Append('-');
                 _sb.Append(current.Day.ToString("D2", CultureInfo.InvariantCulture)).Append(' ');
                 _sb.Append(current.Hour.ToString("D2", CultureInfo.InvariantCulture)).Append(':');
