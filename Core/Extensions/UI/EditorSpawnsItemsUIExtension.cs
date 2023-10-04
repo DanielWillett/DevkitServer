@@ -14,6 +14,7 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSp
         SpawnUtil.OnItemSpawnpointAdded += OnSpawnAdded;
         SpawnUtil.OnItemSpawnpointRemoved += OnSpawnRemoved;
         SpawnUtil.OnItemSpawnpointMoved += OnSpawnMoved;
+        SpawnUtil.OnItemSpawnTableChanged += OnSpawnTableChanged;
         SpawnTableUtil.OnItemSpawnTableNameUpdated += OnNameUpdated;
     }
 
@@ -71,11 +72,16 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSp
     {
         UpdateLabel(point);
     }
+    private void OnSpawnTableChanged(ItemSpawnpoint point, RegionIdentifier region)
+    {
+        UpdateLabel(point, GetText(point));
+    }
     public override void Dispose()
     {
         SpawnUtil.OnItemSpawnpointAdded -= OnSpawnAdded;
         SpawnUtil.OnItemSpawnpointRemoved -= OnSpawnRemoved;
         SpawnUtil.OnItemSpawnpointMoved -= OnSpawnMoved;
+        SpawnUtil.OnItemSpawnTableChanged -= OnSpawnTableChanged;
         SpawnTableUtil.OnItemSpawnTableNameUpdated -= OnNameUpdated;
         base.Dispose();
     }

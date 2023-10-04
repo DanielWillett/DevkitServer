@@ -165,7 +165,7 @@ public sealed class DevkitServerModule : IModuleNexus
 
         UnturnedLoaded = true;
     }
-    public void initialize()
+    void IModuleNexus.initialize()
     {
         Stopwatch watch = Stopwatch.StartNew();
         InitializedLogging = false;
@@ -833,7 +833,7 @@ public sealed class DevkitServerModule : IModuleNexus
 #endif
     }
 
-    public void shutdown()
+    void IModuleNexus.shutdown()
     {
         /* SAVE DATA */
         OnSaved();

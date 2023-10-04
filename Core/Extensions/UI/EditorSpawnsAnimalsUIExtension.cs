@@ -11,6 +11,7 @@ internal class EditorSpawnsAnimalsUIExtension : BaseEditorSpawnsUIExtension<Anim
         SpawnUtil.OnAnimalSpawnpointAdded += OnSpawnAdded;
         SpawnUtil.OnAnimalSpawnpointRemoved += OnSpawnRemoved;
         SpawnUtil.OnAnimalSpawnpointMoved += OnSpawnMoved;
+        SpawnUtil.OnAnimalSpawnTableChanged += OnSpawnTableChanged;
         SpawnTableUtil.OnAnimalSpawnTableNameUpdated += OnNameUpdated;
     }
 
@@ -75,11 +76,16 @@ internal class EditorSpawnsAnimalsUIExtension : BaseEditorSpawnsUIExtension<Anim
     {
         UpdateLabel(point);
     }
+    private void OnSpawnTableChanged(AnimalSpawnpoint point, int index)
+    {
+        UpdateLabel(point, GetText(point));
+    }
     public override void Dispose()
     {
         SpawnUtil.OnAnimalSpawnpointAdded -= OnSpawnAdded;
         SpawnUtil.OnAnimalSpawnpointRemoved -= OnSpawnRemoved;
         SpawnUtil.OnAnimalSpawnpointMoved -= OnSpawnMoved;
+        SpawnUtil.OnAnimalSpawnTableChanged -= OnSpawnTableChanged;
         SpawnTableUtil.OnAnimalSpawnTableNameUpdated -= OnNameUpdated;
         base.Dispose();
     }

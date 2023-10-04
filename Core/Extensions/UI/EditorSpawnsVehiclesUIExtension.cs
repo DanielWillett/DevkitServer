@@ -11,6 +11,7 @@ internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtension<Veh
         SpawnUtil.OnVehicleSpawnpointAdded += OnSpawnAdded;
         SpawnUtil.OnVehicleSpawnpointRemoved += OnSpawnRemoved;
         SpawnUtil.OnVehicleSpawnpointMoved += OnSpawnMoved;
+        SpawnUtil.OnVehicleSpawnTableChanged += OnSpawnTableChanged;
         SpawnTableUtil.OnVehicleSpawnTableNameUpdated += OnNameUpdated;
     }
 
@@ -69,6 +70,10 @@ internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtension<Veh
     {
         RemoveLabel(point);
     }
+    private void OnSpawnTableChanged(VehicleSpawnpoint point, int index)
+    {
+        UpdateLabel(point, GetText(point));
+    }
     private void OnSpawnMoved(VehicleSpawnpoint point, Vector3 fromPosition, Vector3 toPosition, float fromAngle, float toAngle)
     {
         if (fromPosition != toPosition)
@@ -79,6 +84,7 @@ internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtension<Veh
         SpawnUtil.OnVehicleSpawnpointAdded -= OnSpawnAdded;
         SpawnUtil.OnVehicleSpawnpointRemoved -= OnSpawnRemoved;
         SpawnUtil.OnVehicleSpawnpointMoved -= OnSpawnMoved;
+        SpawnUtil.OnVehicleSpawnTableChanged -= OnSpawnTableChanged;
         SpawnTableUtil.OnVehicleSpawnTableNameUpdated -= OnNameUpdated;
         base.Dispose();
     }

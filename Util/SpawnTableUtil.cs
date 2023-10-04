@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace DevkitServer.Util;
+﻿namespace DevkitServer.Util;
 
 
 public delegate void AnimalSpawnTableArgs(AnimalTable table, int index);
@@ -63,5 +57,98 @@ public class SpawnTableUtil
     {
         add => EventOnZombieSpawnTableNameSubmitted.Add(value);
         remove => EventOnZombieSpawnTableNameSubmitted.Remove(value);
+    }
+
+    public static void DeselectAnimalTable()
+    {
+        EditorSpawns.selectedAnimal = byte.MaxValue;
+        EditorSpawnsAnimalsUI.updateSelection();
+    }
+    public static bool SelectAnimalTable(AnimalTable table) => SelectAnimalTable(LevelAnimals.tables.IndexOf(table));
+    public static bool SelectAnimalTable(int index)
+    {
+        if (index == byte.MaxValue)
+        {
+            DeselectAnimalTable();
+            return true;
+        }
+
+        if (index < 0 || index >= LevelAnimals.tables.Count)
+            return false;
+
+        EditorSpawns.selectedAnimal = (byte)index;
+        if (EditorSpawns.animalSpawn != null && EditorSpawns.animalSpawn.TryGetComponent(out Renderer renderer))
+            renderer.material.color = LevelAnimals.tables[index].color;
+        EditorSpawnsAnimalsUI.updateSelection();
+        return true;
+    }
+    public static void DeselectVehicleTable()
+    {
+        EditorSpawns.selectedVehicle = byte.MaxValue;
+        EditorSpawnsVehiclesUI.updateSelection();
+    }
+    public static bool SelectVehicleTable(VehicleTable table) => SelectVehicleTable(LevelVehicles.tables.IndexOf(table));
+    public static bool SelectVehicleTable(int index)
+    {
+        if (index == byte.MaxValue)
+        {
+            DeselectVehicleTable();
+            return true;
+        }
+
+        if (index < 0 || index >= LevelVehicles.tables.Count)
+            return false;
+
+        EditorSpawns.selectedVehicle = (byte)index;
+        if (EditorSpawns.vehicleSpawn != null && EditorSpawns.vehicleSpawn.TryGetComponent(out Renderer renderer))
+            renderer.material.color = LevelVehicles.tables[index].color;
+        EditorSpawnsVehiclesUI.updateSelection();
+        return true;
+    }
+    public static void DeselectItemTable()
+    {
+        EditorSpawns.selectedItem = byte.MaxValue;
+        EditorSpawnsItemsUI.updateSelection();
+    }
+    public static bool SelectItemTable(ItemTable table) => SelectItemTable(LevelItems.tables.IndexOf(table));
+    public static bool SelectItemTable(int index)
+    {
+        if (index == byte.MaxValue)
+        {
+            DeselectItemTable();
+            return true;
+        }
+
+        if (index < 0 || index >= LevelItems.tables.Count)
+            return false;
+
+        EditorSpawns.selectedItem = (byte)index;
+        if (EditorSpawns.itemSpawn != null && EditorSpawns.itemSpawn.TryGetComponent(out Renderer renderer))
+            renderer.material.color = LevelItems.tables[index].color;
+        EditorSpawnsItemsUI.updateSelection();
+        return true;
+    }
+    public static void DeselectZombieTable()
+    {
+        EditorSpawns.selectedZombie = byte.MaxValue;
+        EditorSpawnsZombiesUI.updateSelection();
+    }
+    public static bool SelectZombieTable(ZombieTable table) => SelectZombieTable(LevelZombies.tables.IndexOf(table));
+    public static bool SelectZombieTable(int index)
+    {
+        if (index == byte.MaxValue)
+        {
+            DeselectZombieTable();
+            return true;
+        }
+
+        if (index < 0 || index >= LevelZombies.tables.Count)
+            return false;
+
+        EditorSpawns.selectedZombie = (byte)index;
+        if (EditorSpawns.zombieSpawn != null && EditorSpawns.zombieSpawn.TryGetComponent(out Renderer renderer))
+            renderer.material.color = LevelZombies.tables[index].color;
+        EditorSpawnsZombiesUI.updateSelection();
+        return true;
     }
 }

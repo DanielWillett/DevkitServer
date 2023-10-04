@@ -26,6 +26,8 @@ public delegate void PlayerSpawnpointArgs(PlayerSpawnpoint point, int index);
 public delegate void ItemSpawnpointArgs(ItemSpawnpoint point, RegionIdentifier region);
 public delegate void ZombieSpawnpointArgs(ZombieSpawnpoint point, RegionIdentifier region);
 
+public delegate void PlayerSpawnpointIsAlternateArgs(PlayerSpawnpoint point, int index, bool isAlternate);
+
 /// <summary>
 /// Various utilities for working with the animal, vehicle, player, item, and zombie spawn systems.
 /// </summary>
@@ -54,6 +56,13 @@ public static class SpawnUtil
     internal static readonly CachedMulticastEvent<PlayerSpawnpointArgs> EventOnPlayerSpawnpointRemoved = new CachedMulticastEvent<PlayerSpawnpointArgs>(typeof(SpawnUtil), nameof(OnPlayerSpawnpointRemoved));
     internal static readonly CachedMulticastEvent<ItemSpawnpointArgs> EventOnItemSpawnpointRemoved = new CachedMulticastEvent<ItemSpawnpointArgs>(typeof(SpawnUtil), nameof(OnItemSpawnpointRemoved));
     internal static readonly CachedMulticastEvent<ZombieSpawnpointArgs> EventOnZombieSpawnpointRemoved = new CachedMulticastEvent<ZombieSpawnpointArgs>(typeof(SpawnUtil), nameof(OnZombieSpawnpointRemoved));
+
+    internal static readonly CachedMulticastEvent<AnimalSpawnpointArgs> EventOnAnimalSpawnTableChanged = new CachedMulticastEvent<AnimalSpawnpointArgs>(typeof(SpawnTableUtil), nameof(OnAnimalSpawnTableChanged));
+    internal static readonly CachedMulticastEvent<VehicleSpawnpointArgs> EventOnVehicleSpawnTableChanged = new CachedMulticastEvent<VehicleSpawnpointArgs>(typeof(SpawnTableUtil), nameof(OnVehicleSpawnTableChanged));
+    internal static readonly CachedMulticastEvent<ItemSpawnpointArgs> EventOnItemSpawnTableChanged = new CachedMulticastEvent<ItemSpawnpointArgs>(typeof(SpawnTableUtil), nameof(OnItemSpawnTableChanged));
+    internal static readonly CachedMulticastEvent<ZombieSpawnpointArgs> EventOnZombieSpawnTableChanged = new CachedMulticastEvent<ZombieSpawnpointArgs>(typeof(SpawnTableUtil), nameof(OnZombieSpawnTableChanged));
+    
+    internal static readonly CachedMulticastEvent<PlayerSpawnpointIsAlternateArgs> EventOnPlayerSpawnpointIsAlternateChanged = new CachedMulticastEvent<PlayerSpawnpointIsAlternateArgs>(typeof(SpawnTableUtil), nameof(OnPlayerSpawnpointIsAlternateChanged));
 
     private static readonly InstanceSetter<AnimalSpawnpoint, Vector3>? SetAnimalSpawnpointPoint = Accessor.GenerateInstanceSetter<AnimalSpawnpoint, Vector3>("_point");
     private static readonly InstanceSetter<VehicleSpawnpoint, Vector3>? SetVehicleSpawnpointPoint = Accessor.GenerateInstanceSetter<VehicleSpawnpoint, Vector3>("_point");
@@ -250,6 +259,51 @@ public static class SpawnUtil
     }
 
     /// <summary>
+    /// Called when an <see cref="AnimalSpawnpoint"/>'s <see cref="AnimalTable"/> is changed.
+    /// </summary>
+    public static event AnimalSpawnpointArgs OnAnimalSpawnTableChanged
+    {
+        add => EventOnAnimalSpawnTableChanged.Add(value);
+        remove => EventOnAnimalSpawnTableChanged.Remove(value);
+    }
+
+    /// <summary>
+    /// Called when an <see cref="ItemSpawnpoint"/>'s <see cref="ItemTable"/> is changed.
+    /// </summary>
+    public static event ItemSpawnpointArgs OnItemSpawnTableChanged
+    {
+        add => EventOnItemSpawnTableChanged.Add(value);
+        remove => EventOnItemSpawnTableChanged.Remove(value);
+    }
+
+    /// <summary>
+    /// Called when a <see cref="VehicleSpawnpoint"/>'s <see cref="VehicleTable"/> is changed.
+    /// </summary>
+    public static event VehicleSpawnpointArgs OnVehicleSpawnTableChanged
+    {
+        add => EventOnVehicleSpawnTableChanged.Add(value);
+        remove => EventOnVehicleSpawnTableChanged.Remove(value);
+    }
+
+    /// <summary>
+    /// Called when a <see cref="ZombieSpawnpoint"/>'s <see cref="ZombieTable"/> is changed.
+    /// </summary>
+    public static event ZombieSpawnpointArgs OnZombieSpawnTableChanged
+    {
+        add => EventOnZombieSpawnTableChanged.Add(value);
+        remove => EventOnZombieSpawnTableChanged.Remove(value);
+    }
+
+    /// <summary>
+    /// Called when a <see cref="PlayerSpawnpoint"/>'s alternate setting is changed.
+    /// </summary>
+    public static event PlayerSpawnpointIsAlternateArgs OnPlayerSpawnpointIsAlternateChanged
+    {
+        add => EventOnPlayerSpawnpointIsAlternateChanged.Add(value);
+        remove => EventOnPlayerSpawnpointIsAlternateChanged.Remove(value);
+    }
+
+    /// <summary>
     /// Locally sets the <see cref="PlayerSpawnpoint.isAlt"/> backing field to <paramref name="isAlternate"/>.
     /// </summary>
     /// <exception cref="MemberAccessException">Reflection failure.</exception>
@@ -261,9 +315,22 @@ public static class SpawnUtil
         if (SetPlayerSpawnpointIsAlternate == null)
             throw new MemberAccessException("Instance setter for PlayerSpawnpoint.isAlt is not valid.");
 
+        int index = LevelPlayers.spawns.IndexOf(spawn);
         bool oldIsAlternate = spawn.isAlt;
+
+#if CLIENT
+        if (oldIsAlternate != isAlternate && spawn.node != null && spawn.node.TryGetComponent(out PlayerSpawnpointNode node))
+        {
+            node.Color = isAlternate ? Color.black : Color.white;
+        }
+#endif
+
         SetPlayerSpawnpointIsAlternate.Invoke(spawn, isAlternate);
-        Logger.LogDebug($"Player spawnpoint updated: {(oldIsAlternate ? "Alternate" : "Primary")} -> {(isAlternate ? "Alternate" : "Primary")}");
+        if (index >= 0)
+        {
+            Logger.LogDebug($"Player spawnpoint updated: {(oldIsAlternate ? "Alternate" : "Primary")} -> {(isAlternate ? "Alternate" : "Primary")}");
+            EventOnPlayerSpawnpointIsAlternateChanged.TryInvoke(spawn, index, isAlternate);
+        }
     }
 
     /// <summary>

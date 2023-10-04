@@ -1,4 +1,6 @@
-﻿#if CLIENT
+﻿
+using DevkitServer.API.Iterators;
+#if CLIENT
 using DevkitServer.API;
 using DevkitServer.Models;
 using DevkitServer.Players.UI;
@@ -36,7 +38,29 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
         CanScale = false;
         Type = SpawnType.None;
     }
-    
+
+    protected override void OnMiddleClickPicked(in RaycastHit hit)
+    {
+        if (!hit.transform.TryGetComponent(out BaseSpawnpointNode node))
+            return;
+
+        switch (node)
+        {
+            case AnimalSpawnpointNode animal:
+                SpawnTableUtil.SelectAnimalTable(animal.Spawnpoint.type);
+                break;
+            case VehicleSpawnpointNode vehicle:
+                SpawnTableUtil.SelectVehicleTable(vehicle.Spawnpoint.type);
+                break;
+            case ItemSpawnpointNode item:
+                SpawnTableUtil.SelectItemTable(item.Spawnpoint.type);
+                break;
+            case ZombieSpawnpointNode zombie:
+                SpawnTableUtil.SelectItemTable(zombie.Spawnpoint.type);
+                break;
+        }
+    }
+
     internal static void CheckExistingSpawnsForNodeComponents()
     {
         for (int i = 0; i < LevelAnimals.spawns.Count; i++)
@@ -108,7 +132,6 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
             }
         }
     }
-
     protected override bool TryRaycastSelectableItems(in Ray ray, out RaycastHit hit)
     {
         foreach (BaseSpawnpointNode spawn in EnumerateSpawns())
@@ -122,7 +145,6 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
         hit = default;
         return false;
     }
-
     public override void RequestInstantiation(Vector3 position, Quaternion rotation, Vector3 scale)
     {
         switch (Type)
@@ -186,7 +208,6 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
                 break;
         }
     }
-
     protected IEnumerable<BaseSpawnpointNode> EnumerateSpawns() => Type switch
     {
         SpawnType.Animal => LevelAnimals.spawns.Select(x => x.node?.GetComponent<AnimalSpawnpointNode>()).Where(x => x != null)!,
@@ -210,64 +231,43 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
         float distance = Regions.REGION_SIZE * (AreaSelectRegionDistance + 0.5f);
         distance *= distance;
         Vector3 position = Editor.editor.transform.position;
-        switch (Type)
+        return Type switch
         {
-            case SpawnType.Animal:
-                List<AnimalSpawnpoint> animalSpawns = LevelAnimals.spawns;
-                for (int i = 0; i < animalSpawns.Count; ++i)
-                {
-                    AnimalSpawnpoint spawnPoint = animalSpawns[i];
-                    if (position.SqrDist2D(spawnPoint.point) <= distance && spawnPoint.node != null)
-                        yield return spawnPoint.node.gameObject;
-                }
-                break;
-            case SpawnType.Vehicle:
-                List<VehicleSpawnpoint> vehicleSpawns = LevelVehicles.spawns;
-                for (int i = 0; i < vehicleSpawns.Count; ++i)
-                {
-                    VehicleSpawnpoint spawnPoint = vehicleSpawns[i];
-                    if (position.SqrDist2D(spawnPoint.point) <= distance && spawnPoint.node != null)
-                        yield return spawnPoint.node.gameObject;
-                }
-                break;
-            case SpawnType.Player:
-                List<PlayerSpawnpoint> playerSpawns = LevelPlayers.spawns;
-                for (int i = 0; i < playerSpawns.Count; ++i)
-                {
-                    PlayerSpawnpoint spawnPoint = playerSpawns[i];
-                    if (position.SqrDist2D(spawnPoint.point) <= distance && spawnPoint.node != null)
-                        yield return spawnPoint.node.gameObject;
-                }
-                break;
-        }
+            SpawnType.Animal => new DistanceListIterator<AnimalSpawnpoint>(LevelAnimals.spawns, x => x.point, Editor.editor.transform.position, useXZAxisOnly: true)
+                .Select(x => x.node == null ? null! : x.node.gameObject)
+                .Where(x => x != null)
+                .TakeWhile(x => x.gameObject.transform.position.SqrDist2D(position) <= distance),
+
+            SpawnType.Vehicle => new DistanceListIterator<VehicleSpawnpoint>(LevelVehicles.spawns, x => x.point, Editor.editor.transform.position, useXZAxisOnly: true)
+                .Select(x => x.node == null ? null! : x.node.gameObject)
+                .Where(x => x != null)
+                .TakeWhile(x => x.gameObject.transform.position.SqrDist2D(position) <= distance),
+
+            SpawnType.Player => new DistanceListIterator<PlayerSpawnpoint>(LevelPlayers.spawns, x => x.point, Editor.editor.transform.position, useXZAxisOnly: true)
+                .Select(x => x.node == null ? null! : x.node.gameObject)
+                .Where(x => x != null)
+                .TakeWhile(x => x.gameObject.transform.position.SqrDist2D(position) <= distance),
+
+            _ => Array.Empty<GameObject>()
+        };
     }
     private IEnumerable<GameObject> EnumerateRegions()
     {
-        foreach (RegionCoord regionCoord in RegionUtil.EnumerateRegions(Editor.editor.area.region_x, Editor.editor.area.region_y, AreaSelectRegionDistance))
+        if (Type == SpawnType.Item)
         {
-            if (Type == SpawnType.Zombie)
-            {
-                List<ZombieSpawnpoint> region = LevelZombies.spawns[regionCoord.x, regionCoord.y];
-                for (int i = 0; i < region.Count; ++i)
-                {
-                    ZombieSpawnpoint sp = region[i];
-                    if (sp.node == null) continue;
-                    yield return sp.node.gameObject;
-                }
-            }
-            else if (Type == SpawnType.Item)
-            {
-                List<ItemSpawnpoint> region = LevelItems.spawns[regionCoord.x, regionCoord.y];
-                for (int i = 0; i < region.Count; ++i)
-                {
-                    ItemSpawnpoint sp = region[i];
-                    if (sp.node == null) continue;
-                    yield return sp.node.gameObject;
-                }
-            }
+            return new ListRegionsEnumerator<ItemSpawnpoint>(LevelItems.spawns, Editor.editor.area.region_x, Editor.editor.area.region_y, AreaSelectRegionDistance)
+                .Select(x => x.node == null ? null : x.node.gameObject).Where(x => x != null)!;
         }
+        
+        if (Type == SpawnType.Zombie)
+        {
+            return new ListRegionsEnumerator<ZombieSpawnpoint>(LevelZombies.spawns, Editor.editor.area.region_x, Editor.editor.area.region_y, AreaSelectRegionDistance)
+                .Select(x => x.node == null ? null : x.node.gameObject).Where(x => x != null)!;
+        }
+        
+        return Array.Empty<GameObject>();
     }
-    protected override void InputTick()
+    protected override void EarlyInputTick()
     {
         if (!InputEx.GetKeyDown(KeyCode.F8))
             return;
@@ -281,19 +281,30 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
     }
 }
 
-public abstract class BaseSpawnpointNode : MonoBehaviour, IDevkitInteractableBeginSelectionHandler, IDevkitInteractableEndSelectionHandler, ITerminalFormattable
+public abstract class BaseSpawnpointNode : MonoBehaviour, ISpawnpointNode, IDevkitInteractableBeginSelectionHandler, IDevkitInteractableEndSelectionHandler
 {
     private bool _init;
     public bool IsSelected { get; private set; }
     public bool IsAdded { get; internal set; } = true;
     public Collider Collider { get; protected set; } = null!;
+    public Renderer? Renderer { get; protected set; }
     internal bool IgnoreDestroy { get; set; }
+    public virtual Color Color
+    {
+        set
+        {
+            if (Renderer != null)
+                Renderer.material.color = value;
+        }
+    }
 
     [UsedImplicitly]
     private void Start()
     {
+        Renderer = GetComponent<Renderer>();
+        Init();
         SetupCollider();
-        
+
         if (Collider != null)
         {
             Collider.isTrigger = true;
@@ -317,12 +328,11 @@ public abstract class BaseSpawnpointNode : MonoBehaviour, IDevkitInteractableBeg
         Remove();
         IsAdded = false;
     }
-
-    public void beginSelection(InteractionData data)
+    void IDevkitInteractableBeginSelectionHandler.beginSelection(InteractionData data)
     {
         IsSelected = true;
     }
-    public void endSelection(InteractionData data)
+    void IDevkitInteractableEndSelectionHandler.endSelection(InteractionData data)
     {
         IsSelected = false;
     }
@@ -333,6 +343,7 @@ public abstract class BaseSpawnpointNode : MonoBehaviour, IDevkitInteractableBeg
         collider.size = new Vector3(1f, 1f, 1f);
         collider.center = new Vector3(0f, 0f, 0f);
     }
+    protected virtual void Init() { }
     protected abstract bool Add();
     protected abstract bool Remove();
 
@@ -392,10 +403,21 @@ public class AnimalSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTrans
         return point.node.gameObject;
     }
 }
-public class VehicleSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTransformableHandler, IDevkitSelectionCopyableHandler
+public class VehicleSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDevkitSelectionTransformableHandler, IDevkitSelectionCopyableHandler
 {
     private static readonly Color32 SpawnpointColor = new Color32(148, 184, 184, 255);
     public VehicleSpawnpoint Spawnpoint { get; internal set; } = null!;
+    public Renderer? ArrowRenderer { get; protected set; }
+    public override Color Color
+    {
+        set
+        {
+            if (ArrowRenderer != null)
+                ArrowRenderer.material.color = value;
+            base.Color = value;
+        }
+    }
+
     protected override void SetupCollider()
     {
         BoxCollider collider = transform.GetOrAddComponent<BoxCollider>();
@@ -412,6 +434,13 @@ public class VehicleSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTran
     {
         return SpawnUtil.RemoveVehicleSpawn(Spawnpoint, false);
     }
+
+    protected override void Init()
+    {
+        Transform arrow = transform.Find("Arrow");
+        ArrowRenderer = arrow == null ? null : arrow.GetComponent<Renderer>();
+    }
+
     public override string Format(ITerminalFormatProvider provider)
     {
         if (LevelVehicles.tables.Count > Spawnpoint.type)
@@ -436,10 +465,20 @@ public class VehicleSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTran
         return point.node.gameObject;
     }
 }
-public class PlayerSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTransformableHandler, IDevkitSelectionCopyableHandler
+public class PlayerSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDevkitSelectionTransformableHandler, IDevkitSelectionCopyableHandler
 {
     private static readonly Color32 SpawnpointColor = new Color32(204, 255, 102, 255);
     public PlayerSpawnpoint Spawnpoint { get; internal set; } = null!;
+    public Renderer? ArrowRenderer { get; protected set; }
+    public override Color Color
+    {
+        set
+        {
+            if (ArrowRenderer != null)
+                ArrowRenderer.material.color = value;
+            base.Color = value;
+        }
+    }
     protected override void SetupCollider()
     {
         BoxCollider collider = transform.GetOrAddComponent<BoxCollider>();
@@ -456,6 +495,11 @@ public class PlayerSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTrans
     protected override bool Remove()
     {
         return SpawnUtil.RemovePlayerSpawn(Spawnpoint, false);
+    }
+    protected override void Init()
+    {
+        Transform arrow = transform.Find("Arrow");
+        ArrowRenderer = arrow == null ? null : arrow.GetComponent<Renderer>();
     }
     public override string Format(ITerminalFormatProvider provider)
     {
@@ -560,6 +604,24 @@ public class ZombieSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionTran
         SpawnUtil.AddZombieSpawn(point);
         return point.node.gameObject;
     }
+}
+
+public interface ISpawnpointNode : ITerminalFormattable
+{
+    // ReSharper disable InconsistentNaming
+    GameObject gameObject { get; }
+    Transform transform { get; }
+
+    // ReSharper restore InconsistentNaming
+    bool IsSelected { get; }
+    bool IsAdded { get; }
+    Collider Collider { get; }
+    Renderer? Renderer { get; }
+    Color Color { set; }
+}
+public interface IRotatableNode : ISpawnpointNode
+{
+    Renderer? ArrowRenderer { get; }
 }
 #endif
 

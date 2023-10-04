@@ -4,6 +4,7 @@ using DevkitServer.Players;
 using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
+using SDG.Framework.Devkit;
 
 namespace DevkitServer.Patches;
 
@@ -54,6 +55,104 @@ internal static class SpawnsEditorPatches
             Logger.LogWarning("Failed to patch patches for spawn editors.", method: Source);
             Logger.LogError(ex, method: Source);
             DevkitServerModule.Fault();
+        }
+    }
+
+    [HarmonyPatch(typeof(EditorLevelPlayersUI), "onToggledAltToggle")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void OnPlayerToggledAlt(ISleekToggle toggle, bool state)
+    {
+        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+        {
+            if (selection.transform.TryGetComponent(out PlayerSpawnpointNode node))
+            {
+                node.Spawnpoint.SetIsAlternate(state);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onClickedTableButton")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void OnAnimalSelectionChanged(ISleekElement button)
+    {
+        if (EditorSpawns.selectedAnimal >= LevelAnimals.tables.Count)
+            return;
+        AnimalTable table = LevelAnimals.tables[EditorSpawns.selectedAnimal];
+        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+        {
+            if (selection.transform.TryGetComponent(out AnimalSpawnpointNode node))
+            {
+                node.Spawnpoint.type = EditorSpawns.selectedAnimal;
+                node.Color = table.color;
+
+                Logger.LogDebug($"Spawn table updated for {node.Format()}.");
+                SpawnUtil.EventOnAnimalSpawnTableChanged.TryInvoke(node.Spawnpoint, node.Index);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsVehiclesUI), "onClickedTableButton")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void OnVehicleSelectionChanged(ISleekElement button)
+    {
+        if (EditorSpawns.selectedVehicle >= LevelVehicles.tables.Count)
+            return;
+        VehicleTable table = LevelVehicles.tables[EditorSpawns.selectedVehicle];
+        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+        {
+            if (selection.transform.TryGetComponent(out VehicleSpawnpointNode node))
+            {
+                node.Spawnpoint.type = EditorSpawns.selectedVehicle;
+                node.Color = table.color;
+
+                Logger.LogDebug($"Spawn table updated for {node.Format()}.");
+                SpawnUtil.EventOnVehicleSpawnTableChanged.TryInvoke(node.Spawnpoint, node.Index);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onClickedTableButton")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void OnItemSelectionChanged(ISleekElement button)
+    {
+        if (EditorSpawns.selectedItem >= LevelItems.tables.Count)
+            return;
+        ItemTable table = LevelItems.tables[EditorSpawns.selectedItem];
+        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+        {
+            if (selection.transform.TryGetComponent(out ItemSpawnpointNode node))
+            {
+                node.Spawnpoint.type = EditorSpawns.selectedItem;
+                node.Color = table.color;
+
+                Logger.LogDebug($"Spawn table updated for {node.Format()}.");
+                SpawnUtil.EventOnItemSpawnTableChanged.TryInvoke(node.Spawnpoint, node.Region);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onClickedTableButton")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void OnZombieSelectionChanged(ISleekElement button)
+    {
+        if (EditorSpawns.selectedZombie >= LevelZombies.tables.Count)
+            return;
+        ZombieTable table = LevelZombies.tables[EditorSpawns.selectedZombie];
+        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+        {
+            if (selection.transform.TryGetComponent(out ZombieSpawnpointNode node))
+            {
+                node.Spawnpoint.type = EditorSpawns.selectedZombie;
+                node.Color = table.color;
+
+                Logger.LogDebug($"Spawn table updated for {node.Format()}.");
+                SpawnUtil.EventOnZombieSpawnTableChanged.TryInvoke(node.Spawnpoint, node.Region);
+            }
         }
     }
 

@@ -14,6 +14,7 @@ internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<Zomb
         SpawnUtil.OnZombieSpawnpointAdded += OnSpawnAdded;
         SpawnUtil.OnZombieSpawnpointRemoved += OnSpawnRemoved;
         SpawnUtil.OnZombieSpawnpointMoved += OnSpawnMoved;
+        SpawnUtil.OnZombieSpawnTableChanged += OnSpawnTableChanged;
         SpawnTableUtil.OnZombieSpawnTableNameUpdated += OnNameUpdated;
     }
 
@@ -71,11 +72,16 @@ internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<Zomb
     {
         UpdateLabel(point);
     }
+    private void OnSpawnTableChanged(ZombieSpawnpoint point, RegionIdentifier region)
+    {
+        UpdateLabel(point, GetText(point));
+    }
     public override void Dispose()
     {
         SpawnUtil.OnZombieSpawnpointAdded -= OnSpawnAdded;
         SpawnUtil.OnZombieSpawnpointRemoved -= OnSpawnRemoved;
         SpawnUtil.OnZombieSpawnpointMoved -= OnSpawnMoved;
+        SpawnUtil.OnZombieSpawnTableChanged -= OnSpawnTableChanged;
         SpawnTableUtil.OnZombieSpawnTableNameUpdated -= OnNameUpdated;
         base.Dispose();
     }

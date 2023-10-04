@@ -1,4 +1,5 @@
 ﻿#if CLIENT
+using DevkitServer.Configuration;
 using DevkitServer.Players;
 using SDG.Framework.Devkit;
 using SDG.Framework.Devkit.Interactable;
@@ -26,11 +27,14 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
     private bool _canRotate = true;
     private bool _canTranslate = true;
     private bool _handleModeDirty;
+    private Transform? _hoverHighlight;
     public IReadOnlyList<GameObject> CopyBuffer { get; }
     public TransformHandles Handles { get; } = new TransformHandles();
     public bool IsAreaSelecting { get; private set; }
     public bool IsDraggingHandles { get; private set; }
     public bool CanAreaSelect { get; set; } = true;
+    public bool CanMiddleClickPick { get; set; } = true;
+    public bool HighlightHover { get; set; } = true;
     public bool HasReferenceTransform { get; private set; }
     public Vector3 HandlePosition { get; private set; }
     public Vector3 ReferencePosition { get; private set; }
@@ -86,12 +90,14 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         hit = default;
         return false;
     }
-    public void update()
+    void IDevkitTool.update()
     {
-        if (!EditorInteractEx.IsFlying && Glazier.Get().ShouldGameProcessInput)
-        {
-            InputTick();
+        bool flying = EditorInteractEx.IsFlying;
 
+        EarlyInputTick();
+
+        if (!flying && Glazier.Get().ShouldGameProcessInput)
+        {
             if (_handleModeDirty)
             {
                 if (!CanScale && _handleMode == SelectionTool.ESelectionMode.SCALE)
@@ -174,6 +180,21 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                     BeginAreaSelect = MainCamera.instance.ScreenToViewportPoint(Input.mousePosition);
                     AreaSelectStartTime = CachedTime.RealtimeSinceStartup;
                 }
+                
+                CheckHover(in hit);
+            }
+            else if (!isOverHandles && CanMiddleClickPick && InputEx.GetKeyDown(KeyCode.Mouse2))
+            {
+                TryRaycastSelectableItems(in ray, out RaycastHit hit);
+                if (hit.transform != null)
+                    OnMiddleClickPicked(in hit);
+                
+                CheckHover(in hit);
+            }
+            else if (!DevkitServerConfig.Config.RemoveCosmeticImprovements || _hoverHighlight != null)
+            {
+                TryRaycastSelectableItems(in ray, out RaycastHit hit);
+                CheckHover(in hit);
             }
 
             if (!IsDraggingHandles && !IsAreaSelecting && CanAreaSelect && InputEx.GetKey(KeyCode.Mouse0) && CachedTime.RealtimeSinceStartup - AreaSelectStartTime > 0.1f)
@@ -248,13 +269,26 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                 EndDragHandles(false);
             }
         }
-        else if (IsAreaSelecting)
+        else
         {
-            IsAreaSelecting = false;
+            if (IsAreaSelecting)
+            {
+                IsAreaSelecting = false;
+            }
+
+            if (_hoverHighlight != null)
+            {
+                HighlighterUtil.Unhighlight(_hoverHighlight, 0.1f);
+                _hoverHighlight = null;
+            }
         }
 
+        LateInputTick();
+
         if (DevkitSelectionManager.selection.Count == 0)
+        {
             return;
+        }
 
         if (HandleMode == SelectionTool.ESelectionMode.POSITION)
             Handles.SetPreferredMode(_wantsBoundsEditor ? TransformHandles.EMode.PositionBounds : TransformHandles.EMode.Position);
@@ -395,7 +429,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                 DevkitTransactionManager.undo();
         }
     }
-    public void equip()
+    void IDevkitTool.equip()
     {
         GLRenderer.render += OnGLRenderIntl;
         Handles.OnPreTransform += OnHandlesPreTransformed;
@@ -403,8 +437,13 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         Handles.OnTransformed += OnHandleTransformed;
         DevkitSelectionManager.clear();
     }
-    public void dequip()
+    void IDevkitTool.dequip()
     {
+        if (_hoverHighlight != null)
+        {
+            HighlighterUtil.Unhighlight(_hoverHighlight, 0.1f);
+            _hoverHighlight = null;
+        }
         GLRenderer.render -= OnGLRenderIntl;
         Handles.OnPreTransform -= OnHandlesPreTransformed;
         Handles.OnTranslatedAndRotated -= OnHandlesTranslatedAndRotated;
@@ -412,10 +451,38 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         DevkitSelectionManager.clear();
         HasReferenceTransform = false;
     }
+    private void CheckHover(in RaycastHit hit)
+    {
+        if (!DevkitServerConfig.Config.RemoveCosmeticImprovements && HighlightHover && hit.transform != null)
+        {
+            bool dif = _hoverHighlight != hit.transform;
+            if (_hoverHighlight is not null && dif)
+            {
+                if (_hoverHighlight != null && !LevelObjectUtil.IsSelected(_hoverHighlight))
+                    HighlighterUtil.Unhighlight(_hoverHighlight, 0.1f);
 
+                _hoverHighlight = null;
+            }
+
+            if (dif)
+            {
+                if (!LevelObjectUtil.IsSelected(hit.transform))
+                    HighlighterUtil.Highlight(hit.transform, Color.black, 0.1f);
+
+                _hoverHighlight = hit.transform;
+            }
+        }
+        else if (_hoverHighlight != null)
+        {
+            HighlighterUtil.Unhighlight(_hoverHighlight, 0.1f);
+            _hoverHighlight = null;
+        }
+    }
     public abstract void RequestInstantiation(Vector3 position, Quaternion rotation, Vector3 scale);
     protected abstract IEnumerable<GameObject> EnumerateAreaSelectableObjects();
-    protected abstract void InputTick();
+    protected virtual void EarlyInputTick() { }
+    protected virtual void LateInputTick() { }
+    protected virtual void OnMiddleClickPicked(in RaycastHit hit) { }
     protected virtual void OnGLRender()
     {
         if (IsAreaSelecting)
