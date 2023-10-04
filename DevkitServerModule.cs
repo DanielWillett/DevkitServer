@@ -100,7 +100,8 @@ public sealed class DevkitServerModule : IModuleNexus
         { "ObjectIconEditorToggleHint", "[{0}] to edit" },
         { "ObjectIconEditorOffsetAssetHint", "Goto offset" },
         { "ObjectIconEditorOffsetAssetButton", "Go" },
-        { "VersionKickMessage", "This server is running version {0} of DevkitServer, whereas you are running incompatible version {1}."}
+        { "VersionKickMessage", "This server is running version {0} of DevkitServer, whereas you are running incompatible version {1}."},
+        { "WorkshopSubmitMenuExistingModIdLabel", "Override Mod ID" }
     };
     public static Local CommandLocalization { get; private set; } = null!;
 

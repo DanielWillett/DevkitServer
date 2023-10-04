@@ -18,7 +18,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
-    <Version>0.0.7</Version>
+    <Version>0.0.8</Version>
     <Authors>DanielWillett</Authors>
     <Company>DanielWillett</Company>
     <Description>Module for Unturned that enables multi-user map editing.</Description>
@@ -92,6 +92,11 @@
     <None Remove="TestPlugin\**" />
     <None Remove="Common.targets" />
     <None Remove="Unturned.targets" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Module\Libraries\StackCleaner.pdb" />
+    <None Include="Module\Libraries\UniTask.pdb" />
   </ItemGroup>
 
 </Project>
