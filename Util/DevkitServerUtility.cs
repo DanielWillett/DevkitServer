@@ -588,7 +588,7 @@ public static class DevkitServerUtility
         else if (PlayerSavedata.hasSync)
             basePath = Path.Combine(ReadWrite.PATH, "Sync");
         else
-            basePath = Path.Combine(ReadWrite.PATH, ServerSavedata.directory, Provider.serverID, "Players");
+            basePath = Path.Combine(ReadWrite.PATH, ServerSavedata.directoryName, Provider.serverID, "Players");
 
         // intentionally using cultured toString here since the base game also does
         return Path.Combine(basePath, s64 + "_" + characterId, Level.info.name, path);
