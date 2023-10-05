@@ -90,7 +90,10 @@ public static class LevelObjectNetIdDatabase
     {
         if (obj.transform == null)
         {
-            Logger.LogWarning($"Unable to assign NetId to object {obj.instanceID.Format()} ({(obj.asset?.FriendlyName).Format()} / {obj.GUID.Format()}), transform was null.", method: Source);
+            if (obj.asset == null)
+                Logger.LogWarning($"Unable to assign NetId to object {obj.instanceID.Format()} ({(obj.GUID == Guid.Empty ? obj.id.Format() : obj.GUID.Format())}), asset not found.");
+            else
+                Logger.LogWarning($"Unable to assign NetId to object {obj.instanceID.Format()} ({(obj.asset?.FriendlyName).Format()} / {obj.GUID.Format()}), transform was null.", method: Source);
             return NetId.INVALID;
         }
         NetId netId = NetIdRegistry.Claim();
@@ -117,7 +120,10 @@ public static class LevelObjectNetIdDatabase
     {
         if (buildable == null || buildable.transform == null)
         {
-            Logger.LogWarning($"Unable to assign NetId to buildable {(buildable?.asset?.FriendlyName).Format()} / {(buildable?.asset == null ? null : (object)buildable.asset.GUID).Format()}, transform was null.", method: Source);
+            if (buildable != null && buildable.asset == null)
+                Logger.LogWarning($"Unable to assign NetId to buildable at {buildable.point.Format("F1")}, asset not found.");
+            else
+                Logger.LogWarning($"Unable to assign NetId to buildable {(buildable?.asset?.FriendlyName).Format()} / {(buildable?.asset == null ? null : (object)buildable.asset.GUID).Format()}, transform was null.", method: Source);
             return NetId.INVALID;
         }
         NetId netId = NetIdRegistry.Claim();

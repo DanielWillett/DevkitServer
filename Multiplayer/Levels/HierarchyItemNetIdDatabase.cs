@@ -4,7 +4,7 @@ using DevkitServer.Multiplayer.Networking;
 using SDG.Framework.Devkit;
 
 namespace DevkitServer.Multiplayer.Levels;
-internal static class HierarchyItemNetIdDatabase
+public static class HierarchyItemNetIdDatabase
 {
     private const string Source = "HIERARCHY ITEM NET IDS";
     private static readonly Dictionary<uint, NetId> HierarchyItemAssignments = new Dictionary<uint, NetId>(1024);

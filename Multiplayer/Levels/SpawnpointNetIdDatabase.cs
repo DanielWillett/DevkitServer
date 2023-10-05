@@ -6,7 +6,7 @@ using DevkitServer.Util.Encoding;
 using DevkitServer.Util.Region;
 
 namespace DevkitServer.Multiplayer.Levels;
-internal static class SpawnpointNetIdDatabase
+public static class SpawnpointNetIdDatabase
 {
     private const string Source = "SPAWNPOINT NET IDS";
     private static readonly Dictionary<int, NetId> AnimalSpawnAssignments = new Dictionary<int, NetId>(32);

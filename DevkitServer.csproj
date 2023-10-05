@@ -73,6 +73,7 @@
     <Compile Remove="DevkitServer.Launcher\**" />
     <Compile Remove="DevkitServer.Resources\**" />
     <Compile Remove="DevkitServer.Tests\**" />
+    <Compile Remove="Libraries\**" />
     <Compile Remove="Module\**" />
     <Compile Remove="packages\**" />
     <Compile Remove="TestPlugin\**" />
@@ -80,6 +81,7 @@
     <EmbeddedResource Remove="DevkitServer.Launcher\**" />
     <EmbeddedResource Remove="DevkitServer.Resources\**" />
     <EmbeddedResource Remove="DevkitServer.Tests\**" />
+    <EmbeddedResource Remove="Libraries\**" />
     <EmbeddedResource Remove="Module\**" />
     <EmbeddedResource Remove="packages\**" />
     <EmbeddedResource Remove="TestPlugin\**" />
@@ -87,16 +89,12 @@
     <None Remove="DevkitServer.Launcher\**" />
     <None Remove="DevkitServer.Resources\**" />
     <None Remove="DevkitServer.Tests\**" />
+    <None Remove="Libraries\**" />
     <None Remove="Module\**" />
     <None Remove="packages\**" />
     <None Remove="TestPlugin\**" />
     <None Remove="Common.targets" />
     <None Remove="Unturned.targets" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="Module\Libraries\StackCleaner.pdb" />
-    <None Include="Module\Libraries\UniTask.pdb" />
   </ItemGroup>
 
 </Project>
