@@ -13,7 +13,7 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
     protected readonly float DistanceCurveMin;
     protected readonly float DistanceCurveLength;
     protected readonly Dictionary<T, Label> Labels = new Dictionary<T, Label>(16);
-    protected override SleekWindow Parent => EditorUI.window;
+
     [ExistingUIMember("addButton", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected SleekButtonIcon? AddButton;
 
@@ -25,6 +25,7 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
 
     [ExistingUIMember("rotationSlider", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected ISleekSlider? RotationSlider;
+    protected override SleekWindow Parent => EditorUI.window;
     protected BaseEditorSpawnsUIExtension(Vector3 offset, float distanceCurveMin, float distanceCurveMax)
     {
         Offset = offset;
@@ -42,9 +43,8 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
             RotationSlider.isVisible = false;
     }
 
-    protected override void Opened()
+    protected override void OnShown()
     {
-        base.Opened();
         if (!_subbed)
         {
             MovementUtil.OnMainCameraTransformUpdated += OnUpdated;
@@ -54,7 +54,7 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
         }
     }
 
-    protected override void Closed()
+    protected override void OnHidden()
     {
         if (_subbed)
         {
@@ -65,7 +65,6 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
         }
 
         _update = false;
-        base.Closed();
     }
 
     protected virtual bool ShouldShow(T spawn) => true;
@@ -83,7 +82,7 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
         }
     }
 
-    public override void Dispose()
+    protected override void OnDestroyed()
     {
         if (_subbed)
         {
@@ -92,7 +91,6 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
             CachedTime.OnLateUpdate -= OnLateUpdate;
             _subbed = false;
         }
-        base.Dispose();
     }
 
     protected abstract Vector3 GetPosition(T spawn);

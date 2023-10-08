@@ -260,7 +260,7 @@ public static class UIExtensionManager
             if (ext == null) continue;
             info.InstantiationsIntl.Add(ext);
             LogDebug($"* Initialized: {info.ImplementationType.Format()}.", info.Plugin, info.Assembly);
-            if ((info.TypeInfo.OpenOnInitialize || info.TypeInfo.DefaultOpenState) && instance is UIExtension ext2)
+            if ((info.TypeInfo.OpenOnInitialize || info.TypeInfo.DefaultOpenState) && ext is UIExtension ext2)
             {
                 try
                 {

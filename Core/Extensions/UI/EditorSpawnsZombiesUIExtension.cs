@@ -39,16 +39,16 @@ internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<Zomb
                 CreateLabel(spawn, GetText(spawn));
         }
     }
-    protected override void Opened()
+    protected override void OnShown()
     {
-        base.Opened();
+        base.OnShown();
         OnRegionUpdated(default, MovementUtil.MainCameraRegion, MovementUtil.MainCameraIsInRegion);
     }
 
-    protected override void Closed()
+    protected override void OnHidden()
     {
         ClearLabels();
-        base.Closed();
+        base.OnHidden();
     }
 
     private static string GetText(ZombieSpawnpoint point) => LevelZombies.tables.Count > point.type ? LevelZombies.tables[point.type].name : point.type + " - Null";
@@ -76,14 +76,14 @@ internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<Zomb
     {
         UpdateLabel(point, GetText(point));
     }
-    public override void Dispose()
+    protected override void OnDestroyed()
     {
         SpawnUtil.OnZombieSpawnpointAdded -= OnSpawnAdded;
         SpawnUtil.OnZombieSpawnpointRemoved -= OnSpawnRemoved;
         SpawnUtil.OnZombieSpawnpointMoved -= OnSpawnMoved;
         SpawnUtil.OnZombieSpawnTableChanged -= OnSpawnTableChanged;
         SpawnTableUtil.OnZombieSpawnTableNameUpdated -= OnNameUpdated;
-        base.Dispose();
+        base.OnDestroyed();
     }
 }
 #endif

@@ -118,6 +118,9 @@ public static class LevelObjectUtil
 
     private static readonly Action<CullingVolume>? FindCullingVolumeObjects =
         Accessor.GenerateInstanceCaller<CullingVolume, Action<CullingVolume>>("FindObjectsInsideVolume", allowUnsafeTypeBinding: true);
+
+    private static readonly InstanceGetter<CullingVolume, List<LevelObject>>? GetCullingVolumeObjects =
+        Accessor.GenerateInstanceGetter<CullingVolume, List<LevelObject>>("objects");
 #endif
 
     private static readonly InstanceGetter<LevelObject, AssetReference<MaterialPaletteAsset>>? GetCustomMaterialOverrideIntl =
@@ -1142,7 +1145,8 @@ public static class LevelObjectUtil
         if (ClearCullingVolumeObjects == null || FindCullingVolumeObjects == null)
             return false;
 
-        ClearCullingVolumeObjects(volume);
+        if (GetCullingVolumeObjects?.Invoke(volume) is { Count: > 1 })
+            ClearCullingVolumeObjects(volume);
         FindCullingVolumeObjects(volume);
         return true;
     }

@@ -8,25 +8,43 @@ namespace DevkitServer.Core.Extensions.UI;
 [UIExtension(typeof(EditorUI))]
 internal class EditorUIExtension : ContainerUIExtension
 {
-    private readonly List<Nametag> _nametags = new List<Nametag>(16);
+    private readonly Dictionary<ulong, ISleekLabel> _nametags = new Dictionary<ulong, ISleekLabel>(16);
+    private ISleekLabel? _testLabel;
     private bool _subbed;
     protected override SleekWindow Parent => EditorUI.window;
-    protected override void Opened()
+    protected override void OnShown()
     {
-        if (!_subbed)
+        if (!_subbed && DevkitServerModule.IsEditing)
         {
             UserManager.OnUserConnected += OnUserConnected;
             UserManager.OnUserDisconnected += OnUserDisconnected;
             UserInput.OnUserEditorPositionUpdated += OnUserEditorPositionUpdated;
             _subbed = true;
         }
-        UpdateAllNametags();
-        base.Opened();
-    }
 
-    protected override void Closed()
+        string commit = DevkitServerModule.CommitId;
+        if (commit.Equals("0000000", StringComparison.Ordinal))
+            commit = "master";
+
+        _testLabel = Glazier.Get().CreateLabel();
+        _testLabel.fontAlignment = TextAnchor.LowerLeft;
+        _testLabel.fontSize = ESleekFontSize.Small;
+        _testLabel.sizeScale_X = 0.5f;
+        _testLabel.sizeOffset_X = -5;
+        _testLabel.sizeOffset_Y = 30;
+        _testLabel.positionScale_Y = 1f;
+        _testLabel.positionOffset_X = 5;
+        _testLabel.positionOffset_Y = -20;
+        _testLabel.isVisible = true;
+        _testLabel.shadowStyle = ETextContrastContext.ColorfulBackdrop;
+        _testLabel.text = DevkitServerModule.MainLocalization.format("Name") + " v" + Accessor.DevkitServer.GetName().Version.ToString(3) + ", Src: " + commit + ".";
+        Container.AddChild(_testLabel);
+        if (DevkitServerModule.IsEditing)
+            UpdateAllNametags();
+        Logger.LogDebug("Shown editor extension");
+    }
+    protected override void OnHidden()
     {
-        base.Closed();
         if (_subbed)
         {
             UserManager.OnUserConnected -= OnUserConnected;
@@ -34,18 +52,18 @@ internal class EditorUIExtension : ContainerUIExtension
             UserInput.OnUserEditorPositionUpdated -= OnUserEditorPositionUpdated;
             _subbed = false;
         }
+        if (_testLabel != null)
+        {
+            Container.RemoveChild(_testLabel);
+            _testLabel = null;
+        }
+        Logger.LogDebug("hidden editor extension");
     }
 
-    public override void Dispose()
+    protected override void OnDestroyed()
     {
-        if (_subbed)
-        {
-            UserManager.OnUserConnected -= OnUserConnected;
-            UserManager.OnUserDisconnected -= OnUserDisconnected;
-            UserInput.OnUserEditorPositionUpdated -= OnUserEditorPositionUpdated;
-            _subbed = false;
-        }
-        base.Dispose();
+        OnHidden();
+        Logger.LogDebug("Destroyed editor extension");
     }
 
     private void OnUserEditorPositionUpdated(EditorUser user)
@@ -57,16 +75,11 @@ internal class EditorUIExtension : ContainerUIExtension
             UpdateAllNametags();
             return;
         }
-        for (int i = 0; i < _nametags.Count; ++i)
-        {
-            if (_nametags[i].Player == user.SteamId.m_SteamID)
-            {
-                UpdateNametag(_nametags[i].Label, user);
-                return;
-            }
-        }
 
-        CreateNametag(user);
+        if (!_nametags.TryGetValue(user.SteamId.m_SteamID, out ISleekLabel label))
+            CreateNametag(user);
+        else 
+            UpdateNametag(label, user);
     }
     private void CreateNametag(EditorUser user)
     {
@@ -82,7 +95,7 @@ internal class EditorUIExtension : ContainerUIExtension
         label.text = user.DisplayName;
         UpdateNametag(label, user);
         Container.AddChild(label);
-        _nametags.Add(new Nametag(user.SteamId.m_SteamID, label));
+        _nametags.Add(user.SteamId.m_SteamID, label);
         Logger.LogDebug($"Created nametag: {user.Format()}.");
     }
 
@@ -118,48 +131,26 @@ internal class EditorUIExtension : ContainerUIExtension
     {
         if (Container == null)
             return;
-        for (int i = 0; i < _nametags.Count; ++i)
-        {
-            if (_nametags[i].Player == user.SteamId.m_SteamID)
-            {
-                ISleekLabel lbl = _nametags[i].Label;
-                _nametags.RemoveAt(i);
-                Container.RemoveChild(lbl);
-                break;
-            }
-        }
+
+        if (!_nametags.TryGetValue(user.SteamId.m_SteamID, out ISleekLabel lbl))
+            return;
+
+        Container.RemoveChild(lbl);
+        _nametags.Remove(user.SteamId.m_SteamID);
     }
     internal void UpdateAllNametags()
     {
         if (Container == null)
             return;
-        for (int p = 0; p < UserManager.Users.Count; ++p)
+        foreach (EditorUser u in UserManager.Users)
         {
-            bool found = false;
-            EditorUser u = UserManager.Users[p];
-            if (u.IsOwner) continue;
-            for (int i = 0; i < _nametags.Count; ++i)
-            {
-                if (_nametags[i].Player == u.SteamId.m_SteamID)
-                {
-                    UpdateNametag(_nametags[i].Label, u);
-                    found = true;
-                    break;
-                }
-            }
+            if (u.IsOwner)
+                continue;
 
-            if (!found)
+            if (!_nametags.TryGetValue(u.SteamId.m_SteamID, out ISleekLabel label))
                 CreateNametag(u);
-        }
-    }
-    private readonly struct Nametag
-    {
-        public ulong Player { get; }
-        public ISleekLabel Label { get; }
-        public Nametag(ulong player, ISleekLabel label)
-        {
-            Player = player;
-            Label = label;
+            else
+                UpdateNametag(label, u);
         }
     }
 }

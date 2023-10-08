@@ -42,16 +42,16 @@ internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtension<Veh
                 CreateLabel(spawn, GetText(spawn));
         }
     }
-    protected override void Opened()
+    protected override void OnShown()
     {
-        base.Opened();
+        base.OnShown();
         OnRegionUpdated(default, MovementUtil.MainCameraRegion, MovementUtil.MainCameraIsInRegion);
     }
 
-    protected override void Closed()
+    protected override void OnHidden()
     {
         ClearLabels();
-        base.Closed();
+        base.OnHidden();
     }
 
     private static string GetText(VehicleSpawnpoint point) => LevelVehicles.tables.Count > point.type ? LevelVehicles.tables[point.type].name : point.type + " - Null";
@@ -79,14 +79,14 @@ internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtension<Veh
         if (fromPosition != toPosition)
             UpdateLabel(point);
     }
-    public override void Dispose()
+    protected override void OnDestroyed()
     {
         SpawnUtil.OnVehicleSpawnpointAdded -= OnSpawnAdded;
         SpawnUtil.OnVehicleSpawnpointRemoved -= OnSpawnRemoved;
         SpawnUtil.OnVehicleSpawnpointMoved -= OnSpawnMoved;
         SpawnUtil.OnVehicleSpawnTableChanged -= OnSpawnTableChanged;
         SpawnTableUtil.OnVehicleSpawnTableNameUpdated -= OnNameUpdated;
-        base.Dispose();
+        base.OnDestroyed();
     }
 }
 #endif

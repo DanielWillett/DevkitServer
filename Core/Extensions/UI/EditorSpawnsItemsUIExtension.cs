@@ -39,16 +39,16 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSp
                 CreateLabel(spawn, GetText(spawn));
         }
     }
-    protected override void Opened()
+    protected override void OnShown()
     {
-        base.Opened();
+        base.OnShown();
         OnRegionUpdated(default, MovementUtil.MainCameraRegion, MovementUtil.MainCameraIsInRegion);
     }
 
-    protected override void Closed()
+    protected override void OnHidden()
     {
         ClearLabels();
-        base.Closed();
+        base.OnHidden();
     }
 
     private static string GetText(ItemSpawnpoint point) => LevelItems.tables.Count > point.type ? LevelItems.tables[point.type].name : point.type + " - Null";
@@ -76,14 +76,14 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSp
     {
         UpdateLabel(point, GetText(point));
     }
-    public override void Dispose()
+    protected override void OnDestroyed()
     {
         SpawnUtil.OnItemSpawnpointAdded -= OnSpawnAdded;
         SpawnUtil.OnItemSpawnpointRemoved -= OnSpawnRemoved;
         SpawnUtil.OnItemSpawnpointMoved -= OnSpawnMoved;
         SpawnUtil.OnItemSpawnTableChanged -= OnSpawnTableChanged;
         SpawnTableUtil.OnItemSpawnTableNameUpdated -= OnNameUpdated;
-        base.Dispose();
+        base.OnDestroyed();
     }
 }
 #endif

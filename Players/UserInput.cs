@@ -251,6 +251,7 @@ public class UserInput : MonoBehaviour
         }
 
 #if CLIENT
+        _lastFlush = CachedTime.RealtimeSinceStartup;
         IsOwner = User == EditorUser.User;
         if (IsOwner)
         {
@@ -658,6 +659,9 @@ public class UserInput : MonoBehaviour
 
         if ((_pendingPacket.Flags & Flags.HasTimeSinceLastQueue) != 0)
         {
+            // this queues the first packet at the end of the current packet instead of the beginning
+            // to remove that stutter from starting at the beginning, waiting, then continuing with full packets
+
             if (t >= _pendingPacketTime)
             {
                 ApplyPacket(in _pendingPacket);
@@ -675,7 +679,7 @@ public class UserInput : MonoBehaviour
                     if ((packet.Flags & Flags.HasTimeSinceLastQueue) != 0 && packet.TimeSinceLastQueue > 0f)
                     {
                         _pendingPacket = packet;
-                        _pendingPacketTime = t + packet.TimeSinceLastQueue;
+                        _pendingPacketTime = t + packet.TimeSinceLastQueue + 0.25f;
                     }
                     else
                     {
@@ -908,26 +912,26 @@ public class UserInput : MonoBehaviour
         // ReSharper disable once UnusedParameter.Local
         public void Read(ByteReader reader, ushort version)
         {
-            Flags = reader.ReadEnum<Flags>();
+            Flags = (Flags)reader.ReadUInt8();
             DeltaTime = reader.ReadFloat();
             if ((Flags & Flags.HasTimeSinceLastQueue) != 0)
-                TimeSinceLastQueue = reader.ReadFloat();
+                TimeSinceLastQueue = reader.ReadHalfPrecisionFloat();
             if ((Flags & Flags.StopMsg) == 0)
             {
                 if ((Flags & Flags.Position) != 0)
                 {
-                    Speed = reader.ReadFloat();
+                    Speed = reader.ReadHalfPrecisionFloat();
                     byte inputFlag = reader.ReadUInt8();
                     Input = new Vector3((sbyte)((byte)((inputFlag & 0b00001100) >> 2) - 1),
                         (sbyte)((byte)(inputFlag & 0b00000011) - 1),
                         (sbyte)((byte)((inputFlag & 0b00110000) >> 4) - 1));
-                    Position = reader.ReadVector3();
+                    Position = reader.ReadHalfPrecisionVector3();
                 }
 
                 if ((Flags & Flags.Rotation) != 0)
                 {
-                    Pitch = reader.ReadInt8() / 1.4f;
-                    Yaw = reader.ReadUInt8() * 1.5f;
+                    Pitch = reader.ReadHalfPrecisionFloat();
+                    Yaw = reader.ReadHalfPrecisionFloat();
                 }
             }
             else
@@ -941,26 +945,26 @@ public class UserInput : MonoBehaviour
 #if CLIENT
         public void Write(ByteWriter writer)
         {
-            writer.Write(Flags);
+            writer.Write((byte)Flags);
             writer.Write(DeltaTime);
             if ((Flags & Flags.HasTimeSinceLastQueue) != 0)
-                writer.Write(TimeSinceLastQueue);
+                writer.WriteHalfPrecision(TimeSinceLastQueue);
             if ((Flags & Flags.StopMsg) == 0)
             {
                 if ((Flags & Flags.Position) != 0)
                 {
-                    writer.Write(Speed);
+                    writer.WriteHalfPrecision(Speed);
                     byte inputFlag = (byte)((byte)(Mathf.Clamp(Input.y, -1, 1) + 1) |
                                             (byte)((byte)(Mathf.Clamp(Input.x, -1, 1) + 1) << 2) |
                                             (byte)((byte)(Mathf.Clamp(Input.z, -1, 1) + 1) << 4));
                     writer.Write(inputFlag);
-                    writer.Write(Position);
+                    writer.WriteHalfPrecision(Position);
                 }
                     
                 if ((Flags & Flags.Rotation) != 0)
                 {
-                    writer.Write((sbyte)Mathf.Clamp(Pitch * 1.4f, sbyte.MinValue, sbyte.MaxValue));
-                    writer.Write((byte)Mathf.Clamp(Yaw / 1.5f, byte.MinValue, byte.MaxValue));
+                    writer.WriteHalfPrecision(Pitch);
+                    writer.WriteHalfPrecision(Yaw);
                 }
             }
             else

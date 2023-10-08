@@ -1,4 +1,9 @@
-﻿#if SERVER
+﻿#if DEBUG
+#define PRINT_ACTION_DETAIL
+#define PRINT_ACTION_SIMPLE
+#endif
+
+#if SERVER
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players.UI;
@@ -7,6 +12,8 @@ using DevkitServer.Players.UI;
 using DevkitServer.API.Abstractions;
 #endif
 using System.Reflection;
+using System.Text.Json;
+using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
@@ -113,7 +120,9 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 _isRunningCatchUpCoroutine = true;
                 if (CanProcess)
                 {
+#if PRINT_ACTION_SIMPLE
                     Logger.LogDebug("[EDITOR ACTIONS] Catch-up completed in one frame.");
+#endif
                     IsPlayingCatchUp = false;
                 }
             }
@@ -128,7 +137,9 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                     TemporaryEditorActions = null;
                 }
                 IsPlayingCatchUp = false;
+#if PRINT_ACTION_SIMPLE
                 Logger.LogDebug("[EDITOR ACTIONS] Catch-up not needed.");
+#endif
             }
         }
 #endif
@@ -162,6 +173,15 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 _queuedThisFrame = true;
         }
         _pendingActions.Add(action);
+#if PRINT_ACTION_DETAIL
+        Logger.LogDebug($"Action queued to write: {action.Format()}" +
+                        $", time: {CachedTime.RealtimeSinceStartup:F2}" +
+                        $", fps: {1f / CachedTime.DeltaTime:F0}" +
+                        $", queue: {_pendingActions.Count}.{Environment.NewLine}" +
+                        JsonSerializer.Serialize(action, action.GetType(), DevkitServerConfig.SerializerSettings));
+#elif PRINT_ACTION_SIMPLE
+        Logger.LogDebug($"Action queued to write: {action.Format()}.");
+#endif
     }
 
     internal static void ReceiveActionRelay(
@@ -227,7 +247,9 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         if (_pendingActions.Count < 1)
             return;
 
+#if PRINT_ACTION_SIMPLE
         Logger.LogDebug("[EDITOR ACTIONS] Flushing " + _pendingActions.Count.Format() + " action(s).");
+#endif
         WriteEditBuffer(Writer, 0, _pendingActions.Count);
         int len = Writer.Count;
 #if CLIENT
@@ -261,7 +283,9 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             if (IsPlayingCatchUp)
             {
                 IsPlayingCatchUp = false;
+#if PRINT_ACTION_SIMPLE
                 Logger.LogDebug("[EDITOR ACTIONS] Done playing catch-up.");
+#endif
             }
 #endif
             return;
@@ -280,6 +304,15 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 if (action is IDisposable d)
                     d.Dispose();
             }
+#if PRINT_ACTION_DETAIL
+            Logger.LogDebug($"Action applied: {action.Format()}" +
+                            $", time: {CachedTime.RealtimeSinceStartup:F2}" +
+                            $", fps: {1f / CachedTime.DeltaTime:F0}" +
+                            $", queue: {_pendingActions.Count}.{Environment.NewLine}" +
+                            JsonSerializer.Serialize(action, action.GetType(), DevkitServerConfig.SerializerSettings));
+#elif PRINT_ACTION_SIMPLE
+            Logger.LogDebug($"Action applied: {action.Format()}.");
+#endif
         }
     }
     internal static void ApplyAction(IAction action, IActionListener listener)
@@ -358,7 +391,9 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             if (action is IServersideAction)
                 continue;
 #endif
+#if PRINT_ACTION_SIMPLE
             Logger.LogDebug("[EDITOR ACTIONS] Queued action at index " + (i - index).Format() + ": " + action.Format() + ".");
+#endif
             ActionSettingsCollection? toAdd = null;
 
             EditorActionsCodeGeneration.OnWritingAction!(this, ref toAdd, action);
@@ -368,13 +403,17 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 Settings.SetSettings(toAdd);
                 toAdd.StartIndex = (byte)(i - index);
                 c.Add(toAdd);
+#if PRINT_ACTION_SIMPLE
                 Logger.LogDebug("[EDITOR ACTIONS] Queued data at index " + toAdd.StartIndex.Format() + ": " + toAdd.Format() + ".");
+#endif
             }
         }
 
         byte ct2 = (byte)c.Count;
         writer.Write(ct2);
+#if PRINT_ACTION_SIMPLE
         Logger.LogDebug("[EDITOR ACTIONS] Writing " + ct2 + " collections.");
+#endif
         for (int i = 0; i < ct2; ++i)
         {
             ActionSettingsCollection collection = c[i];
@@ -383,7 +422,9 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 
         ListPool<ActionSettingsCollection>.release(c);
 
+#if PRINT_ACTION_SIMPLE
         Logger.LogDebug("[EDITOR ACTIONS] Writing " + ct + " actions.");
+#endif
         for (int i = index; i < count2; ++i)
         {
             IAction action = _pendingActions[i];
@@ -440,11 +481,15 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 ++collIndex;
                 ActionSettingsCollection collection = c[collIndex];
                 Settings.SetSettings(collection);
+#if PRINT_ACTION_SIMPLE
                 Logger.LogDebug($"[EDITOR ACTIONS] Loading option collection at index {collection.StartIndex}: {collection.Format()}.");
+#endif
             }
             ActionType type = reader.ReadEnum<ActionType>();
             IAction? action = EditorActionsCodeGeneration.CreateAction!(type);
+#if PRINT_ACTION_SIMPLE
             Logger.LogDebug($"[EDITOR ACTIONS] Loading action #{i.Format()} {action.Format()}, collection index: {collIndex.Format()}.");
+#endif
             if (action != null)
             {
                 action.Instigator = User == null ? Provider.server : User.SteamId;
@@ -527,7 +572,9 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             _pendingActions.RemoveRange(stInd, tempBuffer.Length);
             Array.Reverse(tempBuffer);
             _pendingActions.InsertRange(0, tempBuffer);
+#if PRINT_ACTION_SIMPLE
             Logger.LogDebug("[EDITOR ACTIONS] Received actions: " + tempBuffer.Length + ".");
+#endif
         }
 
         ListPool<ActionSettingsCollection>.release(c);
@@ -593,14 +640,18 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     {
         Settings = new ActionSettings(this);
         Instance = this;
+#if PRINT_ACTION_SIMPLE
         Logger.LogDebug("[TEMP EDITOR ACTIONS] Initialized.");
+#endif
     }
     public void QueueInstantiation(IHierarchyItemTypeIdentifier type, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
     {
         if (type == null) throw new ArgumentNullException(nameof(type));
 
         _hierarchyInstantiations.Add(new PendingHierarchyInstantiation(type, position, rotation, scale, owner, netId));
+#if PRINT_ACTION_SIMPLE
         Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued hierarchy item instantiation for {type.Format()} when the level loads.");
+#endif
     }
     public void QueueInstantiation(Asset asset, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
     {
@@ -608,7 +659,9 @@ public class TemporaryEditorActions : IActionListener, IDisposable
             throw new ArgumentException("Must be either ObjectAsset (LevelObject) or ItemAsset (LevelBuildableObject).", nameof(asset));
 
         _lvlObjectInstantiations.Add(new PendingLevelObjectInstantiation(asset.getReferenceTo<Asset>(), position, rotation, scale, owner, netId));
+#if PRINT_ACTION_SIMPLE
         Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued level object instantiation for {asset.Format()} when the level loads.");
+#endif
     }
     internal void HandleReadPackets(CSteamID user, ByteReader reader)
     {
@@ -641,7 +694,9 @@ public class TemporaryEditorActions : IActionListener, IDisposable
             }
         }
         EditorActions.ReadDataVersion = 0;
+#if PRINT_ACTION_SIMPLE
         Logger.LogDebug("[TEMP EDITOR ACTIONS] Received actions: " + (_actions.Count - stInd) + ".");
+#endif
 
         ListPool<ActionSettingsCollection>.release(c);
 
@@ -651,7 +706,9 @@ public class TemporaryEditorActions : IActionListener, IDisposable
                 return;
             collIndex = index;
             Settings.SetSettings(c[collIndex]);
+#if PRINT_ACTION_SIMPLE
             Logger.LogDebug("[TEMP EDITOR ACTIONS] Loading option collection: " + c[collIndex].Format() + ".");
+#endif
         }
     }
     internal IEnumerator Flush()
@@ -705,7 +762,9 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         ((IDisposable)Settings).Dispose();
         _actions.Clear();
         Instance = null;
+#if PRINT_ACTION_SIMPLE
         Logger.LogDebug("[TEMP EDITOR ACTIONS] Cleaned up.");
+#endif
     }
 
     private readonly struct PendingHierarchyInstantiation

@@ -476,17 +476,7 @@ internal static class LevelObjectPatches
                 transformations.Add(transformation);
 
                 if (ClientEvents.ListeningOnMoveLevelObjectFinal)
-                    ClientEvents.InvokeOnMoveLevelObjectFinal(
-                        new MoveLevelObjectFinalProperties(transformation, useScale, dt));
-
-                if (LevelObjectUtil.TryFindObject(selection.transform, out RegionIdentifier id))
-                {
-                    if (LevelObjectUtil.GetObjectUnsafe(id) is { isSpeciallyCulled: true })
-                        LevelObjectUtil.UpdateContainingCullingVolumesForMove(selection.fromPosition,
-                            transformation.Transformation.Position);
-                    else
-                        LevelObjectUtil.UpdateContainingCullingVolumes(transformation.Transformation.Position);
-                }
+                    ClientEvents.InvokeOnMoveLevelObjectFinal(new MoveLevelObjectFinalProperties(transformation, useScale, dt));
 
                 if (transformations.Count % LevelObjectUtil.MaxMovePacketSize == 0)
                     Flush();
@@ -495,6 +485,18 @@ internal static class LevelObjectPatches
             }
 
             Flush();
+
+            for (int i = 0; i < selections.Count; ++i)
+            {
+                EditorSelection selection = selections[i];
+                if (LevelObjectUtil.TryFindObject(selection.transform, out RegionIdentifier id))
+                {
+                    if (LevelObjectUtil.GetObjectUnsafe(id) is { isSpeciallyCulled: true })
+                        LevelObjectUtil.UpdateContainingCullingVolumesForMove(selection.fromPosition, selection.transform.position);
+                    else
+                        LevelObjectUtil.UpdateContainingCullingVolumes(selection.transform.position);
+                }
+            }
 
             void Flush()
             {
@@ -777,11 +779,19 @@ internal static class LevelObjectPatches
             return;
 
         Vector3 scale = transform.localScale;
-        bool useScale = scale.IsNearlyEqual(selection.fromScale);
+        bool useScale = !scale.IsNearlyEqual(selection.fromScale);
 
         FinalTransformation transformation = new FinalTransformation(netId,
             new TransformationDelta(TransformationDelta.TransformFlags.All, transform.position, transform.rotation,
                 selection.fromPosition, selection.fromRotation), scale, selection.fromScale);
+
+        if (LevelObjectUtil.TryFindObject(selection.transform, out RegionIdentifier id))
+        {
+            if (LevelObjectUtil.GetObjectUnsafe(id) is { isSpeciallyCulled: true })
+                LevelObjectUtil.UpdateContainingCullingVolumesForMove(selection.fromPosition, transformation.Transformation.Position);
+            else
+                LevelObjectUtil.UpdateContainingCullingVolumes(transformation.Transformation.Position);
+        }
 
         float dt = CachedTime.DeltaTime;
 

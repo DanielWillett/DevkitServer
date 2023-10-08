@@ -43,16 +43,16 @@ internal class EditorSpawnsAnimalsUIExtension : BaseEditorSpawnsUIExtension<Anim
                 CreateLabel(spawn, GetText(spawn));
         }
     }
-    protected override void Opened()
+    protected override void OnShown()
     {
-        base.Opened();
+        base.OnShown();
         OnRegionUpdated(default, MovementUtil.MainCameraRegion, MovementUtil.MainCameraIsInRegion);
     }
 
-    protected override void Closed()
+    protected override void OnHidden()
     {
         ClearLabels();
-        base.Closed();
+        base.OnHidden();
     }
 
     private static string GetText(AnimalSpawnpoint point) => LevelAnimals.tables.Count > point.type ? LevelAnimals.tables[point.type].name : point.type + " - Null";
@@ -80,14 +80,14 @@ internal class EditorSpawnsAnimalsUIExtension : BaseEditorSpawnsUIExtension<Anim
     {
         UpdateLabel(point, GetText(point));
     }
-    public override void Dispose()
+    protected override void OnDestroyed()
     {
         SpawnUtil.OnAnimalSpawnpointAdded -= OnSpawnAdded;
         SpawnUtil.OnAnimalSpawnpointRemoved -= OnSpawnRemoved;
         SpawnUtil.OnAnimalSpawnpointMoved -= OnSpawnMoved;
         SpawnUtil.OnAnimalSpawnTableChanged -= OnSpawnTableChanged;
         SpawnTableUtil.OnAnimalSpawnTableNameUpdated -= OnNameUpdated;
-        base.Dispose();
+        base.OnDestroyed();
     }
 }
 #endif
