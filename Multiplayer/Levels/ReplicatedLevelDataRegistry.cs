@@ -26,6 +26,7 @@ public static class ReplicatedLevelDataRegistry
             RegisteredTypes.Clear();
         }
     }
+
     internal static void RegisterFromAssembly(Assembly assembly, IList<ReplicatedLevelDataSourceInfo>? info, PluginAssembly? plugin)
     {
         lock (RegisteredTypes)
