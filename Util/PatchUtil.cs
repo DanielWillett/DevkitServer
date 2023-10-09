@@ -872,7 +872,7 @@ public static class PatchUtil
     [Pure]
     public static bool ShouldCallvirt(this MethodBase method)
     {
-        return method is { IsStatic: false, DeclaringType: not { IsValueType: true }, IsFinal: false } && (method.DeclaringType is { IsInterface: true } || method.IsVirtual || method.IsAbstract);
+        return method.IsVirtual || method.IsAbstract || method is { IsStatic: false, DeclaringType: not { IsValueType: true }, IsFinal: false } && (method.DeclaringType is { IsInterface: true });
     }
     [Pure]
     public static OpCode GetCall(this MethodBase method)

@@ -1329,6 +1329,7 @@ internal static class Accessor
             return false;
         }
     }
+
     private static IEnumerable<CodeInstruction> AddFunctionIOTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
         yield return new CodeInstruction(OpCodes.Ldstr, "In method: " + method.Format() + " (basic entry)");
@@ -1350,39 +1351,50 @@ internal static class Accessor
     }
     private static IEnumerable<CodeInstruction> AddFunctionStepthroughTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
-        yield return new CodeInstruction(OpCodes.Ldstr, "Stepping through Method: " + method.Format() + ":");
-        yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
-        yield return new CodeInstruction(OpCodes.Call, LogDebug);
-        foreach (CodeInstruction instr in instructions)
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        AddFunctionStepthrough(ins, method);
+        return ins;
+    }
+    internal static void AddFunctionStepthrough(List<CodeInstruction> ins, MethodBase method)
+    {
+        ins.Add(new CodeInstruction(OpCodes.Ldstr, "Stepping through Method: " + method.Format() + ":"));
+        ins.Add(new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green));
+        ins.Add(new CodeInstruction(OpCodes.Call, LogDebug));
+        for (int i = 0; i < ins.Count; i++)
         {
+            CodeInstruction instr = ins[i];
             CodeInstruction? start = null;
             foreach (ExceptionBlock block in instr.blocks)
             {
                 CodeInstruction blockInst = new CodeInstruction(OpCodes.Ldstr, "  " + block.Format());
                 start ??= blockInst;
-                yield return blockInst;
-                yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
-                yield return new CodeInstruction(OpCodes.Call, LogDebug);
+                ins.Insert(i, blockInst);
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green));
+                ins.Insert(i + 2, new CodeInstruction(OpCodes.Call, LogDebug));
+                i += 3;
             }
+
             foreach (Label label in instr.labels)
             {
                 CodeInstruction lblInst = new CodeInstruction(OpCodes.Ldstr, "  " + label.Format() + ":");
                 start ??= lblInst;
-                yield return lblInst;
-                yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
-                yield return new CodeInstruction(OpCodes.Call, LogDebug);
+                ins.Insert(i, lblInst);
+                ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green));
+                ins.Insert(i + 2, new CodeInstruction(OpCodes.Call, LogDebug));
+                i += 3;
             }
 
             CodeInstruction mainInst = new CodeInstruction(OpCodes.Ldstr, "  " + instr.Format());
             start ??= mainInst;
-            yield return mainInst;
-            yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
-            yield return new CodeInstruction(OpCodes.Call, LogDebug);
+            ins.Insert(i, mainInst);
+            ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green));
+            ins.Insert(i + 2, new CodeInstruction(OpCodes.Call, LogDebug));
+            i += 3;
 
             PatchUtil.TransferStartingInstructionNeeds(instr, start);
-            yield return instr;
         }
     }
+
     internal static void CheckFuncArrays()
     {
         FuncTypes ??= new Type[]
@@ -1547,7 +1559,7 @@ internal static class Accessor
     /// <summary>
     /// Safely gets the reflection method info of the passed method. Works best with static methods.<br/><br/>
     /// <code>
-    /// MethodInfo? method = Accessor.MethodOf(Guid.Parse);
+    /// MethodInfo? method = Accessor.GetMethod(Guid.Parse);
     /// </code>
     /// </summary>
     /// <returns>A method info of a passed delegate</returns>

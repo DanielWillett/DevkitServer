@@ -115,6 +115,9 @@
             <SpecificVersion>true</SpecificVersion>
             <Aliases>NSJ</Aliases>
         </Reference>
+        <Reference Include="AstarPathfindingProject">
+            <HintPath>$(ServerPath)\Unturned_Data\Managed\AstarPathfindingProject.dll</HintPath>
+        </Reference>
     </ItemGroup>
 
 
@@ -197,6 +200,9 @@
             <FusionName>Newtonsoft.Json, Version=7.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed</FusionName>
             <SpecificVersion>true</SpecificVersion>
             <Aliases>NSJ</Aliases>
+        </Reference>
+        <Reference Include="AstarPathfindingProject">
+            <HintPath>$(ClientPath)\Unturned_Data\Managed\AstarPathfindingProject.dll</HintPath>
         </Reference>
     </ItemGroup>
 </Project>

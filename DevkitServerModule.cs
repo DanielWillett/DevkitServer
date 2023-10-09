@@ -127,7 +127,8 @@ public sealed class DevkitServerModule : IModuleNexus
         { "FeatureDisabled", "Disabled" },
         { "UndoNotSupported", "Undo Not Supported" },
         { "RedoNotSupported", "Redo Not Supported" },
-        { "TooManySelections", "Too many items selected.\n{0}/{1}"}
+        { "TooManySelections", "Too many items selected.\n{0}/{1}"},
+        { "AlreadyBakingNavigation", "Already Baking Navigation" }
     };
 
     public static CultureInfo CommandParseLocale { get; set; } = CultureInfo.InvariantCulture;
