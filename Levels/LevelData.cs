@@ -1,10 +1,8 @@
-﻿using System.Diagnostics;
-using DevkitServer.Configuration;
-using DevkitServer.Models;
-using DevkitServer.Multiplayer;
+﻿using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
+using System.Diagnostics;
 
 namespace DevkitServer.Levels;
 [EarlyTypeInit]
@@ -14,44 +12,27 @@ public sealed class LevelData
 
     private static readonly InstanceSetter<LevelInfo, string> SetFilePath = Accessor.GenerateInstancePropertySetter<LevelInfo, string>("path", throwOnError: true)!;
 
-    public uint Version { get; private set; }
-#nullable disable
-    public Folder LevelFolderContent { get; private set; }
-    public NetId[] HierarchyItemNetIds { get; internal set; }
-    public uint[] HierarchyItems { get; internal set; }
-    public NetId[] LevelObjectNetIds { get; internal set; }
-    public uint[] Objects { get; internal set; }
-    public RegionIdentifier[] Buildables { get; internal set; }
-    public byte[] Data { get; internal set; }
-    public bool Compressed { get; internal set; }
-    public List<ulong>[,] BuildableData { get; internal set; }
-
-    public int SpawnIndexPlayer { get; internal set; }
-    public int SpawnIndexVehicle { get; internal set; }
-    public int SpawnIndexItem { get; internal set; }
-    public int SpawnIndexZombie { get; internal set; }
-    public int SpawnCount { get; internal set; }
-    public NetId[] SpawnNetIds { get; internal set; }
-    public int[] SpawnIndexes { get; internal set; }
-#nullable restore
     private string? _lclPath;
+    public uint Version { get; private set; }
+    public byte[] Data { get; internal set; } = null!;
+    internal List<object>? ReplicatedLevelData { get; set; }
+    public Folder LevelFolderContent { get; private set; }
+    public bool Compressed { get; internal set; }
     private LevelData() { }
-
     public LevelData(LevelData other)
     {
         LevelFolderContent = other.LevelFolderContent;
         _lclPath = other._lclPath;
         Data = other.Data;
         Compressed = other.Compressed;
-        Objects = other.Objects;
-        Buildables = other.Buildables;
-        LevelObjectNetIds = other.LevelObjectNetIds;
-        HierarchyItemNetIds = other.HierarchyItemNetIds;
-        HierarchyItems = other.HierarchyItems;
-        BuildableData = other.BuildableData;
         Version = DataVersion;
+        ReplicatedLevelData = other.ReplicatedLevelData;
     }
-    public static LevelData GatherLevelData(bool saveToTemp, bool gatherOtherData)
+    public static LevelData GatherLevelData(bool saveToTemp
+#if SERVER
+        , bool gatherLevelData = true
+#endif
+        )
     {
         ThreadUtil.assertIsGameThread();
 #if DEBUG
@@ -90,13 +71,12 @@ public sealed class LevelData
             LevelFolderContent = folder,
             _lclPath = newPath
         };
-        if (gatherOtherData)
-        {
-            LevelObjectNetIdDatabase.GatherData(data);
-            HierarchyItemNetIdDatabase.GatherData(data);
-            BuildableResponsibilities.GatherData(data);
-            SpawnpointNetIdDatabase.GatherData(data);
-        }
+
+#if SERVER
+        if (gatherLevelData)
+            ReplicatedLevelDataRegistry.SaveToLevelData(data);
+#endif
+
 #if DEBUG
         Logger.LogDebug($"[EDITOR LEVEL] GatherLevelData took {stopwatch.GetElapsedMilliseconds().Format("F2")} ms.");
 #endif
@@ -116,42 +96,8 @@ public sealed class LevelData
             Version = reader.ReadUInt32(),
             Data = payload
         };
-        int netIdCount = reader.ReadInt32();
-        int buildableCount = reader.ReadInt32();
-        int hierarchyItemCount = reader.ReadInt32();
 
-        NetId[] levelObjectNetIds = new NetId[netIdCount];
-        NetId[] hierarchyItemNetIds = new NetId[hierarchyItemCount];
-        RegionIdentifier[] buildables = buildableCount == 0 ? Array.Empty<RegionIdentifier>() : new RegionIdentifier[buildableCount];
-        uint[] objects = new uint[netIdCount - buildableCount];
-        uint[] hierarchyItems = new uint[hierarchyItemCount];
-
-        // LevelObjectNetIdDatabase
-        for (int i = 0; i < netIdCount; ++i)
-            levelObjectNetIds[i] = new NetId(reader.ReadUInt32());
-        for (int i = 0; i < buildableCount; ++i)
-            buildables[i] = RegionIdentifier.Read(reader);
-        for (int i = 0; i < objects.Length; ++i)
-            objects[i] = reader.ReadUInt32();
-
-        data.LevelObjectNetIds = levelObjectNetIds;
-        data.Buildables = buildables;
-        data.Objects = objects;
-
-        // HierarchyItemNetIdDatabase
-        for (int i = 0; i < hierarchyItemCount; ++i)
-            hierarchyItemNetIds[i] = new NetId(reader.ReadUInt32());
-        for (int i = 0; i < hierarchyItemCount; ++i)
-            hierarchyItems[i] = reader.ReadUInt32();
-
-        data.HierarchyItemNetIds = hierarchyItemNetIds;
-        data.HierarchyItems = hierarchyItems;
-
-        data.BuildableData = new List<ulong>[Regions.WORLD_SIZE, Regions.WORLD_SIZE];
-        BuildableResponsibilities.ReadToTable(reader, data.BuildableData);
-
-        // SpawnpointNetIdDatabase
-        SpawnpointNetIdDatabase.ReadToDatabase(reader, data);
+        ReplicatedLevelDataRegistry.Read(data, reader);
 
         data.LevelFolderContent = Folder.Read(_levelReader);
 
@@ -164,32 +110,8 @@ public sealed class LevelData
         ByteWriter writer = _levelWriter ??= new ByteWriter(false, 134217728); // 128 MiB
         writer.Write(DataVersion);
         Version = DataVersion;
-        NetId[] levelObjectNetIds = LevelObjectNetIds;
-        NetId[] hierarchyItemNetIds = HierarchyItemNetIds;
-        RegionIdentifier[] buildables = Buildables;
-        uint[] objects = Objects;
-        uint[] hierarchyItems = HierarchyItems;
-        writer.Write(levelObjectNetIds.Length);
-        writer.Write(buildables.Length);
-        writer.Write(hierarchyItems.Length);
 
-        // LevelObjectNetIdDatabase
-        for (int i = 0; i < levelObjectNetIds.Length; ++i)
-            writer.Write(levelObjectNetIds[i].id);
-        for (int i = 0; i < buildables.Length; ++i)
-            RegionIdentifier.Write(writer, buildables[i]);
-        for (int i = 0; i < objects.Length; ++i)
-            writer.Write(objects[i]);
-
-        // HierarchyItemNetIdDatabase
-        for (int i = 0; i < hierarchyItems.Length; ++i)
-            writer.Write(hierarchyItemNetIds[i].id);
-        for (int i = 0; i < hierarchyItems.Length; ++i)
-            writer.Write(hierarchyItems[i]);
-
-        BuildableResponsibilities.WriteTable(writer, BuildableData);
-
-        SpawnpointNetIdDatabase.WriteToDatabase(writer, this);
+        ReplicatedLevelDataRegistry.Write(this, writer);
 
         Folder folder = LevelFolderContent;
         if (_lclPath != null)

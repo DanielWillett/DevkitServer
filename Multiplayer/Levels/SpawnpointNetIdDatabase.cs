@@ -6,8 +6,10 @@ using DevkitServer.Util.Encoding;
 using DevkitServer.Util.Region;
 
 namespace DevkitServer.Multiplayer.Levels;
-public static class SpawnpointNetIdDatabase
+public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<SpawnpointNetIdReplicatedLevelData>
 {
+    public ushort CurrentDataVersion => 0;
+
     private const string Source = "SPAWNPOINT NET IDS";
     private static readonly Dictionary<int, NetId> AnimalSpawnAssignments = new Dictionary<int, NetId>(32);
     private static readonly Dictionary<int, NetId> PlayerSpawnAssignments = new Dictionary<int, NetId>(16);
@@ -32,6 +34,7 @@ public static class SpawnpointNetIdDatabase
 #if SERVER
     private static bool _initialLoaded;
 #endif
+    private SpawnpointNetIdDatabase() { }
     internal static void Init()
     {
 #if SERVER
@@ -538,44 +541,6 @@ public static class SpawnpointNetIdDatabase
 
         return true;
     }
-#if CLIENT
-    public static void LoadFromLevelData()
-    {
-        LevelData data = EditorLevel.ServerPendingLevelData ?? throw new InvalidOperationException("Level data not loaded.");
-        NetId[] netIds = data.SpawnNetIds;
-        int[] indexes = data.SpawnIndexes;
-        
-        int index = 0;
-        for (; index < data.SpawnIndexPlayer; ++index)
-        {
-            ClaimBasicNetId(indexes[index], SpawnType.Animal, netIds[index]);
-        }
-        for (; index < data.SpawnIndexVehicle; ++index)
-        {
-            ClaimBasicNetId(indexes[index], SpawnType.Player, netIds[index]);
-        }
-        for (; index < data.SpawnIndexItem; ++index)
-        {
-            ClaimBasicNetId(indexes[index], SpawnType.Vehicle, netIds[index]);
-        }
-        for (; index < data.SpawnIndexZombie; ++index)
-        {
-            RegionIdentifier id = RegionIdentifier.CreateUnsafe(indexes[index]);
-            if (!id.IsInvalid)
-                ClaimBasicNetId(id, SpawnType.Item, netIds[index]);
-            else
-                Logger.LogWarning($"Received item spawn with invalid region identifier: {id.Format()}.");
-        }
-        for (; index < data.SpawnCount; ++index)
-        {
-            RegionIdentifier id = RegionIdentifier.CreateUnsafe(indexes[index]);
-            if (!id.IsInvalid)
-                ClaimBasicNetId(id, SpawnType.Zombie, netIds[index]);
-            else
-                Logger.LogWarning($"Received zombie spawn with invalid region identifier: {id.Format()}.");
-        }
-    }
-#endif
 #if SERVER
     internal static void AssignExisting()
     {
@@ -751,14 +716,62 @@ public static class SpawnpointNetIdDatabase
             Logger.LogDebug($"[{Source}] Released NetId: {netId.Format()} @ {typeChecked.Format()} ({id.Format()}).");
         }
     }
-    public static void GatherData(LevelData data)
+#if CLIENT
+    public void LoadData(SpawnpointNetIdReplicatedLevelData data)
     {
+        NetId[] netIds = data.NetIds;
+        int[] indexes = data.Indexes;
+
+        int index = 0;
+
+        int maxIndex = data.IndexPlayer;
+        for (; index < maxIndex; ++index)
+        {
+            ClaimBasicNetId(indexes[index], SpawnType.Animal, netIds[index]);
+        }
+
+        maxIndex = data.IndexVehicle;
+        for (; index < maxIndex; ++index)
+        {
+            ClaimBasicNetId(indexes[index], SpawnType.Player, netIds[index]);
+        }
+
+        maxIndex = data.IndexItem;
+        for (; index < maxIndex; ++index)
+        {
+            ClaimBasicNetId(indexes[index], SpawnType.Vehicle, netIds[index]);
+        }
+
+        maxIndex = data.IndexZombie;
+        for (; index < maxIndex; ++index)
+        {
+            RegionIdentifier id = RegionIdentifier.CreateUnsafe(indexes[index]);
+            if (!id.IsInvalid)
+                ClaimBasicNetId(id, SpawnType.Item, netIds[index]);
+            else
+                Logger.LogWarning($"Received item spawn with invalid region identifier: {id.Format()}.");
+        }
+
+        maxIndex = data.Count;
+        for (; index < maxIndex; ++index)
+        {
+            RegionIdentifier id = RegionIdentifier.CreateUnsafe(indexes[index]);
+            if (!id.IsInvalid)
+                ClaimBasicNetId(id, SpawnType.Zombie, netIds[index]);
+            else
+                Logger.LogWarning($"Received zombie spawn with invalid region identifier: {id.Format()}.");
+        }
+    }
+#elif SERVER       
+    public SpawnpointNetIdReplicatedLevelData SaveData()
+    {
+        SpawnpointNetIdReplicatedLevelData data = new SpawnpointNetIdReplicatedLevelData();
         NetId[] netIds = new NetId[AnimalSpawnAssignments.Count + PlayerSpawnAssignments.Count + VehicleSpawnAssignments.Count + ItemSpawnAssignments.Count + ZombieSpawnAssignments.Count];
         int[] indexes = new int[netIds.Length];
 
-        data.SpawnNetIds = netIds;
-        data.SpawnIndexes = indexes;
-        data.SpawnCount = netIds.Length;
+        data.NetIds = netIds;
+        data.Indexes = indexes;
+        data.Count = netIds.Length;
 
         int index = 0;
 
@@ -769,7 +782,7 @@ public static class SpawnpointNetIdDatabase
             ++index;
         }
 
-        data.SpawnIndexPlayer = AnimalSpawnAssignments.Count;
+        data.IndexPlayer = AnimalSpawnAssignments.Count;
         foreach (KeyValuePair<int, NetId> lvlObject in PlayerSpawnAssignments)
         {
             netIds[index] = lvlObject.Value;
@@ -777,7 +790,7 @@ public static class SpawnpointNetIdDatabase
             ++index;
         }
 
-        data.SpawnIndexVehicle = data.SpawnIndexPlayer + PlayerSpawnAssignments.Count;
+        data.IndexVehicle = data.IndexPlayer + PlayerSpawnAssignments.Count;
         foreach (KeyValuePair<int, NetId> lvlObject in VehicleSpawnAssignments)
         {
             netIds[index] = lvlObject.Value;
@@ -785,7 +798,7 @@ public static class SpawnpointNetIdDatabase
             ++index;
         }
 
-        data.SpawnIndexItem = data.SpawnIndexVehicle + VehicleSpawnAssignments.Count;
+        data.IndexItem = data.IndexVehicle + VehicleSpawnAssignments.Count;
         foreach (KeyValuePair<RegionIdentifier, NetId> lvlObject in ItemSpawnAssignments)
         {
             netIds[index] = lvlObject.Value;
@@ -793,43 +806,69 @@ public static class SpawnpointNetIdDatabase
             ++index;
         }
 
-        data.SpawnIndexZombie = data.SpawnIndexItem + ItemSpawnAssignments.Count;
+        data.IndexZombie = data.IndexItem + ItemSpawnAssignments.Count;
         foreach (KeyValuePair<RegionIdentifier, NetId> lvlObject in ZombieSpawnAssignments)
         {
             netIds[index] = lvlObject.Value;
             indexes[index] = lvlObject.Key.Raw;
             ++index;
         }
+
+        return data;
     }
-    internal static void ReadToDatabase(ByteReader reader, LevelData data)
+#endif
+    public SpawnpointNetIdReplicatedLevelData ReadData(ByteReader reader, ushort version)
     {
-        data.SpawnIndexPlayer = reader.ReadInt32();
-        data.SpawnIndexVehicle = reader.ReadInt32();
-        data.SpawnIndexItem = reader.ReadInt32();
-        data.SpawnIndexZombie = reader.ReadInt32();
-        data.SpawnCount = reader.ReadInt32();
-
-        data.SpawnNetIds = new NetId[data.SpawnCount];
-        data.SpawnIndexes = new int[data.SpawnCount];
-
-        for (int i = 0; i < data.SpawnCount; ++i)
+        SpawnpointNetIdReplicatedLevelData data = new SpawnpointNetIdReplicatedLevelData
         {
-            data.SpawnIndexes[i] = reader.ReadInt32();
-            data.SpawnNetIds[i] = reader.ReadNetId();
-        }
+            IndexPlayer = reader.ReadInt32(),
+            IndexVehicle = reader.ReadInt32(),
+            IndexItem = reader.ReadInt32(),
+            IndexZombie = reader.ReadInt32(),
+            Count = reader.ReadInt32()
+        };
+
+        int dataCount = data.Count;
+        NetId[] netIds = new NetId[dataCount];
+        int[] indexes = new int[dataCount];
+
+        for (int i = 0; i < dataCount; ++i)
+            data.Indexes[i] = reader.ReadInt32();
+        for (int i = 0; i < dataCount; ++i)
+            data.NetIds[i] = reader.ReadNetId();
+
+        data.NetIds = netIds;
+        data.Indexes = indexes;
+
+        return data;
     }
-    internal static void WriteToDatabase(ByteWriter writer, LevelData data)
+    public void WriteData(ByteWriter writer, SpawnpointNetIdReplicatedLevelData data)
     {
-        writer.Write(data.SpawnIndexPlayer);
-        writer.Write(data.SpawnIndexVehicle);
-        writer.Write(data.SpawnIndexItem);
-        writer.Write(data.SpawnIndexZombie);
-        writer.Write(data.SpawnCount);
+        int dataCount = data.Count;
 
-        for (int i = 0; i < data.SpawnCount; ++i)
-        {
-            writer.Write(data.SpawnIndexes[i]);
-            writer.Write(data.SpawnNetIds[i]);
-        }
+        writer.Write(data.IndexPlayer);
+        writer.Write(data.IndexVehicle);
+        writer.Write(data.IndexItem);
+        writer.Write(data.IndexZombie);
+        writer.Write(dataCount);
+
+        for (int i = 0; i < dataCount; ++i)
+            writer.Write(data.Indexes[i]);
+        for (int i = 0; i < dataCount; ++i)
+            writer.Write(data.NetIds[i]);
     }
 }
+
+#nullable disable
+public class SpawnpointNetIdReplicatedLevelData
+{
+    public int[] Indexes { get; set; }
+    public NetId[] NetIds { get; set; }
+    public int IndexPlayer { get; set; }
+    public int IndexVehicle { get; set; }
+    public int IndexItem { get; set; }
+    public int IndexZombie { get; set; }
+    public int Count { get; set; }
+}
+
+#nullable restore

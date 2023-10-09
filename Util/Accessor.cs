@@ -816,7 +816,7 @@ internal static class Accessor
         MethodInfo invokeMethod = delegateType.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.Public)!;
         ParameterInfo[] delegateParameters = invokeMethod.GetParameters();
         Type delegateReturnType = invokeMethod.ReturnType;
-        bool needsDynamicMethod = method.ShouldCallvirt() || method.ReturnType != typeof(void) && delegateReturnType == typeof(void);
+        bool needsDynamicMethod = method.ShouldCallvirtRuntime() || method.ReturnType != typeof(void) && delegateReturnType == typeof(void);
         bool isInstanceForValueType = method is { DeclaringType.IsValueType: true };
         if (p.Length != delegateParameters.Length - 1)
         {
@@ -924,7 +924,7 @@ internal static class Accessor
         for (int i = 0; i < p.Length; ++i)
             generator.LoadParameter(i + 1, false, type: parameterTypes[i + 1], p[i].ParameterType);
 
-        generator.Emit(method.GetCall(), method);
+        generator.Emit(method.GetCallRuntime(), method);
         if (method.ReturnType != typeof(void) && delegateReturnType == typeof(void))
             generator.Emit(OpCodes.Pop);
         else if (method.ReturnType != typeof(void))
@@ -1754,7 +1754,7 @@ internal static class Accessor
             MethodInfo explictlyImplementedMethod = mapping.InterfaceMethods[i];
             if (explictlyImplementedMethod.Equals(interfaceMethod))
             {
-                return explictlyImplementedMethod;
+                return mapping.TargetMethods[i];
             }
         }
 

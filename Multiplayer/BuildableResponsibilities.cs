@@ -1,26 +1,31 @@
-﻿using System.Globalization;
-using DevkitServer.Configuration;
-using DevkitServer.Levels;
+﻿using DevkitServer.Configuration;
 using DevkitServer.Models;
+using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.Multiplayer;
-// todo send as level data
-public static class BuildableResponsibilities
+
+public sealed class BuildableResponsibilities : IReplicatedLevelDataSource<BuildableResponsibilitiesReplicatedLevelData>
 {
+    public ushort CurrentDataVersion => 0;
+#if SERVER
     private const string Source = "BUILDABLE RESPONSIBILITIES";
-    private const ushort DataVersion = 0;
+    private const ushort FileDataVersion = 0;
+
+    private static readonly ByteWriter Writer = new ByteWriter(false);
+    private static readonly ByteReader Reader = new ByteReader { LogOnError = false, ThrowOnError = true };
+#endif
+
 #nullable disable
     public static string SavePath { get; private set; }
 #nullable restore
+
 #if SERVER
     public static List<ulong>[,] Table = new List<ulong>[Regions.WORLD_SIZE, Regions.WORLD_SIZE];
 #elif CLIENT
     public static List<bool>[,] Table = new List<bool>[Regions.WORLD_SIZE, Regions.WORLD_SIZE];
 #endif
-    private static readonly ByteWriter Writer = new ByteWriter(false);
-    private static readonly ByteReader Reader = new ByteReader { LogOnError = false, ThrowOnError = true };
 
     public static readonly NetCallCustom SendResponsibilities = new NetCallCustom(NetCalls.SendBuildableResponsibilities);
     internal static void Init()
@@ -30,6 +35,7 @@ public static class BuildableResponsibilities
         Reload();
 #endif
     }
+    private BuildableResponsibilities() { }
     static BuildableResponsibilities()
     {
         for (int x = 0; x < Regions.WORLD_SIZE; ++x)
@@ -183,33 +189,6 @@ public static class BuildableResponsibilities
 
         return data.Length;
     }
-    public static void GatherData(LevelData data)
-    {
-        int worldSize = Regions.WORLD_SIZE;
-        data.BuildableData = new List<ulong>[worldSize, worldSize];
-        for (int x = 0; x < worldSize; ++x)
-        {
-            for (int y = 0; y < worldSize; ++y)
-            {
-#if SERVER
-                data.BuildableData[x, y] = new List<ulong>(Table[x, y] ?? (IEnumerable<ulong>)Array.Empty<ulong>());
-#elif CLIENT
-                List<bool> region = Table[x, y];
-                if (region == null)
-                    data.BuildableData[x, y] = new List<ulong>(0);
-                else
-                {
-                    List<ulong> sendRegion = new List<ulong>(region.Count);
-
-                    for (int i = 0; i < region.Count; ++i)
-                        sendRegion.Add(region[i] ? Provider.client.m_SteamID : 0ul);
-
-                    data.BuildableData[x, y] = sendRegion;
-                }
-#endif
-            }
-        }
-    }
 #if SERVER
     /// <summary>Reload from config file.</summary>
     public static void Reload()
@@ -284,7 +263,7 @@ public static class BuildableResponsibilities
         {
             using FileStream stream = new FileStream(SavePath, FileMode.Create, FileAccess.Write, FileShare.Read);
             Writer.Stream = stream;
-            Writer.Write(DataVersion);
+            Writer.Write(FileDataVersion);
 
             WriteTable(Writer, Table);
 
@@ -296,4 +275,74 @@ public static class BuildableResponsibilities
         }
     }
 #endif
+#if CLIENT
+    public void LoadData(BuildableResponsibilitiesReplicatedLevelData data)
+    {
+        int worldSize = Regions.WORLD_SIZE;
+        List<ulong>[,] table = data.Table;
+        ulong client = Provider.client.m_SteamID;
+        for (int x = 0; x < worldSize; ++x)
+        {
+            for (int y = 0; y < worldSize; ++y)
+            {
+                List<ulong> serverData = table[x, y];
+                ref List<bool> localData = ref Table[x, y];
+                if (localData == null)
+                    localData = new List<bool>(serverData.Count);
+                else
+                    localData.IncreaseCapacity(serverData.Count);
+                List<bool> localData2 = localData;
+                for (int i = 0; i < serverData.Count; ++i)
+                {
+                    if (localData2.Count > i)
+                        localData2[i] = serverData[i] == client;
+                    else
+                        localData2.Add(serverData[i] == client);
+                }
+            }
+        }
+    }
+#elif SERVER
+    public BuildableResponsibilitiesReplicatedLevelData SaveData()
+    {
+        int worldSize = Regions.WORLD_SIZE;
+        List<ulong>[,] data = new List<ulong>[worldSize, worldSize];
+        for (int x = 0; x < worldSize; ++x)
+        {
+            for (int y = 0; y < worldSize; ++y)
+            {
+                data[x, y] = new List<ulong>(Table[x, y] ?? (IEnumerable<ulong>)Array.Empty<ulong>());
+            }
+        }
+
+        return new BuildableResponsibilitiesReplicatedLevelData
+        {
+            Table = data
+        };
+    }
+#endif
+
+    public void WriteData(ByteWriter writer, BuildableResponsibilitiesReplicatedLevelData data)
+    {
+        WriteTable(writer, data.Table);
+    }
+    public BuildableResponsibilitiesReplicatedLevelData ReadData(ByteReader reader, ushort dataVersion)
+    {
+        int worldSize = Regions.WORLD_SIZE;
+        List<ulong>[,] table = new List<ulong>[worldSize, worldSize];
+
+        ReadToTable(reader, table);
+
+        return new BuildableResponsibilitiesReplicatedLevelData
+        {
+            Table = table
+        };
+    }
 }
+
+#nullable disable
+public class BuildableResponsibilitiesReplicatedLevelData
+{
+    public List<ulong>[,] Table { get; set; }
+}
+#nullable restore

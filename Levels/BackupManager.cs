@@ -236,7 +236,11 @@ public sealed class BackupManager : MonoBehaviour
         _lastSave = CachedTime.RealtimeSinceStartup;
         Logger.LogInfo($"[{Source}] Backing up {Level.info.name.Format(false)}...");
         DateTimeOffset timestamp = DateTimeOffset.UtcNow;
-        LevelData save = LevelData.GatherLevelData(true, false);
+        LevelData save = LevelData.GatherLevelData(true
+#if SERVER
+            , gatherLevelData: false
+#endif
+            );
         BackupLogs oldLogs = Interlocked.Exchange(ref _logs, new BackupLogs());
         _working = true;
         if (Provider.clients.Count == 0)

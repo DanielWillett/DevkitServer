@@ -339,6 +339,7 @@ public sealed class DevkitServerModule : IModuleNexus
             LevelObjectNetIdDatabase.Init();
             HierarchyItemNetIdDatabase.Init();
             SpawnpointNetIdDatabase.Init();
+            ReplicatedLevelDataRegistry.RegisterFromAssembly(Accessor.DevkitServer, null, null);
 
             PluginLoader.LoadPlugins();
             CreateDirectoryAttribute.DisposeLoadList();
@@ -827,9 +828,7 @@ public sealed class DevkitServerModule : IModuleNexus
 #if CLIENT
         if (IsEditing)
         {
-            LevelObjectNetIdDatabase.LoadFromLevelData();
-            HierarchyItemNetIdDatabase.LoadFromLevelData();
-            SpawnpointNetIdDatabase.LoadFromLevelData();
+            ReplicatedLevelDataRegistry.LoadFromLevelData();
         }
 #endif
     }
@@ -881,6 +880,7 @@ public sealed class DevkitServerModule : IModuleNexus
         LevelObjectNetIdDatabase.Shutdown();
         HierarchyItemNetIdDatabase.Shutdown();
         SpawnpointNetIdDatabase.Shutdown();
+        ReplicatedLevelDataRegistry.Shutdown();
 
         Instance = null!;
         GameObjectHost = null!;

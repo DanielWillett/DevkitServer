@@ -1,16 +1,19 @@
-﻿using DevkitServer.Levels;
-using DevkitServer.Models;
+﻿using DevkitServer.Models;
 using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.Multiplayer.Levels;
 [EarlyTypeInit]
-public static class LevelObjectNetIdDatabase
+public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelObjectNetIdReplicatedLevelData>
 {
+    public ushort CurrentDataVersion => 0;
+
     private const string Source = "OBJECT NET IDS";
     private static readonly Dictionary<RegionIdentifier, NetId> BuildableAssignments = new Dictionary<RegionIdentifier, NetId>(128);
     private static readonly Dictionary<uint, NetId> LevelObjectAssignments = new Dictionary<uint, NetId>(1024);
     [UsedImplicitly]
     internal static NetCall<uint, NetId> SendBindObject = new NetCall<uint, NetId>(NetCalls.SendBindObject);
+    private LevelObjectNetIdDatabase() { }
     internal static void Init()
     {
         LevelObjectUtil.OnBuildableRegionUpdated += OnBuildableRegionUpdated;
@@ -187,49 +190,6 @@ public static class LevelObjectNetIdDatabase
     }
     internal static void RegisterObject(LevelObject obj, NetId netId) => ClaimNetId(LevelObjectAssignments, obj.instanceID, obj.transform, netId);
     internal static void RegisterBuildable(LevelBuildableObject obj, RegionIdentifier id, NetId netId) => ClaimNetId(BuildableAssignments, id, obj.transform, netId);
-#if CLIENT
-    public static void LoadFromLevelData()
-    {
-        LevelData data = EditorLevel.ServerPendingLevelData ?? throw new InvalidOperationException("Level data not loaded.");
-        NetId[] netIds = data.LevelObjectNetIds;
-        RegionIdentifier[] buildables = data.Buildables;
-        uint[] objects = data.Objects;
-        for (int i = 0; i < buildables.Length; ++i)
-        {
-            RegionIdentifier id = buildables[i];
-            LevelBuildableObject? buildable = LevelObjectUtil.GetBuildable(id);
-            if (buildable == null)
-            {
-                Logger.LogWarning($"Unable to find buildable in level data info: {id.Format()}.");
-                continue;
-            }
-
-            RegisterBuildable(buildable, id, netIds[i]);
-        }
-
-        int offset = buildables.Length;
-        Vector3 last = Vector3.zero;
-        bool any = false;
-        for (int i = 0; i < objects.Length; ++i)
-        {
-            uint instanceId = objects[i];
-            if (!(any
-                    ? LevelObjectUtil.TryFindObject(last, instanceId, out RegionIdentifier id)
-                    : LevelObjectUtil.TryFindObject(instanceId, out id)))
-            {
-                Logger.LogWarning($"Unable to find object in level data info: {instanceId.Format()}.");
-                continue;
-            }
-
-            LevelObject obj = ObjectManager.getObject(id.X, id.Y, id.Index);
-            Transform? t = obj.GetTransform();
-            if (t != null)
-                last = t.position;
-            any = true;
-            RegisterObject(obj, netIds[i + offset]);
-        }
-    }
-#endif
 #if SERVER
     internal static void AssignExisting()
     {
@@ -309,10 +269,51 @@ public static class LevelObjectNetIdDatabase
         if (Level.isLoaded)
             Logger.LogDebug($"[{Source}] Claimed new NetId: {netId.Format()} @ {transform.name.Format()}.");
     }
-    public static void GatherData(LevelData data)
-    {
-        ThreadUtil.assertIsGameThread();
 
+#if CLIENT
+    public void LoadData(LevelObjectNetIdReplicatedLevelData data)
+    {
+        NetId[] netIds = data.NetIds;
+        uint[] objects = data.Objects;
+        RegionIdentifier[] buildables = data.Buildables;
+        for (int i = 0; i < buildables.Length; ++i)
+        {
+            RegionIdentifier id = buildables[i];
+            LevelBuildableObject? buildable = LevelObjectUtil.GetBuildable(id);
+            if (buildable == null)
+            {
+                Logger.LogWarning($"Unable to find buildable in level data info: {id.Format()}.");
+                continue;
+            }
+
+            RegisterBuildable(buildable, id, netIds[i]);
+        }
+
+        int offset = buildables.Length;
+        Vector3 last = Vector3.zero;
+        bool any = false;
+        for (int i = 0; i < objects.Length; ++i)
+        {
+            uint instanceId = objects[i];
+            if (!(any
+                    ? LevelObjectUtil.TryFindObject(last, instanceId, out RegionIdentifier id)
+                    : LevelObjectUtil.TryFindObject(instanceId, out id)))
+            {
+                Logger.LogWarning($"Unable to find object in level data info: {instanceId.Format()}.");
+                continue;
+            }
+
+            LevelObject obj = ObjectManager.getObject(id.X, id.Y, id.Index);
+            Transform? t = obj.GetTransform();
+            if (t != null)
+                last = t.position;
+            any = true;
+            RegisterObject(obj, netIds[i + offset]);
+        }
+    }
+#elif SERVER
+    public LevelObjectNetIdReplicatedLevelData SaveData()
+    {
         NetId[] netIds = new NetId[BuildableAssignments.Count + LevelObjectAssignments.Count];
         RegionIdentifier[] buildables = BuildableAssignments.Count == 0 ? Array.Empty<RegionIdentifier>() : new RegionIdentifier[BuildableAssignments.Count];
         uint[] objects = new uint[LevelObjectAssignments.Count];
@@ -333,8 +334,60 @@ public static class LevelObjectNetIdDatabase
             ++index;
         }
 
-        data.Objects = objects;
-        data.Buildables = buildables;
-        data.LevelObjectNetIds = netIds;
+        return new LevelObjectNetIdReplicatedLevelData
+        {
+            NetIds = netIds,
+            Objects = objects,
+            Buildables = buildables
+        };
+    }
+#endif
+
+    public void WriteData(ByteWriter writer, LevelObjectNetIdReplicatedLevelData data)
+    {
+        NetId[] netIds = data.NetIds;
+        uint[] objects = data.Objects;
+        RegionIdentifier[] buildables = data.Buildables;
+        writer.Write(netIds.Length);
+        writer.Write(buildables.Length);
+
+        for (int i = 0; i < netIds.Length; ++i)
+            writer.Write(netIds[i].id);
+        for (int i = 0; i < buildables.Length; ++i)
+            RegionIdentifier.Write(writer, buildables[i]);
+        for (int i = 0; i < objects.Length; ++i)
+            writer.Write(objects[i]);
+    }
+    public LevelObjectNetIdReplicatedLevelData ReadData(ByteReader reader, ushort dataVersion)
+    {
+        int netIdCount = reader.ReadInt32();
+        int buildableCount = reader.ReadInt32();
+
+        NetId[] netIds = new NetId[netIdCount];
+        RegionIdentifier[] buildables = buildableCount == 0 ? Array.Empty<RegionIdentifier>() : new RegionIdentifier[buildableCount];
+        uint[] objects = new uint[netIdCount - buildableCount];
+
+        for (int i = 0; i < netIdCount; ++i)
+            netIds[i] = new NetId(reader.ReadUInt32());
+        for (int i = 0; i < buildableCount; ++i)
+            buildables[i] = RegionIdentifier.Read(reader);
+        for (int i = 0; i < objects.Length; ++i)
+            objects[i] = reader.ReadUInt32();
+
+        return new LevelObjectNetIdReplicatedLevelData
+        {
+            NetIds = netIds,
+            Buildables = buildables,
+            Objects = objects
+        };
     }
 }
+
+#nullable disable
+public class LevelObjectNetIdReplicatedLevelData
+{
+    public NetId[] NetIds { get; set; }
+    public uint[] Objects { get; set; }
+    public RegionIdentifier[] Buildables { get; set; }
+}
+#nullable restore

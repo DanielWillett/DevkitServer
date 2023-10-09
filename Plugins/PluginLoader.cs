@@ -9,6 +9,7 @@ using DevkitServer.Players.UI;
 using HarmonyLib;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using DevkitServer.Multiplayer.Levels;
 
 namespace DevkitServer.Plugins;
 public static class PluginLoader
@@ -650,6 +651,7 @@ public class PluginAssembly
     private readonly List<NetInvokerInfo> _netCalls = new List<NetInvokerInfo>();
     private readonly List<NetMethodInfo> _netMethods = new List<NetMethodInfo>();
     private readonly List<HierarchyItemTypeIdentifierFactoryInfo> _hierarchyItemFactories = new List<HierarchyItemTypeIdentifierFactoryInfo>();
+    private readonly List<ReplicatedLevelDataSourceInfo> _replicatedLevelDataSources = new List<ReplicatedLevelDataSourceInfo>();
     public IReadOnlyList<IDevkitServerPlugin> Plugins { get; }
     public Assembly Assembly { get; }
     public string? File { get; }
@@ -660,6 +662,7 @@ public class PluginAssembly
     public IReadOnlyList<NetInvokerInfo> NetCalls { get; }
     public IReadOnlyList<NetMethodInfo> NetMethods { get; }
     public IReadOnlyList<HierarchyItemTypeIdentifierFactoryInfo> HierarchyItemFactories { get; }
+    public IReadOnlyList<ReplicatedLevelDataSourceInfo> ReplicatedLevelDataSources { get; }
     public PluginAssembly(Assembly assembly, string file)
     {
         Assembly = assembly;
@@ -667,6 +670,7 @@ public class PluginAssembly
         NetCalls = _netCalls.AsReadOnly();
         NetMethods = _netMethods.AsReadOnly();
         HierarchyItemFactories = _hierarchyItemFactories.AsReadOnly();
+        ReplicatedLevelDataSources = _replicatedLevelDataSources.AsReadOnly();
         Patcher = new Harmony(PatchesMain.HarmonyId + ".assembly." + assembly.GetName().Name.ToLowerInvariant());
         File = string.IsNullOrEmpty(file) ? null : file;
     }
@@ -701,6 +705,8 @@ public class PluginAssembly
             );
 
             HierarchyItemTypeIdentifierEx.RegisterFromAssembly(Assembly, _hierarchyItemFactories);
+            ReplicatedLevelDataRegistry.RegisterFromAssembly(Assembly, _replicatedLevelDataSources, this);
+
             foreach (Type type in Accessor.GetTypesSafe(Assembly)
                          .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x,
                              (EarlyTypeInitAttribute?)Attribute.GetCustomAttribute(x, typeof(EarlyTypeInitAttribute))))
@@ -791,5 +797,40 @@ public class PluginAssembly
                 Logger.LogError(ex, method: src);
             }
         }
+    }
+    public void LogDebug(string message, ConsoleColor color = ConsoleColor.DarkGray)
+    {
+        if (Plugins.Count == 1)
+            Plugins[0].LogDebug(message, color);
+        else
+            Logger.LogDebug("[" + Assembly.GetName().Name.ToUpperInvariant() + " (DLL)] " + message, color);
+    }
+    public void LogInfo(string message, ConsoleColor color = ConsoleColor.DarkCyan)
+    {
+        if (Plugins.Count == 1)
+            Plugins[0].LogInfo(message, color);
+        else
+            Logger.LogInfo("[" + Assembly.GetName().Name.ToUpperInvariant() + " (DLL)] " + message, color);
+    }
+    public void LogWarning(string message, ConsoleColor color = ConsoleColor.Yellow, [CallerMemberName] string method = "")
+    {
+        if (Plugins.Count == 1)
+            Plugins[0].LogWarning(message, color);
+        else
+            Logger.LogWarning("[" + Assembly.GetName().Name.ToUpperInvariant() + " (DLL)] " + message, color, method);
+    }
+    public void LogError(string message, ConsoleColor color = ConsoleColor.Red, [CallerMemberName] string method = "")
+    {
+        if (Plugins.Count == 1)
+            Plugins[0].LogError(message, color);
+        else
+            Logger.LogError("[" + Assembly.GetName().Name.ToUpperInvariant() + " (DLL)] " + message, color, method);
+    }
+    public void LogError(Exception ex, [CallerMemberName] string method = "")
+    {
+        if (Plugins.Count == 1)
+            Plugins[0].LogError(ex);
+        else
+            Logger.LogError(ex, method: method);
     }
 }

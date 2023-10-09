@@ -1,11 +1,13 @@
-﻿using System.Collections.Concurrent;
-using DevkitServer.Levels;
+﻿using DevkitServer.Levels;
 using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Util.Encoding;
 using SDG.Framework.Devkit;
 
 namespace DevkitServer.Multiplayer.Levels;
-public static class HierarchyItemNetIdDatabase
+public sealed class HierarchyItemNetIdDatabase : IReplicatedLevelDataSource<HierarchyItemNetIdReplicatedLevelData>
 {
+    public ushort CurrentDataVersion => 0;
+
     private const string Source = "HIERARCHY ITEM NET IDS";
     private static readonly Dictionary<uint, NetId> HierarchyItemAssignments = new Dictionary<uint, NetId>(1024);
     [UsedImplicitly]
@@ -13,12 +15,13 @@ public static class HierarchyItemNetIdDatabase
 #if SERVER
     private static bool _initialLoaded;
 #endif
+    private HierarchyItemNetIdDatabase() { }
     internal static void Init()
     {
 #if SERVER
         LevelHierarchy.itemRemoved += LevelHierarchyOnItemRemoved;
 #endif
-}
+    }
     internal static void Shutdown()
     {
 #if SERVER
@@ -109,25 +112,6 @@ public static class HierarchyItemNetIdDatabase
         else
             ClaimBasicNetId(item, netId);
     }
-#if CLIENT
-    public static void LoadFromLevelData()
-    {
-        LevelData data = EditorLevel.ServerPendingLevelData ?? throw new InvalidOperationException("Level data not loaded.");
-        NetId[] netIds = data.HierarchyItemNetIds;
-        uint[] items = data.HierarchyItems;
-        for (int i = 0; i < items.Length; ++i)
-        {
-            uint instanceId = items[i];
-            if (!HierarchyUtil.TryFindItem(instanceId, out IDevkitHierarchyItem item))
-            {
-                Logger.LogWarning($"Unable to find hierarchy item in level data info: {instanceId.Format()}.");
-                continue;
-            }
-
-            RegisterHierarchyItem(item, netIds[i]);
-        }
-    }
-#endif
 #if SERVER
     internal static void AssignExisting()
     {
@@ -213,20 +197,83 @@ public static class HierarchyItemNetIdDatabase
         if (Level.isLoaded)
             Logger.LogDebug($"[{Source}] Claimed new NetId: {netId.Format()} @ {transform.name.Format()}.");
     }
-    public static void GatherData(LevelData data)
+
+
+#if CLIENT
+    public void LoadData(HierarchyItemNetIdReplicatedLevelData data)
+    {
+        NetId[] netIds = data.NetIds;
+        uint[] items = data.InstanceIds;
+        for (int i = 0; i < items.Length; ++i)
+        {
+            uint instanceId = items[i];
+            if (!HierarchyUtil.TryFindItem(instanceId, out IDevkitHierarchyItem item))
+            {
+                Logger.LogWarning($"Unable to find hierarchy item in level data info: {instanceId.Format()}.");
+                continue;
+            }
+
+            RegisterHierarchyItem(item, netIds[i]);
+        }
+    }
+#elif SERVER
+    public HierarchyItemNetIdReplicatedLevelData SaveData()
     {
         NetId[] netIds = new NetId[HierarchyItemAssignments.Count];
-        uint[] objects = new uint[HierarchyItemAssignments.Count];
+        uint[] items = new uint[HierarchyItemAssignments.Count];
         int index = 0;
 
         foreach (KeyValuePair<uint, NetId> lvlObject in HierarchyItemAssignments)
         {
             netIds[index] = lvlObject.Value;
-            objects[index] = lvlObject.Key;
+            items[index] = lvlObject.Key;
             ++index;
         }
 
-        data.HierarchyItems = objects;
-        data.HierarchyItemNetIds = netIds;
+        return new HierarchyItemNetIdReplicatedLevelData
+        {
+            InstanceIds = items,
+            NetIds = netIds
+        };
+    }
+#endif
+
+    public void WriteData(ByteWriter writer, HierarchyItemNetIdReplicatedLevelData data)
+    {
+        NetId[] netIds = data.NetIds;
+        uint[] instanceIds = data.InstanceIds;
+
+        int ct = Math.Min(instanceIds.Length, netIds.Length);
+        writer.Write(ct);
+
+        for (int i = 0; i < ct; ++i)
+            writer.Write(netIds[i].id);
+        for (int i = 0; i < ct; ++i)
+            writer.Write(instanceIds[i]);
+    }
+    public HierarchyItemNetIdReplicatedLevelData ReadData(ByteReader reader, ushort dataVersion)
+    {
+        int ct = reader.ReadInt32();
+        NetId[] netIds = new NetId[ct];
+        uint[] items = new uint[ct];
+
+        for (int i = 0; i < ct; ++i)
+            netIds[i] = reader.ReadNetId();
+        for (int i = 0; i < ct; ++i)
+            items[i] = reader.ReadUInt32();
+
+        return new HierarchyItemNetIdReplicatedLevelData
+        {
+            InstanceIds = items,
+            NetIds = netIds
+        };
     }
 }
+
+#nullable disable
+public class HierarchyItemNetIdReplicatedLevelData
+{
+    public NetId[] NetIds { get; set; }
+    public uint[] InstanceIds { get; set; }
+}
+#nullable restore

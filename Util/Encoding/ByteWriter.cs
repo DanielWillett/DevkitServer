@@ -249,7 +249,7 @@ public class ByteWriter
             litEndStrt[i] = stack[size - i - 1];
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe void EndianCheck(byte* litEndStrt, int size)
+    internal static unsafe void EndianCheck(byte* litEndStrt, int size)
     {
         if (size > 1 && IsBigEndian) Reverse(litEndStrt, size);
     }
@@ -1101,6 +1101,29 @@ public class ByteWriter
         System.Buffer.BlockCopy(n, 0, _buffer, _size, n.Length);
         _size = newsize;
     }
+    /// <summary>
+    /// Does not write length.
+    /// </summary>
+    public void WriteBlock(byte[] n, int index, int count = -1)
+    {
+        if (count == -1)
+            count = n.Length - index;
+        if (index < 0)
+            index = 0;
+        if (index + count > _buffer.Length)
+            throw new ArgumentOutOfRangeException(nameof(index));
+        if (_streamMode)
+        {
+            _stream!.Write(n, index, count);
+            _size += n.Length;
+            return;
+        }
+        int newsize = _size + count;
+        if (newsize > _buffer.Length)
+            ExtendBufferIntl(newsize);
+        System.Buffer.BlockCopy(n, index, _buffer, _size, count);
+        _size = newsize;
+    }
     public unsafe void WriteLong(byte[] n)
     {
         int len = n.Length;
@@ -1139,7 +1162,7 @@ public class ByteWriter
         }
         else if (_buffer.Length != 0)
         {
-            _buffer = BaseCapacity < 1 ? Array.Empty<byte>() : new byte[BaseCapacity];
+            Array.Clear(_buffer, 0, _buffer.Length);
             _size = 0;
         }
     }

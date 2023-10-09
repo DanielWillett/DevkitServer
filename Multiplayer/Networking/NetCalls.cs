@@ -39,5 +39,6 @@ internal enum NetCalls : ushort
     SendHierarchySyncData = 37,
     TranslatableEditorUIMessage = 38,
     AskSave = 39,
-    SendBindSpawnpoint = 40
+    SendBindSpawnpoint = 40,
+    SendBakeNavRequest = 41
 }

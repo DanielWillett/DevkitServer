@@ -872,12 +872,22 @@ public static class PatchUtil
     [Pure]
     public static bool ShouldCallvirt(this MethodBase method)
     {
-        return method.IsVirtual || method.IsAbstract || method is { IsStatic: false, DeclaringType: not { IsValueType: true }, IsFinal: false } && (method.DeclaringType is { IsInterface: true });
+        return method is { IsFinal: false, IsVirtual: true } || method.IsAbstract || method is { IsStatic: false, DeclaringType: not { IsValueType: true }, IsFinal: false } || method.DeclaringType is { IsInterface: true };
+    }
+    [Pure]
+    public static bool ShouldCallvirtRuntime(this MethodBase method)
+    {
+        return method is { IsFinal: false, IsVirtual: true } || method.IsAbstract || method.DeclaringType is { IsInterface: true };
     }
     [Pure]
     public static OpCode GetCall(this MethodBase method)
     {
         return method.ShouldCallvirt() ? OpCodes.Callvirt : OpCodes.Call;
+    }
+    [Pure]
+    public static OpCode GetCallRuntime(this MethodBase method)
+    {
+        return method.ShouldCallvirtRuntime() ? OpCodes.Callvirt : OpCodes.Call;
     }
     public static void CheckCopiedMethodPatchOutOfDate(ref MethodInfo original, MethodBase invoker)
     {
