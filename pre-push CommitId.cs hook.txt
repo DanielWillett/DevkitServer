@@ -1,0 +1,12 @@
+#!/bin/sh
+COMMIT_ID=$(git rev-parse HEAD)
+
+(
+	echo namespace DevkitServer\;
+	echo 
+	echo // This file is automatically overwritten during commit.
+	echo internal static class CommitId
+	echo \{
+	echo 	public static readonly string Commit = \"$COMMIT_ID\"\;
+	echo \}
+) > CommitId.cs
