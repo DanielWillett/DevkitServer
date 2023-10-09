@@ -1,5 +1,4 @@
-﻿using DevkitServer.Levels;
-using DevkitServer.Multiplayer.Networking;
+﻿using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 using SDG.Framework.Devkit;
 
@@ -11,7 +10,7 @@ public sealed class HierarchyItemNetIdDatabase : IReplicatedLevelDataSource<Hier
     private const string Source = "HIERARCHY ITEM NET IDS";
     private static readonly Dictionary<uint, NetId> HierarchyItemAssignments = new Dictionary<uint, NetId>(1024);
     [UsedImplicitly]
-    internal static NetCall<uint, NetId> SendBindHierarchyItem = new NetCall<uint, NetId>(NetCalls.SendBindHierarchyItem);
+    internal static NetCall<uint, NetId> SendBindHierarchyItem = new NetCall<uint, NetId>(DevkitServerNetCall.SendBindHierarchyItem);
 #if SERVER
     private static bool _initialLoaded;
 #endif
@@ -38,7 +37,7 @@ public sealed class HierarchyItemNetIdDatabase : IReplicatedLevelDataSource<Hier
     }
 #endif
 #if CLIENT
-    [NetCall(NetCallSource.FromServer, NetCalls.SendBindHierarchyItem)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendBindHierarchyItem)]
     private static void ReceiveBindHierarchyItem(MessageContext ctx, uint instanceId, NetId netId)
     {
         if (HierarchyUtil.TryFindItem(instanceId, out IDevkitHierarchyItem item))
@@ -129,7 +128,7 @@ public sealed class HierarchyItemNetIdDatabase : IReplicatedLevelDataSource<Hier
         for (; hierarchyItemIndex < items.Count; ++hierarchyItemIndex)
             AddHierarchyItem(items[hierarchyItemIndex]);
         
-        Logger.LogInfo($"[{Source}] Assigned NetIds for {hierarchyItemIndex.Format()} hierarchy items{hierarchyItemIndex.S()}.");
+        Logger.LogInfo($"[{Source}] Assigned NetIds for {hierarchyItemIndex.Format()} hierarchy item{hierarchyItemIndex.S()}.");
     }
 #endif
     private static void ClaimBasicNetId(IDevkitHierarchyItem item, NetId netId)

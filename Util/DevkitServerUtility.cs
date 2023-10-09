@@ -1056,6 +1056,43 @@ public static class DevkitServerUtility
 
         return rtn;
     }
+
+    /// <summary>
+    /// Creates a copy of an array and adds <paramref name="value"/> to it.
+    /// </summary>
+    public static void AddToArray<T>(ref T[]? array, T value, int index = -1)
+    {
+        if (array == null || array.Length == 0)
+        {
+            array = new T[] { value };
+            return;
+        }
+        if (index < 0)
+            index = array.Length;
+        T[] old = array;
+        array = new T[old.Length + 1];
+        if (index != 0)
+            Array.Copy(old, array, index);
+        if (index != old.Length)
+            Array.Copy(old, index, array, index + 1, old.Length - index);
+        array[index] = value;
+    }
+
+    /// <summary>
+    /// Creates a copy of an array after removing <paramref name="value"/> from it.
+    /// </summary>
+    public static void RemoveFromArray<T>(ref T[] array, int index)
+    {
+        if (index < 0 || index >= array.Length)
+            throw new ArgumentOutOfRangeException(nameof(index), "Index out of bounds of the array.");
+
+        T[] old = array;
+        array = new T[old.Length - 1];
+        if (index != 0)
+            Array.Copy(old, 0, array, 0, index);
+        if (index != array.Length)
+            Array.Copy(old, index + 1, array, index, array.Length - index);
+    }
     /// <summary>
     /// Returns the first value only if the count is one.
     /// </summary>

@@ -5,11 +5,18 @@ using System.Runtime.InteropServices;
 
 namespace DevkitServer.Multiplayer.Networking;
 
+/// <summary>
+/// Represents the header for <see cref="DevkitServerMessage.InvokeMethod"/> messges.
+/// </summary>
 [StructLayout(LayoutKind.Explicit, Size = MaximumSize)]
 public readonly struct MessageOverhead
 {
+    [ThreadStatic]
+    private static byte[]? t_GuidBuffer;
+
     public const int MinimumSize = 7;
-    public const int MaximumSize = 27;
+    public const int MinimumGuidSize = 21;
+    public const int MaximumSize = 43;
 
     [FieldOffset(0)]
     public readonly MessageFlags Flags;
@@ -63,17 +70,32 @@ public readonly struct MessageOverhead
         length = 7;
         flags = (MessageFlags)(*ptr);
         int offset = 1;
-        guid = Guid.Empty;
-        messageId = UnsafeBitConverter.GetUInt16(ptr, offset);
-        offset += sizeof(ushort);
+        if ((flags & MessageFlags.Guid) == 0)
+        {
+            messageId = UnsafeBitConverter.GetUInt16(ptr, offset);
+            offset += sizeof(ushort);
+            guid = Guid.Empty;
+        }
+        else
+        {
+            messageId = 0;
+            byte[] bytes = t_GuidBuffer ??= new byte[16];
+
+            fixed (byte* bufferPtr = bytes)
+                *(Guid*)bufferPtr = *(Guid*)(ptr + offset);
+
+            guid = new Guid(bytes);
+            offset += 16;
+        }
+
         size = UnsafeBitConverter.GetInt32(ptr, offset);
         offset += sizeof(int);
-        if ((flags & RequestKeyMask) > 0 && (len == -1 || len >= offset + sizeof(long)))
+        if ((flags & RequestKeyMask) != 0 && (len == -1 || len >= offset + sizeof(long)))
         {
             requestKey = UnsafeBitConverter.GetInt64(ptr, offset);
             offset += sizeof(long);
         }
-        if ((flags & ResponseKeyMask) > 0 && (len == -1 || len >= offset + sizeof(long)))
+        if ((flags & ResponseKeyMask) != 0 && (len == -1 || len >= offset + sizeof(long)))
         {
             responseKey = UnsafeBitConverter.GetInt64(ptr, offset);
             offset += sizeof(long);
@@ -81,19 +103,64 @@ public readonly struct MessageOverhead
 
         length = offset;
     }
+
+    /// <summary>
+    /// Create a core message overhead using a <see cref="DevkitServerNetCall"/> value.
+    /// </summary>
     public MessageOverhead(MessageFlags flags, ushort messageId, int size, long requestKey = default, long responseKey = default)
     {
+        flags &= ~MessageFlags.Guid;
         Flags = flags;
         MessageId = messageId;
         Size = size;
-        RequestKey = (flags & RequestKeyMask) > 0 ? requestKey : default;
-        ResponseKey = (flags & ResponseKeyMask) > 0 ? responseKey : default;
         Length = MinimumSize;
         MessageGuid = Guid.Empty;
-        if (flags == MessageFlags.None) return;
-        if ((flags & RequestKeyMask) > 0)
+        if (flags == MessageFlags.None)
+            return;
+        RequestKey = (flags & RequestKeyMask) != 0 ? requestKey : default;
+        ResponseKey = (flags & ResponseKeyMask) != 0 ? responseKey : default;
+        if ((flags & RequestKeyMask) != 0)
             Length += sizeof(long);
-        if ((flags & ResponseKeyMask) > 0)
+        if ((flags & ResponseKeyMask) != 0)
+            Length += sizeof(long);
+    }
+
+    /// <summary>
+    /// Create a plugin message overhead using a <see cref="Guid"/> value.
+    /// </summary>
+    public MessageOverhead(MessageFlags flags, Guid guid, int size, long requestKey = default, long responseKey = default)
+    {
+        flags |= MessageFlags.Guid;
+        Flags = flags;
+        MessageId = 0;
+        MessageGuid = guid;
+        Size = size;
+        Length = MinimumGuidSize;
+        if (flags is MessageFlags.None or MessageFlags.Guid)
+            return;
+        RequestKey = (flags & RequestKeyMask) != 0 ? requestKey : default;
+        ResponseKey = (flags & ResponseKeyMask) != 0 ? responseKey : default;
+        if ((flags & RequestKeyMask) != 0)
+            Length += sizeof(long);
+        if ((flags & ResponseKeyMask) != 0)
+            Length += sizeof(long);
+    }
+    public MessageOverhead(MessageFlags flags, Guid guid, ushort messageId, int size, long requestKey = default, long responseKey = default)
+    {
+        if (guid != Guid.Empty)
+            flags |= MessageFlags.Guid;
+        Flags = flags;
+        MessageId = messageId;
+        MessageGuid = guid;
+        Size = size;
+        Length = (flags & MessageFlags.Guid) != 0 ? MinimumGuidSize : MinimumSize;
+        if (flags is MessageFlags.None or MessageFlags.Guid)
+            return;
+        RequestKey = (flags & RequestKeyMask) != 0 ? requestKey : default;
+        ResponseKey = (flags & ResponseKeyMask) != 0 ? responseKey : default;
+        if ((flags & RequestKeyMask) != 0)
+            Length += sizeof(long);
+        if ((flags & ResponseKeyMask) != 0)
             Length += sizeof(long);
     }
     public unsafe void GetBytes(byte[] output, int index)
@@ -105,16 +172,26 @@ public readonly struct MessageOverhead
     {
         *output = (byte)Flags;
         length = 1;
-        UnsafeBitConverter.GetBytes(output, MessageId, length);
-        length += sizeof(ushort);
+        if ((Flags & MessageFlags.Guid) == 0)
+        {
+            UnsafeBitConverter.GetBytes(output, (ushort)MessageId, length);
+            length += sizeof(ushort);
+        }
+        else
+        {
+            byte[] bytes = MessageGuid.ToByteArray();
+            fixed (byte* ptr = bytes)
+                Buffer.MemoryCopy(ptr, output + length, 16, 16);
+            length += 16;
+        }
         UnsafeBitConverter.GetBytes(output, Size, length);
         length += sizeof(int);
-        if ((Flags & RequestKeyMask) > 0)
+        if ((Flags & RequestKeyMask) != 0)
         {
             UnsafeBitConverter.GetBytes(output, RequestKey, length);
             length += sizeof(long);
         }
-        if ((Flags & ResponseKeyMask) > 0)
+        if ((Flags & ResponseKeyMask) != 0)
         {
             UnsafeBitConverter.GetBytes(output, ResponseKey, length);
             length += sizeof(long);
@@ -132,10 +209,20 @@ public readonly struct MessageOverhead
     public override string ToString()
     {
         string msg;
-        if (MessageId == 0)
-            msg = "Unknown Message Type;";
+        if ((Flags & MessageFlags.Guid) == 0)
+        {
+            if (MessageId == 0)
+                msg = "Unknown Message Type (" + MessageId.ToString(CultureInfo.InvariantCulture) + ");";
+            else
+                msg = "Msg: " + NetFactory.GetInvokerName(MessageId, (Flags & MessageFlags.HighSpeed) != 0) + ";";
+        }
         else
-            msg = "Msg: " + NetFactory.GetInvokerName(MessageId, (Flags & MessageFlags.HighSpeed) != 0) + ";";
+        {
+            if (MessageGuid == Guid.Empty)
+                msg = "Unknown Message Type (" + MessageGuid.ToString("N") + ");";
+            else
+                msg = "Msg: " + NetFactory.GetInvokerName(MessageGuid, (Flags & MessageFlags.HighSpeed) != 0) + ";";
+        }
         msg += " " + DevkitServerUtility.FormatBytes(Size) + ";";
         if (ResponseKey != 0)
             msg += " Snowflake: " + RequestKey.ToString(CultureInfo.InvariantCulture) + ";";

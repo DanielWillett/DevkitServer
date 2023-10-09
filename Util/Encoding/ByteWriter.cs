@@ -1840,13 +1840,6 @@ public class ByteWriter
         }
         else Write(false);
     }
-    /// <returns>The buffer without copying it to a correctly sized array. Save <see cref="Count"/> before running this method to get the amount of bytes of actual data.</returns>
-    public byte[] FinishWrite()
-    {
-        byte[] rtn = _buffer;
-        Flush();
-        return rtn;
-    }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Write<T1>(Writer<T1> writer, T1 arg)
     {

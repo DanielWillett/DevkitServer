@@ -24,10 +24,10 @@ public static class UIMessage
     public static EEditorMessage CustomMessage { get; } = (EEditorMessage)typeof(EEditorMessage).GetFields().Length;
 
     [UsedImplicitly]
-    private static readonly NetCall<string> SendEditorUIMessage = new NetCall<string>((ushort)NetCalls.EditorUIMessage);
+    private static readonly NetCall<string> SendEditorUIMessage = new NetCall<string>((ushort)DevkitServerNetCall.EditorUIMessage);
 
     [UsedImplicitly]
-    private static readonly NetCallRaw<TranslationData> SendTranslatableEditorUIMessage = new NetCallRaw<TranslationData>((ushort)NetCalls.TranslatableEditorUIMessage, TranslationData.Read, TranslationData.Write);
+    private static readonly NetCallRaw<TranslationData> SendTranslatableEditorUIMessage = new NetCallRaw<TranslationData>((ushort)DevkitServerNetCall.TranslatableEditorUIMessage, TranslationData.Read, TranslationData.Write);
 #if CLIENT
     [HarmonyPatch(typeof(EditorUI), nameof(EditorUI.message))]
     [HarmonyTranspiler]
@@ -85,13 +85,13 @@ public static class UIMessage
             yield return instr;
         }
     }
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.EditorUIMessage)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.EditorUIMessage)]
     private static void ReceiveEditorUIMessage(MessageContext ctx, string message)
     {
         ctx.Acknowledge(SendEditorMessage(message) ? StandardErrorCode.Success : StandardErrorCode.GenericError);
     }
 
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.TranslatableEditorUIMessage)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.TranslatableEditorUIMessage)]
     private static void ReceiveTranslatableEditorUIMessage(MessageContext ctx, TranslationData data)
     {
         ctx.Acknowledge(SendEditorMessage(data.Source, data.TranslationKey, data.FormattingArguments) ? StandardErrorCode.Success : StandardErrorCode.GenericError);

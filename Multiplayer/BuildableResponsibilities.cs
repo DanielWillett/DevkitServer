@@ -27,7 +27,7 @@ public sealed class BuildableResponsibilities : IReplicatedLevelDataSource<Build
     public static List<bool>[,] Table = new List<bool>[Regions.WORLD_SIZE, Regions.WORLD_SIZE];
 #endif
 
-    public static readonly NetCallCustom SendResponsibilities = new NetCallCustom(NetCalls.SendBuildableResponsibilities);
+    public static readonly NetCallCustom SendResponsibilities = new NetCallCustom(DevkitServerNetCall.SendBuildableResponsibilities);
     internal static void Init()
     {
         SavePath = Path.Combine(DevkitServerConfig.LevelDirectory, "Responsibilities", "buildable-responsibilities.dat");

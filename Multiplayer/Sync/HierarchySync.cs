@@ -11,7 +11,7 @@ public class HierarchySync : AuthoritativeSync<HierarchySync>
     private const string Source = "HIERARCHY SYNC";
     private const float Delay = 0.5f;
     private const float SendDelay = 3f;
-    private static readonly NetCallRaw<ulong, HierarchyItemInfo> SendHierarchySyncData = new NetCallRaw<ulong, HierarchyItemInfo>(NetCalls.SendHierarchySyncData, null, reader => new HierarchyItemInfo(reader), null, (writer, obj) => obj.Write(writer));
+    private static readonly NetCallRaw<ulong, HierarchyItemInfo> SendHierarchySyncData = new NetCallRaw<ulong, HierarchyItemInfo>(DevkitServerNetCall.SendHierarchySyncData, null, reader => new HierarchyItemInfo(reader), null, (writer, obj) => obj.Write(writer));
 
     private readonly List<NetId> _syncQueue = new List<NetId>();
     private float _lastSent;
@@ -65,7 +65,7 @@ public class HierarchySync : AuthoritativeSync<HierarchySync>
 #endif
     }
 
-    [NetCall(NetCallSource.FromEither, NetCalls.SendHierarchySyncData)]
+    [NetCall(NetCallSource.FromEither, DevkitServerNetCall.SendHierarchySyncData)]
     private static void ReceiveHierarchySyncData(MessageContext ctx, ulong relaySource, HierarchyItemInfo obj)
     {
         HierarchySync? sync;

@@ -224,25 +224,25 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 #endif
 
 #if CLIENT
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendPermissionState)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendPermissionState)]
     private static void ReceivePermissionState(MessageContext ctx, Permission perm, bool state)
     {
         UserPermissions.UserHandler.ReceivePermissionState(perm, state);
         ctx.Acknowledge();
     }
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendClearPermissions)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendClearPermissions)]
     private static void ReceiveClearPermissions(MessageContext ctx)
     {
         UserPermissions.UserHandler.ReceiveClearPermissions();
         ctx.Acknowledge();
     }
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendPermissionGroupState)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendPermissionGroupState)]
     private static void ReceivePermissionGroupState(MessageContext ctx, PermissionGroup group, bool state)
     {
         UserPermissions.UserHandler.ReceivePermissionGroupState(group, state);
         ctx.Acknowledge();
     }
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendClearPermissionGroups)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendClearPermissionGroups)]
     private static void ReceiveClearPermissionGroups(MessageContext ctx)
     {
         UserPermissions.UserHandler.ReceiveClearPermissions();

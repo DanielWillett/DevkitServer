@@ -30,7 +30,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
     };
 
     [UsedImplicitly]
-    internal static NetCall<byte, int, NetId> SendBindSpawnpoint = new NetCall<byte, int, NetId>(NetCalls.SendBindSpawnpoint);
+    internal static NetCall<byte, int, NetId> SendBindSpawnpoint = new NetCall<byte, int, NetId>(DevkitServerNetCall.SendBindSpawnpoint);
 #if SERVER
     private static bool _initialLoaded;
 #endif
@@ -247,7 +247,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
 #endif
     
 #if CLIENT
-    [NetCall(NetCallSource.FromServer, NetCalls.SendBindSpawnpoint)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendBindSpawnpoint)]
     private static StandardErrorCode ReceiveBindSpawnpoint(MessageContext ctx, byte spawnType, int index, NetId netId)
     {
         SpawnType type = (SpawnType)spawnType;

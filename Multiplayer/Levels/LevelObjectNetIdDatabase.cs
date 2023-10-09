@@ -12,7 +12,7 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
     private static readonly Dictionary<RegionIdentifier, NetId> BuildableAssignments = new Dictionary<RegionIdentifier, NetId>(128);
     private static readonly Dictionary<uint, NetId> LevelObjectAssignments = new Dictionary<uint, NetId>(1024);
     [UsedImplicitly]
-    internal static NetCall<uint, NetId> SendBindObject = new NetCall<uint, NetId>(NetCalls.SendBindObject);
+    internal static NetCall<uint, NetId> SendBindObject = new NetCall<uint, NetId>(DevkitServerNetCall.SendBindObject);
     private LevelObjectNetIdDatabase() { }
     internal static void Init()
     {
@@ -25,7 +25,7 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
         LevelObjectUtil.OnBuildableRemoved -= OnBuildableRemoved;
     }
 #if CLIENT
-    [NetCall(NetCallSource.FromServer, NetCalls.SendBindObject)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendBindObject)]
     private static void ReceiveBindObject(MessageContext ctx, uint instanceId, NetId netId)
     {
         if (LevelObjectUtil.TryFindObject(instanceId, out RegionIdentifier id))

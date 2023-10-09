@@ -12,7 +12,7 @@ using SDG.Framework.Devkit.Transactions;
 namespace DevkitServer.Players;
 public class UserTransactions : MonoBehaviour
 {
-    private static readonly NetCall<bool> SendReunRequest = new NetCall<bool>((ushort)NetCalls.ReunRequest);
+    private static readonly NetCall<bool> SendReunRequest = new NetCall<bool>((ushort)DevkitServerNetCall.ReunRequest);
     public EditorUser User { get; internal set; } = null!;
 
     // ReSharper disable once UnusedAutoPropertyAccessor.Local
@@ -41,7 +41,7 @@ public class UserTransactions : MonoBehaviour
             UIMessage.SendEditorMessage(User, DevkitServerModule.MessageLocalization.Translate("UndoNotSupported"));
         Logger.LogDebug($"{User.Format()} Requested a{(isRedo ? " redo." : "n undo.")}");
     }
-    [NetCall(NetCallSource.FromClient, (ushort)NetCalls.ReunRequest)]
+    [NetCall(NetCallSource.FromClient, (ushort)DevkitServerNetCall.ReunRequest)]
     [UsedImplicitly]
     private static void ReceiveReunRequest(MessageContext ctx, bool isRedo)
     {

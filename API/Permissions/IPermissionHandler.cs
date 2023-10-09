@@ -195,17 +195,17 @@ public interface IUserPermissionHandler
 public static class PermissionsEx
 {
     [UsedImplicitly]
-    private static readonly NetCall<string> SendPermissionLateRegistered = new NetCall<string>((ushort)NetCalls.SendPermissionLateRegistered);
+    private static readonly NetCall<string> SendPermissionLateRegistered = new NetCall<string>((ushort)DevkitServerNetCall.SendPermissionLateRegistered);
     [UsedImplicitly]
     private static readonly NetCallRaw<PermissionGroup> SendPermissionGroupLateRegistered = new NetCallRaw<PermissionGroup>(
-        (ushort)NetCalls.SendPermissionGroupLateRegistered, PermissionGroup.ReadPermissionGroup, PermissionGroup.WritePermissionGroup);
+        (ushort)DevkitServerNetCall.SendPermissionGroupLateRegistered, PermissionGroup.ReadPermissionGroup, PermissionGroup.WritePermissionGroup);
     [UsedImplicitly]
     private static readonly NetCallRaw<PermissionGroup> SendPermissionGroupUpdate = new NetCallRaw<PermissionGroup>(
-        (ushort)NetCalls.SendPermissionGroupUpdate, PermissionGroup.ReadPermissionGroup, PermissionGroup.WritePermissionGroup);
+        (ushort)DevkitServerNetCall.SendPermissionGroupUpdate, PermissionGroup.ReadPermissionGroup, PermissionGroup.WritePermissionGroup);
     [UsedImplicitly]
-    private static readonly NetCall<string> SendPermissionDeregistered = new NetCall<string>((ushort)NetCalls.SendPermissionDeregistered);
+    private static readonly NetCall<string> SendPermissionDeregistered = new NetCall<string>((ushort)DevkitServerNetCall.SendPermissionDeregistered);
     [UsedImplicitly]
-    private static readonly NetCall<string> SendPermissionGroupDeregistered = new NetCall<string>((ushort)NetCalls.SendPermissionGroupDeregistered);
+    private static readonly NetCall<string> SendPermissionGroupDeregistered = new NetCall<string>((ushort)DevkitServerNetCall.SendPermissionGroupDeregistered);
     /// <summary>
     /// Check to see if either the client or a user has a permission.
     /// </summary>
@@ -468,7 +468,7 @@ public static class PermissionsEx
 #endif
 
 #if CLIENT
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendPermissionLateRegistered)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendPermissionLateRegistered)]
     [UsedImplicitly]
     private static void ReceivePermissionLateRegistered(MessageContext ctx, string str)
     {
@@ -481,14 +481,14 @@ public static class PermissionsEx
 
         ctx.Acknowledge(StandardErrorCode.NotFound);
     }
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendPermissionGroupLateRegistered)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendPermissionGroupLateRegistered)]
     [UsedImplicitly]
     private static void ReceivePermissionGroupLateRegistered(MessageContext ctx, PermissionGroup group)
     {
         UserPermissions.Handler.Register(group);
         ctx.Acknowledge(StandardErrorCode.Success);
     }
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendPermissionDeregistered)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendPermissionDeregistered)]
     [UsedImplicitly]
     private static void ReceivePermissionDeregistered(MessageContext ctx, string str)
     {
@@ -500,7 +500,7 @@ public static class PermissionsEx
 
         ctx.Acknowledge(StandardErrorCode.NotFound);
     }
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendPermissionGroupDeregistered)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendPermissionGroupDeregistered)]
     [UsedImplicitly]
     private static void ReceivePermissionGroupLateRegistered(MessageContext ctx, string groupId)
     {
@@ -515,7 +515,7 @@ public static class PermissionsEx
 
         ctx.Acknowledge(StandardErrorCode.NotFound);
     }
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendPermissionGroupUpdate)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendPermissionGroupUpdate)]
     [UsedImplicitly]
     private static void ReceivePermissionGroupUpdate(MessageContext ctx, PermissionGroup group)
     {

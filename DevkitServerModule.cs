@@ -45,7 +45,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static readonly string ServerRule = "DevkitServer";
     internal static readonly Color32 ModuleColor = new Color32(0, 255, 153, 255);
     internal static readonly Color32 UnturnedColor = new Color32(99, 123, 99, 255);
-    internal static NetCall ClientAskSave = new NetCall(NetCalls.AskSave);
+    internal static NetCall ClientAskSave = new NetCall(DevkitServerNetCall.AskSave);
     private static CancellationTokenSource? _tknSrc;
     private static string? _asmPath;
     private static IReadOnlyList<string>? _searchLocations;
@@ -811,6 +811,7 @@ public sealed class DevkitServerModule : IModuleNexus
 
         LevelObjectNetIdDatabase.AssignExisting();
         HierarchyItemNetIdDatabase.AssignExisting();
+        NavigationNetIdDatabase.AssignExisting();
 #endif
         if (IsEditing)
         {

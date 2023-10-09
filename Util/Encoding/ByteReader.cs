@@ -253,8 +253,24 @@ public class ByteReader
         _index = 0;
         _streamMode = true;
     }
+
     /// <summary>
-    /// Loads a new byte array to be read from. Use <see cref="Skip"/> to set an offset.
+    /// Loads a new byte array to be read from with an offset.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"/>
+    /// <exception cref="ArgumentOutOfRangeException"/>
+    public void LoadNew(byte[] bytes, int index)
+    {
+        if (index >= bytes.Length)
+            throw new ArgumentOutOfRangeException(nameof(index));
+        if (index < 0)
+            index = 0;
+        LoadNew(bytes);
+        if (index > 0)
+            Skip(index);
+    }
+    /// <summary>
+    /// Loads a new byte array to be read from.
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
     public void LoadNew(byte[] bytes)
@@ -2010,12 +2026,15 @@ public sealed class ByteReaderRaw<T> : ByteReader
     {
         _reader = reader ?? ReaderHelper<T>.Reader!;
     }
-    public bool Read(byte[]? bytes, out T arg)
+    public bool Read(byte[]? bytes, int index, out T arg)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg = _reader.Invoke(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg = _reader.Invoke(this);
+            return !HasFailed;
+        }
     }
 }
 
@@ -2033,13 +2052,16 @@ public sealed class ByteReaderRaw<T1, T2> : ByteReader
         _reader1 = reader1 ?? ReaderHelper<T1>.Reader!;
         _reader2 = reader2 ?? ReaderHelper<T2>.Reader!;
     }
-    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2)
+    public bool Read(byte[]? bytes, int index, out T1 arg1, out T2 arg2)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg1 = _reader1.Invoke(this);
-        arg2 = _reader2.Invoke(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg1 = _reader1.Invoke(this);
+            arg2 = _reader2.Invoke(this);
+            return !HasFailed;
+        }
     }
 }
 
@@ -2059,14 +2081,17 @@ public sealed class ByteReaderRaw<T1, T2, T3> : ByteReader
         _reader2 = reader2 ?? ReaderHelper<T2>.Reader!;
         _reader3 = reader3 ?? ReaderHelper<T3>.Reader!;
     }
-    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3)
+    public bool Read(byte[]? bytes, int index, out T1 arg1, out T2 arg2, out T3 arg3)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg1 = _reader1.Invoke(this);
-        arg2 = _reader2.Invoke(this);
-        arg3 = _reader3.Invoke(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg1 = _reader1.Invoke(this);
+            arg2 = _reader2.Invoke(this);
+            arg3 = _reader3.Invoke(this);
+            return !HasFailed;
+        }
     }
 }
 
@@ -2088,15 +2113,18 @@ public sealed class ByteReaderRaw<T1, T2, T3, T4> : ByteReader
         _reader3 = reader3 ?? ReaderHelper<T3>.Reader!;
         _reader4 = reader4 ?? ReaderHelper<T4>.Reader!;
     }
-    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4)
+    public bool Read(byte[]? bytes, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg1 = _reader1.Invoke(this);
-        arg2 = _reader2.Invoke(this);
-        arg3 = _reader3.Invoke(this);
-        arg4 = _reader4.Invoke(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg1 = _reader1.Invoke(this);
+            arg2 = _reader2.Invoke(this);
+            arg3 = _reader3.Invoke(this);
+            arg4 = _reader4.Invoke(this);
+            return !HasFailed;
+        }
     }
 }
 
@@ -2120,16 +2148,19 @@ public sealed class ByteReaderRaw<T1, T2, T3, T4, T5> : ByteReader
         _reader4 = reader4 ?? ReaderHelper<T4>.Reader!;
         _reader5 = reader5 ?? ReaderHelper<T5>.Reader!;
     }
-    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5)
+    public bool Read(byte[]? bytes, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg1 = _reader1.Invoke(this);
-        arg2 = _reader2.Invoke(this);
-        arg3 = _reader3.Invoke(this);
-        arg4 = _reader4.Invoke(this);
-        arg5 = _reader5.Invoke(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg1 = _reader1.Invoke(this);
+            arg2 = _reader2.Invoke(this);
+            arg3 = _reader3.Invoke(this);
+            arg4 = _reader4.Invoke(this);
+            arg5 = _reader5.Invoke(this);
+            return !HasFailed;
+        }
     }
 }
 
@@ -2155,17 +2186,20 @@ public sealed class ByteReaderRaw<T1, T2, T3, T4, T5, T6> : ByteReader
         _reader5 = reader5 ?? ReaderHelper<T5>.Reader!;
         _reader6 = reader6 ?? ReaderHelper<T6>.Reader!;
     }
-    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6)
+    public bool Read(byte[]? bytes, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg1 = _reader1.Invoke(this);
-        arg2 = _reader2.Invoke(this);
-        arg3 = _reader3.Invoke(this);
-        arg4 = _reader4.Invoke(this);
-        arg5 = _reader5.Invoke(this);
-        arg6 = _reader6.Invoke(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg1 = _reader1.Invoke(this);
+            arg2 = _reader2.Invoke(this);
+            arg3 = _reader3.Invoke(this);
+            arg4 = _reader4.Invoke(this);
+            arg5 = _reader5.Invoke(this);
+            arg6 = _reader6.Invoke(this);
+            return !HasFailed;
+        }
     }
 }
 
@@ -2180,12 +2214,15 @@ public sealed class DynamicByteReader<T1> : ByteReader
     }
     private static readonly Reader<T1> Reader1;
 
-    public bool Read(byte[]? bytes, out T1 arg1)
+    public bool Read(byte[]? bytes, int index, out T1 arg1)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg1 = Reader1(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg1 = Reader1(this);
+            return !HasFailed;
+        }
     }
 }
 
@@ -2202,13 +2239,16 @@ public sealed class DynamicByteReader<T1, T2> : ByteReader
     private static readonly Reader<T1> Reader1;
     private static readonly Reader<T2> Reader2;
 
-    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2)
+    public bool Read(byte[]? bytes, int index, out T1 arg1, out T2 arg2)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg1 = Reader1(this);
-        arg2 = Reader2(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg1 = Reader1(this);
+            arg2 = Reader2(this);
+            return !HasFailed;
+        }
     }
 }
 
@@ -2227,14 +2267,17 @@ public sealed class DynamicByteReader<T1, T2, T3> : ByteReader
     private static readonly Reader<T2> Reader2;
     private static readonly Reader<T3> Reader3;
 
-    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3)
+    public bool Read(byte[]? bytes, int index, out T1 arg1, out T2 arg2, out T3 arg3)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg1 = Reader1(this);
-        arg2 = Reader2(this);
-        arg3 = Reader3(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg1 = Reader1(this);
+            arg2 = Reader2(this);
+            arg3 = Reader3(this);
+            return !HasFailed;
+        }
     }
 }
 
@@ -2255,15 +2298,18 @@ public sealed class DynamicByteReader<T1, T2, T3, T4> : ByteReader
     private static readonly Reader<T3> Reader3;
     private static readonly Reader<T4> Reader4;
 
-    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4)
+    public bool Read(byte[]? bytes, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg1 = Reader1(this);
-        arg2 = Reader2(this);
-        arg3 = Reader3(this);
-        arg4 = Reader4(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg1 = Reader1(this);
+            arg2 = Reader2(this);
+            arg3 = Reader3(this);
+            arg4 = Reader4(this);
+            return !HasFailed;
+        }
     }
 }
 
@@ -2286,16 +2332,19 @@ public sealed class DynamicByteReader<T1, T2, T3, T4, T5> : ByteReader
     private static readonly Reader<T4> Reader4;
     private static readonly Reader<T5> Reader5;
 
-    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5)
+    public bool Read(byte[]? bytes, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg1 = Reader1(this);
-        arg2 = Reader2(this);
-        arg3 = Reader3(this);
-        arg4 = Reader4(this);
-        arg5 = Reader5(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg1 = Reader1(this);
+            arg2 = Reader2(this);
+            arg3 = Reader3(this);
+            arg4 = Reader4(this);
+            arg5 = Reader5(this);
+            return !HasFailed;
+        }
     }
 }
 
@@ -2320,17 +2369,20 @@ public sealed class DynamicByteReader<T1, T2, T3, T4, T5, T6> : ByteReader
     private static readonly Reader<T5> Reader5;
     private static readonly Reader<T6> Reader6;
 
-    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6)
+    public bool Read(byte[]? bytes, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg1 = Reader1(this);
-        arg2 = Reader2(this);
-        arg3 = Reader3(this);
-        arg4 = Reader4(this);
-        arg5 = Reader5(this);
-        arg6 = Reader6(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg1 = Reader1(this);
+            arg2 = Reader2(this);
+            arg3 = Reader3(this);
+            arg4 = Reader4(this);
+            arg5 = Reader5(this);
+            arg6 = Reader6(this);
+            return !HasFailed;
+        }
     }
 }
 
@@ -2357,18 +2409,21 @@ public sealed class DynamicByteReader<T1, T2, T3, T4, T5, T6, T7> : ByteReader
     private static readonly Reader<T6> Reader6;
     private static readonly Reader<T7> Reader7;
 
-    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7)
+    public bool Read(byte[]? bytes, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg1 = Reader1(this);
-        arg2 = Reader2(this);
-        arg3 = Reader3(this);
-        arg4 = Reader4(this);
-        arg5 = Reader5(this);
-        arg6 = Reader6(this);
-        arg7 = Reader7(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg1 = Reader1(this);
+            arg2 = Reader2(this);
+            arg3 = Reader3(this);
+            arg4 = Reader4(this);
+            arg5 = Reader5(this);
+            arg6 = Reader6(this);
+            arg7 = Reader7(this);
+            return !HasFailed;
+        }
     }
 }
 
@@ -2397,19 +2452,22 @@ public sealed class DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8> : ByteRead
     private static readonly Reader<T7> Reader7;
     private static readonly Reader<T8> Reader8;
 
-    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8)
+    public bool Read(byte[]? bytes, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg1 = Reader1(this);
-        arg2 = Reader2(this);
-        arg3 = Reader3(this);
-        arg4 = Reader4(this);
-        arg5 = Reader5(this);
-        arg6 = Reader6(this);
-        arg7 = Reader7(this);
-        arg8 = Reader8(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg1 = Reader1(this);
+            arg2 = Reader2(this);
+            arg3 = Reader3(this);
+            arg4 = Reader4(this);
+            arg5 = Reader5(this);
+            arg6 = Reader6(this);
+            arg7 = Reader7(this);
+            arg8 = Reader8(this);
+            return !HasFailed;
+        }
     }
 }
 
@@ -2440,20 +2498,23 @@ public sealed class DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9> : Byte
     private static readonly Reader<T8> Reader8;
     private static readonly Reader<T9> Reader9;
 
-    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8, out T9 arg9)
+    public bool Read(byte[]? bytes, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8, out T9 arg9)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg1 = Reader1(this);
-        arg2 = Reader2(this);
-        arg3 = Reader3(this);
-        arg4 = Reader4(this);
-        arg5 = Reader5(this);
-        arg6 = Reader6(this);
-        arg7 = Reader7(this);
-        arg8 = Reader8(this);
-        arg9 = Reader9(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg1 = Reader1(this);
+            arg2 = Reader2(this);
+            arg3 = Reader3(this);
+            arg4 = Reader4(this);
+            arg5 = Reader5(this);
+            arg6 = Reader6(this);
+            arg7 = Reader7(this);
+            arg8 = Reader8(this);
+            arg9 = Reader9(this);
+            return !HasFailed;
+        }
     }
 }
 
@@ -2486,21 +2547,24 @@ public sealed class DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> :
     private static readonly Reader<T9> Reader9;
     private static readonly Reader<T10> Reader10;
 
-    public bool Read(byte[]? bytes, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8, out T9 arg9, out T10 arg10)
+    public bool Read(byte[]? bytes, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8, out T9 arg9, out T10 arg10)
     {
-        if (bytes != null)
-            LoadNew(bytes);
-        arg1 = Reader1(this);
-        arg2 = Reader2(this);
-        arg3 = Reader3(this);
-        arg4 = Reader4(this);
-        arg5 = Reader5(this);
-        arg6 = Reader6(this);
-        arg7 = Reader7(this);
-        arg8 = Reader8(this);
-        arg9 = Reader9(this);
-        arg10 = Reader10(this);
-        return !HasFailed;
+        lock (this)
+        {
+            if (bytes != null)
+                LoadNew(bytes, index);
+            arg1 = Reader1(this);
+            arg2 = Reader2(this);
+            arg3 = Reader3(this);
+            arg4 = Reader4(this);
+            arg5 = Reader5(this);
+            arg6 = Reader6(this);
+            arg7 = Reader7(this);
+            arg8 = Reader8(this);
+            arg9 = Reader9(this);
+            arg10 = Reader10(this);
+            return !HasFailed;
+        }
     }
 }
 

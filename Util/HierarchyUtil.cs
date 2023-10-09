@@ -25,13 +25,13 @@ public static class HierarchyUtil
     
     [UsedImplicitly]
     private static readonly NetCallRaw<IHierarchyItemTypeIdentifier, Vector3, Quaternion, Vector3> SendRequestInstantiation =
-        new NetCallRaw<IHierarchyItemTypeIdentifier, Vector3, Quaternion, Vector3>(NetCalls.RequestHierarchyInstantiation,
+        new NetCallRaw<IHierarchyItemTypeIdentifier, Vector3, Quaternion, Vector3>(DevkitServerNetCall.RequestHierarchyInstantiation,
             HierarchyItemTypeIdentifierEx.ReadIdentifier!, null, null, null,
             HierarchyItemTypeIdentifierEx.WriteIdentifier, null, null, null);
 
     [UsedImplicitly]
     private static readonly NetCallRaw<IHierarchyItemTypeIdentifier, Vector3, Quaternion, Vector3, ulong, NetId> SendInstantiation =
-        new NetCallRaw<IHierarchyItemTypeIdentifier, Vector3, Quaternion, Vector3, ulong, NetId>(NetCalls.SendHierarchyInstantiation,
+        new NetCallRaw<IHierarchyItemTypeIdentifier, Vector3, Quaternion, Vector3, ulong, NetId>(DevkitServerNetCall.SendHierarchyInstantiation,
             HierarchyItemTypeIdentifierEx.ReadIdentifier!, null, null, null, null, null,
             HierarchyItemTypeIdentifierEx.WriteIdentifier, null, null, null, null, null);
 #if CLIENT
@@ -40,7 +40,7 @@ public static class HierarchyUtil
         SendRequestInstantiation.Invoke(type, position, rotation, scale);
     }
 
-    [NetCall(NetCallSource.FromServer, NetCalls.SendHierarchyInstantiation)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendHierarchyInstantiation)]
     public static StandardErrorCode ReceiveHierarchyInstantiation(MessageContext ctx, IHierarchyItemTypeIdentifier? type, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
     {
         if (type == null)
@@ -77,7 +77,7 @@ public static class HierarchyUtil
         return StandardErrorCode.GenericError;
     }
 #elif SERVER
-    [NetCall(NetCallSource.FromClient, NetCalls.RequestHierarchyInstantiation)]
+    [NetCall(NetCallSource.FromClient, DevkitServerNetCall.RequestHierarchyInstantiation)]
     public static void ReceiveRequestHierarchyInstantiation(MessageContext ctx, IHierarchyItemTypeIdentifier? type, Vector3 position, Quaternion rotation, Vector3 scale)
     {
         EditorUser? user = ctx.GetCaller();

@@ -15,7 +15,7 @@ namespace DevkitServer.Patches;
 [HarmonyPriority(-1)]
 internal class NavigationPatches
 {
-    private static readonly NetCall<int> SendBakeNavRequest = new NetCall<int>(NetCalls.SendBakeNavRequest);
+    private static readonly NetCall<int> SendBakeNavRequest = new NetCall<int>(DevkitServerNetCall.SendBakeNavRequest);
 
     private const string Source = "NAV PATCHES";
     internal static bool BlockBake;

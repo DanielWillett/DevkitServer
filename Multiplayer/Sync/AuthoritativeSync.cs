@@ -8,7 +8,7 @@ using System.Reflection;
 namespace DevkitServer.Multiplayer.Sync;
 public abstract class AuthoritativeSync : MonoBehaviour
 {
-    protected static readonly NetCall<ulong, Type> SendAuthoritativeSyncAuthority = new NetCall<ulong, Type>((ushort)NetCalls.TileSyncAuthority);
+    protected static readonly NetCall<ulong, Type> SendAuthoritativeSyncAuthority = new NetCall<ulong, Type>((ushort)DevkitServerNetCall.TileSyncAuthority);
     protected static readonly Color AuthColor = new Color32(102, 255, 255, 255);
     protected static readonly Color NoAuthColor = new Color32(255, 80, 80, 255);
     protected bool HasAuthorityIntl;
@@ -19,7 +19,7 @@ public abstract class AuthoritativeSync : MonoBehaviour
 
 #if CLIENT
     private static MethodInfo? _setAuthMethod;
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.TileSyncAuthority)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.TileSyncAuthority)]
     [UsedImplicitly]
     private static void ReceiveAuthoritativeSyncAuthority(MessageContext ctx, ulong s64, Type type)
     {

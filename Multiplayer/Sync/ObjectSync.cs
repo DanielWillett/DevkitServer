@@ -10,7 +10,7 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
     private const string Source = "OBJECT SYNC";
     private const float Delay = 0.5f;
     private const float SendDelay = 3f;
-    private static readonly NetCallRaw<ulong, ObjectInfo> SendObjectSyncData = new NetCallRaw<ulong, ObjectInfo>(NetCalls.SendObjectSyncData, null, reader => new ObjectInfo(reader), null, (writer, obj) => obj.Write(writer));
+    private static readonly NetCallRaw<ulong, ObjectInfo> SendObjectSyncData = new NetCallRaw<ulong, ObjectInfo>(DevkitServerNetCall.SendObjectSyncData, null, reader => new ObjectInfo(reader), null, (writer, obj) => obj.Write(writer));
 
     private readonly List<NetId> _syncQueue = new List<NetId>();
     private float _lastSent;
@@ -64,7 +64,7 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
 #endif
     }
 
-    [NetCall(NetCallSource.FromEither, NetCalls.SendObjectSyncData)]
+    [NetCall(NetCallSource.FromEither, DevkitServerNetCall.SendObjectSyncData)]
     private static void ReceiveObjectSyncData(MessageContext ctx, ulong relaySource, ObjectInfo obj)
     {
         ObjectSync? sync;

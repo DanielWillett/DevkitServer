@@ -1,5 +1,5 @@
 ﻿namespace DevkitServer.Multiplayer.Networking;
-internal enum NetCalls : ushort
+public enum DevkitServerNetCall : ushort
 {
     RequestLevel = 1,
     StartSendLevel = 2,
@@ -40,5 +40,6 @@ internal enum NetCalls : ushort
     TranslatableEditorUIMessage = 38,
     AskSave = 39,
     SendBindSpawnpoint = 40,
-    SendBakeNavRequest = 41
+    SendBakeNavRequest = 41,
+    SendBindNavigation = 42
 }

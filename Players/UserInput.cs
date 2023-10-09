@@ -30,13 +30,13 @@ public class UserInput : MonoBehaviour
     public const ushort SaveDataVersion = 5;
     public const ushort SendDataVersion = 0;
     [UsedImplicitly]
-    private static readonly NetCall<ulong, Vector3, Vector3> SendTransform = new NetCall<ulong, Vector3, Vector3>(NetCalls.SendTransform);
+    private static readonly NetCall<ulong, Vector3, Vector3> SendTransform = new NetCall<ulong, Vector3, Vector3>(DevkitServerNetCall.SendTransform);
     [UsedImplicitly]
-    private static readonly NetCall<ulong, CameraController> SendUpdateController = new NetCall<ulong, CameraController>(NetCalls.SendUpdateController);
+    private static readonly NetCall<ulong, CameraController> SendUpdateController = new NetCall<ulong, CameraController>(DevkitServerNetCall.SendUpdateController);
     [UsedImplicitly]
-    private static readonly NetCall<CameraController> RequestUpdateController = new NetCall<CameraController>(NetCalls.RequestUpdateController);
+    private static readonly NetCall<CameraController> RequestUpdateController = new NetCall<CameraController>(DevkitServerNetCall.RequestUpdateController);
     [UsedImplicitly]
-    private static readonly NetCall RequestInitialState = new NetCall(NetCalls.RequestInitialState);
+    private static readonly NetCall RequestInitialState = new NetCall(DevkitServerNetCall.RequestInitialState);
 #if CLIENT
     private static readonly StaticSetter<float>? SetPitch = Accessor.GenerateStaticSetter<EditorLook, float>("_pitch");
     private static readonly StaticSetter<float>? SetYaw = Accessor.GenerateStaticSetter<EditorLook, float>("_yaw");
@@ -294,7 +294,7 @@ public class UserInput : MonoBehaviour
 
 #if CLIENT
     [UsedImplicitly]
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendTransform)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendTransform)]
     private static void ReceiveTransform(MessageContext ctx, ulong player, Vector3 pos, Vector3 eulerRotation)
     {
         EditorUser? user = UserManager.FromId(player);
@@ -322,7 +322,7 @@ public class UserInput : MonoBehaviour
     }
 #endif
 #if SERVER
-    [NetCall(NetCallSource.FromClient, NetCalls.RequestInitialState)]
+    [NetCall(NetCallSource.FromClient, DevkitServerNetCall.RequestInitialState)]
     private static void ReceiveRequestInitialState(MessageContext ctx)
     {
         EditorUser? user = ctx.GetCaller();
@@ -468,7 +468,7 @@ public class UserInput : MonoBehaviour
             Logger.LogError("Failed to read incoming movement packet length.");
             return;
         }
-        NetFactory.IncrementByteCount(false, DevkitMessage.MovementRelay, len + sizeof(ushort));
+        NetFactory.IncrementByteCount(false, DevkitServerMessage.MovementRelay, len + sizeof(ushort));
 
 #if SERVER
         EditorUser? user = UserManager.FromConnection(transportConnection);
@@ -510,7 +510,7 @@ public class UserInput : MonoBehaviour
                     list.Add(pl.transportConnection);
             }
 
-            NetFactory.SendGeneric(DevkitMessage.MovementRelay, sendBytes, list, reliable: false);
+            NetFactory.SendGeneric(DevkitServerMessage.MovementRelay, sendBytes, list, reliable: false);
         }
 #endif
     }
@@ -519,8 +519,8 @@ public class UserInput : MonoBehaviour
     {
         if (_packets.Count < 1) return;
         HandleFlushPackets(Writer);
-        int len = Writer.Count;
-        NetFactory.SendGeneric(DevkitMessage.MovementRelay, Writer.FinishWrite(), 0, len, _bufferHasStop);
+        NetFactory.SendGeneric(DevkitServerMessage.MovementRelay, Writer.Buffer, 0, Writer.Count, _bufferHasStop);
+        Writer.Flush();
         _bufferHasStop = false;
     }
     private void HandleFlushPackets(ByteWriter writer)
@@ -735,7 +735,7 @@ public class UserInput : MonoBehaviour
 #endif
     }
 #if CLIENT
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendUpdateController)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendUpdateController)]
     private static void ReceiveControllerUpdated(MessageContext ctx, ulong steam64, CameraController controller)
     {
         EditorUser? user = UserManager.FromId(steam64);
@@ -782,7 +782,7 @@ public class UserInput : MonoBehaviour
             );
     }
 #if SERVER
-    [NetCall(NetCallSource.FromClient, NetCalls.RequestUpdateController)]
+    [NetCall(NetCallSource.FromClient, DevkitServerNetCall.RequestUpdateController)]
     private static StandardErrorCode ReceiveUpdateControllerRequest(MessageContext ctx, CameraController controller)
     {
         EditorUser? user = ctx.GetCaller();

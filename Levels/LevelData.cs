@@ -125,7 +125,7 @@ public sealed class LevelData
 
         byte[] data = writer.ToArray();
         Data = data;
-        writer.FinishWrite();
+        writer.Flush();
     }
 
     internal static bool ShouldSendFile(FileInfo file)

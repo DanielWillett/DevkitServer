@@ -1,9 +1,6 @@
 ﻿using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
-#if CLIENT
-using JetBrains.Annotations;
-#endif
 #if SERVER
 using DevkitServer.Configuration;
 using DevkitServer.Players;
@@ -30,13 +27,13 @@ public sealed class ClientInfo
         remove => OnClientInfoReadyEvent.Remove(value);
     }
 
-    internal static readonly NetCallRaw<ClientInfo> SendClientInfo = new NetCallRaw<ClientInfo>((ushort)NetCalls.SendClientInfo, ReadInfo, WriteInfo);
+    internal static readonly NetCallRaw<ClientInfo> SendClientInfo = new NetCallRaw<ClientInfo>((ushort)DevkitServerNetCall.SendClientInfo, ReadInfo, WriteInfo);
 
     public const ushort DataVersion = 0;
 #if CLIENT
     public static ClientInfo? Info { get; private set; }
 
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendClientInfo)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendClientInfo)]
     [UsedImplicitly]
     private static void ReceiveClientInfo(MessageContext ctx, ClientInfo info)
     {

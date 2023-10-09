@@ -3,6 +3,12 @@
 #define PRINT_ACTION_SIMPLE
 #endif
 
+using System.Reflection;
+using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Players;
+using DevkitServer.Util.Encoding;
+using SDG.Framework.Utilities;
+using SDG.NetPak;
 #if SERVER
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Sync;
@@ -11,14 +17,10 @@ using DevkitServer.Players.UI;
 #if CLIENT
 using DevkitServer.API.Abstractions;
 #endif
-using System.Reflection;
+#if PRINT_ACTION_DETAIL
 using System.Text.Json;
 using DevkitServer.Configuration;
-using DevkitServer.Multiplayer.Networking;
-using DevkitServer.Players;
-using DevkitServer.Util.Encoding;
-using SDG.Framework.Utilities;
-using SDG.NetPak;
+#endif
 
 namespace DevkitServer.Multiplayer.Actions;
 
@@ -86,6 +88,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     public HierarchyActions HierarchyActions { get; }
     public ObjectActions ObjectActions { get; }
     public SpawnActions SpawnActions { get; }
+    public int QueueSize => _pendingActions.Count;
 
     private EditorActions()
     {
@@ -195,7 +198,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             Logger.LogError("Failed to read incoming action packet length.", method: "EDITOR ACTIONS");
             return;
         }
-        NetFactory.IncrementByteCount(false, DevkitMessage.ActionRelay, len + sizeof(ushort));
+        NetFactory.IncrementByteCount(false, DevkitServerMessage.ActionRelay, len + sizeof(ushort));
 
 #if SERVER
         EditorUser? user = UserManager.FromConnection(transportConnection);
@@ -251,12 +254,12 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         Logger.LogDebug("[EDITOR ACTIONS] Flushing " + _pendingActions.Count.Format() + " action(s).");
 #endif
         WriteEditBuffer(Writer, 0, _pendingActions.Count);
-        int len = Writer.Count;
 #if CLIENT
-        NetFactory.SendGeneric(DevkitMessage.ActionRelay, Writer.FinishWrite(), 0, len, true);
+        NetFactory.SendGeneric(DevkitServerMessage.ActionRelay, Writer.Buffer, 0, Writer.Count, true);
 #else
-        NetFactory.SendGeneric(DevkitMessage.ActionRelay, Writer.FinishWrite(), DevkitServerUtility.GetAllConnections(), 0, len, true);
+        NetFactory.SendGeneric(DevkitServerMessage.ActionRelay, Writer.Buffer, DevkitServerUtility.GetAllConnections(), 0, Writer.Count, true);
 #endif
+        Writer.Flush();
     }
     public static (int Data, int Settings) GetMaxSizes(IAction action) =>
         EditorActionsCodeGeneration.Attributes.TryGetValue(action.Type, out ActionAttribute attr)
@@ -304,15 +307,6 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 if (action is IDisposable d)
                     d.Dispose();
             }
-#if PRINT_ACTION_DETAIL
-            Logger.LogDebug($"Action applied: {action.Format()}" +
-                            $", time: {CachedTime.RealtimeSinceStartup:F2}" +
-                            $", fps: {1f / CachedTime.DeltaTime:F0}" +
-                            $", queue: {_pendingActions.Count}.{Environment.NewLine}" +
-                            JsonSerializer.Serialize(action, action.GetType(), DevkitServerConfig.SerializerSettings));
-#elif PRINT_ACTION_SIMPLE
-            Logger.LogDebug($"Action applied: {action.Format()}.");
-#endif
         }
     }
     internal static void ApplyAction(IAction action, IActionListener listener)
@@ -327,6 +321,15 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         try
         {
             action.Apply();
+#if PRINT_ACTION_DETAIL
+            Logger.LogDebug($"Action applied: {action.Format()}" +
+                            $", time: {CachedTime.RealtimeSinceStartup:F2}" +
+                            $", fps: {1f / CachedTime.DeltaTime:F0}" +
+                            $", queue: {listener.QueueSize}.{Environment.NewLine}" +
+                            JsonSerializer.Serialize(action, action.GetType(), DevkitServerConfig.SerializerSettings));
+#elif PRINT_ACTION_SIMPLE
+            Logger.LogDebug($"Action applied: {action.Format()}.");
+#endif
         }
         finally
         {
@@ -549,8 +552,8 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             if (anyInvalid)
             {
                 WriteEditBuffer(Writer, stInd, _pendingActions.Count - stInd);
-                int len = Writer.Count;
-                NetFactory.SendGeneric(DevkitMessage.ActionRelay, Writer.FinishWrite(), list, 0, len, true);
+                NetFactory.SendGeneric(DevkitServerMessage.ActionRelay, Writer.Buffer, list, 0, Writer.Count, true);
+                Writer.Flush();
             }
 
             // faster to just copy the array so do that when possible
@@ -559,7 +562,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 byte[] sendBytes = new byte[sizeof(ulong) + bufferLength];
                 Buffer.BlockCopy(buffer, offset, sendBytes, sizeof(ulong), bufferLength);
                 UnsafeBitConverter.GetBytes(sendBytes, User == null ? 0ul : User.SteamId.m_SteamID);
-                NetFactory.SendGeneric(DevkitMessage.ActionRelay, sendBytes, list, reliable: false);
+                NetFactory.SendGeneric(DevkitServerMessage.ActionRelay, sendBytes, list, reliable: false);
             }
         }
 #endif
@@ -613,6 +616,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 public interface IActionListener
 {
     ActionSettings Settings { get; }
+    int QueueSize { get; }
 }
 #if CLIENT
 public class TemporaryEditorActions : IActionListener, IDisposable
@@ -633,8 +637,8 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     private readonly List<PendingHierarchyInstantiation> _hierarchyInstantiations = new List<PendingHierarchyInstantiation>();
     private readonly List<PendingLevelObjectInstantiation> _lvlObjectInstantiations = new List<PendingLevelObjectInstantiation>();
     private readonly List<IAction> _actions = new List<IAction>();
-    public ActionSettings Settings { get; }
     public int QueueSize => _actions.Count;
+    public ActionSettings Settings { get; }
     internal bool NeedsToFlush => _actions.Count > 0 || _hierarchyInstantiations.Count > 0 || _lvlObjectInstantiations.Count > 0;
     private TemporaryEditorActions()
     {

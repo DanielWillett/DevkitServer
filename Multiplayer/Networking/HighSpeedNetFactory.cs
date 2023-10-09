@@ -11,10 +11,10 @@ public static class HighSpeedNetFactory
 {
     public const int BufferSize = 4194304; // 4 MiB
 
-    internal static readonly NetCall<Guid> HighSpeedVerify = new NetCall<Guid>((ushort)HighSpeedNetCall.Verify) { HighSpeed = true };
-    internal static readonly NetCall HighSpeedVerifyConfirm = new NetCall((ushort)HighSpeedNetCall.VerifyConfirm) { HighSpeed = true };
-    internal static readonly NetCall<Guid, ulong> SteamVerify = new NetCall<Guid, ulong>((ushort)NetCalls.SendSteamVerificationToken);
-    internal static readonly NetCall<ushort> OpenHighSpeedClient = new NetCall<ushort>((ushort)NetCalls.OpenHighSpeedClient);
+    internal static readonly NetCall<Guid> HighSpeedVerify = new NetCall<Guid>((ushort)HighSpeedNetCall.Verify, highSpeed: true);
+    internal static readonly NetCall HighSpeedVerifyConfirm = new NetCall((ushort)HighSpeedNetCall.VerifyConfirm, highSpeed: true);
+    internal static readonly NetCall<Guid, ulong> SteamVerify = new NetCall<Guid, ulong>((ushort)DevkitServerNetCall.SendSteamVerificationToken);
+    internal static readonly NetCall<ushort> OpenHighSpeedClient = new NetCall<ushort>((ushort)DevkitServerNetCall.OpenHighSpeedClient);
 #if SERVER
     internal static void StartVerifying(HighSpeedConnection pending)
     {
@@ -118,7 +118,7 @@ public static class HighSpeedNetFactory
         return HighSpeedServer.Instance.VerifiedConnections.FirstOrDefault(Filter) ?? HighSpeedServer.Instance.PendingConnections.FirstOrDefault(Filter);
     }
 
-    [NetCall(NetCallSource.FromClient, (ushort)NetCalls.SendSteamVerificationToken)]
+    [NetCall(NetCallSource.FromClient, (ushort)DevkitServerNetCall.SendSteamVerificationToken)]
     private static void ReceiveSteamToken(MessageContext ctx, Guid received, ulong steam64)
     {
         HighSpeedServer server = HighSpeedServer.Instance;
@@ -144,7 +144,7 @@ public static class HighSpeedNetFactory
 #endif
 #if CLIENT
     private static readonly List<MessageContext> PendingConnects = new List<MessageContext>();
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.OpenHighSpeedClient)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.OpenHighSpeedClient)]
     private static void ReceiveOpenHighSpeedClient(MessageContext ctx, ushort port)
     {
         HighSpeedConnection? connection = HighSpeedConnection.Instance;
@@ -169,6 +169,7 @@ public static class HighSpeedNetFactory
         Logger.LogDebug("Sent steam token for high-speed connection.");
         SteamVerify.Invoke(received, Provider.client.m_SteamID);
     }
+
     [NetCall(NetCallSource.FromServer, (ushort)HighSpeedNetCall.VerifyConfirm, HighSpeed = true, HighSpeedAllowUnverified = true)]
     private static void ReceiveVerified(MessageContext ctx)
     {

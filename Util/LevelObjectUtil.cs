@@ -106,10 +106,10 @@ public static class LevelObjectUtil
 #endif
 
     [UsedImplicitly]
-    private static readonly NetCall<Guid, Vector3, Quaternion, Vector3> SendRequestInstantiation = new NetCall<Guid, Vector3, Quaternion, Vector3>(NetCalls.RequestLevelObjectInstantiation);
+    private static readonly NetCall<Guid, Vector3, Quaternion, Vector3> SendRequestInstantiation = new NetCall<Guid, Vector3, Quaternion, Vector3>(DevkitServerNetCall.RequestLevelObjectInstantiation);
 
     [UsedImplicitly]
-    private static readonly NetCall<Guid, Vector3, Quaternion, Vector3, ulong, NetId> SendLevelObjectInstantiation = new NetCall<Guid, Vector3, Quaternion, Vector3, ulong, NetId>(NetCalls.SendLevelObjectInstantiation);
+    private static readonly NetCall<Guid, Vector3, Quaternion, Vector3, ulong, NetId> SendLevelObjectInstantiation = new NetCall<Guid, Vector3, Quaternion, Vector3, ulong, NetId>(DevkitServerNetCall.SendLevelObjectInstantiation);
 
 
 #if CLIENT
@@ -182,7 +182,7 @@ public static class LevelObjectUtil
         SendRequestInstantiation.Invoke(asset, position, rotation, scale);
     }
 
-    [NetCall(NetCallSource.FromServer, NetCalls.SendLevelObjectInstantiation)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendLevelObjectInstantiation)]
     internal static StandardErrorCode ReceiveInstantiation(MessageContext ctx, Guid asset, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
     {
         if (Assets.find(asset) is not ObjectAsset objAsset)
@@ -310,7 +310,7 @@ public static class LevelObjectUtil
     /// </summary>
     /// <param name="ctx">Create using <see cref="MessageContext.CreateFromCaller"/>.</param>
     /// <param name="guid">Guid of an <see cref="ItemBarricadeAsset"/>, <see cref="ItemStructureAsset"/>, or <see cref="ObjectAsset"/>.</param>
-    [NetCall(NetCallSource.FromClient, NetCalls.RequestLevelObjectInstantiation)]
+    [NetCall(NetCallSource.FromClient, DevkitServerNetCall.RequestLevelObjectInstantiation)]
     public static void ReceiveLevelObjectInstantiationRequest(MessageContext ctx, Guid guid, Vector3 position, Quaternion rotation, Vector3 scale)
     {
         EditorUser? user = ctx.GetCaller();

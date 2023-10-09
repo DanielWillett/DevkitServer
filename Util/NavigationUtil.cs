@@ -5,7 +5,7 @@ public static class NavigationUtil
     private static readonly Action<Flag>? UpdateNavmesh = Accessor.GenerateInstanceCaller<Flag, Action<Flag>>("updateNavmesh", false);
 
     /// <returns>A readonly value collection used to loop through all the existing navigations.</returns>
-    public static IReadOnlyCollection<Flag> NavigationFlags => GetNavigationFlags();
+    public static IReadOnlyList<Flag> NavigationFlags => GetNavigationFlags();
     /// <summary>
     /// If possible, use <see cref="NavigationFlags"/> instead.
     /// </summary>

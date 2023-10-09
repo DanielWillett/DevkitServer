@@ -74,12 +74,12 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
     }
 #endif
 
-    internal static readonly NetCallRaw<Permission, bool> SendPermissionState = new NetCallRaw<Permission, bool>((ushort)NetCalls.SendPermissionState,
+    internal static readonly NetCallRaw<Permission, bool> SendPermissionState = new NetCallRaw<Permission, bool>((ushort)DevkitServerNetCall.SendPermissionState,
         Permission.ReadPermission, null, Permission.WritePermission, null);
-    internal static readonly NetCallRaw<PermissionGroup, bool> SendPermissionGroupState = new NetCallRaw<PermissionGroup, bool>((ushort)NetCalls.SendPermissionGroupState,
+    internal static readonly NetCallRaw<PermissionGroup, bool> SendPermissionGroupState = new NetCallRaw<PermissionGroup, bool>((ushort)DevkitServerNetCall.SendPermissionGroupState,
         PermissionGroup.ReadPermissionGroup, null, PermissionGroup.WritePermissionGroup, null);
-    internal static readonly NetCall SendClearPermissions = new NetCall((ushort)NetCalls.SendClearPermissions);
-    internal static readonly NetCall SendClearPermissionGroups = new NetCall((ushort)NetCalls.SendClearPermissionGroups);
+    internal static readonly NetCall SendClearPermissions = new NetCall((ushort)DevkitServerNetCall.SendClearPermissions);
+    internal static readonly NetCall SendClearPermissionGroups = new NetCall((ushort)DevkitServerNetCall.SendClearPermissionGroups);
 #if SERVER
     public static readonly string DefaultFileLocation = Path.Combine(DevkitServerConfig.Directory, "permissions.json");
     public const ushort DataVersion = 0;

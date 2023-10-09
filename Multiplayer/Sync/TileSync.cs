@@ -306,7 +306,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             Logger.LogError("[TILE SYNC] Failed to read incoming tile data packet length.");
             return;
         }
-        NetFactory.IncrementByteCount(false, DevkitMessage.MovementRelay, len + sizeof(ushort));
+        NetFactory.IncrementByteCount(false, DevkitServerMessage.MovementRelay, len + sizeof(ushort));
 
         if (!reader.ReadBytesPtr(len, out byte[] buffer, out int offset))
         {
@@ -349,7 +349,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
                     if (sync.IsOwner || sp.playerID.steamID.m_SteamID == sync.User!.SteamId.m_SteamID)
                         list.Add(sp.transportConnection);
                 }
-                NetFactory.SendGeneric(DevkitMessage.SendTileData, buffer, list, length: len, reliable: true, offset: offset);
+                NetFactory.SendGeneric(DevkitServerMessage.SendTileData, buffer, list, length: len, reliable: true, offset: offset);
             }
 #endif
             sync.ReceiveTileData(buffer, offset + sizeof(ulong));
@@ -583,7 +583,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
 
             Buffer.BlockCopy(_buffer, _index, PacketBuffer, PacketHeaderSize + sizeof(ulong), len);
 
-            NetFactory.SendGeneric(DevkitMessage.SendTileData, PacketBuffer,
+            NetFactory.SendGeneric(DevkitServerMessage.SendTileData, PacketBuffer,
 #if SERVER
                 null,
 #endif

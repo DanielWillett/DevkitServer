@@ -1,14 +1,13 @@
 ﻿using DevkitServer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
-using System.IO.Compression;
-using System.Reflection;
-using SDG.Provider;
 #if CLIENT
 using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Patches;
 using SDG.Framework.Utilities;
+using SDG.Provider;
+using System.IO.Compression;
 #endif
 #if SERVER
 using CompressionLevel = System.IO.Compression.CompressionLevel;
@@ -22,27 +21,27 @@ public static class EditorLevel
 {
     public const int DataBufferPacketSize = NetFactory.MaxPacketSize; // 60 KiB (must be slightly under ushort.MaxValue, 60 KB is a good middle ground to allow for future overhead expansion, etc).
     [UsedImplicitly]
-    private static readonly NetCall SendRequestLevel = new NetCall((ushort)NetCalls.RequestLevel);
+    private static readonly NetCall SendRequestLevel = new NetCall(DevkitServerNetCall.RequestLevel);
     [UsedImplicitly]
-    private static readonly NetCall<int, string, long, int, bool, long> StartSendLevel = new NetCall<int, string, long, int, bool, long>((ushort)NetCalls.StartSendLevel);
+    private static readonly NetCall<int, string, long, int, bool, long> StartSendLevel = new NetCall<int, string, long, int, bool, long>(DevkitServerNetCall.StartSendLevel);
     [UsedImplicitly]
-    private static readonly NetCallCustom SendLevelPacket = new NetCallCustom((ushort)NetCalls.SendLevel);
+    private static readonly NetCallCustom SendLevelPacket = new NetCallCustom(DevkitServerNetCall.SendLevel);
     [UsedImplicitly]
-    private static readonly NetCall<bool, bool> EndSendLevel = new NetCall<bool, bool>((ushort)NetCalls.EndSendLevel);
+    private static readonly NetCall<bool, bool> EndSendLevel = new NetCall<bool, bool>(DevkitServerNetCall.EndSendLevel);
     [UsedImplicitly]
-    private static readonly NetCall<int[]> RequestPackets = new NetCall<int[]>((ushort)NetCalls.RequestLevelPackets);
+    private static readonly NetCall<int[]> RequestPackets = new NetCall<int[]>(DevkitServerNetCall.RequestLevelPackets);
     [UsedImplicitly]
-    private static readonly NetCall<int, int> SendCheckup = new NetCall<int, int>((ushort)NetCalls.RequestLevelCheckup);
+    private static readonly NetCall<int, int> SendCheckup = new NetCall<int, int>(DevkitServerNetCall.RequestLevelCheckup);
     [UsedImplicitly]
-    private static readonly NetCallRaw<byte[], bool> SendWholeLevel = new NetCallRaw<byte[], bool>((ushort)HighSpeedNetCall.SendWholeLevel, reader => reader.ReadLongUInt8Array(), null, (writer, b) => writer.WriteLong(b), null
+    private static readonly NetCallRaw<byte[], bool> SendWholeLevel = new NetCallRaw<byte[], bool>((ushort)HighSpeedNetCall.SendWholeLevel, reader => reader.ReadLongUInt8Array(), null, (writer, b) => writer.WriteLong(b), null, highSpeed: true
 #if SERVER
         , capacity: 80000000
 #endif
-        ) { HighSpeed = true };
+        );
     [UsedImplicitly]
-    private static readonly NetCall SendPending = new NetCall((ushort)NetCalls.SendPending);
+    private static readonly NetCall SendPending = new NetCall(DevkitServerNetCall.SendPending);
     [UsedImplicitly]
-    internal static readonly NetCall Ping = new NetCall((ushort)NetCalls.Ping);
+    internal static readonly NetCall Ping = new NetCall(DevkitServerNetCall.Ping);
     internal static List<ITransportConnection> PendingToReceiveActions = new List<ITransportConnection>(4);
 #if CLIENT
     public static string TempLevelPath => Path.Combine(DevkitServerConfig.ServerFolder, "Levels", _pendingLevelName ?? throw new NotSupportedException("Level not pending."), "Level Install");
@@ -55,7 +54,7 @@ public static class EditorLevel
     // i used an exit flag here because the finally block is not executed when calling StopCoroutine (Dispose is not called)
     private static bool _exitCoroutine;
 
-    [NetCall(NetCallSource.FromClient, (ushort)NetCalls.RequestLevel)]
+    [NetCall(NetCallSource.FromClient, (ushort)DevkitServerNetCall.RequestLevel)]
     private static StandardErrorCode ReceiveLevelRequest(MessageContext ctx)
     {
         Logger.LogInfo($"[SEND LEVEL] Received level request from ({ctx.Connection.Format()}).", ConsoleColor.DarkCyan);
@@ -159,7 +158,7 @@ public static class EditorLevel
                 {
                     float start = CachedTime.RealtimeSinceStartup;
                     NetTask task4 = Ping.RequestAck(connection, 2000);
-                    while (!task4.isCompleted)
+                    while (!task4.IsCompleted)
                         yield return null;
                     if (!task4.Parameters.Responded)
                     {
@@ -207,7 +206,7 @@ public static class EditorLevel
             if (!lowSpeedDownload)
             {
                 NetTask pingTask = Ping.Listen(15000);
-                NetTask stTask = StartSendLevel.RequestAck(connection, data.Length, lvlName, task2.requestId, -1, true, pingTask.requestId);
+                NetTask stTask = StartSendLevel.RequestAck(connection, data.Length, lvlName, task2.RequestId, -1, true, pingTask.RequestId);
                 yield return stTask;
                 if (!stTask.Parameters.Responded || stTask.Parameters.ErrorCode is not (int)StandardErrorCode.Success)
                 {
@@ -219,9 +218,9 @@ public static class EditorLevel
                 Logger.LogInfo($"[SEND LEVEL] Ready to upload {lvlName} to high-speed connection.", ConsoleColor.DarkCyan);
                 yield return new WaitForSeconds(0.25f);
                 NetTask task = SendWholeLevel.RequestAck(hsConn!, data, compressed, 20000);
-                while (!task.isCompleted)
+                while (!task.IsCompleted)
                 {
-                    if (pingTask.isCompleted)
+                    if (pingTask.IsCompleted)
                     {
                         if (pingTask.Parameters.Responded)
                         {
@@ -229,7 +228,7 @@ public static class EditorLevel
                             Logger.LogDebug("[SEND LEVEL] Received keep-alive from client while downloading, refreshed timeout.");
                         }
 
-                        pingTask = new NetTask(false, pingTask.requestId, 10000);
+                        pingTask = new NetTask(false, pingTask.RequestId, 10000);
                         NetFactory.RegisterListener(pingTask, Ping);
                     }
 
@@ -249,12 +248,12 @@ public static class EditorLevel
             }
             else
             {
-                MessageOverhead cpy = new MessageOverhead(MessageFlags.None, (ushort)NetCalls.SendLevel, 0, 0);
+                MessageOverhead cpy = new MessageOverhead(MessageFlags.None, (ushort)DevkitServerNetCall.SendLevel, 0, 0);
                 byte[] dataBuffer = new byte[cpy.Length + sizeof(int) + DataBufferPacketSize];
                 int index = 0;
                 int c = -1;
                 int ttl = (int)Math.Ceiling(data.Length / (double)DataBufferPacketSize);
-                StartSendLevel.Invoke(connection, data.Length, lvlName, task2.requestId, ttl, false, 0);
+                StartSendLevel.Invoke(connection, data.Length, lvlName, task2.RequestId, ttl, false, 0);
 
                 if (!connection.TryGetPort(out _))
                     yield break;
@@ -272,7 +271,7 @@ public static class EditorLevel
                 {
                     int len = Math.Min(DataBufferPacketSize, data.Length - index);
                     if (len <= 0) break;
-                    cpy = new MessageOverhead(MessageFlags.None, (ushort)NetCalls.SendLevel, sizeof(int) + len, 0);
+                    cpy = new MessageOverhead(MessageFlags.None, (ushort)DevkitServerNetCall.SendLevel, sizeof(int) + len, 0);
                     Buffer.BlockCopy(data, index, dataBuffer, cpy.Length + sizeof(int), len);
                     ++c;
                     index += len;
@@ -286,7 +285,7 @@ public static class EditorLevel
                         bool retried = false;
                     retry2:
                         NetTask task3 = SendCheckup.RequestAck(connection, lastCheckup, c, 10000);
-                        while (!task3.isCompleted)
+                        while (!task3.IsCompleted)
                             yield return null;
                         if (task3.Parameters.Responded && task3.Parameters.ErrorCode.HasValue)
                         {
@@ -344,7 +343,7 @@ public static class EditorLevel
                 if (task.Parameters.TryGetParameter(0, out int[] packets) && packets.Length > 0)
                 {
                     Array.Sort(packets);
-                    cpy = new MessageOverhead(MessageFlags.AcknowledgeRequest, (ushort)NetCalls.SendLevel, 0, 0);
+                    cpy = new MessageOverhead(MessageFlags.AcknowledgeRequest, (ushort)DevkitServerNetCall.SendLevel, 0, 0);
                     dataBuffer = new byte[cpy.Length + sizeof(int) + DataBufferPacketSize];
                     for (int i = 0; i < packets.Length; ++i)
                     {
@@ -354,7 +353,7 @@ public static class EditorLevel
                         int len = Math.Min(DataBufferPacketSize, data.Length - index);
                         if (len <= 0) break;
                         task = SendLevelPacket.ListenAck(1500);
-                        cpy = new MessageOverhead(MessageFlags.AcknowledgeRequest, (ushort)NetCalls.SendLevel, sizeof(int) + len, task.requestId);
+                        cpy = new MessageOverhead(MessageFlags.AcknowledgeRequest, (ushort)DevkitServerNetCall.SendLevel, sizeof(int) + len, task.RequestId);
                         Buffer.BlockCopy(data, index, dataBuffer, cpy.Length + sizeof(int), len);
                         cpy.GetBytes(dataBuffer, 0);
                         UnsafeBitConverter.GetBytes(dataBuffer, packet, cpy.Length);
@@ -458,7 +457,7 @@ public static class EditorLevel
             if (t - _lastKeepalive > 7.5f && _pendingKeepAliveKey != 0)
             {
                 _lastKeepalive = t;
-                MessageOverhead ovh = new MessageOverhead(MessageFlags.RequestResponse, Ping.ID, 0, _pendingKeepAliveKey);
+                MessageOverhead ovh = new MessageOverhead(Ping.DefaultFlags | MessageFlags.RequestResponse, Ping.Guid, Ping.Id, 0, _pendingKeepAliveKey);
                 Ping.Invoke(ref ovh);
                 Logger.LogDebug("[RECEIVING LEVEL] Sending KeepAlive: " + ovh.Format() + ".");
             }
@@ -512,12 +511,12 @@ public static class EditorLevel
             LoadingUI.NotifyDownloadProgress(_pendingLevelIndex == 0 || _pendingLevelLength == 0 ? 0.05f : ((float)_pendingLevelIndex / _pendingLevelLength * 0.90f + 0.05f));
         }
     }
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.Ping)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.Ping)]
     private static void ReceivePing(MessageContext ctx)
     {
         ctx.Acknowledge();
     }
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.RequestLevelCheckup)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.RequestLevelCheckup)]
     private static int ReceiveLevelCheckup(MessageContext ctx, int start, int end)
     {
         if (_pendingLevel == null)
@@ -536,7 +535,7 @@ public static class EditorLevel
 
         return missing;
     }
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.StartSendLevel)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.StartSendLevel)]
     private static void ReceiveStartLevel(MessageContext ctx, int length, string lvlName, long reqId, int packetCount, bool viaTcp, long keepAliveKey)
     {
         _hs = viaTcp;
@@ -581,7 +580,7 @@ public static class EditorLevel
         _lastDirty = true;
     }
 
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.SendLevel)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendLevel)]
     private static void ReceiveLevelDataPacket(MessageContext ctx, ByteReader reader)
     {
         if (_pendingLevel == null || _pendingLevelName == null)
@@ -627,7 +626,7 @@ public static class EditorLevel
     {
         if (!_isCancelling && _pendingLevel != null)
         {
-            MessageOverhead ovh = new MessageOverhead(MessageFlags.RequestResponse, EndSendLevel.ID, 0, 0, _pendingCancelKey);
+            MessageOverhead ovh = new MessageOverhead(EndSendLevel.DefaultFlags | MessageFlags.RequestResponse, EndSendLevel.Id, 0, 0, _pendingCancelKey);
             EndSendLevel.Invoke(ref ovh, true, false);
             _isCancelling = true;
             string lvl = _pendingLevelName ?? string.Empty;
@@ -718,7 +717,7 @@ public static class EditorLevel
         ctx.Acknowledge(StandardErrorCode.Success);
     }
 
-    [NetCall(NetCallSource.FromServer, (ushort)NetCalls.EndSendLevel)]
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.EndSendLevel)]
     private static void ReceiveEndLevel(MessageContext ctx, bool cancelled, bool wasCompressed)
     {
         if (_pendingLevelName == null || _pendingLevel == null)

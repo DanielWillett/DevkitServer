@@ -608,7 +608,7 @@ internal static class PatchesMain
                 PendingConnections.RemoveAt(i);
         }
     }
-    [NetCall(NetCallSource.FromClient, (ushort)NetCalls.SendPending)]
+    [NetCall(NetCallSource.FromClient, (ushort)DevkitServerNetCall.SendPending)]
     [UsedImplicitly]
     private static void OnConnectionPending(MessageContext ctx)
     {

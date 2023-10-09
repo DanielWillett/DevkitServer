@@ -4,8 +4,9 @@ using DevkitServer.Util.Encoding;
 namespace DevkitServer.Multiplayer.Networking;
 
 /// <summary>
-/// Create with <see cref="CreateFromCaller"/>.
+/// Contains context for <see cref="DevkitServerMessage.InvokeMethod"/> messges, such as the overhead, connection source, and if it was sent over a High-Speed connection.
 /// </summary>
+/// <remarks>Simulate with <see cref="CreateFromCaller"/>.</remarks>
 public readonly struct MessageContext
 {
     public static readonly MessageContext Nil = new MessageContext(null!, new MessageOverhead(MessageFlags.None, 0, 0), false);
@@ -45,12 +46,12 @@ public readonly struct MessageContext
         return new MessageContext(user.Connection, new MessageOverhead(MessageFlags.None, 0, 0), false);
     }
 #endif
-    public MessageOverhead GetReplyOverhead(ushort id, bool layered, bool ack)
+    public MessageOverhead GetReplyOverhead(BaseNetCall call, bool layered, bool ack)
     {
         MessageFlags flags;
         if ((Overhead.Flags & MessageFlags.Request) == MessageFlags.Request)
         {
-            flags = BaseNetCall.DefaultFlags;
+            flags = call.DefaultFlags;
             if (Overhead.RequestKey != 0)
                 flags |= MessageFlags.RequestResponse;
             if (layered)
@@ -60,7 +61,7 @@ public readonly struct MessageContext
 
         if (ack)
             flags |= MessageFlags.AcknowledgeRequest;
-        return new MessageOverhead(flags, id, 0, Overhead.RequestKey);
+        return new MessageOverhead(flags, call.Guid, call.Id, 0, Overhead.RequestKey);
     }
     public bool Acknowledge()
     {
@@ -115,7 +116,7 @@ public readonly struct MessageContext
     public void Reply(NetCall call)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -125,7 +126,7 @@ public readonly struct MessageContext
     public void Reply(NetCallCustom call, NetCallCustom.WriterTask task)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -135,7 +136,7 @@ public readonly struct MessageContext
     public void Reply<T1>(NetCallRaw<T1> call, T1 arg1)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -145,7 +146,7 @@ public readonly struct MessageContext
     public void Reply<T1, T2>(NetCallRaw<T1, T2> call, T1 arg1, T2 arg2)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -155,7 +156,7 @@ public readonly struct MessageContext
     public void Reply<T1, T2, T3>(NetCallRaw<T1, T2, T3> call, T1 arg1, T2 arg2, T3 arg3)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -165,7 +166,7 @@ public readonly struct MessageContext
     public void Reply<T1, T2, T3, T4>(NetCallRaw<T1, T2, T3, T4> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -175,7 +176,7 @@ public readonly struct MessageContext
     public void Reply<T1, T2, T3, T4, T5>(NetCallRaw<T1, T2, T3, T4, T5> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -185,7 +186,7 @@ public readonly struct MessageContext
     public void Reply<T1, T2, T3, T4, T5, T6>(NetCallRaw<T1, T2, T3, T4, T5, T6> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -195,7 +196,7 @@ public readonly struct MessageContext
     public void Reply<T1>(NetCall<T1> call, T1 arg1)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -205,7 +206,7 @@ public readonly struct MessageContext
     public void Reply<T1, T2>(NetCall<T1, T2> call, T1 arg1, T2 arg2)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -215,7 +216,7 @@ public readonly struct MessageContext
     public void Reply<T1, T2, T3>(NetCall<T1, T2, T3> call, T1 arg1, T2 arg2, T3 arg3)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -225,7 +226,7 @@ public readonly struct MessageContext
     public void Reply<T1, T2, T3, T4>(NetCall<T1, T2, T3, T4> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -235,7 +236,7 @@ public readonly struct MessageContext
     public void Reply<T1, T2, T3, T4, T5>(NetCall<T1, T2, T3, T4, T5> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -245,7 +246,7 @@ public readonly struct MessageContext
     public void Reply<T1, T2, T3, T4, T5, T6>(NetCall<T1, T2, T3, T4, T5, T6> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -255,7 +256,7 @@ public readonly struct MessageContext
     public void Reply<T1, T2, T3, T4, T5, T6, T7>(NetCall<T1, T2, T3, T4, T5, T6, T7> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -265,7 +266,7 @@ public readonly struct MessageContext
     public void Reply<T1, T2, T3, T4, T5, T6, T7, T8>(NetCall<T1, T2, T3, T4, T5, T6, T7, T8> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -275,7 +276,7 @@ public readonly struct MessageContext
     public void Reply<T1, T2, T3, T4, T5, T6, T7, T8, T9>(NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -285,7 +286,7 @@ public readonly struct MessageContext
     public void Reply<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, false);
+        MessageOverhead overhead = GetReplyOverhead(call, false, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -295,7 +296,7 @@ public readonly struct MessageContext
     public void ReplyLayered(NetCall call)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -305,7 +306,7 @@ public readonly struct MessageContext
     public void ReplyLayered(NetCallCustom call, NetCallCustom.WriterTask task)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -315,7 +316,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1>(NetCallRaw<T1> call, T1 arg1)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -325,7 +326,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1, T2>(NetCallRaw<T1, T2> call, T1 arg1, T2 arg2)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -335,7 +336,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1, T2, T3>(NetCallRaw<T1, T2, T3> call, T1 arg1, T2 arg2, T3 arg3)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -345,7 +346,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1, T2, T3, T4>(NetCallRaw<T1, T2, T3, T4> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -355,7 +356,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1, T2, T3, T4, T5>(NetCallRaw<T1, T2, T3, T4, T5> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -365,7 +366,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1, T2, T3, T4, T5, T6>(NetCallRaw<T1, T2, T3, T4, T5, T6> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -375,7 +376,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1>(NetCall<T1> call, T1 arg1)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -385,7 +386,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1, T2>(NetCall<T1, T2> call, T1 arg1, T2 arg2)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -395,7 +396,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1, T2, T3>(NetCall<T1, T2, T3> call, T1 arg1, T2 arg2, T3 arg3)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -405,7 +406,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1, T2, T3, T4>(NetCall<T1, T2, T3, T4> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -415,7 +416,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1, T2, T3, T4, T5>(NetCall<T1, T2, T3, T4, T5> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -425,7 +426,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1, T2, T3, T4, T5, T6>(NetCall<T1, T2, T3, T4, T5, T6> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -435,7 +436,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1, T2, T3, T4, T5, T6, T7>(NetCall<T1, T2, T3, T4, T5, T6, T7> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -445,7 +446,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1, T2, T3, T4, T5, T6, T7, T8>(NetCall<T1, T2, T3, T4, T5, T6, T7, T8> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -455,7 +456,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1, T2, T3, T4, T5, T6, T7, T8, T9>(NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -465,7 +466,7 @@ public readonly struct MessageContext
     public void ReplyLayered<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, false);
+        MessageOverhead overhead = GetReplyOverhead(call, true, false);
         call.Invoke(ref overhead
 #if SERVER
             , Connection
@@ -475,7 +476,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck(NetCall call, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -487,7 +488,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck(NetCallCustom call, NetCallCustom.WriterTask task, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task2 = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -499,7 +500,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1>(NetCallRaw<T1> call, T1 arg1, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -511,7 +512,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1, T2>(NetCallRaw<T1, T2> call, T1 arg1, T2 arg2, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -523,7 +524,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1, T2, T3>(NetCallRaw<T1, T2, T3> call, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -535,7 +536,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1, T2, T3, T4>(NetCallRaw<T1, T2, T3, T4> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -547,7 +548,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1, T2, T3, T4, T5>(NetCallRaw<T1, T2, T3, T4, T5> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -559,7 +560,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1, T2, T3, T4, T5, T6>(NetCallRaw<T1, T2, T3, T4, T5, T6> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -571,7 +572,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1>(NetCall<T1> call, T1 arg1, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -583,7 +584,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1, T2>(NetCall<T1, T2> call, T1 arg1, T2 arg2, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -595,7 +596,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1, T2, T3>(NetCall<T1, T2, T3> call, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -607,7 +608,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1, T2, T3, T4>(NetCall<T1, T2, T3, T4> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -619,7 +620,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1, T2, T3, T4, T5>(NetCall<T1, T2, T3, T4, T5> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -631,7 +632,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1, T2, T3, T4, T5, T6>(NetCall<T1, T2, T3, T4, T5, T6> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -643,7 +644,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1, T2, T3, T4, T5, T6, T7>(NetCall<T1, T2, T3, T4, T5, T6, T7> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -655,7 +656,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1, T2, T3, T4, T5, T6, T7, T8>(NetCall<T1, T2, T3, T4, T5, T6, T7, T8> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -667,7 +668,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1, T2, T3, T4, T5, T6, T7, T8, T9>(NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -679,7 +680,7 @@ public readonly struct MessageContext
     public NetTask ReplyAndRequestAck<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, false, true);
+        MessageOverhead overhead = GetReplyOverhead(call, false, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -691,7 +692,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck(NetCall call, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -703,7 +704,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck(NetCallCustom call, NetCallCustom.WriterTask task, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task2 = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -715,7 +716,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1>(NetCallRaw<T1> call, T1 arg1, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -727,7 +728,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1, T2>(NetCallRaw<T1, T2> call, T1 arg1, T2 arg2, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -739,7 +740,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1, T2, T3>(NetCallRaw<T1, T2, T3> call, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -751,7 +752,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1, T2, T3, T4>(NetCallRaw<T1, T2, T3, T4> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -763,7 +764,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1, T2, T3, T4, T5>(NetCallRaw<T1, T2, T3, T4, T5> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -775,7 +776,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1, T2, T3, T4, T5, T6>(NetCallRaw<T1, T2, T3, T4, T5, T6> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -787,7 +788,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1>(NetCall<T1> call, T1 arg1, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -799,7 +800,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1, T2>(NetCall<T1, T2> call, T1 arg1, T2 arg2, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -811,7 +812,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1, T2, T3>(NetCall<T1, T2, T3> call, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -823,7 +824,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1, T2, T3, T4>(NetCall<T1, T2, T3, T4> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -835,7 +836,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1, T2, T3, T4, T5>(NetCall<T1, T2, T3, T4, T5> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -847,7 +848,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1, T2, T3, T4, T5, T6>(NetCall<T1, T2, T3, T4, T5, T6> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -859,7 +860,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1, T2, T3, T4, T5, T6, T7>(NetCall<T1, T2, T3, T4, T5, T6, T7> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -871,7 +872,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1, T2, T3, T4, T5, T6, T7, T8>(NetCall<T1, T2, T3, T4, T5, T6, T7, T8> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -883,7 +884,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1, T2, T3, T4, T5, T6, T7, T8, T9>(NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
@@ -895,7 +896,7 @@ public readonly struct MessageContext
     public NetTask ReplyLayeredAndRequestAck<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> call, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, int timeoutMs = 5000)
     {
         if (Connection is null) throw NilError();
-        MessageOverhead overhead = GetReplyOverhead(call.ID, true, true);
+        MessageOverhead overhead = GetReplyOverhead(call, true, true);
         NetTask task = call.ListenAck(timeoutMs);
         call.Invoke(ref overhead
 #if SERVER
