@@ -70,12 +70,12 @@ Global
 		{1653CB14-E527-4FD1-AB0F-06DAC72BFCDF}.ServerRelease|Any CPU.Build.0 = ServerRelease|Any CPU
 		{5B03E97D-9E96-4F25-9200-33035CCD1902}.ClientDebug|Any CPU.ActiveCfg = ClientDebug|Any CPU
 		{5B03E97D-9E96-4F25-9200-33035CCD1902}.ClientRelease|Any CPU.ActiveCfg = ClientRelease|Any CPU
-		{5B03E97D-9E96-4F25-9200-33035CCD1902}.ServerDebug|Any CPU.ActiveCfg = ClientDebug|Any CPU
+		{5B03E97D-9E96-4F25-9200-33035CCD1902}.ServerDebug|Any CPU.ActiveCfg = ServerRelease|Any CPU
 		{5B03E97D-9E96-4F25-9200-33035CCD1902}.ServerRelease|Any CPU.ActiveCfg = ServerRelease|Any CPU
 		{5B03E97D-9E96-4F25-9200-33035CCD1902}.ServerRelease|Any CPU.Build.0 = ServerRelease|Any CPU
 		{58A685A9-9ACA-4592-8F91-FF574C88C3DD}.ClientDebug|Any CPU.ActiveCfg = ServerRelease|Any CPU
 		{58A685A9-9ACA-4592-8F91-FF574C88C3DD}.ClientRelease|Any CPU.ActiveCfg = ClientRelease|Any CPU
-		{58A685A9-9ACA-4592-8F91-FF574C88C3DD}.ServerDebug|Any CPU.ActiveCfg = ClientDebug|Any CPU
+		{58A685A9-9ACA-4592-8F91-FF574C88C3DD}.ServerDebug|Any CPU.ActiveCfg = ServerRelease|Any CPU
 		{58A685A9-9ACA-4592-8F91-FF574C88C3DD}.ServerRelease|Any CPU.ActiveCfg = ServerRelease|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution

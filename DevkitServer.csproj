@@ -18,11 +18,12 @@
   </PropertyGroup>
   <PropertyGroup>
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
-    <Version>0.0.10</Version>
+    <Version>0.0.12</Version>
     <Authors>DanielWillett</Authors>
     <Company>DanielWillett</Company>
     <Description>Module for Unturned that enables multi-user map editing.</Description>
     <PackageProjectUrl>https://github.com/DanielWillett/DevkitServer</PackageProjectUrl>
+    <PackageIcon>icon.png</PackageIcon>
     <PackageTags>unturned, module, map, editor, multiplayer</PackageTags>
     <PackageReleaseNotes>https://github.com/DanielWillett/DevkitServer/releases</PackageReleaseNotes>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
@@ -58,6 +59,7 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="Promo\icon.png" Pack="true" PackagePath="" />
     <None Include="Module" Pack="false" />
     <None Include="Module\**" Pack="false" />
   </ItemGroup>

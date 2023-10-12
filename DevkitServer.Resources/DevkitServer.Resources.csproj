@@ -14,7 +14,7 @@
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
     <PackageId>DevkitServer.Resources</PackageId>
     <Title>DevkitServer.Resources</Title>
-    <Version>0.0.10</Version>
+    <Version>0.0.11</Version>
     <Authors>DanielWillett</Authors>
     <Company>DanielWillett</Company>
     <Description>Module config resources for DevkitServer, a multiplayer map editor module for nturned.</Description>
@@ -24,6 +24,7 @@
     <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
+    <PackageIcon>icon.png</PackageIcon>
     <IncludeSymbols>True</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <AssemblyName>DevkitServer.Resources</AssemblyName>
@@ -45,6 +46,7 @@
     <EmbeddedResource Remove="Module\**" />
     <None Remove="Module\**" />
     <None Include="README.md" Pack="true" PackagePath="\"/>
+    <None Include="..\Promo\icon.png" Pack="true" PackagePath=""/>
   </ItemGroup>
 
   <ItemGroup>
