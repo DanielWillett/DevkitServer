@@ -19,6 +19,7 @@ public class ByteWriter
     private static readonly MethodInfo WriteNullableEnumMethod = typeof(ByteWriter).GetMethod(nameof(WriteNullableEnum), BindingFlags.Instance | BindingFlags.NonPublic)
                                                                  ?? throw new MemberAccessException("Unable to find write nullable enum method.");
     private int _size;
+    private int _maxSize;
     private byte[] _buffer;
     private bool _streamMode;
     private Stream? _stream;
@@ -214,6 +215,33 @@ public class ByteWriter
             System.Buffer.BlockCopy(old, 0, _buffer, 0, _size);
         }
     }
+
+    public void BackTrack(int position)
+    {
+        if (_streamMode)
+            throw new NotSupportedException("BackTrack and Return are not supported in stream mode.");
+        if (position < 0)
+            position = 0;
+        if (position > _size)
+            throw new ArgumentOutOfRangeException(nameof(position));
+        if (position == _size)
+            return;
+
+        _maxSize = _size;
+        _size = position;
+    }
+    public void Return()
+    {
+        if (_streamMode)
+            throw new NotSupportedException("BackTrack and Return are not supported in stream mode.");
+        if (_maxSize == 0)
+            throw new InvalidOperationException("You must call BackTrack before calling Return.");
+
+        if (_size < _maxSize)
+            _size = _maxSize;
+        _maxSize = 0;
+    }
+
     /// <summary>Use with caution, may not be consistant with structs that do not have an explicit layout.</summary>
     public unsafe void WriteStruct<T>(in T value) where T : unmanaged
     {

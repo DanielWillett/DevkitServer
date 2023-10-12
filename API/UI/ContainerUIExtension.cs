@@ -20,9 +20,9 @@ public abstract class ContainerUIExtension : UIExtension, IDisposable
     {
         Container = new SleekFullscreenBox
         {
-            sizeScale_X = 1f,
-            sizeScale_Y = 1f,
-            isVisible = false
+            SizeScale_X = 1f,
+            SizeScale_Y = 1f,
+            IsVisible = false
         };
         _containerHasBeenParented = false;
     }
@@ -43,7 +43,7 @@ public abstract class ContainerUIExtension : UIExtension, IDisposable
             {
                 try
                 {
-                    Container.destroy();
+                    Container.InternalDestroy();
                 }
                 catch (Exception ex)
                 {
@@ -55,8 +55,8 @@ public abstract class ContainerUIExtension : UIExtension, IDisposable
 
                 Container = new SleekFullscreenBox
                 {
-                    sizeScale_X = 1f,
-                    sizeScale_Y = 1f
+                    SizeScale_X = 1f,
+                    SizeScale_Y = 1f
                 };
             }
 
@@ -64,21 +64,21 @@ public abstract class ContainerUIExtension : UIExtension, IDisposable
             _containerHasBeenParented = true;
         }
 
-        Container.sizeScale_X = SizeScaleX;
-        Container.sizeScale_Y = SizeScaleY;
-        Container.sizeOffset_X = SizeOffsetX;
-        Container.sizeOffset_Y = SizeOffsetY;
-        Container.positionScale_X = PositionScaleX;
-        Container.positionScale_Y = PositionScaleY;
-        Container.positionOffset_X = PositionOffsetX;
-        Container.positionOffset_Y = PositionOffsetY;
-        Container.isVisible = true;
+        Container.SizeScale_X = SizeScaleX;
+        Container.SizeScale_Y = SizeScaleY;
+        Container.SizeOffset_X = SizeOffsetX;
+        Container.SizeOffset_Y = SizeOffsetY;
+        Container.PositionScale_X = PositionScaleX;
+        Container.PositionScale_Y = PositionScaleY;
+        Container.PositionOffset_X = PositionOffsetX;
+        Container.PositionOffset_Y = PositionOffsetY;
+        Container.IsVisible = true;
         OnShown();
     }
     protected sealed override void Closed()
     {
         OnHidden();
-        Container.isVisible = false;
+        Container.IsVisible = false;
     }
 
     public void Dispose()

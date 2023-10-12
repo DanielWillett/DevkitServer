@@ -1,79 +1,95 @@
 {
 	"IsEnabled": true,
 	"Name": "DevkitServer",
-	"Version": "0.0.0.1",
+	"Version": "0.0.0.0",
 	"Dependencies":
 	[
 		{
 			"Name": "DevkitServer.Launcher",
-			"Version": "1.0.0.0"
+			"Version": "1.0.0.1"
 		}
 	],
 	"Assemblies":
 	[
 		{
+			"Path": "/Libraries/System.Numerics.Vectors.dll",
+			"Role": "Both_Optional",
+			"Load_As_Byte_Array": false
+		},
+		{
 			"Path": "/Libraries/0Harmony.dll",
-			"Role": "Both_Optional"
+			"Role": "Both_Optional",
+			"Load_As_Byte_Array": false
 		},
 		{
 			"Path": "/Libraries/StackCleaner.dll",
-			"Role": "Both_Optional"
+			"Role": "Both_Optional",
+			"Load_As_Byte_Array": false
 		},
 		{
 			"Path": "/Libraries/System.Runtime.CompilerServices.Unsafe.dll",
-			"Role": "Both_Optional"
+			"Role": "Both_Optional",
+			"Load_As_Byte_Array": false
 		},
 		{
 			"Path": "/Libraries/System.Text.Encodings.Web.dll",
-			"Role": "Both_Optional"
+			"Role": "Both_Optional",
+			"Load_As_Byte_Array": false
 		},
 		{
 			"Path": "/Libraries/Microsoft.Bcl.AsyncInterfaces.dll",
-			"Role": "Both_Optional"
+			"Role": "Both_Optional",
+			"Load_As_Byte_Array": false
 		},
 		{
 			"Path": "/Libraries/System.Memory.dll",
-			"Role": "Both_Optional"
+			"Role": "Both_Optional",
+			"Load_As_Byte_Array": false
 		},
 		{
 			"Path": "/Libraries/System.Buffers.dll",
-			"Role": "Both_Optional"
-		},
-		{
-			"Path": "/Libraries/System.Numerics.Vectors.dll",
-			"Role": "Both_Optional"
+			"Role": "Both_Optional",
+			"Load_As_Byte_Array": false
 		},
 		{
 			"Path": "/Libraries/System.ValueTuple.dll",
-			"Role": "Both_Optional"
+			"Role": "Both_Optional",
+			"Load_As_Byte_Array": false
 		},
 		{
 			"Path": "/Libraries/System.Threading.Tasks.Extensions.dll",
-			"Role": "Both_Optional"
+			"Role": "Both_Optional",
+			"Load_As_Byte_Array": false
 		},
 		{
 			"Path": "/Libraries/System.IO.Compression.dll",
-			"Role": "Both_Optional"
+			"Role": "Both_Optional",
+			"Load_As_Byte_Array": false
 		},
 		{
 			"Path": "/Libraries/System.IO.Compression.FileSystem.dll",
-			"Role": "Both_Optional"
+			"Role": "Both_Optional",
+			"Load_As_Byte_Array": false
 		},
 		{
 			"Path": "/Libraries/System.Text.Json.dll",
-			"Role": "Both_Optional"
+			"Role": "Both_Optional",
+			"Load_As_Byte_Array": false
 		},
 		{
 			"Path": "/Libraries/UniTask.dll",
-			"Role": "Both_Optional"
+			"Role": "Both_Optional",
+			"Load_As_Byte_Array": false
 		},
 		{
 			"Path": "/Bin/DevkitServer_Server.dll",
-			"Role": "Server"
+			"Role": "Server",
+			"Load_As_Byte_Array": false
 		},
 		{
 			"Path": "/Bin/DevkitServer_Client.dll",
-			"Role": "Client"
+			"Role": "Client",
+			"Load_As_Byte_Array": false
 		}
 	]
 }

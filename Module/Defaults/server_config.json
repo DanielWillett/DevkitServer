@@ -1,5 +1,10 @@
 {
-  "$schema": "https://github.com/DanielWillett/DevkitServer/tree/master/Module/Schemas/server_config_schema.json",
+  "$schema": "https://raw.githubusercontent.com/DanielWillett/DevkitServer/master/Module/Schemas/server_config_schema.json",
+
+  /*
+   *  Add a log to Unturned/Logs that includes whatever visual ANSI codes are used to color the console.
+   */
+  "ansi_log": true,
 
   /*
    *  Full (24-bit) console color support (works in the Win 11 terminal and most web terminals).
@@ -23,15 +28,15 @@
    */
   "new_level_info": {
 
-      /* 
+    /* 
        *  Level Types
        *   Survival (Normal)
        *   Horde
        *   Arena
        */
-      "gamemode_type": "Survival",
+    "gamemode_type": "Survival",
 
-      /*
+    /*
        *  Level Sizes
        *   Tiny    512m   0.5x0.5 tile  + 0.5 tile border
        *   Small   1024m  1x1     tile  + 0.5 tile border
@@ -39,16 +44,16 @@
        *   Large   4096m  4x4     tiles + 1   tile border
        *   Insane  8192m  8x8     tiles + 1   tile border
        */
-      "start_size": "Medium",
+    "start_size": "Medium",
 
-      /*
+    /*
        *  SteamID of the 'owner' of the map.
        *  This value goes in the map metadata, which decides who can open the file normally without a '.unlocker' file.
        *  Any SteamID format works.
        *
        *  This has no effect on uploading to workshop.
        */
-      "map_owner": "nil"
+    "map_owner": "nil"
   },
 
   /*

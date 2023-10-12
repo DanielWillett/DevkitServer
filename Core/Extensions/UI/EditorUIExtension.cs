@@ -27,17 +27,17 @@ internal class EditorUIExtension : ContainerUIExtension
             commit = "master";
 
         _testLabel = Glazier.Get().CreateLabel();
-        _testLabel.fontAlignment = TextAnchor.LowerLeft;
-        _testLabel.fontSize = ESleekFontSize.Small;
-        _testLabel.sizeScale_X = 0.5f;
-        _testLabel.sizeOffset_X = -5;
-        _testLabel.sizeOffset_Y = 30;
-        _testLabel.positionScale_Y = 1f;
-        _testLabel.positionOffset_X = 5;
-        _testLabel.positionOffset_Y = -20;
-        _testLabel.isVisible = true;
-        _testLabel.shadowStyle = ETextContrastContext.ColorfulBackdrop;
-        _testLabel.text = DevkitServerModule.MainLocalization.format("Name") + " v" + Accessor.DevkitServer.GetName().Version.ToString(3) + ", Src: " + commit + ".";
+        _testLabel.TextAlignment = TextAnchor.LowerLeft;
+        _testLabel.FontSize = ESleekFontSize.Tiny;
+        _testLabel.SizeScale_X = 0.5f;
+        _testLabel.SizeOffset_X = -5;
+        _testLabel.SizeOffset_Y = 20;
+        _testLabel.PositionScale_Y = 1f;
+        _testLabel.PositionOffset_X = 5;
+        _testLabel.PositionOffset_Y = -20;
+        _testLabel.IsVisible = true;
+        _testLabel.TextContrastContext = ETextContrastContext.ColorfulBackdrop;
+        _testLabel.Text = DevkitServerModule.MainLocalization.format("Name") + " v" + Accessor.DevkitServer.GetName().Version.ToString(3) + "-client, Src: " + DevkitServerModule.GetRelativeRepositoryUrl(null, false) + ".";
         Container.AddChild(_testLabel);
         if (DevkitServerModule.IsEditing)
             UpdateAllNametags();
@@ -87,12 +87,12 @@ internal class EditorUIExtension : ContainerUIExtension
             return;
         // PlayerGroupUI.addGroup
         ISleekLabel label = Glazier.Get().CreateLabel();
-        label.positionOffset_X = -100;
-        label.positionOffset_Y = -15;
-        label.sizeOffset_X = 200;
-        label.sizeOffset_Y = 30;
-        label.shadowStyle = ETextContrastContext.ColorfulBackdrop;
-        label.text = user.DisplayName;
+        label.PositionOffset_X = -100;
+        label.PositionOffset_Y = -15;
+        label.SizeOffset_X = 200;
+        label.SizeOffset_Y = 30;
+        label.TextContrastContext = ETextContrastContext.ColorfulBackdrop;
+        label.Text = user.DisplayName;
         UpdateNametag(label, user);
         Container.AddChild(label);
         _nametags.Add(user.SteamId.m_SteamID, label);
@@ -109,16 +109,16 @@ internal class EditorUIExtension : ContainerUIExtension
         Vector3 screenPos = MainCamera.instance.WorldToViewportPoint(ctrl.transform.position + Vector3.up);
         if (screenPos.z <= 0.0)
         {
-            if (nametag.isVisible)
-                nametag.isVisible = false;
+            if (nametag.IsVisible)
+                nametag.IsVisible = false;
         }
         else
         {
             Vector2 adjScreenPos = Container.ViewportToNormalizedPosition(screenPos);
-            nametag.positionScale_X = adjScreenPos.x;
-            nametag.positionScale_Y = adjScreenPos.y;
-            if (!nametag.isVisible)
-                nametag.isVisible = true;
+            nametag.PositionScale_X = adjScreenPos.x;
+            nametag.PositionScale_Y = adjScreenPos.y;
+            if (!nametag.IsVisible)
+                nametag.IsVisible = true;
         }
     }
 

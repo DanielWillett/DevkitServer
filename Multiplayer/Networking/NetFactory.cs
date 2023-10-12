@@ -17,9 +17,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-#if CLIENT
 using DevkitServer.Multiplayer.Sync;
-#endif
 
 namespace DevkitServer.Multiplayer.Networking;
 
@@ -131,6 +129,7 @@ public static class NetFactory
         methods[(int)DevkitServerMessage.MovementRelay] = typeof(UserInput).GetMethod(nameof(UserInput.ReceiveMovementRelay), BindingFlags.NonPublic | BindingFlags.Static)!;
 #if CLIENT
         methods[(int)DevkitServerMessage.SendTileData] = typeof(TileSync).GetMethod(nameof(TileSync.ReceiveTileData), BindingFlags.NonPublic | BindingFlags.Static)!;
+        methods[(int)DevkitServerMessage.SendNavigationData] = typeof(NavigationSync).GetMethod(nameof(NavigationSync.ReceiveNavigationData), BindingFlags.NonPublic | BindingFlags.Static)!;
 #endif
         methods[(int)DevkitServerMessage.ActionRelay] = typeof(EditorActions).GetMethod(nameof(EditorActions.ReceiveActionRelay), BindingFlags.NonPublic | BindingFlags.Static)!;
 
@@ -235,7 +234,7 @@ public static class NetFactory
 
         for (int i = 0; i < methods.Length; ++i)
         {
-            MethodInfo m = methods[i];
+            MethodInfo? m = methods[i];
             if (m == null)
                 continue;
             try
@@ -1417,11 +1416,12 @@ public enum NetCallSource : byte
 }
 public enum DevkitServerMessage
 {
-    InvokeMethod,
-    InvokeGuidMethod,
-    MovementRelay,
-    SendTileData,
-    ActionRelay
+    InvokeMethod = 0,
+    InvokeGuidMethod = 1,
+    MovementRelay = 2,
+    SendTileData = 3,
+    ActionRelay = 4,
+    SendNavigationData = 5
 }
 public delegate void SentMessage(ITransportConnection connection, in MessageOverhead overhead, byte[] message);
 public delegate void ReceivedMessage(ITransportConnection connection, in MessageOverhead overhead, byte[] message);

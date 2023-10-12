@@ -1,6 +1,4 @@
-﻿using DevkitServer.API.Logging;
-using DevkitServer.Commands.Subsystem;
-using JetBrains.Annotations;
+﻿using DevkitServer.Commands.Subsystem;
 
 namespace DevkitServer.API.Logging.Terminals;
 internal sealed class BackgroundLoggingTerminal : MonoBehaviour, ITerminal

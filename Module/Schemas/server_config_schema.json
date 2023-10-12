@@ -5,6 +5,10 @@
     "description": "Defines general server-side settings for DevkitServer.",
     "type": "object",
     "properties": {
+        "ansi_log": {
+            "description": "Add a log to Unturned/Logs that includes whatever visual ANSI codes are used to color the console.",
+            "type": "boolean"
+        },
         "extended_visual_ansi_support": {
             "description": "Full (24-bit) console color support (works in the Win 11 terminal and most web terminals).",
             "type": "boolean"

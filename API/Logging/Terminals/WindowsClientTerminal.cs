@@ -1,12 +1,9 @@
 ﻿#if CLIENT
-using System.Diagnostics;
-using JetBrains.Annotations;
+using DevkitServer.Commands.Subsystem;
 using System.Runtime.InteropServices;
 using System.Text;
-using DevkitServer.Commands.Subsystem;
 using ThreadPriority = System.Threading.ThreadPriority;
 using ThreadState = System.Threading.ThreadState;
-using DevkitServer.API.Logging;
 
 namespace DevkitServer.API.Logging.Terminals;
 internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
@@ -16,8 +13,10 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
 
     public event TerminalPreReadDelegate? OnInput;
     public event TerminalPreWriteDelegate? OnOutput;
-    private readonly Queue<LogMessage> _messageQueue = new Queue<LogMessage>();
-    private readonly Queue<string> _inputQueue = new Queue<string>();
+    private readonly List<LogMessage> _messageQueue = new List<LogMessage>();
+    private int _msgIndex;
+    private readonly List<string> _inputQueue = new List<string>();
+    private int _inputIndex;
     private volatile bool _cancellationRequested;
     private Thread? _keyMonitor;
     private uint? _closeHandler;
@@ -62,7 +61,14 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
         {
             while (_inputQueue.Count > 0)
             {
-                string deq = _inputQueue.Dequeue();
+                string deq = _inputQueue[_inputIndex];
+                ++_inputIndex;
+
+                if (_inputQueue.Count <= _inputIndex)
+                {
+                    _inputQueue.Clear();
+                    _inputIndex = 0;
+                }
                 bool shouldHandle = true;
                 OnInput?.Invoke(deq, ref shouldHandle);
             }
@@ -82,7 +88,14 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                     int y = Console.CursorTop;
                     while (_messageQueue.Count > 0)
                     {
-                        LogMessage msg = _messageQueue.Dequeue();
+                        LogMessage msg = _messageQueue[_msgIndex];
+                        ++_msgIndex;
+
+                        if (_messageQueue.Count <= _msgIndex)
+                        {
+                            _messageQueue.Clear();
+                            _msgIndex = 0;
+                        }
                         int h = 1;
                         for (int i = 0; i < msg.Message.Length; ++i)
                             if (msg.Message[i] == '\n') ++h;
@@ -117,7 +130,14 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                 {
                     while (_messageQueue.Count > 0)
                     {
-                        LogMessage msg = _messageQueue.Dequeue();
+                        LogMessage msg = _messageQueue[_msgIndex];
+                        ++_msgIndex;
+
+                        if (_messageQueue.Count <= _msgIndex)
+                        {
+                            _messageQueue.Clear();
+                            _msgIndex = 0;
+                        }
                         msg.Write();
                         if (msg.Save)
                         {
@@ -158,7 +178,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
     public void Write(string input, ConsoleColor color, bool save, Severity severity)
     {
         OnOutput?.Invoke(ref input, ref color);
-        _messageQueue.Enqueue(new LogMessage(input, color, save));
+        _messageQueue.Add(new LogMessage(input, color, save));
         if (DevkitServerModule.IsMainThread)
             OutputTick();
     }
@@ -177,7 +197,18 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
         if (_messageQueue.Count > 0)
         {
             while (_messageQueue.Count > 0)
-                _messageQueue.Dequeue().Write();
+            {
+                LogMessage msg = _messageQueue[_msgIndex];
+                ++_msgIndex;
+
+                if (_messageQueue.Count <= _msgIndex)
+                {
+                    _messageQueue.Clear();
+                    _msgIndex = 0;
+                }
+
+                msg.Write();
+            }
         }
         _setup = false;
         FreeConsole();
@@ -279,7 +310,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                 }
                 if (current.Length > 0)
                 {
-                    _inputQueue.Enqueue(current);
+                    _inputQueue.Add(current);
                 }
                 _inText = false;
             }

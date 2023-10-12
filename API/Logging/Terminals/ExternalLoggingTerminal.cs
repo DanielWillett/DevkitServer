@@ -1,6 +1,4 @@
-﻿using DevkitServer.API.Logging;
-
-namespace DevkitServer.API.Logging.Terminals;
+﻿namespace DevkitServer.API.Logging.Terminals;
 internal sealed class ExternalLoggingTerminal : ITerminal
 {
     public event TerminalPreReadDelegate? OnInput;

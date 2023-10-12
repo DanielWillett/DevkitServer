@@ -1,7 +1,6 @@
 ﻿#if CLIENT
 using DevkitServer.API.UI;
 using DevkitServer.Patches;
-using DevkitServer.Players.UI;
 using HarmonyLib;
 using System.Reflection;
 
@@ -22,7 +21,7 @@ internal class CustomSleekWrapperDestroyHandler : ICustomOnDestroy
     }
     public void Patch()
     {
-        MethodInfo? method = typeof(SleekWrapper).GetMethod(nameof(SleekWrapper.destroy), BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        MethodInfo? method = typeof(SleekWrapper).GetMethod(nameof(SleekWrapper.InternalDestroy), BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
         if (method == null)
         {
             Logger.LogWarning("Unable to find method: SleekWrapper.destroy.", method: Source);
@@ -34,7 +33,7 @@ internal class CustomSleekWrapperDestroyHandler : ICustomOnDestroy
 
     public void Unpatch()
     {
-        MethodInfo? method = typeof(SleekWrapper).GetMethod(nameof(SleekWrapper.destroy), BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        MethodInfo? method = typeof(SleekWrapper).GetMethod(nameof(SleekWrapper.InternalDestroy), BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
         if (method != null)
             PatchesMain.Patcher.Unpatch(method, new Action<object>(OnDestroyInvoker).Method);
     }

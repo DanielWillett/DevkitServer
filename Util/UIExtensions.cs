@@ -4,14 +4,14 @@ public static class UIExtensions
 {
     public static void CopyTransformFrom(this ISleekElement element, ISleekElement other)
     {
-        element.positionOffset_X = other.positionOffset_X;
-        element.positionOffset_Y = other.positionOffset_Y;
-        element.positionScale_X = other.positionScale_X;
-        element.positionScale_Y = other.positionScale_Y;
-        element.sizeOffset_X = other.sizeOffset_X;
-        element.sizeOffset_Y = other.sizeOffset_Y;
-        element.sizeScale_X = other.sizeScale_X;
-        element.sizeScale_Y = other.sizeScale_Y;
+        element.PositionOffset_X = other.PositionOffset_X;
+        element.PositionOffset_Y = other.PositionOffset_Y;
+        element.PositionScale_X = other.PositionScale_X;
+        element.PositionScale_Y = other.PositionScale_Y;
+        element.SizeOffset_X = other.SizeOffset_X;
+        element.SizeOffset_Y = other.SizeOffset_Y;
+        element.SizeScale_X = other.SizeScale_X;
+        element.SizeScale_Y = other.SizeScale_Y;
     }
 }
 #endif

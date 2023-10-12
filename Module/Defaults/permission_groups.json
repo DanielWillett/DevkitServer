@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/DanielWillett/DevkitServer/tree/master/Module/Schemas/permission_groups_schema.json",
+  "$schema": "https://raw.githubusercontent.com/DanielWillett/DevkitServer/master/Module/Schemas/permission_groups_schema.json",
   "groups": [
     {
       "id": "viewer",

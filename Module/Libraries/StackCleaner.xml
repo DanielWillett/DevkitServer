@@ -70,6 +70,12 @@
             </summary>
             <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
         </member>
+        <member name="P:StackCleaner.StackCleanerConfiguration.IncludeAssemblyData">
+            <summary>
+            Assembly-qualified name (and path if <see cref="P:StackCleaner.StackCleanerConfiguration.IncludeFileData"/> is <see langword="true"/>) will be included in the source data.
+            </summary>
+            <exception cref="T:System.NotSupportedException">Object is frozen (has been given to a <see cref="T:StackCleaner.StackTraceCleaner"/>).</exception>
+        </member>
         <member name="P:StackCleaner.StackCleanerConfiguration.UseTypeAliases">
             <summary>
             Primitive types will use their aliases.
@@ -170,6 +176,12 @@
             Text is colored with &lt;span&gt; tags.
             </summary>
             <remarks>Use classes instead of constant CSS styles by setting <see cref="P:StackCleaner.StackCleanerConfiguration.HtmlUseClassNames"/> to <see langword="true"/>.</remarks>
+        </member>
+        <member name="F:StackCleaner.StackColorFormatType.ANSIColorNoBright">
+            <summary>
+            ANSI Text formatting codes without bright colors (3-bit).<br/>
+            <seealso href="https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences?redirectedfrom=MSDN#text-formatting"/>
+            </summary>
         </member>
         <member name="T:StackCleaner.ColorConfig">
             <summary>
@@ -402,7 +414,7 @@
             Sets the default values for <see cref="T:StackCleaner.Color4Config"/>.
             </summary>
         </member>
-        <member name="M:StackCleaner.Color4Config.ToConsoleColor(System.Int32)">
+        <member name="M:StackCleaner.Color4Config.ToConsoleColor(System.Int32,System.Boolean)">
             <summary>
             Convert ARGB data to <see cref="T:System.ConsoleColor"/> (picks the closest).
             </summary>
@@ -530,13 +542,18 @@
             Convert ARGB data to <see cref="T:System.Drawing.Color"/>.
             </summary>
         </member>
+        <member name="M:StackCleaner.Color32Config.ToConsoleColor(System.Drawing.Color,System.Boolean)">
+            <summary>
+            Convert ARGB data to <see cref="T:System.Drawing.Color"/>.
+            </summary>
+        </member>
         <member name="T:StackCleaner.StackTraceCleaner">
             <summary>
             Tool that clears up stack traces to make them much more readable during debugging.<br/>
             Supports highly customizable color formatting in the following formats:<br/>
             <br/>
-            • <see cref="T:System.ConsoleColor"/><br/>
-            • ANSI color codes (4-bit)<br/>
+            • <see cref="T:System.ConsoleColor"/> (Only compatible with <see cref="M:StackCleaner.StackTraceCleaner.WriteToConsole(System.Diagnostics.StackTrace,System.Boolean)"/>)<br/>
+            • ANSI color codes (3-bit and 4-bit)<br/>
             • Extended ANSI color codes (32-bit where supported)<br/>
             • Unity Rich Text<br/>
             • Unity TextMeshPro Rich Text<br/>
@@ -859,12 +876,12 @@
             </summary>
             <exception cref="T:System.ArgumentNullException"/>
         </member>
-        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriterIntl(System.Reflection.MethodBase,System.IO.TextWriter,System.Boolean)">
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriterIntl(System.Reflection.MethodBase,System.IO.TextWriter)">
             <summary>
             Formats the <paramref name="method"/> and writes it to <paramref name="writer"/>.
             </summary>
         </member>
-        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriterIntlAsync(System.Reflection.MethodBase,System.IO.TextWriter,System.Boolean,System.Threading.CancellationToken)">
+        <member name="M:StackCleaner.StackTraceCleaner.WriteToTextWriterIntlAsync(System.Reflection.MethodBase,System.IO.TextWriter,System.Threading.CancellationToken)">
             <summary>
             Formats the <paramref name="method"/> and writes it to <paramref name="writer"/> asynchronously.
             </summary>

@@ -2,7 +2,7 @@ Lib.Harmony (0Harmony) by Pardeike - 2.2.2 - https://www.nuget.org/packages/Lib.
 
 Microsoft.Bcl.AsyncInterfaces by Microsoft (dotnet) - 7.0.0 - https://www.nuget.org/packages/Microsoft.Bcl.AsyncInterfaces/7.0.0
 
-StackCleaner by DanielWillett - 1.2.2 - https://github.com/DanielWillett/StackCleaner
+StackCleaner by DanielWillett - 1.4.1 - https://github.com/DanielWillett/StackCleaner
 
 System.Buffers by Microsoft (dotnet) - 4.5.1 - https://www.nuget.org/packages/System.Buffers/4.5.1
 
@@ -14,13 +14,14 @@ System.IO.Compression.FileSystem by Microsoft (dotnet) - 4.8.9032.0 - .NET Frame
 
 System.Memory by Microsoft (dotnet) - 4.5.5 - https://www.nuget.org/packages/System.Memory/4.5.5
 
-System.Numerics.Vectors (dotnet) - 4.5.0 - https://www.nuget.org/packages/System.Numerics.Vectors/4.5.0
+System.Numerics.Vectors (mono 4.5) by Microsoft (dotnet) - 4.6.57.0 - from Unity files at C:\Program Files\Unity\Editor\Data\MonoBleedingEdge\lib\mono\4.5
+ # This assembly is compatible with Unity 2021.3.29f1, most others available are not.
 
 System.Runtime.CompilerServices.Unsafe - 6.0.0 - https://www.nuget.org/packages/System.Runtime.CompilerServices.Unsafe/6.0.0
 
 System.Text.Encodings.Web - 7.0.0 - https://www.nuget.org/packages/System.Text.Encodings.Web/7.0.0
 
-System.Text.Json - 7.0.3 - https://www.nuget.org/packages/System.Text.Json/7.0.3
+System.Text.Json - 7.0.0 - https://www.nuget.org/packages/System.Text.Json/7.0.3
 
 System.Threading.Tasks.Extensions - 4.5.4 - https://www.nuget.org/packages/System.Threading.Tasks.Extensions/4.5.4
 

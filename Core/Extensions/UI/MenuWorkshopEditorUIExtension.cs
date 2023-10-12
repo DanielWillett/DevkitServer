@@ -14,13 +14,13 @@ internal class MenuWorkshopEditorUIExtension
     {
         ISleekButton refreshButton = Glazier.Get().CreateButton();
 
-        refreshButton.positionOffset_X = -305;
-        refreshButton.positionOffset_Y = 570;
-        refreshButton.positionScale_X = 0.5f;
-        refreshButton.sizeOffset_X = 200;
-        refreshButton.sizeOffset_Y = 30;
-        refreshButton.text = DevkitServerModule.MainLocalization.Translate("RefreshLevelsButton");
-        refreshButton.onClickedButton += OnClickedRefresh;
+        refreshButton.PositionOffset_X = -305;
+        refreshButton.PositionOffset_Y = 570;
+        refreshButton.PositionScale_X = 0.5f;
+        refreshButton.SizeOffset_X = 200;
+        refreshButton.SizeOffset_Y = 30;
+        refreshButton.Text = DevkitServerModule.MainLocalization.Translate("RefreshLevelsButton");
+        refreshButton.OnClicked += OnClickedRefresh;
 
         Container.AddChild(refreshButton);
     }

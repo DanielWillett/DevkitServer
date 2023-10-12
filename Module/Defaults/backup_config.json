@@ -1,5 +1,5 @@
 {
-  "$schema": "https://github.com/DanielWillett/DevkitServer/tree/master/Module/Schemas/backup_schema.json",
+  "$schema": "https://raw.githubusercontent.com/DanielWillett/DevkitServer/master/Module/Schemas/backup_schema.json",
 
   /*
    *  Backup Behaviors

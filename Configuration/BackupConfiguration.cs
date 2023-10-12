@@ -6,7 +6,7 @@ namespace DevkitServer.Configuration;
 [EarlyTypeInit(-2)]
 public sealed class BackupConfiguration : SchemaConfiguration
 {
-    public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/backup_schema.json");
+    public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/backup_schema.json", true);
     private sealed class ConfigContainer : JsonConfigurationFile<BackupConfiguration>
     {
         internal ConfigContainer() : base(FilePath) { }

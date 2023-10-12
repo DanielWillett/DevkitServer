@@ -1201,11 +1201,12 @@ public static class DevkitServerUtility
     [Pure]
     public static bool IsChildOf(DirectoryInfo shorterPath, DirectoryInfo longerPath, bool includeSubDirectories = true)
     {
+        string shortFullname = shorterPath.FullName;
         if (!includeSubDirectories)
-            return longerPath.Parent != null && longerPath.Parent.FullName.Equals(shorterPath.FullName, StringComparison.Ordinal);
+            return longerPath.Parent != null && longerPath.Parent.FullName.Equals(shortFullname, StringComparison.Ordinal);
         while (longerPath.Parent != null)
         {
-            if (longerPath.Parent.FullName.Equals(shorterPath.FullName, StringComparison.Ordinal))
+            if (longerPath.Parent.FullName.Equals(shortFullname, StringComparison.Ordinal))
                 return true;
             longerPath = longerPath.Parent;
         }

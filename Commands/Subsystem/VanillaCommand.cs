@@ -34,7 +34,7 @@ internal sealed class VanillaCommand : ICachedTranslationSourceCommand
     }
 
 #if SERVER
-    public bool CheckPermission(EditorUser? user) => user.CheckPermission(Permissions, (this as IExecutableCommand).AnyPermissions);
+    public bool CheckPermission(EditorUser user) => user.CheckPermission(Permissions, (this as IExecutableCommand).AnyPermissions);
 #else
     public bool CheckPermission() => Command.ClientHasPermissionToRun();
 #endif

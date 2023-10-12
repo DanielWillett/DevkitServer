@@ -141,7 +141,7 @@ internal static class EditorActionsCodeGeneration
         DynamicMethod writeMethod = new DynamicMethod("SettingsWriteHandler", attributes, CallingConventions.Standard,
             typeof(void), new Type[] { typeof(IActionListener), typeof(ActionSettingsCollection).MakeByRefType(), typeof(IAction) },
             typeof(EditorActionsCodeGeneration), true);
-        DebuggableEmitter writeGenerator = new DebuggableEmitter(writeMethod) { DebugLog = false };
+        DebuggableEmitter writeGenerator = new DebuggableEmitter(writeMethod) { DebugLog = true };
 
         DynamicMethod readMethod = new DynamicMethod("SettingsReadHandler", attributes, CallingConventions.Standard,
             typeof(void), new Type[] { typeof(IActionListener), typeof(IAction) },
@@ -181,10 +181,10 @@ internal static class EditorActionsCodeGeneration
 
         // ActionSettings settings = actions.Settings;
         writeGenerator.Emit(OpCodes.Ldarg_0);
-        writeGenerator.Emit(OpCodes.Call, getActionSettings);
+        writeGenerator.Emit(getActionSettings.GetCall(), getActionSettings);
         writeGenerator.Emit(OpCodes.Stloc, writeActionSettings);
         readGenerator.Emit(OpCodes.Ldarg_0);
-        readGenerator.Emit(OpCodes.Call, getActionSettings);
+        readGenerator.Emit(getActionSettings.GetCall(), getActionSettings);
         readGenerator.Emit(OpCodes.Stloc, readActionSettings);
 
         LocalBuilder anyChanged = writeGenerator.DeclareLocal(typeof(bool));
@@ -579,6 +579,80 @@ internal static class EditorActionsCodeGeneration
         ReadSettingsCollection = (HandleByteReadSettings)byteReadMethod.CreateDelegate(typeof(HandleByteReadSettings));
         AppendSettingsCollection = (HandleAppendSettingsCollection)toStringMethod.CreateDelegate(typeof(HandleAppendSettingsCollection));
         Init = true;
+
+#if DEBUG
+        bool anyFail = false;
+        ActionSettingsCollection c2 = null;
+        try
+        {
+            OnWritingAction(null, ref c2, null);
+        }
+        catch (NullReferenceException) { }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex);
+            anyFail = true;
+        }
+
+        try
+        {
+            OnReadingAction(null, null);
+        }
+        catch (NullReferenceException) { }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex);
+            anyFail = true;
+        }
+
+        try
+        {
+            CreateAction(0);
+        }
+        catch (NullReferenceException) { }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex);
+            anyFail = true;
+        }
+
+        try
+        {
+            WriteSettingsCollection(null, null);
+        }
+        catch (NullReferenceException) { }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex);
+            anyFail = true;
+        }
+
+        try
+        {
+            ReadSettingsCollection(null, null);
+        }
+        catch (NullReferenceException) { }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex);
+            anyFail = true;
+        }
+        
+
+        try
+        {
+            AppendSettingsCollection(null, null);
+        }
+        catch (NullReferenceException) { }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex);
+            anyFail = true;
+        }
+
+        if (anyFail)
+            throw new Exception("Failed to create valid ActionSetting dynamic methods.");
+#endif
     }
 }
 

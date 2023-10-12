@@ -6,10 +6,10 @@ https://www.nuget.org/packages/NuGet.Packaging
 https://www.nuget.org/packages/NuGet.Versioning
 
 System.IO.Compression by Microsoft (dotnet) - 4.8.9032.0 - .NET Framework v4.8.1 Redistributable
- # This assembly is compatible with Unity, most others available are not.
+ # This assembly is compatible with Unity 2021.3.29f1, most others available are not.
 
 System.IO.Compression.FileSystem by Microsoft (dotnet) - 4.8.9032.0 - .NET Framework v4.8.1 Redistributable
- # This assembly is compatible with Unity, most others available are not.
+ # This assembly is compatible with Unity 2021.3.29f1, most others available are not.
 
-System.Xml.Linq (mono port) by Microsoft (dotnet), b0at - 3.5.21022.801 - https://www.nuget.org/packages/System.Xml.Linq/3.5.21022.801
- # This assembly is compatible with Unity, most others available are not.
+System.Xml.Linq (mono 4.5) by Microsoft (dotnet) - 4.6.57.0 - from Unity files at C:\Program Files\Unity\Editor\Data\MonoBleedingEdge\lib\mono\4.5
+ # This assembly is compatible with Unity 2021.3.29f1, most others available are not.

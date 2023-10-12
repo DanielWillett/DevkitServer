@@ -39,6 +39,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     public TileSync TileSync { get; private set; } = null!;
     public ObjectSync ObjectSync { get; private set; } = null!;
     public HierarchySync HierarchySync { get; private set; } = null!;
+    public NavigationSync NavigationSync { get; private set; } = null!;
     public string DisplayName { get; private set; } = null!;
     public SteamPlayer? Player { get; internal set; }
     public IReadOnlyList<AuthoritativeSync> Syncs { get; }
@@ -109,9 +110,11 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         TileSync = EditorObject.GetComponent<TileSync>();
         ObjectSync = EditorObject.GetComponent<ObjectSync>();
         HierarchySync = EditorObject.GetComponent<HierarchySync>();
+        NavigationSync = EditorObject.GetComponent<NavigationSync>();
         IntlSyncs.Add(TileSync);
         IntlSyncs.Add(ObjectSync);
         IntlSyncs.Add(HierarchySync);
+        IntlSyncs.Add(NavigationSync);
 #if CLIENT
         StartCoroutine(DeactivateAfterFrame());
 #else

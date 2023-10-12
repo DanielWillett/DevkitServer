@@ -1,5 +1,5 @@
 ﻿#if DEBUG
-#define PRINT_ACTION_DETAIL
+// #define PRINT_ACTION_DETAIL
 #define PRINT_ACTION_SIMPLE
 #endif
 

@@ -34,13 +34,13 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
         DistanceCurveLength = distanceCurveMax - distanceCurveMin;
 
         if (AddButton != null)
-            AddButton.isVisible = false;
+            AddButton.IsVisible = false;
         if (RemoveButton != null)
-            RemoveButton.isVisible = false;
+            RemoveButton.IsVisible = false;
         if (RadiusSlider != null)
-            RadiusSlider.isVisible = false;
+            RadiusSlider.IsVisible = false;
         if (RotationSlider != null)
-            RotationSlider.isVisible = false;
+            RotationSlider.IsVisible = false;
     }
 
     protected override void OnShown()
@@ -99,12 +99,12 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
         if (Container == null)
             return -1;
         ISleekLabel label = Glazier.Get().CreateLabel();
-        label.positionOffset_X = -150;
-        label.positionOffset_Y = -15;
-        label.sizeOffset_X = 300;
-        label.sizeOffset_Y = 30;
-        label.shadowStyle = ETextContrastContext.ColorfulBackdrop;
-        label.text = text;
+        label.PositionOffset_X = -150;
+        label.PositionOffset_Y = -15;
+        label.SizeOffset_X = 300;
+        label.SizeOffset_Y = 30;
+        label.TextContrastContext = ETextContrastContext.ColorfulBackdrop;
+        label.Text = text;
         Label lbl = new Label
         {
             Element = label,
@@ -150,25 +150,25 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
             return;
         bool show = ShouldShow(label.Spawn);
         if (text != null)
-            label.Element.text = text;
+            label.Element.Text = text;
         if (!show)
         {
-            if (label.Element.isVisible)
-                label.Element.isVisible = false;
+            if (label.Element.IsVisible)
+                label.Element.IsVisible = false;
             return;
         }
         Vector3 position = GetPosition(label.Spawn);
         Vector3 screenPos = MainCamera.instance.WorldToViewportPoint(position + Offset);
         if (screenPos.z <= 0.0)
         {
-            if (label.Element.isVisible)
-                label.Element.isVisible = false;
+            if (label.Element.IsVisible)
+                label.Element.IsVisible = false;
         }
         else
         {
             Vector2 adjScreenPos = Container.ViewportToNormalizedPosition(screenPos);
-            label.Element.positionScale_X = adjScreenPos.x;
-            label.Element.positionScale_Y = adjScreenPos.y;
+            label.Element.PositionScale_X = adjScreenPos.x;
+            label.Element.PositionScale_Y = adjScreenPos.y;
 
             float dist = (position - MainCamera.instance.transform.position).sqrMagnitude;
             bool isClose = DevkitServerConfig.Config.RemoveCosmeticImprovements || dist < DistanceCurveMin * DistanceCurveMin;
@@ -176,19 +176,19 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
             {
                 if (isClose)
                 {
-                    label.Element.textColor = GlazierConst.DefaultLabelForegroundColor;
+                    label.Element.TextColor = GlazierConst.DefaultLabelForegroundColor;
                 }
                 else
                 {
                     dist = Mathf.Sqrt(dist) - DistanceCurveMin;
                     float a = 1f - Mathf.Pow(dist / DistanceCurveLength, 2);
-                    label.Element.textColor = new SleekColor(ESleekTint.FONT, a);
+                    label.Element.TextColor = new SleekColor(ESleekTint.FONT, a);
                 }
                 label.IsClose = isClose;
             }
 
-            if (!label.Element.isVisible)
-                label.Element.isVisible = true;
+            if (!label.Element.IsVisible)
+                label.Element.IsVisible = true;
         }
     }
     internal void UpdateAllLabels()

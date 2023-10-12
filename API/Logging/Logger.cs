@@ -3,6 +3,7 @@ using StackCleaner;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using Cysharp.Threading.Tasks;
 using DevkitServer.API.Logging.Terminals;
@@ -10,13 +11,14 @@ using DevkitServer.Levels;
 #if CLIENT
 using DevkitServer.Patches;
 using HarmonyLib;
-using System.Text;
 #endif
 
 namespace DevkitServer.API.Logging;
 public static class Logger
 {
     private static readonly bool IsExternalFeatureset;
+    private static FileStream? _ansiLog;
+    private static StreamWriter? _ansiLogWriter;
 #nullable disable
     private static ITerminal _term;
 #nullable restore
@@ -84,9 +86,11 @@ public static class Logger
             }
         }
     }
-    private const string TimeFormat = "yyyy-MM-dd hh:mm:ss";
+    internal const string TimeFormat = "yyyy-MM-dd hh:mm:ss";
     static Logger()
     {
+        CommandWindow.Log("Loading logging...");
+
         try
         {
             IsExternalFeatureset = !DevkitServerModule.UnturnedLoaded;
@@ -95,14 +99,17 @@ public static class Logger
                 ColorFormatting = StackColorFormatType.ExtendedANSIColor,
                 Colors = Type.GetType("System.Drawing.Color, System.Drawing", false, false) == null ? UnityColor32Config.Default : Color32Config.Default,
                 IncludeNamespaces = false,
+                IncludeLineData = true,
 #if DEBUG
                 IncludeFileData = true,
                 IncludeSourceData = true,
-                IncludeILOffset = true
+                IncludeILOffset = true,
+                IncludeAssemblyData = true,
 #else
                 IncludeFileData = false,
-                IncludeSourceData = false,
-                IncludeILOffset = false
+                IncludeSourceData = true,
+                IncludeILOffset = true,
+                IncludeAssemblyData = false
 #endif
             };
             if (IsExternalFeatureset)
@@ -115,17 +122,18 @@ public static class Logger
                 {
                     typeof(UniTask)
                 };
-                Type? type = typeof(UniTask).Assembly.GetType("Cysharp.Threading.Tasks.EnumeratorAsyncExtensions+EnumeratorPromise", false, false);
+                Assembly uniTask = typeof(UniTask).Assembly;
+                Type? type = uniTask.GetType("Cysharp.Threading.Tasks.EnumeratorAsyncExtensions+EnumeratorPromise", false, false);
 
                 if (type != null)
                     hiddenTypes.Add(type);
                 
-                type = typeof(UniTask).Assembly.GetType("Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`1", false, false);
+                type = uniTask.GetType("Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`1", false, false);
 
                 if (type != null)
                     hiddenTypes.Add(type);
                 
-                type = typeof(UniTask).Assembly.GetType("Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2", false, false);
+                type = uniTask.GetType("Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2", false, false);
 
                 if (type != null)
                     hiddenTypes.Add(type);
@@ -137,13 +145,10 @@ public static class Logger
 
                 config.HiddenTypes = hiddenTypes;
 #if !SERVER
-                if (Application.platform is RuntimePlatform.WindowsPlayer or RuntimePlatform.WindowsEditor)
+                if (Application.platform is RuntimePlatform.WindowsPlayer or RuntimePlatform.WindowsEditor or RuntimePlatform.WindowsServer)
                     config.ColorFormatting = StackColorFormatType.ExtendedANSIColor;
                 else
                     config.ColorFormatting = StackColorFormatType.None;
-#else
-                if (Application.platform is not RuntimePlatform.WindowsPlayer and not RuntimePlatform.WindowsEditor)
-                    config.ColorFormatting = StackColorFormatType.ANSIColor;
 #endif
                 if (!DevkitServerConfig.Config.ConsoleVisualANSISupport)
                 {
@@ -161,7 +166,7 @@ public static class Logger
             if (!IsExternalFeatureset)
             {
 #if !SERVER
-                if (Application.platform is RuntimePlatform.WindowsPlayer or RuntimePlatform.WindowsEditor)
+                if (Application.platform is RuntimePlatform.WindowsPlayer or RuntimePlatform.WindowsEditor or RuntimePlatform.WindowsServer)
                 {
                     Terminal = DevkitServerModule.GameObjectHost.AddComponent<WindowsClientTerminal>();
                     LogInfo("Initalized Windows terminal.", ConsoleColor.DarkCyan);
@@ -188,8 +193,16 @@ public static class Logger
         }
         catch (Exception ex)
         {
-            Console.WriteLine("[DEVKIT SERVER] Error initializing logger.");
-            Console.WriteLine("[DEVKIT SERVER] " + Environment.NewLine + ex);
+            if (IsExternalFeatureset)
+            {
+                Console.WriteLine("[DEVKIT SERVER] Error initializing logger.");
+                Console.WriteLine("[DEVKIT SERVER] " + Environment.NewLine + ex);
+            }
+            else
+            {
+                CommandWindow.Log("[DEVKIT SERVER] Error initializing logger.");
+                CommandWindow.Log("[DEVKIT SERVER] " + Environment.NewLine + ex);
+            }
 
             StackCleanerConfiguration config = new StackCleanerConfiguration
             {
@@ -198,11 +211,121 @@ public static class Logger
                 IncludeNamespaces = true,
                 IncludeFileData = true,
                 IncludeSourceData = true,
-                IncludeILOffset = true
+                IncludeILOffset = true,
+                IncludeAssemblyData = true,
+                IncludeLineData = true
             };
             StackCleaner = new StackTraceCleaner(config);
+            if (IsExternalFeatureset)
+            {
+                Terminal = new ExternalLoggingTerminal();
+            }
+            else
+            {
+#if SERVER
+                Terminal = DevkitServerModule.GameObjectHost.AddComponent<ServerTerminal>();
+#elif CLIENT
+                if (Application.platform is RuntimePlatform.WindowsPlayer or RuntimePlatform.WindowsEditor or RuntimePlatform.WindowsServer)
+                {
+                    Terminal = DevkitServerModule.GameObjectHost.AddComponent<WindowsClientTerminal>();
+                }
+                else
+                {
+                    Terminal = DevkitServerModule.GameObjectHost.AddComponent<BackgroundLoggingTerminal>();
+                }
+#else
+                Terminal = new ExternalLoggingTerminal();
+#endif
+            }
+        }
+
+        if (!IsExternalFeatureset && DevkitServerConfig.Config.ANSILog)
+        {
+            try
+            {
+                string fn = Dedicator.isStandaloneDedicatedServer ? $"Server_{Provider.serverID}" : "Client";
+                string path = Path.Combine(ReadWrite.PATH, "Logs");
+                string prevPath = Path.Combine(path, fn + "_Prev.ansi");
+                path = Path.Combine(path, fn + ".ansi");
+
+                bool deleted = false;
+                try
+                {
+                    if (File.Exists(prevPath))
+                        File.Delete(prevPath);
+
+                    deleted = true;
+                }
+                catch (Exception ex)
+                {
+                    LogError($"Unable to delete previous log - {ex.GetType().Format()} - {ex.Message.Format()}.");
+                }
+
+                if (deleted)
+                {
+                    try
+                    {
+                        if (File.Exists(path))
+                            File.Move(path, prevPath);
+
+                        deleted = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError($"Unable to move log to previous log - {ex.GetType().Format()} - {ex.Message.Format()}.");
+                    }
+                }
+
+                _ansiLog = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+                _ansiLogWriter = new StreamWriter(_ansiLog, Encoding.UTF8, 1024, true);
+            }
+            catch (Exception ex)
+            {
+                LogError("Unable to open visual ANSI log.");
+                LogError(ex);
+            }
         }
     }
+    private static void CloseAnsiLog()
+    {
+        Exception? ex1 = null, ex2 = null;
+        if (_ansiLogWriter is not null)
+        {
+            try
+            {
+                _ansiLogWriter.Dispose();
+                _ansiLogWriter = null;
+            }
+            catch (Exception ex)
+            {
+                ex1 = ex;
+            }
+        }
+
+        if (_ansiLog is not null)
+        {
+            try
+            {
+                _ansiLog.Dispose();
+            }
+            catch (Exception ex)
+            {
+                ex2 = ex;
+            }
+            _ansiLog = null;
+        }
+
+        if (ex1 != null || ex2 != null)
+        {
+            AggregateException ex;
+            if (ex1 != null && ex2 != null)
+                ex = new AggregateException("Failed to close ANSI log.", ex1, ex2);
+            else
+                ex = new AggregateException("Failed to close ANSI log.", ex1 ?? ex2!);
+            LogError(ex);
+        }
+    }
+
     internal static void ClearLoadingErrors()
     {
         if (_loadingErrors != null)
@@ -578,6 +701,22 @@ public static class Logger
             string om2 = outputMessage;
             ConsoleColor cc2 = color;
             DevkitServerUtility.QueueOnMainThread(() => OnTerminalOutputIntl(om2, cc2));
+        }
+
+        if (_ansiLog is { CanWrite: true } && _ansiLogWriter != null)
+        {
+            try
+            {
+                if (!outputMessage.EndsWith(FormattingUtil.ANSIForegroundReset, StringComparison.Ordinal))
+                    outputMessage += FormattingUtil.ANSIForegroundReset;
+                _ansiLogWriter.WriteLine(FormattingUtil.GetANSIString(color, false) + outputMessage);
+            }
+            catch (Exception ex)
+            {
+                CloseAnsiLog();
+                LogError("Failed to write to ANSI log.");
+                LogError(ex);
+            }
         }
     }
     private static void OnTerminalOutputIntl(string outputMessage, ConsoleColor color)

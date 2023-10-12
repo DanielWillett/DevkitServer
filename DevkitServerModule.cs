@@ -22,6 +22,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security;
+using DevkitServer.Framework;
 using UnityEngine.SceneManagement;
 using Module = SDG.Framework.Modules.Module;
 using Version = System.Version;
@@ -35,12 +36,16 @@ using SDG.Framework.Utilities;
 using DevkitServer.Util.Debugging;
 #endif
 #endif
+#if SERVER
+using HighlightingSystem;
+#endif
 
 namespace DevkitServer;
 
 public sealed class DevkitServerModule : IModuleNexus
 {
-    public static readonly string RepositoryUrl = "https://github.com/DanielWillett/DevkitServer"; // don't suffix this with '/'
+    public static readonly string RepositoryUrl = "https://github.com/DanielWillett/DevkitServer"; // don't suffix these with '/'
+    public static readonly string RawRepositoryUrl = "https://raw.githubusercontent.com/DanielWillett/DevkitServer";
     public const string ModuleName = "DevkitServer";
     public static readonly string ServerRule = "DevkitServer";
     internal static readonly Color32 ModuleColor = new Color32(0, 255, 153, 255);
@@ -50,6 +55,7 @@ public sealed class DevkitServerModule : IModuleNexus
     private static string? _asmPath;
     private static IReadOnlyList<string>? _searchLocations;
     private static string? _commitIdShort;
+    private static AssemblyResolver _asmResolver = null!;
     public static string CommitId => _commitIdShort ??= DevkitServer.CommitId.Commit.Length > 7 ? DevkitServer.CommitId.Commit.Substring(0, 7) : DevkitServer.CommitId.Commit;
     public static string LongCommitId => DevkitServer.CommitId.Commit;
     public Assembly Assembly { get; } = Assembly.GetExecutingAssembly();
@@ -70,6 +76,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static bool UnityLoaded { get; }
     public static bool UnturnedLoaded { get; }
     public static bool InitializedLogging { get; private set; }
+    public static bool InitializedPluginLoader { get; internal set; }
     public static string AssemblyPath => _asmPath ??= Accessor.DevkitServer.Location;
     public static bool IsAuthorityEditor =>
 #if CLIENT
@@ -174,22 +181,30 @@ public sealed class DevkitServerModule : IModuleNexus
             goto fault;
         try
         {
+            _asmResolver = new AssemblyResolver();
+#if SERVER
+            if (!Dedicator.isStandaloneDedicatedServer)
+            {
+                CommandWindow.LogError("You are running a dedicated server build on a game client.");
+                goto fault;
+            }
+#elif CLIENT
+            if (Dedicator.isStandaloneDedicatedServer)
+            {
+                CommandWindow.LogError("You are running a client build on a dedicated server.");
+                goto fault;
+            }
+#endif
+
+
             // Initialize UniTask
             if (!PlayerLoopHelper.HasBeenInitialized)
                 PlayerLoopHelper.Init();
             GameObjectHost = new GameObject(ModuleName);
             ComponentHost = GameObjectHost.AddComponent<DevkitServerModuleComponent>();
-            GameObjectHost.AddComponent<CachedTime>();
             GameObjectHost.hideFlags = HideFlags.DontSave;
             Provider.gameMode = new DevkitServerGamemode();
             Object.DontDestroyOnLoad(GameObjectHost);
-#if CLIENT
-            ObjectIconPresets.Init();
-            GameObject objectItemGeneratorHost = new GameObject("ObjectIconGenerator", typeof(Light), typeof(IconGenerator), typeof(Camera));
-            objectItemGeneratorHost.transform.SetParent(GameObjectHost.transform, true);
-            objectItemGeneratorHost.hideFlags = HideFlags.DontSave;
-            Object.DontDestroyOnLoad(objectItemGeneratorHost);
-#endif
 
             Logger.InitLogger();
             InitializedLogging = true;
@@ -198,6 +213,7 @@ public sealed class DevkitServerModule : IModuleNexus
             MovementUtil.Init();
             Logger.PostPatcherSetupInitLogger();
 #endif
+            GameObjectHost.AddComponent<CachedTime>();
         }
         catch (Exception ex)
         {
@@ -313,8 +329,13 @@ public sealed class DevkitServerModule : IModuleNexus
                     Object.DestroyImmediate(comp);
                 else
                     Logger.LogWarning("Unable to destroy EditorArea.");
+                comp = editor.GetComponentInChildren(typeof(HighlightingRenderer));
+                if (comp != null)
+                    Object.DestroyImmediate(comp);
+                else
+                    Logger.LogWarning("Unable to destroy HighlightingRenderer.");
 
-                Logger.LogDebug($"Destroyed client-side editor components.");
+                Logger.LogDebug("Destroyed client-side editor components.");
             }
             else
                 Logger.LogWarning("Unable to destroy client-side editor components.");
@@ -334,6 +355,12 @@ public sealed class DevkitServerModule : IModuleNexus
             ChatManager.onChatMessageReceived += OnChatMessageReceived;
             UserTPVControl.Init();
             Level.onLevelExited += OnLevelExited;
+
+            ObjectIconPresets.Init();
+            GameObject objectItemGeneratorHost = new GameObject("ObjectIconGenerator", typeof(Light), typeof(IconGenerator), typeof(Camera));
+            objectItemGeneratorHost.transform.SetParent(GameObjectHost.transform, true);
+            objectItemGeneratorHost.hideFlags = HideFlags.DontSave;
+            Object.DontDestroyOnLoad(objectItemGeneratorHost);
 #endif
             AssetUtil.OnBeginLevelLoading += OnLevelStartLoading;
             LevelObjectNetIdDatabase.Init();
@@ -616,19 +643,26 @@ public sealed class DevkitServerModule : IModuleNexus
     /// </summary>
     /// <param name="relativePath"></param>
     /// <param name="shortenCommitId">Uses the 7 digit commit ID instead of the full commit ID.</param>
-    public static string GetRelativeRepositoryUrl(string? relativePath, bool shortenCommitId = true)
+    public static string GetRelativeRepositoryUrl(string? relativePath, bool rawFile, bool shortenCommitId = true)
     {
         string tree = shortenCommitId ? CommitId : LongCommitId;
         if (string.IsNullOrEmpty(tree) || CommitId.Equals("0000000", StringComparison.Ordinal))
             tree = "master";
-        tree = RepositoryUrl + (relativePath != null && relativePath.IndexOf('.') != -1 ? "/blob/" : "/tree/") + tree;
+        bool directory = relativePath == null || relativePath.IndexOf('.') == -1;
+        rawFile &= !directory;
+        tree = (rawFile ? RawRepositoryUrl : RepositoryUrl) + (directory ? "/tree/" : (rawFile ? "/" : "/blob/")) + tree;
         if (string.IsNullOrWhiteSpace(tree))
             return tree;
         
-        if (relativePath![0] == '/')
-            return tree + relativePath;
-        
-        return tree + "/" + relativePath;
+        if (!string.IsNullOrEmpty(relativePath))
+        {
+            if (relativePath![0] == '/')
+                return tree + relativePath;
+
+            return tree + "/" + relativePath;
+        }
+
+        return tree;
     }
     public static string? FindModuleFile(string name)
     {
@@ -887,6 +921,8 @@ public sealed class DevkitServerModule : IModuleNexus
         GameObjectHost = null!;
         LoadFaulted = false;
         Logger.CloseLogger();
+
+        _asmResolver.Dispose();
     }
 #if CLIENT
     internal static void RegisterDisconnectFromEditingServer()
@@ -976,5 +1012,4 @@ public sealed class DevkitServerModuleComponent : MonoBehaviour
     {
         _ticks = 0;
     }
-
 }

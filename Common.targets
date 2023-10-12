@@ -4,9 +4,18 @@
 
     <!-- Packages -->
     <ItemGroup>
-        <PackageReference Include="Lib.Harmony" Version="2.2.2" />
-        <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
-        <PackageReference Include="System.Text.Json" Version="7.0.3" />
+        <PackageReference Include="Lib.Harmony" Version="2.2.2">
+            <Private>false</Private>
+        </PackageReference>
+        <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0">
+            <Private>false</Private>
+        </PackageReference>
+        <PackageReference Include="System.Text.Json" Version="7.0.3">
+            <Private>false</Private>
+        </PackageReference>
+      <PackageReference Include="DanielWillett.StackCleaner" Version="1.4.1">
+        <Private>false</Private>
+      </PackageReference>
     </ItemGroup>
 
   
@@ -34,11 +43,10 @@
 
 
     <!-- Debug Output -->
-    <Target Name="DevkitServer Module Debug Output" AfterTargets="Build" Condition="true">
+    <Target Name="DevkitServer Module Debug Output" BeforeTargets="Build" Condition="true">
         <Message Text="Building server module... $(PackageId)" Importance="high" Condition="$(DefineConstants.Contains(SERVER))"/>
         <Message Text="Building client module... $(PackageId)" Importance="high" Condition="$(DefineConstants.Contains(CLIENT))"/>
-        <Message Text="Client Location: &quot;$(ClientPath)&quot;." Importance="high"/>
-        <Message Text="Server Location: &quot;$(ServerPath)&quot;." Importance="high"/>
+        <Message Text="Installation Location: &quot;$(SharedPath)&quot;." Importance="high"/>
         <Message Text="Library Location: &quot;$(IncludedLibrariesPath)&quot;." Importance="high"/>
         <Message Text="Solution Location: &quot;$(SolutionDir)&quot;." Importance="high"/>
         <Message Text="Defines: $(DefineConstants)." Importance="high"/>

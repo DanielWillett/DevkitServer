@@ -10,7 +10,6 @@ using HarmonyLib;
 using SDG.Framework.Devkit;
 using System.Reflection;
 using System.Reflection.Emit;
-using DevkitServer.API;
 using EditorUI = SDG.Unturned.EditorUI;
 #endif
 
@@ -170,7 +169,8 @@ public class UserInput : MonoBehaviour
     private UserInputPacket _lastPacket;
 #endif
     private static readonly ByteReader Reader = new ByteReader { ThrowOnError = true };
-    private readonly Queue<UserInputPacket> _packets = new Queue<UserInputPacket>();
+    private readonly List<UserInputPacket> _packets = new List<UserInputPacket>();
+    private int _packetsIndex = 0;
 #if CLIENT
     private static readonly Func<IDevkitTool?>? GetDevkitTool;
     private static readonly Action<IDevkitTool?>? SetDevkitTool;
@@ -530,7 +530,14 @@ public class UserInput : MonoBehaviour
         writer.Write((byte)c);
         for (int i = 0; i < c; ++i)
         {
-            UserInputPacket p = _packets.Dequeue();
+            UserInputPacket p = _packets[_packetsIndex];
+            ++_packetsIndex;
+
+            if (_packets.Count <= _packetsIndex)
+            {
+                _packets.Clear();
+                _packetsIndex = 0;
+            }
             p.Write(writer);
         }
     }
@@ -543,7 +550,7 @@ public class UserInput : MonoBehaviour
         {
             UserInputPacket p = new UserInputPacket();
             p.Read(reader, version);
-            _packets.Enqueue(p);
+            _packets.Add(p);
         }
         if (User.Player != null && User.Player.player != null)
             SetLastInputted?.Invoke(User.Player.player.input, CachedTime.RealtimeSinceStartup);
@@ -620,7 +627,7 @@ public class UserInput : MonoBehaviour
                     },
                     DeltaTime = CachedTime.DeltaTime
                 };
-                _packets.Enqueue(_lastPacket);
+                _packets.Add(_lastPacket);
                 _lastQueue = t;
             }
             else if (!_hasStopped)
@@ -635,7 +642,7 @@ public class UserInput : MonoBehaviour
                     Position = _lastPos = pos
                 };
                 _lastQueue = t;
-                _packets.Enqueue(_lastPacket);
+                _packets.Add(_lastPacket);
                 _bufferHasStop = true;
             }
 
@@ -673,7 +680,15 @@ public class UserInput : MonoBehaviour
         {
             while (_packets is { Count: > 0 } && t >= _nextPacketApplyTime)
             {
-                UserInputPacket packet = _packets.Dequeue();
+                UserInputPacket packet = _packets[_packetsIndex];
+                ++_packetsIndex;
+
+                if (_packets.Count <= _packetsIndex)
+                {
+                    _packets.Clear();
+                    _packetsIndex = 0;
+                }
+
                 if (_networkedInitialPosition)
                 {
                     if ((packet.Flags & Flags.HasTimeSinceLastQueue) != 0 && packet.TimeSinceLastQueue > 0f)

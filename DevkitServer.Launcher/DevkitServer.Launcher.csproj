@@ -33,12 +33,13 @@
     <Configurations>ClientDebug;ClientRelease;ServerDebug;ServerRelease</Configurations>
   </PropertyGroup>
 
+  <Import Project="$(SolutionDir)Common.targets" />
+
   <ItemGroup>
     <PackageReference Include="NuGet.Packaging" Version="6.7.0" />
-    <PackageReference Remove="Newtonsoft.Json"/>
+    <Reference Remove="Newtonsoft.Json"/>
   </ItemGroup>
 
-  <Import Project="$(SolutionDir)Common.targets" />
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
     <Exec Command="SET &quot;sourcedir=$(OutDir)&#xD;&#xA;SET &quot;config=$(ConfigurationName)&#xD;&#xA;ECHO Building %25config%25&#xD;&#xA;XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;$(ClientPath)\Modules\DevkitServer.Launcher\Bin\$(ProjectName).dll*&quot;&#xD;&#xA;XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;$(ClientPath)\Modules\DevkitServer.Launcher\Bin\$(ProjectName).pdb*&quot;&#xD;&#xA;XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;$(ServerPath)\Modules\DevkitServer.Launcher\Bin\$(ProjectName).dll*&quot;&#xD;&#xA;XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;$(ServerPath)\Modules\DevkitServer.Launcher\Bin\$(ProjectName).pdb*&quot;" />
   </Target>
@@ -47,17 +48,6 @@
     <Compile Remove="Module\**" />
     <EmbeddedResource Remove="Module\**" />
     <None Remove="Module\**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Net.Http" />
-    <Reference Remove="UniTask" />
-
-    <PackageReference Remove="System.Text.Json" />
-    <PackageReference Remove="Lib.Harmony" />
-    <PackageReference Remove="System.Runtime.CompilerServices.Unsafe" />
   </ItemGroup>
 
   <ItemGroup>

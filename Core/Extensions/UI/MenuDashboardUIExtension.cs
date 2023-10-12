@@ -20,11 +20,11 @@ internal class MenuDashboardUIExtension : UIExtension, IDisposable
         _githubButton = Glazier.Get().CreateButton();
 
         _githubButton.CopyTransformFrom(ExitButton);
-        _githubButton.positionOffset_Y = ExitButton.positionOffset_Y - 60;
-        _githubButton.text = "DevkitServer GitHub";
-        _githubButton.fontSize = ESleekFontSize.Medium;
-        _githubButton.onClickedButton += OnClickedDevkitServerGithubButton;
-        _githubButton.backgroundColor = ESleekTint.BACKGROUND;
+        _githubButton.PositionOffset_Y = ExitButton.PositionOffset_Y - 60;
+        _githubButton.Text = "DevkitServer GitHub";
+        _githubButton.FontSize = ESleekFontSize.Medium;
+        _githubButton.OnClicked += OnClickedDevkitServerGithubButton;
+        _githubButton.BackgroundColor = ESleekTint.BACKGROUND;
 
         Container.AddChild(_githubButton);
     }
@@ -40,7 +40,7 @@ internal class MenuDashboardUIExtension : UIExtension, IDisposable
 
     public void Dispose()
     {
-        _githubButton.onClickedButton -= OnClickedDevkitServerGithubButton;
+        _githubButton.OnClicked -= OnClickedDevkitServerGithubButton;
         Container.RemoveChild(_githubButton);
     }
 }

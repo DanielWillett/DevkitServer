@@ -1,5 +1,10 @@
 {
-  "$schema": "https://github.com/DanielWillett/DevkitServer/tree/master/Module/Schemas/client_config_schema.json",
+  "$schema": "https://raw.githubusercontent.com/DanielWillett/DevkitServer/master/Module/Schemas/client_config_schema.json",
+
+  /*
+   *  Add a log to Unturned/Logs that includes whatever visual ANSI codes are used to color the console.
+   */
+  "ansi_log": true,
 
   /*
    *  Full (24-bit) console color support (works in the Win 11 terminal and most web terminals).

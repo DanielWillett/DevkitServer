@@ -345,9 +345,9 @@ public class DevkitServerConfig
 public class SystemConfig : SchemaConfiguration
 {
 #if SERVER
-    public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/server_config_schema.json");
+    public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/server_config_schema.json", true);
 #else
-    public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/client_config_schema.json");
+    public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/client_config_schema.json", true);
 #endif
 
 #nullable disable
@@ -359,6 +359,9 @@ public class SystemConfig : SchemaConfiguration
 
     [JsonPropertyName("walmart_pc_support")]
     public bool RemoveCosmeticImprovements { get; set; }
+
+    [JsonPropertyName("ansi_log")]
+    public bool ANSILog { get; set; }
 
 #if CLIENT
     [JsonPropertyName("enable_object_ui_extension")]

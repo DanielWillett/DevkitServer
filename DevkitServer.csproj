@@ -58,6 +58,8 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="Module" Pack="false" />
+    <None Include="Module\**" Pack="false" />
   </ItemGroup>
 
   <!-- Signing -->
@@ -90,11 +92,9 @@
     <None Remove="DevkitServer.Resources\**" />
     <None Remove="DevkitServer.Tests\**" />
     <None Remove="Libraries\**" />
-    <None Remove="Module\**" />
     <None Remove="packages\**" />
     <None Remove="TestPlugin\**" />
     <None Remove="Common.targets" />
     <None Remove="Unturned.targets" />
   </ItemGroup>
-
 </Project>

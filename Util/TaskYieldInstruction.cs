@@ -1,4 +1,5 @@
 ﻿namespace DevkitServer.Util;
+
 public sealed class TaskYieldInstruction : CustomYieldInstruction
 {
     public CancellationToken Token { get; }

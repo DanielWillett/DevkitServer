@@ -42,110 +42,110 @@ internal class EditorLevelObjectsUIExtension : UIExtension
             return;
 
         ISleekBox displayBox = Glazier.Get().CreateBox();
-        displayBox.positionScale_X = 1f;
-        displayBox.positionScale_Y = 1f;
-        displayBox.positionOffset_X = _assetsScrollBox.positionOffset_X - (Size + 30);
-        displayBox.positionOffset_Y = -Size - 20;
-        displayBox.sizeOffset_X = Size + 20;
-        displayBox.sizeOffset_Y = Size + 20;
+        displayBox.PositionScale_X = 1f;
+        displayBox.PositionScale_Y = 1f;
+        displayBox.PositionOffset_X = _assetsScrollBox.PositionOffset_X - (Size + 30);
+        displayBox.PositionOffset_Y = -Size - 20;
+        displayBox.SizeOffset_X = Size + 20;
+        displayBox.SizeOffset_Y = Size + 20;
         _container.AddChild(displayBox);
 
         _displayTitle = Glazier.Get().CreateBox();
-        _displayTitle.positionScale_X = 1f;
-        _displayTitle.positionScale_Y = 1f;
-        _displayTitle.positionOffset_X = _assetsScrollBox.positionOffset_X - (Size + 30);
-        _displayTitle.positionOffset_Y = -Size - 60;
-        _displayTitle.sizeOffset_X = Size + 20;
-        _displayTitle.sizeOffset_Y = 30;
-        _displayTitle.text = DevkitServerModule.MainLocalization.Translate("NoAssetSelected");
+        _displayTitle.PositionScale_X = 1f;
+        _displayTitle.PositionScale_Y = 1f;
+        _displayTitle.PositionOffset_X = _assetsScrollBox.PositionOffset_X - (Size + 30);
+        _displayTitle.PositionOffset_Y = -Size - 60;
+        _displayTitle.SizeOffset_X = Size + 20;
+        _displayTitle.SizeOffset_Y = 30;
+        _displayTitle.Text = DevkitServerModule.MainLocalization.Translate("NoAssetSelected");
 
         _container.AddChild(_displayTitle);
 
         _preview = Glazier.Get().CreateImage();
-        _preview.sizeScale_X = 0f;
-        _preview.sizeScale_Y = 0f;
-        _preview.positionScale_X = 0.5f;
-        _preview.positionScale_Y = 0.5f;
-        _preview.sizeOffset_X = Size;
-        _preview.sizeOffset_Y = Size;
-        _preview.shouldDestroyTexture = true;
+        _preview.SizeScale_X = 0f;
+        _preview.SizeScale_Y = 0f;
+        _preview.PositionScale_X = 0.5f;
+        _preview.PositionScale_Y = 0.5f;
+        _preview.SizeOffset_X = Size;
+        _preview.SizeOffset_Y = Size;
+        _preview.ShouldDestroyTexture = true;
         displayBox.AddChild(_preview);
 
         _editHint = Glazier.Get().CreateLabel();
-        _editHint.shadowStyle = ETextContrastContext.ColorfulBackdrop;
-        _editHint.text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorToggleHint", MenuConfigurationControlsUI.getKeyCodeText(EditToggleKey));
-        _editHint.positionScale_X = 1f;
-        _editHint.positionScale_Y = 1f;
-        _editHint.positionOffset_X = _assetsScrollBox.positionOffset_X - (Size + 30);
-        _editHint.positionOffset_Y = -20;
-        _editHint.fontAlignment = TextAnchor.MiddleCenter;
-        _editHint.textColor = new SleekColor(ESleekTint.FOREGROUND);
-        _editHint.sizeOffset_X = Size + 20;
-        _editHint.sizeOffset_Y = 20;
+        _editHint.TextContrastContext = ETextContrastContext.ColorfulBackdrop;
+        _editHint.Text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorToggleHint", MenuConfigurationControlsUI.getKeyCodeText(EditToggleKey));
+        _editHint.PositionScale_X = 1f;
+        _editHint.PositionScale_Y = 1f;
+        _editHint.PositionOffset_X = _assetsScrollBox.PositionOffset_X - (Size + 30);
+        _editHint.PositionOffset_Y = -20;
+        _editHint.TextAlignment = TextAnchor.MiddleCenter;
+        _editHint.TextColor = new SleekColor(ESleekTint.FOREGROUND);
+        _editHint.SizeOffset_X = Size + 20;
+        _editHint.SizeOffset_Y = 20;
 
         _container.AddChild(_editHint);
 
         _editorActive = false;
 
         _isEditingToggle = Glazier.Get().CreateToggle();
-        _isEditingToggle.positionScale_X = 1f;
-        _isEditingToggle.positionScale_Y = 1f;
-        _isEditingToggle.positionOffset_X = _displayTitle.positionOffset_X - 30;
-        _isEditingToggle.positionOffset_Y = -Size - 55;
-        _isEditingToggle.sizeOffset_X = 20;
-        _isEditingToggle.sizeOffset_Y = 20;
-        _isEditingToggle.addLabel(DevkitServerModule.MainLocalization.Translate("ObjectIconEditorToggle"), new SleekColor(ESleekTint.FOREGROUND).Get(), ESleekSide.LEFT);
-        _isEditingToggle.sideLabel.shadowStyle = ETextContrastContext.ColorfulBackdrop;
-        _isEditingToggle.isVisible = false;
-        _isEditingToggle.onToggled += OnToggled;
+        _isEditingToggle.PositionScale_X = 1f;
+        _isEditingToggle.PositionScale_Y = 1f;
+        _isEditingToggle.PositionOffset_X = _displayTitle.PositionOffset_X - 30;
+        _isEditingToggle.PositionOffset_Y = -Size - 55;
+        _isEditingToggle.SizeOffset_X = 20;
+        _isEditingToggle.SizeOffset_Y = 20;
+        _isEditingToggle.AddLabel(DevkitServerModule.MainLocalization.Translate("ObjectIconEditorToggle"), new SleekColor(ESleekTint.FOREGROUND).Get(), ESleekSide.LEFT);
+        _isEditingToggle.SideLabel.TextContrastContext = ETextContrastContext.ColorfulBackdrop;
+        _isEditingToggle.IsVisible = false;
+        _isEditingToggle.OnValueChanged += OnToggled;
         _container.AddChild(_isEditingToggle);
 
         _saveEditButton = Glazier.Get().CreateButton();
-        _saveEditButton.positionScale_X = 1f;
-        _saveEditButton.positionScale_Y = 1f;
-        _saveEditButton.positionOffset_X = _isEditingToggle.positionOffset_X - Size + 10;
-        _saveEditButton.positionOffset_Y = -Size - 25;
-        _saveEditButton.sizeOffset_X = Size / 2;
-        _saveEditButton.sizeOffset_Y = 30;
-        _saveEditButton.text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorSave");
-        _saveEditButton.onClickedButton += OnSaveEdit;
-        _saveEditButton.isVisible = false;
+        _saveEditButton.PositionScale_X = 1f;
+        _saveEditButton.PositionScale_Y = 1f;
+        _saveEditButton.PositionOffset_X = _isEditingToggle.PositionOffset_X - Size + 10;
+        _saveEditButton.PositionOffset_Y = -Size - 25;
+        _saveEditButton.SizeOffset_X = Size / 2;
+        _saveEditButton.SizeOffset_Y = 30;
+        _saveEditButton.Text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorSave");
+        _saveEditButton.OnClicked += OnSaveEdit;
+        _saveEditButton.IsVisible = false;
         _container.AddChild(_saveEditButton);
 
         _saveNewEditButton = Glazier.Get().CreateButton();
-        _saveNewEditButton.positionScale_X = 1f;
-        _saveNewEditButton.positionScale_Y = 1f;
-        _saveNewEditButton.positionOffset_X = _isEditingToggle.positionOffset_X + (Size + 30) / 2 - Size;
-        _saveNewEditButton.positionOffset_Y = -Size - 25;
-        _saveNewEditButton.sizeOffset_X = Size / 2;
-        _saveNewEditButton.sizeOffset_Y = 30;
-        _saveNewEditButton.text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorSaveNew");
-        _saveNewEditButton.onClickedButton += OnSaveNewEdit;
-        _saveNewEditButton.isVisible = false;
+        _saveNewEditButton.PositionScale_X = 1f;
+        _saveNewEditButton.PositionScale_Y = 1f;
+        _saveNewEditButton.PositionOffset_X = _isEditingToggle.PositionOffset_X + (Size + 30) / 2 - Size;
+        _saveNewEditButton.PositionOffset_Y = -Size - 25;
+        _saveNewEditButton.SizeOffset_X = Size / 2;
+        _saveNewEditButton.SizeOffset_Y = 30;
+        _saveNewEditButton.Text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorSaveNew");
+        _saveNewEditButton.OnClicked += OnSaveNewEdit;
+        _saveNewEditButton.IsVisible = false;
         _container.AddChild(_saveNewEditButton);
 
         _offsetField = Glazier.Get().CreateStringField();
-        _offsetField.positionScale_X = 1f;
-        _offsetField.positionScale_Y = 1f;
-        _offsetField.positionOffset_X = _saveEditButton.positionOffset_X;
-        _offsetField.positionOffset_Y = _saveEditButton.positionOffset_Y + 40;
-        _offsetField.sizeOffset_X = 3 * Size / 4 - 5;
-        _offsetField.sizeOffset_Y = 30;
-        _offsetField.hint = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorOffsetAssetHint");
-        _offsetField.isVisible = false;
+        _offsetField.PositionScale_X = 1f;
+        _offsetField.PositionScale_Y = 1f;
+        _offsetField.PositionOffset_X = _saveEditButton.PositionOffset_X;
+        _offsetField.PositionOffset_Y = _saveEditButton.PositionOffset_Y + 40;
+        _offsetField.SizeOffset_X = 3 * Size / 4 - 5;
+        _offsetField.SizeOffset_Y = 30;
+        _offsetField.TooltipText = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorOffsetAssetHint");
+        _offsetField.IsVisible = false;
         _container.AddChild(_offsetField);
 
         _gotoOffsetButton = Glazier.Get().CreateButton();
-        _gotoOffsetButton.positionScale_X = 1f;
-        _gotoOffsetButton.positionScale_Y = 1f;
-        _gotoOffsetButton.positionOffset_X = _offsetField.positionOffset_X + _offsetField.sizeOffset_X + 10;
-        _gotoOffsetButton.positionOffset_Y = _offsetField.positionOffset_Y;
-        _gotoOffsetButton.sizeOffset_X = Size / 4;
-        _gotoOffsetButton.sizeOffset_Y = 30;
-        _gotoOffsetButton.text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorOffsetAssetButton");
-        _gotoOffsetButton.isVisible = false;
-        _gotoOffsetButton.onClickedButton += OnClickedGotoAsset;
-        _gotoOffsetButton.onRightClickedButton += OnRightClickedGotoAsset;
+        _gotoOffsetButton.PositionScale_X = 1f;
+        _gotoOffsetButton.PositionScale_Y = 1f;
+        _gotoOffsetButton.PositionOffset_X = _offsetField.PositionOffset_X + _offsetField.SizeOffset_X + 10;
+        _gotoOffsetButton.PositionOffset_Y = _offsetField.PositionOffset_Y;
+        _gotoOffsetButton.SizeOffset_X = Size / 4;
+        _gotoOffsetButton.SizeOffset_Y = 30;
+        _gotoOffsetButton.Text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorOffsetAssetButton");
+        _gotoOffsetButton.IsVisible = false;
+        _gotoOffsetButton.OnClicked += OnClickedGotoAsset;
+        _gotoOffsetButton.OnRightClicked += OnRightClickedGotoAsset;
         _container.AddChild(_gotoOffsetButton);
 
         UpdateSelectedObject();
@@ -156,13 +156,13 @@ internal class EditorLevelObjectsUIExtension : UIExtension
 
     private void OnRightClickedGotoAsset(ISleekElement button)
     {
-        _offsetField.text = LevelObjectUtil.SelectedAsset is not ObjectAsset asset ? string.Empty : asset.GUID.ToString("N");
+        _offsetField.Text = LevelObjectUtil.SelectedAsset is not ObjectAsset asset ? string.Empty : asset.GUID.ToString("N");
     }
     private void OnClickedGotoAsset(ISleekElement button)
     {
-        if (!Guid.TryParse(_offsetField.text, out Guid guid) || Assets.find(guid) is not ObjectAsset asset)
+        if (!Guid.TryParse(_offsetField.Text, out Guid guid) || Assets.find(guid) is not ObjectAsset asset)
         {
-            _offsetField.text = string.Empty;
+            _offsetField.Text = string.Empty;
             return;
         }
         
@@ -198,11 +198,11 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         if (!_editorActive)
             state = false;
 
-        _saveNewEditButton.isVisible = state;
-        _saveEditButton.isVisible = state;
-        _offsetField.isVisible = state;
-        _gotoOffsetButton.isVisible = state;
-        _editHint.isVisible = !state;
+        _saveNewEditButton.IsVisible = state;
+        _saveEditButton.IsVisible = state;
+        _offsetField.IsVisible = state;
+        _gotoOffsetButton.IsVisible = state;
+        _editHint.IsVisible = !state;
     }
 
     public bool EditorActive
@@ -214,10 +214,10 @@ internal class EditorLevelObjectsUIExtension : UIExtension
             if (!value)
             {
                 OnToggled(_isEditingToggle, false);
-                _isEditingToggle.state = false;
+                _isEditingToggle.Value = false;
             }
 
-            _isEditingToggle.isVisible = value;
+            _isEditingToggle.IsVisible = value;
         }
     }
     private void OnSaveEdit(ISleekElement button)
@@ -250,7 +250,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         {
             return;
         }
-        if (!inst._isEditingToggle.state || LevelObjectUtil.SelectedAsset is not ObjectAsset asset)
+        if (!inst._isEditingToggle.Value || LevelObjectUtil.SelectedAsset is not ObjectAsset asset)
         {
             goto clear;
         }
@@ -295,11 +295,11 @@ internal class EditorLevelObjectsUIExtension : UIExtension
             if (box == null)
                 return;
             if (levelObject == null && buildable is not ItemBarricadeAsset and not ItemStructureAsset)
-                box.text = string.Empty;
+                box.Text = string.Empty;
             else if (levelObject != null)
-                box.text = levelObject.FriendlyName;
+                box.Text = levelObject.FriendlyName;
             else
-                box.text = buildable!.FriendlyName;
+                box.Text = buildable!.FriendlyName;
 
             if (inst != null && DevkitServerConfig.Config.EnableObjectUIExtension)
                 inst.UpdateSelectedObject();
@@ -313,7 +313,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
 
     internal void UpdateSelectedObject()
     {
-        _preview.texture = null;
+        _preview.Texture = null;
         Asset? asset = LevelObjectUtil.SelectedAsset;
         if (asset != null)
         {
@@ -337,15 +337,15 @@ internal class EditorLevelObjectsUIExtension : UIExtension
                 text += " (Structure)";
             else if (asset is ItemBarricadeAsset)
                 text += " (Barricade)";
-            _displayTitle.text = text;
+            _displayTitle.Text = text;
             Color rarityColor = asset is ItemAsset item ? ItemTool.getRarityColorUI(item.rarity) : Color.white;
-            _displayTitle.backgroundColor = SleekColor.BackgroundIfLight(rarityColor);
-            _displayTitle.textColor = rarityColor;
+            _displayTitle.BackgroundColor = SleekColor.BackgroundIfLight(rarityColor);
+            _displayTitle.TextColor = rarityColor;
         }
         else
         {
-            _displayTitle.textColor = ESleekTint.FOREGROUND;
-            _displayTitle.text = DevkitServerModule.MainLocalization.Translate("NoAssetSelected");
+            _displayTitle.TextColor = ESleekTint.FOREGROUND;
+            _displayTitle.Text = DevkitServerModule.MainLocalization.Translate("NoAssetSelected");
         }
     }
 
@@ -354,35 +354,35 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         _isGeneratingIcon = false;
         if (EditorObjects.selectedItemAsset != asset && EditorObjects.selectedObjectAsset != asset)
             return;
-        _preview.texture = texture;
-        _preview.shouldDestroyTexture = destroy;
+        _preview.Texture = texture;
+        _preview.ShouldDestroyTexture = destroy;
         if (texture != null)
         {
             float aspect = (float)texture.width / texture.height;
             if (Mathf.Approximately(aspect, 1f))
             {
-                _preview.sizeOffset_X = Size;
-                _preview.sizeOffset_Y = Size;
+                _preview.SizeOffset_X = Size;
+                _preview.SizeOffset_Y = Size;
             }
             else if (aspect > 1f)
             {
-                _preview.sizeOffset_X = Size;
-                _preview.sizeOffset_Y = Mathf.RoundToInt(Size / aspect);
+                _preview.SizeOffset_X = Size;
+                _preview.SizeOffset_Y = Mathf.RoundToInt(Size / aspect);
             }
             else
             {
-                _preview.sizeOffset_X = Mathf.RoundToInt(Size * aspect);
-                _preview.sizeOffset_Y = Size;
+                _preview.SizeOffset_X = Mathf.RoundToInt(Size * aspect);
+                _preview.SizeOffset_Y = Size;
             }
         }
         else
         {
-            _preview.sizeOffset_X = Size;
-            _preview.sizeOffset_Y = Size;
+            _preview.SizeOffset_X = Size;
+            _preview.SizeOffset_Y = Size;
         }
 
-        _preview.positionOffset_X = -Size / 2;
-        _preview.positionOffset_Y = -Size / 2;
+        _preview.PositionOffset_X = -Size / 2;
+        _preview.PositionOffset_Y = -Size / 2;
     }
     private static void Patch()
     {

@@ -1,7 +1,0 @@
-StackCleaner by DanielWillett - 1.2.2 - https://github.com/DanielWillett/StackCleaner
-
-UniTask by Cysharp - 2.3.3 - https://github.com/Cysharp/UniTask
- + Unturned (2020.3.38f1 LTS) fork by DanielWillett - https://github.com/DanielWillett/UniTaskUnturned
-
-System.IO.Compression.FileSystem by Microsoft (dotnet) - 4.8.9032.0 - .NET Framework v4.8.1 Redistributable
- # This assembly is compatible with Unity, most others available are not.

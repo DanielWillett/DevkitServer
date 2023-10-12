@@ -44,7 +44,7 @@ public static class UIMessage
         {
             Logger.LogWarning("Unable to find field: UIMessage._customText.");
         }
-        MethodInfo? setText = typeof(ISleekLabel).GetProperty(nameof(ISleekLabel.text), BindingFlags.Instance | BindingFlags.Public)?.SetMethod;
+        MethodInfo? setText = typeof(ISleekLabel).GetProperty(nameof(ISleekLabel.Text), BindingFlags.Instance | BindingFlags.Public)?.SetMethod;
         if (setText == null)
         {
             Logger.LogWarning("Unable to find method: ISleekLabel.text.");

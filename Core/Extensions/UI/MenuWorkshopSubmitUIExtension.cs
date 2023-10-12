@@ -23,12 +23,12 @@ internal class MenuWorkshopSubmitUIExtension : IDisposable
     public MenuWorkshopSubmitUIExtension()
     {
         _existingModId = Glazier.Get().CreateStringField();
-        _existingModId.positionOffset_X = -200;
-        _existingModId.positionOffset_Y = 100;
-        _existingModId.positionScale_X = 0.5f;
-        _existingModId.sizeOffset_X = 200;
-        _existingModId.sizeOffset_Y = 30;
-        _existingModId.addLabel(DevkitServerModule.MainLocalization.Translate("WorkshopSubmitMenuExistingModIdLabel"), ESleekSide.RIGHT);
+        _existingModId.PositionOffset_X = -200;
+        _existingModId.PositionOffset_Y = 100;
+        _existingModId.PositionScale_X = 0.5f;
+        _existingModId.SizeOffset_X = 200;
+        _existingModId.SizeOffset_Y = 30;
+        _existingModId.AddLabel(DevkitServerModule.MainLocalization.Translate("WorkshopSubmitMenuExistingModIdLabel"), ESleekSide.RIGHT);
         Container!.AddChild(_existingModId);
         _transpiler = Accessor.GetMethod(CreateModTranspiler)!;
         _postfix = Accessor.GetMethod(ClearTextPostfix)!;
@@ -70,12 +70,12 @@ internal class MenuWorkshopSubmitUIExtension : IDisposable
         }
     }
 
-    private static bool HasModId() => _existingModId is not null && ulong.TryParse(_existingModId.text, NumberStyles.Number, CultureInfo.InvariantCulture, out ulong id) && id != 0;
-    private static PublishedFileId_t GetModId() => new PublishedFileId_t(_existingModId is not null && ulong.TryParse(_existingModId.text, NumberStyles.Number, CultureInfo.InvariantCulture, out ulong id) ? id : 0);
+    private static bool HasModId() => _existingModId is not null && ulong.TryParse(_existingModId.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out ulong id) && id != 0;
+    private static PublishedFileId_t GetModId() => new PublishedFileId_t(_existingModId is not null && ulong.TryParse(_existingModId.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out ulong id) ? id : 0);
     private static TempSteamworksWorkshop GetWorkshop() => Provider.provider.workshopService;
-    private static void ClearText() => _existingModId.text = string.Empty;
+    private static void ClearText() => _existingModId.Text = string.Empty;
     [UsedImplicitly]
-    private static void ClearTextPostfix(ISleekElement button) => _existingModId.text = string.Empty;
+    private static void ClearTextPostfix(ISleekElement button) => _existingModId.Text = string.Empty;
     private static IEnumerable<CodeInstruction> CreateModTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
     {
         MethodInfo? prepareUgcStep1 = typeof(TempSteamworksWorkshop).GetMethod("prepareUGC", BindingFlags.Public | BindingFlags.Instance, null, new Type[]
