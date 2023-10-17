@@ -1260,6 +1260,8 @@ internal static class Accessor
             Logger.LogError("IsServer: " + (IsServerGetter != null) + ", IsEditor: " + (IsEditorGetter != null) + ".");
             foreach (CodeInstruction instr in instructions)
                 yield return instr;
+
+            yield break;
         }
         foreach (CodeInstruction instr in instructions)
         {
@@ -1267,7 +1269,7 @@ internal static class Accessor
             {
                 yield return instr;
                 yield return new CodeInstruction(OpCodes.Not);
-                yield return new CodeInstruction(OpCodes.Call, IsEditorGetter);
+                yield return new CodeInstruction(IsEditorGetter.GetCallRuntime(), IsEditorGetter);
                 yield return new CodeInstruction(OpCodes.Or);
                 yield return new CodeInstruction(OpCodes.Not);
                 if (__method != null)
@@ -1334,7 +1336,7 @@ internal static class Accessor
     {
         yield return new CodeInstruction(OpCodes.Ldstr, "In method: " + method.Format() + " (basic entry)");
         yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
-        yield return new CodeInstruction(OpCodes.Call, LogDebug);
+        yield return new CodeInstruction(LogDebug.GetCallRuntime(), LogDebug);
 
         foreach (CodeInstruction instr in instructions)
         {
@@ -1344,7 +1346,7 @@ internal static class Accessor
                 PatchUtil.TransferStartingInstructionNeeds(instr, logInstr);
                 yield return logInstr;
                 yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
-                yield return new CodeInstruction(OpCodes.Call, LogDebug);
+                yield return new CodeInstruction(LogDebug.GetCallRuntime(), LogDebug);
             }
             yield return instr;
         }
@@ -1359,7 +1361,7 @@ internal static class Accessor
     {
         ins.Add(new CodeInstruction(OpCodes.Ldstr, "Stepping through Method: " + method.Format() + ":"));
         ins.Add(new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green));
-        ins.Add(new CodeInstruction(OpCodes.Call, LogDebug));
+        ins.Add(new CodeInstruction(LogDebug.GetCallRuntime(), LogDebug));
         for (int i = 0; i < ins.Count; i++)
         {
             CodeInstruction instr = ins[i];
@@ -1370,7 +1372,7 @@ internal static class Accessor
                 start ??= blockInst;
                 ins.Insert(i, blockInst);
                 ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green));
-                ins.Insert(i + 2, new CodeInstruction(OpCodes.Call, LogDebug));
+                ins.Insert(i + 2, new CodeInstruction(LogDebug.GetCallRuntime(), LogDebug));
                 i += 3;
             }
 
@@ -1380,7 +1382,7 @@ internal static class Accessor
                 start ??= lblInst;
                 ins.Insert(i, lblInst);
                 ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green));
-                ins.Insert(i + 2, new CodeInstruction(OpCodes.Call, LogDebug));
+                ins.Insert(i + 2, new CodeInstruction(LogDebug.GetCallRuntime(), LogDebug));
                 i += 3;
             }
 
@@ -1388,7 +1390,7 @@ internal static class Accessor
             start ??= mainInst;
             ins.Insert(i, mainInst);
             ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green));
-            ins.Insert(i + 2, new CodeInstruction(OpCodes.Call, LogDebug));
+            ins.Insert(i + 2, new CodeInstruction(LogDebug.GetCallRuntime(), LogDebug));
             i += 3;
 
             PatchUtil.TransferStartingInstructionNeeds(instr, start);

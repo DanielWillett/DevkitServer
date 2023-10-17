@@ -131,6 +131,9 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         ClientInfo.SendClientInfo.Invoke(Connection, ClientInfo);
         Logger.DumpJson(ClientInfo);
         TileSync.SendAuthority(Connection);
+        ObjectSync.SendAuthority(Connection);
+        HierarchySync.SendAuthority(Connection);
+        NavigationSync.SendAuthority(Connection);
 #endif
         Logger.LogDebug("[USERS] Editor User initialized: " + SteamId.m_SteamID.Format() + " (" + DisplayName.Format() + ").");
     }

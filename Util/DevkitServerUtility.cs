@@ -56,7 +56,7 @@ public static class DevkitServerUtility
         }
 
         if (length == 0)
-            return length.ToString("N");
+            return 0.ToString("N" + Math.Max(0, decimals).ToString(CultureInfo.InvariantCulture));
 
         bool neg = length < 0;
         length = Math.Abs(length);

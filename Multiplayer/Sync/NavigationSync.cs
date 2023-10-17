@@ -1,60 +1,73 @@
-﻿#if CLIENT
-//#define GL_SAMPLES
-#endif
-using DevkitServer.Configuration;
+﻿using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
-using HarmonyLib;
-using SDG.Framework.Landscapes;
 using SDG.NetPak;
-#if CLIENT
-using SDG.Framework.Rendering;
-#endif
 
 namespace DevkitServer.Multiplayer.Sync;
 
+/*
+ * This class uses a temporary file because the maximum possible size of a navigation volume is over the maximum size of an array.
+ * As unlikely as this is it's still unnecessary to use that much memory.
+ */
+
 public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
 {
+    private const float Delay = 0.75f;
+    private const float SendDelay = 0.25f;
+
     private const string Source = "NAVIGATION SYNC";
 
     private const int MaxPacketSize = (int)(NetFactory.MaxPacketSize * 0.2f);
 
-    private static readonly byte[] Buffer = new byte[MaxPacketSize + HeaderSize];
+    private static readonly byte[] Buffer = new byte[MaxPacketSize + PacketHeaderSize + sizeof(ulong)];
+    public override bool SupportsClientsideAuthority => false;
 
     // Header structure
-    // [1B: header size] [4B: total size] [4B: total packets] [4B: nav net id]
+    // [1B: header size] [8B: total size] [4B: total packets] [4B: nav net id]
 
-    private const byte HeaderSize = checked(1 + sizeof(int) + sizeof(int) + sizeof(uint) /* align to 64 bit */ + 3);
+    private const byte HeaderSize = checked(1 + sizeof(long) + sizeof(int) + sizeof(uint) /* align to 64 bit */ + 7);
 
     // Packet Header structure
     // [1B: packet header size] [4B: packet id] [2B: packet length] 
     private const byte PacketHeaderSize = checked(1 + sizeof(int) + sizeof(ushort) /* align to 64 bit */ + 1);
     
     private int _index = -1;
-    private static readonly byte[] PacketBuffer = new byte[PacketHeaderSize + sizeof(ulong) + MaxPacketSize];
-    private int _packetId;
+    private int _packetId = -1;
     private float _lastSent;
-    private int _queueIndex;
+    private float _shouldMoveOnAfter;
     private FileStream? _fs;
-    private int _bufferLen;
+    private long _bufferLen;
     private int _ttlPackets;
-    private byte _receiving;
+    private NetId _pendingNetId;
     private BitArray? _packetMask;
+    private volatile int _queued;
 
-    private readonly List<NetId> _queue = new List<NetId>(4);
+    private readonly List<NetId> _syncQueue = new List<NetId>(4);
+    private List<PacketInfo>? _packets;
+
+    private readonly struct PacketInfo
+    {
+        public readonly int PacketId;
+        public readonly byte[] Data;
+        public readonly NetId Nav;
+        public PacketInfo(int packetId, byte[] data, NetId nav)
+        {
+            PacketId = packetId;
+            Data = data;
+            Nav = nav;
+        }
+    }
 
     protected override void Init() { }
     protected override void OnAuthorityUpdated(bool authority)
     {
         if (!authority)
         {
-            _queue.Clear();
-            _queueIndex = 0;
+            _syncQueue.Clear();
         }
     }
-    /*
     private void ReceiveNavigationData(byte[] data, int offset)
     {
         if (!HasAuthority || IsOwner)
@@ -66,87 +79,169 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
         byte hdrSize = data[offset];
         if (hdrSize != PacketHeaderSize)
         {
-            Logger.LogWarning($"Out of date packet header: {hdrSize.Format()}B.", method: Source);
-            return;
+            Logger.LogWarning($"Possibly out of date packet header: {hdrSize.Format()}B.", method: Source);
         }
 
         int packetId = BitConverter.ToInt32(data, offset + 1);
         int len = BitConverter.ToUInt16(data, offset + 1 + sizeof(int));
         Logger.LogDebug($"[{Source}] Packet received: #{packetId.Format()}, len: {len.Format()}.");
-        offset += PacketHeaderSize;
+        offset += hdrSize;
         if (packetId == 0)
         {
             _index = 0;
-            hdrSize = data[offset + 1];
+            hdrSize = data[offset];
             if (hdrSize != HeaderSize)
             {
-                Logger.LogWarning($"Out of date header: {hdrSize.Format()}B.", method: Source);
+                Logger.LogWarning($"Possibly out of date header: {hdrSize.Format()}B.", method: Source);
                 return;
             }
-            _bufferLen = BitConverter.ToInt32(data, offset + 2) - hdrSize;
-            _ttlPackets = BitConverter.ToInt32(data, offset + 2 + sizeof(int));
+            _bufferLen = BitConverter.ToInt64(data, offset + 1) - hdrSize;
+            _ttlPackets = BitConverter.ToInt32(data, offset + 1 + sizeof(long));
+            _pendingNetId = new NetId(BitConverter.ToUInt32(data, offset + 1 + sizeof(long) + sizeof(int)));
 
             if (_packetMask == null || _packetMask.Length < _ttlPackets)
-                _packetMask = new BitArray(Mathf.CeilToInt(_ttlPackets / 32f) * 32);
+                _packetMask = new BitArray((int)Math.Ceiling(_ttlPackets / 32d) * 32);
             else
                 _packetMask.SetAll(false);
 
-            _packetMask[0] = true;
-
-            int xmin = BitConverter.ToInt32(data, offset + 2 + sizeof(int) * 2);
-            int ymin = BitConverter.ToInt32(data, offset + 2 + sizeof(int) * 3);
-            int xmax = BitConverter.ToInt32(data, offset + 2 + sizeof(int) * 4);
-            int ymax = BitConverter.ToInt32(data, offset + 2 + sizeof(int) * 5);
-
-            int xtile = BitConverter.ToInt32(data, offset + 2 + sizeof(int) * 6);
-            int ytile = BitConverter.ToInt32(data, offset + 2 + sizeof(int) * 7);
-            offset += HeaderSize;
+            offset += hdrSize;
             len -= HeaderSize;
 
-            _receiving = new MapInvalidation(new LandscapeCoord(xtile, ytile), xmin, ymin, xmax, ymax, _dataType, CachedTime.RealtimeSinceStartup);
-#if CLIENT
-            _renderGl = true;
-#if GL_SAMPLES
-            _gl = _receiving;
-#endif
-#endif
-            Logger.LogDebug($"[{Source}] Received starting packet: Len: {_bufferLen}. Packets: {_ttlPackets}. {_receiving.Format()}.");
+            Logger.LogDebug($"[{Source}] Received starting packet: Len: {_bufferLen.Format()}. Packets: {_ttlPackets.Format()}. {_pendingNetId.Format()}.");
+            CreateFileStream();
         }
         else if (packetId >= _ttlPackets)
         {
-            Logger.LogWarning($"Received out of bounds packet: {(packetId + 1).Format()}/{_ttlPackets}.", method: Source);
+            Logger.LogWarning($"Received out of bounds packet: {(packetId + 1).Format()}/{_ttlPackets.Format()}.", method: Source);
         }
-        else _packetMask![packetId] = true;
-        Logger.LogDebug($"[{Source}] Offset: {offset.Format()}, copying {len} B to {_index}.");
-        Buffer.BlockCopy(data, offset, _fs, _index, len);
-        Logger.LogDebug($"[{Source}] Receiving packet #{packetId} for tile {_receiving.Tile.Format()} ({DevkitServerUtility.FormatBytes(len)} @ {DevkitServerUtility.FormatBytes(_index)})");
 
         _index += len;
-        int missingCt = 0;
 
-#if GL_SAMPLES
-        _invalSamples = true;
-#endif
+        if (_fs == null)
+        {
+            Logger.LogError("Unable to append to buffer, FileStream is null.", method: Source);
+            return;
+        }
+
+        byte[] newData = new byte[len];
+        System.Buffer.BlockCopy(data, offset, newData, 0, newData.Length);
+        data = newData;
+
+        StartProcessingPacket(new PacketInfo(packetId, data, _pendingNetId), true);
+    }
+
+    private void StartProcessingPacket(PacketInfo packet, bool isNew)
+    {
+        // asynchronously write to temp nav file to help with file locking.
+
+        bool isNext = packet.PacketId == _packetId + 1;
+        int val = -1;
+        if (isNext)
+            val = Interlocked.CompareExchange(ref _queued, 1, 0);
+
+        if (val == 0)
+        {
+            _packetId = packet.PacketId;
+            try
+            {
+                _fs!.BeginWrite(packet.Data, 0, packet.Data.Length, WriteComplete, _fs);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Failed to write to navigation file.", method: Source);
+                Logger.LogError(ex);
+                Interlocked.Exchange(ref _queued, 0);
+            }
+        }
+        else
+        {
+            _packets ??= new List<PacketInfo>();
+            if (isNew)
+                _packets.Add(packet);
+            else
+                _packets.Insert(0, packet);
+        }
+    }
+
+    private void FinishReceive()
+    {
+        Interlocked.Exchange(ref _queued, 0);
+
+        Logger.LogDebug($"[{Source}] Received packet #{_packetId} for nav {_pendingNetId.Format()} @ {DevkitServerUtility.FormatBytes(_index)}.");
+
+        int missingCt = 0;
+        _packetMask![_packetId] = true;
+        _shouldMoveOnAfter = CachedTime.RealtimeSinceStartup + 15f;
+        if (_packets != null && _packets.Any(x => x.Nav.id == _pendingNetId.id))
+        {
+            if (_queued == 0 && _fs != null)
+            {
+                int index = -1;
+                int id = -1;
+                for (int i = 0; i < _packets.Count; ++i)
+                {
+                    PacketInfo info = _packets[i];
+                    if (info.Nav.id != _pendingNetId.id)
+                        return;
+
+                    if (index == -1 || id > info.PacketId)
+                    {
+                        id = info.PacketId;
+                        index = i;
+                    }
+                }
+
+                if (index == -1)
+                    return;
+
+                PacketInfo newPacket = _packets[index];
+                _packets.RemoveAt(index);
+
+                StartProcessingPacket(newPacket, false);
+            }
+
+            return;
+        }
 
         for (int i = 0; i < _ttlPackets; ++i)
         {
             if (!_packetMask![i])
                 ++missingCt;
         }
-        if (missingCt < 1 || packetId == _ttlPackets - 1)
+        if (missingCt < 1 || _packetId == _ttlPackets - 1)
         {
+            _fs!.Seek(0L, SeekOrigin.Begin);
             if (missingCt > 0)
             {
                 Logger.LogWarning($"Missing packets: {missingCt}/{_ttlPackets} ({missingCt / _ttlPackets:P0}.", method: Source);
-                _receiving = default;
-                _index = 0;
-                _packetId = 0;
+                _pendingNetId = NetId.INVALID;
+                _index = -1;
+                _packetId = -1;
                 return;
             }
-            ApplyBuffer();
+            ApplyBuffer(_pendingNetId);
         }
     }
-    */
+    private void WriteComplete(IAsyncResult ar)
+    {
+        if (ar.AsyncState is not FileStream str)
+            return;
+
+        try
+        {
+            str.EndWrite(ar);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error writing navigation to buffer.", method: Source);
+            Logger.LogError(ex, method: Source);
+            Interlocked.Exchange(ref _queued, 0);
+            return;
+        }
+
+        DevkitServerUtility.QueueOnMainThread(FinishReceive);
+    }
+    
     [UsedImplicitly]
     internal static void ReceiveNavigationData(NetPakReader reader)
     {
@@ -201,7 +296,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
                 NetFactory.SendGeneric(DevkitServerMessage.SendTileData, buffer, list, length: len, reliable: true, offset: offset);
             }
 #endif
-            // sync.ReceiveNavigationData(buffer, offset + sizeof(ulong));
+           sync.ReceiveNavigationData(buffer, offset + sizeof(ulong));
         }
         else
             Logger.LogWarning($"Received tile data from non-authoritive NavigationSync: {(sync.User == null ? "server-side authority" : sync.User.Format())}.", method: Source);
@@ -215,6 +310,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
         {
             _fs.Flush();
             _fs.Dispose();
+            File.Delete(Path.Combine(DevkitServerConfig.TempFolder, "nav.temp"));
         }
         catch
         {
@@ -236,8 +332,10 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
     private void BufferData()
     {
         _index = 0;
-        Logger.LogDebug($"[{Source}] Buffering queue[" + _queueIndex + "].");
-        NetId netId = _queue[_queueIndex];
+        NetId netId = _syncQueue[_syncQueue.Count - 1];
+        _syncQueue.RemoveAt(_syncQueue.Count - 1);
+        _pendingNetId = netId;
+        Logger.LogDebug($"[{Source}] Buffering navigation data: {netId.Format()}.");
         IReadOnlyList<Flag> flags = NavigationUtil.NavigationFlags;
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav) || nav >= flags.Count)
         {
@@ -260,14 +358,14 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
         writer.Write(HeaderSize);
         writer.Write(_bufferLen);
         writer.Write(_ttlPackets);
-        writer.Write(netId);
+        writer.Write(netId.id);
 
         NavigationUtil.WriteRecastGraphData(writer, flag.graph);
         Logger.LogDebug($"[{Source}]  Buffered {DevkitServerUtility.FormatBytes(_bufferLen - HeaderSize)}. Total packets: {_ttlPackets.Format()}.");
 
         _fs!.Seek(0L, SeekOrigin.Begin);
     }
-    private void ApplyBuffer()
+    private void ApplyBuffer(NetId netId)
     {
         if (_fs == null)
         {
@@ -280,111 +378,159 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             ByteReader reader = new ByteReader();
             reader.LoadNew(_fs!);
 
-            reader.Skip(HeaderSize - sizeof(uint));
-            NetId netId = reader.ReadNetId();
-
             IReadOnlyList<Flag> flags = NavigationUtil.NavigationFlags;
             if (!NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav) || nav >= flags.Count)
             {
                 Logger.LogWarning($" Navigation flag not found in ApplyBuffer: {netId.Format()}.", method: Source);
-                TryDisposeFileStream();
                 return;
             }
 
             Flag flag = flags[nav];
             NavigationUtil.ReadRecastGraphDataTo(reader, flag.graph);
+            flag.UpdateEditorNavmesh();
 
-            _receiving = default;
-            _index = 0;
-            _packetId = 0;
+            _pendingNetId = NetId.INVALID;
+            _index = -1;
+            _packetId = -1;
+            Logger.LogInfo($"[{Source}] Synced navigation #{nav.Format()}'s nav-mesh from the server.");
         }
         finally
         {
             TryDisposeFileStream();
         }
     }
-    /*
+    
     [UsedImplicitly]
     private unsafe void Update()
     {
+        float time = CachedTime.RealtimeSinceStartup;
+        if (!HasAuthority && _packets is { Count: > 0 } && _fs != null && _queued == 0)
+        {
+            int index = -1;
+            int id = -1;
+            for (int i = 0; i < _packets.Count; ++i)
+            {
+                PacketInfo info = _packets[i];
+                if (!_pendingNetId.IsNull() && info.Nav.id != _pendingNetId.id)
+                    return;
+
+                if (index == -1 || id > info.PacketId)
+                {
+                    id = info.PacketId;
+                    index = i;
+                }
+            }
+
+            if (index == -1)
+            {
+                if (_shouldMoveOnAfter < time)
+                {
+                    for (int i = 0; i < _packets.Count; ++i)
+                    {
+                        PacketInfo info = _packets[i];
+
+                        if (index == -1 || id > info.PacketId)
+                        {
+                            id = info.PacketId;
+                            index = i;
+                        }
+                    }
+                }
+
+                if (index == -1)
+                    return;
+            }
+
+            PacketInfo newPacket = _packets[index];
+            _packets.RemoveAt(index);
+
+            StartProcessingPacket(newPacket, false);
+            _shouldMoveOnAfter = time + 15f;
+        }
+
 #if SERVER
         if (Provider.clients.Count == 0)
             return;
 #endif
-        if (!HasAuthority || !IsOwner)
+        if (!HasAuthority || !IsOwner || (_syncQueue.Count == 0 && _packetId == -1))
             return;
-        float time = CachedTime.RealtimeSinceStartup;
-        if (_dataType == DataType.None && time - _lastSent > 1.5f)
+
+        if (_packetId == -1 && time - _lastSent > Delay)
         {
-            if (_invalidations.Count == 0)
-            {
-                _queueIndex = 0;
-                _dataType = DataType.None;
+            if (_syncQueue.Count == 0)
                 return;
-            }
-            while (_queueIndex < _invalidations.Count && time - _invalidations[_queueIndex].Time < 3f)
-                ++_queueIndex;
-            if (_queueIndex >= _invalidations.Count)
-            {
-                _queueIndex = 0;
-                _dataType = DataType.None;
-                return;
-            }
-            _lastSent = time;
-            _dataType = _invalidations[_queueIndex].Type;
 
             BufferData();
+            _packetId = 0;
         }
-        else if (_dataType != DataType.None && _index > -1 && time - _lastSent > (_packetId == 0 ? 0.5f : 0.2f))
+
+        if (_packetId != -1 && time - _lastSent > (_packetId == 0 ? 0.5f : 0.2f) && _fs != null)
         {
             _lastSent = time;
-            MapInvalidation inv = _invalidations[_queueIndex];
-            LandscapeCoord coord = inv.Tile;
-            LandscapeTile? tile = Landscape.getTile(coord);
-            if (tile == null)
+
+            const int index = sizeof(ulong) + PacketHeaderSize;
+
+            int len = _fs.Read(Buffer, index, MaxPacketSize);
+            Logger.LogDebug($"Read from file: {len.Format()} B. Index: {index.Format()} B, max: {MaxPacketSize.Format()} B.");
+            if (len <= 0)
             {
-                Logger.LogWarning("Tile not found in BufferData: " + coord + ".", method: Source);
-                goto flush;
+                _bufferLen = 0;
+                _index = -1;
+                _packetId = -1;
+                TryDisposeFileStream();
+                return;
             }
 
-            int len = MaxPacketSize;
-            if (_index + len > _bufferLen)
-                len = _bufferLen - _index;
-
-            fixed (byte* ptr = PacketBuffer)
+            int offset = sizeof(ulong);
+            fixed (byte* ptr = Buffer)
             {
                 UnsafeBitConverter.GetBytes(ptr, User == null ? 0ul : User.SteamId.m_SteamID);
-                ptr[sizeof(ulong)] = PacketHeaderSize;
-                int offset = 1 + sizeof(ulong);
+                ptr[offset] = PacketHeaderSize;
+                ++offset;
                 UnsafeBitConverter.GetBytes(ptr, _packetId, offset);
                 offset += sizeof(int);
                 UnsafeBitConverter.GetBytes(ptr, (ushort)len, offset);
             }
 
-            Buffer.BlockCopy(_fs, _index, PacketBuffer, PacketHeaderSize + sizeof(ulong), len);
-
-            NetFactory.SendGeneric(DevkitServerMessage.SendTileData, PacketBuffer,
+            NetFactory.SendGeneric(DevkitServerMessage.SendNavigationData, Buffer,
 #if SERVER
                 null,
 #endif
-                length: PacketHeaderSize + sizeof(ulong) + len, reliable: true);
-            // DevkitServerUtility.PrintBytesHex(PacketBuffer, len: PacketHeaderSize + sizeof(ulong) + len);
-            Logger.LogDebug($"[{Source}] #{_packetId.Format()} Tile: {tile.coord.Format()} Length: {len.Format()}.");
+                length: index + len, reliable: true);
+
+            Logger.LogDebug($"[{Source}] Sent nav data packet #{_packetId.Format()} {DevkitServerUtility.FormatBytes(len)} ({DevkitServerUtility.FormatBytes(_index)} / {DevkitServerUtility.FormatBytes(_bufferLen)}).");
 
             _index += len;
             ++_packetId;
-        flush:
-            // flush buffer
-            if (_index >= _bufferLen || tile == null)
+            if (_packetId == _ttlPackets)
             {
-                _invalidations.RemoveAt(_queueIndex);
-                _dataType = DataType.None;
-                _bufferLen = 0;
-                _index = -1;
-                _packetId = 0;
+                Logger.LogInfo($"[{Source}] Synced navigation #{(NavigationNetIdDatabase.TryGetNavigation(_pendingNetId, out byte nav) ? nav.Format() : _pendingNetId.Format())}'s nav-mesh to all clients.");
             }
         }
-    }*/
+    }
 
     protected override void Deinit() { }
+
+    /// <summary>
+    /// Queues a navigation flag to sync if this has authority.
+    /// </summary>
+    /// <param name="netId">The <see cref="NetId"/> of the navigation flag.</param>
+    public void EnqueueSync(NetId netId)
+    {
+        if (!HasAuthority)
+            return;
+
+        for (int i = _syncQueue.Count - 1; i >= 0; --i)
+        {
+            if (_syncQueue[i].id == netId.id)
+            {
+                _syncQueue.RemoveAt(i);
+                break;
+            }
+        }
+
+        _syncQueue.Insert(0, netId);
+        _lastSent = CachedTime.RealtimeSinceStartup + Math.Max(-Delay, SendDelay - _syncQueue.Count * Delay);
+        Logger.LogDebug($"[{Source}] Requested sync for: {netId.Format()}.");
+    }
 }

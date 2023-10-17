@@ -366,7 +366,7 @@ public static class AssetUtil
             generator.Emit(OpCodes.Ldloca_S, 2);
             generator.Emit(OpCodes.Ldloca_S, 3);
             generator.Emit(OpCodes.Ldloca_S, 4);
-            generator.Emit(OpCodes.Call, method);
+            generator.Emit(method.GetCallRuntime(), method);
 
             generator.Emit(OpCodes.Ldloca_S, 5);
             generator.Emit(OpCodes.Ldarg_0);
@@ -397,7 +397,7 @@ public static class AssetUtil
             generator.Emit(OpCodes.Stfld, originField);
 
             generator.Emit(OpCodes.Ldloc_S, 5);
-            generator.Emit(OpCodes.Call, loadFileMethod);
+            generator.Emit(loadFileMethod.GetCallRuntime(), loadFileMethod);
 
             generator.Emit(OpCodes.Ret);
 

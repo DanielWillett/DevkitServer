@@ -1,4 +1,7 @@
-﻿using DevkitServer.Util.Encoding;
+﻿using DevkitServer.Multiplayer.Levels;
+using DevkitServer.Multiplayer.Sync;
+using DevkitServer.Players;
+using DevkitServer.Util.Encoding;
 using Pathfinding;
 
 namespace DevkitServer.Util;
@@ -27,6 +30,8 @@ public static class NavigationUtil
     /// <returns><see langword="false"/> in the case of a reflection failure.</returns>
     public static bool UpdateEditorNavmesh(this Flag flag)
     {
+        ThreadUtil.assertIsGameThread();
+
         if (UpdateNavmesh == null)
             return false;
 
@@ -35,10 +40,125 @@ public static class NavigationUtil
     }
 
     /// <summary>
+    /// Gets the index of the <see cref="Flag"/> in <c><see cref="LevelNavigation"/>.flags</c>, or -1 if it's not found or in the case of a reflection failure.
+    /// </summary>
+    public static bool TryGetIndex(this Flag flag, out byte nav)
+    {
+        int index2 = flag.GetIndex();
+        if (index2 <= 0)
+        {
+            nav = byte.MaxValue;
+            return false;
+        }
+
+        nav = (byte)index2;
+        return true;
+    }
+
+    /// <summary>
+    /// Gets the <see cref="Flag"/> at index <paramref name="nav"/>, or returns <see langword="false"/> if it's out of range or in the case of a reflection failure.
+    /// </summary>
+    public static int GetIndex(this Flag flag)
+    {
+        if (GetNavigationFlags == null)
+            return -1;
+
+        int index = GetNavigationFlags().IndexOf(flag);
+        return index is < 0 or >= byte.MaxValue ? -1 : index;
+    }
+
+    /// <summary>
+    /// Gets the <see cref="Flag"/> at index <paramref name="nav"/>, or returns <see langword="false"/> if it's out of range or in the case of a reflection failure.
+    /// </summary>
+    /// <param name="nav">Flag index in <c><see cref="LevelNavigation"/>.flags</c>.</param>
+    public static bool TryGetFlag(byte nav, out Flag flag)
+    {
+        flag = GetFlagSafe(nav)!;
+        return flag != null;
+    }
+
+    /// <summary>
+    /// Gets the <see cref="Flag"/> at index <paramref name="nav"/>, or <see langword="null"/> if it's out of range or in the case of a reflection failure.
+    /// </summary>
+    /// <param name="nav">Flag index in <c><see cref="LevelNavigation"/>.flags</c>.</param>
+    public static Flag? GetFlagSafe(byte nav)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (GetNavigationFlags == null)
+            return null;
+
+        IReadOnlyList<Flag> flagList = GetNavigationFlags();
+        if (nav == byte.MaxValue || nav >= flagList.Count)
+            return null;
+
+        return flagList[nav];
+    }
+    internal static Flag GetFlagUnsafe(byte nav) => NavigationFlags[nav];
+    private static bool CheckSync(out NavigationSync sync)
+    {
+        sync = null!;
+#if CLIENT
+        if (!DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.NavigationSync == null || !EditorUser.User.NavigationSync.HasAuthority)
+            return false;
+        sync = EditorUser.User.NavigationSync;
+#elif SERVER
+        if (!DevkitServerModule.IsEditing || NavigationSync.ServersideAuthority == null || !NavigationSync.ServersideAuthority.HasAuthority)
+            return false;
+        sync = NavigationSync.ServersideAuthority;
+#endif
+        return true;
+    }
+
+    /// <summary>
+    /// Queues the navigation mesh for the provided <see cref="Flag"/> to sync if local has authority over <see cref="NavigationSync"/>.
+    /// </summary>
+    public static bool SyncIfAuthority(Flag flag)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (!CheckSync(out NavigationSync sync) || !flag.TryGetIndex(out byte nav) || !NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
+            return false;
+
+        sync.EnqueueSync(netId);
+        return true;
+    }
+
+    /// <summary>
+    /// Queues the navigation mesh at the provided index to sync if local has authority over <see cref="NavigationSync"/>.
+    /// </summary>
+    public static bool SyncIfAuthority(byte nav)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (!CheckSync(out NavigationSync sync) || !NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
+            return false;
+
+        sync.EnqueueSync(netId);
+        return true;
+    }
+
+    /// <summary>
+    /// Queues the navigation mesh at the provided index to sync if local has authority over <see cref="NavigationSync"/>.
+    /// </summary>
+    public static bool SyncIfAuthority(NetId netId)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (!CheckSync(out NavigationSync sync))
+            return false;
+
+        sync.EnqueueSync(netId);
+        return true;
+    }
+
+    /// <summary>
     /// Calculates the amount of bytes that will be written by <see cref="WriteRecastGraphData"/>.
     /// </summary>
     public static int CalculateTotalWriteSize(RecastGraph graph)
     {
+        ThreadUtil.assertIsGameThread();
+
         int ct = 27 + sizeof(ushort) * 2 * graph.tileZCount * graph.tileXCount;
 
         RecastGraph.NavmeshTile[] tiles = graph.GetTiles();
@@ -65,6 +185,8 @@ public static class NavigationUtil
     /// <remarks>Does the same thing as <see cref="LevelNavigation.save"/></remarks>
     public static void WriteRecastGraphData(ByteWriter writer, RecastGraph graph)
     {
+        ThreadUtil.assertIsGameThread();
+
         const byte version = 0;
 
         writer.Write(version);
@@ -106,11 +228,15 @@ public static class NavigationUtil
     /// <remarks>Does the same thing as <see cref="LevelNavigation.buildGraph"/>.</remarks>
     public static void ReadRecastGraphDataTo(ByteReader reader, RecastGraph graph)
     {
+        ThreadUtil.assertIsGameThread();
+
         AstarPath.active.BlockUntilPathQueueBlocked();
 
         reader.ReadUInt8(); // version
 
         TriangleMeshNode.SetNavmeshHolder((int)graph.graphIndex, graph);
+
+        uint graphIndex = (uint)AstarPath.active.astarData.GetGraphIndex(graph);
 
         graph.forcedBoundsCenter = reader.ReadVector3();
         graph.forcedBoundsSize = reader.ReadVector3();
@@ -154,7 +280,7 @@ public static class NavigationUtil
                     TriangleMeshNode node = new TriangleMeshNode(AstarPath.active);
                     tile.nodes[i] = node;
 
-                    node.GraphIndex = graph.graphIndex;
+                    node.GraphIndex = graphIndex;
                     node.Penalty = 0u;
                     node.Walkable = true;
                     node.v0 = tile.tris[i * 3] | offsetBits;

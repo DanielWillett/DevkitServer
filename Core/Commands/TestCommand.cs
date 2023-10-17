@@ -1,12 +1,11 @@
-﻿using System.Collections.ObjectModel;
+﻿using Cysharp.Threading.Tasks;
 using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Sync;
+using System.Collections.ObjectModel;
 using System.Reflection;
-using Cysharp.Threading.Tasks;
-using Unturned.SystemEx;
 #if CLIENT
 using DevkitServer.AssetTools;
 using DevkitServer.Configuration;
@@ -14,6 +13,7 @@ using DevkitServer.Util.Debugging;
 using System.Diagnostics;
 using DevkitServer.Players;
 using SDG.Framework.Devkit;
+using Unturned.SystemEx;
 #endif
 
 namespace DevkitServer.Core.Commands;
@@ -142,6 +142,21 @@ internal static class CommandTests
     public static readonly Action<CommandContext>[] Commands;
     public static readonly Func<CommandContext, CancellationToken, UniTask>[] AsyncCommands;
 #if CLIENT
+    private static void missingobjects(CommandContext ctx)
+    {
+        List<ObjectAsset> assets = new List<ObjectAsset>(1024);
+
+        Assets.find(assets);
+
+        assets.RemoveAll(x => x.type == EObjectType.DECAL || ObjectIconPresets.Presets.ContainsKey(x.GUID));
+
+
+        for (int i = 0; i < assets.Count; i++)
+        {
+            ObjectAsset asset = assets[i];
+            Logger.LogInfo($"{i.Format()} {asset.Format()} ({asset.getFilePath().Format()})");
+        }
+    }
     private static void grab(CommandContext ctx)
     {
         if (ctx.HasArgsExact(0))

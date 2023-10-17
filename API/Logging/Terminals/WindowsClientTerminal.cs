@@ -2,6 +2,7 @@
 using DevkitServer.Commands.Subsystem;
 using System.Runtime.InteropServices;
 using System.Text;
+using SDG.Framework.Utilities;
 using ThreadPriority = System.Threading.ThreadPriority;
 using ThreadState = System.Threading.ThreadState;
 
@@ -170,7 +171,8 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                       6 => "Shutting Down",
                       _ => "Unknown: " + _closeHandler.Value
                   } + "\".", ConsoleColor.Red, true, Severity.Info);
-            Provider.shutdown(2, "Closed by Console: No Explanation");
+
+            TimeUtility.InvokeAfterDelay(() => Application.Quit(0), 0.5f);
             _closeHandler = uint.MaxValue;
         }
     }

@@ -141,7 +141,7 @@ internal static class EditorActionsCodeGeneration
         DynamicMethod writeMethod = new DynamicMethod("SettingsWriteHandler", attributes, CallingConventions.Standard,
             typeof(void), new Type[] { typeof(IActionListener), typeof(ActionSettingsCollection).MakeByRefType(), typeof(IAction) },
             typeof(EditorActionsCodeGeneration), true);
-        DebuggableEmitter writeGenerator = new DebuggableEmitter(writeMethod) { DebugLog = true };
+        DebuggableEmitter writeGenerator = new DebuggableEmitter(writeMethod) { DebugLog = false };
 
         DynamicMethod readMethod = new DynamicMethod("SettingsReadHandler", attributes, CallingConventions.Standard,
             typeof(void), new Type[] { typeof(IActionListener), typeof(IAction) },
@@ -181,10 +181,10 @@ internal static class EditorActionsCodeGeneration
 
         // ActionSettings settings = actions.Settings;
         writeGenerator.Emit(OpCodes.Ldarg_0);
-        writeGenerator.Emit(getActionSettings.GetCall(), getActionSettings);
+        writeGenerator.Emit(getActionSettings.GetCallRuntime(), getActionSettings);
         writeGenerator.Emit(OpCodes.Stloc, writeActionSettings);
         readGenerator.Emit(OpCodes.Ldarg_0);
-        readGenerator.Emit(getActionSettings.GetCall(), getActionSettings);
+        readGenerator.Emit(getActionSettings.GetCallRuntime(), getActionSettings);
         readGenerator.Emit(OpCodes.Stloc, readActionSettings);
 
         LocalBuilder anyChanged = writeGenerator.DeclareLocal(typeof(bool));
@@ -243,10 +243,10 @@ internal static class EditorActionsCodeGeneration
                 // ActionSettingsCollection? settings = settings.GetSetting(<type>);
                 writeGenerator.Emit(OpCodes.Ldloc, writeActionSettings);
                 PatchUtil.LoadConstantI4(writeGenerator, (int)attr.ActionSetting);
-                writeGenerator.Emit(OpCodes.Call, getSettings);
+                writeGenerator.Emit(getSettings.GetCallRuntime(), getSettings);
                 readGenerator.Emit(OpCodes.Ldloc, readActionSettings);
                 PatchUtil.LoadConstantI4(readGenerator, (int)attr.ActionSetting);
-                readGenerator.Emit(OpCodes.Call, getSettings);
+                readGenerator.Emit(getSettings.GetCallRuntime(), getSettings);
 
                 // if (settings == null) goto updateValuePop;
                 writeGenerator.Emit(OpCodes.Dup);
@@ -268,19 +268,19 @@ internal static class EditorActionsCodeGeneration
                 readGenerator.Emit(OpCodes.Stloc, readSettings);
 
                 // if (settings.<Property> equals action.<Property>) continue;
-                writeGenerator.Emit(OpCodes.Callvirt, settingsProperty.GetMethod);
+                writeGenerator.Emit(settingsProperty.GetMethod.GetCallRuntime(), settingsProperty.GetMethod);
                 if (property.PropertyType == typeof(float))
                 {
                     writeGenerator.Emit(OpCodes.Ldarg_2);
-                    writeGenerator.Emit(OpCodes.Callvirt, property.GetMethod);
+                    writeGenerator.Emit(property.GetMethod.GetCallRuntime(), property.GetMethod);
                     writeGenerator.Emit(OpCodes.Ldc_R4, tol);
-                    writeGenerator.Emit(OpCodes.Call, nearlyEqual);
+                    writeGenerator.Emit(nearlyEqual.GetCallRuntime(), nearlyEqual);
                     writeGenerator.Emit(OpCodes.Brtrue, writeCheckNextProp.Value);
                 }
                 else if (property.PropertyType.IsPrimitive || property.PropertyType.IsEnum)
                 {
                     writeGenerator.Emit(OpCodes.Ldarg_2);
-                    writeGenerator.Emit(OpCodes.Callvirt, property.GetMethod);
+                    writeGenerator.Emit(property.GetMethod.GetCallRuntime(), property.GetMethod);
                     writeGenerator.Emit(OpCodes.Beq, writeCheckNextProp.Value);
                 }
                 else
@@ -304,16 +304,16 @@ internal static class EditorActionsCodeGeneration
                         writeGenerator.Emit(OpCodes.Stloc, lcl);
                         writeGenerator.Emit(OpCodes.Ldloca, lcl);
                         writeGenerator.Emit(OpCodes.Ldarg_2);
-                        writeGenerator.Emit(OpCodes.Callvirt, property.GetMethod);
+                        writeGenerator.Emit(property.GetMethod.GetCallRuntime(), property.GetMethod);
                         writeGenerator.Emit(OpCodes.Box, property.PropertyType);
                         writeGenerator.Emit(OpCodes.Constrained, property.PropertyType);
                     }
                     else
                     {
                         writeGenerator.Emit(OpCodes.Ldarg_2);
-                        writeGenerator.Emit(OpCodes.Callvirt, property.GetMethod);
+                        writeGenerator.Emit(property.GetMethod.GetCallRuntime(), property.GetMethod);
                     }
-                    writeGenerator.Emit(OpCodes.Callvirt, objEquals);
+                    writeGenerator.Emit(objEquals.GetCallRuntime(), objEquals);
                     writeGenerator.Emit(OpCodes.Brtrue, writeCheckNextProp.Value);
                 }
 
@@ -323,8 +323,8 @@ internal static class EditorActionsCodeGeneration
                 // action.<Property> = collection.<Property>
                 readGenerator.Emit(OpCodes.Ldarg_1);
                 readGenerator.Emit(OpCodes.Ldloc, readSettings);
-                readGenerator.Emit(OpCodes.Callvirt, settingsProperty.GetMethod);
-                readGenerator.Emit(OpCodes.Callvirt, property.SetMethod);
+                readGenerator.Emit(settingsProperty.GetMethod.GetCallRuntime(), settingsProperty.GetMethod);
+                readGenerator.Emit(property.SetMethod.GetCallRuntime(), property.SetMethod);
             }
 
             if (writeCheckNextProp.HasValue)
@@ -353,11 +353,11 @@ internal static class EditorActionsCodeGeneration
             writeGenerator.Emit(OpCodes.Ldarg_1);
 
             writeGenerator.Emit(OpCodes.Ldsfld, poolField);
-            writeGenerator.Emit(OpCodes.Call, claimFromPool);
+            writeGenerator.Emit(claimFromPool.GetCallRuntime(), claimFromPool);
             writeGenerator.Emit(OpCodes.Stloc, writeSettings);
             writeGenerator.Emit(OpCodes.Ldloc, writeSettings);
             writeGenerator.Emit(OpCodes.Dup);
-            writeGenerator.Emit(OpCodes.Call, reset);
+            writeGenerator.Emit(reset.GetCallRuntime(), reset);
             writeGenerator.Emit(OpCodes.Stind_Ref);
 
             writeGenerator.MarkLabel(writeSetProperties);
@@ -376,18 +376,18 @@ internal static class EditorActionsCodeGeneration
                 // collection.<Property> = action.<Property>
                 writeGenerator.Emit(OpCodes.Ldloc, writeSettings);
                 writeGenerator.Emit(OpCodes.Ldarg_2);
-                writeGenerator.Emit(OpCodes.Callvirt, property.GetMethod);
-                writeGenerator.Emit(OpCodes.Callvirt, settingsProperty.SetMethod);
+                writeGenerator.Emit(property.GetMethod.GetCallRuntime(), property.GetMethod);
+                writeGenerator.Emit(settingsProperty.SetMethod.GetCallRuntime(), settingsProperty.SetMethod);
 
                 if (!used.Contains(attr.ActionSetting))
                 {
                     writeGenerator.Emit(OpCodes.Ldloc, writeSettings);
                     writeGenerator.Emit(OpCodes.Dup);
                     // collection.Flags |= <Type>
-                    writeGenerator.Emit(OpCodes.Call, flagsProperty.GetMethod);
+                    writeGenerator.Emit(flagsProperty.GetMethod.GetCallRuntime(), flagsProperty.GetMethod);
                     PatchUtil.LoadConstantI4(writeGenerator, (int)attr.ActionSetting);
                     writeGenerator.Emit(OpCodes.Or);
-                    writeGenerator.Emit(OpCodes.Call, flagsProperty.GetSetMethod(true));
+                    writeGenerator.Emit(flagsProperty.GetSetMethod(true).GetCallRuntime(), flagsProperty.GetSetMethod(true));
                     used.Add(attr.ActionSetting);
                 }
             }
@@ -477,7 +477,7 @@ internal static class EditorActionsCodeGeneration
                 if (method is ConstructorInfo ctor)
                     createGenerator.Emit(OpCodes.Newobj, ctor);
                 else if (method is MethodInfo method2)
-                    createGenerator.Emit(OpCodes.Call, method2);
+                    createGenerator.Emit(method2.GetCallRuntime(), method2);
                 else createGenerator.Emit(OpCodes.Ldnull);
                 createGenerator.Emit(OpCodes.Ret);
             }
@@ -523,9 +523,9 @@ internal static class EditorActionsCodeGeneration
             byteWriteGenerator.Emit(OpCodes.Ldarg_0);
             byteReadGenerator.Emit(OpCodes.Ldarg_0);
             toStringGenerator.Emit(OpCodes.Ldarg_0);
-            byteWriteGenerator.Emit(OpCodes.Call, flagsProperty.GetMethod);
-            byteReadGenerator.Emit(OpCodes.Call, flagsProperty.GetMethod);
-            toStringGenerator.Emit(OpCodes.Call, flagsProperty.GetMethod);
+            byteWriteGenerator.Emit(flagsProperty.GetMethod.GetCallRuntime(), flagsProperty.GetMethod);
+            byteReadGenerator.Emit(flagsProperty.GetMethod.GetCallRuntime(), flagsProperty.GetMethod);
+            toStringGenerator.Emit(flagsProperty.GetMethod.GetCallRuntime(), flagsProperty.GetMethod);
             PatchUtil.LoadConstantI4(byteWriteGenerator, (int)setting);
             PatchUtil.LoadConstantI4(byteReadGenerator, (int)setting);
             PatchUtil.LoadConstantI4(toStringGenerator, (int)setting);
@@ -543,24 +543,24 @@ internal static class EditorActionsCodeGeneration
             // writer.Write(<value>);
             byteWriteGenerator.Emit(OpCodes.Ldarg_1);
             byteWriteGenerator.Emit(OpCodes.Ldarg_0);
-            byteWriteGenerator.Emit(OpCodes.Call, property.GetMethod);
-            byteWriteGenerator.Emit(OpCodes.Call, write);
+            byteWriteGenerator.Emit(property.GetMethod.GetCallRuntime(), property.GetMethod);
+            byteWriteGenerator.Emit(write.GetCallRuntime(), write);
             if (write.ReturnType != typeof(void))
                 byteWriteGenerator.Emit(OpCodes.Pop);
 
             byteReadGenerator.Emit(OpCodes.Ldarg_0);
             byteReadGenerator.Emit(OpCodes.Ldarg_1);
-            byteReadGenerator.Emit(OpCodes.Call, read);
-            byteReadGenerator.Emit(OpCodes.Call, property.GetSetMethod(true));
+            byteReadGenerator.Emit(read.GetCallRuntime(), read);
+            byteReadGenerator.Emit(property.GetSetMethod(true).GetCallRuntime(), property.GetSetMethod(true));
 
             toStringGenerator.Emit(OpCodes.Ldarg_1);
             toStringGenerator.Emit(OpCodes.Ldstr, " " + property.Name + ": ");
-            toStringGenerator.Emit(OpCodes.Call, append);
+            toStringGenerator.Emit(append.GetCallRuntime(), append);
             toStringGenerator.Emit(OpCodes.Ldarg_0);
-            toStringGenerator.Emit(OpCodes.Call, property.GetMethod);
+            toStringGenerator.Emit(property.GetMethod.GetCallRuntime(), property.GetMethod);
             if (property.PropertyType.IsValueType)
                 toStringGenerator.Emit(OpCodes.Box, property.PropertyType);
-            toStringGenerator.Emit(OpCodes.Call, append);
+            toStringGenerator.Emit(append.GetCallRuntime(), append);
             if (append.ReturnType != typeof(void))
                 toStringGenerator.Emit(OpCodes.Pop);
 
@@ -651,7 +651,10 @@ internal static class EditorActionsCodeGeneration
         }
 
         if (anyFail)
+        {
+            DevkitServerModule.Fault();
             throw new Exception("Failed to create valid ActionSetting dynamic methods.");
+        }
 #endif
     }
 }

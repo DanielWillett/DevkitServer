@@ -21,9 +21,11 @@ public class ByteEncoderTests
 {
     private static ByteWriter GetWriter(bool stream, out Stream? memory)
     {
-        ByteWriter writer = new ByteWriter(false);
+        ByteWriter writer = new ByteWriter(false, stream ? 2 : 512);
         if (stream)
+        {
             writer.Stream = memory = new MemoryStream();
+        }
         else memory = null;
         return writer;
     }

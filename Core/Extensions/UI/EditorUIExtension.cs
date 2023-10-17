@@ -22,10 +22,6 @@ internal class EditorUIExtension : ContainerUIExtension
             _subbed = true;
         }
 
-        string commit = DevkitServerModule.CommitId;
-        if (commit.Equals("0000000", StringComparison.Ordinal))
-            commit = "master";
-
         _testLabel = Glazier.Get().CreateLabel();
         _testLabel.TextAlignment = TextAnchor.LowerLeft;
         _testLabel.FontSize = ESleekFontSize.Tiny;

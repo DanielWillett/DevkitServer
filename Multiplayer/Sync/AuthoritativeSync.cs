@@ -6,6 +6,20 @@ using System.Reflection;
 #endif
 
 namespace DevkitServer.Multiplayer.Sync;
+/*
+ * Todo list when adding a new sync class:
+ *
+ * Create class XXXSync : AuthoritativeSync<XXXSync>
+ *  - Configure SupportsClientsideAuthority as false if needed.
+ *
+ * Add CreateServerAuthority call in DevkitServerModule.OnPostLevelLoaded
+ * Add DestroyServerAuthority call in DevkitServerModule.shutdown
+ * Add editor.AddComponent<XXXSync>().User = user; to DevkitServerGamemode.SetupEditorObject
+ * Add new XXXSync property in EditorUser
+ * Add XXXSync = EditorObject.GetComponent<XXXSync>(); in EditorUser.Init
+ * Add IntlSyncs.Add(XXXSync); in EditorUser.Init
+ * Add XXXSync.SendAuthority(Connection); in EditorUser.Init
+ */
 public abstract class AuthoritativeSync : MonoBehaviour
 {
     protected static readonly NetCall<ulong, Type> SendAuthoritativeSyncAuthority = new NetCall<ulong, Type>((ushort)DevkitServerNetCall.TileSyncAuthority);
@@ -16,6 +30,7 @@ public abstract class AuthoritativeSync : MonoBehaviour
     /// <remarks><see langword="null"/> for the server-side authority instance.</remarks>
     public EditorUser? User { get; internal set; }
     public bool IsOwner { get; protected set; }
+    public virtual bool SupportsClientsideAuthority => true;
 
 #if CLIENT
     private static MethodInfo? _setAuthMethod;

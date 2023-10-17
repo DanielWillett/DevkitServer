@@ -152,8 +152,15 @@ public class CommandTests
             cmd = "/" + cmd;
         IExecutableCommand? command2 = null;
         string[]? args2 = null;
-        if (ThreadUtil.gameThread == null)
-            ThreadUtil.setupGameThread();
+        try
+        {
+            if (ThreadUtil.gameThread == null)
+                ThreadUtil.setupGameThread();
+        }
+        catch
+        {
+            // ignored
+        }
         TestCommandHandler handler = new TestCommandHandler(_sampleCommands);
         CommandParser parser = new CommandParser(handler);
         handler.OnCommandExecuted +=

@@ -131,7 +131,7 @@ public static class PatchUtil
     public static void ReturnIfFalse(IList<CodeInstruction> instructions, ILGenerator generator, ref int index, Func<bool> checker, Label? @goto = null)
     {
         Label continueLbl = generator.DefineLabel();
-        CodeInstruction instruction = new CodeInstruction(OpCodes.Call, checker.Method);
+        CodeInstruction instruction = new CodeInstruction(checker.Method.GetCallRuntime(), checker.Method);
         instruction.labels.AddRange(instructions[index].labels);
         instructions[index].labels.Clear();
         instructions.Insert(index, instruction);

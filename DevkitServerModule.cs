@@ -565,6 +565,7 @@ public sealed class DevkitServerModule : IModuleNexus
             TileSync.CreateServersideAuthority();
             ObjectSync.CreateServersideAuthority();
             HierarchySync.CreateServersideAuthority();
+            NavigationSync.CreateServersideAuthority();
         }
         else if (level == Level.BUILD_INDEX_GAME)
         {
@@ -879,6 +880,9 @@ public sealed class DevkitServerModule : IModuleNexus
         _tknSrc?.Cancel();
         _tknSrc = null;
         TileSync.DestroyServersideAuthority();
+        ObjectSync.DestroyServersideAuthority();
+        HierarchySync.DestroyServersideAuthority();
+        NavigationSync.DestroyServersideAuthority();
         if (BackupManager != null)
             Object.Destroy(BackupManager);
         BackupManager = null;

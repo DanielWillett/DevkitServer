@@ -41,6 +41,5 @@ public enum DevkitServerNetCall : ushort
     AskSave = 39,
     SendBindSpawnpoint = 40,
     SendBakeNavRequest = 41,
-    SendBindNavigation = 42,
-    SendRecastGraph = 43
+    SendBindNavigation = 42
 }

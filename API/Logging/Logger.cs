@@ -104,7 +104,7 @@ public static class Logger
                 IncludeFileData = true,
                 IncludeSourceData = true,
                 IncludeILOffset = true,
-                IncludeAssemblyData = true,
+                // IncludeAssemblyData = true,
 #else
                 IncludeFileData = false,
                 IncludeSourceData = true,

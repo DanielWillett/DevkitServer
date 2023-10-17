@@ -53,15 +53,15 @@ public class DebuggableEmitter
                 Generator.Emit(OpCodes.Ldsfld, Accessor.LoggerStackCleanerField);
                 Generator.Emit(OpCodes.Ldc_I4_1);
                 Generator.Emit(OpCodes.Newobj, Accessor.StackTraceIntConstructor);
-                Generator.Emit(OpCodes.Call, Accessor.StackTraceCleanerGetStringMethod);
-                Generator.Emit(OpCodes.Call, Accessor.Concat2StringsMethod);
+                Generator.Emit(Accessor.StackTraceCleanerGetStringMethod.GetCallRuntime(), Accessor.StackTraceCleanerGetStringMethod);
+                Generator.Emit(Accessor.Concat2StringsMethod.GetCallRuntime(), Accessor.Concat2StringsMethod);
             }
             catch (MemberAccessException)
             {
                 Generator.Emit(OpCodes.Ldstr, ".method " + Method.Format());
             }
             PatchUtil.LoadConstantI4(Generator, (int)ConsoleColor.DarkRed);
-            Generator.Emit(OpCodes.Call, Accessor.LogDebug);
+            Generator.Emit(Accessor.LogDebug.GetCallRuntime(), Accessor.LogDebug);
         }
         _init = true;
 #endif
@@ -555,7 +555,7 @@ public class DebuggableEmitter
         {
             Generator.Emit(OpCodes.Ldstr, msg);
             PatchUtil.LoadConstantI4(Generator, (int)ConsoleColor.DarkRed);
-            Generator.Emit(OpCodes.Call, Accessor.LogDebug);
+            Generator.Emit(Accessor.LogDebug.GetCallRuntime(), Accessor.LogDebug);
         }
     }
     [Conditional("DEBUG")]
@@ -570,7 +570,7 @@ public class DebuggableEmitter
         {
             Generator.Emit(OpCodes.Ldstr, msg);
             PatchUtil.LoadConstantI4(Generator, (int)ConsoleColor.DarkRed);
-            Generator.Emit(OpCodes.Call, Accessor.LogDebug);
+            Generator.Emit(Accessor.LogDebug.GetCallRuntime(), Accessor.LogDebug);
         }
         _lastWasPrefix = code.OpCodeType == OpCodeType.Prefix;
     }

@@ -1159,7 +1159,7 @@ internal static class LevelObjectPatches
                 ins.Insert(i + 2, PatchUtil.GetLocalCodeInstruction(lclXB, lclX, false, false));
                 ins.Insert(i + 3, PatchUtil.GetLocalCodeInstruction(lclYB, lclY, false, false));
                 ins.Insert(i + 4, PatchUtil.GetLocalCodeInstruction(lclIndexB, lclIndex, false, false));
-                ins.Insert(i + 5, new CodeInstruction(OpCodes.Call, invoker));
+                ins.Insert(i + 5, new CodeInstruction(invoker.GetCallRuntime(), invoker));
                 removePatch = true;
                 break;
             }

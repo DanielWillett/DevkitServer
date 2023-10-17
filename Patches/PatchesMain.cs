@@ -723,14 +723,15 @@ internal static class PatchesMain
     private static IEnumerable<CodeInstruction> DedicatedUgcLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
         bool one = false;
-        yield return new CodeInstruction(OpCodes.Call, new Action(MapCreation.PrefixLoadingDedicatedUGC).Method);
+        MethodInfo prefix = Accessor.GetMethod(MapCreation.PrefixLoadingDedicatedUGC)!;
+        yield return new CodeInstruction(prefix.GetCallRuntime(), prefix);
 
         foreach (CodeInstruction instr in instructions)
         {
             if (!one && instr.Calls(lvlLoad))
             {
                 yield return new CodeInstruction(OpCodes.Pop);
-                yield return new CodeInstruction(OpCodes.Call, lvlEdit);
+                yield return new CodeInstruction(lvlEdit.GetCallRuntime(), lvlEdit);
                 Logger.LogDebug("Inserted patch to " + method.Format() + " to load editor instead of player.");
                 one = true;
             }
@@ -783,7 +784,7 @@ internal static class PatchesMain
             {
                 Label label = generator.DefineLabel();
                 yield return new CodeInstruction(OpCodes.Ldarg_0);
-                yield return new CodeInstruction(OpCodes.Call, mtd);
+                yield return new CodeInstruction(mtd.GetCallRuntime(), mtd);
                 yield return new CodeInstruction(OpCodes.Brtrue_S, label);
                 Logger.LogDebug("Inserted patch to " + method.Format() + " to skip level hash verification.");
                 yield return ins;

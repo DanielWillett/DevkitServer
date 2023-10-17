@@ -201,22 +201,22 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         
         // string method = this.DeclaringType.Name.ToUpperInvariant()
         il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Call, getDeclaringType);
+        il.Emit(getDeclaringType.GetCallRuntime(), getDeclaringType);
         il.Emit(OpCodes.Callvirt, getTypeName);
-        il.Emit(OpCodes.Call, toUpperInvariant);
+        il.Emit(toUpperInvariant.GetCallRuntime(), toUpperInvariant);
         il.Emit(OpCodes.Stloc_2);
 
         // Logger.LogError(this.ErrorMessage, method: method);
         il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Call, getErrorMessage);
+        il.Emit(getErrorMessage.GetCallRuntime(), getErrorMessage);
         PatchUtil.LoadConstantI4(il, (int)ConsoleColor.Red);
         il.Emit(OpCodes.Ldloc_2);
-        il.Emit(OpCodes.Call, logErrorText);
+        il.Emit(logErrorText.GetCallRuntime(), logErrorText);
 
         // Logger.LogError(ex, method: method);
         il.Emit(OpCodes.Ldc_I4_1);
         il.Emit(OpCodes.Ldloc_2);
-        il.Emit(OpCodes.Call, logErrorEx);
+        il.Emit(logErrorEx.GetCallRuntime(), logErrorEx);
 
         if (!DevkitServerModule.MonoLoaded)
             il.Emit(OpCodes.Leave_S, incrLbl);

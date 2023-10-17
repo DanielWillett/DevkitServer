@@ -26,4 +26,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DevkitServer.csproj" />
   </ItemGroup>
+  <ItemGroup>
+
+  </ItemGroup>
 </Project>

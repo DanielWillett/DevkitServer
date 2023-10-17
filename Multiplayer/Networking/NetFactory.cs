@@ -706,7 +706,7 @@ public static class NetFactory
             });
         }
 #if METHOD_LOGGING
-        Logger.LogDebug($"  Invoked net method: {methodInfo.Method}.");
+        Logger.LogDebug($"  Invoked net method: {methodInfo.Method.Format()}.");
 #endif
 
         return true;
