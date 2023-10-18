@@ -581,7 +581,7 @@ public static class LevelObjectUtil
         buildable = asset as ItemAsset;
         return @object != null || buildable is ItemStructureAsset or ItemBarricadeAsset;
     }
-    private static bool CheckSync(out ObjectSync sync)
+    internal static bool CheckSync(out ObjectSync sync)
     {
         sync = null!;
 #if CLIENT

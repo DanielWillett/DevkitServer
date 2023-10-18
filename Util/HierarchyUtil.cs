@@ -307,7 +307,7 @@ public static class HierarchyUtil
                 return i;
         return ~min;
     }
-    private static bool CheckSync(out HierarchySync sync)
+    internal static bool CheckSync(out HierarchySync sync)
     {
         sync = null!;
 #if CLIENT
@@ -342,6 +342,75 @@ public static class HierarchyUtil
         sync.EnqueueSync(netId);
         return true;
     }
+
+    /// <summary>
+    /// Gets the closest node of type <typeparamref name="TNode"/>, or <see langword="null"/> if there are none (or in the case of a reflection failure).
+    /// </summary>
+    [Pure]
+    public static TNode? GetNearestNode<TNode>(Vector3 position) where TNode : TempNodeBase
+    {
+        GameObject? closestNode = null;
+        float dist = 0f;
+        TempNodeSystemBase? system = NodeItemTypeIdentifier.Get(typeof(TNode)).System;
+
+        if (system == null)
+            return null;
+
+        foreach (GameObject node in NodeItemTypeIdentifier.EnumerateSystem(system))
+        {
+            float distSqr = (position - node.transform.position).sqrMagnitude;
+            if (closestNode == null || distSqr < dist)
+            {
+                closestNode = node;
+                dist = distSqr;
+            }
+        }
+
+        if (closestNode == null)
+        {
+            Logger.LogDebug($"No nodes available in {FormattingUtil.FormatMethod(typeof(TNode), typeof(HierarchyUtil), nameof(GetNearestNode), new (Type type, string? name)[]
+            {
+                (typeof(Vector3), nameof(position))
+            }, null, new Type[] { typeof(TNode) }, true)}");
+        }
+
+        return closestNode == null ? null : closestNode.GetComponent<TNode>();
+    }
+
+    /// <summary>
+    /// Gets the closest volume of type <typeparamref name="TVolume"/>, or <see langword="null"/> if there are none (or in the case of a reflection failure).
+    /// </summary>
+    [Pure]
+    public static TVolume? GetNearestVolume<TVolume>(Vector3 position) where TVolume : VolumeBase
+    {
+        VolumeBase? closestNode = null;
+        float dist = 0f;
+        VolumeManagerBase? manager = VolumeItemTypeIdentifier.Get(typeof(TVolume)).Manager;
+
+        if (manager == null)
+            return null;
+
+        foreach (VolumeBase node in manager.EnumerateAllVolumes())
+        {
+            float distSqr = (position - node.transform.position).sqrMagnitude;
+            if (closestNode == null || distSqr < dist)
+            {
+                closestNode = node;
+                dist = distSqr;
+            }
+        }
+
+        if (closestNode == null)
+        {
+            Logger.LogDebug($"No volumes available in {FormattingUtil.FormatMethod(typeof(TVolume), typeof(HierarchyUtil), nameof(GetNearestVolume), new (Type type, string? name)[]
+            {
+                (typeof(Vector3), nameof(position))
+            }, null, new Type[] { typeof(TVolume) }, true)}");
+        }
+
+        return closestNode == null ? null : closestNode as TVolume;
+    }
+
 #if SERVER
     [Pure]
     public static bool CheckMovePermission(IDevkitHierarchyItem item, ulong user)

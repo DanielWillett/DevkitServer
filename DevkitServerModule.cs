@@ -68,7 +68,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static bool HasLoadedBundle { get; private set; }
     public static MasterBundle? Bundle { get; private set; }
     public static MasterBundleConfig? BundleConfig { get; private set; }
-    public static bool IsMainThread => ThreadUtil.gameThread == Thread.CurrentThread;
+    public static bool IsMainThread => Thread.CurrentThread.IsGameThread();
     public static CancellationToken UnloadToken => _tknSrc == null ? CancellationToken.None : _tknSrc.Token;
     public static Local MainLocalization { get; private set; } = null!;
     public static BackupManager? BackupManager { get; private set; }
@@ -135,7 +135,8 @@ public sealed class DevkitServerModule : IModuleNexus
         { "UndoNotSupported", "Undo Not Supported" },
         { "RedoNotSupported", "Redo Not Supported" },
         { "TooManySelections", "Too many items selected.\n{0}/{1}"},
-        { "AlreadyBakingNavigation", "Already Baking Navigation" }
+        { "AlreadyBakingNavigationName", "Already Baking Navigation\nNavigation: {0} (# {1})" },
+        { "AlreadyBakingNavigationIndex", "Already Baking Navigation\nNavigation # {0}" }
     };
 
     public static CultureInfo CommandParseLocale { get; set; } = CultureInfo.InvariantCulture;

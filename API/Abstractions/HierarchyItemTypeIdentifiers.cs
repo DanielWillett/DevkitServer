@@ -1,12 +1,12 @@
-﻿using System.Globalization;
+﻿using DevkitServer.Plugins;
 using DevkitServer.Util.Encoding;
 using SDG.Framework.Devkit;
 using SDG.Framework.Foliage;
 using SDG.Framework.Landscapes;
 using SDG.Framework.Water;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using DevkitServer.Plugins;
 
 namespace DevkitServer.API.Abstractions;
 public static class HierarchyItemTypeIdentifierEx
@@ -373,12 +373,21 @@ public sealed class LegacyDevkitHierarchyWorldObjectIdentifier : IHierarchyItemT
 [EarlyTypeInit]
 public sealed class NodeItemTypeIdentifier : IHierarchyItemTypeIdentifier
 {
+    private TempNodeSystemBase? _system;
+    private bool _systemCached;
+
     private static readonly Action<TempNodeSystemBase, Vector3>? CallInstantiateNodeSystem =
         Accessor.GenerateInstanceCaller<TempNodeSystemBase, Action<TempNodeSystemBase, Vector3>>("Instantiate", allowUnsafeTypeBinding: true);
+
+    private static readonly Func<TempNodeSystemBase, IEnumerable<GameObject>>? CallEnumerateGameObjects =
+        Accessor.GenerateInstanceCaller<TempNodeSystemBase, Func<TempNodeSystemBase, IEnumerable<GameObject>>>("EnumerateGameObjects", allowUnsafeTypeBinding: true);
 
     private static readonly Dictionary<Type, NodeItemTypeIdentifier> Pool = new Dictionary<Type, NodeItemTypeIdentifier>(3);
     public static NodeItemTypeIdentifier Get(Type type)
     {
+        if (!DevkitServerModule.IsMainThread)
+            return new NodeItemTypeIdentifier(type);
+
         if (!Pool.TryGetValue(type, out NodeItemTypeIdentifier id))
         {
             id = new NodeItemTypeIdentifier(type);
@@ -386,9 +395,34 @@ public sealed class NodeItemTypeIdentifier : IHierarchyItemTypeIdentifier
         }
         return id;
     }
+    public static IEnumerable<GameObject> EnumerateSystem(TempNodeSystemBase nodeSystemBase)
+    {
+        if (CallEnumerateGameObjects != null)
+            return CallEnumerateGameObjects.Invoke(nodeSystemBase) ?? Array.Empty<GameObject>();
+
+        MethodInfo? method = nodeSystemBase.GetType().GetMethod("GetAllNodes", BindingFlags.Public | BindingFlags.Instance);
+
+        if (method != null && typeof(IEnumerable<TempNodeBase>).IsAssignableFrom(method.ReturnType))
+            return (method.Invoke(nodeSystemBase, Array.Empty<object>()) as IEnumerable<TempNodeBase>)?.Select(x => x.gameObject) ?? Array.Empty<GameObject>();
+
+        return Array.Empty<GameObject>();
+    }
 
     public byte TypeIndex => 1;
     public Type Type { get; private set; }
+    public TempNodeSystemBase? System
+    {
+        get
+        {
+            if (_systemCached)
+                return _system;
+
+            if (Interlocked.CompareExchange(ref _system, TryGetSystem(Type), null) == null)
+                _systemCached = true;
+
+            return _system;
+        }
+    }
 
     internal NodeItemTypeIdentifier()
     {
@@ -409,7 +443,7 @@ public sealed class NodeItemTypeIdentifier : IHierarchyItemTypeIdentifier
         if (CallInstantiateNodeSystem == null)
             return;
 
-        TempNodeSystemBase? system = TryGetSystem(Type);
+        TempNodeSystemBase? system = System;
         if (system == null)
             return;
 
@@ -521,12 +555,18 @@ public sealed class NodeItemTypeIdentifier : IHierarchyItemTypeIdentifier
 [EarlyTypeInit]
 public sealed class VolumeItemTypeIdentifier : IHierarchyItemTypeIdentifier
 {
+    private VolumeManagerBase? _manager;
+    private bool _managerCached;
+
     private static readonly Action<VolumeManagerBase, Vector3, Quaternion, Vector3>? CallInstantiateVolumeSystem =
         Accessor.GenerateInstanceCaller<VolumeManagerBase, Action<VolumeManagerBase, Vector3, Quaternion, Vector3>>("InstantiateVolume", throwOnError: false, allowUnsafeTypeBinding: true);
 
     private static readonly Dictionary<Type, VolumeItemTypeIdentifier> Pool = new Dictionary<Type, VolumeItemTypeIdentifier>(18);
     public static VolumeItemTypeIdentifier Get(Type type)
     {
+        if (!DevkitServerModule.IsMainThread)
+            return new VolumeItemTypeIdentifier(type);
+        
         if (!Pool.TryGetValue(type, out VolumeItemTypeIdentifier id))
         {
             id = new VolumeItemTypeIdentifier(type);
@@ -536,6 +576,19 @@ public sealed class VolumeItemTypeIdentifier : IHierarchyItemTypeIdentifier
     }
     public byte TypeIndex => 2;
     public Type Type { get; private set; }
+    public VolumeManagerBase? Manager
+    {
+        get
+        {
+            if (_managerCached)
+                return _manager;
+
+            if (Interlocked.CompareExchange(ref _manager, TryGetManager(Type), null) == null)
+                _managerCached = true;
+
+            return _manager;
+        }
+    }
 
     internal VolumeItemTypeIdentifier()
     {
@@ -556,7 +609,7 @@ public sealed class VolumeItemTypeIdentifier : IHierarchyItemTypeIdentifier
         if (CallInstantiateVolumeSystem == null)
             return;
 
-        VolumeManagerBase? system = TryGetManager(Type);
+        VolumeManagerBase? system = Manager;
         if (system == null)
             return;
 

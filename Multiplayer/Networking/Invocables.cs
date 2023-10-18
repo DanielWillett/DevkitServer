@@ -124,7 +124,7 @@ public class NetCallCustom : BaseNetCall
         {
             _writer.Flush();
             task(_writer);
-            _writer.PrependData(ref overhead);
+            _writer.PrependOverhead(ref overhead);
             return _writer.ToArray();
         }
     }
@@ -147,7 +147,7 @@ public class NetCallCustom : BaseNetCall
             {
                 _writer.Flush();
                 task(_writer);
-                _writer.PrependData(ref overhead);
+                _writer.PrependOverhead(ref overhead);
 #if SERVER
                 connection.Send(_writer.ToArray());
 #else
@@ -177,7 +177,7 @@ public class NetCallCustom : BaseNetCall
             {
                 _writer.Flush();
                 task(_writer);
-                _writer.PrependData(ref overhead);
+                _writer.PrependOverhead(ref overhead);
                 bytes = _writer.ToArray();
             }
 
@@ -221,7 +221,7 @@ public class NetCallCustom : BaseNetCall
             {
                 _writer.Flush();
                 task(_writer);
-                _writer.PrependData(ref overhead);
+                _writer.PrependOverhead(ref overhead);
                 connection.Send(_writer.ToArray());
             }
         }

@@ -11,6 +11,7 @@ using System;
 using System.Globalization;
 using System.IO;
 using DevkitServer.API.Abstractions;
+using DevkitServer.Multiplayer.Networking;
 using StackCleaner;
 
 namespace DevkitServer.Tests;
@@ -21,7 +22,7 @@ public class ByteEncoderTests
 {
     private static ByteWriter GetWriter(bool stream, out Stream? memory)
     {
-        ByteWriter writer = new ByteWriter(false, stream ? 2 : 512);
+        ByteWriter writer = new ByteWriter(stream ? 2 : 512);
         if (stream)
         {
             writer.Stream = memory = new MemoryStream();
@@ -1250,7 +1251,7 @@ public class ByteEncoderTests
     [TestMethod]
     public void TestSkip()
     {
-        ByteWriter writer = new ByteWriter(false);
+        ByteWriter writer = new ByteWriter();
         const string testString = "test";
         
         writer.Write(0);
@@ -1271,7 +1272,7 @@ public class ByteEncoderTests
     [TestMethod]
     public void TestStreamBufferOverflow()
     {
-        ByteWriter writer = new ByteWriter(false, 8);
+        ByteWriter writer = new ByteWriter(8);
 
         using MemoryStream ms = new MemoryStream(64);
         writer.Stream = ms;
@@ -1289,12 +1290,42 @@ public class ByteEncoderTests
     [TestMethod]
     public void TestBufferOverflow()
     {
-        ByteWriter writer = new ByteWriter(false, 8);
+        ByteWriter writer = new ByteWriter(8);
 
         writer.Write(3);
         writer.Write((ushort)5);
         writer.WriteBlock(new byte[] { 43, 26, 224, 46, 2 });
         
         Assert.IsTrue(11 <= writer.Buffer.Length);
+    }
+    [TestMethod]
+    [DataRow(9)]
+    [DataRow(256)]
+    public void TestPrepend(int capacity)
+    {
+        ByteWriter writer = new ByteWriter(capacity)
+        {
+            AllowPrepending = true
+        };
+
+        writer.Write(3);
+        writer.Write(6);
+        MessageOverhead overhead = new MessageOverhead(MessageFlags.None, 12, 0);
+        writer.PrependOverhead(ref overhead);
+
+        byte[] data = writer.ToArray();
+        writer.Flush();
+
+        byte[] overheadData = overhead.GetBytes();
+        byte[] expected = { 3, 0, 0, 0, 6, 0, 0, 0 };
+        Assert.AreEqual(overheadData.Length + expected.Length, data.Length);
+        for (int i = 0; i < overheadData.Length; ++i)
+        {
+            Assert.AreEqual(overheadData[i], data[i]);
+        }
+        for (int i = 0; i < expected.Length; ++i)
+        {
+            Assert.AreEqual(expected[i], data[i + overheadData.Length]);
+        }
     }
 }

@@ -34,23 +34,23 @@
     <ItemGroup>
         <Reference Include="UniTask">
             <HintPath>$(IncludedLibrariesPath)\UniTask.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
 
         <!-- System.IO.Compression -->
         <Reference Include="System.Data.DataSetExtensions">
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="System.IO.Compression">
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="System.IO.Compression.FileSystem">
             <HintPath>$(IncludedLibrariesPath)\System.IO.Compression.FileSystem.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="System.Runtime">
             <HintPath>$(IncludedLibrariesPath)\System.Runtime.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
     </ItemGroup>
 
@@ -67,239 +67,237 @@
 
     <!-- Shared References -->
     <ItemGroup>
-        
       <!-- Unturned -->
         <Reference Include="Assembly-CSharp">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\Assembly-CSharp.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="com.rlabrecque.steamworks.net">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\com.rlabrecque.steamworks.net.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="SDG.NetTransport">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\SDG.NetTransport.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="SDG.NetPak.Runtime">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\SDG.NetPak.Runtime.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="SDG.HostBans.Runtime">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\SDG.HostBans.Runtime.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="SystemEx">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\SystemEx.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEx">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEx.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnturnedDat">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnturnedDat.dll</HintPath>
-            <Private>true</Private>
         </Reference>
 
         <!-- Unity -->
         <Reference Include="StandardAssets">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\StandardAssets.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.CoreModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.ImageConversionModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.PhysicsModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.TerrainModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.TerrainModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.AssetBundleModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.AssetBundleModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.UnityWebRequestModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.AccessibilityModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.AccessibilityModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.AIModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.AIModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.AnimationModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.AnimationModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.AudioModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.AudioModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.ClothModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.ClothModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.ClusterInputModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.ClusterInputModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.ClusterRendererModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.ClusterRendererModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.DirectorModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.DirectorModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.GridModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.GridModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.JSONSerializeModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.JSONSerializeModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.LocalizationModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.LocalizationModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.ParticleSystemModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.ParticleSystemModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.Physics2DModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.Physics2DModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.SubstanceModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.SubstanceModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.SubsystemsModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.SubsystemsModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.TerrainPhysicsModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.TerrainPhysicsModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.TilemapModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.TilemapModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.UNETModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.UNETModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.UnityAnalyticsCommonModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.UnityAnalyticsCommonModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.UnityWebRequestAssetBundleModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.UnityWebRequestAssetBundleModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.UnityWebRequestAudioModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.UnityWebRequestAudioModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.UnityWebRequestTextureModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.UnityWebRequestTextureModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.VehiclesModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.VehiclesModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.WindModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.WindModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.WindModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.WindModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
 
         <!-- Third-Party -->
         <Reference Include="BattlEye">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\BattlEye.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="HighlightingSystem">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\HighlightingSystem.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="Mono.Posix">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\Mono.Posix.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="Mono.Security">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\Mono.Security.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="Pathfinding.ClipperLib">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\Pathfinding.ClipperLib.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="Pathfinding.Ionic.Zip.Reduced">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\Pathfinding.Ionic.Zip.Reduced.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="Pathfinding.JsonFx">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\Pathfinding.JsonFx.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="Pathfinding.Poly2Tri">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\Pathfinding.Poly2Tri.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="System.Configuration">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\System.Configuration.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="System.Core">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\System.Core.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="System.Data">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\System.Data.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="System.EnterpriseServices">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\System.EnterpriseServices.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="System.Numerics">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\System.Numerics.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="System.Security">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\System.Security.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="System.Transactions">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\System.Transactions.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="System.Xml">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\System.Xml.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
       
         <Reference Include="Newtonsoft.Json_2">
@@ -307,11 +305,11 @@
             <FusionName>Newtonsoft.Json, Version=7.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed</FusionName>
             <SpecificVersion>true</SpecificVersion>
             <Aliases>NSJ</Aliases>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="AstarPathfindingProject">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\AstarPathfindingProject.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
     </ItemGroup>
 
@@ -327,110 +325,120 @@
         <!-- Unturned -->
         <Reference Include="SDG.Glazier.Runtime">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\SDG.Glazier.Runtime.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="Unturned.LiveConfig.Runtime">
           <HintPath>$(SharedPath)\Unturned_Data\Managed\Unturned.LiveConfig.Runtime.dll</HintPath>
-          <Private>true</Private>
+          <Private>false</Private>
         </Reference>
 
         <!-- Unity -->
         <Reference Include="Unity.TextMeshPro">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\Unity.TextMeshPro.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.IMGUIModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.InputModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.InputModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.UI">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.UI.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.TextRenderingModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.InputLegacyModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="Unity.Postprocessing.Runtime">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\Unity.Postprocessing.Runtime.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.ARModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.ARModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.NVIDIAModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.NVIDIAModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.ScreenCaptureModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.ScreenCaptureModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.SpriteMaskModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.SpriteMaskModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.SpriteShapeModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.SpriteShapeModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.StreamingModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.StreamingModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.TextCoreFontEngineModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.TextCoreFontEngineModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.TextCoreModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.TextCoreModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.TextCoreTextEngineModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.TextCoreTextEngineModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.TextRenderingModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.UIElementsModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.UIElementsModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.UIModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.UIModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.VFXModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.VFXModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.VideoModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.VideoModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.VirtualTexturingModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.VirtualTexturingModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.VRModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.VRModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
         <Reference Include="UnityEngine.XRModule">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\UnityEngine.XRModule.dll</HintPath>
-            <Private>true</Private>
+            <Private>false</Private>
         </Reference>
       
+    </ItemGroup>
+
+    <!-- Copy libraries for EXEs. -->
+    <ItemGroup Condition="'$(OutputType)' != 'Library' Or '$(TestProjectType)' != ''">
+      <Reference Update="*">
+        <Private>true</Private>
+      </Reference>
+      <PackageReference Update="*">
+        <Private>true</Private>
+      </PackageReference>
     </ItemGroup>
 </Project>

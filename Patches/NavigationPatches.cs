@@ -3,10 +3,12 @@ using HarmonyLib;
 using Pathfinding;
 using System.Reflection;
 using System.Reflection.Emit;
+using DevkitServer.API.Permissions;
 using Progress = Pathfinding.Progress;
 #if CLIENT
+using System.Security.Principal;
 using DevkitServer.API.Abstractions;
-using DevkitServer.API.Permissions;
+using DevkitServer.Core.Extensions.UI;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Players.UI;
@@ -14,8 +16,13 @@ using DevkitServer.Players.UI;
 #if SERVER
 using Pathfinding.Voxels;
 using System.Diagnostics;
+using System.Globalization;
 using Cysharp.Threading.Tasks;
+using DevkitServer.API.Abstractions;
+using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer.Levels;
+using DevkitServer.Players;
+using DevkitServer.Players.UI;
 #endif
 
 namespace DevkitServer.Patches;
@@ -26,20 +33,59 @@ internal static class NavigationPatches
     [UsedImplicitly]
     private static readonly NetCall<NetId> SendBakeNavRequest = new NetCall<NetId>(DevkitServerNetCall.SendBakeNavRequest);
 
+    [UsedImplicitly]
+    private static readonly NetCall<NetId, float, string, bool> SendNavBakeProgressUpdate = new NetCall<NetId, float, string, bool>(DevkitServerNetCall.SendNavBakeProgressUpdate);
+
 #if SERVER
     private static readonly Action? CallListen = Accessor.GenerateStaticCaller<Provider, Action>("listen");
     private static DateTime _lastListen;
+    private static Flag? _baking;
+    private static bool _hasStartedBakingTiles;
 #endif
 
     private const string Source = "NAV PATCHES";
-    internal static bool BlockBake;
+    internal static int BlockBake;
 #if SERVER
     internal static bool CanBake => true;
 #else
-    internal static bool CanBake => !DevkitServerModule.IsEditing || (!BlockBake && (VanillaPermissions.AllNavigation.Has() || VanillaPermissions.BakeNavigation.Has(false)));
+    internal static bool CanBake => !DevkitServerModule.IsEditing || (VanillaPermissions.AllNavigation.Has() || VanillaPermissions.BakeNavigation.Has(false));
 #endif
 
     private static readonly MethodInfo CurrentCanBakeGetter = typeof(NavigationPatches).GetProperty(nameof(CanBake), BindingFlags.Static | BindingFlags.NonPublic)!.GetMethod;
+
+#if SERVER
+    [HarmonyPatch(typeof(Flag), nameof(Flag.bakeNavigation))]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    private static void OnPreBakingNav(Flag __instance)
+    {
+        Logger.LogDebug($"[{Source}] Baking: {__instance.point.Format()}.");
+        _baking = __instance;
+        _hasStartedBakingTiles = false;
+        if (Provider.clients.Count > 0 && __instance.TryGetIndex(out byte nav) && NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
+        {
+            SendNavBakeProgressUpdate.Invoke(Provider.GatherClientConnections(), netId, 0f, string.Empty, true);
+        }
+    }
+
+    [HarmonyPatch(typeof(Flag), nameof(Flag.bakeNavigation))]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    private static void OnPostBakingNav(Flag __instance)
+    {
+        Logger.LogDebug($"[{Source}] Done baking: {__instance.point.Format()}.");
+        if (Provider.clients.Count > 0 && __instance.TryGetIndex(out byte nav) && NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
+        {
+            SendNavBakeProgressUpdate.Invoke(Provider.GatherClientConnections(), netId, 1f, string.Empty, false);
+        }
+
+        if (_baking == __instance)
+        {
+            _hasStartedBakingTiles = false;
+            _baking = null;
+        }
+    }
+#endif
 
     [HarmonyPatch(typeof(Flag), nameof(Flag.bakeNavigation))]
     [HarmonyTranspiler]
@@ -140,36 +186,85 @@ internal static class NavigationPatches
     [NetCall(NetCallSource.FromClient, DevkitServerNetCall.SendBakeNavRequest)]
     private static void ReceiveBakeNavRequest(MessageContext ctx, NetId netId)
     {
+        EditorUser? caller = ctx.GetCaller();
+        if (caller == null)
+        {
+            ctx.Acknowledge(StandardErrorCode.InvalidData);
+            return;
+        }
+        if (!VanillaPermissions.BakeNavigation.Has(caller.SteamId.m_SteamID))
+        {
+            UIMessage.SendNoPermissionMessage(caller, VanillaPermissions.BakeNavigation);
+            ctx.Acknowledge(StandardErrorCode.NoPermissions);
+            return;
+        }
+
+        if (!NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav))
+        {
+            Logger.LogWarning($"Unknown navigvation flag NetId: {netId.Format()}.", method: Source);
+            ctx.Acknowledge(StandardErrorCode.NotFound);
+            return;
+        }
+
+        if (!NavigationUtil.CheckSync(out _))
+        {
+            Logger.LogWarning($"Unable to bake navigation NetId: {netId.Format()}. Not sync authority.", method: Source);
+            ctx.Acknowledge(StandardErrorCode.NotSupported);
+            return;
+        }
+
+        IReadOnlyList<Flag> list = NavigationUtil.NavigationFlags;
+
+        if (list.Count <= nav)
+        {
+            Logger.LogWarning($"Unknown flag: {netId.Format()}, nav: {nav.Format()}.", method: Source);
+            ctx.Acknowledge(StandardErrorCode.NotFound);
+            return;
+        }
+
+        int old = Interlocked.CompareExchange(ref BlockBake, nav + 1, 0);
+        if (old != 0)
+        {
+            ctx.Acknowledge(StandardErrorCode.AccessViolation);
+
+            if (old > 0 && NavigationUtil.TryGetFlag((byte)(old - 1), out Flag oldFlag))
+            {
+                string? navName = HierarchyUtil.GetNearestNode<LocationDevkitNode>(oldFlag.point)?.locationName;
+                if (navName != null)
+                {
+                    UIMessage.SendEditorMessage(caller, TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationName", new object[] { navName, (byte)(old - 1) });
+                    return;
+                }
+            }
+
+            UIMessage.SendEditorMessage(caller, TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationIndex", new object[] { (byte)(old - 1) });
+            return;
+        }
+
+        Flag flag = list[nav];
+
         UniTask.Create(async () =>
         {
             // to keep the lock statement in the message reader from holding throughout the entire frozen frame (could cause a deadlock).
             await UniTask.NextFrame();
 
-            IReadOnlyList<Flag> list = NavigationUtil.NavigationFlags;
-
-            if (!NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav))
+            try
             {
-                Logger.LogWarning($"Unknown navigvation flag NetId: {netId.Format()}.", method: Source);
-                ctx.Acknowledge(StandardErrorCode.NotFound);
-                return;
-            }
+                Logger.LogInfo($"[{Source}] Baking navigation: {netId.Format()}...");
+                Stopwatch sw = Stopwatch.StartNew();
 
-            if (list.Count <= nav)
+                flag.bakeNavigation();
+
+                sw.Stop();
+                Logger.LogInfo($"[{Source}] Done baking navigation {netId.Format()}, baking took {sw.GetElapsedMilliseconds():F2} ms.");
+            }
+            finally
             {
-                Logger.LogWarning($"Unknown flag: {netId.Format()}, nav: {nav.Format()}.", method: Source);
-                ctx.Acknowledge(StandardErrorCode.NotFound);
-                return;
+                if (Interlocked.CompareExchange(ref BlockBake, 0, nav + 1) != nav + 1)
+                {
+                    Logger.LogWarning($"Synchronization fault when syncing navigation flag {nav.Format()}.", method: Source);
+                }
             }
-
-            Flag flag = list[nav];
-
-            Logger.LogInfo($"[{Source}] Baking navigation: {netId.Format()}...");
-            Stopwatch sw = Stopwatch.StartNew();
-
-            flag.bakeNavigation();
-
-            sw.Stop();
-            Logger.LogInfo($"[{Source}] Done baking navigation {netId.Format()}, baking took {sw.GetElapsedMilliseconds():F2} ms.");
 
             ctx.Acknowledge(StandardErrorCode.Success);
 
@@ -182,8 +277,60 @@ internal static class NavigationPatches
     private static void OnBakeNavigationProgressUpdate(Progress progress)
     {
         Logger.LogInfo($"[{Source}] [A* PATHFINDING] (" + progress.progress.Format("P") + ") " + progress.description.Colorize(ConsoleColor.Gray) + ".");
+#if SERVER       
+        if (Provider.clients.Count > 0 && _baking != null && _baking.TryGetIndex(out byte nav) && NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
+        {
+            float progressPercentage = 0f;
+            if (progress.description.StartsWith("Building Tile ", StringComparison.Ordinal))
+            {
+                _hasStartedBakingTiles = true;
+                int i1 = progress.description.IndexOf('/', 14);
+                if (i1 == -1 ||
+                    !int.TryParse(progress.description.Substring(14, i1 - 14), NumberStyles.Number, CultureInfo.InvariantCulture, out int partialSmall) ||
+                    !int.TryParse(progress.description.Substring(i1 + 1), NumberStyles.Number, CultureInfo.InvariantCulture, out int partialLarge))
+                    progressPercentage = 0.5f;
+                else
+                    progressPercentage = ((float)partialSmall / partialLarge) * 0.8f + 0.1f;
+            }
+            else if (_hasStartedBakingTiles)
+                progressPercentage = 0.9f + progress.progress / 10f;
+            else
+                progressPercentage = progress.progress / 10f;
+            SendNavBakeProgressUpdate.Invoke(Provider.GatherClientConnections(), netId, progressPercentage, progress.description, true);
+        }
+#endif
     }
 #if CLIENT
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendNavBakeProgressUpdate)]
+    private static void ReceiveNavigationBakeProgress(MessageContext ctx, NetId netId, float progress, string desc, bool isActive)
+    {
+        string? name = null;
+
+        if (NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav) && NavigationUtil.TryGetFlag(nav, out Flag flag))
+            name = HierarchyUtil.GetNearestNode<LocationDevkitNode>(flag.point)?.locationName;
+        
+        if (!isActive)
+        {
+            if (name != null)
+                Logger.LogInfo($"[{Source}] [SERVER / A* PATHFINDING] [{name.Format()} # {nav.Format()}] {"Done baking navigation".Colorize(ConsoleColor.Gray)}.");
+            else
+                Logger.LogInfo($"[{Source}] [SERVER / A* PATHFINDING] [{netId.Format()}] {"Done baking navigation".Colorize(ConsoleColor.Gray)}.");
+        }
+        else if (name != null)
+            Logger.LogInfo($"[{Source}] [SERVER / A* PATHFINDING] [{name.Format()} # {nav.Format()}] {progress.Format("P")} - {desc.Colorize(ConsoleColor.Gray)}.");
+        else
+            Logger.LogInfo($"[{Source}] [SERVER / A* PATHFINDING] [{netId.Format()}] {progress.Format("P")} - {desc.Colorize(ConsoleColor.Gray)}.");
+
+        EditorUIExtension? editorUi = UIExtensionManager.GetInstance<EditorUIExtension>();
+        if (editorUi != null)
+        {
+            if (!string.IsNullOrEmpty(desc))
+                editorUi.UpdateLoadingBarDescription(desc);
+
+            editorUi.UpdateLoadingBarProgress(progress);
+            editorUi.UpdateLoadingBarVisibility(isActive);
+        }
+    }
     private static void OnBakeNavigationRequest(Flag flag)
     {
         DevkitServerModule.AssertIsDevkitServerClient();
@@ -210,9 +357,23 @@ internal static class NavigationPatches
 #endif
     private static void OnBakeNavigationWhileAlreadyBaking()
     {
-        Logger.LogWarning(BlockBake ? "Tried to bake navigation while it's already baking." : "You do not have permission to bake navigation.", method: Source);
+        Logger.LogWarning(BlockBake == 0 ? "Tried to bake navigation while it's already baking." : "You do not have permission to bake navigation.", method: Source);
 #if CLIENT
-        UIMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigation");
+        int old = BlockBake;
+        if (old > 0 && NavigationUtil.TryGetFlag((byte)(old - 1), out Flag oldFlag))
+        {
+            string? navName = HierarchyUtil.GetNearestNode<LocationDevkitNode>(oldFlag.point)?.locationName;
+            if (navName != null)
+            {
+                UIMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationName", new object[] { navName, (byte)(old - 1) });
+                return;
+            }
+        }
+
+        if (old <= 0)
+            UIMessage.SendNoPermissionMessage(VanillaPermissions.BakeNavigation);
+        else
+            UIMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationIndex", new object[] { (byte)(old - 1) });
 #endif
     }
 }

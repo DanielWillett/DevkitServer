@@ -359,11 +359,15 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
         writer.Write(_bufferLen);
         writer.Write(_ttlPackets);
         writer.Write(netId.id);
+        if (HeaderSize > writer.Count)
+            writer.WriteBlock(0, HeaderSize - writer.Count);
+        
 
         NavigationUtil.WriteRecastGraphData(writer, flag.graph);
         Logger.LogDebug($"[{Source}]  Buffered {DevkitServerUtility.FormatBytes(_bufferLen - HeaderSize)}. Total packets: {_ttlPackets.Format()}.");
 
-        _fs!.Seek(0L, SeekOrigin.Begin);
+        _fs!.Flush();
+        _fs.Seek(0L, SeekOrigin.Begin);
     }
     private void ApplyBuffer(NetId netId)
     {

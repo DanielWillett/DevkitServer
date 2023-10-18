@@ -46,15 +46,15 @@ public class ByteWriter
         }
     }
     public int Count { get => _size; set => _size = value; }
-    public bool ShouldPrepend { get; protected set; }
     public int BaseCapacity { get; set; }
-
-    public ByteWriter(bool shouldPrepend = true, int capacity = 0)
+    public bool AllowPrepending { get; set; }
+    internal ByteWriter(bool allowPrepending = true, int capacity = 0)
     {
         BaseCapacity = capacity;
         _buffer = BaseCapacity < 1 ? Array.Empty<byte>() : new byte[BaseCapacity];
-        ShouldPrepend = shouldPrepend;
+        AllowPrepending = allowPrepending;
     }
+    public ByteWriter(int capacity = 0) : this(false, capacity) { }
     private static void PrepareMethods()
     {
         _nonNullableWriters ??= new Dictionary<Type, MethodInfo>(44)
@@ -163,26 +163,39 @@ public class ByteWriter
                                                         ?? throw new MemberAccessException("Unable to find nullable write method for " + writeType.Name + ".");
     }
     /// <summary>The value of <paramref name="overhead"/>.<see cref="MessageOverhead.Size">Size</see> will be overwritten.</summary>
-    public unsafe void PrependData(ref MessageOverhead overhead)
+    public unsafe void PrependOverhead(ref MessageOverhead overhead)
     {
         MessageOverhead.SetSize(ref overhead, _size);
-        if (!ShouldPrepend)
+        if (!AllowPrepending)
             return;
+
         if (_streamMode)
             throw new NotSupportedException("Prepending is not supported in stream mode.");
+
         if (_size == 0)
         {
             _buffer = overhead.GetBytes();
             return;
         }
+
         int ttl = overhead.Length;
-        byte* staloc = stackalloc byte[ttl];
-        overhead.GetBytes(staloc, out _);
-        byte[] old = _buffer;
-        _buffer = new byte[_size + ttl];
-        System.Buffer.BlockCopy(old, 0, _buffer, ttl, _size);
+        byte* overheadBytes = stackalloc byte[ttl];
+        overhead.GetBytes(overheadBytes, out _);
+
+        if (_size + ttl <= _buffer.Length)
+        {
+            fixed (byte* ptr = _buffer)
+                System.Buffer.MemoryCopy(ptr, ptr + ttl, _buffer.Length - ttl, _size);
+        }
+        else
+        {
+            byte[] old = _buffer;
+            _buffer = new byte[_size + ttl];
+            System.Buffer.BlockCopy(old, 0, _buffer, ttl, _size);
+        }
+
         fixed (byte* ptr = _buffer)
-            System.Buffer.MemoryCopy(staloc, ptr, ttl, ttl);
+            System.Buffer.MemoryCopy(overheadBytes, ptr, ttl, ttl);
         _size += ttl;
     }
     public byte[] ToArray()
@@ -266,6 +279,49 @@ public class ByteWriter
         {
             *(T*)ptr = value;
             EndianCheck(ptr, sizeof(T));
+        }
+        _size = newsize;
+    }
+    public unsafe void WriteBlock(byte value, int count)
+    {
+        if (count == 0)
+            return;
+        if (count < 0)
+            throw new ArgumentOutOfRangeException(nameof(count));
+        if (_streamMode)
+        {
+            if (_buffer == null || _buffer.Length < 1)
+                _buffer = new byte[BaseCapacity <= 0 ? Math.Min(128, count) : 0];
+
+            if (value != 0)
+            {
+                fixed (byte* ptr = _buffer)
+                {
+                    int c = Math.Min(count, _buffer.Length);
+                    for (int i = 0; i < c; ++i)
+                        ptr[i] = value;
+                }
+            }
+
+            _size += count;
+            while (count > 0)
+            {
+                int c = Math.Min(count, _buffer.Length);
+                _stream!.Write(_buffer, 0, c);
+                count -= c;
+            }
+            return;
+        }
+        int newsize = _size + count;
+        if (newsize > _buffer.Length)
+            ExtendBufferIntl(newsize);
+        if (value != 0)
+        {
+            fixed (byte* ptr = &_buffer[_size])
+            {
+                for (int i = 0; i < count; ++i)
+                    ptr[i] = value;
+            }
         }
         _size = newsize;
     }
@@ -1962,7 +2018,7 @@ public sealed class ByteWriterRaw<T> : ByteWriter
 {
     private readonly Writer<T> writer;
     /// <summary>Leave <paramref name="writer"/> null to auto-fill.</summary>
-    public ByteWriterRaw(Writer<T>? writer, bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity)
+    public ByteWriterRaw(Writer<T>? writer, bool allowPrepending = true, int capacity = 0) : base(allowPrepending, capacity)
     {
         this.writer = writer ?? WriterHelper<T>.Writer;
     }
@@ -1972,7 +2028,7 @@ public sealed class ByteWriterRaw<T> : ByteWriter
         {
             Flush();
             writer.Invoke(this, obj);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }
@@ -2003,7 +2059,7 @@ public sealed class ByteWriterRaw<T1, T2> : ByteWriter
             Flush();
             writer1.Invoke(this, arg1);
             writer2.Invoke(this, arg2);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }
@@ -2038,7 +2094,7 @@ public sealed class ByteWriterRaw<T1, T2, T3> : ByteWriter
             writer1.Invoke(this, arg1);
             writer2.Invoke(this, arg2);
             writer3.Invoke(this, arg3);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }
@@ -2077,7 +2133,7 @@ public sealed class ByteWriterRaw<T1, T2, T3, T4> : ByteWriter
             writer2.Invoke(this, arg2);
             writer3.Invoke(this, arg3);
             writer4.Invoke(this, arg4);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }
@@ -2120,7 +2176,7 @@ public sealed class ByteWriterRaw<T1, T2, T3, T4, T5> : ByteWriter
             writer3.Invoke(this, arg3);
             writer4.Invoke(this, arg4);
             writer5.Invoke(this, arg5);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }
@@ -2167,7 +2223,7 @@ public sealed class ByteWriterRaw<T1, T2, T3, T4, T5, T6> : ByteWriter
             writer4.Invoke(this, arg4);
             writer5.Invoke(this, arg5);
             writer6.Invoke(this, arg6);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }
@@ -2200,7 +2256,7 @@ public sealed class DynamicByteWriter<T1> : ByteWriter
         {
             Flush();
             writer.Invoke(this, obj);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }
@@ -2231,7 +2287,7 @@ public sealed class DynamicByteWriter<T1, T2> : ByteWriter
             Flush();
             Write(writer1, arg1);
             Write(writer2, arg2);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }
@@ -2266,7 +2322,7 @@ public sealed class DynamicByteWriter<T1, T2, T3> : ByteWriter
             Write(writer1, arg1);
             Write(writer2, arg2);
             Write(writer3, arg3);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }
@@ -2308,7 +2364,7 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4> : ByteWriter
             Write(writer2, arg2);
             Write(writer3, arg3);
             Write(writer4, arg4);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }
@@ -2354,7 +2410,7 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5> : ByteWriter
             Write(writer3, arg3);
             Write(writer4, arg4);
             Write(writer5, arg5);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }
@@ -2404,7 +2460,7 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5, T6> : ByteWriter
             Write(writer4, arg4);
             Write(writer5, arg5);
             Write(writer6, arg6);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }
@@ -2459,7 +2515,7 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7> : ByteWriter
             Write(writer5, arg5);
             Write(writer6, arg6);
             Write(writer7, arg7);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }
@@ -2518,7 +2574,7 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8> : ByteWrit
             Write(writer6, arg6);
             Write(writer7, arg7);
             Write(writer8, arg8);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }
@@ -2581,7 +2637,7 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9> : Byte
             Write(writer7, arg7);
             Write(writer8, arg8);
             Write(writer9, arg9);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }
@@ -2649,7 +2705,7 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> :
             Write(writer8, arg8);
             Write(writer9, arg9);
             Write(writer10, arg10);
-            PrependData(ref overhead);
+            PrependOverhead(ref overhead);
             return ToArray();
         }
     }

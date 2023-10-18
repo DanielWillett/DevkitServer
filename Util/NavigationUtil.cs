@@ -73,7 +73,7 @@ public static class NavigationUtil
     /// <param name="nav">Flag index in <c><see cref="LevelNavigation"/>.flags</c>.</param>
     public static bool TryGetFlag(byte nav, out Flag flag)
     {
-        flag = GetFlagSafe(nav)!;
+        flag = GetFlag(nav)!;
         return flag != null;
     }
 
@@ -81,7 +81,7 @@ public static class NavigationUtil
     /// Gets the <see cref="Flag"/> at index <paramref name="nav"/>, or <see langword="null"/> if it's out of range or in the case of a reflection failure.
     /// </summary>
     /// <param name="nav">Flag index in <c><see cref="LevelNavigation"/>.flags</c>.</param>
-    public static Flag? GetFlagSafe(byte nav)
+    public static Flag? GetFlag(byte nav)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -95,7 +95,7 @@ public static class NavigationUtil
         return flagList[nav];
     }
     internal static Flag GetFlagUnsafe(byte nav) => NavigationFlags[nav];
-    private static bool CheckSync(out NavigationSync sync)
+    internal static bool CheckSync(out NavigationSync sync)
     {
         sync = null!;
 #if CLIENT

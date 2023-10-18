@@ -10,6 +10,8 @@ internal class EditorUIExtension : ContainerUIExtension
 {
     private readonly Dictionary<ulong, ISleekLabel> _nametags = new Dictionary<ulong, ISleekLabel>(16);
     private ISleekLabel? _testLabel;
+    private SleekLoadingScreenProgressBar? _loadingProgress;
+    private ISleekBox? _loadingBox;
     private bool _subbed;
     protected override SleekWindow Parent => EditorUI.window;
     protected override void OnShown()
@@ -34,7 +36,31 @@ internal class EditorUIExtension : ContainerUIExtension
         _testLabel.IsVisible = true;
         _testLabel.TextContrastContext = ETextContrastContext.ColorfulBackdrop;
         _testLabel.Text = DevkitServerModule.MainLocalization.format("Name") + " v" + Accessor.DevkitServer.GetName().Version.ToString(3) + "-client, Src: " + DevkitServerModule.GetRelativeRepositoryUrl(null, false) + ".";
+
+        _loadingBox = Glazier.Get().CreateBox();
+
+        _loadingBox.IsVisible = false;
+        _loadingBox.PositionScale_X = 0.5f;
+        _loadingBox.PositionScale_Y = 0.25f;
+        _loadingBox.SizeScale_X = 0.25f;
+        _loadingBox.SizeOffset_X = 10f;
+        _loadingBox.SizeOffset_Y = 50f;
+
+        // probably ugly af but ill change it later.
+        _loadingProgress = new SleekLoadingScreenProgressBar
+        {
+            DescriptionText = string.Empty,
+            ProgressPercentage = 0,
+
+            IsVisible = false,
+            PositionScale_X = 0.5f,
+            PositionScale_Y = 0.25f,
+            SizeScale_X = 0.25f,
+            SizeOffset_Y = 40f
+        };
+
         Container.AddChild(_testLabel);
+        Container.AddChild(_loadingProgress);
         if (DevkitServerModule.IsEditing)
             UpdateAllNametags();
         Logger.LogDebug("Shown editor extension");
@@ -52,6 +78,16 @@ internal class EditorUIExtension : ContainerUIExtension
         {
             Container.RemoveChild(_testLabel);
             _testLabel = null;
+        }
+        if (_loadingProgress != null)
+        {
+            Container.RemoveChild(_loadingProgress);
+            _loadingProgress = null;
+        }
+        if (_loadingBox != null)
+        {
+            Container.RemoveChild(_loadingBox);
+            _loadingBox = null;
         }
         Logger.LogDebug("hidden editor extension");
     }
@@ -148,6 +184,23 @@ internal class EditorUIExtension : ContainerUIExtension
             else
                 UpdateNametag(label, u);
         }
+    }
+    public void UpdateLoadingBarVisibility(bool visibility)
+    {
+        if (_loadingBox != null && _loadingBox.IsVisible != visibility)
+            _loadingBox.IsVisible = visibility;
+        if (_loadingProgress != null && _loadingProgress.IsVisible != visibility)
+            _loadingProgress.IsVisible = visibility;
+    }
+    public void UpdateLoadingBarDescription(string description)
+    {
+        if (_loadingProgress != null && !string.Equals(_loadingProgress.DescriptionText, description, StringComparison.Ordinal))
+            _loadingProgress.DescriptionText = description;
+    }
+    public void UpdateLoadingBarProgress(float progress)
+    {
+        if (_loadingProgress != null && progress != _loadingProgress.ProgressPercentage)
+            _loadingProgress.ProgressPercentage = progress;
     }
 }
 #endif
