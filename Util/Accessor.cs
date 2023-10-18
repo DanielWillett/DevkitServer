@@ -1653,7 +1653,7 @@ internal static class Accessor
         type2 = type.BaseType;
 
         int level = 0;
-        for (; type2 != null && (!excludeSystemBase || type2 != typeof(object) && type != typeof(ValueType)); type2 = type.BaseType)
+        for (; type2 != null && (!excludeSystemBase || type2 != typeof(object) && type2 != typeof(ValueType)); type2 = type.BaseType)
         {
             ++level;
             action(type2, level);
@@ -1679,7 +1679,7 @@ internal static class Accessor
         type2 = type.BaseType;
 
         int level = 0;
-        for (; type2 != null && (!excludeSystemBase || type2 != typeof(object) && type != typeof(ValueType)); type2 = type.BaseType)
+        for (; type2 != null && (!excludeSystemBase || type2 != typeof(object) && type2 != typeof(ValueType)); type2 = type.BaseType)
         {
             ++level;
             if (!action(type2, level))

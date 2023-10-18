@@ -1,9 +1,14 @@
-﻿using DevkitServer.Configuration;
+﻿using System.Globalization;
+using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
 using SDG.NetPak;
+#if CLIENT
+using DevkitServer.Core.Extensions.UI;
+using DevkitServer.Players.UI;
+#endif
 
 namespace DevkitServer.Multiplayer.Sync;
 
@@ -32,7 +37,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
     // Packet Header structure
     // [1B: packet header size] [4B: packet id] [2B: packet length] 
     private const byte PacketHeaderSize = checked(1 + sizeof(int) + sizeof(ushort) /* align to 64 bit */ + 1);
-    
+
     private int _index = -1;
     private int _packetId = -1;
     private float _lastSent;
@@ -43,6 +48,12 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
     private NetId _pendingNetId;
     private BitArray? _packetMask;
     private volatile int _queued;
+    private string? _navMeshDisplay;
+#if CLIENT
+    private NetId _pendingUINetId;
+    private NetId _timingOutNetId;
+    private float _pendingUINetIdStartTime;
+#endif
 
     private readonly List<NetId> _syncQueue = new List<NetId>(4);
     private List<PacketInfo>? _packets;
@@ -99,6 +110,18 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             _ttlPackets = BitConverter.ToInt32(data, offset + 1 + sizeof(long));
             _pendingNetId = new NetId(BitConverter.ToUInt32(data, offset + 1 + sizeof(long) + sizeof(int)));
 
+            if (NavigationNetIdDatabase.TryGetNavigation(_pendingNetId, out byte nav) && NavigationUtil.TryGetFlag(nav, out Flag flag))
+            {
+                string? navName = HierarchyUtil.GetNearestNode<LocationDevkitNode>(flag.point)?.locationName;
+                _navMeshDisplay = string.IsNullOrEmpty(navName)
+                    ? $"Navigation # {nav.ToString(CultureInfo.InvariantCulture)}"
+                    : $"Navigation at {navName} (# {nav.ToString(CultureInfo.InvariantCulture)})";
+            }
+            else
+            {
+                _navMeshDisplay = $"Navigation {_pendingNetId.id.ToString("X8", CultureInfo.InvariantCulture)}";
+            }
+
             if (_packetMask == null || _packetMask.Length < _ttlPackets)
                 _packetMask = new BitArray((int)Math.Ceiling(_ttlPackets / 32d) * 32);
             else
@@ -107,12 +130,12 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             offset += hdrSize;
             len -= HeaderSize;
 
-            Logger.LogDebug($"[{Source}] Received starting packet: Len: {_bufferLen.Format()}. Packets: {_ttlPackets.Format()}. {_pendingNetId.Format()}.");
+            Logger.LogDebug($"[{Source}] Received starting packet of {_navMeshDisplay}: Len: {_bufferLen.Format()}. Packets: {_ttlPackets.Format()}. {_pendingNetId.Format()}.");
             CreateFileStream();
         }
         else if (packetId >= _ttlPackets)
         {
-            Logger.LogWarning($"Received out of bounds packet: {(packetId + 1).Format()}/{_ttlPackets.Format()}.", method: Source);
+            Logger.LogWarning($"Received out of bounds packet for {_navMeshDisplay}: {(packetId + 1).Format()}/{_ttlPackets.Format()}.", method: Source);
         }
 
         _index += len;
@@ -167,11 +190,26 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
     {
         Interlocked.Exchange(ref _queued, 0);
 
-        Logger.LogDebug($"[{Source}] Received packet #{_packetId} for nav {_pendingNetId.Format()} @ {DevkitServerUtility.FormatBytes(_index)}.");
+        Logger.LogDebug($"[{Source}] Received packet #{_packetId.Format()} for {_navMeshDisplay} @ {DevkitServerUtility.FormatBytes(_index)}.");
 
         int missingCt = 0;
         _packetMask![_packetId] = true;
         _shouldMoveOnAfter = CachedTime.RealtimeSinceStartup + 15f;
+
+#if CLIENT
+        if (_pendingUINetId == _pendingNetId)
+        {
+            EditorUIExtension? uiExt = UIExtensionManager.GetInstance<EditorUIExtension>();
+            if (uiExt != null)
+            {
+                uiExt.UpdateLoadingBarProgress((float)(_packetId + 1) / _ttlPackets);
+                uiExt.UpdateLoadingBarDescription($"Downloading {_navMeshDisplay} | " + DevkitServerUtility.FormatBytes(_index) + " / " + DevkitServerUtility.FormatBytes(_bufferLen));
+            }
+
+            _pendingUINetIdStartTime = CachedTime.RealtimeSinceStartup;
+        }
+#endif
+
         if (_packets != null && _packets.Any(x => x.Nav.id == _pendingNetId.id))
         {
             if (_queued == 0 && _fs != null)
@@ -215,6 +253,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             {
                 Logger.LogWarning($"Missing packets: {missingCt}/{_ttlPackets} ({missingCt / _ttlPackets:P0}.", method: Source);
                 _pendingNetId = NetId.INVALID;
+                _navMeshDisplay = null;
                 _index = -1;
                 _packetId = -1;
                 return;
@@ -241,7 +280,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
 
         DevkitServerUtility.QueueOnMainThread(FinishReceive);
     }
-    
+
     [UsedImplicitly]
     internal static void ReceiveNavigationData(NetPakReader reader)
     {
@@ -296,7 +335,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
                 NetFactory.SendGeneric(DevkitServerMessage.SendTileData, buffer, list, length: len, reliable: true, offset: offset);
             }
 #endif
-           sync.ReceiveNavigationData(buffer, offset + sizeof(ulong));
+            sync.ReceiveNavigationData(buffer, offset + sizeof(ulong));
         }
         else
             Logger.LogWarning($"Received tile data from non-authoritive NavigationSync: {(sync.User == null ? "server-side authority" : sync.User.Format())}.", method: Source);
@@ -361,7 +400,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
         writer.Write(netId.id);
         if (HeaderSize > writer.Count)
             writer.WriteBlock(0, HeaderSize - writer.Count);
-        
+
 
         NavigationUtil.WriteRecastGraphData(writer, flag.graph);
         Logger.LogDebug($"[{Source}]  Buffered {DevkitServerUtility.FormatBytes(_bufferLen - HeaderSize)}. Total packets: {_ttlPackets.Format()}.");
@@ -393,8 +432,25 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             NavigationUtil.ReadRecastGraphDataTo(reader, flag.graph);
             flag.UpdateEditorNavmesh();
 
+#if CLIENT
+            if (_pendingUINetId == netId)
+            {
+                EditorUIExtension? uiExt = UIExtensionManager.GetInstance<EditorUIExtension>();
+                if (uiExt != null)
+                {
+                    uiExt.UpdateLoadingBarProgress(1f);
+                    uiExt.UpdateLoadingBarDescription($"Done Syncing {_navMeshDisplay}");
+
+                    // roll back so it auto-times out.
+                    _pendingUINetIdStartTime = CachedTime.RealtimeSinceStartup - 5.5f;
+                    _timingOutNetId = _pendingUINetId;
+                }
+            }
+#endif
+
             _pendingNetId = NetId.INVALID;
             _index = -1;
+            _navMeshDisplay = null;
             _packetId = -1;
             Logger.LogInfo($"[{Source}] Synced navigation #{nav.Format()}'s nav-mesh from the server.");
         }
@@ -403,11 +459,30 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             TryDisposeFileStream();
         }
     }
-    
+
     [UsedImplicitly]
     private unsafe void Update()
     {
         float time = CachedTime.RealtimeSinceStartup;
+#if CLIENT
+        if (!IsOwner && !_pendingUINetId.IsNull())
+        {
+            if (time - _pendingUINetIdStartTime > 7.5f)
+            {
+                EditorUIExtension? uiExt = UIExtensionManager.GetInstance<EditorUIExtension>();
+                uiExt?.UpdateLoadingBarVisibility(false);
+                _pendingUINetId = NetId.INVALID;
+                _timingOutNetId = NetId.INVALID;
+            }
+            else if (time - _pendingUINetIdStartTime > 5f && _timingOutNetId != _pendingUINetId)
+            {
+                EditorUIExtension? uiExt = UIExtensionManager.GetInstance<EditorUIExtension>();
+                uiExt?.UpdateLoadingBarProgress(0f);
+                uiExt?.UpdateLoadingBarDescription("Timed Out.");
+                _timingOutNetId = _pendingUINetId;
+            }
+        }
+#endif
         if (!HasAuthority && _packets is { Count: > 0 } && _fs != null && _queued == 0)
         {
             int index = -1;
@@ -537,4 +612,17 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
         _lastSent = CachedTime.RealtimeSinceStartup + Math.Max(-Delay, SendDelay - _syncQueue.Count * Delay);
         Logger.LogDebug($"[{Source}] Requested sync for: {netId.Format()}.");
     }
+#if CLIENT
+    internal void StartWaitingToUpdateLoadingBar(EditorUIExtension extension, NetId netId)
+    {
+        extension.UpdateLoadingBarVisibility(true);
+        extension.UpdateLoadingBarProgress(0f);
+
+        // all the A* output is in English so I think it's more consistant to not use translations here.
+        extension.UpdateLoadingBarDescription("Syncing...");
+
+        _pendingUINetId = netId;
+        _pendingUINetIdStartTime = CachedTime.RealtimeSinceStartup;
+    }
+#endif
 }

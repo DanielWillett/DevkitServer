@@ -366,6 +366,7 @@ public static class HierarchyUtil
             }
         }
 
+#if DEBUG
         if (closestNode == null)
         {
             Logger.LogDebug($"No nodes available in {FormattingUtil.FormatMethod(typeof(TNode), typeof(HierarchyUtil), nameof(GetNearestNode), new (Type type, string? name)[]
@@ -373,6 +374,7 @@ public static class HierarchyUtil
                 (typeof(Vector3), nameof(position))
             }, null, new Type[] { typeof(TNode) }, true)}");
         }
+#endif
 
         return closestNode == null ? null : closestNode.GetComponent<TNode>();
     }
@@ -400,6 +402,7 @@ public static class HierarchyUtil
             }
         }
 
+#if DEBUG
         if (closestNode == null)
         {
             Logger.LogDebug($"No volumes available in {FormattingUtil.FormatMethod(typeof(TVolume), typeof(HierarchyUtil), nameof(GetNearestVolume), new (Type type, string? name)[]
@@ -407,6 +410,7 @@ public static class HierarchyUtil
                 (typeof(Vector3), nameof(position))
             }, null, new Type[] { typeof(TVolume) }, true)}");
         }
+#endif
 
         return closestNode == null ? null : closestNode as TVolume;
     }

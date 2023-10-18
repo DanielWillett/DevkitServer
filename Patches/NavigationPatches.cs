@@ -11,6 +11,7 @@ using DevkitServer.API.Abstractions;
 using DevkitServer.Core.Extensions.UI;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer.Levels;
+using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players.UI;
 #endif
 #if SERVER
@@ -328,7 +329,17 @@ internal static class NavigationPatches
                 editorUi.UpdateLoadingBarDescription(desc);
 
             editorUi.UpdateLoadingBarProgress(progress);
-            editorUi.UpdateLoadingBarVisibility(isActive);
+            if (!isActive)
+            {
+                if (NavigationSync.Authority == null)
+                {
+                    editorUi.UpdateLoadingBarVisibility(false);
+                    return;
+                }
+
+                NavigationSync.Authority.StartWaitingToUpdateLoadingBar(editorUi, netId);
+            }
+            editorUi.UpdateLoadingBarVisibility(true);
         }
     }
     private static void OnBakeNavigationRequest(Flag flag)

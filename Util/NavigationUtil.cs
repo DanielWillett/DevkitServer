@@ -45,7 +45,7 @@ public static class NavigationUtil
     public static bool TryGetIndex(this Flag flag, out byte nav)
     {
         int index2 = flag.GetIndex();
-        if (index2 <= 0)
+        if (index2 < 0)
         {
             nav = byte.MaxValue;
             return false;

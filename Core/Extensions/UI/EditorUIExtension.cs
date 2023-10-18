@@ -2,11 +2,12 @@
 using DevkitServer.API.UI;
 using DevkitServer.Multiplayer;
 using DevkitServer.Players;
+using Version = System.Version;
 
 namespace DevkitServer.Core.Extensions.UI;
 
 [UIExtension(typeof(EditorUI))]
-internal class EditorUIExtension : ContainerUIExtension
+public class EditorUIExtension : ContainerUIExtension
 {
     private readonly Dictionary<ulong, ISleekLabel> _nametags = new Dictionary<ulong, ISleekLabel>(16);
     private ISleekLabel? _testLabel;
@@ -24,42 +25,52 @@ internal class EditorUIExtension : ContainerUIExtension
             _subbed = true;
         }
 
+        Version version = Accessor.DevkitServer.GetName().Version;
+
         _testLabel = Glazier.Get().CreateLabel();
         _testLabel.TextAlignment = TextAnchor.LowerLeft;
-        _testLabel.FontSize = ESleekFontSize.Tiny;
+        _testLabel.FontSize = version.Major <= 0 ? ESleekFontSize.Small : ESleekFontSize.Tiny;
         _testLabel.SizeScale_X = 0.5f;
         _testLabel.SizeOffset_X = -5;
         _testLabel.SizeOffset_Y = 20;
         _testLabel.PositionScale_Y = 1f;
-        _testLabel.PositionOffset_X = 5;
+        _testLabel.PositionOffset_X = version.Major <= 0 ? 1 : 2;
         _testLabel.PositionOffset_Y = -20;
         _testLabel.IsVisible = true;
         _testLabel.TextContrastContext = ETextContrastContext.ColorfulBackdrop;
-        _testLabel.Text = DevkitServerModule.MainLocalization.format("Name") + " v" + Accessor.DevkitServer.GetName().Version.ToString(3) + "-client, Src: " + DevkitServerModule.GetRelativeRepositoryUrl(null, false) + ".";
+
+        string debugText = DevkitServerModule.MainLocalization.format("Name") + " v" + version.ToString(3) + "-client, Src: " + DevkitServerModule.GetRelativeRepositoryUrl(null, false) + ".";
+        if (version.Major <= 0)
+            debugText += " [WIP]";
+
+        _testLabel.Text = debugText;
 
         _loadingBox = Glazier.Get().CreateBox();
 
         _loadingBox.IsVisible = false;
-        _loadingBox.PositionScale_X = 0.5f;
+        _loadingBox.PositionScale_X = 0.375f;
         _loadingBox.PositionScale_Y = 0.25f;
+        _loadingBox.PositionOffset_X = -10f;
+        _loadingBox.PositionOffset_Y = -10f - 30f;
         _loadingBox.SizeScale_X = 0.25f;
-        _loadingBox.SizeOffset_X = 10f;
-        _loadingBox.SizeOffset_Y = 50f;
-
-        // probably ugly af but ill change it later.
+        _loadingBox.SizeOffset_X = 20f;
+        _loadingBox.SizeOffset_Y = 60f;
+        
         _loadingProgress = new SleekLoadingScreenProgressBar
         {
             DescriptionText = string.Empty,
             ProgressPercentage = 0,
 
             IsVisible = false,
-            PositionScale_X = 0.5f,
+            PositionScale_X = 0.375f,
             PositionScale_Y = 0.25f,
+            PositionOffset_Y = -10f - 20f,
             SizeScale_X = 0.25f,
             SizeOffset_Y = 40f
         };
 
         Container.AddChild(_testLabel);
+        Container.AddChild(_loadingBox);
         Container.AddChild(_loadingProgress);
         if (DevkitServerModule.IsEditing)
             UpdateAllNametags();
@@ -79,23 +90,21 @@ internal class EditorUIExtension : ContainerUIExtension
             Container.RemoveChild(_testLabel);
             _testLabel = null;
         }
-        if (_loadingProgress != null)
-        {
-            Container.RemoveChild(_loadingProgress);
-            _loadingProgress = null;
-        }
         if (_loadingBox != null)
         {
             Container.RemoveChild(_loadingBox);
             _loadingBox = null;
         }
-        Logger.LogDebug("hidden editor extension");
+        if (_loadingProgress != null)
+        {
+            Container.RemoveChild(_loadingProgress);
+            _loadingProgress = null;
+        }
     }
 
     protected override void OnDestroyed()
     {
         OnHidden();
-        Logger.LogDebug("Destroyed editor extension");
     }
 
     private void OnUserEditorPositionUpdated(EditorUser user)
@@ -128,7 +137,6 @@ internal class EditorUIExtension : ContainerUIExtension
         UpdateNametag(label, user);
         Container.AddChild(label);
         _nametags.Add(user.SteamId.m_SteamID, label);
-        Logger.LogDebug($"Created nametag: {user.Format()}.");
     }
 
     private void UpdateNametag(ISleekLabel nametag, EditorUser user)

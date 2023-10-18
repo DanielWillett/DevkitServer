@@ -5,7 +5,7 @@
  * Uncomment this to enable UI Extension Debug Logging.
  */
 
-#define UI_EXT_DEBUG
+// #define UI_EXT_DEBUG
 #endif
 
 using DevkitServer.API;
@@ -358,9 +358,9 @@ public static class UIExtensionManager
                     }
                 }
 
-                _onDestroy?.Invoke(instantiation);
                 if (ParentTypeInfo.TryGetValue(info.ParentType, out UIExtensionParentTypeInfo parentInfo))
                     parentInfo.InstancesIntl.RemoveAll(x => x.Instance == instance);
+                _onDestroy?.Invoke(instantiation);
             }
             info.InstantiationsIntl.Clear();
             LogDebug($"* Destroyed Instances: {info.ImplementationType.Format()}.", info.Plugin, info.Assembly);
@@ -1248,7 +1248,31 @@ public static class UIExtensionManager
     }
     private static class InstanceCache<T> where T : class
     {
-        public static T? Instance;
+        private static T? _instance;
+        public static T? Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+                    Recache();
+
+                    if (_instance == null)
+                    {
+                        Type type = typeof(T);
+                        UIExtensionInfo? extInfo = Extensions.FirstOrDefault(x => x.ImplementationType == type);
+
+                        if (extInfo != null)
+                            LogWarning($"Unable to find instance of UI extension: {type.Format()} extending {extInfo.TypeInfo.Type.Format()}.", extInfo.Plugin, extInfo.Assembly);
+                        else
+                            LogWarning($"Unable to find instance of UI extension: {type.Format()}.");
+                    }
+                }
+
+                return _instance;
+            }
+        }
+
         static InstanceCache()
         {
             Recache();
@@ -1261,12 +1285,15 @@ public static class UIExtensionManager
 
             if (info == null)
                 return;
-            Instance = info.Instantiations.OfType<T>().LastOrDefault();
+            _instance = info.Instantiations.OfType<T>().LastOrDefault();
         }
         private static void OnDestroyed(object instance)
         {
+            if (instance is not T)
+                return;
+
             if (ReferenceEquals(Instance, instance))
-                Instance = null;
+                _instance = null;
             Recache();
         }
         private static void OnAdded(object obj)
