@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>DanielWillett.ReflectionTools</RootNamespace>
+    <TargetFramework>net481</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <AssemblyOriginatorKeyFile>C:\Users\danny\OneDrive\Documents\Strong Name Keys\DanielWillett.ReflectionTools\DanielWillett.ReflectionTools.dll.snk</AssemblyOriginatorKeyFile>
+    <Version>1.0.2</Version>
+    <AssemblyVersion>$(Version).0</AssemblyVersion>
+    <FileVersion>$(Version).0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DevkitServer.csproj" />
+  </ItemGroup>
+
+</Project>

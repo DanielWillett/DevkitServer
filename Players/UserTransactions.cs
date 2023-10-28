@@ -1,22 +1,20 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using DevkitServer.Multiplayer.Networking;
+#if SERVER
+using DevkitServer.API.UI;
 using DevkitServer.Multiplayer;
-using DevkitServer.Multiplayer.Networking;
-using DevkitServer.Players.UI;
-using JetBrains.Annotations;
-using SDG.Framework.Devkit.Transactions;
+#endif
 
 namespace DevkitServer.Players;
 public class UserTransactions : MonoBehaviour
 {
+    [UsedImplicitly]
     private static readonly NetCall<bool> SendReunRequest = new NetCall<bool>((ushort)DevkitServerNetCall.ReunRequest);
     public EditorUser User { get; internal set; } = null!;
 
     // ReSharper disable once UnusedAutoPropertyAccessor.Local
     public bool IsOwner { get; private set; }
+
+    [UsedImplicitly]
     private void Start()
     {
         if (User == null)
@@ -36,9 +34,9 @@ public class UserTransactions : MonoBehaviour
     private void ReceiveReunRequest(bool isRedo)
     {
         if (isRedo)
-            UIMessage.SendEditorMessage(User, DevkitServerModule.MessageLocalization.Translate("RedoNotSupported"));
+            EditorMessage.SendEditorMessage(User, DevkitServerModule.MessageLocalization.Translate("RedoNotSupported"));
         else
-            UIMessage.SendEditorMessage(User, DevkitServerModule.MessageLocalization.Translate("UndoNotSupported"));
+            EditorMessage.SendEditorMessage(User, DevkitServerModule.MessageLocalization.Translate("UndoNotSupported"));
         Logger.LogDebug($"{User.Format()} Requested a{(isRedo ? " redo." : "n undo.")}");
     }
     [NetCall(NetCallSource.FromClient, (ushort)DevkitServerNetCall.ReunRequest)]
@@ -60,10 +58,4 @@ public class UserTransactions : MonoBehaviour
         SendReunRequest.Invoke(true);
     }
 #endif
-}
-
-public readonly struct UserTransaction
-{
-    public readonly ulong User;
-    public readonly DevkitTransactionGroup Transaction;
 }

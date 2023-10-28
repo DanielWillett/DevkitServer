@@ -8,6 +8,8 @@ using DevkitServer.Patches;
 using SDG.Framework.Utilities;
 using SDG.Provider;
 using System.IO.Compression;
+using DevkitServer.API;
+
 #endif
 #if SERVER
 using CompressionLevel = System.IO.Compression.CompressionLevel;

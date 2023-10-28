@@ -1,5 +1,4 @@
 ﻿using DevkitServer.Multiplayer.Networking;
-using JetBrains.Annotations;
 #if SERVER
 using DevkitServer.Players;
 #endif

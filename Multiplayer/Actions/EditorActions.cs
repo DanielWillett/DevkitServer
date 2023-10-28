@@ -3,20 +3,24 @@
 #define PRINT_ACTION_SIMPLE
 #endif
 
-using System.Reflection;
+using DevkitServer.API;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
 using SDG.Framework.Utilities;
 using SDG.NetPak;
+using System.Reflection;
+
 #if SERVER
+using DevkitServer.API.UI;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Sync;
-using DevkitServer.Players.UI;
 #endif
+
 #if CLIENT
 using DevkitServer.API.Abstractions;
 #endif
+
 #if PRINT_ACTION_DETAIL
 using System.Text.Json;
 using DevkitServer.Configuration;
@@ -524,7 +528,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                     if (CachedTime.RealtimeSinceStartup - _lastNoPermissionMessage > 5f)
                     {
                         if (User != null)
-                            UIMessage.SendNoPermissionMessage(User);
+                            EditorMessage.SendNoPermissionMessage(User);
                         _lastNoPermissionMessage = CachedTime.RealtimeSinceStartup;
                     }
                 }

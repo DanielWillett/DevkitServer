@@ -1,15 +1,18 @@
 ﻿using DevkitServer.Models;
+using DevkitServer.Multiplayer.Levels;
 using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
-using DevkitServer.Multiplayer.Levels;
+using DevkitServer.API;
+
+
 #if CLIENT
+using DevkitServer.API.UI;
 using DevkitServer.Configuration;
-using DevkitServer.Core.Extensions.UI;
 using DevkitServer.Core.Permissions;
+using DevkitServer.Core.UI.Extensions;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Players;
-using DevkitServer.Players.UI;
 using SDG.Framework.Devkit.Transactions;
 using SDG.Framework.Utilities;
 #endif
@@ -591,13 +594,13 @@ internal static class LevelObjectPatches
         Logger.LogDebug($"[{Source}] Checking instantiate.");
         if (IsSyncing || EditorActions.HasLargeQueue())
         {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
+            EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return;
         }
 
         if (!LevelObjectUtil.CheckPlacePermission())
         {
-            UIMessage.SendNoPermissionMessage(VanillaPermissions.PlaceObjects);
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.PlaceObjects);
             return;
         }
 
@@ -610,7 +613,7 @@ internal static class LevelObjectPatches
             return true;
         if (IsSyncing || EditorActions.HasLargeQueue())
         {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
+            EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
         List<EditorSelection> selections = LevelObjectUtil.EditorObjectSelection;
@@ -635,13 +638,13 @@ internal static class LevelObjectPatches
                         continue;
                     if (!LevelObjectUtil.CheckDeleteBuildablePermission(id))
                     {
-                        UIMessage.SendNoPermissionMessage(VanillaPermissions.RemoveUnownedObjects);
+                        EditorMessage.SendNoPermissionMessage(VanillaPermissions.RemoveUnownedObjects);
                         return false;
                     }
                 }
                 else if (!LevelObjectUtil.CheckDeletePermission(LevelObjectUtil.GetObjectUnsafe(id).instanceID))
                 {
-                    UIMessage.SendNoPermissionMessage(VanillaPermissions.RemoveUnownedObjects);
+                    EditorMessage.SendNoPermissionMessage(VanillaPermissions.RemoveUnownedObjects);
                     return false;
                 }
 
@@ -681,12 +684,12 @@ internal static class LevelObjectPatches
             return true;
         if (IsSyncing || EditorActions.HasLargeQueue())
         {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
+            EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
         if (LevelObjectUtil.EditorObjectSelection.Count > LevelObjectUtil.MaxCopySelectionSize)
         {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("TooManySelections", LevelObjectUtil.EditorObjectSelection.Count, LevelObjectUtil.MaxCopySelectionSize));
+            EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("TooManySelections", LevelObjectUtil.EditorObjectSelection.Count, LevelObjectUtil.MaxCopySelectionSize));
             return false;
         }
         Logger.LogDebug($"[{Source}] Copying.");
@@ -708,19 +711,19 @@ internal static class LevelObjectPatches
         Logger.LogDebug($"[{Source}] Checking paste.");
         if (IsSyncing || EditorActions.HasLargeQueue())
         {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
+            EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
 
         List<EditorCopy> copies = LevelObjectUtil.EditorObjectCopies;
         if (copies.Count > LevelObjectUtil.MaxCopySelectionSize)
         {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("TooManySelections", copies.Count, LevelObjectUtil.MaxCopySelectionSize));
+            EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("TooManySelections", copies.Count, LevelObjectUtil.MaxCopySelectionSize));
             return false;
         }
 
         if (LevelObjectUtil.CheckPlacePermission()) return true;
-        UIMessage.SendNoPermissionMessage(VanillaPermissions.PlaceObjects);
+        EditorMessage.SendNoPermissionMessage(VanillaPermissions.PlaceObjects);
         return false;
     }
     private static bool CheckCanMove()
@@ -729,7 +732,7 @@ internal static class LevelObjectPatches
             return true;
         if (IsSyncing)
         {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
+            EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
         List<EditorSelection> selection = LevelObjectUtil.EditorObjectSelection;
@@ -743,14 +746,14 @@ internal static class LevelObjectPatches
                 if (!LevelObjectUtil.TryFindBuildable(selection[i].transform, out RegionIdentifier id) ||
                     !LevelObjectUtil.CheckMoveBuildablePermission(id))
                 {
-                    UIMessage.SendNoPermissionMessage(VanillaPermissions.MoveUnownedObjects);
+                    EditorMessage.SendNoPermissionMessage(VanillaPermissions.MoveUnownedObjects);
                     return false;
                 }
                 continue;
             }
             if (!LevelObjectUtil.CheckMovePermission(obj.instanceID))
             {
-                UIMessage.SendNoPermissionMessage(VanillaPermissions.MoveUnownedObjects);
+                EditorMessage.SendNoPermissionMessage(VanillaPermissions.MoveUnownedObjects);
                 return false;
             }
         }
@@ -864,7 +867,7 @@ internal static class LevelObjectPatches
             return;
         if (!LevelObjectUtil.CheckMovePermission(obj.instanceID))
         {
-            UIMessage.SendNoPermissionMessage(VanillaPermissions.MoveUnownedObjects);
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.MoveUnownedObjects);
             obj.SetCustomMaterialPaletteOverride(old);
             return;
         }
@@ -965,7 +968,7 @@ internal static class LevelObjectPatches
             return;
         if (!LevelObjectUtil.CheckMovePermission(obj.instanceID))
         {
-            UIMessage.SendNoPermissionMessage(VanillaPermissions.MoveUnownedObjects);
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.MoveUnownedObjects);
             obj.SetMaterialIndexOverride(old);
             return;
         }

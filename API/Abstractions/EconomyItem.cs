@@ -1,15 +1,33 @@
 ﻿using SDG.Framework.Devkit;
 
 namespace DevkitServer.API.Abstractions;
-public sealed class EconomyItem<TAsset> : IDirtyable where TAsset : ItemClothingAsset
+
+/// <summary>
+/// Represents and abstracts a costmetic clothing item from the Steam marketplace.
+/// </summary>
+/// <typeparam name="TAsset">Asset type.</typeparam>
+public sealed class EconomyItem<TAsset> : IDirtyable where TAsset : ItemAsset
 {
+    private const string Source = "ECON ITEM";
+
     private TAsset? _asset;
     private int _steamId;
-    private MythicAsset? _mythic;
-    private bool mythicDirty;
+    private MythicAsset? _mythicAsset;
+    private bool _isMythicDirty;
 
+    /// <summary>
+    /// Ensure that the item has <c>Pro</c> in its dat file.
+    /// </summary>
     public bool RequirePro { get; set; }
+
+    /// <summary>
+    /// Has the items changed since <see cref="IDirtyable.save"/> was last ran.
+    /// </summary>
     public bool isDirty { get; set; }
+
+    /// <summary>
+    /// Steam marketplace item ID.
+    /// </summary>
     public int SteamItem
     {
         get => _steamId;
@@ -19,7 +37,7 @@ public sealed class EconomyItem<TAsset> : IDirtyable where TAsset : ItemClothing
                 return;
             _steamId = value;
             _asset = null;
-            mythicDirty = true;
+            _isMythicDirty = true;
             if (_steamId != 0)
             {
                 try
@@ -33,24 +51,28 @@ public sealed class EconomyItem<TAsset> : IDirtyable where TAsset : ItemClothing
 #endif
                 {
 #if DEBUG
-                    Logger.LogDebug($"Error getting a GUID for steam inventory item ID: {value.Format()}. This can be ignored.");
-                    Logger.LogError(ex);
+                    Logger.LogDebug($"[{Source}] Error getting a GUID for steam inventory item ID: {value.Format()}. This can be ignored.");
+                    Logger.LogError(ex, method: Source);
 #endif
                 }
                 if (RequirePro && _asset is not { isPro: true } || !RequirePro && _asset == null)
                 {
                     _asset = null;
                     _steamId = 0;
-                    Logger.LogDebug($"Error getting a GUID for steam inventory item ID: {value.Format()}, item was not pro. This can be ignored.");
+                    Logger.LogDebug($"[{Source}] Error getting a GUID for steam inventory item ID: {value.Format()}, item was not pro. This can be ignored.");
                 }
             }
             if (value != 0 && _asset == null)
             {
-                Logger.LogDebug($"Error getting a GUID for steam inventory item ID: {value.Format()}. This can be ignored.");
+                Logger.LogDebug($"[{Source}] Error getting a GUID for steam inventory item ID: {value.Format()}. This can be ignored.");
             }
             isDirty = true;
         }
     }
+
+    /// <summary>
+    /// Unturned asset.
+    /// </summary>
     public TAsset? Asset
     {
         get => _asset;
@@ -59,10 +81,10 @@ public sealed class EconomyItem<TAsset> : IDirtyable where TAsset : ItemClothing
             if (_asset == value) return;
             if (RequirePro && value is { isPro: false })
             {
-                Logger.LogDebug($"Error getting steam inventory item ID for asset: {value.Format()}, not Pro. This can be ignored.");
+                Logger.LogDebug($"[{Source}] Error getting steam inventory item ID for asset: {value.Format()}, not Pro. This can be ignored.");
             }
             _asset = value;
-            mythicDirty = true;
+            _isMythicDirty = true;
             if (_asset == null)
             {
                 _steamId = 0;
@@ -73,33 +95,34 @@ public sealed class EconomyItem<TAsset> : IDirtyable where TAsset : ItemClothing
                 {
                     _steamId = Provider.provider.economyService.getInventorySkinID(value!.id);
                 }
-#if DEBUG
-                catch (Exception ex)
+#if !DEBUG
+                catch { /* ignored */ }
 #else
-                catch
-#endif
+                catch (Exception ex)
                 {
-#if DEBUG
-                    Logger.LogDebug($"Error getting steam inventory item ID for asset: {value.Format()}. This can be ignored.");
-                    Logger.LogError(ex);
-#endif
+                    Logger.LogDebug($"[{Source}] Error getting steam inventory item ID for asset: {value.Format()}. This can be ignored.");
+                    Logger.LogError(ex, method: Source);
                 }
+#endif
             }
             if (_steamId == 0 && _asset is { isPro: true })
             {
                 _asset = null;
-                Logger.LogDebug($"Error getting steam inventory item ID for asset: {value.Format()}. This can be ignored.");
+                Logger.LogDebug($"[{Source}] Error getting steam inventory item ID for asset: {value.Format()}. This can be ignored.");
             }
 
             isDirty = true;
         }
     }
 
-    public MythicAsset? Mythic
+    /// <summary>
+    /// Asset of the mythic skin.
+    /// </summary>
+    public MythicAsset? MythicAsset
     {
         get
         {
-            if (mythicDirty)
+            if (_isMythicDirty)
             {
                 if (_steamId == 0)
                     return null;
@@ -107,18 +130,18 @@ public sealed class EconomyItem<TAsset> : IDirtyable where TAsset : ItemClothing
                 ushort id = Provider.provider.economyService.getInventoryMythicID(_steamId);
                 if (id != 0)
                 {
-                    _mythic = Assets.find(EAssetType.MYTHIC, id) as MythicAsset;
+                    _mythicAsset = Assets.find(EAssetType.MYTHIC, id) as MythicAsset;
                 }
-                mythicDirty = false;
+                _isMythicDirty = false;
             }
 
-            return _mythic;
+            return _mythicAsset;
         }
         set
         {
-            if (_mythic == value) return;
-            _mythic = value;
-            mythicDirty = false;
+            if (_mythicAsset == value) return;
+            _mythicAsset = value;
+            _isMythicDirty = false;
             isDirty = true;
         }
     }

@@ -6,8 +6,8 @@ using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
 using SDG.NetPak;
 #if CLIENT
-using DevkitServer.Core.Extensions.UI;
-using DevkitServer.Players.UI;
+using DevkitServer.API.UI.Extensions;
+using DevkitServer.Core.UI.Extensions;
 #endif
 
 namespace DevkitServer.Multiplayer.Sync;

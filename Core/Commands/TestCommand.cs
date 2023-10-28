@@ -142,36 +142,6 @@ internal static class CommandTests
     public static readonly Action<CommandContext>[] Commands;
     public static readonly Func<CommandContext, CancellationToken, UniTask>[] AsyncCommands;
 #if CLIENT
-    private static void nearestvolume(CommandContext ctx)
-    {
-        if (!ctx.TryGet(0, out string typeStr) || Accessor.AssemblyCSharp.GetType(typeStr) is not { } type || !typeof(VolumeBase).IsAssignableFrom(type))
-            throw ctx.ReplyString("Type not found.");
-
-        VolumeBase? volume = (VolumeBase?)typeof(HierarchyUtil)
-            .GetMethod("GetNearestVolume", BindingFlags.Static | BindingFlags.Public)?
-            .MakeGenericMethod(type)
-            .Invoke(null, new object[] { ctx.Caller.Position });
-
-        if (volume == null)
-            throw ctx.ReplyString($"No {type.Name}s nearby.");
-
-        ctx.ReplyString($"{type.Name} at {volume.inspectablePosition}, instance id: {volume.instanceID}.");
-    }
-    private static void nearestnode(CommandContext ctx)
-    {
-        if (!ctx.TryGet(0, out string typeStr) || Accessor.AssemblyCSharp.GetType(typeStr) is not { } type || !typeof(TempNodeBase).IsAssignableFrom(type))
-            throw ctx.ReplyString("Type not found.");
-
-        TempNodeBase? node = (TempNodeBase?)typeof(HierarchyUtil)
-            .GetMethod("GetNearestNode", BindingFlags.Static | BindingFlags.Public)?
-            .MakeGenericMethod(type)
-            .Invoke(null, new object[] { ctx.Caller.Position });
-
-        if (node == null)
-            throw ctx.ReplyString($"No {type.Name}s nearby.");
-
-        ctx.ReplyString($"{type.Name} at {node.inspectablePosition}, instance id: {node.instanceID}.");
-    }
     private static void missingobjects(CommandContext ctx)
     {
         List<ObjectAsset> assets = new List<ObjectAsset>(1024);

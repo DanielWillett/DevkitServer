@@ -1,4 +1,5 @@
-﻿using DevkitServer.Multiplayer.Levels;
+﻿using DevkitServer.API;
+using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
@@ -40,7 +41,7 @@ public static class NavigationUtil
     }
 
     /// <summary>
-    /// Gets the index of the <see cref="Flag"/> in <c><see cref="LevelNavigation"/>.flags</c>, or -1 if it's not found or in the case of a reflection failure.
+    /// Tries to find the index of the <see cref="Flag"/> in <c><see cref="LevelNavigation"/>.flags</c>.
     /// </summary>
     public static bool TryGetIndex(this Flag flag, out byte nav)
     {
@@ -56,7 +57,7 @@ public static class NavigationUtil
     }
 
     /// <summary>
-    /// Gets the <see cref="Flag"/> at index <paramref name="nav"/>, or returns <see langword="false"/> if it's out of range or in the case of a reflection failure.
+    /// Gets the index of the <see cref="Flag"/> in <c><see cref="LevelNavigation"/>.flags</c>, or -1 if it's not found or in the case of a reflection failure.
     /// </summary>
     public static int GetIndex(this Flag flag)
     {

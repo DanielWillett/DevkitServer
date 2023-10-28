@@ -1,9 +1,10 @@
 ﻿
 using DevkitServer.API.Iterators;
+using DevkitServer.API.UI;
+
 #if CLIENT
 using DevkitServer.API;
 using DevkitServer.Models;
-using DevkitServer.Players.UI;
 using DevkitServer.Util.Region;
 using SDG.Framework.Devkit.Interactable;
 #endif
@@ -153,7 +154,7 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
             case SpawnType.Animal:
                 if (EditorSpawns.selectedAnimal >= LevelAnimals.tables.Count)
                 {
-                    UIMessage.SendEditorMessage("No animal selected");
+                    EditorMessage.SendEditorMessage("No animal selected");
                     return;
                 }
 
@@ -163,7 +164,7 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
             case SpawnType.Vehicle:
                 if (EditorSpawns.selectedVehicle >= LevelVehicles.tables.Count)
                 {
-                    UIMessage.SendEditorMessage("No vehicle selected");
+                    EditorMessage.SendEditorMessage("No vehicle selected");
                     return;
                 }
 
@@ -177,13 +178,13 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
             case SpawnType.Item:
                 if (EditorSpawns.selectedItem >= LevelItems.tables.Count)
                 {
-                    UIMessage.SendEditorMessage("No item selected");
+                    EditorMessage.SendEditorMessage("No item selected");
                     return;
                 }
 
                 if (!Regions.checkSafe(position))
                 {
-                    UIMessage.SendEditorMessage("Out of bounds");
+                    EditorMessage.SendEditorMessage("Out of bounds");
                     return;
                 }
 
@@ -193,13 +194,13 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
             case SpawnType.Zombie:
                 if (EditorSpawns.selectedZombie >= LevelZombies.tables.Count)
                 {
-                    UIMessage.SendEditorMessage("No zombie selected");
+                    EditorMessage.SendEditorMessage("No zombie selected");
                     return;
                 }
 
                 if (!Regions.checkSafe(position))
                 {
-                    UIMessage.SendEditorMessage("Out of bounds");
+                    EditorMessage.SendEditorMessage("Out of bounds");
                     return;
                 }
 

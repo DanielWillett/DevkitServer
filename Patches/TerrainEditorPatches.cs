@@ -12,7 +12,8 @@ using SDG.Framework.Landscapes;
 using System.Reflection;
 using System.Reflection.Emit;
 using DevkitServer.Multiplayer.Sync;
-using DevkitServer.Players.UI;
+using DevkitServer.API.UI;
+using DevkitServer.API;
 
 namespace DevkitServer.Patches;
 [HarmonyPatch]
@@ -388,7 +389,7 @@ internal static class TerrainEditorPatches
         }
         rtn:
         if (!allow)
-            UIMessage.SendNoPermissionMessage(null);
+            EditorMessage.SendNoPermissionMessage(null);
         return allow;
         
     }
@@ -398,7 +399,7 @@ internal static class TerrainEditorPatches
         bool allow = true;
         if (EditorActions.IsPlayingCatchUp)
         {
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
+            EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
         if (UserInput.ActiveTool is TerrainEditor editor && GetTerrainBrushWorldPosition != null)
@@ -419,7 +420,7 @@ internal static class TerrainEditorPatches
                 {
                     if (pendingSync.Value.CollidesWith2DCircle(GetTerrainBrushWorldPosition(editor), rad))
                     {
-                        UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
+                        EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
                         return false;
                     }
                 }

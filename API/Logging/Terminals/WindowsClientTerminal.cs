@@ -1,8 +1,8 @@
 ﻿#if CLIENT
 using DevkitServer.Commands.Subsystem;
+using SDG.Framework.Utilities;
 using System.Runtime.InteropServices;
 using System.Text;
-using SDG.Framework.Utilities;
 using ThreadPriority = System.Threading.ThreadPriority;
 using ThreadState = System.Threading.ThreadState;
 

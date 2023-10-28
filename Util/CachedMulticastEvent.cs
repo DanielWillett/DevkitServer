@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using System.Reflection.Emit;
+using DevkitServer.API.Abstractions;
 
 namespace DevkitServer.Util;
 public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
@@ -154,7 +155,7 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         FieldInfo field = wrapperType.GetField(nameof(_delegates), BindingFlags.NonPublic | BindingFlags.Instance)!;
 
         DynamicMethod method = new DynamicMethod("TryInvoke" + type.Name, MethodAttributes.Public | MethodAttributes.Static, CallingConventions.Standard, typeof(void), types, wrapperType, true);
-        ILGenerator il = method.GetILGenerator();
+        IOpCodeEmitter il = method.GetILGenerator().AsEmitter();
         for (int i = 0; i < expectedParameters.Length; ++i)
             method.DefineParameter(i + 2, expectedParameters[i].Attributes, expectedParameters[i].Name);
         method.DefineParameter(1, ParameterAttributes.None, "this");

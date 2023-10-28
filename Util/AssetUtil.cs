@@ -2,7 +2,9 @@
 using SDG.Framework.Modules;
 using System.Reflection;
 using System.Reflection.Emit;
+using DevkitServer.API.Abstractions;
 using Module = SDG.Framework.Modules.Module;
+using DevkitServer.API;
 
 namespace DevkitServer.Util;
 
@@ -349,7 +351,7 @@ public static class AssetUtil
             }
 
             DynamicMethod dm = new DynamicMethod("LoadAsset", typeof(void), new Type[] { typeof(string), typeof(AssetOrigin) }, typeof(AssetUtil).Module, true);
-            ILGenerator generator = dm.GetILGenerator();
+            IOpCodeEmitter generator = dm.GetILGenerator().AsEmitter();
             dm.DefineParameter(0, ParameterAttributes.None, "path");
             dm.DefineParameter(1, ParameterAttributes.None, "assetOrigin");
             generator.DeclareLocal(typeof(DatDictionary));

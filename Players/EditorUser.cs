@@ -6,10 +6,6 @@ using DevkitServer.Multiplayer.Sync;
 #if CLIENT
 using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Networking;
-using DevkitServer.Players.UI;
-#endif
-#if SERVER
-using DevkitServer.Util.Comparers;
 #endif
 
 namespace DevkitServer.Players;

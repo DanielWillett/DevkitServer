@@ -1,4 +1,6 @@
 ﻿#if CLIENT
+using DevkitServer.API;
+
 namespace DevkitServer.Players;
 
 [EarlyTypeInit]

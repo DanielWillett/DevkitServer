@@ -1,4 +1,5 @@
 ﻿#if CLIENT
+using DevkitServer.API;
 using DevkitServer.API.Abstractions;
 using DevkitServer.Multiplayer;
 using HarmonyLib;
@@ -333,7 +334,7 @@ internal sealed class EditorClothes : MonoBehaviour
                 model.DestroyRigidbody();
                 if (_isVisual && _isMythic)
                 {
-                    MythicAsset? mythic = item.Mythic;
+                    MythicAsset? mythic = item.MythicAsset;
                     CenterHeadEffect(null, transform, model);
                     if (mythic != null)
                         ItemTool.applyEffect(model, mythic.id, EEffectType.HOOK);

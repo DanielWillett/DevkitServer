@@ -21,7 +21,7 @@ internal static class ObjectIconPresets
     {
         Level.onPostLevelLoaded += OnLevelLoaded;
     }
-    public static void UpdateEditCache(LevelObject levelObject, ObjectAsset asset)
+    internal static void UpdateEditCache(LevelObject levelObject, ObjectAsset asset)
     {
         Transform? ctrl = EditorUser.User?.Input.Aim;
         if (ctrl == null)
@@ -227,7 +227,7 @@ internal static class ObjectIconPresets
                         Logger.LogWarning($"Object not found for icon preset: {preset.Asset.GUID.Format()} in {configFile.File.Format()}.", method: IconGenerator.Source);
                     else
                         Logger.LogDebug($"[{IconGenerator.Source}] Object not found for workshop icon preset: {preset.Asset.GUID.Format()} in {configFile.File.Format()}.");
-                    return;
+                    continue;
                 }
                 preset.File = configFile.File;
                 if (!Presets.TryGetValue(preset.Asset.GUID, out AssetIconPreset existing) || existing.Priority < preset.Priority)
@@ -265,7 +265,7 @@ internal static class ObjectIconPresets
         }
     }
 
-    private static readonly List<AssetIconPreset> DefaultPresets = new List<AssetIconPreset>(128)
+    private static readonly List<AssetIconPreset> DefaultPresets = new List<AssetIconPreset>(17)
     {
         /* Billboard 0-16 */
         new AssetIconPreset

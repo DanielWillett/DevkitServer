@@ -2,6 +2,8 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DevkitServer.API;
+
 
 #if CLIENT
 using System.Globalization;
@@ -40,7 +42,8 @@ public class DevkitServerConfig
         IncludeFields = true,
         AllowTrailingCommas = true,
         Encoder = Encoder,
-        MaxDepth = 32
+        MaxDepth = 32,
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals | JsonNumberHandling.AllowReadingFromString
     };
     public static readonly JsonSerializerOptions CondensedSerializerSettings = new JsonSerializerOptions
     {
@@ -48,7 +51,8 @@ public class DevkitServerConfig
         IncludeFields = true,
         AllowTrailingCommas = true,
         Encoder = Encoder,
-        MaxDepth = 32
+        MaxDepth = 32,
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals | JsonNumberHandling.AllowReadingFromString
     };
 
     public static readonly JsonWriterOptions WriterOptions = new JsonWriterOptions { Indented = true, Encoder = Encoder, MaxDepth = 32, SkipValidation = false };
@@ -211,7 +215,8 @@ public class DevkitServerConfig
                 if (File.Exists(path))
                 {
                     using FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                    int len = (int)Math.Min(fs.Length, int.MaxValue);
+                    DevkitServerUtility.AdvancePastUTF8Bom(fs);
+                    int len = (int)Math.Min(fs.Length - fs.Position, int.MaxValue);
                     byte[] bytes = new byte[len];
                     int l = fs.Read(bytes, 0, len);
                     if (l != len)

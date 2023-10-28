@@ -1,4 +1,5 @@
-﻿using DevkitServer.API.Abstractions;
+﻿using DevkitServer.API;
+using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Models;
@@ -6,12 +7,11 @@ using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Multiplayer.Sync;
-#if SERVER
 using DevkitServer.Players;
-using DevkitServer.Players.UI;
+#if SERVER
+using DevkitServer.API.UI;
 #elif CLIENT
 using DevkitServer.Multiplayer.Actions;
-using DevkitServer.Players;
 #endif
 using SDG.Framework.Devkit;
 
@@ -88,7 +88,7 @@ public static class HierarchyUtil
         }
         if (type == null)
         {
-            UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+            EditorMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("UnknownError"));
             return;
         }
 
@@ -100,7 +100,7 @@ public static class HierarchyUtil
         {
             Logger.LogError($"Error instantiating {type.Format()}.", method: Source);
             Logger.LogError(ex, method: Source);
-            UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", ex.Message));
+            EditorMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", ex.Message));
             return;
         }
 
@@ -108,7 +108,7 @@ public static class HierarchyUtil
         if (newItem == null || !type.Type.IsInstanceOfType(newItem))
         {
             Logger.LogError($"Failed to create {type.Format()}.", method: Source);
-            UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+            EditorMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("UnknownError"));
             return;
         }
 

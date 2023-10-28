@@ -18,7 +18,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
-    <Version>0.0.12</Version>
+    <Version>0.0.13</Version>
     <Authors>DanielWillett</Authors>
     <Company>DanielWillett</Company>
     <Description>Module for Unturned that enables multi-user map editing.</Description>
@@ -65,7 +65,7 @@
   </ItemGroup>
 
   <!-- Signing -->
-  <PropertyGroup Condition="$(DefineConstants.Contains(RELEASE))">
+  <PropertyGroup Condition="exists('C:\Users\danny\OneDrive\Documents\DevkitServer\devkitserver.dll.snk')">
     <SignAssembly>True</SignAssembly>
     <AssemblyOriginatorKeyFile>C:\Users\danny\OneDrive\Documents\DevkitServer\devkitserver.dll.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
@@ -77,6 +77,7 @@
     <Compile Remove="DevkitServer.Launcher\**" />
     <Compile Remove="DevkitServer.Resources\**" />
     <Compile Remove="DevkitServer.Tests\**" />
+    <Compile Remove="ForwardingTargets\**" />
     <Compile Remove="Libraries\**" />
     <Compile Remove="Module\**" />
     <Compile Remove="packages\**" />
@@ -85,6 +86,7 @@
     <EmbeddedResource Remove="DevkitServer.Launcher\**" />
     <EmbeddedResource Remove="DevkitServer.Resources\**" />
     <EmbeddedResource Remove="DevkitServer.Tests\**" />
+    <EmbeddedResource Remove="ForwardingTargets\**" />
     <EmbeddedResource Remove="Libraries\**" />
     <EmbeddedResource Remove="Module\**" />
     <EmbeddedResource Remove="packages\**" />
@@ -93,10 +95,15 @@
     <None Remove="DevkitServer.Launcher\**" />
     <None Remove="DevkitServer.Resources\**" />
     <None Remove="DevkitServer.Tests\**" />
+    <None Remove="ForwardingTargets\**" />
     <None Remove="Libraries\**" />
     <None Remove="packages\**" />
     <None Remove="TestPlugin\**" />
     <None Remove="Common.targets" />
     <None Remove="Unturned.targets" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DanielWillett.UnturnedUITools" Version="[1.2.0,)" />
   </ItemGroup>
 </Project>

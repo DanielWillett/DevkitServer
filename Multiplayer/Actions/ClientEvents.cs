@@ -1,4 +1,6 @@
-﻿#if CLIENT
+﻿using DevkitServer.API;
+
+#if CLIENT
 namespace DevkitServer.Multiplayer.Actions;
 
 [EarlyTypeInit]

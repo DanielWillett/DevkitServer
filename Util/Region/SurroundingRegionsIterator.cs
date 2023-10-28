@@ -1,4 +1,6 @@
-﻿namespace DevkitServer.Util.Region;
+﻿using DevkitServer.API;
+
+namespace DevkitServer.Util.Region;
 
 [EarlyTypeInit]
 public struct SurroundingRegionsIterator : IEnumerator<RegionCoord>, IEnumerable<RegionCoord>

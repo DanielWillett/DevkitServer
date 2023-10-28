@@ -5,6 +5,7 @@ using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
 using SDG.Framework.Devkit;
+using DevkitServer.API;
 
 namespace DevkitServer.Patches;
 

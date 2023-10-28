@@ -1,7 +1,7 @@
 ﻿#if SERVER
 using DevkitServer.API.Permissions;
-#elif CLIENT
 #endif
+using DevkitServer.API;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Util.Encoding;

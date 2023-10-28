@@ -1,10 +1,19 @@
-﻿using HarmonyLib;
+﻿using DevkitServer.API;
+using DevkitServer.API.Abstractions;
+using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
 
 namespace DevkitServer.Util;
+
+/// <summary>
+/// Utilities for <see cref="ILGenerator"/> and transpiling with Harmony.
+/// </summary>
 public static class PatchUtil
 {
+    /// <summary>
+    /// Returns instructions to throw the provided <typeparamref name="TException"/> with an optional <paramref name="message"/>.
+    /// </summary>
     [Pure]
     public static IEnumerable<CodeInstruction> Throw<TException>(string? message = null) where TException : Exception
     {
@@ -34,57 +43,11 @@ public static class PatchUtil
             new CodeInstruction(OpCodes.Throw)
         };
     }
-    public static object? Get(this MemberInfo member, object? instance)
-    {
-        if (member is PropertyInfo property)
-        {
-            MethodInfo? getter = property.GetGetMethod(true);
-            if (getter == null)
-                throw new NotSupportedException(property.Name + " does not have a getter.");
-            return getter.Invoke(instance, Array.Empty<object>());
-        }
 
-        if (member is FieldInfo field)
-            return field.GetValue(instance);
-
-        throw new ArgumentException("Member must be a FieldInfo or PropertyInfo.", nameof(member));
-    }
-    public static void Set(this MemberInfo member, object? instance, object? value)
-    {
-        if (member is PropertyInfo property)
-        {
-            MethodInfo? setter = property.GetSetMethod(true);
-            if (setter == null)
-                throw new NotSupportedException(property.Name + " does not have a setter.");
-
-            setter.Invoke(instance, new object?[] { value });
-        }
-
-        if (member is FieldInfo field)
-            field.SetValue(instance, value);
-
-        throw new ArgumentException("Member must be a FieldInfo or PropertyInfo.", nameof(member));
-    }
-    [Pure]
-    public static Type? GetMemberType(this MemberInfo member) => member switch
-    {
-        MethodInfo a => a.ReturnType,
-        FieldInfo a => a.FieldType,
-        PropertyInfo a => a.PropertyType,
-        ConstructorInfo a => a.DeclaringType,
-        EventInfo a => a.EventHandlerType,
-        _ => throw new ArgumentException($"Member type {member.GetType().Name} does not have a member type.", nameof(member))
-    };
-    [Pure]
-    public static bool GetIsStatic(this MemberInfo member) => member switch
-    {
-        MethodBase a => a.IsStatic,
-        FieldInfo a => a.IsStatic,
-        PropertyInfo a => a.GetGetMethod(true) is { } getter ? getter.IsStatic : (a.GetSetMethod(true) is { } setter && setter.IsStatic),
-        EventInfo a => a.GetAddMethod(true) is { } adder ? adder.IsStatic : (a.GetRemoveMethod(true) is { } remover ? remover.IsStatic : (a.GetRaiseMethod(true) is { } raiser && raiser.IsStatic)),
-        Type a => (a.Attributes & (TypeAttributes.Abstract | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit | TypeAttributes.Class)) != 0,
-        _ => throw new ArgumentException($"Member type {member.GetType().Name} is not static-able.", nameof(member))
-    };
+    /// <summary>
+    /// Returns <see langword="true"/> if the instruction at <paramref name="index"/> and the following match <paramref name="matches"/>. Pass <see langword="null"/> as a wildcard match.
+    /// </summary>
+    /// <remarks><paramref name="index"/> will be incremented to the next instruction after the match.</remarks>
     [Pure]
     public static bool FollowPattern(IList<CodeInstruction> instructions, ref int index, params PatternMatch?[] matches)
     {
@@ -95,6 +58,10 @@ public static class PatchUtil
         }
         return false;
     }
+
+    /// <summary>
+    /// Returns <see langword="true"/> and removes the instructions at <paramref name="index"/> and the following if they match <paramref name="matches"/>. Pass <see langword="null"/> as a wildcard match.
+    /// </summary>
     [Pure]
     public static bool RemovePattern(IList<CodeInstruction> instructions, int index, params PatternMatch?[] matches)
     {
@@ -113,6 +80,10 @@ public static class PatchUtil
         }
         return false;
     }
+
+    /// <summary>
+    /// Returns <see langword="true"/> if the instruction at <paramref name="index"/> and the following match <paramref name="matches"/>. Pass <see langword="null"/> as a wildcard match.
+    /// </summary>
     [Pure]
     public static bool MatchPattern(IList<CodeInstruction> instructions, int index, params PatternMatch?[] matches)
     {
@@ -128,6 +99,10 @@ public static class PatchUtil
         return true;
     }
 
+    /// <summary>
+    /// Inserts instructions to execute <paramref name="checker"/> and return (or optionally branch to <paramref name="goto"/>) if it returns <see langword="false"/>.
+    /// </summary>
+    /// <returns>Amount of instructions skipped.</returns>
     public static void ReturnIfFalse(IList<CodeInstruction> instructions, ILGenerator generator, ref int index, Func<bool> checker, Label? @goto = null)
     {
         Label continueLbl = generator.DefineLabel();
@@ -142,6 +117,11 @@ public static class PatchUtil
         if (instructions.Count > index)
             instructions[index].labels.Add(continueLbl);
     }
+    
+    /// <summary>
+    /// Remove instructions until <paramref name="match"/> is satisfied or the method ends.
+    /// </summary>
+    /// <returns>The amount of instructions removed.</returns>
     public static int RemoveUntil(IList<CodeInstruction> instructions, int index, PatternMatch match, bool includeMatch = true)
     {
         int amt = 0;
@@ -165,6 +145,11 @@ public static class PatchUtil
         }
         return amt;
     }
+
+    /// <summary>
+    /// Increment <paramref name="index"/> until <paramref name="match"/> matches or the function ends.
+    /// </summary>
+    /// <returns>Amount of instructions skipped.</returns>
     [Pure]
     public static int ContinueUntil(IList<CodeInstruction> instructions, ref int index, PatternMatch match, bool includeMatch = true)
     {
@@ -182,6 +167,11 @@ public static class PatchUtil
         }
         return amt;
     }
+
+    /// <summary>
+    /// Increment <paramref name="index"/> until <paramref name="match"/> fails or the function ends.
+    /// </summary>
+    /// <returns>Amount of instructions skipped.</returns>
     [Pure]
     public static int ContinueWhile(IList<CodeInstruction> instructions, ref int index, PatternMatch match, bool includeNext = true)
     {
@@ -199,6 +189,10 @@ public static class PatchUtil
         }
         return amt;
     }
+
+    /// <summary>
+    /// Add <paramref name="label"/> to the next instruction that matches <paramref name="match"/>.
+    /// </summary>
     [Pure]
     public static bool LabelNext(IList<CodeInstruction> instructions, int index, Label label, PatternMatch match, int shift = 0, bool labelRtnIfFailure = false)
     {
@@ -227,6 +221,10 @@ public static class PatchUtil
         }
         return false;
     }
+
+    /// <summary>
+    /// Get a label to the next instruction that matches <paramref name="match"/>.
+    /// </summary>
     [Pure]
     public static Label? LabelNext(IList<CodeInstruction> instructions, ILGenerator generator, int index, PatternMatch match, int shift = 0)
     {
@@ -245,6 +243,10 @@ public static class PatchUtil
         }
         return null;
     }
+
+    /// <summary>
+    /// Get a label to the next instruction that matches <paramref name="match"/>, or the end of the function.
+    /// </summary>
     [Pure]
     public static Label LabelNextOrReturn(IList<CodeInstruction> instructions, ILGenerator generator, int index, PatternMatch? match, int shift = 0, bool allowUseExisting = true)
     {
@@ -284,6 +286,10 @@ public static class PatchUtil
             return label;
         }
     }
+
+    /// <summary>
+    /// Get the label of the next branch instructino.
+    /// </summary>
     [Pure]
     public static Label? GetNextBranchTarget(IList<CodeInstruction> instructions, int index)
     {
@@ -297,6 +303,10 @@ public static class PatchUtil
 
         return null;
     }
+
+    /// <summary>
+    /// Find the index of the code instruction to which the label refers.
+    /// </summary>
     [Pure]
     public static int FindLabelDestinationIndex(IList<CodeInstruction> instructions, Label label, int startIndex = 0)
     {
@@ -317,10 +327,14 @@ public static class PatchUtil
 
         return -1;
     }
+
+    /// <summary>
+    /// Create a code instruction loading a local (by builder or index).
+    /// </summary>
     [Pure]
-    public static CodeInstruction GetLocalCodeInstruction(LocalBuilder? builder, int index, bool set, bool byref = false)
+    public static CodeInstruction GetLocalCodeInstruction(LocalBuilder? builder, int index, bool set, bool byRef = false)
     {
-        return new CodeInstruction(GetLocalCode(builder != null ? builder.LocalIndex : index, set, byref), builder);
+        return new CodeInstruction(GetLocalCode(builder != null ? builder.LocalIndex : index, set, byRef), builder);
     }
 #if CLIENT
     [Obsolete("Fix this it messes up OnKeyUp calls.")]
@@ -329,14 +343,23 @@ public static class PatchUtil
     {
     }
 #endif
+
+    /// <summary>
+    /// Get the label ID from a <see cref="Label"/> object.
+    /// </summary>
+    /// <remarks>Not CLR compliant.</remarks>
     [Pure]
     public static unsafe int GetLabelId(this Label label) => *(int*)&label;
+
+    /// <summary>
+    /// Get the <see cref="OpCode"/> for a local.
+    /// </summary>
     [Pure]
-    public static OpCode GetLocalCode(int index, bool set, bool byref = false)
+    public static OpCode GetLocalCode(int index, bool set, bool byRef = false)
     {
         if (index > ushort.MaxValue)
             throw new ArgumentOutOfRangeException(nameof(index));
-        if (!set && byref)
+        if (!set && byRef)
         {
             return index > byte.MaxValue ? OpCodes.Ldloca : OpCodes.Ldloca_S;
         }
@@ -349,6 +372,10 @@ public static class PatchUtil
             _ => set ? (index > byte.MaxValue ? OpCodes.Stloc : OpCodes.Stloc_S) : (index > byte.MaxValue ? OpCodes.Ldloc : OpCodes.Ldloc_S)
         };
     }
+
+    /// <summary>
+    /// Get the <see cref="OpCode"/> for an argument.
+    /// </summary>
     [Pure]
     public static OpCode GetArgumentCode(int index, bool set, bool byref = false)
     {
@@ -368,7 +395,11 @@ public static class PatchUtil
             _ => index > byte.MaxValue ? OpCodes.Ldarg : OpCodes.Ldarg_S
         };
     }
-    public static void EmitArgument(ILGenerator il, int index, bool set, bool byref = false)
+
+    /// <summary>
+    /// Loads an argument from an index.
+    /// </summary>
+    public static void EmitArgument(IOpCodeEmitter il, int index, bool set, bool byref = false)
     {
         if (index > ushort.MaxValue)
             throw new ArgumentOutOfRangeException(nameof(index));
@@ -397,35 +428,10 @@ public static class PatchUtil
 
         il.Emit(index > byte.MaxValue ? OpCodes.Ldarg : OpCodes.Ldarg_S, index);
     }
-    public static void EmitArgument(DebuggableEmitter il, int index, bool set, bool byref = false)
-    {
-        if (index > ushort.MaxValue)
-            throw new ArgumentOutOfRangeException(nameof(index));
-        if (set)
-        {
-            il.Emit(index > byte.MaxValue ? OpCodes.Starg : OpCodes.Starg_S, index);
-            return;
-        }
-        if (byref)
-        {
-            il.Emit(index > byte.MaxValue ? OpCodes.Ldarga : OpCodes.Ldarga_S, index);
-            return;
-        }
-        
-        if (index is < 4 and > -1)
-        {
-            il.Emit(index switch
-            {
-                0 => OpCodes.Ldarg_0,
-                1 => OpCodes.Ldarg_1,
-                2 => OpCodes.Ldarg_2,
-                _ => OpCodes.Ldarg_3
-            });
-            return;
-        }
 
-        il.Emit(index > byte.MaxValue ? OpCodes.Ldarg : OpCodes.Ldarg_S, index);
-    }
+    /// <summary>
+    /// Get the index of a local code instruction.
+    /// </summary>
     [Pure]
     public static int GetLocalIndex(CodeInstruction code, bool set)
     {
@@ -462,6 +468,10 @@ public static class PatchUtil
 
         return -1;
     }
+
+    /// <summary>
+    /// Emit an Int32.
+    /// </summary>
     [Pure]
     public static CodeInstruction LoadConstantI4(int number)
     {
@@ -480,7 +490,11 @@ public static class PatchUtil
             _ => new CodeInstruction(OpCodes.Ldc_I4, number),
         };
     }
-    public static void LoadConstantI4(ILGenerator generator, int number)
+
+    /// <summary>
+    /// Emit an Int32.
+    /// </summary>
+    public static void LoadConstantI4(IOpCodeEmitter generator, int number)
     {
         OpCode code = number switch
         {
@@ -501,27 +515,10 @@ public static class PatchUtil
         else
             generator.Emit(code);
     }
-    public static void LoadConstantI4(DebuggableEmitter generator, int number)
-    {
-        OpCode code = number switch
-        {
-            -1 => OpCodes.Ldc_I4_M1,
-            0 => OpCodes.Ldc_I4_0,
-            1 => OpCodes.Ldc_I4_1,
-            2 => OpCodes.Ldc_I4_2,
-            3 => OpCodes.Ldc_I4_3,
-            4 => OpCodes.Ldc_I4_4,
-            5 => OpCodes.Ldc_I4_5,
-            6 => OpCodes.Ldc_I4_6,
-            7 => OpCodes.Ldc_I4_7,
-            8 => OpCodes.Ldc_I4_8,
-            _ => OpCodes.Ldc_I4
-        };
-        if (number is < -1 or > 8)
-            generator.Emit(code, number);
-        else
-            generator.Emit(code);
-    }
+
+    /// <summary>
+    /// Loads a parameter from an index.
+    /// </summary>
     [Pure]
     public static CodeInstruction LoadParameter(int index)
     {
@@ -535,7 +532,11 @@ public static class PatchUtil
             _ => new CodeInstruction(OpCodes.Ldarg, index)
         };
     }
-    public static void LoadParameter(this DebuggableEmitter generator, int index, bool byref = false, Type? type = null, Type? targetType = null)
+
+    /// <summary>
+    /// Loads a parameter from an index.
+    /// </summary>
+    public static void LoadParameter(this IOpCodeEmitter generator, int index, bool byref = false, Type? type = null, Type? targetType = null)
     {
         if (byref)
         {
@@ -563,34 +564,10 @@ public static class PatchUtil
                 generator.Emit(OpCodes.Unbox_Any, targetType);
         }
     }
-    public static void LoadParameter(this ILGenerator generator, int index, bool byref = false, Type? type = null, Type? targetType = null)
-    {
-        if (byref)
-        {
-            generator.Emit(index > ushort.MaxValue ? OpCodes.Ldarga : OpCodes.Ldarga_S, index);
-            return;
-        }
-        OpCode code = index switch
-        {
-            0 => OpCodes.Ldarg_0,
-            1 => OpCodes.Ldarg_1,
-            2 => OpCodes.Ldarg_2,
-            3 => OpCodes.Ldarg_3,
-            <= ushort.MaxValue => OpCodes.Ldarg_S,
-            _ => OpCodes.Ldarg
-        };
-        if (index > 3)
-            generator.Emit(code, index);
-        else
-            generator.Emit(code);
-        if (type != null && targetType != null && type != typeof(void) && targetType != typeof(void))
-        {
-            if (type.IsValueType && !targetType.IsValueType)
-                generator.Emit(OpCodes.Box, type);
-            else if (!type.IsValueType && targetType.IsValueType)
-                generator.Emit(OpCodes.Unbox_Any, targetType);
-        }
-    }
+
+    /// <summary>
+    /// Get the local builder or index of the instruction.
+    /// </summary>
     [Pure]
     public static LocalBuilder? GetLocal(CodeInstruction code, out int index, bool set)
     {
@@ -660,13 +637,25 @@ public static class PatchUtil
         index = -1;
         return null;
     }
+
+    /// <summary>
+    /// Copy an instruction without 
+    /// </summary>
     [Pure]
     public static CodeInstruction CopyWithoutSpecial(this CodeInstruction instruction) => new CodeInstruction(instruction.opcode, instruction.operand);
+
+    /// <summary>
+    /// Transfers blocks that would be on the last instruction of a block to the target instruction.
+    /// </summary>
     public static void TransferEndingInstructionNeeds(CodeInstruction originalEnd, CodeInstruction newEnd)
     {
         newEnd.blocks.AddRange(originalEnd.blocks.Where(x => x.blockType.IsEndBlockType()));
         originalEnd.blocks.RemoveAll(x => x.blockType.IsEndBlockType());
     }
+
+    /// <summary>
+    /// Transfers all labels and blocks that would be on the first instruction of a block to the target instruction.
+    /// </summary>
     public static void TransferStartingInstructionNeeds(CodeInstruction originalStart, CodeInstruction newStart)
     {
         newStart.labels.AddRange(originalStart.labels);
@@ -674,6 +663,10 @@ public static class PatchUtil
         newStart.blocks.AddRange(originalStart.blocks.Where(x => x.blockType.IsBeginBlockType()));
         originalStart.blocks.RemoveAll(x => x.blockType.IsBeginBlockType());
     }
+
+    /// <summary>
+    /// Cut and pastes all labels and blocks to the target instruction.
+    /// </summary>
     public static void MoveBlocksAndLabels(this CodeInstruction from, CodeInstruction to)
     {
         to.labels.AddRange(from.labels);
@@ -682,14 +675,26 @@ public static class PatchUtil
         from.blocks.Clear();
     }
 
+    /// <summary>
+    /// Would this block type begin a block?
+    /// </summary>
     [Pure]
     public static bool IsBeginBlockType(this ExceptionBlockType type) => type is ExceptionBlockType.BeginCatchBlock
         or ExceptionBlockType.BeginExceptFilterBlock or ExceptionBlockType.BeginExceptionBlock
         or ExceptionBlockType.BeginFaultBlock or ExceptionBlockType.BeginFinallyBlock;
 
+    /// <summary>
+    /// Would this block type end a block?
+    /// </summary>
     [Pure]
     public static bool IsEndBlockType(this ExceptionBlockType type) => type == ExceptionBlockType.EndExceptionBlock;
 
+    /// <summary>
+    /// Compare <see cref="OpCode"/>s.
+    /// </summary>
+    /// <param name="opcode">Original <see cref="OpCode"/>.</param>
+    /// <param name="comparand"><see cref="OpCode"/> to compare to <paramref name="opcode"/>.</param>
+    /// <param name="fuzzy">Changes how similar <see cref="OpCode"/>s are compared (<c>br</c> and <c>ble</c> will match, for example).</param>
     [Pure]
     public static bool IsOfType(this OpCode opcode, OpCode comparand, bool fuzzy = false)
     {
@@ -769,41 +774,93 @@ public static class PatchUtil
         return false;
     }
 
+    /// <summary>
+    /// Is this opcode any variants of <c>stloc</c>.
+    /// </summary>
+    /// <param name="opcode"><see cref="OpCode"/> to check.</param>
     [Pure]
     public static bool IsStLoc(this OpCode opcode)
     {
         return opcode == OpCodes.Stloc || opcode == OpCodes.Stloc_S || opcode == OpCodes.Stloc_0 || opcode == OpCodes.Stloc_1 || opcode == OpCodes.Stloc_2 || opcode == OpCodes.Stloc_3;
     }
+
+    /// <summary>
+    /// Is this opcode any variants of <c>ldloc</c>.
+    /// </summary>
+    /// <param name="opcode"><see cref="OpCode"/> to check.</param>
+    /// <param name="byRef">Only match instructions that load by address.</param>
+    /// <param name="either">Match instructions that load by value or address.</param>
     [Pure]
-    public static bool IsLdLoc(this OpCode opcode, bool address = false, bool either = false)
+    public static bool IsLdLoc(this OpCode opcode, bool byRef = false, bool either = false)
     {
         if (opcode == OpCodes.Ldloc_S || opcode == OpCodes.Ldloc_0 || opcode == OpCodes.Ldloc_1 || opcode == OpCodes.Ldloc_2 || opcode == OpCodes.Ldloc_3 || opcode == OpCodes.Ldloc)
-            return !address || either;
+            return !byRef || either;
         if (opcode == OpCodes.Ldloca_S || opcode == OpCodes.Ldloca)
-            return address || either;
+            return byRef || either;
 
         return false;
     }
+
+    /// <summary>
+    /// Is this opcode any variants of <c>starg</c>.
+    /// </summary>
+    /// <param name="opcode"><see cref="OpCode"/> to check.</param>
     [Pure]
     public static bool IsStArg(this OpCode opcode)
     {
         return opcode == OpCodes.Starg || opcode == OpCodes.Starg_S;
     }
+
+    /// <summary>
+    /// Is this opcode any variants of <c>stloc</c>.
+    /// </summary>
+    /// <param name="opcode"><see cref="OpCode"/> to check.</param>
+    /// <param name="byRef">Only match instructions that load by address.</param>
+    /// <param name="either">Match instructions that load by value or address.</param>
     [Pure]
-    public static bool IsLdArg(this OpCode opcode, bool address = false, bool either = false)
+    public static bool IsLdArg(this OpCode opcode, bool byRef = false, bool either = false)
     {
         if (opcode == OpCodes.Ldarg_S || opcode == OpCodes.Ldarg_0 || opcode == OpCodes.Ldarg_1 || opcode == OpCodes.Ldarg_2 || opcode == OpCodes.Ldarg_3 || opcode == OpCodes.Ldarg)
-            return !address || either;
+            return !byRef || either;
         if (opcode == OpCodes.Ldarga_S || opcode == OpCodes.Ldarga)
-            return address || either;
+            return byRef || either;
 
         return false;
     }
 
+    /// <summary>
+    /// Is this opcode any variants of <c>br</c>.
+    /// </summary>
+    /// <remarks>Use <see cref="IsBr"/> for the same check but all parameters default to <see langword="false"/>.</remarks>
+    /// <param name="opcode"><see cref="OpCode"/> to check.</param>
+    /// <param name="br">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>br</c>.</param>
+    /// <param name="brtrue">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>brtrue</c>.</param>
+    /// <param name="brfalse">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>brfalse</c>.</param>
+    /// <param name="beq">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>beq</c>.</param>
+    /// <param name="bne">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>bne</c>.</param>
+    /// <param name="bge">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>bge</c>.</param>
+    /// <param name="ble">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ble</c>.</param>
+    /// <param name="bgt">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>bgt</c>.</param>
+    /// <param name="blt">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>blt</c>.</param>
     [Pure]
     public static bool IsBrAny(this OpCode opcode, bool br = true, bool brtrue = true, bool brfalse = true,
         bool beq = true, bool bne = true, bool bge = true, bool ble = true, bool bgt = true, bool blt = true)
         => opcode.IsBr(br, brtrue, brfalse, beq, bne, bge, ble, bgt, blt);
+
+    /// <summary>
+    /// Is this opcode any variants of <c>br</c>.
+    /// </summary>
+    /// <remarks>Use <see cref="IsBrAny"/> for the same check but all parameters default to <see langword="true"/>.</remarks>
+    /// <param name="opcode"><see cref="OpCode"/> to check.</param>
+    /// <param name="br">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>br</c>.</param>
+    /// <param name="brtrue">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>brtrue</c>.</param>
+    /// <param name="brfalse">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>brfalse</c>.</param>
+    /// <param name="beq">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>beq</c>.</param>
+    /// <param name="bne">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>bne</c>.</param>
+    /// <param name="bge">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>bge</c>.</param>
+    /// <param name="ble">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ble</c>.</param>
+    /// <param name="bgt">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>bgt</c>.</param>
+    /// <param name="blt">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>blt</c>.</param>
     [Pure]
     public static bool IsBr(this OpCode opcode, bool br = false, bool brtrue = false, bool brfalse = false, bool beq = false, bool bne = false, bool bge = false, bool ble = false, bool bgt = false, bool blt = false)
     {
@@ -828,6 +885,18 @@ public static class PatchUtil
 
         return false;
     }
+
+    /// <summary>
+    /// Is this opcode any variants of <c>ldc</c>.
+    /// </summary>
+    /// <remarks>Use <see cref="IsBrAny"/> for the same check but all parameters default to <see langword="true"/>.</remarks>
+    /// <param name="opcode"><see cref="OpCode"/> to check.</param>
+    /// <param name="int">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldc.i4</c>.</param>
+    /// <param name="long">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldc.i8</c>.</param>
+    /// <param name="float">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldc.r4</c>.</param>
+    /// <param name="double">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldc.r8</c>.</param>
+    /// <param name="string">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldstr</c>.</param>
+    /// <param name="null">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldnull</c>.</param>
     [Pure]
     public static bool IsLdc(this OpCode opcode, bool @int = true, bool @long = false, bool @float = false, bool @double = false, bool @string = false, bool @null = false)
     {
@@ -849,6 +918,24 @@ public static class PatchUtil
 
         return false;
     }
+
+    /// <summary>
+    /// Is this opcode any variants of <c>conv</c>.
+    /// </summary>
+    /// <remarks>Use <see cref="IsBrAny"/> for the same check but all parameters default to <see langword="true"/>.</remarks>
+    /// <param name="opcode"><see cref="OpCode"/> to check.</param>
+    /// <param name="nint">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>conv.i</c> or <c>conv.u</c>.</param>
+    /// <param name="byte">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>conv.i1</c> or <c>conv.u1</c>.</param>
+    /// <param name="short">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>conv.i2</c> or <c>conv.u2</c>.</param>
+    /// <param name="int">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>conv.i4</c> or <c>conv.u4</c>.</param>
+    /// <param name="long">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>conv.i8</c> or <c>conv.u8</c>.</param>
+    /// <param name="float">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>conv.r4</c> or <c>conv.r.un</c>.</param>
+    /// <param name="double">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>conv.r8</c>.</param>
+    /// <param name="fromUnsigned">Allow converting from unsigned checks.</param>
+    /// <param name="toUnsigned">Allow converting to unsigned checks.</param>
+    /// <param name="signed">Allow converting to signed checks.</param>
+    /// <param name="overflowCheck">Allow overflow checks.</param>
+    /// <param name="noOverflowCheck">Allow no overflow checks.</param>
     [Pure]
     public static bool IsConv(this OpCode opcode, bool @nint = true, bool @byte = true, bool @short = true, bool @int = true, bool @long = true, bool @float = true, bool @double = true, bool fromUnsigned = true, bool toUnsigned = true, bool signed = true, bool overflowCheck = true, bool noOverflowCheck = true)
     {
@@ -869,27 +956,26 @@ public static class PatchUtil
 
         return false;
     }
-    [Pure]
-    public static bool ShouldCallvirt(this MethodBase method)
-    {
-        return method is { IsFinal: false, IsVirtual: true } || method.IsAbstract || method is { IsStatic: false, DeclaringType: not { IsValueType: true }, IsFinal: false } || method.DeclaringType is { IsInterface: true };
-    }
-    [Pure]
-    public static bool ShouldCallvirtRuntime(this MethodBase method)
-    {
-        return method is { IsFinal: false, IsVirtual: true } || method.IsAbstract || method.DeclaringType is { IsInterface: true };
-    }
+
+    /// <summary>
+    /// Return the correct call <see cref="OpCode"/> to use depending on the method. Usually you will use <see cref="GetCallRuntime"/> instead as it doesn't account for possible future keyword changes.
+    /// </summary>
     [Pure]
     public static OpCode GetCall(this MethodBase method)
     {
         return method.ShouldCallvirt() ? OpCodes.Callvirt : OpCodes.Call;
     }
+
+    /// <summary>
+    /// Return the correct call <see cref="OpCode"/> to use depending on the method at runtime. Doesn't account for future changes.
+    /// </summary>
     [Pure]
     public static OpCode GetCallRuntime(this MethodBase method)
     {
         return method.ShouldCallvirtRuntime() ? OpCodes.Callvirt : OpCodes.Call;
     }
-    public static void CheckCopiedMethodPatchOutOfDate(ref MethodInfo original, MethodBase invoker)
+
+    internal static void CheckCopiedMethodPatchOutOfDate(ref MethodInfo original, MethodBase invoker)
     {
         if (original == null)
             return;
@@ -935,4 +1021,10 @@ public static class PatchUtil
         }
     }
 }
+
+/// <summary>
+/// Represents a predicate for code instructions.
+/// </summary>
+/// <param name="instruction">The code instruction to check for a match on.</param>
+/// <returns><see langword="true"/> for a match, otherwise <see langword="false"/>.</returns>
 public delegate bool PatternMatch(CodeInstruction instruction);

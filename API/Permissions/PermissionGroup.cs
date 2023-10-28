@@ -1,7 +1,7 @@
 ﻿using DevkitServer.Configuration;
+using DevkitServer.Util.Encoding;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.API.Permissions;
 [JsonConverter(typeof(PermissionGroupConverter))]

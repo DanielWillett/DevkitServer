@@ -1,16 +1,19 @@
 ﻿using DevkitServer.API.Permissions;
+using DevkitServer.API.UI;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
-using DevkitServer.Players.UI;
 using DevkitServer.Util.Encoding;
 using SDG.NetPak;
+using DevkitServer.API;
+
+
 #if CLIENT
+using DevkitServer.API.Abstractions;
 using HarmonyLib;
 using SDG.Framework.Devkit;
 using System.Reflection;
 using System.Reflection.Emit;
-using EditorUI = SDG.Unturned.EditorUI;
 #endif
 
 namespace DevkitServer.Players;
@@ -170,7 +173,7 @@ public class UserInput : MonoBehaviour
 #endif
     private static readonly ByteReader Reader = new ByteReader { ThrowOnError = true };
     private readonly List<UserInputPacket> _packets = new List<UserInputPacket>();
-    private int _packetsIndex = 0;
+    private int _packetsIndex;
 #if CLIENT
     private static readonly Func<IDevkitTool?>? GetDevkitTool;
     private static readonly Action<IDevkitTool?>? SetDevkitTool;
@@ -216,7 +219,7 @@ public class UserInput : MonoBehaviour
             DynamicMethod method = new DynamicMethod("get_activeTool", attributes,
                 conventions, typeof(IDevkitTool),
                 Array.Empty<Type>(), type, true);
-            ILGenerator il = method.GetILGenerator();
+            IOpCodeEmitter il = method.GetILGenerator().AsEmitter();
             il.Emit(OpCodes.Ldsfld, instanceField);
             il.Emit(OpCodes.Ldfld, toolField);
             il.Emit(OpCodes.Ret);
@@ -228,7 +231,7 @@ public class UserInput : MonoBehaviour
             DynamicMethod method = new DynamicMethod("set_activeTool", attributes,
                 conventions, typeof(void),
                 new Type[] { typeof(IDevkitTool) }, type, true);
-            ILGenerator il = method.GetILGenerator();
+            IOpCodeEmitter il = method.GetILGenerator().AsEmitter();
             if (!setToolMethod.IsStatic)
                 il.Emit(OpCodes.Ldsfld, instanceField);
             il.Emit(OpCodes.Ldarg_0);
@@ -810,7 +813,7 @@ public class UserInput : MonoBehaviour
             EventOnUserControllerUpdateRequested.TryInvoke(user, ref shouldAllow);
             if (!shouldAllow)
             {
-                UIMessage.SendNoPermissionMessage(user);
+                EditorMessage.SendNoPermissionMessage(user);
                 return StandardErrorCode.NoPermissions;
             }
 
@@ -818,7 +821,7 @@ public class UserInput : MonoBehaviour
             return StandardErrorCode.Success;
         }
         
-        UIMessage.SendNoPermissionMessage(user);
+        EditorMessage.SendNoPermissionMessage(user);
         return StandardErrorCode.NoPermissions;
     }
     private void Load()

@@ -1,6 +1,4 @@
-﻿using System.Diagnostics.Eventing.Reader;
-
-namespace DevkitServer.Core;
+﻿namespace DevkitServer.Core;
 internal static class SharedResources
 {
 #if CLIENT

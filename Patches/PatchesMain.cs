@@ -8,6 +8,8 @@ using SDG.Framework.Landscapes;
 using System.Reflection.Emit;
 using Cysharp.Threading.Tasks;
 using Version = System.Version;
+using DevkitServer.API;
+
 #if CLIENT
 using DevkitServer.Multiplayer.Levels;
 #endif
@@ -248,7 +250,7 @@ internal static class PatchesMain
         if (!DevkitServerModule.IsEditing)
             return false;
 #if CLIENT
-        if (caller.channel.isOwner)
+        if (caller.channel.IsLocalPlayer)
             return UserInput.LocalController == CameraController.Editor;
 #endif
         EditorUser? user = UserManager.FromId(caller.player.channel.owner.playerID.steamID.m_SteamID);

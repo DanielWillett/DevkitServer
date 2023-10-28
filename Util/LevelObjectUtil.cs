@@ -1,15 +1,18 @@
 ﻿using DevkitServer.API.Permissions;
+using DevkitServer.API.UI;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Actions;
-using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Multiplayer.Levels;
+using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Multiplayer.Sync;
-using DevkitServer.Players.UI;
 using DevkitServer.Util.Region;
+using DevkitServer.API;
+
+
 #if CLIENT
-using DevkitServer.Core.Extensions.UI;
+using DevkitServer.Core.UI.Extensions;
 using DevkitServer.Patches;
 using DevkitServer.Players;
 using System.Reflection;
@@ -17,6 +20,7 @@ using System.Reflection;
 #if SERVER
 using DevkitServer.Players;
 #endif
+
 
 namespace DevkitServer.Util;
 
@@ -323,7 +327,7 @@ public static class LevelObjectUtil
         if (!GetObjectOrBuildableAsset(guid, out ObjectAsset? objectAsset, out ItemAsset? buildableAsset))
         {
             Logger.LogError($"Unable to get asset for level object instantiation request from {user.Format()}.", method: Source);
-            UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", guid.ToString("N") + " Unknown Asset"));
+            EditorMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", guid.ToString("N") + " Unknown Asset"));
             return;
         }
         Asset asset = objectAsset ?? (Asset)buildableAsset!;
@@ -355,7 +359,7 @@ public static class LevelObjectUtil
         {
             Logger.LogError($"Error instantiating {asset.Format()}.", method: Source);
             Logger.LogError(ex, method: Source);
-            UIMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", ex.Message));
+            EditorMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", ex.Message));
             return;
         }
         
@@ -454,6 +458,7 @@ public static class LevelObjectUtil
     {
         return GetCustomMaterialOverrideIntl == null ? AssetReference<MaterialPaletteAsset>.invalid : GetCustomMaterialOverrideIntl(levelObject);
     }
+#pragma warning disable CS0162 // Unreachable code
     internal static bool SetMaterialIndexOverrideLocal(LevelObject levelObject, int materialIndexOverride, bool reapply = true)
     {
         ThreadUtil.assertIsGameThread();
@@ -463,10 +468,12 @@ public static class LevelObjectUtil
         if (materialIndexOverride < -1)
             materialIndexOverride = -1;
         SetMaterialIndexOverrideIntl(levelObject, materialIndexOverride);
+        // ReSharper disable once HeuristicUnreachableCode
         if (reapply && !Dedicator.IsDedicatedServer)
             CallReapplyMaterialOverridesIntl!(levelObject);
         return true;
     }
+#pragma warning restore CS0162
     internal static bool SetCustomMaterialPaletteOverrideLocal(LevelObject levelObject, AssetReference<MaterialPaletteAsset> customMaterialOverride
 #if CLIENT
         , bool reapply = true
@@ -1178,7 +1185,7 @@ public static class LevelObjectUtil
     internal static void ClientInstantiateObjectsAndLock(IReadOnlyList<EditorCopy> copies)
     {
         LevelObjectPatches.IsSyncing = true;
-        UIMessage.SendEditorMessage("Syncing");
+        EditorMessage.SendEditorMessage("Syncing");
         DevkitServerModule.ComponentHost.StartCoroutine(PasteObjectsCoroutine(copies));
     }
     private static IEnumerator PasteObjectsCoroutine(IReadOnlyList<EditorCopy> copies)

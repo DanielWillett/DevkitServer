@@ -9,8 +9,13 @@ using DevkitServer.Patches;
 using HarmonyLib;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using DevkitServer.Compat;
+using SDG.Framework.Modules;
+using Module = SDG.Framework.Modules.Module;
+using Type = System.Type;
+
 #if CLIENT
-using DevkitServer.Players.UI;
+using DevkitServer.API.UI.Extensions;
 #endif
 
 namespace DevkitServer.Plugins;
@@ -130,11 +135,11 @@ public static class PluginLoader
     /// <summary>
     /// Force an assembly to load if it's not already.
     /// </summary>
-    public static void ForceLoadLibrary(PluginLibrary library)
+    /// <returns><see langword="False"/> if it was already loaded, otherwise <see langword="true"/>.</returns>
+    public static bool ForceLoadLibrary(PluginLibrary library)
     {
-
+        return library.ForceLoad();
     }
-
     private static void AssertPluginValid(IDevkitServerPlugin plugin)
     {
         if (string.IsNullOrWhiteSpace(plugin.DataDirectory) || !Uri.TryCreate(plugin.DataDirectory, UriKind.Absolute, out Uri uri) || !uri.IsFile)
@@ -287,7 +292,6 @@ public static class PluginLoader
         }
     }
 
-
     /// <summary>
     /// Registers and loads a plugin library.
     /// </summary>
@@ -331,7 +335,6 @@ public static class PluginLoader
                 Logger.LogInfo($"[LOAD {asmName.Name.ToUpperInvariant()}] Discovered plugin library: " + Path.GetFileName(dllPath).Format() + ".");
         }
     }
-
     internal static string GetSource(this IDevkitServerPlugin plugin)
     {
         Color color = plugin.GetColor();
@@ -650,13 +653,16 @@ public static class PluginLoader
     {
         // check if the assembly just has one plugin
         if (assembly == Accessor.DevkitServer) return null;
-        for (int i = 0; i < AssembliesIntl.Count; ++i)
+        lock (AssembliesIntl)
         {
-            if (AssembliesIntl[i].Assembly == assembly)
+            for (int i = 0; i < AssembliesIntl.Count; ++i)
             {
-                if (AssembliesIntl[i].Plugins.Count == 1)
-                    return AssembliesIntl[i].Plugins[0];
-                break;
+                if (AssembliesIntl[i].Assembly == assembly)
+                {
+                    if (AssembliesIntl[i].Plugins.Count == 1)
+                        return AssembliesIntl[i].Plugins[0];
+                    break;
+                }
             }
         }
         return null;
@@ -675,13 +681,16 @@ public static class PluginLoader
         // check if the assembly just has one plugin
         Assembly asm = relaventType.Assembly;
         if (asm == Accessor.DevkitServer) return null;
-        for (int i = 0; i < AssembliesIntl.Count; ++i)
+        lock (AssembliesIntl)
         {
-            if (AssembliesIntl[i].Assembly == asm)
+            for (int i = 0; i < AssembliesIntl.Count; ++i)
             {
-                if (AssembliesIntl[i].Plugins.Count == 1)
-                    return AssembliesIntl[i].Plugins[0];
-                break;
+                if (AssembliesIntl[i].Assembly == asm)
+                {
+                    if (AssembliesIntl[i].Plugins.Count == 1)
+                        return AssembliesIntl[i].Plugins[0];
+                    break;
+                }
             }
         }
 
@@ -766,6 +775,99 @@ public static class PluginLoader
 
         return null;
     }
+
+    /// <summary>
+    /// Finds an existing, or creates a new <see cref="ModulePlugin"/> for a foreign module (for compatability reasons).
+    /// </summary>
+    /// <exception cref="ArgumentNullException"/>
+    /// <exception cref="InvalidOperationException">Tried to create a plugin with <see cref="DevkitServerModule.Module"/>.</exception>
+    /// <exception cref="Exception">Failed to create the plugin for a variety of reasons.</exception>
+    public static ModulePlugin FindOrCreateModulePlugin(Module module)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (module == null)
+            throw new ArgumentNullException(nameof(module));
+
+        if (module == DevkitServerModule.Module)
+            throw new InvalidOperationException("DevkitServer is not a foreign module.");
+
+        lock (PluginsIntl)
+        {
+            ModulePlugin? plugin = PluginsIntl.OfType<ModulePlugin>().FirstOrDefault(x => x.Module == module);
+
+            if (plugin != null) return plugin;
+
+            ModulePlugin newPlugin = new ModulePlugin(module);
+            string src = "LOAD " + newPlugin.GetSource();
+
+            if (!module.isEnabled)
+            {
+                try
+                {
+                    module.isEnabled = true;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Failed to enable module: {module.config.Name.Format(false)}.", method: src);
+                    Logger.LogError(ex, method: src);
+                }
+            }
+
+            PluginAssembly? primaryModuleAssembly = null;
+            if (module.assemblies != null)
+            {
+                lock (AssembliesIntl)
+                {
+                    List<Type> types = Accessor.GetTypesSafe(module.assemblies);
+                    
+                    foreach (Type type in types.Where(x => typeof(IModuleNexus).IsAssignableFrom(x)))
+                    {
+                        if (AssembliesIntl.Any(x => x.Assembly == type.Assembly))
+                            continue;
+
+                        PluginAssembly assembly = new PluginAssembly(type.Assembly, type.Assembly.Location, false);
+                        assembly.AddPlugin(newPlugin);
+                        assembly.ReflectAndPatch();
+
+                        AssembliesIntl.Add(assembly);
+                        primaryModuleAssembly = assembly;
+                        Logger.LogDebug($"[{src}] Discovered nexus DLL in module {module.config.Name.Format(false)}: {type.Assembly.FullName.Format()}.");
+                    }
+                }
+            }
+
+            if (primaryModuleAssembly == null)
+            {
+                Logger.LogWarning($"Unable to find assemblies for module plugin: {module.config.Name.Format(false)}.", method: src);
+                newPlugin.Assembly = new PluginAssembly();
+                newPlugin.Assembly.AddPlugin(newPlugin);
+            }
+            else
+            {
+                newPlugin.Assembly = primaryModuleAssembly;
+            }
+
+            try
+            {
+                AssertPluginValid(newPlugin);
+                InitPlugin(newPlugin);
+                ((IDevkitServerPlugin)newPlugin).Load();
+                OnPluginLoadedEvent.TryInvoke(newPlugin);
+                Logger.LogInfo($"[{src}] Loaded successfully.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Module plugin failed to load: {module.config.Name.Format(false)}.", method: src);
+                Logger.LogError($"Failed to load module plugin assembly: {(primaryModuleAssembly?.Assembly.GetName().Name).Format()}.", method: src);
+                throw new Exception($"Failed to create a plugin for {module.config.Name}.", ex);
+            }
+
+            PluginsIntl.Add(newPlugin);
+
+            return newPlugin;
+        }
+    }
 }
 
 public class PluginLibrary
@@ -814,32 +916,53 @@ public class PluginLibrary
 }
 public class PluginAssembly
 {
-    private readonly List<IDevkitServerPlugin> _plugins = new List<IDevkitServerPlugin>();
-    private readonly List<NetInvokerInfo> _netCalls = new List<NetInvokerInfo>();
-    private readonly List<NetMethodInfo> _netMethods = new List<NetMethodInfo>();
-    private readonly List<HierarchyItemTypeIdentifierFactoryInfo> _hierarchyItemFactories = new List<HierarchyItemTypeIdentifierFactoryInfo>();
-    private readonly List<ReplicatedLevelDataSourceInfo> _replicatedLevelDataSources = new List<ReplicatedLevelDataSourceInfo>();
+    private readonly List<IDevkitServerPlugin> _plugins;
+    private readonly List<NetInvokerInfo> _netCalls;
+    private readonly List<NetMethodInfo> _netMethods;
+    private readonly List<HierarchyItemTypeIdentifierFactoryInfo> _hierarchyItemFactories;
+    private readonly List<ReplicatedLevelDataSourceInfo> _replicatedLevelDataSources;
     public IReadOnlyList<IDevkitServerPlugin> Plugins { get; }
     public Assembly Assembly { get; }
     public string? File { get; }
-    public Harmony Patcher { get; internal set; }
+    public Harmony? Patcher { get; internal set; }
     public bool HasReflected { get; private set; }
     public bool HasPatched { get; private set; }
-    public string HarmonyId => Patcher.Id;
+    public string? HarmonyId => Patcher?.Id;
     public IReadOnlyList<NetInvokerInfo> NetCalls { get; }
     public IReadOnlyList<NetMethodInfo> NetMethods { get; }
     public IReadOnlyList<HierarchyItemTypeIdentifierFactoryInfo> HierarchyItemFactories { get; }
     public IReadOnlyList<ReplicatedLevelDataSourceInfo> ReplicatedLevelDataSources { get; }
-    public PluginAssembly(Assembly assembly, string file)
+    public PluginAssembly(Assembly assembly, string file, bool autoPatch = true)
     {
+        _plugins = new List<IDevkitServerPlugin>();
+        _netCalls = new List<NetInvokerInfo>();
+        _netMethods = new List<NetMethodInfo>();
+        _hierarchyItemFactories = new List<HierarchyItemTypeIdentifierFactoryInfo>();
+        _replicatedLevelDataSources = new List<ReplicatedLevelDataSourceInfo>();
         Assembly = assembly;
         Plugins = _plugins.AsReadOnly();
         NetCalls = _netCalls.AsReadOnly();
         NetMethods = _netMethods.AsReadOnly();
         HierarchyItemFactories = _hierarchyItemFactories.AsReadOnly();
         ReplicatedLevelDataSources = _replicatedLevelDataSources.AsReadOnly();
-        Patcher = new Harmony(PatchesMain.HarmonyId + ".assembly." + assembly.GetName().Name.ToLowerInvariant());
+        Patcher = autoPatch ? new Harmony(PatchesMain.HarmonyId + ".assembly." + assembly.GetName().Name.ToLowerInvariant()) : null;
         File = string.IsNullOrEmpty(file) ? null : file;
+    }
+    internal PluginAssembly()
+    {
+        _netCalls = new List<NetInvokerInfo>(0);
+        _netMethods = new List<NetMethodInfo>(0);
+        _hierarchyItemFactories = new List<HierarchyItemTypeIdentifierFactoryInfo>(0);
+        _replicatedLevelDataSources = new List<ReplicatedLevelDataSourceInfo>(0);
+        _plugins = new List<IDevkitServerPlugin>(1);
+        Plugins = _plugins.AsReadOnly();
+        NetCalls = Array.Empty<NetInvokerInfo>();
+        NetMethods = Array.Empty<NetMethodInfo>();
+        HierarchyItemFactories = Array.Empty<HierarchyItemTypeIdentifierFactoryInfo>();
+        ReplicatedLevelDataSources = Array.Empty<ReplicatedLevelDataSourceInfo>();
+        File = null!;
+        Assembly = null!;
+        Patcher = null!;
     }
     internal void AddPlugin(IDevkitServerPlugin plugin)
     {
@@ -909,7 +1032,7 @@ public class PluginAssembly
 
             CreateDirectoryAttribute.CreateInAssembly(Assembly);
         }
-        if (!HasPatched)
+        if (!HasPatched && Patcher != null)
         {
             HasPatched = true;
             try
@@ -939,7 +1062,7 @@ public class PluginAssembly
     {
         ThreadUtil.assertIsGameThread();
 
-        if (!HasPatched) return;
+        if (!HasPatched || Patcher == null) return;
         HasPatched = false;
         string src = "INIT " + Assembly.GetName().Name.ToUpperInvariant();
 

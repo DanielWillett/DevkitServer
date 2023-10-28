@@ -27,10 +27,11 @@ using UnityEngine.SceneManagement;
 using Module = SDG.Framework.Modules.Module;
 using Version = System.Version;
 #if CLIENT
+using DevkitServer.API.UI;
+using DevkitServer.API.UI.Extensions;
 using DevkitServer.API.Logging;
 using DevkitServer.Core.Tools;
 using DevkitServer.Players;
-using DevkitServer.Players.UI;
 using SDG.Framework.Utilities;
 #if DEBUG
 using DevkitServer.Util.Debugging;
@@ -55,7 +56,7 @@ public sealed class DevkitServerModule : IModuleNexus
     private static string? _asmPath;
     private static IReadOnlyList<string>? _searchLocations;
     private static string? _commitIdShort;
-    private static AssemblyResolver _asmResolver = null!;
+    internal static AssemblyResolver AssemblyResolver = null!;
     public static string CommitId => _commitIdShort ??= DevkitServer.CommitId.Commit.Length > 7 ? DevkitServer.CommitId.Commit.Substring(0, 7) : DevkitServer.CommitId.Commit;
     public static string LongCommitId => DevkitServer.CommitId.Commit;
     public Assembly Assembly { get; } = Assembly.GetExecutingAssembly();
@@ -68,6 +69,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static bool HasLoadedBundle { get; private set; }
     public static MasterBundle? Bundle { get; private set; }
     public static MasterBundleConfig? BundleConfig { get; private set; }
+    public static Module Module { get; private set; } = null!;
     public static bool IsMainThread => Thread.CurrentThread.IsGameThread();
     public static CancellationToken UnloadToken => _tknSrc == null ? CancellationToken.None : _tknSrc.Token;
     public static Local MainLocalization { get; private set; } = null!;
@@ -177,12 +179,37 @@ public sealed class DevkitServerModule : IModuleNexus
     void IModuleNexus.initialize()
     {
         Stopwatch watch = Stopwatch.StartNew();
+        Module? module = null;
         InitializedLogging = false;
         if (LoadFaulted)
             goto fault;
         try
         {
-            _asmResolver = new AssemblyResolver();
+            foreach (Module mdl in ModuleHook.modules)
+            {
+                if (mdl.assemblies != null && mdl.assemblies.Any(x => x == Accessor.DevkitServer))
+                {
+                    module = mdl;
+                    break;
+                }
+            }
+
+            if (module == null)
+            {
+                LoadFaulted = true;
+                Logger.LogError("Unable to find DevkitServer in ModuleHook.modules.");
+                goto fault;
+            }
+
+            Module = module;
+
+            AssemblyResolver = new AssemblyResolver();
+            AssemblyResolver.ShutdownUnsupportedModules();
+
+            if (AssemblyResolver.TriedToLoadUIExtensionModule)
+            {
+                Compat.UIExtensionManagerCompat.Init();
+            }
 #if SERVER
             if (!Dedicator.isStandaloneDedicatedServer)
             {
@@ -197,10 +224,10 @@ public sealed class DevkitServerModule : IModuleNexus
             }
 #endif
 
-
             // Initialize UniTask
             if (!PlayerLoopHelper.HasBeenInitialized)
                 PlayerLoopHelper.Init();
+
             GameObjectHost = new GameObject(ModuleName);
             ComponentHost = GameObjectHost.AddComponent<DevkitServerModuleComponent>();
             GameObjectHost.hideFlags = HideFlags.DontSave;
@@ -381,12 +408,17 @@ public sealed class DevkitServerModule : IModuleNexus
         fault:
         watch.Stop();
         if (UnturnedLoaded)
-            Logger.LogInfo($"{ModuleName} initializer took {watch.ElapsedMilliseconds} ms.");
+        {
+            if (InitializedLogging)
+                Logger.LogInfo($"{ModuleName.Colorize(ModuleColor)} initializer took {watch.GetElapsedMilliseconds().Format("F2")} ms.");
+            else
+                CommandWindow.Log($"{ModuleName} initializer took {watch.GetElapsedMilliseconds():F2} ms.");
+        }
+
         if (LoadFaulted)
         {
             try
             {
-                Module module = ModuleHook.getModuleByName(ModuleName);
                 if (module != null)
                     module.isEnabled = false;
             }
@@ -877,6 +909,8 @@ public sealed class DevkitServerModule : IModuleNexus
 
         DevkitServerConfig.ClearTempFolder();
 
+        UIExtensionManager.Shutdown();
+
         PluginLoader.Unload();
         _tknSrc?.Cancel();
         _tknSrc = null;
@@ -927,7 +961,7 @@ public sealed class DevkitServerModule : IModuleNexus
         LoadFaulted = false;
         Logger.CloseLogger();
 
-        _asmResolver.Dispose();
+        AssemblyResolver.Dispose();
     }
 #if CLIENT
     internal static void RegisterDisconnectFromEditingServer()

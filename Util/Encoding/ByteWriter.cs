@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using DevkitServer.Models;
+using DevkitServer.API;
 
 namespace DevkitServer.Util.Encoding;
 

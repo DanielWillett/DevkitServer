@@ -7,6 +7,7 @@ using SDG.Framework.Landscapes;
 using SDG.Framework.Water;
 using System.Reflection;
 using System.Text.Json;
+using DevkitServer.API;
 
 #if CLIENT
 using HarmonyLib;

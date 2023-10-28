@@ -1,4 +1,6 @@
-﻿using DevkitServer.Util.Encoding;
+﻿using DevkitServer.API;
+using DevkitServer.API.Abstractions;
+using DevkitServer.Util.Encoding;
 using SDG.Framework.Utilities;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -141,32 +143,32 @@ internal static class EditorActionsCodeGeneration
         DynamicMethod writeMethod = new DynamicMethod("SettingsWriteHandler", attributes, CallingConventions.Standard,
             typeof(void), new Type[] { typeof(IActionListener), typeof(ActionSettingsCollection).MakeByRefType(), typeof(IAction) },
             typeof(EditorActionsCodeGeneration), true);
-        DebuggableEmitter writeGenerator = new DebuggableEmitter(writeMethod) { DebugLog = false };
+        IOpCodeEmitter writeGenerator = new DebuggableEmitter(writeMethod) { DebugLog = false };
 
         DynamicMethod readMethod = new DynamicMethod("SettingsReadHandler", attributes, CallingConventions.Standard,
             typeof(void), new Type[] { typeof(IActionListener), typeof(IAction) },
             typeof(EditorActionsCodeGeneration), true);
-        DebuggableEmitter readGenerator = new DebuggableEmitter(readMethod) { DebugLog = false };
+        IOpCodeEmitter readGenerator = new DebuggableEmitter(readMethod) { DebugLog = false };
 
         DynamicMethod createMethod = new DynamicMethod("CreateAction", attributes, CallingConventions.Standard,
             typeof(IAction), new Type[] { typeof(ActionType) },
             typeof(EditorActionsCodeGeneration), true);
-        DebuggableEmitter createGenerator = new DebuggableEmitter(createMethod) { DebugLog = false };
+        IOpCodeEmitter createGenerator = new DebuggableEmitter(createMethod) { DebugLog = false };
 
         DynamicMethod byteWriteMethod = new DynamicMethod("ByteWriteHandler", attributes, CallingConventions.Standard,
             typeof(void), new Type[] { typeof(ActionSettingsCollection), typeof(ByteWriter) },
             typeof(EditorActionsCodeGeneration), true);
-        DebuggableEmitter byteWriteGenerator = new DebuggableEmitter(byteWriteMethod) { DebugLog = false };
+        IOpCodeEmitter byteWriteGenerator = new DebuggableEmitter(byteWriteMethod) { DebugLog = false };
 
         DynamicMethod byteReadMethod = new DynamicMethod("ByteReadHandler", attributes, CallingConventions.Standard,
             typeof(void), new Type[] { typeof(ActionSettingsCollection), typeof(ByteReader) },
             typeof(EditorActionsCodeGeneration), true);
-        DebuggableEmitter byteReadGenerator = new DebuggableEmitter(byteReadMethod) { DebugLog = false };
+        IOpCodeEmitter byteReadGenerator = new DebuggableEmitter(byteReadMethod) { DebugLog = false };
 
         DynamicMethod toStringMethod = new DynamicMethod("CollectionToStringHandler", attributes, CallingConventions.Standard,
             typeof(void), new Type[] { typeof(ActionSettingsCollection), typeof(StringBuilder) },
             typeof(EditorActionsCodeGeneration), true);
-        DebuggableEmitter toStringGenerator = new DebuggableEmitter(toStringMethod) { DebugLog = false };
+        IOpCodeEmitter toStringGenerator = new DebuggableEmitter(toStringMethod) { DebugLog = false };
 
         // generate dynamic methods to apply settings from interfaces.
 
@@ -581,11 +583,16 @@ internal static class EditorActionsCodeGeneration
         Init = true;
 
 #if DEBUG
+        /*
+         * Run little tests for each method to see if they throw InvalidProgramExceptions or any other IL related exceptions.
+         *
+         * NullReferenceExceptions are desired in this case.
+         */
         bool anyFail = false;
-        ActionSettingsCollection c2 = null;
+        ActionSettingsCollection c2 = null!;
         try
         {
-            OnWritingAction(null, ref c2, null);
+            OnWritingAction(null!, ref c2!, null!);
         }
         catch (NullReferenceException) { }
         catch (Exception ex)
@@ -596,7 +603,7 @@ internal static class EditorActionsCodeGeneration
 
         try
         {
-            OnReadingAction(null, null);
+            OnReadingAction(null!, null!);
         }
         catch (NullReferenceException) { }
         catch (Exception ex)
@@ -618,7 +625,7 @@ internal static class EditorActionsCodeGeneration
 
         try
         {
-            WriteSettingsCollection(null, null);
+            WriteSettingsCollection(null!, null!);
         }
         catch (NullReferenceException) { }
         catch (Exception ex)
@@ -629,7 +636,7 @@ internal static class EditorActionsCodeGeneration
 
         try
         {
-            ReadSettingsCollection(null, null);
+            ReadSettingsCollection(null!, null!);
         }
         catch (NullReferenceException) { }
         catch (Exception ex)
@@ -641,7 +648,7 @@ internal static class EditorActionsCodeGeneration
 
         try
         {
-            AppendSettingsCollection(null, null);
+            AppendSettingsCollection(null!, null!);
         }
         catch (NullReferenceException) { }
         catch (Exception ex)

@@ -1,11 +1,12 @@
 ﻿#if CLIENT
+using DevkitServer.API;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
+using DevkitServer.API.UI;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Players;
-using DevkitServer.Players.UI;
 using HarmonyLib;
 using SDG.Framework.Devkit;
 using SDG.Framework.Devkit.Transactions;
@@ -155,7 +156,7 @@ internal static class SelectionToolPatches
             return true;
         if (DevkitSelectionManager.selection.Count <= 0)
         {
-            UIMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "UnknownError");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "UnknownError");
             _skippedMoveHandle = true;
             return false;
         }
@@ -163,7 +164,7 @@ internal static class SelectionToolPatches
         DevkitSelection? sel = DevkitSelectionManager.selection.FirstOrDefault();
         if (sel == null || sel.gameObject == null)
         {
-            UIMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "UnknownError");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "UnknownError");
             _skippedMoveHandle = true;
             return false;
         }
@@ -175,7 +176,7 @@ internal static class SelectionToolPatches
             {
                 if (!HierarchyUtil.CheckMovePermission(HierarchyUtil.HierarchyItemBuffer[i]))
                 {
-                    UIMessage.SendNoPermissionMessage(null);
+                    EditorMessage.SendNoPermissionMessage(null);
                     _skippedMoveHandle = true;
                     return false;
                 }
@@ -286,7 +287,7 @@ internal static class SelectionToolPatches
                 {
                     if (v.activeVolumeManager is LandscapeHoleVolumeManager)
                     {
-                        UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("FeatureDisabled"));
+                        EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("FeatureDisabled"));
                         return;
                     }
 
@@ -302,7 +303,7 @@ internal static class SelectionToolPatches
             if (!HierarchyUtil.CheckPlacePermission(id))
             {
                 Permission? place = HierarchyUtil.GetPlacePermission(id);
-                UIMessage.SendEditorMessage(place == null
+                EditorMessage.SendEditorMessage(place == null
                     ? DevkitServerModule.MessageLocalization.Translate("NoPermissions")
                     : DevkitServerModule.MessageLocalization.Translate("NoPermissionsWithPermission", place.ToString()));
                 return;
@@ -314,7 +315,7 @@ internal static class SelectionToolPatches
                 ClientEvents.EventOnRequestInstantiateHierarchyObject.TryInvoke(in instantiation);
         }
         else
-            UIMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+            EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("UnknownError"));
 
         Logger.LogDebug("[CLIENT EVENTS] Instantiation requested at: " + position.Format() + " of " + (id == null ? ((object?)null).Format() : id.Format()) + ".");
     }

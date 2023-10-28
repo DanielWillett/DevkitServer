@@ -2,8 +2,7 @@
 using DevkitServer.API.Permissions;
 using DevkitServer.Plugins;
 #if CLIENT
-using DevkitServer.Players.UI;
-using DevkitServer.API.UI;
+using DevkitServer.API.UI.Extensions;
 #endif
 
 namespace DevkitServer.API;
@@ -126,10 +125,6 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
     public void RegisterUIExtension(Type implementationType, Type parentUIType, int priority)
     {
         UIExtensionManager.RegisterExtension(new UIExtensionInfo(implementationType, parentUIType, priority, this));
-    }
-    public void DeregisterUIExtension(Type implementationType)
-    {
-        UIExtensionManager.DeregisterExtension(implementationType);
     }
 #endif
 #nullable disable

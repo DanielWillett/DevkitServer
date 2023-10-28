@@ -1,4 +1,5 @@
-﻿using DevkitServer.Configuration;
+﻿using DevkitServer.API;
+using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
@@ -57,6 +58,8 @@ public sealed class LevelData
                 newPath = oldPath;
                 saveToTemp = false;
             }
+
+            dirtyState = DirtyManagerState.Create();
         }
 
         Level.save();

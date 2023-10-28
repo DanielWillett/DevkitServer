@@ -1,29 +1,30 @@
-﻿using DevkitServer.Multiplayer.Networking;
+﻿using DevkitServer.API.Permissions;
+using DevkitServer.API.UI;
+using DevkitServer.Multiplayer.Networking;
 using HarmonyLib;
 using Pathfinding;
 using System.Reflection;
 using System.Reflection.Emit;
-using DevkitServer.API.Permissions;
 using Progress = Pathfinding.Progress;
+using DevkitServer.API;
+
 #if CLIENT
-using System.Security.Principal;
 using DevkitServer.API.Abstractions;
-using DevkitServer.Core.Extensions.UI;
+using DevkitServer.API.UI.Extensions;
 using DevkitServer.Core.Permissions;
+using DevkitServer.Core.UI.Extensions;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Sync;
-using DevkitServer.Players.UI;
 #endif
 #if SERVER
-using Pathfinding.Voxels;
-using System.Diagnostics;
-using System.Globalization;
 using Cysharp.Threading.Tasks;
 using DevkitServer.API.Abstractions;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Players;
-using DevkitServer.Players.UI;
+using Pathfinding.Voxels;
+using System.Diagnostics;
+using System.Globalization;
 #endif
 
 namespace DevkitServer.Patches;
@@ -195,7 +196,7 @@ internal static class NavigationPatches
         }
         if (!VanillaPermissions.BakeNavigation.Has(caller.SteamId.m_SteamID))
         {
-            UIMessage.SendNoPermissionMessage(caller, VanillaPermissions.BakeNavigation);
+            EditorMessage.SendNoPermissionMessage(caller, VanillaPermissions.BakeNavigation);
             ctx.Acknowledge(StandardErrorCode.NoPermissions);
             return;
         }
@@ -233,12 +234,12 @@ internal static class NavigationPatches
                 string? navName = HierarchyUtil.GetNearestNode<LocationDevkitNode>(oldFlag.point)?.locationName;
                 if (navName != null)
                 {
-                    UIMessage.SendEditorMessage(caller, TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationName", new object[] { navName, (byte)(old - 1) });
+                    EditorMessage.SendEditorMessage(caller, TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationName", new object[] { navName, (byte)(old - 1) });
                     return;
                 }
             }
 
-            UIMessage.SendEditorMessage(caller, TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationIndex", new object[] { (byte)(old - 1) });
+            EditorMessage.SendEditorMessage(caller, TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationIndex", new object[] { (byte)(old - 1) });
             return;
         }
 
@@ -376,15 +377,15 @@ internal static class NavigationPatches
             string? navName = HierarchyUtil.GetNearestNode<LocationDevkitNode>(oldFlag.point)?.locationName;
             if (navName != null)
             {
-                UIMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationName", new object[] { navName, (byte)(old - 1) });
+                EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationName", new object[] { navName, (byte)(old - 1) });
                 return;
             }
         }
 
         if (old <= 0)
-            UIMessage.SendNoPermissionMessage(VanillaPermissions.BakeNavigation);
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.BakeNavigation);
         else
-            UIMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationIndex", new object[] { (byte)(old - 1) });
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationIndex", new object[] { (byte)(old - 1) });
 #endif
     }
 }

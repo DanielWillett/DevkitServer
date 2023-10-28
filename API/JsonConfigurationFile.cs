@@ -4,6 +4,11 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace DevkitServer.API;
+
+/// <summary>
+/// Managed JSON config file of type <typeparamref name="TConfig"/>.
+/// </summary>
+/// <remarks>Has built in backup and default features.</remarks>
 public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvider<TConfig> where TConfig : class, new()
 {
     protected CachedMulticastEvent<Action> EventOnRead;
@@ -45,6 +50,10 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
     public JsonWriterOptions WriterOptions { get; set; } = DevkitServerConfig.WriterOptions;
     [JsonIgnore]
     public JsonSerializerOptions SerializerOptions { get; set; } = DevkitServerConfig.SerializerSettings;
+
+    /// <summary>
+    /// File where the config is expected to be stored.
+    /// </summary>
     [JsonIgnore]
     public string File
     {
@@ -153,7 +162,10 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
             if (System.IO.File.Exists(path))
             {
                 using FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                int len = (int)Math.Min(fs.Length, int.MaxValue);
+
+                DevkitServerUtility.AdvancePastUTF8Bom(fs);
+
+                int len = (int)Math.Min(fs.Length - fs.Position, int.MaxValue);
                 byte[] bytes = new byte[len];
                 int l = fs.Read(bytes, 0, len);
                 if (l != len)

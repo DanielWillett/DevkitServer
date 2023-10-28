@@ -6,12 +6,14 @@ using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Landscapes;
 using System.Reflection;
 using System.Reflection.Emit;
+using DevkitServer.API.UI;
+using DevkitServer.API;
+
 #if SERVER
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;
 #endif
 #if CLIENT
-using DevkitServer.Players.UI;
 #endif
 
 namespace DevkitServer.Multiplayer.Actions;
