@@ -80,7 +80,7 @@ public abstract class ContainerUIExtension : UIExtension, IDisposable
     protected abstract void OnShown();
 
     /// <summary>
-    /// Remove all your components in this method by calling <see cref="SleekWrapper.RemoveChild"/> on <see cref="Container"/>.
+    /// Remove all your components in this method by calling <see cref="UIExtensions.TryRemoveChild"/> on <see cref="Container"/>.
     /// </summary>
     protected abstract void OnHidden();
 
@@ -144,7 +144,14 @@ public abstract class ContainerUIExtension : UIExtension, IDisposable
     protected sealed override void Closed()
     {
         OnHidden();
-        Container.IsVisible = false;
+        try
+        {
+            Container.IsVisible = false;
+        }
+        catch (NullReferenceException)
+        {
+            // ignored
+        }
     }
 
     /// <summary>
@@ -153,11 +160,8 @@ public abstract class ContainerUIExtension : UIExtension, IDisposable
     public void Dispose()
     {
         OnDestroyed();
-        if (Parent != null && Parent.FindIndexOfChild(Container) >= 0)
-        {
-            Parent.RemoveChild(Container);
-            _containerHasBeenParented = true;
-        }
+        Parent.TryRemoveChild(Container);
+        _containerHasBeenParented = true;
         Container = null!;
     }
 }

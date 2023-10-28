@@ -92,7 +92,7 @@ public static class UIExtensionManager
                         }
                         catch (Exception ex)
                         {
-                            LogError($"Error invoking OnClosed from {instanceInfo.Instance.GetType().Name} while destroying.", extension.Plugin, extension.Assembly);
+                            LogError($"Error invoking OnClosed from {instanceInfo.Instance.GetType().Format()} while destroying.", extension.Plugin, extension.Assembly);
                             CommandWindow.LogError(ex);
                         }
                     }
@@ -102,11 +102,11 @@ public static class UIExtensionManager
                     try
                     {
                         disposable.Dispose();
-                        LogDebug($"* Disposed: {extension.ImplementationType.Name}.", extension.Plugin, extension.Assembly);
+                        LogDebug($"* Disposed: {extension.ImplementationType.Format()}.", extension.Plugin, extension.Assembly);
                     }
                     catch (Exception ex)
                     {
-                        LogError($"Error disposing UI extension: {extension.ImplementationType.Name}.", extension.Plugin, extension.Assembly);
+                        LogError($"Error disposing UI extension: {extension.ImplementationType.Format()}.", extension.Plugin, extension.Assembly);
                         CommandWindow.LogError(ex);
                     }
                 }
@@ -157,7 +157,7 @@ public static class UIExtensionManager
             }
             catch (Exception ex)
             {
-                LogError($"Failed to unpatch extension {PendingUnpatchesIntl[i].GetType().Name}.");
+                LogError($"Failed to unpatch extension {PendingUnpatchesIntl[i].GetType().Format()}.");
                 CommandWindow.LogError(ex);
             }
         }
@@ -196,7 +196,7 @@ public static class UIExtensionManager
                     }
                     catch (Exception ex)
                     {
-                        LogError($"Failed to unpatch CustomOnOpen {typeInfo.CustomOnOpen.GetType().Name} for {typeInfo.Type.Name}.");
+                        LogError($"Failed to unpatch CustomOnOpen {typeInfo.CustomOnOpen.GetType().Format()} for {typeInfo.Type.Format()}.");
                         CommandWindow.LogError(ex);
                     }
                 }
@@ -217,7 +217,7 @@ public static class UIExtensionManager
                     }
                     catch (Exception ex)
                     {
-                        LogError($"Failed to unpatch CustomOnClose {typeInfo.CustomOnClose.GetType().Name} for {typeInfo.Type.Name}.");
+                        LogError($"Failed to unpatch CustomOnClose {typeInfo.CustomOnClose.GetType().Format()} for {typeInfo.Type.Format()}.");
                         CommandWindow.LogError(ex);
                     }
                 }
@@ -238,7 +238,7 @@ public static class UIExtensionManager
                     }
                     catch (Exception ex)
                     {
-                        LogError($"Failed to unpatch CustomOnDestroy {typeInfo.CustomOnDestroy.GetType().Name} for {typeInfo.Type.Name}.");
+                        LogError($"Failed to unpatch CustomOnDestroy {typeInfo.CustomOnDestroy.GetType().Format()} for {typeInfo.Type.Format()}.");
                         CommandWindow.LogError(ex);
                     }
                 }
@@ -259,7 +259,7 @@ public static class UIExtensionManager
                     }
                     catch (Exception ex)
                     {
-                        LogError($"Failed to unpatch CustomOnInitialize {typeInfo.CustomOnInitialize.GetType().Name} for {typeInfo.Type.Name}.");
+                        LogError($"Failed to unpatch CustomOnInitialize {typeInfo.CustomOnInitialize.GetType().Format()} for {typeInfo.Type.Format()}.");
                         CommandWindow.LogError(ex);
                     }
                 }
@@ -358,11 +358,11 @@ public static class UIExtensionManager
         if (instance != null)
             type = instance.GetType();
         
-        LogDebug($"Opened: {type!.Name}.");
+        LogDebug($"Opened: {type.Format()}.");
 
-        if (!ParentTypeInfoIntl.TryGetValue(type, out UIExtensionParentTypeInfo parentTypeInfo))
+        if (!ParentTypeInfoIntl.TryGetValue(type!, out UIExtensionParentTypeInfo parentTypeInfo))
         {
-            LogWarning($"Unable to find parent type info while opening {type.Name}.");
+            LogWarning($"Unable to find parent type info while opening {type.Format()}.");
             return;
         }
 
@@ -374,7 +374,7 @@ public static class UIExtensionManager
             {
                 if (instanceInfo.IsOpen)
                 {
-                    LogDebug($"Already open: {type.Name}.");
+                    LogDebug($"Already open: {type.Format()}.");
                     return;
                 }
 
@@ -386,13 +386,13 @@ public static class UIExtensionManager
 
         if (!found)
         {
-            LogWarning($"Unable to find vanilla instance info while opening {type.Name}.");
+            LogWarning($"Unable to find vanilla instance info while opening {type.Format()}.");
             return;
         }
 
         if (parentTypeInfo.InstancesIntl.Count == 0)
         {
-            LogDebug($"No instances attached to UI type {type.Name} to open.");
+            LogDebug($"No instances attached to UI type {type.Format()} to open.");
             return;
         }
 
@@ -404,7 +404,7 @@ public static class UIExtensionManager
             if (!ReferenceEquals(instanceInfo.VanillaInstance.Instance, instance) && parentTypeInfo.ParentTypeInfo is { IsInstanceUI: false, IsStaticUI: false })
                 continue;
 
-            LogDebug($"* Opening instance of: {instanceInfo.Extension.ImplementationType.Name}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
+            LogDebug($"* Opening instance of: {instanceInfo.Extension.ImplementationType.Format()}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
 
             if (instanceInfo.Instance is UIExtension ext)
             {
@@ -414,7 +414,7 @@ public static class UIExtensionManager
                 }
                 catch (Exception ex)
                 {
-                    LogError($"Error invoking OnOpened from {instanceInfo.Instance.GetType().Name}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
+                    LogError($"Error invoking OnOpened from {instanceInfo.Instance.GetType().Format()}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
                     CommandWindow.LogError(ex);
                 }
             }
@@ -423,14 +423,14 @@ public static class UIExtensionManager
                 Compat.UIExtensionManagerCompat.InvokeOnOpened(instanceInfo.Instance, instanceInfo.Extension);
             }
 
-            LogDebug($"* Opened: {instanceInfo.Extension.ImplementationType.Name}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
+            LogDebug($"* Opened: {instanceInfo.Extension.ImplementationType.Format()}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
 
             anyClosed = true;
         }
 
         if (!anyClosed)
         {
-            LogDebug($"No instances attached to UI type {type.Name} with the provided instance to open.");
+            LogDebug($"No instances attached to UI type {type.Format()} with the provided instance to open.");
         }
     }
     private static void OnClosed(Type? type, object? instance)
@@ -438,11 +438,11 @@ public static class UIExtensionManager
         if (instance != null)
             type = instance.GetType();
         
-        LogDebug($"Closed: {type!.Name}.");
+        LogDebug($"Closed: {type.Format()}.");
 
-        if (!ParentTypeInfoIntl.TryGetValue(type, out UIExtensionParentTypeInfo parentTypeInfo))
+        if (!ParentTypeInfoIntl.TryGetValue(type!, out UIExtensionParentTypeInfo parentTypeInfo))
         {
-            LogWarning($"Unable to find parent type info while closing {type.Name}.");
+            LogWarning($"Unable to find parent type info while closing {type.Format()}.");
             return;
         }
 
@@ -454,7 +454,7 @@ public static class UIExtensionManager
             {
                 if (!instanceInfo.IsOpen)
                 {
-                    LogDebug($"Already closed: {type.Name}.");
+                    LogDebug($"Already closed: {type.Format()}.");
                     return;
                 }
 
@@ -466,13 +466,13 @@ public static class UIExtensionManager
 
         if (!found)
         {
-            LogWarning($"Unable to find vanilla instance info while closing {type.Name}.");
+            LogWarning($"Unable to find vanilla instance info while closing {type.Format()}.");
             return;
         }
 
         if (parentTypeInfo.InstancesIntl.Count == 0)
         {
-            LogDebug($"No instances attached to UI type {type.Name} to close.");
+            LogDebug($"No instances attached to UI type {type.Format()} to close.");
             return;
         }
 
@@ -484,7 +484,7 @@ public static class UIExtensionManager
             if (!ReferenceEquals(instanceInfo.VanillaInstance.Instance, instance) && parentTypeInfo.ParentTypeInfo is { IsInstanceUI: false, IsStaticUI: false })
                 continue;
             
-            LogDebug($"* Closing instance of: {instanceInfo.Extension.ImplementationType.Name}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
+            LogDebug($"* Closing instance of: {instanceInfo.Extension.ImplementationType.Format()}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
 
             if (instanceInfo.Instance is UIExtension ext)
             {
@@ -494,7 +494,7 @@ public static class UIExtensionManager
                 }
                 catch (Exception ex)
                 {
-                    LogError($"Error invoking OnClosed from {instanceInfo.Instance.GetType().Name}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
+                    LogError($"Error invoking OnClosed from {instanceInfo.Instance.GetType().Format()}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
                     CommandWindow.LogError(ex);
                 }
             }
@@ -503,14 +503,14 @@ public static class UIExtensionManager
                 Compat.UIExtensionManagerCompat.InvokeOnClosed(instanceInfo.Instance, instanceInfo.Extension);
             }
 
-            LogDebug($"* Closed: {instanceInfo.Extension.ImplementationType.Name}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
+            LogDebug($"* Closed: {instanceInfo.Extension.ImplementationType.Format()}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
 
             anyClosed = true;
         }
 
         if (!anyClosed)
         {
-            LogDebug($"No instances attached to UI type {type.Name} with the provided instance to close.");
+            LogDebug($"No instances attached to UI type {type.Format()} with the provided instance to close.");
         }
     }
     private static void OnInitialized(Type? type, object? instance)
@@ -539,7 +539,7 @@ public static class UIExtensionManager
                         LogError($"Error invoking OnOpened from {ext.GetType().Format()}.", info.Plugin, info.Assembly);
                         LogError(ex, info.Plugin, info.Assembly);
                     }
-                    LogDebug($"  * Opened: {info.ImplementationType.Name}.", info.Plugin, info.Assembly);
+                    LogDebug($"  * Opened: {info.ImplementationType.Format()}.", info.Plugin, info.Assembly);
                 }
                 else if (DevkitServerModule.AssemblyResolver.TriedToLoadUIExtensionModule)
                 {
@@ -562,9 +562,9 @@ public static class UIExtensionManager
                 if (!logged)
                 {
                     logged = true;
-                    LogDebug($"Destroyed: {type!.Name}.");
+                    LogDebug($"Destroyed: {type!.Format()}.");
                 }
-                LogDebug($"* Destroying child: {otherTypeInfo.Type.Name}.");
+                LogDebug($"* Destroying child: {otherTypeInfo.Type.Format()}.");
                 OnDestroy(otherTypeInfo.Type, null);
             }
         }
@@ -577,7 +577,7 @@ public static class UIExtensionManager
 
         if (!logged)
         {
-            LogDebug($"Destroyed: {type!.Name}.");
+            LogDebug($"Destroyed: {type!.Format()}.");
         }
 
         bool close = parentTypeInfo.ParentTypeInfo.CloseOnDestroy;
@@ -592,7 +592,7 @@ public static class UIExtensionManager
                 {
                     if (!instanceInfo.IsOpen)
                     {
-                        LogDebug($"Already closed: {type!.Name}.");
+                        LogDebug($"Already closed: {type!.Format()}.");
                         close = false;
                     }
                     else instanceInfo.IsOpen = false;
@@ -605,14 +605,14 @@ public static class UIExtensionManager
 
             if (!found)
             {
-                LogWarning($"Unable to find vanilla instance info while closing (destroying) {type!.Name}.");
+                LogWarning($"Unable to find vanilla instance info while closing (destroying) {type!.Format()}.");
                 close = false;
             }
         }
 
         if (parentTypeInfo.InstancesIntl.Count == 0)
         {
-            LogDebug($"No instances attached to UI type {type!.Name} to destroy.");
+            LogDebug($"No instances attached to UI type {type!.Format()} to destroy.");
             return;
         }
 
@@ -624,7 +624,7 @@ public static class UIExtensionManager
             if (!ReferenceEquals(instanceInfo.VanillaInstance.Instance, instance) && parentTypeInfo.ParentTypeInfo is { IsInstanceUI: false, IsStaticUI: false })
                 continue;
 
-            LogDebug($"* Destroying instance of: {instanceInfo.Extension.ImplementationType.Name}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
+            LogDebug($"* Destroying instance of: {instanceInfo.Extension.ImplementationType.Format()}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
 
             if (close)
             {
@@ -636,7 +636,7 @@ public static class UIExtensionManager
                     }
                     catch (Exception ex)
                     {
-                        LogError($"Error invoking OnClosed from {instanceInfo.Instance.GetType().Name} while destroying.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
+                        LogError($"Error invoking OnClosed from {instanceInfo.Instance.GetType().Format()} while destroying.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
                         CommandWindow.LogError(ex);
                     }
                 }
@@ -644,7 +644,7 @@ public static class UIExtensionManager
                 {
                     Compat.UIExtensionManagerCompat.InvokeOnClosed(instanceInfo.Instance, instanceInfo.Extension);
                 }
-                LogDebug($"  * Closed: {instanceInfo.Extension.ImplementationType.Name}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
+                LogDebug($"  * Closed: {instanceInfo.Extension.ImplementationType.Format()}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
             }
             if (instanceInfo.Instance is IDisposable disposable)
             {
@@ -654,11 +654,11 @@ public static class UIExtensionManager
                 }
                 catch (Exception ex)
                 {
-                    LogError($"Error disposing UI extension: {instanceInfo.Extension.ImplementationType.Name}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
+                    LogError($"Error disposing UI extension: {instanceInfo.Extension.ImplementationType.Format()}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
                     CommandWindow.LogError(ex);
                 }
 
-                LogDebug($"  * Disposed: {instanceInfo.Extension.ImplementationType.Name}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
+                LogDebug($"  * Disposed: {instanceInfo.Extension.ImplementationType.Format()}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
             }
 
             if (instanceInfo.Extension.InstantiationsIntl.Count == 1 && instanceInfo.Extension.InstantiationsIntl[0] == instanceInfo.Instance)
@@ -680,7 +680,7 @@ public static class UIExtensionManager
 
         if (!anyDestroyed)
         {
-            LogDebug($"No instances attached to UI type {type!.Name} with the provided instance to destroy.");
+            LogDebug($"No instances attached to UI type {type!.Format()} with the provided instance to destroy.");
         }
     }
     internal static bool RegisterExtension(UIExtensionInfo info)
@@ -788,11 +788,14 @@ public static class UIExtensionManager
                      .Concat<MemberInfo>(info.ImplementationType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.FlattenHierarchy))
                      .Concat(info.ImplementationType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.FlattenHierarchy)
                          .Where(x => !x.IsSpecialName))
-                     .OrderByDescending(Accessor.GetPriority)
+                     .OrderByDescending<MemberInfo, int>(DevkitServerModule.AssemblyResolver.TriedToLoadUIExtensionModule
+                         ? Compat.UIExtensionManagerCompat.GetPriority
+                         : Accessor.GetPriority)
                      .ThenBy(x => x.Name))
         {
-            if (member.IsIgnored())
+            if (member.IsIgnored() || DevkitServerModule.AssemblyResolver.TriedToLoadUIExtensionModule && Compat.UIExtensionManagerCompat.IsIgnored(member))
                 continue;
+
             try
             {
                 TryInitializeMember(info, member);
@@ -804,7 +807,7 @@ public static class UIExtensionManager
         }
 
         if (exceptions != null)
-            throw new AggregateException($"Failed to initialze UI extension: {info.ImplementationType.Name}.", exceptions);
+            throw new AggregateException($"Failed to initialze UI extension: {info.ImplementationType.Format()}.", exceptions);
 
         try
         {
@@ -945,7 +948,7 @@ public static class UIExtensionManager
         type = extInfo?.ParentType;
         if (uiInstance != null && type != uiInstance.GetType() && type != null)
         {
-            LogWarning($"Extension type does not match parent type: {type.Name} vs {instance.GetType().Name}.");
+            LogWarning($"Extension type does not match parent type: {type.Format()} vs {instance.GetType().Format()}.");
             return;
         }
 
@@ -954,12 +957,12 @@ public static class UIExtensionManager
 
         if (extInfo == null)
         {
-            LogWarning($"Failed to find extension info for extension: {instance.GetType().Name}.");
+            LogWarning($"Failed to find extension info for extension: {instance.GetType().Format()}.");
             return;
         }
         if (parentInfo == null)
         {
-            LogWarning($"Failed to find parent info for extension: {instance.GetType().Name}.", extInfo.Plugin, extInfo.Assembly);
+            LogWarning($"Failed to find parent info for extension: {instance.GetType().Format()}.", extInfo.Plugin, extInfo.Assembly);
             return;
         }
 
@@ -971,7 +974,7 @@ public static class UIExtensionManager
             vanillaInstances.Clear();
             info = new UIExtensionVanillaInstanceInfo(parentInfo.ParentTypeInfo.IsStaticUI ? null : uiInstance, parentInfo.ParentTypeInfo.OpenOnInitialize || parentInfo.ParentTypeInfo.DefaultOpenState);
             vanillaInstances.Add(info);
-            LogDebug($"Replaced vanilla instance info: {parentInfo.ParentType.Name}.");
+            LogDebug($"Replaced vanilla instance info: {parentInfo.ParentType.Format()}.");
         }
         else
         {
@@ -980,7 +983,7 @@ public static class UIExtensionManager
                 if (ReferenceEquals(vanillaInstances[i].Instance, uiInstance))
                 {
                     info = vanillaInstances[i];
-                    LogDebug($"Found vanilla instance info: {parentInfo.ParentType.Name}.");
+                    LogDebug($"Found vanilla instance info: {parentInfo.ParentType.Format()}.");
                     break;
                 }
             }
@@ -989,7 +992,7 @@ public static class UIExtensionManager
             {
                 info = new UIExtensionVanillaInstanceInfo(parentInfo.ParentTypeInfo.IsStaticUI ? null : uiInstance, parentInfo.ParentTypeInfo.OpenOnInitialize || parentInfo.ParentTypeInfo.DefaultOpenState);
                 vanillaInstances.Add(info);
-                LogDebug($"Added vanilla instance info: {parentInfo.ParentType.Name}.");
+                LogDebug($"Added vanilla instance info: {parentInfo.ParentType.Format()}.");
             }
         }
 
@@ -1014,7 +1017,7 @@ public static class UIExtensionManager
 
             if (instance == null)
             {
-                LogWarning($"Failed to create extension of type {info.ImplementationType.Name}.", info.Plugin, info.Assembly);
+                LogWarning($"Failed to create extension of type {info.ImplementationType.Format()}.", info.Plugin, info.Assembly);
                 return null;
             }
 
@@ -1033,7 +1036,14 @@ public static class UIExtensionManager
     private static void TryInitializeMember(UIExtensionInfo info, MemberInfo member)
     {
         if (Attribute.GetCustomAttribute(member, typeof(ExistingMemberAttribute)) is not ExistingMemberAttribute existingMemberAttribute)
-            return;
+        {
+            if (!DevkitServerModule.AssemblyResolver.TriedToLoadUIExtensionModule)
+                return;
+
+            existingMemberAttribute = Compat.UIExtensionManagerCompat.GetExistingMemberAttribute(member)!;
+            if (existingMemberAttribute == null)
+                return;
+        }
 
         ExistingMemberFailureBehavior failureMode = existingMemberAttribute.FailureBehavior;
 

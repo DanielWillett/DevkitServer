@@ -1,11 +1,12 @@
 ﻿using DanielWillett.UITools;
 using DanielWillett.UITools.API.Extensions;
+using DanielWillett.UITools.Util;
 using DevkitServer.API;
 using DevkitServer.API.UI.Extensions;
+using DevkitServer.API.UI.Extensions.Members;
 using DevkitServer.Plugins;
-using System.Reflection;
-using DanielWillett.UITools.Util;
 using SDG.Framework.Modules;
+using System.Reflection;
 using Module = SDG.Framework.Modules.Module;
 
 namespace DevkitServer.Compat;
@@ -135,5 +136,30 @@ internal class UIExtensionManagerCompat : IUIExtensionManager
             UIExtensionManager.LogError(ex, info.Plugin, info.Assembly);
         }
     }
+    public static bool IsIgnored(MemberInfo member) => Attribute.IsDefined(member, typeof(DanielWillett.ReflectionTools.IgnoreAttribute));
+    public static int GetPriority(MemberInfo member)
+    {
+        int p1 = member.GetPriority();
+        if (p1 != 0)
+            return p1;
+
+        return Attribute.GetCustomAttribute(member, typeof(DanielWillett.ReflectionTools.PriorityAttribute)) is
+            DanielWillett.ReflectionTools.PriorityAttribute p
+            ? p.Priority
+            : 0;
+    }
+
     public static bool IsAssignableFromUIExtension(Type type) => typeof(DanielWillett.UITools.API.Extensions.UIExtension).IsAssignableFrom(type);
+    public static ExistingMemberAttribute? GetExistingMemberAttribute(MemberInfo member)
+    {
+        if (Attribute.GetCustomAttribute(member, typeof(DanielWillett.UITools.API.Extensions.Members.ExistingMemberAttribute)) is not DanielWillett.UITools.API.Extensions.Members.ExistingMemberAttribute memberInfo)
+            return null;
+
+        return new ExistingMemberAttribute(memberInfo.MemberName)
+        {
+            FailureBehavior = (ExistingMemberFailureBehavior)memberInfo.FailureBehavior,
+            InitializeMode = (ExistingMemberInitializeMode)memberInfo.InitializeMode,
+            OwningType = memberInfo.OwningType
+        };
+    }
 }
