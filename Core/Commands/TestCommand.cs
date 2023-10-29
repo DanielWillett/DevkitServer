@@ -6,6 +6,9 @@ using DevkitServer.Models;
 using DevkitServer.Multiplayer.Sync;
 using System.Collections.ObjectModel;
 using System.Reflection;
+using DevkitServer.API.UI.Icons;
+
+
 #if CLIENT
 using DevkitServer.AssetTools;
 using DevkitServer.Configuration;

@@ -455,12 +455,8 @@ public static class PluginLoader
                 Assembly assembly = Assembly.LoadFrom(pluginDll);
                 List<Type> types = Accessor.GetTypesSafe(assembly);
                 foreach (Type type in types
-                             .Where(x => typeof(IDevkitServerPlugin).IsAssignableFrom(x))
-                             .OrderByDescending(x =>
-                                 Attribute.GetCustomAttribute(x, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr
-                                     ? attr.Priority
-                                     : 0
-                             ))
+                             .Where(typeof(IDevkitServerPlugin).IsAssignableFrom)
+                             .OrderByDescending(x => x.GetPriority()))
                 {
                     if (type.IsInterface)
                         continue;
@@ -533,12 +529,7 @@ public static class PluginLoader
 
             UserPermissions.InitHandlers();
 
-            pluginsTemp = PluginsIntl.OrderByDescending(x =>
-                Attribute.GetCustomAttribute(x.GetType(), typeof(LoadPriorityAttribute)) is
-                    LoadPriorityAttribute attr
-                    ? attr.Priority
-                    : 0
-            ).ToList();
+            pluginsTemp = PluginsIntl.OrderByDescending(x => x.GetType().GetPriority()).ToList();
 
             // load plugins based on priority
             for (int i = 0; i < pluginsTemp.Count; ++i)
@@ -699,8 +690,9 @@ public static class PluginLoader
         lock (PluginsIntl)
         {
             // find attribute on member
-            if (Attribute.GetCustomAttribute(member, typeof(PluginIdentifierAttribute)) is PluginIdentifierAttribute { PluginType: { } ptype })
+            if (member.TryGetAttributeSafe(out PluginIdentifierAttribute attribute) && attribute.PluginType != null)
             {
+                Type? ptype = attribute.PluginType;
                 for (int i = 0; i < PluginsIntl.Count; ++i)
                 {
                     if (ptype == PluginsIntl[i].GetType())
@@ -749,7 +741,7 @@ public static class PluginLoader
         {
             if (FindPluginInstanceOfType(type) is { } p)
                 return p;
-            return Attribute.GetCustomAttribute(type, typeof(PluginIdentifierAttribute)) is PluginIdentifierAttribute { PluginType: { } ptype }
+            return type.GetAttributeSafe(typeof(PluginIdentifierAttribute), true) is PluginIdentifierAttribute { PluginType: { } ptype }
                 ? FindPluginInstanceOfType(ptype)
                 : null;
         }
@@ -998,8 +990,7 @@ public class PluginAssembly
             ReplicatedLevelDataRegistry.RegisterFromAssembly(Assembly, _replicatedLevelDataSources, this);
 
             foreach (Type type in Accessor.GetTypesSafe(Assembly)
-                         .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x,
-                             (EarlyTypeInitAttribute?)Attribute.GetCustomAttribute(x, typeof(EarlyTypeInitAttribute))))
+                         .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x, x.GetAttributeSafe<EarlyTypeInitAttribute>()))
                          .Where(x => x.Value != null)
                          .OrderByDescending(x => x.Value!.Priority)
                          .ThenBy(x => x.Key.Name)

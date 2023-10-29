@@ -464,7 +464,7 @@ public static class MapCreation
 
         writer.WriteStartObject();
 
-        foreach (FieldInfo field in fields.Where(x => !Attribute.IsDefined(x, typeof(NSJ::Newtonsoft.Json.JsonIgnoreAttribute))))
+        foreach (FieldInfo field in fields.Where(x => !x.HasAttributeSafe(typeof(NSJ::Newtonsoft.Json.JsonIgnoreAttribute))))
         {
             object defaultValue = field.GetValue(defaultValues);
             object value = field.GetValue(data);

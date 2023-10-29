@@ -5,7 +5,7 @@
  * Uncomment this to enable UI Extension Debug Logging.
  */
 
-#define UI_EXT_DEBUG
+// #define UI_EXT_DEBUG
 #endif
 
 using DevkitServer.API.Abstractions;
@@ -20,6 +20,7 @@ using System.Reflection.Emit;
 using System.Runtime.Serialization;
 
 namespace DevkitServer.API.UI.Extensions;
+
 /// <summary>
 /// Manages UI extensions, which is a system designed to easily extend vanilla UIs.
 /// </summary>
@@ -69,206 +70,217 @@ public static class UIExtensionManager
 
     internal static void Shutdown()
     {
-        LogDebug("Cleaning up extensions...");
-
-        for (int i = ExtensionsIntl.Count - 1; i >= 0; i--)
+        try
         {
-            UIExtensionInfo extension = ExtensionsIntl[i];
+            LogDebug("Cleaning up extensions...");
 
-            if (!ParentTypeInfoIntl.TryGetValue(extension.ParentType, out UIExtensionParentTypeInfo? parentTypeInfo))
-                continue;
-
-            bool close = parentTypeInfo is { ParentTypeInfo.CloseOnDestroy: true };
-            for (int j = parentTypeInfo.InstancesIntl.Count - 1; j >= 0; j--)
+            for (int i = ExtensionsIntl.Count - 1; i >= 0; i--)
             {
-                UIExtensionInstanceInfo instanceInfo = parentTypeInfo.InstancesIntl[j];
-                if (close && instanceInfo.VanillaInstance.IsOpen)
+                UIExtensionInfo extension = ExtensionsIntl[i];
+
+                if (!ParentTypeInfoIntl.TryGetValue(extension.ParentType, out UIExtensionParentTypeInfo? parentTypeInfo))
+                    continue;
+
+                bool close = parentTypeInfo is { ParentTypeInfo.CloseOnDestroy: true };
+                for (int j = parentTypeInfo.InstancesIntl.Count - 1; j >= 0; j--)
                 {
-                    if (instanceInfo.Instance is UIExtension ext)
+                    UIExtensionInstanceInfo instanceInfo = parentTypeInfo.InstancesIntl[j];
+                    if (close && instanceInfo.VanillaInstance.IsOpen)
+                    {
+                        if (instanceInfo.Instance is UIExtension ext)
+                        {
+                            try
+                            {
+                                ext.InvokeOnClosed();
+                            }
+                            catch (Exception ex)
+                            {
+                                LogError($"Error invoking OnClosed from {instanceInfo.Instance.GetType().Format()} while destroying.", extension.Plugin, extension.Assembly);
+                                LogError(ex);
+                            }
+                        }
+                    }
+                    if (instanceInfo.Instance is IDisposable disposable)
                     {
                         try
                         {
-                            ext.InvokeOnClosed();
+                            disposable.Dispose();
+                            LogDebug($"* Disposed: {extension.ImplementationType.Format()}.", extension.Plugin, extension.Assembly);
                         }
                         catch (Exception ex)
                         {
-                            LogError($"Error invoking OnClosed from {instanceInfo.Instance.GetType().Format()} while destroying.", extension.Plugin, extension.Assembly);
-                            CommandWindow.LogError(ex);
+                            LogError($"Error disposing UI extension: {extension.ImplementationType.Format()}.", extension.Plugin, extension.Assembly);
+                            LogError(ex);
                         }
                     }
-                }
-                if (instanceInfo.Instance is IDisposable disposable)
-                {
-                    try
+
+                    if (instanceInfo.Extension.InstantiationsIntl.Count == 1 && instanceInfo.Extension.InstantiationsIntl[0] == instanceInfo.Instance)
                     {
-                        disposable.Dispose();
-                        LogDebug($"* Disposed: {extension.ImplementationType.Format()}.", extension.Plugin, extension.Assembly);
+                        instanceInfo.Extension.InstantiationsIntl.RemoveAt(0);
+                        if (instanceInfo.Instance is IUnpatchableUIExtension unpatchable)
+                        {
+                            Type instanceType = unpatchable.GetType();
+                            if (!PendingUnpatchesIntl.Exists(x => x.GetType() == instanceType))
+                                PendingUnpatchesIntl.Add(unpatchable);
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        LogError($"Error disposing UI extension: {extension.ImplementationType.Format()}.", extension.Plugin, extension.Assembly);
-                        CommandWindow.LogError(ex);
-                    }
+                    else
+                        instanceInfo.Extension.InstantiationsIntl.Remove(instanceInfo.Instance);
+                    _onDestroy?.Invoke(instanceInfo.Instance);
                 }
 
-                if (instanceInfo.Extension.InstantiationsIntl.Count == 1 && instanceInfo.Extension.InstantiationsIntl[0] == instanceInfo.Instance)
+                parentTypeInfo.InstancesIntl.Clear();
+            }
+
+            ExtensionsIntl.Clear();
+            ExtensionsDictIntl.Clear();
+
+            LogDebug("Unpatching visibility listeners...");
+            /* Unpatch open, close, initialize, and destroy patches */
+            foreach (UIExtensionPatch patch in Patches.Values.Reverse())
+            {
+                try
                 {
-                    instanceInfo.Extension.InstantiationsIntl.RemoveAt(0);
-                    if (instanceInfo.Instance is IUnpatchableUIExtension unpatchable)
+                    PatchesMain.Patcher.Unpatch(patch.Original, patch.Patch);
+                }
+                catch (Exception ex)
+                {
+                    LogError($"Unable to unpatch {patch.Original.FullDescription()}.");
+                    LogError(ex);
+                }
+            }
+            Patches.Clear();
+
+            LogDebug("Unpatching IUnpatchableExtension extensions...");
+            /* Unpatch extensions implementing IUnpatchableExtension */
+            for (int i = 0; i < PendingUnpatchesIntl.Count; ++i)
+            {
+                try
+                {
+                    PendingUnpatchesIntl[i].Unpatch();
+                }
+                catch (Exception ex)
+                {
+                    Type type = PendingUnpatchesIntl[i].GetType();
+                    IDevkitServerPlugin? plugin = PluginLoader.FindPluginForMember(type);
+                    LogError($"Failed to unpatch extension {type.Format()}.", plugin, type.Assembly);
+                    LogError(ex, plugin, type.Assembly);
+                }
+            }
+            PendingUnpatchesIntl.Clear();
+
+            LogDebug("Unpatching existing member implementations...");
+            /* Unpatch existing member getters */
+            foreach (KeyValuePair<MethodBase, UIExtensionExistingMemberPatchInfo> existingMember in PatchInfo.Reverse())
+            {
+                try
+                {
+                    PatchesMain.Patcher.Unpatch(existingMember.Key, existingMember.Value.Transpiler);
+                }
+                catch (Exception ex)
+                {
+                    LogError($"Unable to unpatch existing member {existingMember.Key.FullDescription()}.", existingMember.Value.Extension.Plugin, existingMember.Value.Extension.Assembly);
+                    LogError(ex, existingMember.Value.Extension.Plugin, existingMember.Value.Extension.Assembly);
+                }
+            }
+            PatchInfo.Clear();
+
+            ParentTypeInfoIntl.Clear();
+
+            LogDebug("Unpatching custom UI handlers...");
+            /* Unpatch custom handlers */
+            foreach (UITypeInfo typeInfo in UIAccessTools.TypeInfo.Values)
+            {
+                if (typeInfo.CustomOnOpen != null)
+                {
+                    if (typeInfo.CustomOnOpen.HasBeenInitialized)
                     {
-                        Type instanceType = unpatchable.GetType();
-                        if (!PendingUnpatchesIntl.Exists(x => x.GetType() == instanceType))
-                            PendingUnpatchesIntl.Add(unpatchable);
+                        typeInfo.CustomOnOpen.HasBeenInitialized = false;
+                        try
+                        {
+                            typeInfo.CustomOnOpen.Unpatch(PatchesMain.Patcher);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogError($"Failed to unpatch CustomOnOpen {typeInfo.CustomOnOpen.GetType().Format()} for {typeInfo.Type.Format()}.");
+                            LogError(ex);
+                        }
+                    }
+                    if (typeInfo.CustomOnOpen.HasOnOpenBeenInitialized)
+                    {
+                        typeInfo.CustomOnOpen.HasOnOpenBeenInitialized = false;
+                        typeInfo.CustomOnOpen.OnOpened -= OnOpened;
                     }
                 }
-                else
-                    instanceInfo.Extension.InstantiationsIntl.Remove(instanceInfo.Instance);
-                parentTypeInfo.InstancesIntl.RemoveAt(i);
-                _onDestroy?.Invoke(instanceInfo.Instance);
+                if (typeInfo.CustomOnClose != null)
+                {
+                    if (typeInfo.CustomOnClose.HasBeenInitialized)
+                    {
+                        typeInfo.CustomOnClose.HasBeenInitialized = false;
+                        try
+                        {
+                            typeInfo.CustomOnClose.Unpatch(PatchesMain.Patcher);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogError($"Failed to unpatch CustomOnClose {typeInfo.CustomOnClose.GetType().Format()} for {typeInfo.Type.Format()}.");
+                            LogError(ex);
+                        }
+                    }
+                    if (typeInfo.CustomOnClose.HasOnCloseBeenInitialized)
+                    {
+                        typeInfo.CustomOnClose.HasOnCloseBeenInitialized = false;
+                        typeInfo.CustomOnClose.OnClosed -= OnClosed;
+                    }
+                }
+                if (typeInfo.CustomOnDestroy != null)
+                {
+                    if (typeInfo.CustomOnDestroy.HasBeenInitialized)
+                    {
+                        typeInfo.CustomOnDestroy.HasBeenInitialized = false;
+                        try
+                        {
+                            typeInfo.CustomOnDestroy.Unpatch(PatchesMain.Patcher);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogError($"Failed to unpatch CustomOnDestroy {typeInfo.CustomOnDestroy.GetType().Format()} for {typeInfo.Type.Format()}.");
+                            LogError(ex);
+                        }
+                    }
+                    if (typeInfo.CustomOnDestroy.HasOnDestroyBeenInitialized)
+                    {
+                        typeInfo.CustomOnDestroy.HasOnDestroyBeenInitialized = false;
+                        typeInfo.CustomOnDestroy.OnDestroyed -= OnDestroy;
+                    }
+                }
+                if (typeInfo.CustomOnInitialize != null)
+                {
+                    if (typeInfo.CustomOnInitialize.HasBeenInitialized)
+                    {
+                        typeInfo.CustomOnInitialize.HasBeenInitialized = false;
+                        try
+                        {
+                            typeInfo.CustomOnInitialize.Unpatch(PatchesMain.Patcher);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogError($"Failed to unpatch CustomOnInitialize {typeInfo.CustomOnInitialize.GetType().Format()} for {typeInfo.Type.Format()}.");
+                            LogError(ex);
+                        }
+                    }
+                    if (typeInfo.CustomOnInitialize.HasOnInitializeBeenInitialized)
+                    {
+                        typeInfo.CustomOnInitialize.HasOnInitializeBeenInitialized = false;
+                        typeInfo.CustomOnInitialize.OnInitialized -= OnInitialized;
+                    }
+                }
             }
         }
-
-        ExtensionsIntl.Clear();
-        ExtensionsDictIntl.Clear();
-
-        LogDebug("Unpatching visibility listeners...");
-        /* Unpatch open, close, initialize, and destroy patches */
-        foreach (UIExtensionPatch patch in Patches.Values.Reverse())
+        catch (Exception ex)
         {
-            try
-            {
-                PatchesMain.Patcher.Unpatch(patch.Original, patch.Patch);
-            }
-            catch (Exception ex)
-            {
-                LogError($"Unable to unpatch {patch.Original.FullDescription()}.");
-                CommandWindow.LogError(ex);
-            }
-        }
-        Patches.Clear();
-
-        LogDebug("Unpatching IUnpatchableExtension extensions...");
-        /* Unpatch extensions implementing IUnpatchableExtension */
-        for (int i = 0; i < PendingUnpatchesIntl.Count; ++i)
-        {
-            try
-            {
-                PendingUnpatchesIntl[i].Unpatch();
-            }
-            catch (Exception ex)
-            {
-                LogError($"Failed to unpatch extension {PendingUnpatchesIntl[i].GetType().Format()}.");
-                CommandWindow.LogError(ex);
-            }
-        }
-        PendingUnpatchesIntl.Clear();
-
-        LogDebug("Unpatching existing member implementations...");
-        /* Unpatch existing member getters */
-        foreach (KeyValuePair<MethodBase, UIExtensionExistingMemberPatchInfo> existingMember in PatchInfo.Reverse())
-        {
-            try
-            {
-                PatchesMain.Patcher.Unpatch(existingMember.Key, existingMember.Value.Transpiler);
-            }
-            catch (Exception ex)
-            {
-                LogError($"Unable to unpatch existing member {existingMember.Key.FullDescription()}.");
-                CommandWindow.LogError(ex);
-            }
-        }
-        PatchInfo.Clear();
-
-        ParentTypeInfoIntl.Clear();
-
-        LogDebug("Unpatching custom UI handlers...");
-        /* Unpatch custom handlers */
-        foreach (UITypeInfo typeInfo in UIAccessTools.TypeInfo.Values)
-        {
-            if (typeInfo.CustomOnOpen != null)
-            {
-                if (typeInfo.CustomOnOpen.HasBeenInitialized)
-                {
-                    typeInfo.CustomOnOpen.HasBeenInitialized = false;
-                    try
-                    {
-                        typeInfo.CustomOnOpen.Unpatch(PatchesMain.Patcher);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogError($"Failed to unpatch CustomOnOpen {typeInfo.CustomOnOpen.GetType().Format()} for {typeInfo.Type.Format()}.");
-                        CommandWindow.LogError(ex);
-                    }
-                }
-                if (typeInfo.CustomOnOpen.HasOnOpenBeenInitialized)
-                {
-                    typeInfo.CustomOnOpen.HasOnOpenBeenInitialized = false;
-                    typeInfo.CustomOnOpen.OnOpened -= OnOpened;
-                }
-            }
-            if (typeInfo.CustomOnClose != null)
-            {
-                if (typeInfo.CustomOnClose.HasBeenInitialized)
-                {
-                    typeInfo.CustomOnClose.HasBeenInitialized = false;
-                    try
-                    {
-                        typeInfo.CustomOnClose.Unpatch(PatchesMain.Patcher);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogError($"Failed to unpatch CustomOnClose {typeInfo.CustomOnClose.GetType().Format()} for {typeInfo.Type.Format()}.");
-                        CommandWindow.LogError(ex);
-                    }
-                }
-                if (typeInfo.CustomOnClose.HasOnCloseBeenInitialized)
-                {
-                    typeInfo.CustomOnClose.HasOnCloseBeenInitialized = false;
-                    typeInfo.CustomOnClose.OnClosed -= OnClosed;
-                }
-            }
-            if (typeInfo.CustomOnDestroy != null)
-            {
-                if (typeInfo.CustomOnDestroy.HasBeenInitialized)
-                {
-                    typeInfo.CustomOnDestroy.HasBeenInitialized = false;
-                    try
-                    {
-                        typeInfo.CustomOnDestroy.Unpatch(PatchesMain.Patcher);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogError($"Failed to unpatch CustomOnDestroy {typeInfo.CustomOnDestroy.GetType().Format()} for {typeInfo.Type.Format()}.");
-                        CommandWindow.LogError(ex);
-                    }
-                }
-                if (typeInfo.CustomOnDestroy.HasOnDestroyBeenInitialized)
-                {
-                    typeInfo.CustomOnDestroy.HasOnDestroyBeenInitialized = false;
-                    typeInfo.CustomOnDestroy.OnDestroyed -= OnDestroy;
-                }
-            }
-            if (typeInfo.CustomOnInitialize != null)
-            {
-                if (typeInfo.CustomOnInitialize.HasBeenInitialized)
-                {
-                    typeInfo.CustomOnInitialize.HasBeenInitialized = false;
-                    try
-                    {
-                        typeInfo.CustomOnInitialize.Unpatch(PatchesMain.Patcher);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogError($"Failed to unpatch CustomOnInitialize {typeInfo.CustomOnInitialize.GetType().Format()} for {typeInfo.Type.Format()}.");
-                        CommandWindow.LogError(ex);
-                    }
-                }
-                if (typeInfo.CustomOnInitialize.HasOnInitializeBeenInitialized)
-                {
-                    typeInfo.CustomOnInitialize.HasOnInitializeBeenInitialized = false;
-                    typeInfo.CustomOnInitialize.OnInitialized -= OnInitialized;
-                }
-            }
+            LogError("Error cleaning up UIExtensionManager.");
+            LogError(ex);
         }
     }
 
@@ -276,35 +288,35 @@ public static class UIExtensionManager
     internal static void LogDebug(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
         if (plugin == null)
-            Logger.LogDebug(assembly == null ? "[" + Source + "] " + message : "[" + Source + " | " + assembly.GetName().Name.ToUpperInvariant() + "] " + message);
+            Logger.LogDebug(assembly == null || assembly == Accessor.DevkitServer ? "[" + Source + "] " + message : "[" + Source + " | " + assembly.GetName().Name.ToUpperInvariant() + "] " + message);
         else
             plugin.LogDebug(message);
     }
     internal static void LogInfo(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
         if (plugin == null)
-            Logger.LogWarning(message, method: assembly == null ? Source : Source + " | " + assembly.GetName().Name.ToUpperInvariant());
+            Logger.LogWarning(message, method: assembly == null || assembly == Accessor.DevkitServer ? Source : Source + " | " + assembly.GetName().Name.ToUpperInvariant());
         else
             plugin.LogWarning(message);
     }
     internal static void LogWarning(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
         if (plugin == null)
-            Logger.LogWarning(message, method: assembly == null ? Source : Source + " | " + assembly.GetName().Name.ToUpperInvariant());
+            Logger.LogWarning(message, method: assembly == null || assembly == Accessor.DevkitServer ? Source : Source + " | " + assembly.GetName().Name.ToUpperInvariant());
         else
             plugin.LogWarning(message);
     }
     internal static void LogError(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
         if (plugin == null)
-            Logger.LogError(message, method: assembly == null ? Source : Source + " | " + assembly.GetName().Name.ToUpperInvariant());
+            Logger.LogError(message, method: assembly == null || assembly == Accessor.DevkitServer ? Source : Source + " | " + assembly.GetName().Name.ToUpperInvariant());
         else
             plugin.LogError(message);
     }
     internal static void LogError(Exception ex, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
         if (plugin == null)
-            Logger.LogError(ex, method: assembly == null ? Source : Source + " | " + assembly.GetName().Name.ToUpperInvariant());
+            Logger.LogError(ex, method: assembly == null || assembly == Accessor.DevkitServer ? Source : Source + " | " + assembly.GetName().Name.ToUpperInvariant());
         else
             plugin.LogError(ex);
     }
@@ -316,10 +328,10 @@ public static class UIExtensionManager
         List<Type> types = Accessor.GetTypesSafe(assembly, true);
         foreach (Type type in types)
         {
-            if (Attribute.GetCustomAttribute(type, typeof(UIExtensionAttribute)) is not UIExtensionAttribute attribute)
+            if (!type.TryGetAttributeSafe(out UIExtensionAttribute attribute))
                 continue;
 
-            LoadPriorityAttribute? priority = Attribute.GetCustomAttribute(type, typeof(LoadPriorityAttribute)) as LoadPriorityAttribute;
+            LoadPriorityAttribute? priority = type.GetAttributeSafe<LoadPriorityAttribute>();
             IDevkitServerPlugin? plugin = null;
             if (type.Assembly != Accessor.DevkitServer)
             {
@@ -415,7 +427,7 @@ public static class UIExtensionManager
                 catch (Exception ex)
                 {
                     LogError($"Error invoking OnOpened from {instanceInfo.Instance.GetType().Format()}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
-                    CommandWindow.LogError(ex);
+                    LogError(ex);
                 }
             }
             else if (DevkitServerModule.AssemblyResolver.TriedToLoadUIExtensionModule)
@@ -495,7 +507,7 @@ public static class UIExtensionManager
                 catch (Exception ex)
                 {
                     LogError($"Error invoking OnClosed from {instanceInfo.Instance.GetType().Format()}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
-                    CommandWindow.LogError(ex);
+                    LogError(ex);
                 }
             }
             else if (DevkitServerModule.AssemblyResolver.TriedToLoadUIExtensionModule)
@@ -637,7 +649,7 @@ public static class UIExtensionManager
                     catch (Exception ex)
                     {
                         LogError($"Error invoking OnClosed from {instanceInfo.Instance.GetType().Format()} while destroying.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
-                        CommandWindow.LogError(ex);
+                        LogError(ex);
                     }
                 }
                 else if (DevkitServerModule.AssemblyResolver.TriedToLoadUIExtensionModule)
@@ -655,7 +667,7 @@ public static class UIExtensionManager
                 catch (Exception ex)
                 {
                     LogError($"Error disposing UI extension: {instanceInfo.Extension.ImplementationType.Format()}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
-                    CommandWindow.LogError(ex);
+                    LogError(ex);
                 }
 
                 LogDebug($"  * Disposed: {instanceInfo.Extension.ImplementationType.Format()}.", instanceInfo.Extension.Plugin, instanceInfo.Extension.Assembly);
@@ -790,7 +802,7 @@ public static class UIExtensionManager
                          .Where(x => !x.IsSpecialName))
                      .OrderByDescending<MemberInfo, int>(DevkitServerModule.AssemblyResolver.TriedToLoadUIExtensionModule
                          ? Compat.UIExtensionManagerCompat.GetPriority
-                         : Accessor.GetPriority)
+                         : x => x.GetPriority(true))
                      .ThenBy(x => x.Name))
         {
             if (member.IsIgnored() || DevkitServerModule.AssemblyResolver.TriedToLoadUIExtensionModule && Compat.UIExtensionManagerCompat.IsIgnored(member))
@@ -1035,7 +1047,7 @@ public static class UIExtensionManager
     }
     private static void TryInitializeMember(UIExtensionInfo info, MemberInfo member)
     {
-        if (Attribute.GetCustomAttribute(member, typeof(ExistingMemberAttribute)) is not ExistingMemberAttribute existingMemberAttribute)
+        if (!member.TryGetAttributeSafe(out ExistingMemberAttribute existingMemberAttribute))
         {
             if (!DevkitServerModule.AssemblyResolver.TriedToLoadUIExtensionModule)
                 return;

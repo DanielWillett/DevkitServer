@@ -31,27 +31,24 @@ internal static class EditorActionsCodeGeneration
             {
                 if (!t.IsAbstract && typeof(IAction).IsAssignableFrom(t))
                 {
-                    Attribute[] attrs = Attribute.GetCustomAttributes(t, typeof(ActionAttribute), false);
-                    if (attrs.Length > 0)
+                    ActionAttribute[] attrs = t.GetAttributesSafe<ActionAttribute>(false);
+                   foreach (ActionAttribute actionAttr in attrs)
                     {
-                        foreach (ActionAttribute actionAttr in attrs.OfType<ActionAttribute>())
+                        actionAttr.Type = t;
+                        if (Attributes.TryGetValue(actionAttr.ActionType, out ActionAttribute attribute))
                         {
-                            actionAttr.Type = t;
-                            if (Attributes.TryGetValue(actionAttr.ActionType, out ActionAttribute attribute))
-                            {
-                                Logger.LogWarning($"[EDITOR ACTIONS] Duplicate action attribute for type ignored: {actionAttr.ActionType.Format()}, {t.Format()} already overridden by {attribute.Type.Format()}.");
-                            }
-                            else
-                            {
-                                Attributes[actionAttr.ActionType] = actionAttr;
-                                actions.Add((t, actionAttr));
-                            }
+                            Logger.LogWarning($"[EDITOR ACTIONS] Duplicate action attribute for type ignored: {actionAttr.ActionType.Format()}, {t.Format()} already overridden by {attribute.Type.Format()}.");
+                        }
+                        else
+                        {
+                            Attributes[actionAttr.ActionType] = actionAttr;
+                            actions.Add((t, actionAttr));
                         }
                     }
                 }
                 continue;
             }
-            if (Attribute.GetCustomAttribute(t, typeof(ActionSettingAttribute), false) is ActionSettingAttribute settingAttr)
+            if (t.TryGetAttributeSafe(out ActionSettingAttribute settingAttr))
             {
                 PropertyInfo[] props = t.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                 properties.Add((t, settingAttr, new List<PropertyInfo>(props)));

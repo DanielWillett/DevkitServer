@@ -34,7 +34,7 @@ public abstract class BaseNetCall
     protected BaseNetCall(Delegate method, bool highSpeed = false)
     {
         MethodInfo info = method.GetMethodInfo();
-        if (Attribute.GetCustomAttribute(info, typeof(NetCallAttribute)) is NetCallAttribute attribute)
+        if (info.TryGetAttributeSafe(out NetCallAttribute attribute))
         {
             Id = attribute.MethodID;
             Guid = string.IsNullOrEmpty(attribute.GuidString) || !Guid.TryParse(attribute.GuidString, out Guid g) ? Guid.Empty : g;

@@ -54,6 +54,16 @@ public class UserInput : MonoBehaviour
             return Level.isEditor ? CameraController.Editor : (Level.isLoaded ? CameraController.Player : CameraController.None);
         }
     }
+    public static Transform LocalAim
+    {
+        get
+        {
+            if (DevkitServerModule.IsEditing && EditorUser.User?.Input is not null && EditorUser.User.Input.Aim != null)
+                return EditorUser.User.Input.Aim;
+
+            return Level.isEditor || !Level.isLoaded ? MainCamera.instance.transform : Player.player.look.aim;
+        }
+    }
 #endif
     private CameraController _controller;
 

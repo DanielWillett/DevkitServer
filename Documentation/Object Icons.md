@@ -41,13 +41,14 @@ Except for the *Custom icons file*, the file name must start with one of the fol
 |---|---|---|
 |Custom icons file: `Unturned\DevkitServer\configured_icons.json`|No|N/A|
 |Loaded workshop content: `steamapps\workshop\304930\*`|Yes|Yes|
-|Temp level folder: `Unturned\DevkitServer\Temp_IP_Port\Levels\LevelName\Level Install\LevelName\Bundles`|When on Server|Yes|
+|Active level folder: `Unturned\Maps\<Map Name>\Bundles\*`|When singleplayer editing|Yes|
 |Sandbox folder: `Unturned\Sandbox`|No|Yes|
 |Vanilla bundles folder: `Unturned\Bundles`|Yes|No|
 |Vanilla object bundles folder: `Unturned\Bundles\Objects`|Yes|Yes|
 |DevkitServer module folders: `Unturned\Modules\DevkitServer`|Yes|Yes|
 |DevkitServer config folder: `Unturned\DevkitServer`|Yes|No|
 |Plugin data folders: `Unturned\DevkitServer\Plugins\Assembly.PluginName`|Unless plugin is in developer mode|Yes|
+|Enabled module folders: `Unturned\Modules\<Module Name>\*`|Yes|Yes|
 
 To include custom icon offsets in your mod, delete the custom icon file at `Unturned\DevkitServer\configured_icons.json` and exit and rejoin the editor if needed.
 

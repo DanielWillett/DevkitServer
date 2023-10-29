@@ -2,13 +2,28 @@
 using UnityEngine.Rendering;
 using GraphicsSettings = SDG.Unturned.GraphicsSettings;
 
-namespace DevkitServer.Util;
-public sealed class IconGenerator : MonoBehaviour
+namespace DevkitServer.API.UI.Icons;
+
+/// <summary>
+/// Generate icons for LevelObjects.
+/// </summary>
+public sealed class ObjectIconGenerator : MonoBehaviour
 {
     internal const string Source = "OBJECT ICONS";
 
+    /// <summary>
+    /// Field of view of the perspective camera used for rendering the icons.
+    /// </summary>
     public const float FOV = 60f;
+
+    /// <summary>
+    /// How much distance affects the far clip plane.
+    /// </summary>
     public const float DistanceScale = 1;
+
+    /// <summary>
+    /// Far clip plane multiplier.
+    /// </summary>
     public const float FarClipPlaneScale = 2.25f;
     private static readonly Vector3 EulerDefaultCameraRotation = new Vector3(5.298f, -23.733f, 0f);
     private static readonly Quaternion DefaultCameraRotation = Quaternion.Euler(EulerDefaultCameraRotation);
@@ -16,12 +31,12 @@ public sealed class IconGenerator : MonoBehaviour
     private static readonly List<Renderer> WorkingRenderersList = new List<Renderer>(4);
     private Camera _camera = null!;
     private Light _light = null!;
-    public static IconGenerator? Instance { get; private set; }
+    public static ObjectIconGenerator? Instance { get; private set; }
     [UsedImplicitly]
     private void Start()
     {
-        _camera = this.gameObject.GetComponent<Camera>();
-        _light = this.gameObject.GetComponent<Light>();
+        _camera = gameObject.GetComponent<Camera>();
+        _light = gameObject.GetComponent<Light>();
 
         _camera.cullingMask = RayMasks.LARGE | RayMasks.MEDIUM | RayMasks.SMALL;
         _camera.clearFlags = CameraClearFlags.Nothing;
@@ -36,9 +51,22 @@ public sealed class IconGenerator : MonoBehaviour
 
         Instance = this;
     }
+
+    /// <summary>
+    /// Forces all icon offsets to be recached.
+    /// </summary>
     public static void ClearCache() => Metrics.Clear();
+
+    /// <summary>
+    /// Forces the icon offset for <paramref name="guid"/> to be recached.
+    /// </summary>
     public static void ClearCache(Guid guid) => Metrics.Remove(guid);
-    public static void GetIcon(Asset asset, int width, int height, Action<Asset, Texture2D?, bool> onIconReady)
+
+    /// <summary>
+    /// Start rendering an icon for any <see cref="VehicleAsset"/>, <see cref="ItemAsset"/>, or <see cref="ObjectAsset"/>.
+    /// </summary>
+    /// <param name="onIconReady">Callback invoked when the icon is ready on the main thread.</param>
+    public static void GetIcon(Asset asset, int width, int height, ObjectIconRenderOptions? options, Action<Asset, Texture2D?, bool, ObjectIconRenderOptions?> onIconReady)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -47,12 +75,12 @@ public sealed class IconGenerator : MonoBehaviour
 
         if (asset is VehicleAsset vehicle)
         {
-            VehicleTool.getIcon(vehicle.id, 0, vehicle, null, width, height, false, txt => onIconReady(asset, txt, true));
+            VehicleTool.getIcon(vehicle.id, 0, vehicle, null, width, height, false, txt => onIconReady(asset, txt, true, options));
             return;
         }
         if (asset is ItemAsset item)
         {
-            ItemTool.getIcon(item.id, 0, 100, item.getState(true), item, null, string.Empty, string.Empty, width, height, false, false, txt => onIconReady(asset, txt, true));
+            ItemTool.getIcon(item.id, 0, 100, item.getState(true), item, null, string.Empty, string.Empty, width, height, false, false, txt => onIconReady(asset, txt, true, options));
             return;
         }
 
@@ -67,28 +95,96 @@ public sealed class IconGenerator : MonoBehaviour
                 Decal? decal = model.GetComponentInChildren<Decal>();
                 if (decal != null && decal.material.GetTexture("_MainTex") is Texture2D texture)
                 {
-                    onIconReady(asset, texture, false);
+                    onIconReady(asset, texture, false, options);
                     return;
                 }
             }
-            onIconReady(asset, null, true);
+            onIconReady(asset, null, true, options);
             return;
         }
 
         if (model == null)
         {
-            onIconReady(asset, null, true);
+            onIconReady(asset, null, true, options);
             return;
         }
 
         ObjectIconMetrics metrics = GetObjectIconMetrics(asset);
         GameObject levelObject = Instantiate(model, new Vector3(-256f, -256f, 0f), LevelObjectUtil.DefaultObjectRotation);
+        levelObject.SetActive(false);
+        bool npc = false;
+        if (obj is ObjectNPCAsset { type: EObjectType.NPC, interactability: EObjectInteractability.NPC })
+        {
+            // set clothes
+            levelObject.AddComponent<InteractableObjectNPC>().updateState(obj, Array.Empty<byte>());
+            npc = true;
+        }
+        else
+        {
+            ApplyMaterialPalette(obj, options, levelObject);
+        }
+
+        levelObject.SetActive(true);
+
+        if (npc)
+        {
+            Instance.StartCoroutine(Instance.RenderNPC(asset, levelObject, metrics, width, height, onIconReady, options));
+            return;
+        }
 
         Texture2D icon = Instance.CaptureIcon(asset.GUID.ToString("N"), levelObject, in metrics, width, height);
 
         Destroy(levelObject);
 
-        onIconReady(asset, icon, true);
+        onIconReady(asset, icon, true, options);
+    }
+
+
+    private IEnumerator RenderNPC(Asset asset, GameObject levelObject, ObjectIconMetrics metrics, int width, int height, Action<Asset, Texture2D?, bool, ObjectIconRenderOptions?> onIconReady, ObjectIconRenderOptions? options)
+    {
+        // give time for animation to start
+        yield return null;
+        yield return null;
+
+        // allow clothing and hair to be seen through the camera.
+        Layerer.relayer(levelObject.transform, LayerMasks.SMALL);
+
+        Texture2D icon = CaptureIcon(asset.GUID.ToString("N"), levelObject, in metrics, width, height);
+
+        Destroy(levelObject);
+
+        onIconReady(asset, icon, true, options);
+    }
+
+    private static void ApplyMaterialPalette(ObjectAsset obj, ObjectIconRenderOptions? options, GameObject levelObject)
+    {
+        AssetReference<MaterialPaletteAsset> palette = obj.materialPalette;
+        if (options is { MaterialPaletteOverride.isValid: true })
+            palette = options.MaterialPaletteOverride;
+
+        if (!palette.isValid || palette.Find() is not { } asset || asset.materials.Count <= 0)
+            return;
+
+        int index = options?.MaterialIndexOverride ?? -1;
+        if (index < 0)
+            index = UnityEngine.Random.Range(0, asset.materials.Count);
+        else if (index >= asset.materials.Count)
+            index = asset.materials.Count - 1;
+
+        Material mat = Assets.load<Material>(asset.materials[index]);
+
+        levelObject.GetComponentsInChildren(WorkingRenderersList);
+        try
+        {
+            foreach (Renderer renderer in WorkingRenderersList)
+            {
+                renderer.sharedMaterial = mat;
+            }
+        }
+        finally
+        {
+            WorkingRenderersList.Clear();
+        }
     }
     public static void GetCameraPositionAndRotation(in ObjectIconMetrics metrics, Transform target, out Vector3 position, out Quaternion rotation)
     {
@@ -161,7 +257,7 @@ public sealed class IconGenerator : MonoBehaviour
             name = "Icon_Obj_" + name,
             filterMode = FilterMode.Point
         };
-        
+
         outTexture.ReadPixels(new Rect(0f, 0f, width, height), 0, 0);
         outTexture.Apply();
 
@@ -190,7 +286,7 @@ public sealed class IconGenerator : MonoBehaviour
 
         if (preset == null || preset.Asset.GUID != asset.GUID)
             ObjectIconPresets.Presets.TryGetValue(asset.GUID, out preset);
-        
+
         if (preset != null)
         {
             Vector3 pos = preset.IconPosition;

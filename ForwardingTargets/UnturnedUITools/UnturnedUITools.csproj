@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>DanielWillett.UITools</RootNamespace>
+    <TargetFramework>net481</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
+    <AssemblyOriginatorKeyFile>C:\Users\danny\OneDrive\Documents\Strong Name Keys\DanielWillett.UnturnedUITools\DanielWillett.UnturnedUITools.dll.snk</AssemblyOriginatorKeyFile>
+    <Version>1.2.0</Version>
+    <AssemblyVersion>$(Version).0</AssemblyVersion>
+    <FileVersion>$(Version).0</FileVersion>
+    <Configurations>ClientRelease</Configurations>
+  </PropertyGroup>
+
+  <Import Project="$(SolutionDir)Unturned.targets" />
+
+</Project>

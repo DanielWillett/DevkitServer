@@ -1,6 +1,8 @@
 ﻿#if CLIENT
+using DevkitServer.API;
 using DevkitServer.API.UI.Extensions;
 using DevkitServer.API.UI.Extensions.Members;
+using DevkitServer.API.UI.Icons;
 using DevkitServer.Configuration;
 using DevkitServer.Patches;
 using DevkitServer.Players;
@@ -11,7 +13,10 @@ namespace DevkitServer.Core.UI.Extensions;
 [UIExtension(typeof(EditorLevelObjectsUI))]
 internal class EditorLevelObjectsUIExtension : UIExtension
 {
+    // todo add to config
     public static KeyCode EditToggleKey = KeyCode.F8;
+    public static KeyCode LogMissingKeybind = KeyCode.Keypad5;
+    public static bool ShouldCycleMaterialPalette = true;
     private const int Size = 158;
     private static bool _patched;
 #nullable disable
@@ -28,6 +33,10 @@ internal class EditorLevelObjectsUIExtension : UIExtension
     private readonly ISleekImage _preview;
     private bool _isGeneratingIcon;
     private bool _editorActive;
+    private int _materialIndex;
+    private int _materialTtl;
+    private float _nextIcon;
+    private float _lastUpdate;
 
     private readonly ISleekToggle _isEditingToggle;
     private readonly ISleekButton _saveEditButton;
@@ -35,6 +44,27 @@ internal class EditorLevelObjectsUIExtension : UIExtension
     private readonly ISleekButton _gotoOffsetButton;
     private readonly ISleekField _offsetField;
     private readonly ISleekLabel _editHint;
+    private readonly ISleekLabel _materialIndexLbl;
+    private readonly ISleekLabel _noteText;
+
+    /// <summary>
+    /// If the live editor is enabled.
+    /// </summary>
+    public bool EditorActive
+    {
+        get => _editorActive;
+        private set
+        {
+            _editorActive = value;
+            if (!value)
+            {
+                OnToggled(_isEditingToggle, false);
+                _isEditingToggle.Value = false;
+            }
+
+            _isEditingToggle.IsVisible = value;
+        }
+    }
 
     internal EditorLevelObjectsUIExtension()
     {
@@ -62,12 +92,12 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         _container.AddChild(_displayTitle);
 
         _preview = Glazier.Get().CreateImage();
-        _preview.SizeScale_X = 0f;
-        _preview.SizeScale_Y = 0f;
-        _preview.PositionScale_X = 0.5f;
-        _preview.PositionScale_Y = 0.5f;
-        _preview.SizeOffset_X = Size;
-        _preview.SizeOffset_Y = Size;
+        _preview.SizeScale_X = 1f;
+        _preview.SizeScale_Y = 1f;
+        _preview.SizeOffset_X = -20;
+        _preview.SizeOffset_Y = -20;
+        _preview.PositionOffset_X = 10;
+        _preview.PositionOffset_Y = 10;
         _preview.ShouldDestroyTexture = true;
         displayBox.AddChild(_preview);
 
@@ -84,6 +114,21 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         _editHint.SizeOffset_Y = 20;
 
         _container.AddChild(_editHint);
+
+        _materialIndexLbl = Glazier.Get().CreateLabel();
+        _materialIndexLbl.TextContrastContext = ETextContrastContext.ColorfulBackdrop;
+        _materialIndexLbl.PositionScale_X = 1f;
+        _materialIndexLbl.PositionScale_Y = 1f;
+        _materialIndexLbl.PositionOffset_X = _assetsScrollBox.PositionOffset_X - (Size + 20);
+        _materialIndexLbl.PositionOffset_Y = -Size - 10;
+        _materialIndexLbl.TextAlignment = TextAnchor.MiddleLeft;
+        _materialIndexLbl.TextColor = new SleekColor(ESleekTint.FOREGROUND);
+        _materialIndexLbl.SizeOffset_X = Size + 20;
+        _materialIndexLbl.SizeOffset_Y = 20;
+        _materialIndexLbl.IsVisible = true;
+        _materialIndexLbl.Text = string.Empty;
+
+        _container.AddChild(_materialIndexLbl);
 
         _editorActive = false;
 
@@ -148,11 +193,60 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         _gotoOffsetButton.OnRightClicked += OnRightClickedGotoAsset;
         _container.AddChild(_gotoOffsetButton);
 
-        UpdateSelectedObject();
+        _noteText = Glazier.Get().CreateLabel();
+        _noteText.AllowRichText = true;
+        _noteText.TextColor = ESleekTint.FOREGROUND;
+        _noteText.FontSize = ESleekFontSize.Small;
+        _noteText.TextAlignment = TextAnchor.LowerCenter;
+        _noteText.TextContrastContext = ETextContrastContext.ColorfulBackdrop;
+        _noteText.Text = string.Empty;
+        _noteText.IsVisible = false;
+        _noteText.PositionScale_X = 1f;
+        _noteText.PositionScale_Y = 0f;
+        _noteText.SizeScale_Y = 1f;
+        _noteText.SizeOffset_X = Size * 3f + 90f;
+        _noteText.SizeOffset_Y = -(Size + 160);
+        _noteText.PositionOffset_X = displayBox.PositionOffset_X - _noteText.SizeOffset_X + displayBox.SizeOffset_X;
+        _noteText.PositionOffset_Y = 90f;
+        _container.AddChild(_noteText);
+
+        UpdateSelectedObject(true);
         if (!_patched)
             Patch();
     }
 #nullable restore
+
+    /// <summary>
+    /// Call this after manually updating the selected object or buildable type.
+    /// </summary>
+    public static void UpdateSelection(ObjectAsset? levelObject, ItemAsset? buildable)
+    {
+        if (levelObject == null && buildable == null)
+            ObjectIconPresets.ClearEditCache();
+        EditorLevelObjectsUIExtension? inst = UIExtensionManager.GetInstance<EditorLevelObjectsUIExtension>();
+        if (inst == null)
+            return;
+        try
+        {
+            ISleekBox? box = inst.SelectedBox;
+            if (box == null)
+                return;
+            if (levelObject == null && buildable is not ItemBarricadeAsset and not ItemStructureAsset)
+                box.Text = string.Empty;
+            else if (levelObject != null)
+                box.Text = levelObject.FriendlyName;
+            else
+                box.Text = buildable!.FriendlyName;
+            
+            inst._materialIndex = -1;
+            inst.UpdateSelectedObject(true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error updating selection.", method: ObjectIconGenerator.Source);
+            Logger.LogError(ex, method: ObjectIconGenerator.Source);
+        }
+    }
 
     private void OnRightClickedGotoAsset(ISleekElement button)
     {
@@ -186,11 +280,21 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         }
 
         if (target == null)
+        {
+            Logger.LogWarning($"Tried to goto asset {selectedAsset.FriendlyName} but not selected.", method: ObjectIconGenerator.Source);
             return;
+        }
 
-        IconGenerator.ObjectIconMetrics metrics = IconGenerator.GetObjectIconMetrics(asset);
-        IconGenerator.GetCameraPositionAndRotation(in metrics, target.transform, out Vector3 position, out Quaternion rotation);
+        bool editing = ObjectIconPresets.ActivelyEditing != null && ObjectIconPresets.ActivelyEditing.Asset.GUID == target.GUID;
+        if (editing)
+            ObjectIconPresets.ClearEditCache();
+
+        ObjectIconGenerator.ObjectIconMetrics metrics = ObjectIconGenerator.GetObjectIconMetrics(asset);
+        ObjectIconGenerator.GetCameraPositionAndRotation(in metrics, target.transform, out Vector3 position, out Quaternion rotation);
         UserInput.SetEditorTransform(position, rotation);
+
+        if (editing)
+            ObjectIconPresets.UpdateEditCache(target, target.asset);
     }
 
     private void OnToggled(ISleekToggle toggle, bool state)
@@ -204,29 +308,13 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         _gotoOffsetButton.IsVisible = state;
         _editHint.IsVisible = !state;
     }
-
-    public bool EditorActive
-    {
-        get => _editorActive;
-        private set
-        {
-            _editorActive = value;
-            if (!value)
-            {
-                OnToggled(_isEditingToggle, false);
-                _isEditingToggle.Value = false;
-            }
-
-            _isEditingToggle.IsVisible = value;
-        }
-    }
     private void OnSaveEdit(ISleekElement button)
     {
         Asset? asset = LevelObjectUtil.SelectedAsset;
         if (asset == null)
             return;
         ObjectIconPresets.SaveEditCache(false);
-        UpdateSelectedObject();
+        UpdateSelectedObject(false);
     }
     private void OnSaveNewEdit(ISleekElement button)
     {
@@ -234,37 +322,35 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         if (asset == null)
             return;
         ObjectIconPresets.SaveEditCache(true);
-        UpdateSelectedObject();
+        UpdateSelectedObject(false);
     }
     internal static void OnUpdate()
     {
         EditorLevelObjectsUIExtension? inst = UIExtensionManager.GetInstance<EditorLevelObjectsUIExtension>();
         if (inst == null)
-        {
             return;
-        }
 
         if (InputEx.GetKeyDown(EditToggleKey))
             inst.EditorActive = !inst.EditorActive;
+
+        if (InputEx.GetKeyDown(LogMissingKeybind))
+            LogMissingOffsets();
+
         if (inst._isGeneratingIcon)
-        {
             return;
-        }
+        
         if (!inst._isEditingToggle.Value || LevelObjectUtil.SelectedAsset is not ObjectAsset asset)
-        {
             goto clear;
-        }
+        
         LevelObject? selectedObject = null;
         foreach (EditorSelection selection in LevelObjectUtil.EditorObjectSelection)
         {
             if (!LevelObjectUtil.TryFindObject(selection.transform, out LevelObject lvlObj) || lvlObj.asset.GUID != asset.GUID)
-            {
                 continue;
-            }
+            
             if (selectedObject != null)
-            {
                 goto clear;
-            }
+            
             selectedObject = lvlObj;
         }
 
@@ -274,54 +360,29 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         }
 
         ObjectIconPresets.UpdateEditCache(selectedObject, asset);
-        inst.UpdateSelectedObject();
+        inst.UpdateSelectedObject(false);
         return;
 
     clear:
         if (ObjectIconPresets.ActivelyEditing != null)
         {
             ObjectIconPresets.ClearEditCache();
-            inst.UpdateSelectedObject();
+            inst.UpdateSelectedObject(true);
         }
-    }
-    public static void UpdateSelection(ObjectAsset? levelObject, ItemAsset? buildable)
-    {
-        if (levelObject == null && buildable == null)
-            ObjectIconPresets.ClearEditCache();
-        EditorLevelObjectsUIExtension? inst = UIExtensionManager.GetInstance<EditorLevelObjectsUIExtension>();
-        try
-        {
-            ISleekBox? box = inst?.SelectedBox;
-            if (box == null)
-                return;
-            if (levelObject == null && buildable is not ItemBarricadeAsset and not ItemStructureAsset)
-                box.Text = string.Empty;
-            else if (levelObject != null)
-                box.Text = levelObject.FriendlyName;
-            else
-                box.Text = buildable!.FriendlyName;
 
-            if (inst != null && DevkitServerConfig.Config.EnableObjectUIExtension)
-                inst.UpdateSelectedObject();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError("Error updating selection.");
-            Logger.LogError(ex);
-        }
+        if (ShouldCycleMaterialPalette && inst._materialIndex >= 0 && inst._nextIcon > 0f && inst._nextIcon < Time.realtimeSinceStartup)
+            inst.UpdateSelectedObject(true);
     }
 
-    internal void UpdateSelectedObject()
+    internal void UpdateSelectedObject(bool updateMat)
     {
+        Logger.LogDebug($"Update selected object: {updateMat.Format()}.");
         _preview.Texture = null;
         Asset? asset = LevelObjectUtil.SelectedAsset;
         if (asset != null)
         {
             _isGeneratingIcon = true;
-            if (asset is ObjectNPCAsset)
-                OnIconReady(asset, null, false);
-            else
-                IconGenerator.GetIcon(asset, Size, Size, OnIconReady);
+            _nextIcon = -1f;
             string text = asset.FriendlyName;
             if (asset is ObjectAsset obj)
                 text += " (" + obj.type switch
@@ -341,48 +402,104 @@ internal class EditorLevelObjectsUIExtension : UIExtension
             Color rarityColor = asset is ItemAsset item ? ItemTool.getRarityColorUI(item.rarity) : Color.white;
             _displayTitle.BackgroundColor = SleekColor.BackgroundIfLight(rarityColor);
             _displayTitle.TextColor = rarityColor;
+
+            if (asset is ObjectAsset obj2)
+            {
+                if (obj2.interactability != EObjectInteractability.NOTE)
+                {
+                    if (_noteText.IsVisible)
+                    {
+                        _noteText.IsVisible = false;
+                        _noteText.Text = string.Empty;
+                    }
+                }
+                else
+                {
+                    _noteText.IsVisible = true;
+                    _noteText.Text = obj2.interactabilityText;
+                }
+
+                if (updateMat && obj2.materialPalette.isValid && obj2.materialPalette.Find() is { materials.Count: > 0 } palette)
+                {
+                    _materialTtl = palette.materials.Count;
+                    _materialIndex = _materialTtl == 1 || !ShouldCycleMaterialPalette ? -1 : (_materialIndex == -1 ? UnityEngine.Random.Range(0, _materialTtl) : (_materialIndex + 1) % _materialTtl);
+                }
+                else if (updateMat) _materialTtl = 0;
+                else _materialIndex = -1;
+            }
+
+            ObjectIconRenderOptions? options;
+            if ((_materialIndex == -1 || _materialTtl == 0) && Time.realtimeSinceStartup - _lastUpdate > 1f)
+                options = null;
+            else
+                options = new ObjectIconRenderOptions
+                {
+                    MaterialIndexOverride = !updateMat && _materialIndex == -1 ? 0 : _materialIndex
+                };
+
+            ObjectIconGenerator.GetIcon(asset, Size, Size, options, OnIconReady);
         }
         else
         {
+            if (_noteText.IsVisible)
+            {
+                _noteText.IsVisible = false;
+                _noteText.Text = string.Empty;
+            }
+
             _displayTitle.TextColor = ESleekTint.FOREGROUND;
             _displayTitle.Text = DevkitServerModule.MainLocalization.Translate("NoAssetSelected");
+            _materialIndexLbl.Text = string.Empty;
         }
+
+        _lastUpdate = Time.realtimeSinceStartup;
     }
 
-    private void OnIconReady(Asset asset, Texture? texture, bool destroy)
+    private void OnIconReady(Asset asset, Texture? texture, bool destroy, ObjectIconRenderOptions? options)
     {
         _isGeneratingIcon = false;
         if (EditorObjects.selectedItemAsset != asset && EditorObjects.selectedObjectAsset != asset)
             return;
         _preview.Texture = texture;
         _preview.ShouldDestroyTexture = destroy;
+
         if (texture != null)
         {
             float aspect = (float)texture.width / texture.height;
             if (Mathf.Approximately(aspect, 1f))
             {
-                _preview.SizeOffset_X = Size;
-                _preview.SizeOffset_Y = Size;
+                _preview.SizeOffset_X = -20;
+                _preview.SizeOffset_Y = -20;
+                _preview.PositionOffset_X = 10;
+                _preview.PositionOffset_Y = 10;
             }
             else if (aspect > 1f)
             {
-                _preview.SizeOffset_X = Size;
-                _preview.SizeOffset_Y = Mathf.RoundToInt(Size / aspect);
+                _preview.SizeOffset_X = -20f;
+                _preview.SizeOffset_Y = -(1f - 1f / aspect) * Size - 20f;
+                _preview.PositionOffset_X = 10f;
+                _preview.PositionOffset_Y = (1f - 1f / aspect) * Size / 2f + 10f;
             }
             else
             {
-                _preview.SizeOffset_X = Mathf.RoundToInt(Size * aspect);
-                _preview.SizeOffset_Y = Size;
+                _preview.PositionOffset_X = (1f - aspect) * Size / 2f + 10f;
+                _preview.PositionOffset_Y = 10f;
+                _preview.SizeOffset_X = -(1f - aspect) * Size - 20f;
+                _preview.SizeOffset_Y = -20f;
             }
+
+            _materialIndexLbl.Text = _materialIndex == -1 || !ShouldCycleMaterialPalette ? string.Empty : $"{_materialIndex} / {_materialTtl - 1}";
         }
         else
         {
-            _preview.SizeOffset_X = Size;
-            _preview.SizeOffset_Y = Size;
+            _preview.SizeOffset_X = -20;
+            _preview.SizeOffset_Y = -20;
+            _preview.PositionOffset_X = 10;
+            _preview.PositionOffset_Y = 10;
+            _materialIndexLbl.Text = string.Empty;
         }
 
-        _preview.PositionOffset_X = -Size / 2;
-        _preview.PositionOffset_Y = -Size / 2;
+        _nextIcon = Time.realtimeSinceStartup + 1f;
     }
     private static void Patch()
     {
@@ -392,9 +509,8 @@ internal class EditorLevelObjectsUIExtension : UIExtension
             Logger.LogError("Failed to find method: EditorLevelObjectsUI.onClickedAssetButton", method: "LVL OBJ UI EXT");
             return;
         }
-
-        MethodInfo method = new Action<bool>(OnUpdatedElement).Method;
-        PatchesMain.Patcher.Patch(target, finalizer: new HarmonyMethod(method));
+        
+        PatchesMain.Patcher.Patch(target, finalizer: new HarmonyMethod(Accessor.GetMethod(OnUpdatedElement)));
         _patched = true;
     }
     private static void OnUpdatedElement(bool __runOriginal)
@@ -403,7 +519,96 @@ internal class EditorLevelObjectsUIExtension : UIExtension
             return;
 
         EditorLevelObjectsUIExtension? inst = UIExtensionManager.GetInstance<EditorLevelObjectsUIExtension>();
-        inst?.UpdateSelectedObject();
+
+        if (inst == null)
+            return;
+
+        inst._materialIndex = -1;
+        inst.UpdateSelectedObject(true);
+    }
+
+    /// <summary>
+    /// Logs any objects missing offsets to console.
+    /// </summary>
+    public static void LogMissingOffsets()
+    {
+        List<ObjectAsset> objects = new List<ObjectAsset>(4096);
+        Assets.find(objects);
+
+        string sboxPath = Path.Combine(UnturnedPaths.RootDirectory.FullName, "Sandbox") + Path.DirectorySeparatorChar;
+        string mapPath = Path.Combine(UnturnedPaths.RootDirectory.FullName, "Maps") + Path.DirectorySeparatorChar;
+
+        ulong lastMod = ulong.MaxValue;
+        foreach (ObjectAsset obj in objects
+                     .Where(x => x.type is not EObjectType.DECAL and not EObjectType.NPC)
+                     .OrderByDescending(x => x.GetOrigin()?.workshopFileId ?? 0ul)
+                     .ThenBy(x => x.getFilePath()))
+        {
+            if (ObjectIconPresets.Presets.ContainsKey(obj.GUID))
+                continue;
+
+            AssetOrigin? assetOrigin = obj.GetOrigin();
+            ulong modId = assetOrigin?.workshopFileId ?? 0ul;
+
+            string path = Path.GetFullPath(obj.getFilePath());
+
+            if (modId == 0ul && path.IndexOf(sboxPath, StringComparison.Ordinal) != -1)
+                modId = 1ul;
+            else if (modId == 0ul && path.IndexOf(mapPath, StringComparison.Ordinal) != -1)
+                modId = 2ul;
+
+            if (modId != lastMod)
+            {
+                lastMod = modId;
+                Logger.LogInfo($"[{ObjectIconGenerator.Source}]");
+                string? modName;
+                if (modId == 0ul)
+                {
+                    modName = "Vanilla Content";
+                    Logger.LogInfo($"[{ObjectIconGenerator.Source}] === {modName.Format(false)} ===");
+                }
+                else if (modId == 1ul)
+                {
+                    modName = "Sandbox Content";
+                    Logger.LogInfo($"[{ObjectIconGenerator.Source}] === {modName.Format(false)} ===");
+                }
+                else if (modId == 2ul)
+                {
+                    modName = "Map Bundles";
+                    Logger.LogInfo($"[{ObjectIconGenerator.Source}] === {modName.Format(false)} ===");
+                }
+                else
+                {
+                    modName = null;
+                    if (assetOrigin != null)
+                    {
+                        int index = assetOrigin.name.IndexOf('"');
+                        if (index != -1 && index < assetOrigin.name.Length - 1)
+                        {
+                            int index2 = assetOrigin.name.IndexOf('"', index + 1);
+                            modName = assetOrigin.name.Substring(index + 1, index2 - index - 1);
+                        }
+                    }
+
+                    Logger.LogInfo($"[{ObjectIconGenerator.Source}] " + (modName == null ? $"=== Mod: {modId.Format()} ===" : $"=== Mod: {modName.Format(false)} ({modId.Format()}) ==="));
+                }
+            }
+
+            if (modId == 0ul)
+                path = DevkitServerUtility.GetRelativePath(UnturnedPaths.RootDirectory.FullName, path);
+            else if (modId == 1ul)
+                path = DevkitServerUtility.GetRelativePath(sboxPath, path);
+            else if (modId == 2ul)
+                path = DevkitServerUtility.GetRelativePath(mapPath, path);
+            else
+            {
+                SteamContent? ugc = Provider.provider?.workshopService?.ugc?.Find(x => x.publishedFileID.m_PublishedFileId == modId);
+                if (ugc != null)
+                    path = DevkitServerUtility.GetRelativePath(ugc.path, path);
+            }
+
+            Logger.LogInfo($"[{ObjectIconGenerator.Source}] Missing Object: {$"{obj.FriendlyName,-33}".Colorize(new Color32(255, 204, 102, 255))} @ {path.Colorize(ConsoleColor.DarkGray)}");
+        }
     }
 }
 #endif

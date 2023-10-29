@@ -35,6 +35,7 @@ using DevkitServer.Players;
 using SDG.Framework.Utilities;
 #if DEBUG
 using DevkitServer.Util.Debugging;
+using DevkitServer.API.UI.Icons;
 #endif
 #endif
 #if SERVER
@@ -206,10 +207,13 @@ public sealed class DevkitServerModule : IModuleNexus
             AssemblyResolver = new AssemblyResolver();
             AssemblyResolver.ShutdownUnsupportedModules();
 
+#if CLIENT
             if (AssemblyResolver.TriedToLoadUIExtensionModule)
             {
                 Compat.UIExtensionManagerCompat.Init();
             }
+#endif
+
 #if SERVER
             if (!Dedicator.isStandaloneDedicatedServer)
             {
@@ -294,8 +298,7 @@ public sealed class DevkitServerModule : IModuleNexus
             }
             
             foreach (Type type in Accessor.GetTypesSafe()
-                         .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x,
-                             (EarlyTypeInitAttribute?)Attribute.GetCustomAttribute(x, typeof(EarlyTypeInitAttribute))))
+                         .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x, x.GetAttributeSafe<EarlyTypeInitAttribute>()))
                          .Where(x => x.Value is { RequiresUIAccessTools: false })
                          .OrderByDescending(x => x.Value!.Priority)
                          .ThenBy(x => x.Key.Name)
@@ -385,7 +388,7 @@ public sealed class DevkitServerModule : IModuleNexus
             Level.onLevelExited += OnLevelExited;
 
             ObjectIconPresets.Init();
-            GameObject objectItemGeneratorHost = new GameObject("ObjectIconGenerator", typeof(Light), typeof(IconGenerator), typeof(Camera));
+            GameObject objectItemGeneratorHost = new GameObject("ObjectIconGenerator", typeof(Light), typeof(ObjectIconGenerator), typeof(Camera));
             objectItemGeneratorHost.transform.SetParent(GameObjectHost.transform, true);
             objectItemGeneratorHost.hideFlags = HideFlags.DontSave;
             Object.DontDestroyOnLoad(objectItemGeneratorHost);
@@ -481,8 +484,7 @@ public sealed class DevkitServerModule : IModuleNexus
             UIAccessTools.Init();
 
             foreach (Type type in Accessor.GetTypesSafe()
-                         .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x,
-                             (EarlyTypeInitAttribute?)Attribute.GetCustomAttribute(x, typeof(EarlyTypeInitAttribute))))
+                         .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x, x.GetAttributeSafe<EarlyTypeInitAttribute>()))
                          .Where(x => x.Value is { RequiresUIAccessTools: true })
                          .OrderByDescending(x => x.Value!.Priority)
                          .ThenBy(x => x.Key.Name)
@@ -909,7 +911,9 @@ public sealed class DevkitServerModule : IModuleNexus
 
         DevkitServerConfig.ClearTempFolder();
 
+#if CLIENT
         UIExtensionManager.Shutdown();
+#endif
 
         PluginLoader.Unload();
         _tknSrc?.Cancel();
@@ -944,8 +948,8 @@ public sealed class DevkitServerModule : IModuleNexus
         Provider.onEnemyDisconnected -= EditorUser.OnEnemyDisconnected;
         ChatManager.onChatMessageReceived -= OnChatMessageReceived;
         UserTPVControl.Deinit();
-        if (IconGenerator.Instance != null)
-            Object.Destroy(IconGenerator.Instance.gameObject);
+        if (ObjectIconGenerator.Instance != null)
+            Object.Destroy(ObjectIconGenerator.Instance.gameObject);
         ObjectIconPresets.Deinit();
         MovementUtil.Deinit();
         Level.onLevelExited -= OnLevelExited;

@@ -54,8 +54,8 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
         MainLocalizationDirectory = Path.Combine(LocalizationDirectory, "Main");
         Translations = Localization.tryRead(MainLocalizationDirectory, false);
         PermissionPrefix = name.ToLowerInvariant().Replace('.', '-');
-        if (Attribute.GetCustomAttribute(GetType(), typeof(PermissionPrefixAttribute)) is PermissionPrefixAttribute { Prefix.Length: > 0 } attr)
-            PermissionPrefix = attr.Prefix;
+        if (GetType().TryGetAttributeSafe(out PermissionPrefixAttribute prefixAttr, true) && !string.IsNullOrWhiteSpace(prefixAttr.Prefix))
+            PermissionPrefix = prefixAttr.Prefix;
     }
     protected virtual LocalDatDictionary DefaultLocalization => new LocalDatDictionary();
 

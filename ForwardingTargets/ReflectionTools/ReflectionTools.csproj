@@ -9,6 +9,7 @@
     <Version>1.0.2</Version>
     <AssemblyVersion>$(Version).0</AssemblyVersion>
     <FileVersion>$(Version).0</FileVersion>
+    <Configurations>Release</Configurations>
   </PropertyGroup>
 
   <ItemGroup>

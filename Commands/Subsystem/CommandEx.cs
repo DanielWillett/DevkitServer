@@ -66,7 +66,7 @@ public static class CommandEx
         {
             foreach (Type type in Accessor.GetTypesSafe(asm))
             {
-                if (type.IsAbstract || !exe.IsAssignableFrom(type) || Attribute.IsDefined(type, typeof(IgnoreAttribute)))
+                if (type.IsAbstract || !exe.IsAssignableFrom(type) || type.IsIgnored())
                     continue;
                 try
                 {

@@ -179,47 +179,56 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
 
             foreach (Type type in Accessor.GetTypesSafe(assembly))
             {
-                if (Attribute.IsDefined(type, typeof(IgnoreAttribute)))
+                if (type.IsIgnored())
                     continue;
+
                 FieldInfo[] fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
                 foreach (FieldInfo field in fields)
                 {
-                    if (field.IsStatic && typeof(Permission).IsAssignableFrom(field.FieldType))
+                    if (!field.IsStatic || !typeof(Permission).IsAssignableFrom(field.FieldType))
+                        continue;
+
+                    if (!field.TryGetAttributeSafe(out PermissionAttribute attribute) || field.IsIgnored())
+                        continue;
+
+                    Permission? perm = (Permission?)field.GetValue(null);
+                    if (perm == null) continue;
+                    if (!thisAssembly && (perm.Plugin == null || perm.Plugin.Assembly.Assembly != assembly))
                     {
-                        if (Attribute.GetCustomAttribute(field, typeof(PermissionAttribute)) is PermissionAttribute && !Attribute.IsDefined(field, typeof(IgnoreAttribute)))
+                        IDevkitServerPlugin? plugin2 = null;
+                        if (attribute.PluginType != null)
                         {
-                            Permission? perm = (Permission?)field.GetValue(null);
-                            if (perm == null) continue;
-                            if (!thisAssembly && (perm.Plugin == null || perm.Plugin.Assembly.Assembly != assembly))
-                            {
-                                IDevkitServerPlugin? plugin2 = PluginLoader.FindPluginForMember(field);
-
-                                if (plugin2 == null)
-                                {
-                                    Logger.LogWarning("Permission ignored because of a plugin type error in " + field.Format() +
-                                                      ". Either the plugin type is not from the same assembly, " +
-                                                      "it was not explicitly defined in a plugin with more than one plugin types, " +
-                                                      "or it defined a type that isn't a loaded plugin type. Try setting the "
-                                                      + nameof(PermissionAttribute.PluginType).Format() + " field in the "
-                                                      + typeof(PermissionAttribute).Format() + ".");
-                                    perm.Plugin = null;
-                                    continue;
-                                }
-
-                                perm.Plugin = plugin2;
-                            }
-                            else if (thisAssembly)
-                            {
-                                if (!perm.DevkitServer && !perm.Core)
-                                    Logger.LogWarning("DevkitServer or Core flag not set on permission at " + field.Format() + ".");
-                                if (perm.Plugin != null)
-                                    Logger.LogWarning("Plugin property set on permission at " + field.Format() + ".");
-                            }
-
-                            Logger.LogDebug("Found permission: " + perm.Format() + ".");
-                            perms.Add(perm);
+                            plugin2 = PluginLoader.Plugins.FirstOrDefault(attribute.PluginType.IsInstanceOfType);
                         }
+
+                        plugin2 ??= PluginLoader.FindPluginForMember(field);
+
+                        if (plugin2 == null)
+                        {
+                            Logger.LogWarning("Permission ignored because of a plugin type error in " +
+                                              field.Format() +
+                                              ". Either the plugin type is not from the same assembly, " +
+                                              "it was not explicitly defined in a plugin with more than one plugin types, " +
+                                              "or it defined a type that isn't a loaded plugin type. Try setting the "
+                                              + nameof(PermissionAttribute.PluginType).Format() + " field in the "
+                                              + typeof(PermissionAttribute).Format() + ".");
+                            perm.Plugin = null;
+                            continue;
+                        }
+
+                        perm.Plugin = plugin2;
                     }
+                    else if (thisAssembly)
+                    {
+                        if (perm is { DevkitServer: false, Core: false })
+                            Logger.LogWarning("DevkitServer or Core flag not set on permission at " +
+                                              field.Format() + ".");
+                        if (perm.Plugin != null)
+                            Logger.LogWarning("Plugin property set on permission at " + field.Format() + ".");
+                    }
+
+                    Logger.LogDebug("Found permission: " + perm.Format() + ".");
+                    perms.Add(perm);
                 }
             }
         }

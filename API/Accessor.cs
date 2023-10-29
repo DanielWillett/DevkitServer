@@ -48,6 +48,8 @@ public static class Accessor
 
     internal static Type[]? FuncTypes;
     internal static Type[]? ActionTypes;
+    private static Type? _ignoreAttribute;
+    private static Type? _priorityAttribute;
     private static bool _castExCtorCalc;
     private static bool _nreExCtorCalc;
 
@@ -967,7 +969,7 @@ public static class Accessor
 
         if (isInstanceForValueType && delegateParameters[0].ParameterType != typeof(object)
 #if NET471_OR_GREATER
-                                   && !Attribute.IsDefined(method, typeof(IsReadOnlyAttribute))
+                                   && !method.HasAttributeSafe<IsReadOnlyAttribute>()
 #endif
                                    )
         {
@@ -1618,65 +1620,169 @@ public static class Accessor
     }
 
     /// <summary>
+    /// Checks for the the attribute of type <typeparamref name="TAttribute"/> on <paramref name="member"/>.
+    /// </summary>
+    [Pure]
+    public static bool HasAttributeSafe<TAttribute>(this ICustomAttributeProvider member, bool inherit = false) where TAttribute : Attribute => member.HasAttributeSafe(typeof(TAttribute), inherit);
+
+    /// <summary>
+    /// Checks for the attribute of type <paramref name="attributeType"/> on <paramref name="member"/>.
+    /// </summary>
+    /// <param name="member">Member to check for attributes. This can be <see cref="Module"/>, <see cref="Assembly"/>, <see cref="MemberInfo"/>, or <see cref="ParameterInfo"/>.</param>
+    /// <param name="attributeType">Type of the attribute to check for.</param>
+    /// <param name="inherit">Also check parent members.</param>
+    /// <exception cref="ArgumentException"><paramref name="attributeType"/> did not derive from <see cref="Attribute"/>.</exception>
+    [Pure]
+    public static bool HasAttributeSafe(this ICustomAttributeProvider member, Type attributeType, bool inherit = false)
+    {
+        try
+        {
+            return member.IsDefined(attributeType, inherit);
+        }
+        catch (TypeLoadException)
+        {
+            return false;
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Checks for and returns the the attribute of type <typeparamref name="TAttribute"/> on <paramref name="member"/>.
+    /// </summary>
+    /// <param name="inherit">Also check parent members.</param>
+    /// <param name="member">Member to check for attributes. This can be <see cref="Module"/>, <see cref="Assembly"/>, <see cref="MemberInfo"/>, or <see cref="ParameterInfo"/>.</param>
+    /// <typeparam name="TAttribute">Type of the attribute to check for.</typeparam>
+    /// <exception cref="AmbiguousMatchException">There are more than one attributes of type <paramref name="attributeType"/>.</exception>
+    [Pure]
+    public static TAttribute? GetAttributeSafe<TAttribute>(this ICustomAttributeProvider member, bool inherit = false) where TAttribute : Attribute
+        => member.GetAttributeSafe(typeof(TAttribute), inherit) as TAttribute;
+
+    /// <summary>
+    /// Checks for and returns the attribute of type <paramref name="attributeType"/> on <paramref name="member"/>.
+    /// </summary>
+    /// <param name="member">Member to check for attributes. This can be <see cref="Module"/>, <see cref="Assembly"/>, <see cref="MemberInfo"/>, or <see cref="ParameterInfo"/>.</param>
+    /// <param name="attributeType">Type of the attribute to check for.</param>
+    /// <param name="inherit">Also check parent members.</param>
+    /// <exception cref="ArgumentException"><paramref name="attributeType"/> did not derive from <see cref="Attribute"/>.</exception>
+    /// <exception cref="AmbiguousMatchException">There are more than one attributes of type <paramref name="attributeType"/>.</exception>
+    [Pure]
+    public static Attribute? GetAttributeSafe(this ICustomAttributeProvider member, Type attributeType, bool inherit = false)
+    {
+        try
+        {
+            switch (member)
+            {
+                case MemberInfo memberInfo:
+                    return Attribute.GetCustomAttribute(memberInfo, attributeType, inherit);
+                case Module module:
+                    return Attribute.GetCustomAttribute(module, attributeType, inherit);
+                case Assembly assembly:
+                    return Attribute.GetCustomAttribute(assembly, attributeType, inherit);
+                case ParameterInfo parameterInfo:
+                    return Attribute.GetCustomAttribute(parameterInfo, attributeType, inherit);
+                default:
+                    object[] attributes = member.GetCustomAttributes(attributeType, inherit);
+                    if (attributes is not { Length: > 0 })
+                        return null;
+                    if (attributes.Length > 1)
+                        throw new AmbiguousMatchException($"Multiple attributes of type {attributeType.FullName}.");
+                    
+                    return attributes[0] as Attribute;
+            }
+        }
+        catch (TypeLoadException)
+        {
+            return null;
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Checks for and returns the the attribute of type <typeparamref name="TAttribute"/> on <paramref name="member"/>.
+    /// </summary>
+    /// <param name="inherit">Also check parent members.</param>
+    /// <param name="member">Member to check for attributes. This can be <see cref="Module"/>, <see cref="Assembly"/>, <see cref="MemberInfo"/>, or <see cref="ParameterInfo"/>.</param>
+    /// <typeparam name="TAttribute">Type of the attribute to check for.</typeparam>
+    [Pure]
+    public static TAttribute[] GetAttributesSafe<TAttribute>(this ICustomAttributeProvider member, bool inherit = false) where TAttribute : Attribute
+        => (TAttribute[])member.GetAttributesSafe(typeof(TAttribute), inherit);
+
+    /// <summary>
+    /// Checks for and returns the attribute of type <paramref name="attributeType"/> on <paramref name="member"/>.
+    /// </summary>
+    /// <param name="member">Member to check for attributes. This can be <see cref="Module"/>, <see cref="Assembly"/>, <see cref="MemberInfo"/>, or <see cref="ParameterInfo"/>.</param>
+    /// <param name="attributeType">Type of the attribute to check for.</param>
+    /// <param name="inherit">Also check parent members.</param>
+    /// <exception cref="ArgumentException"><paramref name="attributeType"/> did not derive from <see cref="Attribute"/>.</exception>
+    [Pure]
+    public static Attribute[] GetAttributesSafe(this ICustomAttributeProvider member, Type attributeType, bool inherit = false)
+    {
+        try
+        {
+            object[] array = member.GetCustomAttributes(attributeType, inherit);
+            if (array is { Length: > 0 })
+            {
+                if (array.GetType().GetElementType() == attributeType)
+                    return (Attribute[])array;
+
+                int ct = 0;
+                for (int i = 0; i < array.Length; ++i)
+                {
+                    if (array[i] is Attribute attr && attributeType.IsInstanceOfType(attr))
+                        ++ct;
+                }
+
+                Attribute[] array2 = (Attribute[])Array.CreateInstance(attributeType, ct);
+                for (int i = 0; i < array.Length; ++i)
+                {
+                    if (array[i] is Attribute attr && attributeType.IsInstanceOfType(attr))
+                        array2[array2.Length - --ct - 1] = attr;
+                }
+
+                return array2;
+            }
+        }
+        catch (TypeLoadException) { }
+        catch (FileNotFoundException) { }
+
+        return attributeType == typeof(Attribute)
+            ? Array.Empty<Attribute>()
+            : (Attribute[])Array.CreateInstance(attributeType, 0);
+    }
+
+    /// <summary>
+    /// Checks for and outputs the the attribute of type <typeparamref name="TAttribute"/> on <paramref name="member"/>.
+    /// </summary>
+    /// <param name="inherit">Also check parent members.</param>
+    /// <param name="member">Member to check for attributes. This can be <see cref="Module"/>, <see cref="Assembly"/>, <see cref="MemberInfo"/>, or <see cref="ParameterInfo"/>.</param>
+    /// <typeparam name="TAttribute">Type of the attribute to check for.</typeparam>
+    /// <returns><see langword="true"/> if the attribute was found, otherwise <see langword="false"/>.</returns>
+    [Pure]
+    public static bool TryGetAttributeSafe<TAttribute>(this ICustomAttributeProvider member, out TAttribute attribute, bool inherit = false) where TAttribute : Attribute
+    {
+        attribute = (member.GetAttributeSafe(typeof(TAttribute), inherit) as TAttribute)!;
+        return attribute != null;
+    }
+
+    /// <summary>
     /// Checks for the <see cref="IgnoreAttribute"/> on <paramref name="type"/>.
     /// </summary>
+    /// <param name="inherit">Also check parent members.</param>
     [Pure]
-    public static bool IsIgnored(this Type type) => Attribute.IsDefined(type, typeof(IgnoreAttribute));
+    public static bool IsIgnored(this ICustomAttributeProvider member, bool inherit = false) => member.HasAttributeSafe(_ignoreAttribute ??= typeof(IgnoreAttribute), inherit);
 
     /// <summary>
-    /// Checks for the <see cref="IgnoreAttribute"/> on <paramref name="member"/>.
+    /// Checks for the <see cref="PriorityAttribute"/> on <paramref name="type"/> and returns the priority (or zero if not found).
     /// </summary>
     [Pure]
-    public static bool IsIgnored(this MemberInfo member) => Attribute.IsDefined(member, typeof(IgnoreAttribute));
-
-    /// <summary>
-    /// Checks for the <see cref="IgnoreAttribute"/> on <paramref name="assembly"/>.
-    /// </summary>
-    [Pure]
-    public static bool IsIgnored(this Assembly assembly) => Attribute.IsDefined(assembly, typeof(IgnoreAttribute));
-
-    /// <summary>
-    /// Checks for the <see cref="IgnoreAttribute"/> on <paramref name="parameter"/>.
-    /// </summary>
-    [Pure]
-    public static bool IsIgnored(this ParameterInfo parameter) => Attribute.IsDefined(parameter, typeof(IgnoreAttribute));
-
-    /// <summary>
-    /// Checks for the <see cref="IgnoreAttribute"/> on <paramref name="module"/>.
-    /// </summary>
-    [Pure]
-    public static bool IsIgnored(this Module module) => Attribute.IsDefined(module, typeof(IgnoreAttribute));
-
-    /// <summary>
-    /// Checks for the <see cref="LoadPriorityAttribute"/> on <paramref name="type"/> and returns the priority (or zero if not found).
-    /// </summary>
-    [Pure]
-    public static int GetPriority(this Type type) => Attribute.GetCustomAttribute(type, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr ? attr.Priority : 0;
-
-    /// <summary>
-    /// Checks for the <see cref="LoadPriorityAttribute"/> on <paramref name="member"/> and returns the priority (or zero if not found).
-    /// </summary>
-    [Pure]
-    public static int GetPriority(this MemberInfo member) => Attribute.GetCustomAttribute(member, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr ? attr.Priority : 0;
-
-    /// <summary>
-    /// Checks for the <see cref="LoadPriorityAttribute"/> on <paramref name="assembly"/> and returns the priority (or zero if not found).
-    /// </summary>
-    [Pure]
-    public static int GetPriority(this Assembly assembly) => Attribute.GetCustomAttribute(assembly, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr ? attr.Priority : 0;
-
-    /// <summary>
-    /// Checks for the <see cref="LoadPriorityAttribute"/> on <paramref name="parameter"/> and returns the priority (or zero if not found).
-    /// </summary>
-    [Pure]
-    public static int GetPriority(this ParameterInfo parameter) => Attribute.GetCustomAttribute(parameter, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr ? attr.Priority : 0;
-
-    /// <summary>
-    /// Checks for the <see cref="LoadPriorityAttribute"/> on <paramref name="module"/> and returns the priority (or zero if not found).
-    /// </summary>
-    [Pure]
-    public static int GetPriority(this Module module) => Attribute.GetCustomAttribute(module, typeof(LoadPriorityAttribute)) is LoadPriorityAttribute attr ? attr.Priority : 0;
-
+    public static int GetPriority(this ICustomAttributeProvider member, bool inherit = true) => member.GetAttributeSafe(_priorityAttribute ??= typeof(LoadPriorityAttribute), inherit) is LoadPriorityAttribute attr ? attr.Priority : 0;
+    
     /// <summary>
     /// Created for <see cref="List{T}.Sort(Comparison{T})"/> to order by priority (highest to lowest).
     /// </summary>
@@ -1855,12 +1961,12 @@ public static class Accessor
         if (removeNulls)
         {
             if (removeIgnored)
-                types.RemoveAll(x => x == null || Attribute.IsDefined(x, typeof(IgnoreAttribute)));
+                types.RemoveAll(x => x == null || x.IsIgnored());
             else
                 types.RemoveAll(x => x == null);
         }
         else if (removeIgnored)
-            types.RemoveAll(x => Attribute.IsDefined(x!, typeof(IgnoreAttribute)));
+            types.RemoveAll(x => x!.IsIgnored());
 
         types.Sort(SortTypesByPriorityHandler!);
         return types!;
@@ -1892,12 +1998,12 @@ public static class Accessor
         if (removeNulls)
         {
             if (removeIgnored)
-                types.RemoveAll(x => x == null || Attribute.IsDefined(x, typeof(IgnoreAttribute)));
+                types.RemoveAll(x => x == null || x.IsIgnored());
             else
                 types.RemoveAll(x => x == null);
         }
         else if (removeIgnored)
-            types.RemoveAll(x => Attribute.IsDefined(x!, typeof(IgnoreAttribute)));
+            types.RemoveAll(x => x!.IsIgnored());
 
         types.Sort(SortTypesByPriorityHandler!);
         return types!;

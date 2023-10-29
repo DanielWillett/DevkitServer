@@ -1,17 +1,17 @@
 ﻿#if CLIENT
-using DevkitServer.API;
 using DevkitServer.Configuration;
 using DevkitServer.Players;
 using DevkitServer.Plugins;
-using System.Text.Json.Serialization;
+using SDG.Framework.Modules;
 
-namespace DevkitServer.Util;
+namespace DevkitServer.API.UI.Icons;
 internal static class ObjectIconPresets
 {
     private static readonly List<JsonConfigurationFile<List<AssetIconPreset>>> _presetProviders = new List<JsonConfigurationFile<List<AssetIconPreset>>>(1);
     private static JsonConfigurationFile<List<AssetIconPreset>>? _customPresets;
     private static readonly string _customPresetsPath = Path.Combine(DevkitServerConfig.Directory, "configured_icons.json");
     public static Dictionary<Guid, AssetIconPreset> Presets = new Dictionary<Guid, AssetIconPreset>(128);
+    private static readonly List<AssetIconPreset> DefaultPresets = new List<AssetIconPreset>(128);
     public static AssetIconPreset? ActivelyEditing { get; private set; }
     public static void Init()
     {
@@ -23,13 +23,14 @@ internal static class ObjectIconPresets
     }
     internal static void UpdateEditCache(LevelObject levelObject, ObjectAsset asset)
     {
-        Transform? ctrl = EditorUser.User?.Input.Aim;
+        Transform? ctrl = UserInput.LocalAim;
         if (ctrl == null)
             return;
 
         Transform? transform = levelObject.GetTransform();
         if (transform == null)
             return;
+
         if (ActivelyEditing == null || ActivelyEditing.Asset.GUID != asset.GUID)
         {
             ActivelyEditing = new AssetIconPreset
@@ -42,7 +43,7 @@ internal static class ObjectIconPresets
         ActivelyEditing.IconPosition = transform.InverseTransformPoint(ctrl.transform.position);
         ActivelyEditing.IconRotation = transform.InverseTransformRotation(ctrl.transform.rotation);
 
-        IconGenerator.ClearCache(asset.GUID);
+        ObjectIconGenerator.ClearCache(asset.GUID);
     }
     public static void SaveEditCache(bool asNew)
     {
@@ -51,7 +52,7 @@ internal static class ObjectIconPresets
             return;
         Guid guid = preset.Asset.GUID;
 
-        asNewRedo:
+    asNewRedo:
         if (asNew)
         {
             AssetIconPreset? existing = null;
@@ -83,6 +84,7 @@ internal static class ObjectIconPresets
                 _customPresets.Configuration.Add(existing);
             _customPresets.SaveConfig();
             Presets[guid] = existing;
+
             Logger.LogInfo($"Updated asset icon preset: {preset.Asset.Format()}, saved to {_customPresets.File.Format()}.");
         }
         else
@@ -93,11 +95,13 @@ internal static class ObjectIconPresets
                 .Where(x => x.y.Asset.GUID == guid)
                 .OrderByDescending(x => x.y.Priority)
                 .FirstOrDefault();
+
             if (existing == null)
             {
                 asNew = true;
                 goto asNewRedo;
             }
+
             int priority = -1;
             foreach (AssetIconPreset p in _presetProviders.SelectMany(x => x.Configuration).Where(x => x.Asset.GUID == guid && x != existing))
             {
@@ -119,8 +123,8 @@ internal static class ObjectIconPresets
     {
         if (ActivelyEditing == null)
             return;
-        
-        IconGenerator.ClearCache(ActivelyEditing.Asset.GUID);
+
+        ObjectIconGenerator.ClearCache(ActivelyEditing.Asset.GUID);
         ActivelyEditing = null;
     }
     private static void OnLevelLoaded(int level)
@@ -138,6 +142,7 @@ internal static class ObjectIconPresets
         foreach (JsonConfigurationFile<List<AssetIconPreset>> config in _presetProviders)
             config.OnRead -= OnConfigReloaded;
         _presetProviders.Clear();
+        Logger.LogDebug($"[{ObjectIconGenerator.Source}] Searching for object icon preset provider JSON files.");
         string dir;
         if (Provider.provider?.workshopService?.ugc != null)
         {
@@ -146,6 +151,7 @@ internal static class ObjectIconPresets
                 dir = content.type == ESteamUGCType.MAP ? Path.Combine(content.path, "Bundles") : content.path;
                 if (!Directory.Exists(dir))
                     continue;
+                DiscoverAssetIconPresetProvidersIn(dir, true);
                 foreach (string directory in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
                     DiscoverAssetIconPresetProvidersIn(directory, true);
             }
@@ -158,14 +164,16 @@ internal static class ObjectIconPresets
             dir = Path.Combine(Level.info.path, "Bundles");
             if (Directory.Exists(dir))
             {
+                DiscoverAssetIconPresetProvidersIn(dir, !(Level.isEditor && !DevkitServerModule.IsEditing));
                 foreach (string directory in Directory.EnumerateDirectories(Path.Combine(Level.info.path, "Bundles"), "*", SearchOption.AllDirectories))
-                    DiscoverAssetIconPresetProvidersIn(directory, DevkitServerModule.IsEditing);
+                    DiscoverAssetIconPresetProvidersIn(directory, !(Level.isEditor && !DevkitServerModule.IsEditing));
             }
         }
 
         dir = Path.Combine(ReadWrite.PATH, "Sandbox");
         if (Directory.Exists(dir))
         {
+            DiscoverAssetIconPresetProvidersIn(dir, false);
             foreach (string directory in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
                 DiscoverAssetIconPresetProvidersIn(directory, false);
         }
@@ -179,7 +187,7 @@ internal static class ObjectIconPresets
             foreach (string directory in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
                 DiscoverAssetIconPresetProvidersIn(directory, true);
         }
-        
+
         foreach (string directory in DevkitServerModule.AssemblyFileSearchLocations)
             DiscoverAssetIconPresetProvidersIn(directory, true);
 
@@ -189,19 +197,40 @@ internal static class ObjectIconPresets
         {
             if (plugin.DataDirectory is not { Length: > 0 } dir2 || !Directory.Exists(dir2))
                 continue;
+            DiscoverAssetIconPresetProvidersIn(dir2, !plugin.DeveloperMode);
             foreach (string directory in Directory.EnumerateDirectories(dir2, "*", SearchOption.AllDirectories))
                 DiscoverAssetIconPresetProvidersIn(directory, !plugin.DeveloperMode);
         }
-        
+
+        if (ModuleHook.modules != null)
+        {
+            foreach (Module module in ModuleHook.modules)
+            {
+                if (!module.isEnabled || module == DevkitServerModule.Module)
+                    continue;
+
+                DiscoverAssetIconPresetProvidersIn(module.config.DirectoryPath, true);
+                foreach (string directory in Directory.EnumerateDirectories(module.config.DirectoryPath, "*", SearchOption.AllDirectories))
+                    DiscoverAssetIconPresetProvidersIn(directory, true);
+            }
+
+        }
+
         if (!_presetProviders.Exists(x => x.File.Equals(_customPresetsPath, StringComparison.Ordinal)))
-            _presetProviders.Add(_customPresets = new JsonConfigurationFile<List<AssetIconPreset>>(Path.GetFullPath(_customPresetsPath)) { Defaultable = true });
+        {
+            string path = Path.GetFullPath(_customPresetsPath);
+            _presetProviders.Add(_customPresets = new JsonConfigurationFile<List<AssetIconPreset>>(path) { Defaultable = true });
+            Logger.LogDebug($"[{ObjectIconGenerator.Source}] + Registered working icon provider: {path.Format(false)}.");
+        }
 
         Presets.Clear();
+
+        ApplyDefaultProviders();
+
         int ct = DefaultPresets.Count;
 
         foreach (AssetIconPreset preset in DefaultPresets)
         {
-            preset.Priority = int.MinValue;
             preset.File = null;
             Presets[preset.Asset.GUID] = preset;
         }
@@ -223,10 +252,10 @@ internal static class ObjectIconPresets
             {
                 if (preset.Asset.Find() == null)
                 {
-                    if (i < workshop)
-                        Logger.LogWarning($"Object not found for icon preset: {preset.Asset.GUID.Format()} in {configFile.File.Format()}.", method: IconGenerator.Source);
+                    if (i >= workshop)
+                        Logger.LogWarning($"Object not found for icon preset: {preset.Asset.GUID.Format()} in {configFile.File.Format()}.", method: ObjectIconGenerator.Source);
                     else
-                        Logger.LogDebug($"[{IconGenerator.Source}] Object not found for workshop icon preset: {preset.Asset.GUID.Format()} in {configFile.File.Format()}.");
+                        Logger.LogDebug($"[{ObjectIconGenerator.Source}] Object not found for workshop icon preset: {preset.Asset.GUID.Format()} in {configFile.File.Format()}.");
                     continue;
                 }
                 preset.File = configFile.File;
@@ -235,13 +264,13 @@ internal static class ObjectIconPresets
             }
         }
 
-        Logger.LogInfo($"[{IconGenerator.Source}] Registered {Presets.Count.Format()} unique icon presets from {ct.Format()} presets.");
+        Logger.LogInfo($"[{ObjectIconGenerator.Source}] Registered {Presets.Count.Format()} unique icon presets from {ct.Format()} presets.");
 
         GC.Collect();
     }
     private static void OnConfigReloaded()
     {
-        IconGenerator.ClearCache();
+        ObjectIconGenerator.ClearCache();
     }
     private static void DiscoverAssetIconPresetProvidersIn(string path, bool isReadonly)
     {
@@ -259,138 +288,65 @@ internal static class ObjectIconPresets
                 || name.StartsWith("object_presets", StringComparison.InvariantCultureIgnoreCase)
                 ) && !_presetProviders.Exists(x => x.File.Equals(file, StringComparison.Ordinal)))
             {
-                Logger.LogDebug($" + Registered icon provider {file.Format()}.");
+                Logger.LogDebug($"[{ObjectIconGenerator.Source}] + Registered icon provider {file.Format()}.");
                 _presetProviders.Add(new JsonConfigurationFile<List<AssetIconPreset>>(Path.GetFullPath(file)) { ReadOnlyReloading = isReadonly });
             }
         }
     }
-
-    private static readonly List<AssetIconPreset> DefaultPresets = new List<AssetIconPreset>(17)
+    private static void ApplyDefaultProviders()
     {
-        /* Billboard 0-16 */
-        new AssetIconPreset
+        List<IDefaultIconProvider> providers = new List<IDefaultIconProvider>(2);
+        foreach (Type type in Accessor.GetTypesSafe(
+                     ModuleHook.modules
+                         .Where(x => x.assemblies != null)
+                         .SelectMany(x => x.assemblies))
+                     .Where(x => x is { IsInterface: false, IsAbstract: false } && typeof(IDefaultIconProvider).IsAssignableFrom(x)))
         {
-            Asset = new AssetReference<ObjectAsset>(new Guid("205a8cc33c9849c9bd65790403d0753d")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("a227d89ce4f34339a0124c146c1f8218")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("a8681fcb59d44b1588caec49f30a9c8f")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("70a1a85305a54009890ad292cd31b4ba")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("8631144673b34a89af1e6f7160591892")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("4925ee9047d846eea13fe2ffd91d34a3")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("61b260059a16486da1cd434cf7f2a88f")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("026f1c9406c34b8786517e1a6a10db4b")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("ebfb3476f7f0406f88d0cba7054afc3f")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("4182d6f8e54044f08c30d1961bb1dbec")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("7f48479a84a94592932e61684af5ecc6")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("b6f9ed46e7a04072834094ba45bf7bc2")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("74a98d29022343a0904bd6641c96f8c1")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("60b06f3164e24fcf8025fdabbad01841")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("7d8cee8f7ce143d5819629c761fbe861")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("5ba775bc88fe4171ab457e724179086a")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
-        },
-        new AssetIconPreset
-        {
-            Asset = new AssetReference<ObjectAsset>(new Guid("fe5a47b6ef0f4e3087028d57180e0b71")),
-            IconPosition = new Vector3(-3f, -10f, 9f),
-            IconRotation = Quaternion.Euler(-107f, -80f, 260f)
+            try
+            {
+                IDefaultIconProvider provider = (IDefaultIconProvider)Activator.CreateInstance(type);
+                providers.Add(provider);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Unable to apply icon provider: {type.FullName}.", method: ObjectIconGenerator.Source);
+                Logger.LogError(ex, method: ObjectIconGenerator.Source);
+            }
         }
-    };
-}
 
-public class AssetIconPreset
-{
-    [JsonPropertyName("object")]
-    [JsonConverter(typeof(AssetReferenceJsonConverterFactory.AssetReferenceJsonConverterGuidPreferred<ObjectAsset>))]
-    public AssetReference<ObjectAsset> Asset { get; set; }
+        providers.Sort((a, b) => b.Priority.CompareTo(a.Priority));
 
-    [JsonPropertyName("position")]
-    public Vector3 IconPosition { get; set; }
+#if DEBUG
+        foreach (IDefaultIconProvider provider in providers)
+        {
+            Logger.LogDebug($"[{ObjectIconGenerator.Source}] + Registered default icon provider: {provider.GetType().Name} (Priority: {provider.Priority}).");
+        }
+#endif
 
-    [JsonPropertyName("rotation")]
-    [JsonConverter(typeof(QuaternionEulerPreferredJsonConverter))]
-    public Quaternion IconRotation { get; set; }
+        List<ObjectAsset> objects = new List<ObjectAsset>(4096);
+        Assets.find(objects);
 
-    [JsonPropertyName("priority")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public int Priority { get; set; }
+        foreach (ObjectAsset obj in objects)
+        {
+            if (DefaultPresets.Exists(x => x.Asset.GUID == obj.GUID))
+                continue;
 
-    [JsonIgnore]
-    public string? File { get; set; }
+            IDefaultIconProvider? provider = providers.Find(x => x.AppliesTo(obj));
+
+            if (provider == null)
+                continue;
+
+            provider.GetMetrics(obj, out Vector3 position, out Quaternion rotation);
+
+            DefaultPresets.Add(new AssetIconPreset
+            {
+                Asset = new AssetReference<ObjectAsset>(obj.GUID),
+                Priority = int.MinValue,
+                IconPosition = position,
+                IconRotation = rotation
+            });
+        }
+    }
+
 }
 #endif

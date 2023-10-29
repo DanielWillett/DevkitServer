@@ -93,6 +93,7 @@ internal class DevkitServerResources
         new DevkitServerFileResource("UniTask.pdb", Path.Combine("Libraries", "UniTask.pdb"), new Version(0, 0, 10, 0)),
         new DevkitServerFileResource("UniTask.xml", Path.Combine("Libraries", "UniTask.xml"), new Version(0, 0, 10, 0)),
         new DevkitServerFileResource(Path.Combine("Libraries", "UniTask.dll license.txt"), new Version(0, 0, 10, 0)),
-        new DevkitServerFileResource(Path.Combine("Libraries", "ForwardingTargets", "DanielWillett.ReflectionTools.dll"), new Version(0, 0, 14, 0))
+        new DevkitServerFileResource(Path.Combine("Libraries", "ForwardingTargets", "DanielWillett.ReflectionTools.dll"), new Version(0, 0, 14, 0)),
+        new DevkitServerFileResource(Path.Combine("Libraries", "ForwardingTargets", "DanielWillett.UnturnedUITools.dll"), new Version(0, 0, 14, 0))
     };
 }

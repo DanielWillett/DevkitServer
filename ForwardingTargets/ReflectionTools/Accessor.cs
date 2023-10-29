@@ -210,31 +210,31 @@ public static class Accessor
     [Pure]
     public static bool IsIgnored(this Type type)
     {
-        return Attribute.IsDefined(type, typeof(IgnoreAttribute)) || DevkitServer.API.Accessor.IsIgnored(type);
+        return DevkitServer.API.Accessor.HasAttributeSafe<IgnoreAttribute>(type) || DevkitServer.API.Accessor.IsIgnored(type);
     }
 
     [Pure]
     public static bool IsIgnored(this MemberInfo member)
     {
-        return Attribute.IsDefined(member, typeof(IgnoreAttribute)) || DevkitServer.API.Accessor.IsIgnored(member);
+        return DevkitServer.API.Accessor.HasAttributeSafe<IgnoreAttribute>(member) || DevkitServer.API.Accessor.IsIgnored(member);
     }
 
     [Pure]
     public static bool IsIgnored(this Assembly assembly)
     {
-        return Attribute.IsDefined(assembly, typeof(IgnoreAttribute)) || DevkitServer.API.Accessor.IsIgnored(assembly);
+        return DevkitServer.API.Accessor.HasAttributeSafe<IgnoreAttribute>(assembly) || DevkitServer.API.Accessor.IsIgnored(assembly);
     }
 
     [Pure]
     public static bool IsIgnored(this ParameterInfo parameter)
     {
-        return Attribute.IsDefined(parameter, typeof(IgnoreAttribute)) || DevkitServer.API.Accessor.IsIgnored(parameter);
+        return DevkitServer.API.Accessor.HasAttributeSafe<IgnoreAttribute>(parameter) || DevkitServer.API.Accessor.IsIgnored(parameter);
     }
 
     [Pure]
     public static bool IsIgnored(this Module module)
     {
-        return Attribute.IsDefined(module, typeof(IgnoreAttribute)) || DevkitServer.API.Accessor.IsIgnored(module);
+        return DevkitServer.API.Accessor.HasAttributeSafe<IgnoreAttribute>(module) || DevkitServer.API.Accessor.IsIgnored(module);
     }
 
     [Pure]
@@ -242,7 +242,7 @@ public static class Accessor
     {
         int p = DevkitServer.API.Accessor.GetPriority(type);
         if (p == 0)
-            p = Attribute.GetCustomAttribute(type, typeof(PriorityAttribute)) is PriorityAttribute attr ? attr.Priority : 0;
+            p = DevkitServer.API.Accessor.GetAttributeSafe(type, typeof(PriorityAttribute)) is PriorityAttribute attr ? attr.Priority : 0;
         return p;
     }
 
@@ -251,7 +251,7 @@ public static class Accessor
     {
         int p = DevkitServer.API.Accessor.GetPriority(member);
         if (p == 0)
-            p = Attribute.GetCustomAttribute(member, typeof(PriorityAttribute)) is PriorityAttribute attr ? attr.Priority : 0;
+            p = DevkitServer.API.Accessor.GetAttributeSafe(member, typeof(PriorityAttribute)) is PriorityAttribute attr ? attr.Priority : 0;
         return p;
     }
 
@@ -260,7 +260,7 @@ public static class Accessor
     {
         int p = DevkitServer.API.Accessor.GetPriority(assembly);
         if (p == 0)
-            p = Attribute.GetCustomAttribute(assembly, typeof(PriorityAttribute)) is PriorityAttribute attr ? attr.Priority : 0;
+            p = DevkitServer.API.Accessor.GetAttributeSafe(assembly, typeof(PriorityAttribute)) is PriorityAttribute attr ? attr.Priority : 0;
         return p;
     }
 
@@ -269,7 +269,7 @@ public static class Accessor
     {
         int p = DevkitServer.API.Accessor.GetPriority(parameter);
         if (p == 0)
-            p = Attribute.GetCustomAttribute(parameter, typeof(PriorityAttribute)) is PriorityAttribute attr ? attr.Priority : 0;
+            p = DevkitServer.API.Accessor.GetAttributeSafe(parameter, typeof(PriorityAttribute)) is PriorityAttribute attr ? attr.Priority : 0;
         return p;
     }
 
@@ -278,7 +278,7 @@ public static class Accessor
     {
         int p = DevkitServer.API.Accessor.GetPriority(module);
         if (p == 0)
-            p = Attribute.GetCustomAttribute(module, typeof(PriorityAttribute)) is PriorityAttribute attr ? attr.Priority : 0;
+            p = DevkitServer.API.Accessor.GetAttributeSafe(module, typeof(PriorityAttribute)) is PriorityAttribute attr ? attr.Priority : 0;
         return p;
     }
 

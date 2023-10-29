@@ -904,8 +904,8 @@ public static class NetFactory
             {
                 MethodInfo method = methods[m];
 
-                if (Attribute.IsDefined(method, typeof(IgnoreAttribute)) ||
-                    Attribute.GetCustomAttribute(method, typeof(NetCallAttribute)) is not NetCallAttribute attribute ||
+                if (method.IsIgnored() ||
+                    !method.TryGetAttributeSafe(out NetCallAttribute attribute) ||
                     attribute.Type == NetCallSource.None ||
                     !(attribute.Type == NetCallSource.FromEither || search == NetCallSource.FromEither || search == attribute.Type))
                     continue;
@@ -961,11 +961,11 @@ public static class NetFactory
             FieldInfo[] fields = types[i].GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
             for (int f = 0; f < fields.Length; ++f)
             {
-                if (!fields[f].IsStatic || Attribute.IsDefined(fields[f], typeof(IgnoreAttribute)) || !fields[f].FieldType.IsSubclassOf(typeof(BaseNetCall)))
+                if (!fields[f].IsStatic || fields[f].IsIgnored() || !fields[f].FieldType.IsSubclassOf(typeof(BaseNetCall)))
                     continue;
                 
                 FieldInfo field = fields[f];
-                if (Attribute.GetCustomAttribute(field, typeof(IgnoreAttribute)) != null || field.GetValue(null) is not BaseNetCall call)
+                if (field.GetValue(null) is not BaseNetCall call)
                     continue;
                 Type callType = call.GetType();
                 bool core = false;

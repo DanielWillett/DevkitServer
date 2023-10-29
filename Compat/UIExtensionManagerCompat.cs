@@ -1,4 +1,5 @@
-﻿using DanielWillett.UITools;
+﻿#if CLIENT
+using DanielWillett.UITools;
 using DanielWillett.UITools.API.Extensions;
 using DanielWillett.UITools.Util;
 using DevkitServer.API;
@@ -59,6 +60,7 @@ internal class UIExtensionManagerCompat : IUIExtensionManager
 
         lock (_instance!)
         {
+            Logger.LogInfo("Loading compatability module for DanielWillett.UnturnedUITools.");
             UIAccessor.Init();
             UnturnedUIToolsNexus.UIExtensionManager = _instance;
             UnturnedUIToolsNexus.Initialize();
@@ -87,14 +89,12 @@ internal class UIExtensionManagerCompat : IUIExtensionManager
             return;
         IDevkitServerPlugin plugin = PluginLoader.FindOrCreateModulePlugin(module);
         List<Type> types = Accessor.GetTypesSafe(assembly, true);
-        foreach (Type type in types)
+        foreach (Type type in types.OrderByDescending(GetPriority))
         {
-            if (Attribute.GetCustomAttribute(type, typeof(DanielWillett.UITools.API.Extensions.UIExtensionAttribute)) is not DanielWillett.UITools.API.Extensions.UIExtensionAttribute attribute)
+            if (type.TryGetAttributeSafe(out DanielWillett.UITools.API.Extensions.UIExtensionAttribute attribute))
                 continue;
-
-            LoadPriorityAttribute? priority = Attribute.GetCustomAttribute(type, typeof(LoadPriorityAttribute)) as LoadPriorityAttribute;
-
-            API.UI.Extensions.UIExtensionInfo info = new API.UI.Extensions.UIExtensionInfo(type, attribute.ParentType, priority == null ? 0 : priority.Priority, plugin)
+            
+            API.UI.Extensions.UIExtensionInfo info = new API.UI.Extensions.UIExtensionInfo(type, attribute.ParentType, GetPriority(type), plugin)
             {
                 SuppressUIExtensionParentWarning = attribute.SuppressUIExtensionParentWarning || typeof(DanielWillett.UITools.API.Extensions.UIExtension).IsAssignableFrom(type)
             };
@@ -143,7 +143,7 @@ internal class UIExtensionManagerCompat : IUIExtensionManager
         if (p1 != 0)
             return p1;
 
-        return Attribute.GetCustomAttribute(member, typeof(DanielWillett.ReflectionTools.PriorityAttribute)) is
+        return member.GetAttributeSafe(typeof(DanielWillett.ReflectionTools.PriorityAttribute), true) is
             DanielWillett.ReflectionTools.PriorityAttribute p
             ? p.Priority
             : 0;
@@ -152,7 +152,7 @@ internal class UIExtensionManagerCompat : IUIExtensionManager
     public static bool IsAssignableFromUIExtension(Type type) => typeof(DanielWillett.UITools.API.Extensions.UIExtension).IsAssignableFrom(type);
     public static ExistingMemberAttribute? GetExistingMemberAttribute(MemberInfo member)
     {
-        if (Attribute.GetCustomAttribute(member, typeof(DanielWillett.UITools.API.Extensions.Members.ExistingMemberAttribute)) is not DanielWillett.UITools.API.Extensions.Members.ExistingMemberAttribute memberInfo)
+        if (member.TryGetAttributeSafe(out DanielWillett.UITools.API.Extensions.Members.ExistingMemberAttribute memberInfo))
             return null;
 
         return new ExistingMemberAttribute(memberInfo.MemberName)
@@ -163,3 +163,4 @@ internal class UIExtensionManagerCompat : IUIExtensionManager
         };
     }
 }
+#endif

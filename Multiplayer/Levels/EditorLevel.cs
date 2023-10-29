@@ -1,4 +1,5 @@
-﻿using DevkitServer.Levels;
+﻿using DevkitServer.API;
+using DevkitServer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 #if CLIENT
@@ -8,7 +9,6 @@ using DevkitServer.Patches;
 using SDG.Framework.Utilities;
 using SDG.Provider;
 using System.IO.Compression;
-using DevkitServer.API;
 
 #endif
 #if SERVER
