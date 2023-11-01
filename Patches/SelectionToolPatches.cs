@@ -68,7 +68,7 @@ internal static class SelectionToolPatches
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
         int i = 0;
         PatchUtil.InsertActionRateLimiter(ref i, stLbl, ins);
-        StackTracker tracker = new StackTracker(ins);
+        StackTracker tracker = new StackTracker(ins, method);
         for (; i < ins.Count; ++i)
         {
             CodeInstruction c = ins[i];

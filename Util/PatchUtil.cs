@@ -102,20 +102,39 @@ public static class PatchUtil
     /// <summary>
     /// Inserts instructions to execute <paramref name="checker"/> and return (or optionally branch to <paramref name="goto"/>) if it returns <see langword="false"/>.
     /// </summary>
-    /// <returns>Amount of instructions skipped.</returns>
-    public static void ReturnIfFalse(IList<CodeInstruction> instructions, ILGenerator generator, ref int index, Func<bool> checker, Label? @goto = null)
+    /// <returns>Amount of instructions inserted.</returns>
+    public static int ReturnIfFalse(IList<CodeInstruction> instructions, ILGenerator generator, ref int index, Func<bool> checker, Label? @goto = null)
     {
-        Label continueLbl = generator.DefineLabel();
-        CodeInstruction instruction = new CodeInstruction(checker.Method.GetCallRuntime(), checker.Method);
-        instruction.labels.AddRange(instructions[index].labels);
-        instructions[index].labels.Clear();
-        instructions.Insert(index, instruction);
+        if (index < 0)
+            throw new ArgumentException($"Unable to add ReturnIfFalse ({checker.Method.Name}), index is too small: {index}.", nameof(index));
+        if (index >= instructions.Count)
+            throw new ArgumentException($"Unable to add ReturnIfFalse ({checker.Method.Name}), index is too large: {index}.", nameof(index));
 
-        instructions.Insert(index + 1, new CodeInstruction(OpCodes.Brtrue, continueLbl));
-        instructions.Insert(index + 2, @goto.HasValue ? new CodeInstruction(OpCodes.Br, @goto) : new CodeInstruction(OpCodes.Ret));
-        index += 3;
-        if (instructions.Count > index)
-            instructions[index].labels.Add(continueLbl);
+        if (!@goto.HasValue)
+        {
+            CodeInstruction ret = instructions[instructions.Count - 1];
+            if (ret.opcode == OpCodes.Ret && ret.labels.Count > 0)
+                @goto = ret.labels[0];
+
+            if (!@goto.HasValue)
+            {
+                Label continueLbl = generator.DefineLabel();
+                instructions.Insert(index, new CodeInstruction(checker.Method.GetCallRuntime(), checker.Method).MoveLabelsFrom(instructions[index]));
+                instructions.Insert(index + 1, new CodeInstruction(OpCodes.Brtrue, continueLbl));
+                instructions.Insert(index + 2, new CodeInstruction(OpCodes.Ret));
+
+                index += 3;
+                if (instructions.Count > index)
+                    instructions[index].labels.Add(continueLbl);
+                return 3;
+            }
+        }
+        
+        instructions.Insert(index, new CodeInstruction(checker.Method.GetCallRuntime(), checker.Method).MoveLabelsFrom(instructions[index]));
+        instructions.Insert(index + 1, new CodeInstruction(OpCodes.Brfalse, @goto.Value));
+
+        index += 2;
+        return 2;
     }
     
     /// <summary>
@@ -824,6 +843,41 @@ public static class PatchUtil
             return !byRef || either;
         if (opcode == OpCodes.Ldarga_S || opcode == OpCodes.Ldarga)
             return byRef || either;
+
+        return false;
+    }
+
+    /// <summary>
+    /// Is this opcode any variants of <c>call</c>.
+    /// </summary>
+    /// <remarks>Use <see cref="IsCallAny"/> for the same check but all parameters default to <see langword="true"/>.</remarks>
+    /// <param name="opcode"><see cref="OpCode"/> to check.</param>
+    /// <param name="call">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>call</c>.</param>
+    /// <param name="calli">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>calli</c>.</param>
+    /// <param name="callvirt">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>callvirt</c>.</param>
+    [Pure]
+    public static bool IsCall(this OpCode opcode, bool call = false, bool calli = false, bool callvirt = false)
+        => opcode.IsCallAny(call, calli, callvirt);
+
+    /// <summary>
+    /// Is this opcode any variants of <c>call</c>.
+    /// </summary>
+    /// <remarks>Use <see cref="IsCall"/> for the same check but all parameters default to <see langword="false"/>.</remarks>
+    /// <param name="opcode"><see cref="OpCode"/> to check.</param>
+    /// <param name="call">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>call</c>.</param>
+    /// <param name="calli">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>calli</c>.</param>
+    /// <param name="callvirt">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>callvirt</c>.</param>
+    [Pure]
+    public static bool IsCallAny(this OpCode opcode, bool call = true, bool calli = true, bool callvirt = true)
+    {
+        if (opcode == OpCodes.Call)
+            return call;
+
+        if (opcode == OpCodes.Calli)
+            return calli;
+
+        if (opcode == OpCodes.Callvirt)
+            return callvirt;
 
         return false;
     }

@@ -385,6 +385,7 @@ public readonly struct MoveLevelObjectsFinalProperties
         DeltaTime = deltaTime;
     }
 }
+
 public delegate void UpdateObjectsCustomMaterialPaletteOverride(in UpdateObjectsCustomMaterialPaletteOverrideProperties properties);
 public readonly struct UpdateObjectsCustomMaterialPaletteOverrideProperties
 {
@@ -398,6 +399,7 @@ public readonly struct UpdateObjectsCustomMaterialPaletteOverrideProperties
         DeltaTime = deltaTime;
     }
 }
+
 public delegate void UpdateObjectsMaterialIndexOverride(in UpdateObjectsMaterialIndexOverrideProperties properties);
 public readonly struct UpdateObjectsMaterialIndexOverrideProperties
 {
@@ -409,5 +411,101 @@ public readonly struct UpdateObjectsMaterialIndexOverrideProperties
         NetIds = netIds;
         Index = index;
         DeltaTime = deltaTime;
+    }
+}
+
+public delegate void MoveRoadVertex(in MoveRoadVertexProperties properties);
+public delegate void MoveRoadVertexRequested(in MoveRoadVertexProperties properties, ref bool shouldAllow);
+public readonly struct MoveRoadVertexProperties
+{
+    public readonly NetId RoadNetId;
+    public readonly NetId VertexNetId;
+    public readonly Vector3 Position;
+    public readonly Vector3 OldPosition;
+    public readonly float DeltaTime;
+    public MoveRoadVertexProperties(NetId roadNetId, NetId vertexNetId, Vector3 oldPosition, Vector3 position, float deltaTime)
+    {
+        RoadNetId = roadNetId;
+        VertexNetId = vertexNetId;
+        Position = position;
+        OldPosition = oldPosition;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void MoveRoadTangentHandle(in MoveRoadTangentHandleProperties properties);
+public delegate void MoveRoadTangentHandleRequested(in MoveRoadTangentHandleProperties properties, ref bool shouldAllow);
+public readonly struct MoveRoadTangentHandleProperties
+{
+    public readonly NetId RoadNetId;
+    public readonly NetId VertexNetId;
+    public readonly TangentHandle Handle;
+    public readonly Vector3 Position;
+    public readonly Vector3 OldPosition;
+    public readonly float DeltaTime;
+    public MoveRoadTangentHandleProperties(NetId roadNetId, NetId vertexNetId, Vector3 oldPosition, TangentHandle handle, Vector3 position, float deltaTime)
+    {
+        RoadNetId = roadNetId;
+        VertexNetId = vertexNetId;
+        Handle = handle;
+        Position = position;
+        OldPosition = oldPosition;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void DeleteRoadVertex(in DeleteRoadVertexProperties properties);
+public delegate void DeleteRoadVertexRequested(in DeleteRoadVertexProperties properties, ref bool shouldAllow);
+public readonly struct DeleteRoadVertexProperties
+{
+    public readonly NetId RoadNetId;
+    public readonly NetId VertexNetId;
+    public readonly Vector3 OldPosition;
+    public readonly float DeltaTime;
+    public DeleteRoadVertexProperties(NetId roadNetId, NetId vertexNetId, Vector3 oldPosition, float deltaTime)
+    {
+        RoadNetId = roadNetId;
+        VertexNetId = vertexNetId;
+        OldPosition = oldPosition;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void DeleteRoad(in DeleteRoadProperties properties);
+public delegate void DeleteRoadRequested(in DeleteRoadProperties properties, ref bool shouldAllow);
+public readonly struct DeleteRoadProperties
+{
+    public readonly NetId RoadNetId;
+    public readonly Vector3 OldPosition;
+    public readonly float DeltaTime;
+    public DeleteRoadProperties(NetId roadNetId, Vector3 oldPosition, float deltaTime)
+    {
+        RoadNetId = roadNetId;
+        OldPosition = oldPosition;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void RequestInstantiateRoad(in RequestInstantiateRoadProperties properties);
+public delegate void RequestInstantiateRoadRequested(in RequestInstantiateRoadProperties properties, ref bool shouldAllow);
+public readonly struct RequestInstantiateRoadProperties
+{
+    public readonly Vector3 FirstVertexPosition;
+    public RequestInstantiateRoadProperties(Vector3 firstVertexPosition)
+    {
+        FirstVertexPosition = firstVertexPosition;
+    }
+}
+
+public delegate void RequestInstantiateRoadVertex(in RequestInstantiateRoadVertexProperties properties);
+public delegate void RequestInstantiateRoadVertexRequested(in RequestInstantiateRoadVertexProperties properties, ref bool shouldAllow);
+public readonly struct RequestInstantiateRoadVertexProperties
+{
+    public readonly NetId Road;
+    public readonly Vector3 VertexPosition;
+    public RequestInstantiateRoadVertexProperties(NetId road, Vector3 vertexPosition)
+    {
+        Road = road;
+        VertexPosition = vertexPosition;
     }
 }

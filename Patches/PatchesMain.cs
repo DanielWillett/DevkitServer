@@ -31,7 +31,7 @@ internal static class PatchesMain
         try
         {
 #if DEBUG
-            string path = Path.Combine(DevkitServerConfig.Directory, "harmony.log");
+            string path = Path.Combine(UnturnedPaths.RootDirectory.FullName, "Logs", "harmony.log");
             Environment.SetEnvironmentVariable("HARMONY_LOG_FILE", path);
             DevkitServerUtility.CheckDirectory(false, true, DevkitServerConfig.Directory, null);
             try

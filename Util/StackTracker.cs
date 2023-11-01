@@ -4,16 +4,29 @@ using System.Reflection;
 using System.Reflection.Emit;
 
 namespace DevkitServer.Util;
+
+/// <summary>
+/// Tool for keeping up with the stack size of a transpiler.
+/// </summary>
+/// <remarks>It's okay if the given list changes after passing it.</remarks>
 public class StackTracker
 {
     private static readonly InstanceGetter<SignatureHelper, Type[]>? GetArguments = Accessor.GenerateInstanceGetter<SignatureHelper, Type[]>("arguments");
     private static readonly InstanceGetter<SignatureHelper, Type>? GetReturnType = Accessor.GenerateInstanceGetter<SignatureHelper, Type>("returnType");
     private readonly List<CodeInstruction> _instructions;
+    private readonly MethodBase _method;
     private int _lastStackSizeIs0;
-    public StackTracker(List<CodeInstruction> instructions)
+    private int _listVersion;
+    public StackTracker(List<CodeInstruction> instructions, MethodBase method)
     {
         _instructions = instructions;
+        _method = method;
     }
+
+    /// <summary>
+    /// Get the stack size change of this <see cref="OpCode"/> with the given operand and method.
+    /// </summary>
+    /// <remarks>This does not take into account catch blocks, so if one is present one must be added to the stack change.</remarks>
     public static int GetStackChange(OpCode code, object? operand, MethodBase owningMethod)
     {
         int pop;
@@ -98,11 +111,20 @@ public class StackTracker
             }
         }
     }
-    public int GetLastUnconsumedIndex(int startIndex, OpCode code, MethodBase method, object? operand = null)
+
+    /// <summary>
+    /// Returns the index of the last instruction before <paramref name="startIndex"/> which starts with a stack size of zero.
+    /// </summary>
+    /// <remarks>This can be useful for isolating and replicating method calls with arguments that could change over time.</remarks>
+    /// <param name="startIndex">Index to search backwards from.</param>
+    /// <param name="code">Code to match. Use the other overload for a wildcard match.</param>
+    /// <param name="operand">Operand to match, or <see langword="null"/> for a wildcard.</param>
+    /// <exception cref="InvalidProgramException">At any point your stack size drops below zero.</exception>
+    public int GetLastUnconsumedIndex(int startIndex, OpCode code, object? operand = null)
     {
         int stackSize = 0;
         int lastStack = _lastStackSizeIs0;
-        if (_lastStackSizeIs0 >= startIndex)
+        if (_lastStackSizeIs0 >= startIndex || !Accessor.TryGetListVersion(_instructions, out int version) || version != _listVersion)
             lastStack = 0;
 
         int last = -1;
@@ -127,22 +149,42 @@ public class StackTracker
                     if (i >= startIndex)
                     {
                         _lastStackSizeIs0 = lastStack;
+                        Accessor.TryGetListVersion(_instructions, out _listVersion);
                         return last;
                     }
                     last = i;
                 }
             }
-            stackSize += GetStackChange(current.opcode, current.operand, method);
+            stackSize += GetStackChange(current.opcode, current.operand, _method);
             if (current.blocks.Any(x => x.blockType == ExceptionBlockType.BeginCatchBlock))
                 ++stackSize;
+            if (stackSize < 0)
+            {
+                Logger.LogError("Stack size less than 0 around the following lines of IL: ");
+
+                for (int j = Math.Max(0, i - 2); j < Math.Min(_instructions.Count - 1, i + 2); ++j)
+                    Logger.LogError($"#{j.Format("F4")} {_instructions[j].Format()}.");
+
+                throw new InvalidProgramException($"Stack size should never be less than zero. There is an issue with your IL code around index {i}.");
+            }
         }
+
+        Accessor.TryGetListVersion(_instructions, out _listVersion);
         return last;
     }
-    public int GetLastUnconsumedIndex(int startIndex, Predicate<OpCode> codeFilter, MethodBase method, object? operand = null)
+
+    /// <summary>
+    /// Returns the index of the last instruction before <paramref name="startIndex"/> which starts with a stack size of zero.
+    /// </summary>
+    /// <remarks>This can be useful for isolating and replicating method calls with arguments that could change over time.</remarks>
+    /// <param name="startIndex">Index to search backwards from.</param>
+    /// <param name="codeFilter">Predicate for <see cref="CodeInstruction"/> to match, or <see langword="null"/> for a wildcard.</param>
+    /// <exception cref="InvalidProgramException">At any point your stack size drops below zero.</exception>
+    public int GetLastUnconsumedIndex(int startIndex, PatternMatch? codeFilter)
     {
         int stackSize = 0;
         int lastStack = _lastStackSizeIs0;
-        if (_lastStackSizeIs0 >= startIndex)
+        if (_lastStackSizeIs0 >= startIndex || !Accessor.TryGetListVersion(_instructions, out int version) || version != _listVersion)
             lastStack = 0;
 
         int last = -1;
@@ -158,24 +200,37 @@ public class StackTracker
                     continue;
                 }
             }
+
             if (stackSize == 0)
             {
                 lastStack = _lastStackSizeIs0;
                 _lastStackSizeIs0 = i;
-                if (codeFilter(current.opcode) && (operand == null || OperandsEqual(current.operand, operand)))
+                if (codeFilter == null || codeFilter(current))
                 {
                     if (i >= startIndex)
                     {
                         _lastStackSizeIs0 = lastStack;
+                        Accessor.TryGetListVersion(_instructions, out _listVersion);
                         return last;
                     }
                     last = i;
                 }
             }
-            stackSize += GetStackChange(current.opcode, current.operand, method);
+            stackSize += GetStackChange(current.opcode, current.operand, _method);
             if (current.blocks.Any(x => x.blockType == ExceptionBlockType.BeginCatchBlock))
                 ++stackSize;
+            if (stackSize < 0)
+            {
+                Logger.LogError("Stack size less than 0 around the following lines of IL: ");
+
+                for (int j = Math.Max(0, i - 2); j < Math.Min(_instructions.Count - 1, i + 2); ++j)
+                    Logger.LogError($"#{j.Format("F4")} {_instructions[j].Format()}.");
+
+                throw new InvalidProgramException($"Stack size should never be less than zero. There is an issue with your IL code around index {i}.");
+            }
         }
+        
+        Accessor.TryGetListVersion(_instructions, out _listVersion);
         return last;
     }
 

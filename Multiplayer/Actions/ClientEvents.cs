@@ -16,6 +16,8 @@ public static class ClientEvents
     
     internal static CachedMulticastEvent<TryInstantiateHierarchyObject> EventOnTryInstantiateHierarchyObject = new CachedMulticastEvent<TryInstantiateHierarchyObject>(typeof(ClientEvents), nameof(OnTryInstantiateHierarchyObject));
     internal static CachedMulticastEvent<RequestInstantiateHierarchyObject> EventOnRequestInstantiateHierarchyObject = new CachedMulticastEvent<RequestInstantiateHierarchyObject>(typeof(ClientEvents), nameof(OnRequestInstantiateHierarchyObject));
+    internal static CachedMulticastEvent<RequestInstantiateRoad> EventOnRequestInstantiateRoad = new CachedMulticastEvent<RequestInstantiateRoad>(typeof(ClientEvents), nameof(EventOnRequestInstantiateRoad));
+    internal static CachedMulticastEvent<RequestInstantiateRoadVertex> EventOnRequestInstantiateRoadVertex = new CachedMulticastEvent<RequestInstantiateRoadVertex>(typeof(ClientEvents), nameof(EventOnRequestInstantiateRoadVertex));
 
     public static event EditHeightmapRequest OnEditHeightmapPermissionDenied
     {
@@ -59,6 +61,16 @@ public static class ClientEvents
         add => EventOnRequestInstantiateHierarchyObject.Add(value);
         remove => EventOnRequestInstantiateHierarchyObject.Remove(value);
     }
+    public static event RequestInstantiateRoad OnRequestInstantiateRoad
+    {
+        add => EventOnRequestInstantiateRoad.Add(value);
+        remove => EventOnRequestInstantiateRoad.Remove(value);
+    }
+    public static event RequestInstantiateRoadVertex OnRequestInstantiateRoadVertex
+    {
+        add => EventOnRequestInstantiateRoadVertex.Add(value);
+        remove => EventOnRequestInstantiateRoadVertex.Remove(value);
+    }
 
     public static event PaintRamp? OnPaintRamp;
     public static event AdjustHeightmap? OnAdjustHeightmap;
@@ -85,6 +97,16 @@ public static class ClientEvents
     public static event MoveLevelObjectsFinal? OnMoveLevelObjectsFinal;
     public static event UpdateObjectsCustomMaterialPaletteOverride? OnUpdateObjectsCustomMaterialPaletteOverride;
     public static event UpdateObjectsMaterialIndexOverride? OnUpdateObjectsMaterialIndexOverride;
+    public static event MoveRoadVertex? OnMoveRoadVertex;
+    public static event MoveRoadTangentHandle? OnMoveRoadTangentHandle;
+    public static event DeleteRoadVertex? OnDeleteRoadVertex;
+    public static event DeleteRoad? OnDeleteRoad;
+    public static event MoveRoadVertexRequested? OnMoveRoadVertexRequested;
+    public static event MoveRoadTangentHandleRequested? OnMoveRoadTangentHandleRequested;
+    public static event DeleteRoadVertexRequested? OnDeleteRoadVertexRequested;
+    public static event DeleteRoadRequested? OnDeleteRoadRequested;
+    public static event RequestInstantiateRoadVertexRequested? OnRequestInstantiateRoadVertexRequested;
+    public static event RequestInstantiateRoadRequested? OnRequestInstantiateRoadRequested;
 
     public static bool ListeningOnEditHeightmapPermissionDenied => !EventOnEditHeightmapPermissionDenied.IsEmpty;
     public static bool ListeningOnEditSplatmapPermissionDenied => !EventOnEditSplatmapPermissionDenied.IsEmpty;
@@ -122,6 +144,16 @@ public static class ClientEvents
     public static bool ListeningOnMoveLevelObjectsFinal => OnMoveLevelObjectsFinal != null;
     public static bool ListeningOnUpdateObjectsCustomMaterialPaletteOverride => OnUpdateObjectsCustomMaterialPaletteOverride != null;
     public static bool ListeningOnUpdateObjectsMaterialIndexOverride => OnUpdateObjectsMaterialIndexOverride != null;
+    public static bool ListeningOnMoveRoadVertex => OnMoveRoadVertex != null;
+    public static bool ListeningOnMoveRoadTangentHandle => OnMoveRoadTangentHandle != null;
+    public static bool ListeningOnDeleteRoadVertex => OnDeleteRoadVertex != null;
+    public static bool ListeningOnDeleteRoad => OnDeleteRoad != null;
+    public static bool ListeningOnMoveRoadVertexRequested => OnMoveRoadVertexRequested != null;
+    public static bool ListeningOnMoveRoadTangentHandleRequested => OnMoveRoadTangentHandleRequested != null;
+    public static bool ListeningOnDeleteRoadVertexRequested => OnDeleteRoadVertexRequested != null;
+    public static bool ListeningOnDeleteRoadRequested => OnDeleteRoadRequested != null;
+    public static bool ListeningOnRequestInstantiateRoadRequested => OnRequestInstantiateRoadRequested != null;
+    public static bool ListeningOnRequestInstantiateRoadVertexRequested => OnRequestInstantiateRoadVertexRequested != null;
     
     internal static void InvokeOnPaintRamp(in PaintRampProperties properties) => OnPaintRamp?.Invoke(in properties);
     internal static void InvokeOnAdjustHeightmap(in AdjustHeightmapProperties properties) => OnAdjustHeightmap?.Invoke(in properties);
@@ -148,6 +180,16 @@ public static class ClientEvents
     internal static void InvokeOnMoveLevelObjectsFinal(in MoveLevelObjectsFinalProperties properties) => OnMoveLevelObjectsFinal?.Invoke(in properties);
     internal static void InvokeOnUpdateObjectsCustomMaterialPaletteOverride(in UpdateObjectsCustomMaterialPaletteOverrideProperties properties) => OnUpdateObjectsCustomMaterialPaletteOverride?.Invoke(in properties);
     internal static void InvokeOnUpdateObjectsMaterialIndexOverride(in UpdateObjectsMaterialIndexOverrideProperties properties) => OnUpdateObjectsMaterialIndexOverride?.Invoke(in properties);
+    internal static void InvokeOnMoveRoadVertex(in MoveRoadVertexProperties properties) => OnMoveRoadVertex?.Invoke(in properties);
+    internal static void InvokeOnMoveRoadTangentHandle(in MoveRoadTangentHandleProperties properties) => OnMoveRoadTangentHandle?.Invoke(in properties);
+    internal static void InvokeOnDeleteRoadVertex(in DeleteRoadVertexProperties properties) => OnDeleteRoadVertex?.Invoke(in properties);
+    internal static void InvokeOnDeleteRoad(in DeleteRoadProperties properties) => OnDeleteRoad?.Invoke(in properties);
+    internal static void InvokeOnMoveRoadVertexRequested(in MoveRoadVertexProperties properties, ref bool shouldAllow) => OnMoveRoadVertexRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnMoveRoadTangentHandleRequested(in MoveRoadTangentHandleProperties properties, ref bool shouldAllow) => OnMoveRoadTangentHandleRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnDeleteRoadVertexRequested(in DeleteRoadVertexProperties properties, ref bool shouldAllow) => OnDeleteRoadVertexRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnDeleteRoadRequested(in DeleteRoadProperties properties, ref bool shouldAllow) => OnDeleteRoadRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnRequestInstantiateRoadRequested(in RequestInstantiateRoadProperties properties, ref bool shouldAllow) => OnRequestInstantiateRoadRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnRequestInstantiateRoadVertexRequested(in RequestInstantiateRoadVertexProperties properties, ref bool shouldAllow) => OnRequestInstantiateRoadVertexRequested?.Invoke(in properties, ref shouldAllow);
 }
 
 public delegate void TryInstantiateHierarchyObject(ref InstantiateHierarchyObjectProperties properties, ref bool shouldAllow);

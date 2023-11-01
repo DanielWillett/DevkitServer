@@ -28,7 +28,7 @@ public static class VanillaPermissions
     [Permission]
     public static readonly Permission BakeFoliageNearby = new Permission("terrain.foliage.bake.nearby", core: true);
     [Permission]
-    public static readonly Permission PlaceRoads = new Permission("roads.edit", core: true);
+    public static readonly Permission EditRoads = new Permission("roads.edit", core: true);
     [Permission]
     public static readonly Permission BakeRoads = new Permission("roads.bake", core: true);
     [Permission]

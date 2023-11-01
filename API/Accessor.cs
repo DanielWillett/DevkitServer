@@ -2197,6 +2197,41 @@ public static class Accessor
         return method is { IsFinal: false, IsVirtual: true } || method.IsAbstract || method.DeclaringType is { IsInterface: true };
     }
 
+    /// <summary>
+    /// Get the underlying array from a list.
+    /// </summary>
+    /// <exception cref="NotSupportedException">Reflection failure.</exception>
+    /// <exception cref="ArgumentNullException"/>
+    [Pure]
+    public static TElementType[] GetUnderlyingArray<TElementType>(this List<TElementType> list) => ListInfo<TElementType>.GetUnderlyingArray(list);
+
+    /// <summary>
+    /// Get the underlying array from a list, or in the case of a reflection failure calls <see cref="List{TElementType}.ToArray"/> on <paramref name="list"/> and returns that.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"/>
+    [Pure]
+    public static TElementType[] GetUnderlyingArrayOrCopy<TElementType>(this List<TElementType> list) => ListInfo<TElementType>.TryGetUnderlyingArray(list, out TElementType[] array) ? array : list.ToArray();
+
+    /// <summary>
+    /// Get the version of a list, which is incremented each time the list is updated.
+    /// </summary>
+    /// <exception cref="NotSupportedException">Reflection failure.</exception>
+    /// <exception cref="ArgumentNullException"/>
+    [Pure]
+    public static int GetListVersion<TElementType>(this List<TElementType> list) => ListInfo<TElementType>.GetListVersion(list);
+
+    /// <summary>
+    /// Get the underlying array from a list.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"/>
+    public static bool TryGetUnderlyingArray<TElementType>(List<TElementType> list, out TElementType[] underlyingArray) => ListInfo<TElementType>.TryGetUnderlyingArray(list, out underlyingArray);
+
+    /// <summary>
+    /// Get the version of a list, which is incremented each time the list is updated.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"/>
+    public static bool TryGetListVersion<TElementType>(List<TElementType> list, out int version) => ListInfo<TElementType>.TryGetListVersion(list, out version);
+
     private static class DelegateInfo<TDelegate> where TDelegate : Delegate
     {
         public static MethodInfo InvokeMethod { get; }
@@ -2220,6 +2255,79 @@ public static class Accessor
         {
             _nreExCtorCalc = true;
             _nreExCtor = typeof(NullReferenceException).GetConstructor(BindingFlags.Public | BindingFlags.Instance, null, Array.Empty<Type>(), null)!;
+        }
+    }
+    private static class ListInfo<TElementType>
+    {
+        private static InstanceGetter<List<TElementType>, TElementType[]>? _underlyingArrayGetter;
+        private static InstanceGetter<List<TElementType>, int>? _versionGetter;
+        private static bool _checkUndArr;
+        private static bool _checkVer;
+        private static bool CheckUndArr()
+        {
+            if (!_checkUndArr)
+            {
+                _underlyingArrayGetter = GenerateInstanceGetter<List<TElementType>, TElementType[]>("_items", false);
+                _checkUndArr = true;
+            }
+            return _underlyingArrayGetter != null;
+        }
+        private static bool CheckVer()
+        {
+            if (_checkVer)
+            {
+                _versionGetter = GenerateInstanceGetter<List<TElementType>, int>("_version", true);
+                _checkVer = true;
+            }
+            return _versionGetter != null;
+        }
+        public static TElementType[] GetUnderlyingArray(List<TElementType> list)
+        {
+            if (list == null)
+                throw new ArgumentNullException(nameof(list));
+
+            if (_underlyingArrayGetter != null || CheckUndArr())
+                return _underlyingArrayGetter!(list);
+
+            throw new NotSupportedException($"Unable to find '_items' in {list.GetType().Format()}.");
+        }
+        public static int GetListVersion(List<TElementType> list)
+        {
+            if (list == null)
+                throw new ArgumentNullException(nameof(list));
+
+            if (_versionGetter != null || CheckVer())
+                return _versionGetter!(list);
+
+            throw new NotSupportedException($"Unable to find '_version' in {list.GetType().Format()}.");
+        }
+        public static bool TryGetUnderlyingArray(List<TElementType> list, out TElementType[] underlyingArray)
+        {
+            if (list == null)
+                throw new ArgumentNullException(nameof(list));
+
+            if (_underlyingArrayGetter == null && !CheckUndArr())
+            {
+                underlyingArray = null!;
+                return false;
+            }
+
+            underlyingArray = _underlyingArrayGetter!(list);
+            return true;
+        }
+        public static bool TryGetListVersion(List<TElementType> list, out int version)
+        {
+            if (list == null)
+                throw new ArgumentNullException(nameof(list));
+
+            if (_versionGetter == null && !CheckVer())
+            {
+                version = 0;
+                return false;
+            }
+
+            version = _versionGetter!(list);
+            return true;
         }
     }
 

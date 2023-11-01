@@ -43,4 +43,5 @@ public enum DevkitServerNetCall : ushort
     SendBakeNavRequest = 41,
     SendBindNavigation = 42,
     SendNavBakeProgressUpdate = 43,
+    SendBindRoadElement = 44,
 }

@@ -750,7 +750,8 @@ public static class FormattingUtil
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            return GetANSIString(color, false) + str + ANSIForegroundReset;
+            string ansiString = GetANSIString(color, false);
+            return ansiString + str.Replace(ANSIForegroundReset, ansiString) + ANSIForegroundReset;
         }
 
         return str;
@@ -759,10 +760,10 @@ public static class FormattingUtil
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            return (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                       ? GetExtendedANSIString(ToArgb(color), false)
-                       : GetANSIString(ToConsoleColor(ToArgb(color)), false))
-                + str + ANSIForegroundReset;
+            string ansiString = (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                ? GetExtendedANSIString(ToArgb(color), false)
+                : GetANSIString(ToConsoleColor(ToArgb(color)), false));
+            return ansiString + str.Replace(ANSIForegroundReset, ansiString) + ANSIForegroundReset;
         }
 
         return str;
@@ -771,10 +772,10 @@ public static class FormattingUtil
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            return (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                       ? GetExtendedANSIString(ToArgb(color), false)
-                       : GetANSIString(ToConsoleColor(ToArgb(color)), false))
-                + str + ANSIForegroundReset;
+            string ansiString = (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                ? GetExtendedANSIString(ToArgb(color), false)
+                : GetANSIString(ToConsoleColor(ToArgb(color)), false));
+            return ansiString + str.Replace(ANSIForegroundReset, ansiString) + ANSIForegroundReset;
         }
 
         return str;
@@ -783,10 +784,10 @@ public static class FormattingUtil
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            return (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                       ? GetExtendedANSIString(argb, false)
-                       : GetANSIString(ToConsoleColor(argb), false))
-                + str + ANSIForegroundReset;
+            string ansiString = (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                ? GetExtendedANSIString(argb, false)
+                : GetANSIString(ToConsoleColor(argb), false));
+            return ansiString + str.Replace(ANSIForegroundReset, ansiString) + ANSIForegroundReset;
         }
 
         return str;
@@ -823,10 +824,10 @@ public static class FormattingUtil
                 _ => unchecked((int)0xFFFFFFFF)
             };
 
-            return (config.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                       ? GetExtendedANSIString(argb, false)
-                       : GetANSIString(ToConsoleColor(argb), false))
-                + str + ANSIForegroundReset;
+            string ansiString = (config.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                ? GetExtendedANSIString(argb, false)
+                : GetANSIString(ToConsoleColor(argb), false));
+            return ansiString + str.Replace(ANSIForegroundReset, ansiString) + ANSIForegroundReset;
         }
 
         return str;
@@ -835,7 +836,8 @@ public static class FormattingUtil
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            return GetANSIString(color, false) + str;
+            string ansiString = GetANSIString(color, false);
+            return ansiString + str.Replace(ANSIForegroundReset, ansiString);
         }
 
         return str;
@@ -844,10 +846,10 @@ public static class FormattingUtil
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            return (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                       ? GetExtendedANSIString(ToArgb(color), false)
-                       : GetANSIString(ToConsoleColor(ToArgb(color)), false))
-                + str;
+            string ansiString = (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                ? GetExtendedANSIString(ToArgb(color), false)
+                : GetANSIString(ToConsoleColor(ToArgb(color)), false));
+            return ansiString + str.Replace(ANSIForegroundReset, ansiString);
         }
 
         return str;
@@ -856,10 +858,10 @@ public static class FormattingUtil
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            return (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                       ? GetExtendedANSIString(ToArgb(color), false)
-                       : GetANSIString(ToConsoleColor(ToArgb(color)), false))
-                + str;
+            string ansiString = (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                ? GetExtendedANSIString(ToArgb(color), false)
+                : GetANSIString(ToConsoleColor(ToArgb(color)), false));
+            return ansiString + str.Replace(ANSIForegroundReset, ansiString);
         }
 
         return str;
@@ -868,10 +870,10 @@ public static class FormattingUtil
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            return (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                       ? GetExtendedANSIString(argb, false)
-                       : GetANSIString(ToConsoleColor(argb), false))
-                + str;
+            string ansiString = (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                ? GetExtendedANSIString(argb, false)
+                : GetANSIString(ToConsoleColor(argb), false));
+            return ansiString + str.Replace(ANSIForegroundReset, ansiString) + ANSIForegroundReset;
         }
 
         return str;

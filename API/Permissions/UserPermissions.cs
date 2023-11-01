@@ -909,7 +909,7 @@ public class PermissionGroupsConfig : SchemaConfiguration
                 VanillaPermissions.EditNodes,
                 VanillaPermissions.EditCartographyVolumes,
                 VanillaPermissions.BakeCartography,
-                VanillaPermissions.PlaceRoads,
+                VanillaPermissions.EditRoads,
                 VanillaPermissions.BakeRoads,
                 VanillaPermissions.EditLighting
             }),
@@ -925,7 +925,7 @@ public class PermissionGroupsConfig : SchemaConfiguration
                 VanillaPermissions.EditNodes,
                 VanillaPermissions.EditCartographyVolumes,
                 VanillaPermissions.BakeCartography,
-                VanillaPermissions.PlaceRoads,
+                VanillaPermissions.EditRoads,
                 VanillaPermissions.BakeRoads,
             }),
             new PermissionGroup("director", "Director", new Color32(51, 204, 255, 255), 2, new GroupPermission[]
