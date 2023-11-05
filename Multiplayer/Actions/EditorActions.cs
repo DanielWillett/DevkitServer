@@ -64,6 +64,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     internal static bool CanProcess;
     internal static bool HasProcessedPendingHierarchyObjects;
     internal static bool HasProcessedPendingLevelObjects;
+    internal static bool HasProcessedPendingRoads;
     /// <summary>
     /// Is the player catching up after downloading the map.
     /// </summary>
@@ -87,11 +88,12 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     public bool IsOwner { get; internal set; }
     public static IAction? ActiveAction { get; private set; }
     public ActionSettings Settings { get; }
-    public TerrainActions TerrainActions { get; }
-    public FoliageActions FoliageActions { get; }
-    public HierarchyActions HierarchyActions { get; }
-    public ObjectActions ObjectActions { get; }
-    public SpawnActions SpawnActions { get; }
+    internal TerrainActions TerrainActions { get; }
+    internal FoliageActions FoliageActions { get; }
+    internal HierarchyActions HierarchyActions { get; }
+    internal ObjectActions ObjectActions { get; }
+    internal SpawnActions SpawnActions { get; }
+    internal RoadActions RoadActions { get; }
     public int QueueSize => _pendingActions.Count;
 
     private EditorActions()
@@ -102,6 +104,26 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         HierarchyActions = new HierarchyActions(this);
         ObjectActions = new ObjectActions(this);
         SpawnActions = new SpawnActions(this);
+        RoadActions = new RoadActions(this);
+    }
+    public void Subscribe()
+    {
+        TerrainActions.Subscribe();
+        FoliageActions.Subscribe();
+        HierarchyActions.Subscribe();
+        ObjectActions.Subscribe();
+        SpawnActions.Subscribe();
+        RoadActions.Subscribe();
+    }
+
+    public void Unsubscribe()
+    {
+        TerrainActions.Unsubscribe();
+        FoliageActions.Unsubscribe();
+        HierarchyActions.Unsubscribe();
+        ObjectActions.Unsubscribe();
+        SpawnActions.Unsubscribe();
+        RoadActions.Unsubscribe();
     }
 
     [UsedImplicitly]
@@ -138,6 +160,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 CanProcess = true;
                 HasProcessedPendingHierarchyObjects = true;
                 HasProcessedPendingLevelObjects = true;
+                HasProcessedPendingRoads = true;
                 if (TemporaryEditorActions != null)
                 {
                     TemporaryEditorActions.Dispose();
@@ -313,13 +336,13 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             }
         }
     }
-    internal static void ApplyAction(IAction action, IActionListener listener)
+    internal static bool ApplyAction(IAction action, IActionListener listener)
     {
         if (OnApplyingAction != null)
         {
             bool allow = true;
             OnApplyingAction.Invoke(listener, action, ref allow);
-            if (!allow) return;
+            if (!allow) return false;
         }
         ActiveAction = action;
         try
@@ -335,6 +358,12 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             Logger.LogDebug($"Action applied: {action.Format()}.");
 #endif
         }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Error applying action: {action.Format()}.");
+            Logger.LogError(ex);
+            return false;
+        }
         finally
         {
             ActiveAction = null!;
@@ -342,6 +371,8 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 disposable.Dispose();
             OnAppliedAction?.Invoke(listener, action);
         }
+
+        return true;
     }
     private int CountNumActionsInPacket(out int skipped, int index = 0, int length = -1)
     {
@@ -492,7 +523,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 Logger.LogDebug($"[EDITOR ACTIONS] Loading option collection at index {collection.StartIndex}: {collection.Format()}.");
 #endif
             }
-            ActionType type = reader.ReadEnum<ActionType>();
+            DevkitServerActionType type = reader.ReadEnum<DevkitServerActionType>();
             IAction? action = EditorActionsCodeGeneration.CreateAction!(type);
 #if PRINT_ACTION_SIMPLE
             Logger.LogDebug($"[EDITOR ACTIONS] Loading action #{i.Format()} {action.Format()}, collection index: {collIndex.Format()}.");
@@ -598,24 +629,6 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         return true;
     }
 #endif
-
-    public void Subscribe()
-    {
-        TerrainActions.Subscribe();
-        FoliageActions.Subscribe();
-        HierarchyActions.Subscribe();
-        ObjectActions.Subscribe();
-        SpawnActions.Subscribe();
-    }
-
-    public void Unsubscribe()
-    {
-        TerrainActions.Unsubscribe();
-        FoliageActions.Unsubscribe();
-        HierarchyActions.Unsubscribe();
-        ObjectActions.Unsubscribe();
-        SpawnActions.Unsubscribe();
-    }
 }
 public interface IActionListener
 {
@@ -640,10 +653,12 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     public static TemporaryEditorActions? Instance { get; private set; }
     private readonly List<PendingHierarchyInstantiation> _hierarchyInstantiations = new List<PendingHierarchyInstantiation>();
     private readonly List<PendingLevelObjectInstantiation> _lvlObjectInstantiations = new List<PendingLevelObjectInstantiation>();
+    private readonly List<PendingRoadInstantiation> _roadInstantiations = new List<PendingRoadInstantiation>();
+    private readonly List<PendingRoadVertexInstantiation> _roadVertexInstantiations = new List<PendingRoadVertexInstantiation>();
     private readonly List<IAction> _actions = new List<IAction>();
     public int QueueSize => _actions.Count;
     public ActionSettings Settings { get; }
-    internal bool NeedsToFlush => _actions.Count > 0 || _hierarchyInstantiations.Count > 0 || _lvlObjectInstantiations.Count > 0;
+    internal bool NeedsToFlush => _actions.Count > 0 || _hierarchyInstantiations.Count > 0 || _lvlObjectInstantiations.Count > 0 || _roadVertexInstantiations.Count > 0 || _roadInstantiations.Count > 0;
     private TemporaryEditorActions()
     {
         Settings = new ActionSettings(this);
@@ -652,7 +667,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         Logger.LogDebug("[TEMP EDITOR ACTIONS] Initialized.");
 #endif
     }
-    public void QueueInstantiation(IHierarchyItemTypeIdentifier type, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
+    internal void QueueHierarchyItemInstantiation(IHierarchyItemTypeIdentifier type, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
     {
         if (type == null) throw new ArgumentNullException(nameof(type));
 
@@ -661,7 +676,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued hierarchy item instantiation for {type.Format()} when the level loads.");
 #endif
     }
-    public void QueueInstantiation(Asset asset, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
+    internal void QueueLevelObjectInstantiation(Asset asset, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
     {
         if (asset is not ObjectAsset && asset is not ItemBarricadeAsset and not ItemStructureAsset)
             throw new ArgumentException("Must be either ObjectAsset (LevelObject) or ItemAsset (LevelBuildableObject).", nameof(asset));
@@ -669,6 +684,20 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         _lvlObjectInstantiations.Add(new PendingLevelObjectInstantiation(asset.getReferenceTo<Asset>(), position, rotation, scale, owner, netId));
 #if PRINT_ACTION_SIMPLE
         Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued level object instantiation for {asset.Format()} when the level loads.");
+#endif
+    }
+    internal void QueueRoadInstantiation(long netIds, ushort flags, Vector3 position, Vector3 tangent1, Vector3 tangent2, float offset, ulong owner)
+    {
+        _roadInstantiations.Add(new PendingRoadInstantiation(netIds, flags, position, tangent1, tangent2, offset, owner));
+#if PRINT_ACTION_SIMPLE
+        Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued road instantiation at {position.Format()} when the level loads.");
+#endif
+    }
+    internal void QueueRoadVertexInstantiation(NetId roadNetId, Vector3 position, Vector3 tangent1, Vector3 tangent2, bool ignoreTerrain, float verticalOffset, int vertexIndex, ulong owner, NetId vertexNetId, ERoadMode mode)
+    {
+        _roadVertexInstantiations.Add(new PendingRoadVertexInstantiation(roadNetId, position, tangent1, tangent2, ignoreTerrain, verticalOffset, vertexIndex, owner, vertexNetId, mode));
+#if PRINT_ACTION_SIMPLE
+        Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued road vertex instantiation at {position.Format()} (from road {roadNetId.Format()} at #{vertexIndex}) when the level loads.");
 #endif
     }
     internal void HandleReadPackets(CSteamID user, ByteReader reader)
@@ -691,7 +720,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         {
             if (c.Count > collIndex + 1 && c[collIndex + 1].StartIndex >= i)
                 LoadCollection(collIndex + 1);
-            ActionType type = reader.ReadEnum<ActionType>();
+            DevkitServerActionType type = reader.ReadEnum<DevkitServerActionType>();
             IAction? action = EditorActionsCodeGeneration.CreateAction!(type);
             if (action != null)
             {
@@ -740,8 +769,24 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         }
 
         EditorActions.HasProcessedPendingLevelObjects = true;
-        if (_lvlObjectInstantiations.Count > 10)
+
+        if (_lvlObjectInstantiations.Count > 20)
             yield return null;
+        for (int i = 0; i < _roadInstantiations.Count; i++)
+        {
+            PendingRoadInstantiation roadInstantiation = _roadInstantiations[i];
+            RoadUtil.ReceiveInstantiation(MessageContext.Nil, roadInstantiation.Position, roadInstantiation.Flags,
+                roadInstantiation.Tangent1, roadInstantiation.Tangent2, roadInstantiation.Offset,
+                roadInstantiation.NetIds, roadInstantiation.Owner);
+        }
+        for (int i = 0; i < _roadVertexInstantiations.Count; i++)
+        {
+            PendingRoadVertexInstantiation vertexInstantiation = _roadVertexInstantiations[i];
+            RoadUtil.ReceiveVertexInstantiation(MessageContext.Nil, vertexInstantiation.RoadNetId, vertexInstantiation.Position,
+                vertexInstantiation.Tangent1, vertexInstantiation.Tangent2, vertexInstantiation.VertexIndex, vertexInstantiation.Mode,
+                vertexInstantiation.VerticalOffset, vertexInstantiation.IgnoreTerrain, vertexInstantiation.VertexNetId, vertexInstantiation.Owner);
+        }
+        EditorActions.HasProcessedPendingRoads = true;
         for (int i = 0; i < _actions.Count; ++i)
         {
             if (i % 30 == 0 && i > 0)
@@ -763,6 +808,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         EditorActions.CanProcess = false;
         EditorActions.HasProcessedPendingHierarchyObjects = false;
         EditorActions.HasProcessedPendingLevelObjects = false;
+        EditorActions.HasProcessedPendingRoads = false;
         EventOnStartListening.TryInvoke();
     }
     public void Dispose()
@@ -809,6 +855,52 @@ public class TemporaryEditorActions : IActionListener, IDisposable
             Scale = scale;
             Owner = owner;
             NetId = netId;
+        }
+    }
+    private readonly struct PendingRoadInstantiation
+    {
+        public readonly long NetIds;
+        public readonly ushort Flags;
+        public readonly Vector3 Position;
+        public readonly Vector3 Tangent1;
+        public readonly Vector3 Tangent2;
+        public readonly float Offset;
+        public readonly ulong Owner;
+        public PendingRoadInstantiation(long netIds, ushort flags, Vector3 position, Vector3 tangent1, Vector3 tangent2, float offset, ulong owner)
+        {
+            NetIds = netIds;
+            Flags = flags;
+            Position = position;
+            Tangent1 = tangent1;
+            Tangent2 = tangent2;
+            Offset = offset;
+            Owner = owner;
+        }
+    }
+    private readonly struct PendingRoadVertexInstantiation
+    {
+        public readonly NetId RoadNetId;
+        public readonly Vector3 Position;
+        public readonly Vector3 Tangent1;
+        public readonly Vector3 Tangent2;
+        public readonly bool IgnoreTerrain;
+        public readonly float VerticalOffset;
+        public readonly int VertexIndex;
+        public readonly ulong Owner;
+        public readonly NetId VertexNetId;
+        public readonly ERoadMode Mode;
+        public PendingRoadVertexInstantiation(NetId roadNetId, Vector3 position, Vector3 tangent1, Vector3 tangent2, bool ignoreTerrain, float verticalOffset, int vertexIndex, ulong owner, NetId vertexNetId, ERoadMode mode)
+        {
+            RoadNetId = roadNetId;
+            Position = position;
+            Tangent1 = tangent1;
+            Tangent2 = tangent2;
+            IgnoreTerrain = ignoreTerrain;
+            VerticalOffset = verticalOffset;
+            VertexIndex = vertexIndex;
+            Owner = owner;
+            VertexNetId = vertexNetId;
+            Mode = mode;
         }
     }
 }

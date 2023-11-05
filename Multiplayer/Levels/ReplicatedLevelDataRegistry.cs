@@ -360,13 +360,19 @@ public static class ReplicatedLevelDataRegistry
                 Logger.LogError(ex, method: Source);
             }
         }
-
+        int size = writer.Count - (pos + sizeof(int) + sizeof(ushort));
         // update the byte count in the beginning
         fixed (byte* ptr = &writer.Buffer[pos])
         {
-            *(int*)ptr = writer.Count - (pos + sizeof(int) + sizeof(ushort));
+            *(int*)ptr = size;
             ByteWriter.EndianCheck(ptr, sizeof(int));
         }
+#if DEBUG
+        if (srcInfo.Assembly != null)
+            srcInfo.Assembly.LogDebug($"[{Source}] Wrote data from {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}): {DevkitServerUtility.FormatBytes(size)}.");
+        else
+            Logger.LogDebug($"[{Source}] Wrote data from {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}): {DevkitServerUtility.FormatBytes(size)}.");
+#endif
     }
 
     /// <summary>

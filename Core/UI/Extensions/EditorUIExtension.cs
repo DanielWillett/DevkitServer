@@ -88,17 +88,17 @@ public class EditorUIExtension : ContainerUIExtension
         }
         if (_testLabel != null)
         {
-            Container.RemoveChild(_testLabel);
+            Container.TryRemoveChild(_testLabel);
             _testLabel = null;
         }
         if (_loadingBox != null)
         {
-            Container.RemoveChild(_loadingBox);
+            Container.TryRemoveChild(_loadingBox);
             _loadingBox = null;
         }
         if (_loadingProgress != null)
         {
-            Container.RemoveChild(_loadingProgress);
+            Container.TryRemoveChild(_loadingProgress);
             _loadingProgress = null;
         }
     }
@@ -176,7 +176,7 @@ public class EditorUIExtension : ContainerUIExtension
         if (!_nametags.TryGetValue(user.SteamId.m_SteamID, out ISleekLabel lbl))
             return;
 
-        Container.RemoveChild(lbl);
+        Container.TryRemoveChild(lbl);
         _nametags.Remove(user.SteamId.m_SteamID);
     }
     internal void UpdateAllNametags()

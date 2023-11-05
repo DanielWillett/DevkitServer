@@ -63,11 +63,11 @@ public sealed class HierarchyActions
 #endif
 }
 
-[Action(ActionType.MoveHierarchyItems, FinalTransformation.Capacity * 32 + 7, 0)]
+[Action(DevkitServerActionType.MoveHierarchyItems, FinalTransformation.Capacity * 32 + 7, 0)]
 [EarlyTypeInit]
 public sealed class MovedHierarchyObjectsAction : IAction
 {
-    public ActionType Type => ActionType.MoveHierarchyItems;
+    public DevkitServerActionType Type => DevkitServerActionType.MoveHierarchyItems;
     public CSteamID Instigator { get; set; }
     public float DeltaTime { get; set; }
     public FinalTransformation[] Transformations { get; set; } = Array.Empty<FinalTransformation>();
@@ -149,11 +149,11 @@ public sealed class MovedHierarchyObjectsAction : IAction
         return size;
     }
 }
-[Action(ActionType.DeleteHierarchyItems, 68, 0)]
+[Action(DevkitServerActionType.DeleteHierarchyItems, 68, 0)]
 [EarlyTypeInit]
 public sealed class DeleteHierarchyItemsAction : IAction
 {
-    public ActionType Type => ActionType.DeleteHierarchyItems;
+    public DevkitServerActionType Type => DevkitServerActionType.DeleteHierarchyItems;
     public CSteamID Instigator { get; set; }
     public float DeltaTime { get; set; }
     public NetId[] NetIds { get; set; } = Array.Empty<NetId>();

@@ -260,10 +260,10 @@ public interface IAutoFoundation
     ERayMask AutoFoundationRayMask { get; set; }
 }
 
-[Action(ActionType.HeightmapRamp, EncodingEx.MaxTerrainToolBoundsSize + 28, 8)]
-public sealed class HeightmapRampAction : ITerrainAction, IBrushRadius, IBrushFalloff
+[Action(DevkitServerActionType.HeightmapRamp, EncodingEx.MaxTerrainToolBoundsSize + 28, 8)]
+public sealed class HeightmapRampAction : ITerrainAction, IBrushRadiusAction, IBrushFalloffAction
 {
-    public ActionType Type => ActionType.HeightmapRamp;
+    public DevkitServerActionType Type => DevkitServerActionType.HeightmapRamp;
     public TerrainEditorType EditorType => TerrainEditorType.Heightmap;
     public CSteamID Instigator { get; set; }
     public Bounds Bounds { get; set; }
@@ -324,10 +324,10 @@ public sealed class HeightmapRampAction : ITerrainAction, IBrushRadius, IBrushFa
     }
 }
 
-[Action(ActionType.HeightmapAdjust, EncodingEx.MaxTerrainToolBoundsSize + 12, 16)]
-public sealed class HeightmapAdjustAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength, IBrushSensitivity
+[Action(DevkitServerActionType.HeightmapAdjust, EncodingEx.MaxTerrainToolBoundsSize + 12, 16)]
+public sealed class HeightmapAdjustAction : ITerrainAction, IBrushRadiusAction, IBrushFalloffAction, IBrushStrengthAction, IBrushSensitivityAction
 {
-    public ActionType Type => ActionType.HeightmapAdjust;
+    public DevkitServerActionType Type => DevkitServerActionType.HeightmapAdjust;
     public TerrainEditorType EditorType => TerrainEditorType.Heightmap;
     public CSteamID Instigator { get; set; }
     public Bounds Bounds { get; set; }
@@ -380,10 +380,10 @@ public sealed class HeightmapAdjustAction : ITerrainAction, IBrushRadius, IBrush
     }
 }
 
-[Action(ActionType.HeightmapFlatten, EncodingEx.MaxTerrainToolBoundsSize + 13, 20)]
-public sealed class HeightmapFlattenAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength, IBrushSensitivity, IBrushTarget
+[Action(DevkitServerActionType.HeightmapFlatten, EncodingEx.MaxTerrainToolBoundsSize + 13, 20)]
+public sealed class HeightmapFlattenAction : ITerrainAction, IBrushRadiusAction, IBrushFalloffAction, IBrushStrengthAction, IBrushSensitivityAction, IBrushTargetAction
 {
-    public ActionType Type => ActionType.HeightmapFlatten;
+    public DevkitServerActionType Type => DevkitServerActionType.HeightmapFlatten;
     public TerrainEditorType EditorType => TerrainEditorType.Heightmap;
     public EDevkitLandscapeToolHeightmapFlattenMethod FlattenMethod { get; set; }
     public CSteamID Instigator { get; set; }
@@ -442,14 +442,14 @@ public sealed class HeightmapFlattenAction : ITerrainAction, IBrushRadius, IBrus
     }
 }
 
-[Action(ActionType.HeightmapSmooth, EncodingEx.MaxTerrainToolBoundsSize + 16, 12)]
+[Action(DevkitServerActionType.HeightmapSmooth, EncodingEx.MaxTerrainToolBoundsSize + 16, 12)]
 [EarlyTypeInit]
-public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength
+public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadiusAction, IBrushFalloffAction, IBrushStrengthAction
 {
     private static readonly Dictionary<LandscapeCoord, float[,]> PixelSmoothBuffer = new Dictionary<LandscapeCoord, float[,]>(4);
     private static int _pixelSmoothSampleCount;
     private static float _pixelSmoothSampleTotal;
-    public ActionType Type => ActionType.HeightmapSmooth;
+    public DevkitServerActionType Type => DevkitServerActionType.HeightmapSmooth;
     public TerrainEditorType EditorType => TerrainEditorType.Heightmap;
     public EDevkitLandscapeToolHeightmapSmoothMethod SmoothMethod { get; set; }
     public CSteamID Instigator { get; set; }
@@ -591,10 +591,10 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadius, IBrush
     }
 }
 
-[Action(ActionType.SplatmapPaint, EncodingEx.MaxTerrainToolBoundsSize + 13, 64)]
-[Action(ActionType.SplatmapAutoPaint, EncodingEx.MaxTerrainToolBoundsSize + 12, 64, CreateMethod = nameof(CreateAutoPaint))]
+[Action(DevkitServerActionType.SplatmapPaint, EncodingEx.MaxTerrainToolBoundsSize + 13, 64)]
+[Action(DevkitServerActionType.SplatmapAutoPaint, EncodingEx.MaxTerrainToolBoundsSize + 12, 64, CreateMethod = nameof(CreateAutoPaint))]
 [EarlyTypeInit]
-public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength, IBrushTarget, IBrushSensitivity, IAutoSlope, IAutoFoundation, IAsset
+public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadiusAction, IBrushFalloffAction, IBrushStrengthAction, IBrushTargetAction, IBrushSensitivityAction, IAutoSlope, IAutoFoundation, IAssetAction
 {
     private static readonly RaycastHit[] FoundationHits;
     static SplatmapPaintAction()
@@ -676,13 +676,13 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
     private LandscapeMaterialAsset? _asset;
     private bool _assetFound;
 
-    public ActionType Type => IsAuto ? ActionType.SplatmapAutoPaint : ActionType.SplatmapPaint;
+    public DevkitServerActionType Type => IsAuto ? DevkitServerActionType.SplatmapAutoPaint : DevkitServerActionType.SplatmapPaint;
     public TerrainEditorType EditorType => TerrainEditorType.Splatmap;
     public CSteamID Instigator { get; set; }
     public Bounds Bounds { get; set; }
     public Vector2 BrushPosition { get; set; }
     public AssetReference<LandscapeMaterialAsset> SplatmapMaterial { get; set; }
-    Guid IAsset.Asset
+    Guid IAssetAction.Asset
     {
         get => SplatmapMaterial.GUID;
         set => SplatmapMaterial = new AssetReference<LandscapeMaterialAsset>(value);
@@ -864,9 +864,9 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadius, IBrushFa
     private static SplatmapPaintAction CreateAutoPaint() => new SplatmapPaintAction { IsAuto = true };
 }
 
-[Action(ActionType.SplatmapSmooth, EncodingEx.MaxTerrainToolBoundsSize + 8, 12)]
+[Action(DevkitServerActionType.SplatmapSmooth, EncodingEx.MaxTerrainToolBoundsSize + 8, 12)]
 [EarlyTypeInit]
-public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushFalloff, IBrushStrength
+public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadiusAction, IBrushFalloffAction, IBrushStrengthAction
 {
     private class SampleBufferEntry
     {
@@ -878,7 +878,7 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushF
     private static readonly Dictionary<LandscapeCoord, float[,,]> PixelSmoothBuffer = new Dictionary<LandscapeCoord, float[,,]>(4);
     private static int SmoothSampleAverageCount;
     private static int SmoothSampleCount;
-    public ActionType Type => ActionType.SplatmapSmooth;
+    public DevkitServerActionType Type => DevkitServerActionType.SplatmapSmooth;
     public TerrainEditorType EditorType => TerrainEditorType.Splatmap;
     public CSteamID Instigator { get; set; }
     public Bounds Bounds { get; set; }
@@ -1055,11 +1055,11 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadius, IBrushF
     }
 }
 
-[Action(ActionType.HolesCut, EncodingEx.MaxTerrainToolBoundsSize + 8, 4)]
+[Action(DevkitServerActionType.HolesCut, EncodingEx.MaxTerrainToolBoundsSize + 8, 4)]
 [EarlyTypeInit]
-public sealed class HolemapPaintAction : ITerrainAction, IBrushRadius
+public sealed class HolemapPaintAction : ITerrainAction, IBrushRadiusAction
 {
-    public ActionType Type => ActionType.HolesCut;
+    public DevkitServerActionType Type => DevkitServerActionType.HolesCut;
     public TerrainEditorType EditorType => TerrainEditorType.Holes;
     public CSteamID Instigator { get; set; }
     public Bounds Bounds { get; set; }
@@ -1100,21 +1100,21 @@ public sealed class HolemapPaintAction : ITerrainAction, IBrushRadius
     }
 }
 
-[Action(ActionType.AddTile, 5, 8)]
-[Action(ActionType.DeleteTile, 5, 8, CreateMethod = nameof(CreateDeleteTile))]
-public sealed class TileModifyAction : IAction, ICoordinates
+[Action(DevkitServerActionType.AddTile, 5, 8)]
+[Action(DevkitServerActionType.DeleteTile, 5, 8, CreateMethod = nameof(CreateDeleteTile))]
+public sealed class TileModifyAction : IAction, ICoordinatesAction
 {
-    public ActionType Type => IsDelete ? ActionType.DeleteTile : ActionType.AddTile;
+    public DevkitServerActionType Type => IsDelete ? DevkitServerActionType.DeleteTile : DevkitServerActionType.AddTile;
     public CSteamID Instigator { get; set; }
     public float DeltaTime { get; set; }
     public bool IsDelete { get; set; }
     public LandscapeCoord Coordinates { get; set; }
-    int ICoordinates.CoordinateX
+    int ICoordinatesAction.CoordinateX
     {
         get => Coordinates.x;
         set => Coordinates = Coordinates with { x = value };
     }
-    int ICoordinates.CoordinateY
+    int ICoordinatesAction.CoordinateY
     {
         get => Coordinates.y;
         set => Coordinates = Coordinates with { y = value };
@@ -1154,9 +1154,9 @@ public sealed class TileModifyAction : IAction, ICoordinates
     private static TileModifyAction CreateDeleteTile() => new TileModifyAction { IsDelete = true };
 }
 
-[Action(ActionType.UpdateSplatmapLayers, 132, 8)]
+[Action(DevkitServerActionType.UpdateSplatmapLayers, 132, 8)]
 [EarlyTypeInit(RequiresUIAccessTools = true)]
-public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinates
+public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinatesAction
 {
 #if CLIENT
     private static readonly Func<Array?>? GetUILayers = UIAccessTools.CreateUIFieldGetterReturn<Array>(UIAccessTools.EditorTerrainTilesUIType, "layers", false);
@@ -1169,16 +1169,16 @@ public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinates
                 .GetMethod("UpdateSelectedTile", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!
             , allowUnsafeTypeBinding: true);
 #endif
-    public ActionType Type => ActionType.UpdateSplatmapLayers;
+    public DevkitServerActionType Type => DevkitServerActionType.UpdateSplatmapLayers;
     public CSteamID Instigator { get; set; }
     public float DeltaTime { get; set; }
     public LandscapeCoord Coordinates { get; set; }
-    int ICoordinates.CoordinateX
+    int ICoordinatesAction.CoordinateX
     {
         get => Coordinates.x;
         set => Coordinates = Coordinates with { x = value };
     }
-    int ICoordinates.CoordinateY
+    int ICoordinatesAction.CoordinateY
     {
         get => Coordinates.y;
         set => Coordinates = Coordinates with { y = value };

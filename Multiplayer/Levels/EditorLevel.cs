@@ -23,7 +23,7 @@ public static class EditorLevel
 {
     public const int DataBufferPacketSize = NetFactory.MaxPacketSize; // 60 KiB (must be slightly under ushort.MaxValue, 60 KB is a good middle ground to allow for future overhead expansion, etc).
     [UsedImplicitly]
-    private static readonly NetCall SendRequestLevel = new NetCall(DevkitServerNetCall.RequestLevel);
+    private static readonly NetCall<byte[]> SendRequestLevel = new NetCall<byte[]>(DevkitServerNetCall.RequestLevel);
     [UsedImplicitly]
     private static readonly NetCall<int, string, long, int, bool, long> StartSendLevel = new NetCall<int, string, long, int, bool, long>(DevkitServerNetCall.StartSendLevel);
     [UsedImplicitly]
@@ -41,7 +41,7 @@ public static class EditorLevel
 #endif
         );
     [UsedImplicitly]
-    private static readonly NetCall SendPending = new NetCall(DevkitServerNetCall.SendPending);
+    private static readonly NetCall<byte[]> SendPending = new NetCall<byte[]>(DevkitServerNetCall.SendPending);
     [UsedImplicitly]
     internal static readonly NetCall Ping = new NetCall(DevkitServerNetCall.Ping);
     internal static List<ITransportConnection> PendingToReceiveActions = new List<ITransportConnection>(4);
@@ -57,8 +57,15 @@ public static class EditorLevel
     private static bool _exitCoroutine;
 
     [NetCall(NetCallSource.FromClient, (ushort)DevkitServerNetCall.RequestLevel)]
-    private static StandardErrorCode ReceiveLevelRequest(MessageContext ctx)
+    private static StandardErrorCode ReceiveLevelRequest(MessageContext ctx, byte[] passwordSHA1)
     {
+        if (!string.IsNullOrEmpty(Provider.serverPassword) && !Hash.verifyHash(passwordSHA1, Provider.serverPasswordHash))
+        {
+            Logger.LogInfo($"[SEND LEVEL] {ctx.Connection.Format()} tried to request level data with an invalid password.");
+            DevkitServerUtility.CustomDisconnect(ctx.Connection, ESteamRejection.WRONG_PASSWORD);
+            return StandardErrorCode.AccessViolation;
+        }
+
         Logger.LogInfo($"[SEND LEVEL] Received level request from ({ctx.Connection.Format()}).", ConsoleColor.DarkCyan);
         DevkitServerModule.ComponentHost.StartCoroutine(SendLevelCoroutine(ctx.Connection));
         return StandardErrorCode.Success;
@@ -413,15 +420,29 @@ public static class EditorLevel
 
     private static IEnumerator TryReceiveLevelCoroutine()
     {
-        NetTask task = SendPending.RequestAck(1000);
+        byte[] passwordHash = Provider.serverPasswordHash;
+        NetTask task = SendPending.RequestAck(passwordHash, 1000);
         yield return task;
         if (task.Parameters.Responded)
         {
-            yield return new WaitForSeconds(0.1f);
+            if (task.Parameters.ErrorCode is (int)StandardErrorCode.AccessViolation)
+            {
+                Logger.LogInfo($"[RECEIVE LEVEL] Password incorrect for server: {Provider.serverName.Format()}.");
+                DevkitServerUtility.CustomDisconnect(ESteamConnectionFailureInfo.PASSWORD);
+                yield break;
+            }
+            if (task.Parameters.ErrorCode is not (int)StandardErrorCode.Success)
+            {
+                Logger.LogInfo($"[RECEIVE LEVEL] Failed to begin pending level download: {(task.Parameters.ErrorCode.HasValue ? ((StandardErrorCode)task.Parameters.ErrorCode.Value).Format() : "Unknown Error".Colorize(ConsoleColor.Red))}.");
+                DevkitServerUtility.CustomDisconnect($"Error connecting: {(task.Parameters.ErrorCode.HasValue ? ((StandardErrorCode)task.Parameters.ErrorCode.Value).ToString() : "Unknown Error")}.");
+                yield break;
+            }
+
             if (TemporaryEditorActions.Instance == null)
                 TemporaryEditorActions.BeginListening();
+            yield return new WaitForSeconds(0.1f);
             
-            task = SendRequestLevel.RequestAck(3000);
+            task = SendRequestLevel.RequestAck(passwordHash, 3000);
             Logger.LogDebug("[RECEIVE LEVEL] Sent level request.", ConsoleColor.DarkCyan);
             yield return task;
         }

@@ -2,7 +2,7 @@
 using System.Text;
 
 namespace DevkitServer.Multiplayer.Actions;
-public class ActionSettingsCollection : IBrushRadius, IBrushFalloff, IBrushStrength, IBrushSensitivity, IBrushTarget, ICoordinates, IAsset, IAutoFoundation, IAutoSlope, IInstanceId
+public class ActionSettingsCollection : IBrushRadiusAction, IBrushFalloffAction, IBrushStrengthAction, IBrushSensitivityAction, IBrushTargetAction, ICoordinatesAction, IAssetAction, IAutoFoundation, IAutoSlope, IInstanceIdAction
 {
     public const int BaseSize = sizeof(int) + sizeof(ActionSetting);
     public int StartIndex { get; internal set; }

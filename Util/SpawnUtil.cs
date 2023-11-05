@@ -338,6 +338,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates item spawns by region (starting at the middle of the map).
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static ListRegionsEnumerator<ItemSpawnpoint> EnumerateItemSpawns()
     {
         ThreadUtil.assertIsGameThread();
@@ -348,6 +349,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates zombie spawns by region (starting at the middle of the map).
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static ListRegionsEnumerator<ZombieSpawnpoint> EnumerateZombieSpawns()
     {
         ThreadUtil.assertIsGameThread();
@@ -358,6 +360,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates item spawns by region (starting at the middle of the map).
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static ListRegionsEnumerator<ItemSpawnpoint> EnumerateItemSpawns(byte centerX, byte centerY, byte maxRegionDistance = 255)
     {
         ThreadUtil.assertIsGameThread();
@@ -368,6 +371,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates zombie spawns by region (starting at the specified region).
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static ListRegionsEnumerator<ZombieSpawnpoint> EnumerateZombieSpawns(byte centerX, byte centerY, byte maxRegionDistance = 255)
     {
         ThreadUtil.assertIsGameThread();
@@ -378,6 +382,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates item spawns by region (starting at the specified region).
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static ListRegionsEnumerator<ItemSpawnpoint> EnumerateItemSpawns(RegionCoord center, byte maxRegionDistance = 255)
     {
         ThreadUtil.assertIsGameThread();
@@ -388,6 +393,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates zombie spawns by region (starting at the specified region).
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static ListRegionsEnumerator<ZombieSpawnpoint> EnumerateZombieSpawns(RegionCoord center, byte maxRegionDistance = 255)
     {
         ThreadUtil.assertIsGameThread();
@@ -398,6 +404,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates item spawns by region (starting at the region containing the specified point).
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static ListRegionsEnumerator<ItemSpawnpoint> EnumerateItemSpawns(Vector3 center, byte maxRegionDistance = 255)
     {
         ThreadUtil.assertIsGameThread();
@@ -408,6 +415,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates zombie spawns by region (starting at the region containing the specified point).
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static ListRegionsEnumerator<ZombieSpawnpoint> EnumerateZombieSpawns(Vector3 center, byte maxRegionDistance = 255)
     {
         ThreadUtil.assertIsGameThread();
@@ -418,6 +426,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates animal spawns starting at the center of the map.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static DistanceListIterator<AnimalSpawnpoint> EnumerateAnimalSpawns()
     {
         ThreadUtil.assertIsGameThread();
@@ -428,6 +437,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates player spawns starting at the center of the map.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static DistanceListIterator<PlayerSpawnpoint> EnumeratePlayerSpawns()
     {
         ThreadUtil.assertIsGameThread();
@@ -438,6 +448,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates vehicle spawns starting at the center of the map.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static DistanceListIterator<VehicleSpawnpoint> EnumerateVehicleSpawns()
     {
         ThreadUtil.assertIsGameThread();
@@ -448,6 +459,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates animal spawns starting at <paramref name="center"/>.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static DistanceListIterator<AnimalSpawnpoint> EnumerateAnimalSpawns(Vector3 center)
     {
         ThreadUtil.assertIsGameThread();
@@ -458,6 +470,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates player spawns starting at <paramref name="center"/>.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static DistanceListIterator<PlayerSpawnpoint> EnumeratePlayerSpawns(Vector3 center)
     {
         ThreadUtil.assertIsGameThread();
@@ -468,6 +481,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates vehicle spawns starting at <paramref name="center"/>.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static DistanceListIterator<VehicleSpawnpoint> EnumerateVehicleSpawns(Vector3 center)
     {
         ThreadUtil.assertIsGameThread();
@@ -478,6 +492,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates animal spawns starting the center of the specified region.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static DistanceListIterator<AnimalSpawnpoint> EnumerateAnimalSpawns(byte centerX, byte centerY)
     {
         ThreadUtil.assertIsGameThread();
@@ -491,6 +506,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates player spawns starting the center of the specified region.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static DistanceListIterator<PlayerSpawnpoint> EnumeratePlayerSpawns(byte centerX, byte centerY)
     {
         ThreadUtil.assertIsGameThread();
@@ -504,6 +520,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates vehicle spawns starting the center of the specified region.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static DistanceListIterator<VehicleSpawnpoint> EnumerateVehicleSpawns(byte centerX, byte centerY)
     {
         ThreadUtil.assertIsGameThread();
@@ -517,6 +534,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates animal spawns starting the center of the specified region.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static DistanceListIterator<AnimalSpawnpoint> EnumerateAnimalSpawns(RegionCoord center)
     {
         ThreadUtil.assertIsGameThread();
@@ -530,6 +548,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates vehicle spawns starting the center of the specified region.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static DistanceListIterator<VehicleSpawnpoint> EnumerateVehicleSpawns(RegionCoord center)
     {
         ThreadUtil.assertIsGameThread();
@@ -543,6 +562,7 @@ public static class SpawnUtil
     /// <summary>
     /// Enumerates player spawns starting the center of the specified region.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static DistanceListIterator<PlayerSpawnpoint> EnumeratePlayerSpawns(RegionCoord center)
     {
         ThreadUtil.assertIsGameThread();
@@ -556,6 +576,7 @@ public static class SpawnUtil
     /// <summary>
     /// Execute <paramref name="action"/> for each item spawn starting at the provided region.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static void ForEachItemSpawn(byte centerX, byte centerY, byte maxRegionDistance, ForEach<ItemSpawnpoint> action)
     {
         ThreadUtil.assertIsGameThread();
@@ -574,6 +595,7 @@ public static class SpawnUtil
     /// <summary>
     /// Execute <paramref name="action"/> for each item spawn starting at the provided region.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static void ForEachItemSpawn(byte centerX, byte centerY, byte maxRegionDistance, ForEachWhile<ItemSpawnpoint> action)
     {
         ThreadUtil.assertIsGameThread();
@@ -595,6 +617,7 @@ public static class SpawnUtil
     /// <summary>
     /// Execute <paramref name="action"/> for each zombie spawn starting at the provided region.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static void ForEachZombieSpawn(byte centerX, byte centerY, byte maxRegionDistance, ForEach<ItemSpawnpoint> action)
     {
         ThreadUtil.assertIsGameThread();
@@ -613,6 +636,7 @@ public static class SpawnUtil
     /// <summary>
     /// Execute <paramref name="action"/> for each zombie spawn starting at the provided region.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static void ForEachZombieSpawn(byte centerX, byte centerY, byte maxRegionDistance, ForEachWhile<ItemSpawnpoint> action)
     {
         ThreadUtil.assertIsGameThread();

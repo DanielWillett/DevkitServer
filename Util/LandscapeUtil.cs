@@ -656,7 +656,7 @@ public static class LandscapeUtil
             SaveTransactions = true;
         }
     }
-    public static float GetBrushAlpha(this Multiplayer.Actions.IBrushFalloff action, float distance)
+    public static float GetBrushAlpha(this Multiplayer.Actions.IBrushFalloffAction action, float distance)
     {
         return distance < action.BrushFalloff ? 1f : (1f - distance) / (1f - action.BrushFalloff);
     }

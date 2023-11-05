@@ -114,7 +114,7 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
         };
 
         if (Labels.TryGetValue(spawn, out Label lbl2))
-            Container.RemoveChild(lbl2.Element);
+            Container.TryRemoveChild(lbl2.Element);
 
         UpdateLabel(lbl, text);
         Container.AddChild(label);
@@ -126,7 +126,7 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
         if (Container == null || !Labels.TryGetValue(spawn, out Label lbl))
             return;
 
-        Container.RemoveChild(lbl.Element);
+        Container.TryRemoveChild(lbl.Element);
         Labels.Remove(spawn);
     }
     protected void ClearLabels()
@@ -134,7 +134,7 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
         if (Container == null)
             return;
         foreach (Label label in Labels.Values)
-            Container.RemoveChild(label.Element);
+            Container.TryRemoveChild(label.Element);
 
         Labels.Clear();
     }

@@ -100,17 +100,17 @@ public sealed class FoliageActions
 
 }
 
-[Action(ActionType.AddFoliageToSurface, 45, 16)]
+[Action(DevkitServerActionType.AddFoliageToSurface, 45, 16)]
 [EarlyTypeInit]
-public sealed class AddFoliageToSurfaceAction : IServersideAction, IAsset
+public sealed class AddFoliageToSurfaceAction : IServersideAction, IAssetAction
 {
     private static readonly Action<FoliageInfoAsset, Vector3, Quaternion, Vector3, bool>? ExecuteAddFoliage
         = Accessor.GenerateInstanceCaller<FoliageInfoAsset, Action<FoliageInfoAsset, Vector3, Quaternion, Vector3, bool>>("addFoliage", throwOnError: false, allowUnsafeTypeBinding: true);
-    public ActionType Type => ActionType.AddFoliageToSurface;
+    public DevkitServerActionType Type => DevkitServerActionType.AddFoliageToSurface;
     public CSteamID Instigator { get; set; }
     public float DeltaTime { get; set; }
     public AssetReference<FoliageInfoAsset> FoliageAsset { get; set; }
-    Guid IAsset.Asset
+    Guid IAssetAction.Asset
     {
         get => FoliageAsset.GUID;
         set => FoliageAsset = new AssetReference<FoliageInfoAsset>(value);
@@ -226,15 +226,15 @@ public sealed class AddFoliageToSurfaceAction : IServersideAction, IAsset
     ;
 }
 
-[Action(ActionType.RemoveFoliageInstances, 16, 36)]
+[Action(DevkitServerActionType.RemoveFoliageInstances, 16, 36)]
 [EarlyTypeInit]
-public sealed class RemoveFoliageInstancesAction : IAction, ICoordinates, IBrushRadius, IBrushFalloff, IAsset
+public sealed class RemoveFoliageInstancesAction : IAction, ICoordinatesAction, IBrushRadiusAction, IBrushFalloffAction, IAssetAction
 {
-    public ActionType Type => ActionType.RemoveFoliageInstances;
+    public DevkitServerActionType Type => DevkitServerActionType.RemoveFoliageInstances;
     public CSteamID Instigator { get; set; }
     public Vector3 BrushPosition { get; set; }
     public AssetReference<FoliageInstancedMeshInfoAsset> FoliageAsset { get; set; }
-    Guid IAsset.Asset
+    Guid IAssetAction.Asset
     {
         get => FoliageAsset.GUID;
         set => FoliageAsset = new AssetReference<FoliageInstancedMeshInfoAsset>(value);
@@ -312,16 +312,16 @@ public sealed class RemoveFoliageInstancesAction : IAction, ICoordinates, IBrush
     public int CalculateSize() => 16;
 }
 
-[Action(ActionType.RemoveResourceSpawnpoint, 16, 16)]
+[Action(DevkitServerActionType.RemoveResourceSpawnpoint, 16, 16)]
 [EarlyTypeInit]
-public sealed class RemoveResourceSpawnpointAction : IAction, IAsset
+public sealed class RemoveResourceSpawnpointAction : IAction, IAssetAction
 {
-    public ActionType Type => ActionType.RemoveResourceSpawnpoint;
+    public DevkitServerActionType Type => DevkitServerActionType.RemoveResourceSpawnpoint;
     public CSteamID Instigator { get; set; }
     public float DeltaTime { get; set; }
     public Vector3 ResourcePosition { get; set; }
     public AssetReference<ResourceAsset> FoliageAsset { get; set; }
-    Guid IAsset.Asset
+    Guid IAssetAction.Asset
     {
         get => FoliageAsset.GUID;
         set => FoliageAsset = new AssetReference<ResourceAsset>(value);

@@ -643,7 +643,7 @@ public static class DevkitServerUtility
     }
 
     /// <summary>
-    /// Disconnect a user with a custom message using the <see cref="ESteamConnectionFailureInfo.KICKED"/> failure type. Works on client or server.
+    /// Disconnect a user with a custom message using the <see cref="ESteamConnectionFailureInfo.KICKED"/> or <see cref="ESteamRejection.PLUGIN"/> failure type. Works on client or server.
     /// </summary>
     /// <remarks>Clientside will gracefully disconnect, server will reject or kick.</remarks>
     public static void CustomDisconnect(
@@ -653,9 +653,10 @@ public static class DevkitServerUtility
         string message) =>
         CustomDisconnect(
 #if SERVER
-            user,
+            user, message, ESteamRejection.PLUGIN
+#else
+            message, ESteamConnectionFailureInfo.KICKED
 #endif
-        message, ESteamConnectionFailureInfo.KICKED
     );
 
     /// <summary>
@@ -664,15 +665,16 @@ public static class DevkitServerUtility
     /// <remarks>Clientside will gracefully disconnect, server will reject or kick.</remarks>
     public static void CustomDisconnect(
 #if SERVER
-        EditorUser user,
+        EditorUser user, ESteamRejection failureType
+#else
+        ESteamConnectionFailureInfo failureType
 #endif
-        ESteamConnectionFailureInfo failureType) =>
+        ) =>
         CustomDisconnect(
 #if SERVER
             user,
 #endif
-        string.Empty, failureType
-    );
+        string.Empty, failureType);
 
     /// <summary>
     /// Disconnect a user with a custom message and failure type. Works on client or server.
@@ -682,7 +684,13 @@ public static class DevkitServerUtility
 #if SERVER
         EditorUser user,
 #endif
-        string message, ESteamConnectionFailureInfo failureType)
+        string message,
+#if SERVER
+        ESteamRejection failureType
+#else
+        ESteamConnectionFailureInfo failureType
+#endif
+        )
     {
 #if CLIENT
         Provider.connectionFailureInfo = failureType;
@@ -690,12 +698,51 @@ public static class DevkitServerUtility
         DevkitServerModule.IsEditing = false;
 #else
         if (Provider.pending.Any(x => x.playerID.steamID.m_SteamID == user.SteamId.m_SteamID))
-            Provider.reject(user.SteamId, ESteamRejection.PLUGIN, message);
+            Provider.reject(user.SteamId, failureType, message);
         else
             Provider.kick(user.SteamId, message);
 #endif
     }
+#if SERVER
+    /// <summary>
+    /// Disconnect a connection with a custom message using the <see cref="ESteamRejection.PLUGIN"/> failure type. Works on client or server.
+    /// </summary>
+    /// <remarks>Clientside will gracefully disconnect, server will reject or kick.</remarks>
+    public static void CustomDisconnect(ITransportConnection user, string message) =>
+        CustomDisconnect(user, message, ESteamRejection.PLUGIN);
 
+    /// <summary>
+    /// Disconnect a connection with a custom failure type (and no message). Works on client or server.
+    /// </summary>
+    /// <remarks>Clientside will gracefully disconnect, server will reject or kick.</remarks>
+    public static void CustomDisconnect(ITransportConnection user, ESteamRejection failureType) =>
+        CustomDisconnect(user, string.Empty, failureType);
+
+    /// <summary>
+    /// Disconnect a connection with a custom message and failure type. Works on client or server.
+    /// </summary>
+    /// <remarks>Clientside will gracefully disconnect, server will reject or kick.</remarks>
+    public static void CustomDisconnect(ITransportConnection user, string message, ESteamRejection failureType)
+    {
+        if (user is HighSpeedConnection c)
+        {
+            HighSpeedServer.Instance.Disconnect(c);
+            return;
+        }
+
+        SteamPending? pending = Provider.pending.Find(x => ReferenceEquals(x.transportConnection, user));
+        if (pending != null)
+        {
+            Provider.reject(pending.playerID.steamID, ESteamRejection.PLUGIN, message);
+        }
+        else
+        {
+            SteamPlayer? player = Provider.clients.Find(x => ReferenceEquals(x.transportConnection, user));
+            if (player != null)
+                Provider.kick(player.playerID.steamID, message);
+        }
+    }
+#endif
     /// <summary>
     /// Tries to create a directory.
     /// </summary>

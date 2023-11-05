@@ -601,6 +601,7 @@ public sealed class DevkitServerModule : IModuleNexus
             ObjectSync.CreateServersideAuthority();
             HierarchySync.CreateServersideAuthority();
             NavigationSync.CreateServersideAuthority();
+            RoadSync.CreateServersideAuthority();
         }
         else if (level == Level.BUILD_INDEX_GAME)
         {
@@ -879,6 +880,7 @@ public sealed class DevkitServerModule : IModuleNexus
 #if SERVER
         DevkitServerUtility.CheckDirectory(false, false, DevkitServerConfig.LevelDirectory, typeof(DevkitServerConfig).GetProperty(nameof(DevkitServerConfig.LevelDirectory), BindingFlags.Public | BindingFlags.Static));
 
+        RoadNetIdDatabase.AssignExisting();
         LevelObjectNetIdDatabase.AssignExisting();
         HierarchyItemNetIdDatabase.AssignExisting();
         NavigationNetIdDatabase.AssignExisting();
@@ -922,6 +924,7 @@ public sealed class DevkitServerModule : IModuleNexus
         ObjectSync.DestroyServersideAuthority();
         HierarchySync.DestroyServersideAuthority();
         NavigationSync.DestroyServersideAuthority();
+        RoadSync.DestroyServersideAuthority();
         if (BackupManager != null)
             Object.Destroy(BackupManager);
         BackupManager = null;
@@ -1013,6 +1016,12 @@ public sealed class DevkitServerModule : IModuleNexus
     {
         AssertIsDevkitServerClient();
         ClientAskSave.Invoke();
+    }
+#elif SERVER
+    [NetCall(NetCallSource.FromClient, DevkitServerNetCall.AskSave)]
+    private static void ReceiveAskSave(MessageContext ctx)
+    {
+        SaveManager.save();
     }
 #endif
 }

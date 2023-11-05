@@ -144,16 +144,43 @@ internal static class ObjectIconPresets
         _presetProviders.Clear();
         Logger.LogDebug($"[{ObjectIconGenerator.Source}] Searching for object icon preset provider JSON files.");
         string dir;
-        if (Provider.provider?.workshopService?.ugc != null)
+        if (Provider.isConnected)
         {
-            foreach (SteamContent content in Provider.provider.workshopService.ugc)
+            // use server mapping instead of default mapping
+
+            List<Asset> allAssets = new List<Asset>();
+            Assets.find(allAssets);
+            foreach (AssetOrigin? origin in allAssets.Select(x => x.GetOrigin()).Distinct())
             {
-                dir = content.type == ESteamUGCType.MAP ? Path.Combine(content.path, "Bundles") : content.path;
-                if (!Directory.Exists(dir))
+                if (origin == null || origin.workshopFileId == 0ul)
                     continue;
-                DiscoverAssetIconPresetProvidersIn(dir, true);
-                foreach (string directory in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
-                    DiscoverAssetIconPresetProvidersIn(directory, true);
+
+                SteamContent content = Provider.provider.workshopService.ugc.Find(x => x.publishedFileID.m_PublishedFileId == origin.workshopFileId);
+                if (content == null)
+                    continue;
+
+                dir = content.type == ESteamUGCType.MAP ? Path.Combine(content.path, "Bundles") : content.path;
+                if (Directory.Exists(dir))
+                {
+                    DiscoverAssetIconPresetProvidersIn(dir, true);
+                    foreach (string directory in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
+                        DiscoverAssetIconPresetProvidersIn(directory, true);
+                }
+            }
+        }
+        else
+        {
+            if (Provider.provider?.workshopService?.ugc != null)
+            {
+                foreach (SteamContent content in Provider.provider.workshopService.ugc)
+                {
+                    dir = content.type == ESteamUGCType.MAP ? Path.Combine(content.path, "Bundles") : content.path;
+                    if (!Directory.Exists(dir) || !LocalWorkshopSettings.get().getEnabled(content.publishedFileID))
+                        continue;
+                    DiscoverAssetIconPresetProvidersIn(dir, true);
+                    foreach (string directory in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories))
+                        DiscoverAssetIconPresetProvidersIn(directory, true);
+                }
             }
         }
 

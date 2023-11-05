@@ -81,11 +81,11 @@ public sealed class ObjectActions
 }
 
 
-[Action(ActionType.DeleteLevelObjects, 64 * 4 + 5, 0)]
+[Action(DevkitServerActionType.DeleteLevelObjects, 64 * 4 + 5, 0)]
 [EarlyTypeInit]
 public sealed class DeleteLevelObjectsAction : IAction
 {
-    public ActionType Type => ActionType.DeleteLevelObjects;
+    public DevkitServerActionType Type => DevkitServerActionType.DeleteLevelObjects;
     public CSteamID Instigator { get; set; }
     public NetId[] NetIds { get; set; } = Array.Empty<NetId>();
     public float DeltaTime { get; set; }
@@ -176,11 +176,11 @@ public sealed class DeleteLevelObjectsAction : IAction
 }
 
 
-[Action(ActionType.MoveLevelObjectsFinal, FinalTransformation.Capacity * 32 + 7, 0)]
+[Action(DevkitServerActionType.MoveLevelObjectsFinal, FinalTransformation.Capacity * 32 + 7, 0)]
 [EarlyTypeInit]
 public class MoveLevelObjectsFinalAction : IAction
 {
-    public ActionType Type => ActionType.MoveLevelObjectsFinal;
+    public DevkitServerActionType Type => DevkitServerActionType.MoveLevelObjectsFinal;
     public CSteamID Instigator { get; set; }
     public FinalTransformation[] Transformations { get; set; } = Array.Empty<FinalTransformation>();
     public bool UseScale { get; set; }
@@ -282,10 +282,10 @@ public class MoveLevelObjectsFinalAction : IAction
     }
 }
 
-[Action(ActionType.InstantiateLevelObject, 68, 0)]
+[Action(DevkitServerActionType.InstantiateLevelObject, 68, 0)]
 public class InstantiateLevelObjectAction : IServersideAction
 {
-    public ActionType Type => ActionType.InstantiateLevelObject;
+    public DevkitServerActionType Type => DevkitServerActionType.InstantiateLevelObject;
     public float DeltaTime { get; set; }
     public CSteamID Instigator { get; set; }
     public Guid Asset { get; set; }
@@ -332,11 +332,11 @@ public class InstantiateLevelObjectAction : IServersideAction
     public int CalculateSize() => 68;
 }
 
-[Action(ActionType.UpdateObjectsCustomMaterialPaletteOverride, 64 * 4 + 21, 0)]
+[Action(DevkitServerActionType.UpdateObjectsCustomMaterialPaletteOverride, 64 * 4 + 21, 0)]
 [EarlyTypeInit]
 public sealed class UpdateObjectsCustomMaterialPaletteOverrideAction : IAction
 {
-    public ActionType Type => ActionType.UpdateObjectsCustomMaterialPaletteOverride;
+    public DevkitServerActionType Type => DevkitServerActionType.UpdateObjectsCustomMaterialPaletteOverride;
     public CSteamID Instigator { get; set; }
     public NetId[] NetIds { get; set; } = Array.Empty<NetId>();
     public float DeltaTime { get; set; }
@@ -423,11 +423,11 @@ public sealed class UpdateObjectsCustomMaterialPaletteOverrideAction : IAction
     public int CalculateSize() => 21 + Math.Min(byte.MaxValue, NetIds == null ? 0 : NetIds.Length) * 4;
 }
 
-[Action(ActionType.UpdateObjectsMaterialIndexOverride, 64 * 4 + 9, 0)]
+[Action(DevkitServerActionType.UpdateObjectsMaterialIndexOverride, 64 * 4 + 9, 0)]
 [EarlyTypeInit]
 public sealed class UpdateObjectsMaterialIndexOverrideAction : IAction
 {
-    public ActionType Type => ActionType.UpdateObjectsMaterialIndexOverride;
+    public DevkitServerActionType Type => DevkitServerActionType.UpdateObjectsMaterialIndexOverride;
     public CSteamID Instigator { get; set; }
     public NetId[] NetIds { get; set; } = Array.Empty<NetId>();
     public float DeltaTime { get; set; }

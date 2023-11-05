@@ -198,7 +198,7 @@ public static class LevelObjectUtil
             }
             if (!EditorActions.HasProcessedPendingLevelObjects)
             {
-                EditorActions.TemporaryEditorActions?.QueueInstantiation(itemAsset, position, rotation, scale, owner, netId);
+                EditorActions.TemporaryEditorActions?.QueueLevelObjectInstantiation(itemAsset, position, rotation, scale, owner, netId);
                 return StandardErrorCode.Success;
             }
 
@@ -227,7 +227,7 @@ public static class LevelObjectUtil
         }
         if (!EditorActions.HasProcessedPendingLevelObjects)
         {
-            EditorActions.TemporaryEditorActions?.QueueInstantiation(objAsset, position, rotation, scale, owner, netId);
+            EditorActions.TemporaryEditorActions?.QueueLevelObjectInstantiation(objAsset, position, rotation, scale, owner, netId);
             return StandardErrorCode.Success;
         }
 
@@ -321,6 +321,14 @@ public static class LevelObjectUtil
         if (user == null || !user.IsOnline)
         {
             Logger.LogError("Unable to get user from level object instantiation request.", method: Source);
+            ctx.Acknowledge(StandardErrorCode.NoPermissions);
+            return;
+        }
+
+        if (!VanillaPermissions.PlaceObjects.Has(user))
+        {
+            ctx.Acknowledge(StandardErrorCode.NoPermissions);
+            EditorMessage.SendNoPermissionMessage(user, VanillaPermissions.PlaceObjects);
             return;
         }
 
@@ -328,6 +336,7 @@ public static class LevelObjectUtil
         {
             Logger.LogError($"Unable to get asset for level object instantiation request from {user.Format()}.", method: Source);
             EditorMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", guid.ToString("N") + " Unknown Asset"));
+            ctx.Acknowledge(StandardErrorCode.NotFound);
             return;
         }
         Asset asset = objectAsset ?? (Asset)buildableAsset!;
@@ -390,6 +399,8 @@ public static class LevelObjectUtil
         }
 
         SyncIfAuthority(netId);
+
+        ctx.Acknowledge(StandardErrorCode.Success);
     }
 #endif
     private static void InitializeLevelObject(Transform transform, out LevelObject? levelObject,
@@ -499,6 +510,7 @@ public static class LevelObjectUtil
     /// <summary>
     /// Sets the material index override in a <see cref="MaterialPaletteAsset"/> for a <see cref="LevelObject"/> and networks it to connected clients or the server.
     /// </summary>
+    /// <exception cref="NoPermissionsException"/>
     /// <returns><see langword="False"/> in the case of a reflection error.</returns>
     public static bool SetMaterialIndexOverride(this LevelObject levelObject, int materialIndexOverride
 #if CLIENT
@@ -514,7 +526,12 @@ public static class LevelObjectUtil
             return false;
 #if CLIENT
         if (DevkitServerModule.IsEditing && LevelObjectNetIdDatabase.TryGetObjectNetId(levelObject, out NetId netId))
-            ClientEvents.InvokeOnUpdateObjectsMaterialIndexOverride(new UpdateObjectsMaterialIndexOverrideProperties(new NetId[] { netId }, materialIndexOverride, CachedTime.DeltaTime));
+        {
+            if (CheckMovePermission(levelObject.instanceID))
+                ClientEvents.InvokeOnUpdateObjectsMaterialIndexOverride(new UpdateObjectsMaterialIndexOverrideProperties(new NetId[] { netId }, materialIndexOverride, CachedTime.DeltaTime));
+            else
+                throw new NoPermissionsException(VanillaPermissions.MoveUnownedObjects);
+        }
 #else
         if (LevelObjectNetIdDatabase.TryGetObjectNetId(levelObject, out NetId netId))
         {
@@ -532,6 +549,7 @@ public static class LevelObjectUtil
     /// <summary>
     /// Sets the custom <see cref="MaterialPaletteAsset"/> override for a <see cref="LevelObject"/> and networks it to connected clients or the server.
     /// </summary>
+    /// <exception cref="NoPermissionsException"/>
     /// <returns><see langword="False"/> in the case of a reflection error.</returns>
     public static bool SetCustomMaterialPaletteOverride(this LevelObject levelObject, AssetReference<MaterialPaletteAsset> customMaterialPaletteOverride
 #if CLIENT
@@ -547,7 +565,12 @@ public static class LevelObjectUtil
             return false;
 #if CLIENT
         if (DevkitServerModule.IsEditing && LevelObjectNetIdDatabase.TryGetObjectNetId(levelObject, out NetId netId))
-            ClientEvents.InvokeOnUpdateObjectsCustomMaterialPaletteOverride(new UpdateObjectsCustomMaterialPaletteOverrideProperties(new NetId[] { netId }, customMaterialPaletteOverride, CachedTime.DeltaTime));
+        {
+            if (CheckMovePermission(levelObject.instanceID))
+                ClientEvents.InvokeOnUpdateObjectsCustomMaterialPaletteOverride(new UpdateObjectsCustomMaterialPaletteOverrideProperties(new NetId[] { netId }, customMaterialPaletteOverride, CachedTime.DeltaTime));
+            else
+                throw new NoPermissionsException(VanillaPermissions.MoveUnownedObjects);
+        }
 #else
         if (LevelObjectNetIdDatabase.TryGetObjectNetId(levelObject, out NetId netId))
         {

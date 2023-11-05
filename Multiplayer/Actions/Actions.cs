@@ -21,32 +21,57 @@ public enum ActionSetting
     Extended = 1 << 31
 }
 
-public enum ActionType : byte
+public enum DevkitServerActionType : byte
 {
-    HeightmapRamp,
-    HeightmapAdjust,
-    HeightmapFlatten,
-    HeightmapSmooth,
-    SplatmapPaint,
-    SplatmapAutoPaint,
-    SplatmapSmooth,
-    HolesCut,
-    AddTile,
-    DeleteTile,
-    UpdateSplatmapLayers,
-    AddFoliageToSurface,
-    RemoveFoliageInstances,
-    RemoveResourceSpawnpoint,
-    MoveHierarchyItems,
-    DeleteHierarchyItems,
-    DeleteLevelObjects,
-    MoveLevelObjectsFinal,
-    InstantiateLevelObject,
-    UpdateObjectsCustomMaterialPaletteOverride,
-    UpdateObjectsMaterialIndexOverride,
+    /* Terrain */
+    HeightmapRamp = 0,
+    HeightmapAdjust = 1,
+    HeightmapFlatten = 2,
+    HeightmapSmooth = 3,
+    SplatmapPaint = 4,
+    SplatmapAutoPaint = 5,
+    SplatmapSmooth = 6,
+    HolesCut = 7,
+
+    /* Tiles */
+    AddTile = 8,
+    DeleteTile = 9,
+    UpdateSplatmapLayers = 10,
+
+    /* Foliage */
+    AddFoliageToSurface = 11,
+    RemoveFoliageInstances = 12,
+    RemoveResourceSpawnpoint = 13,
+
+    /* Hierarchy Items */
+    MoveHierarchyItems = 14,
+    DeleteHierarchyItems = 15,
+
+    /* Level Objects / Buildables */
+    DeleteLevelObjects = 16,
+    MoveLevelObjectsFinal = 17,
+    InstantiateLevelObject = 18,
+    UpdateObjectsCustomMaterialPaletteOverride = 19,
+    UpdateObjectsMaterialIndexOverride = 20,
+
+    /* Roads */
+    MoveRoadVertex = 21,
+    MoveRoadTangentHandle = 22,
+    DeleteRoadVertex = 23,
+    DeleteRoad = 24,
+    SetRoadIsLoop = 25,
+    SetRoadMaterial = 26,
+    SetRoadVertexIgnoreTerrain = 27,
+    SetRoadVertexVerticalOffset = 28,
+    SetRoadVertexTangentHandleMode = 29,
+    SetRoadMaterialWidth = 30,
+    SetRoadMaterialHeight = 31,
+    SetRoadMaterialDepth = 32,
+    SetRoadMaterialVerticalOffset = 33,
+    SetRoadMaterialIsConcrete = 34,
 
 
-    // for future use
+    /* For future use */
     Extended = 255
 }
 public interface IReflectableAction : IAction
@@ -60,7 +85,7 @@ public interface IServersideAction : IAction
 public interface IAction
 {
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    ActionType Type { get; }
+    DevkitServerActionType Type { get; }
     float DeltaTime { get; set; }
     CSteamID Instigator { get; set; }
     void Apply();
@@ -73,43 +98,43 @@ public interface IAction
 }
 
 [ActionSetting(ActionSetting.Asset)]
-public interface IAsset
+public interface IAssetAction
 {
     Guid Asset { get; set; }
 }
 [ActionSetting(ActionSetting.TileCoordinates)]
-public interface ICoordinates
+public interface ICoordinatesAction
 {
     int CoordinateX { get; set; }
     int CoordinateY { get; set; }
 }
 [ActionSetting(ActionSetting.Radius)]
-public interface IBrushRadius
+public interface IBrushRadiusAction
 {
     float BrushRadius { get; set; }
 }
 [ActionSetting(ActionSetting.Falloff)]
-public interface IBrushFalloff
+public interface IBrushFalloffAction
 {
     float BrushFalloff { get; set; }
 }
 [ActionSetting(ActionSetting.Strength)]
-public interface IBrushStrength
+public interface IBrushStrengthAction
 {
     float BrushStrength { get; set; }
 }
 [ActionSetting(ActionSetting.InstanceId)]
-public interface IInstanceId
+public interface IInstanceIdAction
 {
     uint InstanceId { get; set; }
 }
 [ActionSetting(ActionSetting.Sensitivity)]
-public interface IBrushSensitivity
+public interface IBrushSensitivityAction
 {
     float BrushSensitivity { get; set; }
 }
 [ActionSetting(ActionSetting.Target)]
-public interface IBrushTarget
+public interface IBrushTargetAction
 {
     float BrushTarget { get; set; }
 }

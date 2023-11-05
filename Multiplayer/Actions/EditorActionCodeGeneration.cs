@@ -11,7 +11,7 @@ namespace DevkitServer.Multiplayer.Actions;
 internal static class EditorActionsCodeGeneration
 {
     internal static bool Init;
-    internal static Dictionary<ActionType, ActionAttribute> Attributes = new Dictionary<ActionType, ActionAttribute>(32);
+    internal static Dictionary<DevkitServerActionType, ActionAttribute> Attributes = new Dictionary<DevkitServerActionType, ActionAttribute>(32);
     internal static HandleWriteSettings? OnWritingAction;
     internal static HandleReadSettings? OnReadingAction;
     internal static HandleCreateNewAction? CreateAction;
@@ -148,7 +148,7 @@ internal static class EditorActionsCodeGeneration
         IOpCodeEmitter readGenerator = new DebuggableEmitter(readMethod) { DebugLog = false };
 
         DynamicMethod createMethod = new DynamicMethod("CreateAction", attributes, CallingConventions.Standard,
-            typeof(IAction), new Type[] { typeof(ActionType) },
+            typeof(IAction), new Type[] { typeof(DevkitServerActionType) },
             typeof(EditorActionsCodeGeneration), true);
         IOpCodeEmitter createGenerator = new DebuggableEmitter(createMethod) { DebugLog = false };
 
@@ -401,7 +401,7 @@ internal static class EditorActionsCodeGeneration
         writeGenerator.Emit(OpCodes.Ret);
         readGenerator.Emit(OpCodes.Ret);
 
-        List<(Label lbl, MethodBase method, ActionType actionType)> lbls = new List<(Label, MethodBase, ActionType)>(32);
+        List<(Label lbl, MethodBase method, DevkitServerActionType actionType)> lbls = new List<(Label, MethodBase, DevkitServerActionType)>(32);
         int last = -1;
         bool gap = false;
         foreach ((Type type, ActionAttribute attr) in actions.OrderBy(x => (int)x.attr.ActionType))
@@ -411,7 +411,7 @@ internal static class EditorActionsCodeGeneration
                 if (last + 1 != (int)attr.ActionType)
                 {
                     for (int i = last + 1; i < (int)attr.ActionType; ++i)
-                        Logger.LogWarning($"Missing {((ActionType)i).Format()} action to use switch expression in generated method.", method: "EDITOR ACTIONS");
+                        Logger.LogWarning($"Missing {((DevkitServerActionType)i).Format()} action to use switch expression in generated method.", method: "EDITOR ACTIONS");
                     gap = true;
                 }
                 else last = (int)attr.ActionType;
@@ -452,7 +452,7 @@ internal static class EditorActionsCodeGeneration
             }
             for (int i = 0; i < lbls.Count; ++i)
             {
-                (Label lbl, MethodBase method, ActionType actionType) = lbls[i];
+                (Label lbl, MethodBase method, DevkitServerActionType actionType) = lbls[i];
                 createGenerator.MarkLabel(lbl);
                 Label? lbl2 = null;
                 if (gap)
@@ -665,7 +665,7 @@ internal static class EditorActionsCodeGeneration
 
 internal delegate void HandleWriteSettings(IActionListener actions, ref ActionSettingsCollection? collection, IAction action);
 internal delegate void HandleReadSettings(IActionListener actions, IAction action);
-internal delegate IAction? HandleCreateNewAction(ActionType type);
+internal delegate IAction? HandleCreateNewAction(DevkitServerActionType type);
 internal delegate void HandleByteWriteSettings(ActionSettingsCollection collection, ByteWriter writer);
 internal delegate void HandleByteReadSettings(ActionSettingsCollection collection, ByteReader reader);
 internal delegate void HandleAppendSettingsCollection(ActionSettingsCollection collection, StringBuilder builder);
@@ -683,7 +683,7 @@ internal sealed class ActionSettingAttribute : Attribute
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
 internal sealed class ActionAttribute : Attribute
 {
-    public ActionType ActionType { get; }
+    public DevkitServerActionType ActionType { get; }
 
     /// <summary>
     /// Name of a static method in this class to use to create the action (instead of default constructor).
@@ -704,7 +704,7 @@ internal sealed class ActionAttribute : Attribute
     /// Set at runtime.
     /// </summary>
     public Type? Type { get; internal set; }
-    public ActionAttribute(ActionType type, int capacity, int optionCapacity)
+    public ActionAttribute(DevkitServerActionType type, int capacity, int optionCapacity)
     {
         ActionType = type;
         Capacity = capacity;

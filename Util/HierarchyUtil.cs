@@ -47,7 +47,7 @@ public static class HierarchyUtil
             return StandardErrorCode.InvalidData;
         if (!EditorActions.HasProcessedPendingHierarchyObjects)
         {
-            EditorActions.TemporaryEditorActions?.QueueInstantiation(type, position, rotation, scale, owner, netId);
+            EditorActions.TemporaryEditorActions?.QueueHierarchyItemInstantiation(type, position, rotation, scale, owner, netId);
             return StandardErrorCode.Success;
         }
 
@@ -84,11 +84,24 @@ public static class HierarchyUtil
         if (user == null || !user.IsOnline)
         {
             Logger.LogError("Unable to get user from hierarchy instantiation request.", method: Source);
+            ctx.Acknowledge(StandardErrorCode.NoPermissions);
             return;
         }
         if (type == null)
         {
             EditorMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("UnknownError"));
+            return;
+        }
+
+        if (!CheckPlacePermission(type, user))
+        {
+            ctx.Acknowledge(StandardErrorCode.NoPermissions);
+            EditorMessage.SendNoPermissionMessage(user, type switch
+            {
+                NodeItemTypeIdentifier => VanillaPermissions.PlaceNodes,
+                VolumeItemTypeIdentifier v => v.Type.IsAssignableFrom(typeof(CartographyVolume)) ? VanillaPermissions.PlaceCartographyVolumes : VanillaPermissions.PlaceVolumes,
+                _ => null
+            });
             return;
         }
 

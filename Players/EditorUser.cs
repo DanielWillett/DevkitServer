@@ -36,6 +36,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     public ObjectSync ObjectSync { get; private set; } = null!;
     public HierarchySync HierarchySync { get; private set; } = null!;
     public NavigationSync NavigationSync { get; private set; } = null!;
+    public RoadSync RoadSync { get; private set; } = null!;
     public string DisplayName { get; private set; } = null!;
     public SteamPlayer? Player { get; internal set; }
     public IReadOnlyList<AuthoritativeSync> Syncs { get; }
@@ -107,10 +108,12 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         ObjectSync = EditorObject.GetComponent<ObjectSync>();
         HierarchySync = EditorObject.GetComponent<HierarchySync>();
         NavigationSync = EditorObject.GetComponent<NavigationSync>();
+        RoadSync = EditorObject.GetComponent<RoadSync>();
         IntlSyncs.Add(TileSync);
         IntlSyncs.Add(ObjectSync);
         IntlSyncs.Add(HierarchySync);
         IntlSyncs.Add(NavigationSync);
+        IntlSyncs.Add(RoadSync);
 #if CLIENT
         StartCoroutine(DeactivateAfterFrame());
 #else
@@ -130,6 +133,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         ObjectSync.SendAuthority(Connection);
         HierarchySync.SendAuthority(Connection);
         NavigationSync.SendAuthority(Connection);
+        RoadSync.SendAuthority(Connection);
 #endif
         Logger.LogDebug("[USERS] Editor User initialized: " + SteamId.m_SteamID.Format() + " (" + DisplayName.Format() + ").");
     }

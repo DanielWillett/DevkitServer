@@ -56,6 +56,7 @@ internal static class PatchesMain
 #if CLIENT
             LevelObjectPatches.OptionalPatches();
             SpawnsEditorPatches.ManualPatches();
+            RoadsPatches.OptionalPatches();
 #endif
             DoManualPatches();
             
@@ -72,9 +73,9 @@ internal static class PatchesMain
     {
         try
         {
-            Patcher.UnpatchAll(HarmonyId);
             DoManualUnpatches();
-            Logger.LogInfo($"Finished unpatching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
+            Patcher.UnpatchAll(HarmonyId);
+            Logger.LogInfo($"[{Source}] Finished unpatching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
         }
         catch (Exception ex)
         {
@@ -612,10 +613,18 @@ internal static class PatchesMain
     }
     [NetCall(NetCallSource.FromClient, (ushort)DevkitServerNetCall.SendPending)]
     [UsedImplicitly]
-    private static void OnConnectionPending(MessageContext ctx)
+    private static void OnConnectionPending(MessageContext ctx, byte[] passwordSHA1)
     {
+        if (!string.IsNullOrEmpty(Provider.serverPassword) && !Hash.verifyHash(passwordSHA1, Provider.serverPasswordHash))
+        {
+            Logger.LogInfo($"{ctx.Connection.Format()} tried to connect with an invalid password.");
+            DevkitServerUtility.CustomDisconnect(ctx.Connection, ESteamRejection.WRONG_PASSWORD);
+            ctx.Acknowledge(StandardErrorCode.AccessViolation);
+            return;
+        }
+
         OnConnectionPending(ctx.Connection, null!);
-        ctx.Acknowledge();
+        ctx.Acknowledge(StandardErrorCode.Success);
     }
 
     [HarmonyPatch("ServerMessageHandler_GetWorkshopFiles", "ReadMessage", MethodType.Normal)]
@@ -865,10 +874,10 @@ internal static class PatchesMain
     [UsedImplicitly]
     private static IEnumerable<CodeInstruction> BarricadeManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.AddIsEditorCall(instructions, __method);
 
-    [HarmonyPatch(typeof(AnimalManager), "onLevelLoaded")]
-    [HarmonyTranspiler]
-    [UsedImplicitly]
-    private static IEnumerable<CodeInstruction> AnimalManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.AddIsEditorCall(instructions, __method);
+    // [HarmonyPatch(typeof(AnimalManager), "onLevelLoaded")]
+    // [HarmonyTranspiler]
+    // [UsedImplicitly]
+    // private static IEnumerable<CodeInstruction> AnimalManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.AddIsEditorCall(instructions, __method);
 
     [HarmonyPatch(typeof(GroupManager), "onLevelLoaded")]
     [HarmonyTranspiler]

@@ -42,7 +42,7 @@ internal class MenuDashboardUIExtension : UIExtension, IDisposable
     public void Dispose()
     {
         _githubButton.OnClicked -= OnClickedDevkitServerGithubButton;
-        Container.RemoveChild(_githubButton);
+        Container.TryRemoveChild(_githubButton);
     }
 }
 #nullable restore

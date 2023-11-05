@@ -157,6 +157,17 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
 
         return netId;
     }
+    public static NetId AddVertex(Road road, int vertexIndex)
+    {
+        int roadIndex = road.GetRoadIndex();
+        if (roadIndex < 0)
+            throw new ArgumentException("Road is not present in LevelRoads list.", nameof(road));
+        return AddVertex(new RoadVertexIdentifier(roadIndex, vertexIndex));
+    }
+    public static NetId AddVertex(int roadIndex, int vertexIndex)
+    {
+        return AddVertex(new RoadVertexIdentifier(roadIndex, vertexIndex));
+    }
     public static NetId AddRoad(int roadIndex)
     {
         if (LevelRoads.getRoad(roadIndex) == null)
@@ -167,6 +178,13 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
         ClaimRoadNetId(roadIndex, netId);
 
         return netId;
+    }
+    public static NetId AddRoad(Road road)
+    {
+        int roadIndex = road.GetRoadIndex();
+        if (roadIndex < 0)
+            throw new ArgumentException("Road is not present in LevelRoads list.", nameof(road));
+        return AddRoad(roadIndex);
     }
     public static bool TryGetVertex(NetId netId, out RoadVertexIdentifier vertex)
     {
@@ -231,6 +249,32 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
         
         road = null!;
         return false;
+    }
+    public static bool TryGetRoadNetId(int roadIndex, out NetId netId)
+    {
+        return RoadAssignments.TryGetValue(roadIndex, out netId);
+    }
+    public static bool TryGetRoadNetId(Road road, out NetId netId)
+    {
+        int roadIndex = road.GetRoadIndex();
+        if (roadIndex < 0)
+            throw new ArgumentException("Road is not present in LevelRoads list.", nameof(road));
+        return RoadAssignments.TryGetValue(roadIndex, out netId);
+    }
+    public static bool TryGetVertexNetId(RoadVertexIdentifier vertex, out NetId netId)
+    {
+        return VertexAssignments.TryGetValue(vertex, out netId);
+    }
+    public static bool TryGetVertexNetId(int roadIndex, int vertexIndex, out NetId netId)
+    {
+        return VertexAssignments.TryGetValue(new RoadVertexIdentifier(roadIndex, vertexIndex), out netId);
+    }
+    public static bool TryGetVertexNetId(Road road, int vertexIndex, out NetId netId)
+    {
+        int roadIndex = road.GetRoadIndex();
+        if (roadIndex < 0)
+            throw new ArgumentException("Road is not present in LevelRoads list.", nameof(road));
+        return VertexAssignments.TryGetValue(new RoadVertexIdentifier(roadIndex, vertexIndex), out netId);
     }
 #if SERVER
     internal static void AssignExisting()
@@ -319,6 +363,23 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
             Logger.LogDebug($"[{Source}] Released road NetId: {netId.Format()} for #{roadIndex.Format()}.");
         }
     }
+    public static void RegisterRoad(int roadIndex, NetId netId) => ClaimRoadNetId(roadIndex, netId);
+    public static void RegisterRoad(Road road, NetId netId)
+    {
+        int roadIndex = road.GetRoadIndex();
+        if (roadIndex < 0)
+            throw new ArgumentException("Road is not present in LevelRoads list.", nameof(road));
+        ClaimRoadNetId(roadIndex, netId);
+    }
+    public static void RegisterVertex(RoadVertexIdentifier vertex, NetId netId) => ClaimVertexNetId(vertex, netId);
+    public static void RegisterVertex(int roadIndex, int vertexIndex, NetId netId) => ClaimVertexNetId(new RoadVertexIdentifier(roadIndex, vertexIndex), netId);
+    public static void RegisterVertex(Road road, int vertexIndex, NetId netId)
+    {
+        int roadIndex = road.GetRoadIndex();
+        if (roadIndex < 0)
+            throw new ArgumentException("Road is not present in LevelRoads list.", nameof(road));
+        ClaimVertexNetId(new RoadVertexIdentifier(roadIndex, vertexIndex), netId);
+    }
 #if CLIENT
     public void LoadData(RoadNetIdReplicatedLevelData data)
     {
@@ -345,7 +406,7 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
     {
         RoadNetIdReplicatedLevelData data = new RoadNetIdReplicatedLevelData();
         int vertexCount = Math.Min(int.MaxValue - ushort.MaxValue, VertexAssignments.Count);
-        int roadCount = Math.Min(ushort.MaxValue, RoadAssignments.Keys.Max() + 1);
+        int roadCount = Math.Min(ushort.MaxValue, RoadAssignments.Count > 0 ? RoadAssignments.Keys.Max() + 1 : 0);
         NetId[] netIds = new NetId[vertexCount + roadCount];
         RoadVertexIdentifier[] verticies = new RoadVertexIdentifier[vertexCount];
 

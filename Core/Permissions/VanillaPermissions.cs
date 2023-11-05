@@ -30,7 +30,7 @@ public static class VanillaPermissions
     [Permission]
     public static readonly Permission EditRoads = new Permission("roads.edit", core: true);
     [Permission]
-    public static readonly Permission BakeRoads = new Permission("roads.bake", core: true);
+    public static readonly Permission EditRoadMaterials = new Permission("roads.materials.edit", core: true);
     [Permission]
     public static readonly Permission BakeNavigation = new Permission("navigation.bake", core: true);
     [Permission]

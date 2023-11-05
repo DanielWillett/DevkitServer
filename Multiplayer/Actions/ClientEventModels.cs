@@ -1,4 +1,5 @@
-﻿using DevkitServer.API.Abstractions;
+﻿using DevkitServer.API;
+using DevkitServer.API.Abstractions;
 using DevkitServer.Models;
 using SDG.Framework.Devkit;
 using SDG.Framework.Devkit.Tools;
@@ -501,11 +502,181 @@ public delegate void RequestInstantiateRoadVertex(in RequestInstantiateRoadVerte
 public delegate void RequestInstantiateRoadVertexRequested(in RequestInstantiateRoadVertexProperties properties, ref bool shouldAllow);
 public readonly struct RequestInstantiateRoadVertexProperties
 {
-    public readonly NetId Road;
+    public readonly NetId RoadNetId;
     public readonly Vector3 VertexPosition;
-    public RequestInstantiateRoadVertexProperties(NetId road, Vector3 vertexPosition)
+    public readonly int VertexIndex;
+    public RequestInstantiateRoadVertexProperties(NetId roadNetId, Vector3 vertexPosition, int vertexIndex)
     {
-        Road = road;
+        RoadNetId = roadNetId;
         VertexPosition = vertexPosition;
+        VertexIndex = vertexIndex;
+    }
+}
+
+public delegate void SetRoadMaterialVerticalOffset(in SetRoadMaterialVerticalOffsetProperties properties);
+public delegate void SetRoadMaterialVerticalOffsetRequested(in SetRoadMaterialVerticalOffsetProperties properties, ref bool shouldAllow);
+public readonly struct SetRoadMaterialVerticalOffsetProperties
+{
+    public readonly byte MaterialIndex;
+    public readonly float OldVerticalOffset;
+    public readonly float VerticalOffset;
+    public readonly float DeltaTime;
+    public SetRoadMaterialVerticalOffsetProperties(byte materialIndex, float verticalOffset, float oldVerticalOffset, float deltaTime)
+    {
+        MaterialIndex = materialIndex;
+        VerticalOffset = verticalOffset;
+        OldVerticalOffset = oldVerticalOffset;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void SetRoadMaterialHeight(in SetRoadMaterialHeightProperties properties);
+public delegate void SetRoadMaterialHeightRequested(in SetRoadMaterialHeightProperties properties, ref bool shouldAllow);
+public readonly struct SetRoadMaterialHeightProperties
+{
+    public readonly byte MaterialIndex;
+    public readonly float OldHeight;
+    public readonly float Height;
+    public readonly float DeltaTime;
+    public SetRoadMaterialHeightProperties(byte materialIndex, float height, float oldHeight, float deltaTime)
+    {
+        MaterialIndex = materialIndex;
+        Height = height;
+        OldHeight = oldHeight;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void SetRoadMaterialWidth(in SetRoadMaterialWidthProperties properties);
+public delegate void SetRoadMaterialWidthRequested(in SetRoadMaterialWidthProperties properties, ref bool shouldAllow);
+public readonly struct SetRoadMaterialWidthProperties
+{
+    public readonly byte MaterialIndex;
+    public readonly float OldWidth;
+    public readonly float Width;
+    public readonly float DeltaTime;
+    public SetRoadMaterialWidthProperties(byte materialIndex, float width, float oldWidth, float deltaTime)
+    {
+        MaterialIndex = materialIndex;
+        Width = width;
+        OldWidth = oldWidth;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void SetRoadMaterialDepth(in SetRoadMaterialDepthProperties properties);
+public delegate void SetRoadMaterialDepthRequested(in SetRoadMaterialDepthProperties properties, ref bool shouldAllow);
+public readonly struct SetRoadMaterialDepthProperties
+{
+    public readonly byte MaterialIndex;
+    public readonly float OldDepth;
+    public readonly float Depth;
+    public readonly float DeltaTime;
+    public SetRoadMaterialDepthProperties(byte materialIndex, float depth, float oldDepth, float deltaTime)
+    {
+        MaterialIndex = materialIndex;
+        Depth = depth;
+        OldDepth = oldDepth;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void SetRoadMaterialIsConcrete(in SetRoadMaterialIsConcreteProperties properties);
+public delegate void SetRoadMaterialIsConcreteRequested(in SetRoadMaterialIsConcreteProperties properties, ref bool shouldAllow);
+public readonly struct SetRoadMaterialIsConcreteProperties
+{
+    public readonly byte MaterialIndex;
+    public readonly bool IsConcrete;
+    public readonly float DeltaTime;
+    public SetRoadMaterialIsConcreteProperties(byte materialIndex, bool isConcrete, float deltaTime)
+    {
+        MaterialIndex = materialIndex;
+        IsConcrete = isConcrete;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void SetRoadIsLoop(in SetRoadIsLoopProperties properties);
+public delegate void SetRoadIsLoopRequested(in SetRoadIsLoopProperties properties, ref bool shouldAllow);
+public readonly struct SetRoadIsLoopProperties
+{
+    public readonly NetId RoadNetId;
+    public readonly bool IsLoop;
+    public readonly float DeltaTime;
+    public SetRoadIsLoopProperties(NetId roadNetId, bool isLoop, float deltaTime)
+    {
+        RoadNetId = roadNetId;
+        IsLoop = isLoop;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void SetRoadVertexIgnoreTerrain(in SetRoadVertexIgnoreTerrainProperties properties);
+public delegate void SetRoadVertexIgnoreTerrainRequested(in SetRoadVertexIgnoreTerrainProperties properties, ref bool shouldAllow);
+public readonly struct SetRoadVertexIgnoreTerrainProperties
+{
+    public readonly NetId RoadNetId;
+    public readonly NetId VertexNetId;
+    public readonly bool IgnoreTerrain;
+    public readonly float DeltaTime;
+    public SetRoadVertexIgnoreTerrainProperties(NetId roadNetId, NetId vertexNetId, bool ignoreTerrain, float deltaTime)
+    {
+        RoadNetId = roadNetId;
+        VertexNetId = vertexNetId;
+        IgnoreTerrain = ignoreTerrain;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void SetRoadVertexVerticalOffset(in SetRoadVertexVerticalOffsetProperties properties);
+public delegate void SetRoadVertexVerticalOffsetRequested(in SetRoadVertexVerticalOffsetProperties properties, ref bool shouldAllow);
+public readonly struct SetRoadVertexVerticalOffsetProperties
+{
+    public readonly NetId RoadNetId;
+    public readonly NetId VertexNetId;
+    public readonly float VerticalOffset;
+    public readonly float OldVerticalOffset;
+    public readonly float DeltaTime;
+    public SetRoadVertexVerticalOffsetProperties(NetId roadNetId, NetId vertexNetId, float verticalOffset, float oldVerticalOffset, float deltaTime)
+    {
+        RoadNetId = roadNetId;
+        VertexNetId = vertexNetId;
+        VerticalOffset = verticalOffset;
+        OldVerticalOffset = oldVerticalOffset;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void SetRoadVertexTangentHandleMode(in SetRoadVertexTangentHandleModeProperties properties);
+public delegate void SetRoadVertexTangentHandleModeRequested(in SetRoadVertexTangentHandleModeProperties properties, ref bool shouldAllow);
+public readonly struct SetRoadVertexTangentHandleModeProperties
+{
+    public readonly NetId RoadNetId;
+    public readonly NetId VertexNetId;
+    public readonly ERoadMode TangentHandleMode;
+    public readonly ERoadMode OldTangentHandleMode;
+    public readonly float DeltaTime;
+    public SetRoadVertexTangentHandleModeProperties(NetId roadNetId, NetId vertexNetId, ERoadMode tangentHandleMode, ERoadMode oldTangentHandleMode, float deltaTime)
+    {
+        RoadNetId = roadNetId;
+        VertexNetId = vertexNetId;
+        TangentHandleMode = tangentHandleMode;
+        OldTangentHandleMode = oldTangentHandleMode;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void SetRoadMaterial(in SetRoadMaterialProperties properties);
+public delegate void SetRoadMaterialRequested(in SetRoadMaterialProperties properties, ref bool shouldAllow);
+public readonly struct SetRoadMaterialProperties
+{
+    public readonly NetId RoadNetId;
+    public readonly byte MaterialIndex;
+    public readonly float DeltaTime;
+    public SetRoadMaterialProperties(NetId roadNetId, byte materialIndex, float deltaTime)
+    {
+        RoadNetId = roadNetId;
+        MaterialIndex = materialIndex;
+        DeltaTime = deltaTime;
     }
 }

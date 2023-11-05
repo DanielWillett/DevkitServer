@@ -1,10 +1,12 @@
-﻿using DevkitServer.API;
+﻿using System.Runtime.InteropServices;
+using DevkitServer.API;
 
 namespace DevkitServer.Models;
 
 /// <summary>
 /// Represents a road vertex or joint.
 /// </summary>
+[StructLayout(LayoutKind.Explicit, Size = 4)]
 public readonly struct RoadVertexIdentifier :
     IEquatable<RoadVertexIdentifier>,
     IComparable<RoadVertexIdentifier>,
@@ -12,6 +14,7 @@ public readonly struct RoadVertexIdentifier :
     IComparable<RoadTangentHandleIdentifier>,
     ITerminalFormattable
 {
+    [FieldOffset(0)]
     private readonly int _data;
 
     /// <summary>
@@ -58,9 +61,12 @@ public readonly struct RoadVertexIdentifier :
 /// <summary>
 /// Represents a road vertex or joint's tangent handle.
 /// </summary>
+[StructLayout(LayoutKind.Explicit, Size = 8)]
 public readonly struct RoadTangentHandleIdentifier : IEquatable<RoadTangentHandleIdentifier>, IComparable<RoadTangentHandleIdentifier>, IEquatable<RoadVertexIdentifier>, IComparable<RoadVertexIdentifier>
 {
+    [FieldOffset(0)]
     private readonly int _data;
+    [FieldOffset(4)]
     private readonly TangentHandle _handle;
 
     /// <summary>
@@ -84,11 +90,15 @@ public readonly struct RoadTangentHandleIdentifier : IEquatable<RoadTangentHandl
             throw new ArgumentOutOfRangeException(nameof(roadIndex), $"Must be <= {ushort.MaxValue} and >= {ushort.MinValue}.");
         if (vertexIndex is > ushort.MaxValue or < ushort.MinValue)
             throw new ArgumentOutOfRangeException(nameof(vertexIndex), $"Must be <= {ushort.MaxValue} and >= {ushort.MinValue}.");
+        if (handle is not TangentHandle.Negative and not TangentHandle.Positive)
+            throw new ArgumentOutOfRangeException(nameof(handle), "Handle must be negative (0) or positive (1).");
         _data = ((ushort)roadIndex << 16) | (ushort)vertexIndex;
         _handle = handle;
     }
     public RoadTangentHandleIdentifier(ushort roadIndex, ushort vertexIndex, TangentHandle handle)
     {
+        if (handle is not TangentHandle.Negative and not TangentHandle.Positive)
+            throw new ArgumentOutOfRangeException(nameof(handle), "Handle must be negative (0) or positive (1).");
         _data = (roadIndex << 16) | vertexIndex;
         _handle = handle;
     }
@@ -97,6 +107,7 @@ public readonly struct RoadTangentHandleIdentifier : IEquatable<RoadTangentHandl
         _data = data;
         _handle = handle;
     }
+    public RoadTangentHandleIdentifier OtherHandle() => new RoadTangentHandleIdentifier(_data, (TangentHandle)(1 - (int)Handle));
     public bool Equals(RoadVertexIdentifier other) => other.RawData == _data;
     public bool Equals(RoadTangentHandleIdentifier other) => other._data == _data && other._handle == _handle;
     public int CompareTo(RoadVertexIdentifier other) => _data.CompareTo(other.RawData);

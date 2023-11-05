@@ -3,6 +3,8 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DevkitServer.API;
+using DevkitServer.Multiplayer;
+using DevkitServer.Players;
 
 
 #if CLIENT
@@ -129,6 +131,12 @@ public class DevkitServerConfig
             }
         }
     }
+
+#if CLIENT
+    public static bool RemoveCosmeticImprovements => DevkitServerModule.IsEditing && ClientInfo.Info != null ? ClientInfo.Info.ServerRemovesCosmeticImprovements : Config.RemoveCosmeticImprovements;
+#else
+    public static bool RemoveCosmeticImprovements => Config.RemoveCosmeticImprovements;
+#endif
     public static void ResetToDefaults()
     {
         (_config ??= new SystemConfig()).SetDefaults();

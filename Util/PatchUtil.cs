@@ -168,7 +168,7 @@ public static class PatchUtil
     /// <summary>
     /// Increment <paramref name="index"/> until <paramref name="match"/> matches or the function ends.
     /// </summary>
-    /// <returns>Amount of instructions skipped.</returns>
+    /// <returns>Amount of instructions skipped, or -1 if not matched at all.</returns>
     [Pure]
     public static int ContinueUntil(IList<CodeInstruction> instructions, ref int index, PatternMatch match, bool includeMatch = true)
     {
@@ -181,10 +181,10 @@ public static class PatchUtil
                 index = includeMatch ? i : i + 1;
                 if (includeMatch)
                     --amt;
-                break;
+                return amt;
             }
         }
-        return amt;
+        return -1;
     }
 
     /// <summary>
