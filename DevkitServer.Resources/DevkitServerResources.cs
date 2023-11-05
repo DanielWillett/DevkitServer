@@ -27,7 +27,7 @@ internal class DevkitServerResources
         new DevkitServerDirectoryResource("Bundles", new Version(0, 0, 1, 0)),
         new DevkitServerDirectoryResource("Data", new Version(0, 0, 1, 0)),
         new DevkitServerDirectoryResource("Libraries", new Version(0, 0, 1, 0)),
-        new DevkitServerDirectoryResource(Path.Combine("Libraries", "ForwardingTargets"), new Version(0, 0, 14, 0)),
+        new DevkitServerDirectoryResource(Path.Combine("Libraries", "ForwardingTargets"), new Version(0, 0, 13, 0)),
 
         // Defaults
         new DevkitServerFileResource(Path.Combine("Defaults", "client_config.json"), new Version(0, 0, 10, 0)),
@@ -93,7 +93,7 @@ internal class DevkitServerResources
         new DevkitServerFileResource("UniTask.pdb", Path.Combine("Libraries", "UniTask.pdb"), new Version(0, 0, 10, 0)),
         new DevkitServerFileResource("UniTask.xml", Path.Combine("Libraries", "UniTask.xml"), new Version(0, 0, 10, 0)),
         new DevkitServerFileResource(Path.Combine("Libraries", "UniTask.dll license.txt"), new Version(0, 0, 10, 0)),
-        new DevkitServerFileResource(Path.Combine("Libraries", "ForwardingTargets", "DanielWillett.ReflectionTools.dll"), new Version(0, 0, 14, 0)),
-        new DevkitServerFileResource(Path.Combine("Libraries", "ForwardingTargets", "DanielWillett.UnturnedUITools.dll"), new Version(0, 0, 14, 0))
+        new DevkitServerFileResource(Path.Combine("Libraries", "ForwardingTargets", "DanielWillett.ReflectionTools.dll"), new Version(0, 0, 13, 0)),
+        new DevkitServerFileResource(Path.Combine("Libraries", "ForwardingTargets", "DanielWillett.UnturnedUITools.dll"), new Version(0, 0, 13, 0))
     };
 }

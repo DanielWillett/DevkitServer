@@ -28,6 +28,7 @@ using Module = SDG.Framework.Modules.Module;
 using Version = System.Version;
 #if CLIENT
 using DevkitServer.API.UI;
+using DevkitServer.API.UI.Icons;
 using DevkitServer.API.UI.Extensions;
 using DevkitServer.API.Logging;
 using DevkitServer.Core.Tools;
@@ -35,7 +36,6 @@ using DevkitServer.Players;
 using SDG.Framework.Utilities;
 #if DEBUG
 using DevkitServer.Util.Debugging;
-using DevkitServer.API.UI.Icons;
 #endif
 #endif
 #if SERVER
