@@ -70,6 +70,15 @@ public enum DevkitServerActionType : byte
     SetRoadMaterialVerticalOffset = 33,
     SetRoadMaterialIsConcrete = 34,
 
+    /* Navigation Flags */
+    MoveNavigation = 35,
+    DeleteNavigation = 36,
+    SetNavigationSize = 37,
+    SetNavigationDifficulty = 38,
+    SetNavigationMaximumZombies = 39,
+    SetNavigationMaximumBossZombies = 40,
+    SetNavigationShouldSpawnZombies = 41,
+    SetNavigationInfiniteAgroDistance = 42,
 
     /* For future use */
     Extended = 255
@@ -81,6 +90,10 @@ public interface IReflectableAction : IAction
 public interface IServersideAction : IAction
 {
 
+}
+public interface IReplacableAction : IAction
+{
+    bool TryReplaceFrom(IReplacableAction action);
 }
 public interface IAction
 {

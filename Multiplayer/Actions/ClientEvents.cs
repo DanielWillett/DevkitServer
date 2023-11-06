@@ -3,6 +3,9 @@
 #if CLIENT
 namespace DevkitServer.Multiplayer.Actions;
 
+/// <summary>
+/// Contains client-side events for cancelling and invoking actions during multiplayer editing.
+/// </summary>
 [EarlyTypeInit]
 public static class ClientEvents
 {
@@ -16,8 +19,9 @@ public static class ClientEvents
     
     internal static CachedMulticastEvent<TryInstantiateHierarchyObject> EventOnTryInstantiateHierarchyObject = new CachedMulticastEvent<TryInstantiateHierarchyObject>(typeof(ClientEvents), nameof(OnTryInstantiateHierarchyObject));
     internal static CachedMulticastEvent<RequestInstantiateHierarchyObject> EventOnRequestInstantiateHierarchyObject = new CachedMulticastEvent<RequestInstantiateHierarchyObject>(typeof(ClientEvents), nameof(OnRequestInstantiateHierarchyObject));
-    internal static CachedMulticastEvent<RequestInstantiateRoad> EventOnRequestInstantiateRoad = new CachedMulticastEvent<RequestInstantiateRoad>(typeof(ClientEvents), nameof(EventOnRequestInstantiateRoad));
-    internal static CachedMulticastEvent<RequestInstantiateRoadVertex> EventOnRequestInstantiateRoadVertex = new CachedMulticastEvent<RequestInstantiateRoadVertex>(typeof(ClientEvents), nameof(EventOnRequestInstantiateRoadVertex));
+    internal static CachedMulticastEvent<RequestInstantiateRoad> EventOnRequestInstantiateRoad = new CachedMulticastEvent<RequestInstantiateRoad>(typeof(ClientEvents), nameof(OnRequestInstantiateRoad));
+    internal static CachedMulticastEvent<RequestInstantiateRoadVertex> EventOnRequestInstantiateRoadVertex = new CachedMulticastEvent<RequestInstantiateRoadVertex>(typeof(ClientEvents), nameof(OnRequestInstantiateRoadVertex));
+    internal static CachedMulticastEvent<RequestInstantiateNavigation> EventOnRequestInstantiateNavigation = new CachedMulticastEvent<RequestInstantiateNavigation>(typeof(ClientEvents), nameof(OnRequestInstantiateNavigation));
 
     public static event EditHeightmapRequest OnEditHeightmapPermissionDenied
     {
@@ -70,6 +74,11 @@ public static class ClientEvents
     {
         add => EventOnRequestInstantiateRoadVertex.Add(value);
         remove => EventOnRequestInstantiateRoadVertex.Remove(value);
+    }
+    public static event RequestInstantiateNavigation OnRequestInstantiateNavigation
+    {
+        add => EventOnRequestInstantiateNavigation.Add(value);
+        remove => EventOnRequestInstantiateNavigation.Remove(value);
     }
 
     public static event PaintRamp? OnPaintRamp;
@@ -127,6 +136,23 @@ public static class ClientEvents
     public static event SetRoadMaterialVerticalOffsetRequested? OnSetRoadMaterialVerticalOffsetRequested;
     public static event SetRoadMaterialIsConcrete? OnSetRoadMaterialIsConcrete;
     public static event SetRoadMaterialIsConcreteRequested? OnSetRoadMaterialIsConcreteRequested;
+    public static event MoveNavigation? OnMoveNavigation;
+    public static event MoveNavigationRequested? OnMoveNavigationRequested;
+    public static event DeleteNavigation? OnDeleteNavigation;
+    public static event DeleteNavigationRequested? OnDeleteNavigationRequested;
+    public static event SetNavigationSize? OnSetNavigationSize;
+    public static event SetNavigationSizeRequested? OnSetNavigationSizeRequested;
+    public static event SetNavigationDifficulty? OnSetNavigationDifficulty;
+    public static event SetNavigationDifficultyRequested? OnSetNavigationDifficultyRequested;
+    public static event SetNavigationMaximumZombies? OnSetNavigationMaximumZombies;
+    public static event SetNavigationMaximumZombiesRequested? OnSetNavigationMaximumZombiesRequested;
+    public static event SetNavigationMaximumBossZombies? OnSetNavigationMaximumBossZombies;
+    public static event SetNavigationMaximumBossZombiesRequested? OnSetNavigationMaximumBossZombiesRequested;
+    public static event SetNavigationShouldSpawnZombies? OnSetNavigationShouldSpawnZombies;
+    public static event SetNavigationShouldSpawnZombiesRequested? OnSetNavigationShouldSpawnZombiesRequested;
+    public static event SetNavigationInfiniteAgroDistance? OnSetNavigationInfiniteAgroDistance;
+    public static event SetNavigationInfiniteAgroDistanceRequested? OnSetNavigationInfiniteAgroDistanceRequested;
+    public static event RequestInstantiateNavigationRequested? OnRequestInstantiateNavigationRequested;
 
     public static bool ListeningOnEditHeightmapPermissionDenied => !EventOnEditHeightmapPermissionDenied.IsEmpty;
     public static bool ListeningOnEditSplatmapPermissionDenied => !EventOnEditSplatmapPermissionDenied.IsEmpty;
@@ -194,6 +220,23 @@ public static class ClientEvents
     public static bool ListeningOnSetRoadMaterialVerticalOffsetRequested => OnSetRoadMaterialVerticalOffsetRequested != null;
     public static bool ListeningOnSetRoadMaterialIsConcrete => OnSetRoadMaterialIsConcrete != null;
     public static bool ListeningOnSetRoadMaterialIsConcreteRequested => OnSetRoadMaterialIsConcreteRequested != null;
+    public static bool ListeningOnDeleteNavigation => OnDeleteNavigation != null;
+    public static bool ListeningOnDeleteNavigationRequested => OnDeleteNavigationRequested != null;
+    public static bool ListeningOnMoveNavigation => OnMoveNavigation != null;
+    public static bool ListeningOnMoveNavigationRequested => OnMoveNavigationRequested != null;
+    public static bool ListeningOnSetNavigationSize => OnSetNavigationSize != null;
+    public static bool ListeningOnSetNavigationSizeRequested => OnSetNavigationSizeRequested != null;
+    public static bool ListeningOnSetNavigationDifficulty => OnSetNavigationDifficulty != null;
+    public static bool ListeningOnSetNavigationDifficultyRequested => OnSetNavigationDifficultyRequested != null;
+    public static bool ListeningOnSetNavigationMaximumZombies => OnSetNavigationMaximumZombies != null;
+    public static bool ListeningOnSetNavigationMaximumZombiesRequested => OnSetNavigationMaximumZombiesRequested != null;
+    public static bool ListeningOnSetNavigationMaximumBossZombies => OnSetNavigationMaximumBossZombies != null;
+    public static bool ListeningOnSetNavigationMaximumBossZombiesRequested => OnSetNavigationMaximumBossZombiesRequested != null;
+    public static bool ListeningOnSetNavigationShouldSpawnZombies => OnSetNavigationShouldSpawnZombies != null;
+    public static bool ListeningOnSetNavigationShouldSpawnZombiesRequested => OnSetNavigationShouldSpawnZombiesRequested != null;
+    public static bool ListeningOnSetNavigationInfiniteAgroDistance => OnSetNavigationInfiniteAgroDistance != null;
+    public static bool ListeningOnSetNavigationInfiniteAgroDistanceRequested => OnSetNavigationInfiniteAgroDistanceRequested != null;
+    public static bool ListeningOnRequestInstantiateNavigationRequested => OnRequestInstantiateNavigationRequested != null;
     
     internal static void InvokeOnPaintRamp(in PaintRampProperties properties) => OnPaintRamp?.Invoke(in properties);
     internal static void InvokeOnAdjustHeightmap(in AdjustHeightmapProperties properties) => OnAdjustHeightmap?.Invoke(in properties);
@@ -250,6 +293,23 @@ public static class ClientEvents
     internal static void InvokeOnSetRoadMaterialVerticalOffsetRequested(in SetRoadMaterialVerticalOffsetProperties properties, ref bool shouldAllow) => OnSetRoadMaterialVerticalOffsetRequested?.Invoke(in properties, ref shouldAllow);
     internal static void InvokeOnSetRoadMaterialIsConcrete(in SetRoadMaterialIsConcreteProperties properties) => OnSetRoadMaterialIsConcrete?.Invoke(in properties);
     internal static void InvokeOnSetRoadMaterialIsConcreteRequested(in SetRoadMaterialIsConcreteProperties properties, ref bool shouldAllow) => OnSetRoadMaterialIsConcreteRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnDeleteNavigation(in DeleteNavigationProperties properties) => OnDeleteNavigation?.Invoke(in properties);
+    internal static void InvokeOnDeleteNavigationRequested(in DeleteNavigationProperties properties, ref bool shouldAllow) => OnDeleteNavigationRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnMoveNavigation(in MoveNavigationProperties properties) => OnMoveNavigation?.Invoke(in properties);
+    internal static void InvokeOnMoveNavigationRequested(in MoveNavigationProperties properties, ref bool shouldAllow) => OnMoveNavigationRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetNavigationSize(in SetNavigationSizeProperties properties) => OnSetNavigationSize?.Invoke(in properties);
+    internal static void InvokeOnSetNavigationSizeRequested(in SetNavigationSizeProperties properties, ref bool shouldAllow) => OnSetNavigationSizeRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetNavigationDifficulty(in SetNavigationDifficultyProperties properties) => OnSetNavigationDifficulty?.Invoke(in properties);
+    internal static void InvokeOnSetNavigationDifficultyRequested(in SetNavigationDifficultyProperties properties, ref bool shouldAllow) => OnSetNavigationDifficultyRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetNavigationMaximumZombies(in SetNavigationMaximumZombiesProperties properties) => OnSetNavigationMaximumZombies?.Invoke(in properties);
+    internal static void InvokeOnSetNavigationMaximumZombiesRequested(in SetNavigationMaximumZombiesProperties properties, ref bool shouldAllow) => OnSetNavigationMaximumZombiesRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetNavigationMaximumBossZombies(in SetNavigationMaximumBossZombiesProperties properties) => OnSetNavigationMaximumBossZombies?.Invoke(in properties);
+    internal static void InvokeOnSetNavigationMaximumBossZombiesRequested(in SetNavigationMaximumBossZombiesProperties properties, ref bool shouldAllow) => OnSetNavigationMaximumBossZombiesRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetNavigationShouldSpawnZombies(in SetNavigationShouldSpawnZombiesProperties properties) => OnSetNavigationShouldSpawnZombies?.Invoke(in properties);
+    internal static void InvokeOnSetNavigationShouldSpawnZombiesRequested(in SetNavigationShouldSpawnZombiesProperties properties, ref bool shouldAllow) => OnSetNavigationShouldSpawnZombiesRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetNavigationInfiniteAgroDistance(in SetNavigationInfiniteAgroDistanceProperties properties) => OnSetNavigationInfiniteAgroDistance?.Invoke(in properties);
+    internal static void InvokeOnSetNavigationInfiniteAgroDistanceRequested(in SetNavigationInfiniteAgroDistanceProperties properties, ref bool shouldAllow) => OnSetNavigationInfiniteAgroDistanceRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnRequestInstantiateNavigationRequested(in RequestInstantiateNavigationProperties properties, ref bool shouldAllow) => OnRequestInstantiateNavigationRequested?.Invoke(in properties, ref shouldAllow);
 }
 
 public delegate void TryInstantiateHierarchyObject(ref InstantiateHierarchyObjectProperties properties, ref bool shouldAllow);

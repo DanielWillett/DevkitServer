@@ -492,9 +492,11 @@ public delegate void RequestInstantiateRoadRequested(in RequestInstantiateRoadPr
 public readonly struct RequestInstantiateRoadProperties
 {
     public readonly Vector3 FirstVertexPosition;
-    public RequestInstantiateRoadProperties(Vector3 firstVertexPosition)
+    public readonly byte MaterialIndex;
+    public RequestInstantiateRoadProperties(Vector3 firstVertexPosition, byte materialIndex)
     {
         FirstVertexPosition = firstVertexPosition;
+        MaterialIndex = materialIndex;
     }
 }
 
@@ -677,6 +679,147 @@ public readonly struct SetRoadMaterialProperties
     {
         RoadNetId = roadNetId;
         MaterialIndex = materialIndex;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void RequestInstantiateNavigation(in RequestInstantiateNavigationProperties properties);
+public delegate void RequestInstantiateNavigationRequested(in RequestInstantiateNavigationProperties properties, ref bool shouldAllow);
+public readonly struct RequestInstantiateNavigationProperties
+{
+    public readonly Vector3 Position;
+    public RequestInstantiateNavigationProperties(Vector3 position)
+    {
+        Position = position;
+    }
+}
+
+public delegate void DeleteNavigation(in DeleteNavigationProperties properties);
+public delegate void DeleteNavigationRequested(in DeleteNavigationProperties properties, ref bool shouldAllow);
+public readonly struct DeleteNavigationProperties
+{
+    public readonly NetId NavigationNetId;
+    public readonly Vector3 OldPosition;
+    public readonly float DeltaTime;
+    public DeleteNavigationProperties(NetId navigationNetId, Vector3 oldPosition, float deltaTime)
+    {
+        NavigationNetId = navigationNetId;
+        OldPosition = oldPosition;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void MoveNavigation(in MoveNavigationProperties properties);
+public delegate void MoveNavigationRequested(in MoveNavigationProperties properties, ref bool shouldAllow);
+public readonly struct MoveNavigationProperties
+{
+    public readonly NetId NavigationNetId;
+    public readonly Vector3 Position;
+    public readonly Vector3 OldPosition;
+    public readonly float DeltaTime;
+    public MoveNavigationProperties(NetId navigationNetId, Vector3 position, Vector3 oldPosition, float deltaTime)
+    {
+        NavigationNetId = navigationNetId;
+        Position = position;
+        OldPosition = oldPosition;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void SetNavigationSize(in SetNavigationSizeProperties properties);
+public delegate void SetNavigationSizeRequested(in SetNavigationSizeProperties properties, ref bool shouldAllow);
+public readonly struct SetNavigationSizeProperties
+{
+    public readonly NetId NavigationNetId;
+    public readonly Vector2 Size;
+    public readonly Vector2 OldSize;
+    public readonly float DeltaTime;
+    public SetNavigationSizeProperties(NetId navigationNetId, Vector2 size, Vector2 oldSize, float deltaTime)
+    {
+        NavigationNetId = navigationNetId;
+        Size = size;
+        OldSize = oldSize;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void SetNavigationDifficulty(in SetNavigationDifficultyProperties properties);
+public delegate void SetNavigationDifficultyRequested(in SetNavigationDifficultyProperties properties, ref bool shouldAllow);
+public readonly struct SetNavigationDifficultyProperties
+{
+    public readonly NetId NavigationNetId;
+    public readonly AssetReference<ZombieDifficultyAsset> Difficulty;
+    public readonly AssetReference<ZombieDifficultyAsset> OldDifficulty;
+    public readonly float DeltaTime;
+    public SetNavigationDifficultyProperties(NetId navigationNetId, AssetReference<ZombieDifficultyAsset> difficulty, AssetReference<ZombieDifficultyAsset> oldDifficulty, float deltaTime)
+    {
+        NavigationNetId = navigationNetId;
+        Difficulty = difficulty;
+        OldDifficulty = oldDifficulty;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void SetNavigationMaximumZombies(in SetNavigationMaximumZombiesProperties properties);
+public delegate void SetNavigationMaximumZombiesRequested(in SetNavigationMaximumZombiesProperties properties, ref bool shouldAllow);
+public readonly struct SetNavigationMaximumZombiesProperties
+{
+    public readonly NetId NavigationNetId;
+    public readonly byte MaximumZombies;
+    public readonly byte OldMaximumZombies;
+    public readonly float DeltaTime;
+    public SetNavigationMaximumZombiesProperties(NetId navigationNetId, byte maximumZombies, byte oldMaximumZombies, float deltaTime)
+    {
+        NavigationNetId = navigationNetId;
+        MaximumZombies = maximumZombies;
+        OldMaximumZombies = oldMaximumZombies;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void SetNavigationMaximumBossZombies(in SetNavigationMaximumBossZombiesProperties properties);
+public delegate void SetNavigationMaximumBossZombiesRequested(in SetNavigationMaximumBossZombiesProperties properties, ref bool shouldAllow);
+public readonly struct SetNavigationMaximumBossZombiesProperties
+{
+    public readonly NetId NavigationNetId;
+    public readonly int MaximumBossZombies;
+    public readonly int OldMaximumBossZombies;
+    public readonly float DeltaTime;
+    public SetNavigationMaximumBossZombiesProperties(NetId navigationNetId, int maximumBossZombies, int oldMaximumBossZombies, float deltaTime)
+    {
+        NavigationNetId = navigationNetId;
+        MaximumBossZombies = maximumBossZombies;
+        OldMaximumBossZombies = oldMaximumBossZombies;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void SetNavigationShouldSpawnZombies(in SetNavigationShouldSpawnZombiesProperties properties);
+public delegate void SetNavigationShouldSpawnZombiesRequested(in SetNavigationShouldSpawnZombiesProperties properties, ref bool shouldAllow);
+public readonly struct SetNavigationShouldSpawnZombiesProperties
+{
+    public readonly NetId NavigationNetId;
+    public readonly bool ShouldSpawnZombies;
+    public readonly float DeltaTime;
+    public SetNavigationShouldSpawnZombiesProperties(NetId navigationNetId, bool shouldSpawnZombies, float deltaTime)
+    {
+        NavigationNetId = navigationNetId;
+        ShouldSpawnZombies = shouldSpawnZombies;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void SetNavigationInfiniteAgroDistance(in SetNavigationInfiniteAgroDistanceProperties properties);
+public delegate void SetNavigationInfiniteAgroDistanceRequested(in SetNavigationInfiniteAgroDistanceProperties properties, ref bool shouldAllow);
+public readonly struct SetNavigationInfiniteAgroDistanceProperties
+{
+    public readonly NetId NavigationNetId;
+    public readonly bool InfiniteAgroDistance;
+    public readonly float DeltaTime;
+    public SetNavigationInfiniteAgroDistanceProperties(NetId navigationNetId, bool infiniteAgroDistance, float deltaTime)
+    {
+        NavigationNetId = navigationNetId;
+        InfiniteAgroDistance = infiniteAgroDistance;
         DeltaTime = deltaTime;
     }
 }

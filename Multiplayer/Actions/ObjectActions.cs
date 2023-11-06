@@ -334,13 +334,27 @@ public class InstantiateLevelObjectAction : IServersideAction
 
 [Action(DevkitServerActionType.UpdateObjectsCustomMaterialPaletteOverride, 64 * 4 + 21, 0)]
 [EarlyTypeInit]
-public sealed class UpdateObjectsCustomMaterialPaletteOverrideAction : IAction
+public sealed class UpdateObjectsCustomMaterialPaletteOverrideAction : IReplacableAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.UpdateObjectsCustomMaterialPaletteOverride;
     public CSteamID Instigator { get; set; }
     public NetId[] NetIds { get; set; } = Array.Empty<NetId>();
     public float DeltaTime { get; set; }
     public AssetReference<MaterialPaletteAsset> Value { get; set; }
+    public bool TryReplaceFrom(IReplacableAction action)
+    {
+        UpdateObjectsCustomMaterialPaletteOverrideAction a = (UpdateObjectsCustomMaterialPaletteOverrideAction)action;
+        if (a.NetIds.Length != NetIds.Length)
+            return false;
+        for (int i = 0; i < NetIds.Length; ++i)
+        {
+            if (NetIds[i].id != a.NetIds[i].id)
+                return false;
+        }
+
+        Value = a.Value;
+        return true;
+    }
     public void Apply()
     {
 #if SERVER
@@ -425,13 +439,27 @@ public sealed class UpdateObjectsCustomMaterialPaletteOverrideAction : IAction
 
 [Action(DevkitServerActionType.UpdateObjectsMaterialIndexOverride, 64 * 4 + 9, 0)]
 [EarlyTypeInit]
-public sealed class UpdateObjectsMaterialIndexOverrideAction : IAction
+public sealed class UpdateObjectsMaterialIndexOverrideAction : IReplacableAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.UpdateObjectsMaterialIndexOverride;
     public CSteamID Instigator { get; set; }
     public NetId[] NetIds { get; set; } = Array.Empty<NetId>();
     public float DeltaTime { get; set; }
     public int Value { get; set; }
+    public bool TryReplaceFrom(IReplacableAction action)
+    {
+        UpdateObjectsMaterialIndexOverrideAction a = (UpdateObjectsMaterialIndexOverrideAction)action;
+        if (a.NetIds.Length != NetIds.Length)
+            return false;
+        for (int i = 0; i < NetIds.Length; ++i)
+        {
+            if (NetIds[i].id != a.NetIds[i].id)
+                return false;
+        }
+
+        Value = a.Value;
+        return true;
+    }
     public void Apply()
     {
 #if SERVER

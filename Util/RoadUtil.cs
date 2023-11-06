@@ -614,7 +614,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally set <see cref="RoadJoint.mode"/> and call the proper events.
+    /// Locally set <see cref="RoadJoint.mode"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -639,7 +639,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally set <see cref="RoadJoint.mode"/> and call the proper events.
+    /// Locally set <see cref="RoadJoint.mode"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -672,10 +672,12 @@ public static class RoadUtil
         Logger.LogDebug($"[{Source}] Vertex mode updated: {roadIndex.Format()}/{vertexIndex.Format()} {oldMode.Format()} -> {mode.Format()}.");
 
         SyncIfAuthority(roadIndex);
+
+        // todo update UI
     }
 
     /// <summary>
-    /// Locally set <see cref="Road.isLoop"/> and call the proper events.
+    /// Locally set <see cref="Road.isLoop"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -696,7 +698,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally set <see cref="Road.isLoop"/> and call the proper events.
+    /// Locally set <see cref="Road.isLoop"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -727,10 +729,12 @@ public static class RoadUtil
             road.buildMesh();
 
         SyncIfAuthority(roadIndex);
+
+        // todo update UI
     }
 
     /// <summary>
-    /// Locally set <see cref="Road.material"/> and call the proper events.
+    /// Locally set <see cref="Road.material"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -754,7 +758,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally set <see cref="Road.material"/> and call the proper events.
+    /// Locally set <see cref="Road.material"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -789,10 +793,12 @@ public static class RoadUtil
             road.buildMesh();
 
         SyncIfAuthority(roadIndex);
+
+        // todo update UI
     }
 
     /// <summary>
-    /// Locally set <see cref="RoadJoint.ignoreTerrain"/> and call the proper events.
+    /// Locally set <see cref="RoadJoint.ignoreTerrain"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -818,7 +824,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally set <see cref="RoadJoint.ignoreTerrain"/> and call the proper events.
+    /// Locally set <see cref="RoadJoint.ignoreTerrain"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -855,10 +861,12 @@ public static class RoadUtil
             road.buildMesh();
 
         SyncIfAuthority(roadIndex);
+
+        // todo update UI
     }
 
     /// <summary>
-    /// Locally set <see cref="RoadJoint.offset"/> and call the proper events.
+    /// Locally set <see cref="RoadJoint.offset"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -885,7 +893,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally set <see cref="RoadJoint.offset"/> and call the proper events.
+    /// Locally set <see cref="RoadJoint.offset"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -925,10 +933,12 @@ public static class RoadUtil
             road.buildMesh();
 
         SyncIfAuthority(roadIndex);
+
+        // todo update UI
     }
 
     /// <summary>
-    /// Locally call <see cref="Road.moveVertex"/> and call the proper events.
+    /// Locally call <see cref="Road.moveVertex"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -947,7 +957,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally call <see cref="Road.moveVertex"/> and call the proper events.
+    /// Locally call <see cref="Road.moveVertex"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -980,7 +990,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally call <see cref="Road.moveTangent"/> and call the proper events.
+    /// Locally call <see cref="Road.moveTangent"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1002,7 +1012,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally call <see cref="Road.moveTangent"/> and call the proper events.
+    /// Locally call <see cref="Road.moveTangent"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1043,7 +1053,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally call <see cref="Road.addVertex"/> and call the proper events.
+    /// Locally call <see cref="Road.addVertex"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1064,7 +1074,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally call <see cref="Road.addVertex"/> and call the proper events.
+    /// Locally call <see cref="Road.addVertex"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1103,7 +1113,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally call <see cref="Road.removeVertex"/> and call the proper events.
+    /// Locally call <see cref="Road.removeVertex"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1122,7 +1132,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally call <see cref="Road.removeVertex"/> and call the proper events.
+    /// Locally call <see cref="Road.removeVertex"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1157,7 +1167,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally call <see cref="LevelRoads.addRoad"/> and call the proper events.
+    /// Locally call <see cref="LevelRoads.addRoad"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1189,7 +1199,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally call <see cref="LevelRoads.removeRoad"/> and call the proper events.
+    /// Locally call <see cref="LevelRoads.removeRoad"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1205,7 +1215,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally call <see cref="LevelRoads.removeRoad"/> and call the proper events.
+    /// Locally call <see cref="LevelRoads.removeRoad"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1250,7 +1260,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally set the <see cref="RoadMaterial.width"/> property on a material and call the proper events.
+    /// Locally set the <see cref="RoadMaterial.width"/> property on a material and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1278,11 +1288,13 @@ public static class RoadUtil
             BakeRoadsWithMaterial(materialIndex);
 
         SyncMaterialIfAuthority(materialIndex);
+
+        // todo update UI
         return true;
     }
 
     /// <summary>
-    /// Locally set the <see cref="RoadMaterial.height"/> property on a material and call the proper events.
+    /// Locally set the <see cref="RoadMaterial.height"/> property on a material and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1310,11 +1322,13 @@ public static class RoadUtil
             BakeRoadsWithMaterial(materialIndex);
 
         SyncMaterialIfAuthority(materialIndex);
+
+        // todo update UI
         return true;
     }
 
     /// <summary>
-    /// Locally set the <see cref="RoadMaterial.depth"/> property on a material and call the proper events.
+    /// Locally set the <see cref="RoadMaterial.depth"/> property on a material and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1342,11 +1356,13 @@ public static class RoadUtil
             BakeRoadsWithMaterial(materialIndex);
 
         SyncMaterialIfAuthority(materialIndex);
+
+        // todo update UI
         return true;
     }
 
     /// <summary>
-    /// Locally set the <see cref="RoadMaterial.offset"/> property on a material and call the proper events.
+    /// Locally set the <see cref="RoadMaterial.offset"/> property on a material and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1374,11 +1390,13 @@ public static class RoadUtil
             BakeRoadsWithMaterial(materialIndex);
 
         SyncMaterialIfAuthority(materialIndex);
+
+        // todo update UI
         return true;
     }
 
     /// <summary>
-    /// Locally set the <see cref="RoadMaterial.isConcrete"/> property on a material and call the proper events.
+    /// Locally set the <see cref="RoadMaterial.isConcrete"/> property on a material and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1406,12 +1424,14 @@ public static class RoadUtil
             BakeRoadsWithMaterial(materialIndex);
 
         SyncMaterialIfAuthority(materialIndex);
+
+        // todo update UI
         return true;
     }
 
 #if SERVER
     /// <summary>
-    /// Call <see cref="LevelRoads.addRoad"/> and call the proper events.
+    /// Call <see cref="LevelRoads.addRoad"/> and call the necessary events.
     /// </summary
     /// <remarks>Replicates to clients.</remarks>
     /// <param name="owner">Optional owner/placer for the road.</param>
@@ -1468,7 +1488,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Call <see cref="Road.addVertex"/> and call the proper events.
+    /// Call <see cref="Road.addVertex"/> and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to clients.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1492,7 +1512,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Call <see cref="Road.addVertex"/> and call the proper events.
+    /// Call <see cref="Road.addVertex"/> and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to clients.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1553,7 +1573,7 @@ public static class RoadUtil
 #endif
 
     /// <summary>
-    /// Set the <see cref="RoadMaterial.isConcrete"/> property on a material and call the proper events.
+    /// Set the <see cref="RoadMaterial.isConcrete"/> property on a material and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1582,7 +1602,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the <see cref="RoadMaterial.width"/> property on a material and call the proper events.
+    /// Set the <see cref="RoadMaterial.width"/> property on a material and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1614,7 +1634,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the <see cref="RoadMaterial.height"/> property on a material and call the proper events.
+    /// Set the <see cref="RoadMaterial.height"/> property on a material and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1646,7 +1666,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the <see cref="RoadMaterial.depth"/> property on a material and call the proper events.
+    /// Set the <see cref="RoadMaterial.depth"/> property on a material and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1678,7 +1698,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the <see cref="RoadMaterial.offset"/> property on a material and call the proper events.
+    /// Set the <see cref="RoadMaterial.offset"/> property on a material and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1710,7 +1730,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the <see cref="Road.isLoop"/> property and call the proper events.
+    /// Set the <see cref="Road.isLoop"/> property and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1728,7 +1748,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the <see cref="Road.isLoop"/> property and call the proper events.
+    /// Set the <see cref="Road.isLoop"/> property and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1778,7 +1798,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the <see cref="Road.material"/> property and call the proper events.
+    /// Set the <see cref="Road.material"/> property and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1799,7 +1819,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the <see cref="Road.isLoop"/> property and call the proper events.
+    /// Set the <see cref="Road.isLoop"/> property and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1852,7 +1872,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the <see cref="RoadJoint.ignoreTerrain"/> property and call the proper events.
+    /// Set the <see cref="RoadJoint.ignoreTerrain"/> property and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1873,7 +1893,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the <see cref="RoadJoint.ignoreTerrain"/> property and call the proper events.
+    /// Set the <see cref="RoadJoint.ignoreTerrain"/> property and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1935,7 +1955,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the <see cref="RoadJoint.offset"/> property and call the proper events.
+    /// Set the <see cref="RoadJoint.offset"/> property and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1956,7 +1976,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the <see cref="RoadJoint.offset"/> property and call the proper events.
+    /// Set the <see cref="RoadJoint.offset"/> property and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -2019,7 +2039,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the <see cref="RoadJoint.mode"/> property and call the proper events.
+    /// Set the <see cref="RoadJoint.mode"/> property and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -2040,7 +2060,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the <see cref="RoadJoint.offset"/> property and call the proper events.
+    /// Set the <see cref="RoadJoint.offset"/> property and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -2104,7 +2124,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the root position of a vertex and call the proper events.
+    /// Set the root position of a vertex and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -2124,7 +2144,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the root position of a vertex and call the proper events.
+    /// Set the root position of a vertex and call the necessary events.
     /// </summary>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditRoads"/>.</exception>
@@ -2180,7 +2200,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the relative position of a vertex's tangent handle and call the proper events.
+    /// Set the relative position of a vertex's tangent handle and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -2200,7 +2220,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Set the relative position of a vertex's tangent handle and call the proper events.
+    /// Set the relative position of a vertex's tangent handle and call the necessary events.
     /// </summary>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditRoads"/>.</exception>
@@ -2257,7 +2277,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Delete a vertex and call the proper events.
+    /// Delete a vertex and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -2277,7 +2297,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Delete a vertex and call the proper events.
+    /// Delete a vertex and call the necessary events.
     /// </summary>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditRoads"/>.</exception>
@@ -2332,7 +2352,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Delete a vertex and call the proper events.
+    /// Delete a vertex and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -2349,7 +2369,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Delete a vertex and call the proper events.
+    /// Delete a vertex and call the necessary events.
     /// </summary>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditRoads"/>.</exception>
@@ -2428,7 +2448,7 @@ public static class RoadUtil
             EditorActions.QueueServerAction(new DeleteRoadAction
             {
                 DeltaTime = CachedTime.DeltaTime,
-                InstanceId = roadNetId.id,
+                InstanceId = roadNetId.id
             });
 #endif
         }

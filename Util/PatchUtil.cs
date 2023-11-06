@@ -658,10 +658,28 @@ public static class PatchUtil
     }
 
     /// <summary>
-    /// Copy an instruction without 
+    /// Copy an instruction without labels and blocks.
     /// </summary>
     [Pure]
     public static CodeInstruction CopyWithoutSpecial(this CodeInstruction instruction) => new CodeInstruction(instruction.opcode, instruction.operand);
+
+    /// <summary>
+    /// Transfers blocks that would be on the last instruction of a block to the target instruction.
+    /// </summary>
+    public static CodeInstruction WithEndingInstructionNeeds(this CodeInstruction instruction, CodeInstruction other)
+    {
+        TransferEndingInstructionNeeds(instruction, other);
+        return instruction;
+    }
+
+    /// <summary>
+    /// Transfers all labels and blocks that would be on the first instruction of a block to the target instruction.
+    /// </summary>
+    public static CodeInstruction WithStartingInstructionNeeds(this CodeInstruction instruction, CodeInstruction other)
+    {
+        TransferStartingInstructionNeeds(instruction, other);
+        return instruction;
+    }
 
     /// <summary>
     /// Transfers blocks that would be on the last instruction of a block to the target instruction.
@@ -733,8 +751,18 @@ public static class PatchUtil
                 return comparand.IsLdLoc();
             if (opcode.IsLdLoc(true))
                 return comparand.IsLdLoc(true);
-            if (opcode.IsLdc())
-                return comparand.IsLdc();
+            if (opcode.IsLdFld())
+                return comparand.IsLdFld();
+            if (opcode.IsLdFld(true))
+                return comparand.IsLdFld(true);
+            if (opcode.IsLdFld(@static: true))
+                return comparand.IsLdFld(@static: true);
+            if (opcode.IsLdFld(true, @static: true))
+                return comparand.IsLdFld(true, @static: true);
+            if (opcode.IsLdLoc(true))
+                return comparand.IsLdLoc(true);
+            if (opcode.IsLdc(true))
+                return comparand.IsLdc(true);
             if (opcode.IsLdc(false, true))
                 return comparand.IsLdc(false, true);
             if (opcode.IsLdc(false, false, true))
@@ -768,6 +796,8 @@ public static class PatchUtil
         {
             if (opcode.IsLdArg(true, true))
                 return comparand.IsLdArg(true, true);
+            if (opcode.IsLdFld(either: true, staticOrInstance: true))
+                return comparand.IsLdFld(either: true, staticOrInstance: true);
             if (opcode.IsLdLoc(true, true))
                 return comparand.IsLdLoc(true, true);
             if (opcode.IsLdc(true, true, true, true, true, true))
@@ -816,6 +846,29 @@ public static class PatchUtil
             return !byRef || either;
         if (opcode == OpCodes.Ldloca_S || opcode == OpCodes.Ldloca)
             return byRef || either;
+
+        return false;
+    }
+
+    /// <summary>
+    /// Is this opcode any variants of <c>ldfld</c>.
+    /// </summary>
+    /// <param name="opcode"><see cref="OpCode"/> to check.</param>
+    /// <param name="byRef">Only match instructions that load by address.</param>
+    /// <param name="either">Match instructions that load by value or address.</param>
+    /// <param name="static">Only match instructions that load static fields.</param>
+    /// <param name="staticOrInstance">Match instructions that load static or instance fields.</param>
+    [Pure]
+    public static bool IsLdFld(this OpCode opcode, bool byRef = false, bool either = false, bool @static = false, bool staticOrInstance = false)
+    {
+        if (opcode == OpCodes.Ldfld)
+            return (!byRef || either) && (!@static || staticOrInstance);
+        if (opcode == OpCodes.Ldflda)
+            return (byRef || either) && (!@static || staticOrInstance);
+        if (opcode == OpCodes.Ldsfld)
+            return (!byRef || either) && (@static || staticOrInstance);
+        if (opcode == OpCodes.Ldsflda)
+            return (byRef || either) && (@static || staticOrInstance);
 
         return false;
     }
@@ -943,7 +996,7 @@ public static class PatchUtil
     /// <summary>
     /// Is this opcode any variants of <c>ldc</c>.
     /// </summary>
-    /// <remarks>Use <see cref="IsBrAny"/> for the same check but all parameters default to <see langword="true"/>.</remarks>
+    /// <remarks>Use <see cref="IsLdc"/> for the same check but all parameters default to <see langword="false"/>.</remarks>
     /// <param name="opcode"><see cref="OpCode"/> to check.</param>
     /// <param name="int">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldc.i4</c>.</param>
     /// <param name="long">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldc.i8</c>.</param>
@@ -952,7 +1005,22 @@ public static class PatchUtil
     /// <param name="string">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldstr</c>.</param>
     /// <param name="null">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldnull</c>.</param>
     [Pure]
-    public static bool IsLdc(this OpCode opcode, bool @int = true, bool @long = false, bool @float = false, bool @double = false, bool @string = false, bool @null = false)
+    public static bool IsLdcAny(this OpCode opcode, bool @int = true, bool @long = true, bool @float = true, bool @double = true, bool @string = true, bool @null = true)
+        => IsLdc(opcode, @int, @long, @float, @double, @string, @null);
+
+    /// <summary>
+    /// Is this opcode any variants of <c>ldc</c>.
+    /// </summary>
+    /// <remarks>Use <see cref="IsLdcAny"/> for the same check but all parameters default to <see langword="true"/>.</remarks>
+    /// <param name="opcode"><see cref="OpCode"/> to check.</param>
+    /// <param name="int">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldc.i4</c>.</param>
+    /// <param name="long">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldc.i8</c>.</param>
+    /// <param name="float">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldc.r4</c>.</param>
+    /// <param name="double">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldc.r8</c>.</param>
+    /// <param name="string">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldstr</c>.</param>
+    /// <param name="null">Return <see langword="true"/> if <paramref name="opcode"/> is any variant of <c>ldnull</c>.</param>
+    [Pure]
+    public static bool IsLdc(this OpCode opcode, bool @int = false, bool @long = false, bool @float = false, bool @double = false, bool @string = false, bool @null = false)
     {
         if (opcode == OpCodes.Ldc_I4_0 || opcode == OpCodes.Ldc_I4_1 || opcode == OpCodes.Ldc_I4_S ||
             opcode == OpCodes.Ldc_I4 || opcode == OpCodes.Ldc_I4_2 || opcode == OpCodes.Ldc_I4_3 ||

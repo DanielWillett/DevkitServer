@@ -17,6 +17,20 @@ namespace DevkitServer.Patches;
 internal static class RoadsPatches
 {
     private const string Source = "ROADS PATCHES";
+    private static bool _changing;
+
+    private static void Change(Action action)
+    {
+        _changing = true;
+        try
+        {
+            action();
+        }
+        finally
+        {
+            _changing = false;
+        }
+    }
 
     [UsedImplicitly]
     [HarmonyTranspiler]
@@ -26,7 +40,7 @@ internal static class RoadsPatches
         MethodInfo? deselect = typeof(EditorRoads).GetMethod("deselect", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
         if (deselect == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find property getter: EditorRoads.deselect.", method: Source);
+            Logger.LogWarning($"{method.Format()} - Unable to find method: EditorRoads.deselect.", method: Source);
         }
 
         MethodInfo? removeRoad = typeof(LevelRoads).GetMethod(nameof(LevelRoads.removeRoad),
@@ -358,13 +372,15 @@ internal static class RoadsPatches
     [UsedImplicitly]
     private static bool OnToggleMaterialIsConcrete(ISleekToggle toggle, bool state)
     {
+        if (_changing)
+            return false;
         int materialIndex = EditorRoads.selected;
         if (materialIndex >= LevelRoads.materials.Length)
             return false;
 
         if (DevkitServerModule.IsEditing && !CanEditRoadMaterials())
         {
-            toggle.Value = LevelRoads.materials[materialIndex].isConcrete;
+            Change(() => toggle.Value = LevelRoads.materials[materialIndex].isConcrete);
             return false;
         }
 
@@ -377,7 +393,7 @@ internal static class RoadsPatches
                 ClientEvents.InvokeOnSetRoadMaterialIsConcreteRequested(in properties, ref shouldAllow);
                 if (!shouldAllow)
                 {
-                    toggle.Value = LevelRoads.materials[materialIndex].isConcrete;
+                    Change(() => toggle.Value = LevelRoads.materials[materialIndex].isConcrete);
                     return false;
                 }
             }
@@ -392,7 +408,7 @@ internal static class RoadsPatches
     [UsedImplicitly]
     private static bool OnToggleMode(SleekButtonState button, int index)
     {
-        if (EditorRoads.road == null)
+        if (_changing || EditorRoads.road == null)
             return false;
 
         int vertexIndex = RoadUtil.SelectedVertexIndex;
@@ -405,7 +421,7 @@ internal static class RoadsPatches
 
         if (DevkitServerModule.IsEditing && !CanEditRoads())
         {
-            button.state = (int)EditorRoads.road.joints[vertexIndex].mode;
+            Change(() => button.state = (int)EditorRoads.road.joints[vertexIndex].mode);
             return false;
         }
 
@@ -419,7 +435,7 @@ internal static class RoadsPatches
                 ClientEvents.InvokeOnSetRoadVertexTangentHandleModeRequested(in properties, ref shouldAllow);
                 if (!shouldAllow)
                 {
-                    button.state = (int)properties.OldTangentHandleMode;
+                    Change(() => button.state = (int)EditorRoads.road.joints[vertexIndex].mode);
                     return false;
                 }
             }
@@ -433,7 +449,7 @@ internal static class RoadsPatches
     [UsedImplicitly]
     private static bool OnToggleIgnoreTerrain(ISleekToggle toggle, bool state)
     {
-        if (EditorRoads.road == null)
+        if (_changing || EditorRoads.road == null)
             return false;
         int vertexIndex = RoadUtil.SelectedVertexIndex;
         if (vertexIndex == -1)
@@ -445,7 +461,7 @@ internal static class RoadsPatches
 
         if (DevkitServerModule.IsEditing && !CanEditRoads())
         {
-            toggle.Value = EditorRoads.road.joints[vertexIndex].ignoreTerrain;
+            Change(() => toggle.Value = EditorRoads.road.joints[vertexIndex].ignoreTerrain);
             return false;
         }
 
@@ -460,7 +476,7 @@ internal static class RoadsPatches
                 ClientEvents.InvokeOnSetRoadVertexIgnoreTerrainRequested(in properties, ref shouldAllow);
                 if (!shouldAllow)
                 {
-                    toggle.Value = EditorRoads.road.joints[vertexIndex].ignoreTerrain;
+                    Change(() => toggle.Value = EditorRoads.road.joints[vertexIndex].ignoreTerrain);
                     return false;
                 }
             }
@@ -474,7 +490,7 @@ internal static class RoadsPatches
     [UsedImplicitly]
     private static bool OnTypedOffset(ISleekFloat32Field field, float state)
     {
-        if (EditorRoads.road == null)
+        if (_changing || EditorRoads.road == null)
             return false;
         int vertexIndex = RoadUtil.SelectedVertexIndex;
         if (vertexIndex == -1)
@@ -487,7 +503,7 @@ internal static class RoadsPatches
         float oldVerticalOffset = EditorRoads.road.joints[vertexIndex].offset;
         if (DevkitServerModule.IsEditing && !CanEditRoads())
         {
-            field.Value = oldVerticalOffset;
+            Change(() => field.Value = oldVerticalOffset);
             return false;
         }
 
@@ -502,7 +518,7 @@ internal static class RoadsPatches
                 ClientEvents.InvokeOnSetRoadVertexVerticalOffsetRequested(in properties, ref shouldAllow);
                 if (!shouldAllow)
                 {
-                    field.Value = oldVerticalOffset;
+                    Change(() => field.Value = oldVerticalOffset);
                     return false;
                 }
             }
@@ -516,6 +532,8 @@ internal static class RoadsPatches
     [UsedImplicitly]
     private static bool OnTypedMaterialWidth(ISleekFloat32Field field, float state)
     {
+        if (_changing)
+            return false;
         int materialIndex = EditorRoads.selected;
         if (materialIndex >= LevelRoads.materials.Length)
             return false;
@@ -523,7 +541,7 @@ internal static class RoadsPatches
         float oldWidth = LevelRoads.materials[materialIndex].width;
         if (DevkitServerModule.IsEditing && !CanEditRoadMaterials())
         {
-            field.Value = oldWidth;
+            Change(() => field.Value = oldWidth);
             return false;
         }
 
@@ -536,7 +554,7 @@ internal static class RoadsPatches
                 ClientEvents.InvokeOnSetRoadMaterialWidthRequested(in properties, ref shouldAllow);
                 if (!shouldAllow)
                 {
-                    field.Value = oldWidth;
+                    Change(() => field.Value = oldWidth);
                     return false;
                 }
             }
@@ -551,6 +569,8 @@ internal static class RoadsPatches
     [UsedImplicitly]
     private static bool OnTypedMaterialHeight(ISleekFloat32Field field, float state)
     {
+        if (_changing)
+            return false;
         int materialIndex = EditorRoads.selected;
         if (materialIndex >= LevelRoads.materials.Length)
             return false;
@@ -558,7 +578,7 @@ internal static class RoadsPatches
         float oldHeight = LevelRoads.materials[materialIndex].height;
         if (DevkitServerModule.IsEditing && !CanEditRoadMaterials())
         {
-            field.Value = oldHeight;
+            Change(() => field.Value = oldHeight);
             return false;
         }
 
@@ -571,7 +591,7 @@ internal static class RoadsPatches
                 ClientEvents.InvokeOnSetRoadMaterialHeightRequested(in properties, ref shouldAllow);
                 if (!shouldAllow)
                 {
-                    field.Value = oldHeight;
+                    Change(() => field.Value = oldHeight);
                     return false;
                 }
             }
@@ -586,6 +606,8 @@ internal static class RoadsPatches
     [UsedImplicitly]
     private static bool OnTypedMaterialDepth(ISleekFloat32Field field, float state)
     {
+        if (_changing)
+            return false;
         int materialIndex = EditorRoads.selected;
         if (materialIndex >= LevelRoads.materials.Length)
             return false;
@@ -593,7 +615,7 @@ internal static class RoadsPatches
         float oldDepth = LevelRoads.materials[materialIndex].depth;
         if (DevkitServerModule.IsEditing && !CanEditRoadMaterials())
         {
-            field.Value = oldDepth;
+            Change(() => field.Value = oldDepth);
             return false;
         }
 
@@ -606,7 +628,7 @@ internal static class RoadsPatches
                 ClientEvents.InvokeOnSetRoadMaterialDepthRequested(in properties, ref shouldAllow);
                 if (!shouldAllow)
                 {
-                    field.Value = oldDepth;
+                    Change(() => field.Value = oldDepth);
                     return false;
                 }
             }
@@ -621,6 +643,8 @@ internal static class RoadsPatches
     [UsedImplicitly]
     private static bool OnTypedMaterialVerticalOffset(ISleekFloat32Field field, float state)
     {
+        if (_changing)
+            return false;
         int materialIndex = EditorRoads.selected;
         if (materialIndex >= LevelRoads.materials.Length)
             return false;
@@ -628,7 +652,7 @@ internal static class RoadsPatches
         float oldVerticalOffset = LevelRoads.materials[materialIndex].offset;
         if (DevkitServerModule.IsEditing && !CanEditRoadMaterials())
         {
-            field.Value = oldVerticalOffset;
+            Change(() => field.Value = oldVerticalOffset);
             return false;
         }
 
@@ -641,7 +665,7 @@ internal static class RoadsPatches
                 ClientEvents.InvokeOnSetRoadMaterialVerticalOffsetRequested(in properties, ref shouldAllow);
                 if (!shouldAllow)
                 {
-                    field.Value = oldVerticalOffset;
+                    Change(() => field.Value = oldVerticalOffset);
                     return false;
                 }
             }
@@ -656,12 +680,12 @@ internal static class RoadsPatches
     [UsedImplicitly]
     private static bool OnToggleIsLoop(ISleekToggle toggle, bool state)
     {
-        if (EditorRoads.road == null)
+        if (_changing || EditorRoads.road == null)
             return false;
 
         if (DevkitServerModule.IsEditing && !CanEditRoads())
         {
-            toggle.Value = !state;
+            Change(() => toggle.Value = !state);
             return false;
         }
 
@@ -676,7 +700,7 @@ internal static class RoadsPatches
                 ClientEvents.InvokeOnSetRoadIsLoopRequested(in properties, ref shouldAllow);
                 if (!shouldAllow)
                 {
-                    toggle.Value = !state;
+                    Change(() => toggle.Value = !state);
                     return false;
                 }
             }
@@ -727,12 +751,18 @@ internal static class RoadsPatches
     }
     private static Transform? AddRoad(Vector3 point)
     {
+        if (LevelRoads.getRoad(ushort.MaxValue - 1) != null)
+        {
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "TooManyRoads", new object[] { (ushort)(ushort.MaxValue - 1) });
+            return null!;
+        }
+
         if (DevkitServerModule.IsEditing)
         {
             if (!CanEditRoads())
                 return null;
 
-            RequestInstantiateRoadProperties properties = new RequestInstantiateRoadProperties(point);
+            RequestInstantiateRoadProperties properties = new RequestInstantiateRoadProperties(point, EditorRoads.selected);
             if (ClientEvents.ListeningOnRequestInstantiateRoadRequested)
             {
                 bool shouldAllow = true;
@@ -752,6 +782,12 @@ internal static class RoadsPatches
     }
     private static Transform? AddVertex(Road road, int vertexIndex, Vector3 point)
     {
+        if (road.joints.Count >= ushort.MaxValue - 1)
+        {
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "TooManyRoadVerticies", new object[] { (ushort)(ushort.MaxValue - 1) });
+            return null!;
+        }
+
         Transform? selectedRoadElement;
         if (DevkitServerModule.IsEditing && !CanEditRoads())
         {
@@ -967,7 +1003,7 @@ internal static class RoadsPatches
             return NetId.INVALID;
         if (!RoadNetIdDatabase.TryGetRoadNetId(roadIndex, out NetId netId))
         {
-            Logger.LogWarning($"Unable to find NetId for road: {roadIndex.Format()}.");
+            Logger.LogWarning($"Unable to find NetId for road: {roadIndex.Format()}.", method: Source);
             return NetId.INVALID;
         }
 
@@ -979,7 +1015,7 @@ internal static class RoadsPatches
             return NetId.INVALID;
         if (!RoadNetIdDatabase.TryGetVertexNetId(new RoadVertexIdentifier(roadIndex, vertexIndex), out NetId netId))
         {
-            Logger.LogWarning($"Unable to find NetId for road: {roadIndex.Format()}, vertex: {vertexIndex.Format()}.");
+            Logger.LogWarning($"Unable to find NetId for road: {roadIndex.Format()}, vertex: {vertexIndex.Format()}.", method: Source);
             return NetId.INVALID;
         }
 

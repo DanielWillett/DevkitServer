@@ -1,26 +1,24 @@
-﻿using DevkitServer.API.Permissions;
+﻿using DevkitServer.API;
+using DevkitServer.API.Abstractions;
+using DevkitServer.API.Permissions;
 using DevkitServer.API.UI;
+using DevkitServer.Core.Permissions;
+using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using HarmonyLib;
 using Pathfinding;
 using System.Reflection;
 using System.Reflection.Emit;
 using Progress = Pathfinding.Progress;
-using DevkitServer.API;
 
 #if CLIENT
-using DevkitServer.API.Abstractions;
 using DevkitServer.API.UI.Extensions;
-using DevkitServer.Core.Permissions;
 using DevkitServer.Core.UI.Extensions;
-using DevkitServer.Multiplayer.Levels;
+using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Sync;
 #endif
 #if SERVER
 using Cysharp.Threading.Tasks;
-using DevkitServer.API.Abstractions;
-using DevkitServer.Core.Permissions;
-using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Players;
 using Pathfinding.Voxels;
 using System.Diagnostics;
@@ -270,7 +268,7 @@ internal static class NavigationPatches
 
             ctx.Acknowledge(StandardErrorCode.Success);
 
-            NavigationUtil.SyncIfAuthority(netId);
+            NavigationUtil.SyncGraphIfAuthority(netId);
         });
     }
 
@@ -369,7 +367,7 @@ internal static class NavigationPatches
 #endif
     private static void OnBakeNavigationWhileAlreadyBaking()
     {
-        Logger.LogWarning(BlockBake == 0 ? "Tried to bake navigation while it's already baking." : "You do not have permission to bake navigation.", method: Source);
+        Logger.LogWarning(BlockBake == 0 ? "You do not have permission to bake navigation." : "Tried to bake navigation while it's already baking.", method: Source);
 #if CLIENT
         int old = BlockBake;
         if (old > 0 && NavigationUtil.TryGetFlag((byte)(old - 1), out Flag oldFlag))
@@ -388,4 +386,650 @@ internal static class NavigationPatches
             EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationIndex", new object[] { (byte)(old - 1) });
 #endif
     }
+#if CLIENT
+
+    private static bool _changing;
+    private static void Change(Action action)
+    {
+        _changing = true;
+        try
+        {
+            action();
+        }
+        finally
+        {
+            _changing = false;
+        }
+    }
+    internal static void OptionalPatches()
+    {
+        MethodInfo? method = typeof(EditorEnvironmentNavigationUI).GetMethod("onDraggedWidthSlider", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        if (method == null)
+        {
+            Logger.LogWarning("Unable to find method: EditorEnvironmentNavigationUI.onDraggedWidthSlider.", method: Source);
+        }
+        else
+        {
+            try
+            {
+                PatchesMain.Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(OnChangeWidth)!));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error patching EditorEnvironmentNavigationUI.onDraggedWidthSlider.", method: Source);
+                Logger.LogError(ex, method: Source);
+            }
+        }
+        method = typeof(EditorEnvironmentNavigationUI).GetMethod("onDraggedHeightSlider", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        if (method == null)
+        {
+            Logger.LogWarning("Unable to find method: EditorEnvironmentNavigationUI.onDraggedHeightSlider.", method: Source);
+        }
+        else
+        {
+            try
+            {
+                PatchesMain.Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(OnChangeHeight)!));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error patching EditorEnvironmentNavigationUI.onDraggedHeightSlider.", method: Source);
+                Logger.LogError(ex, method: Source);
+            }
+        }
+        method = typeof(EditorEnvironmentNavigationUI).GetMethod("onDifficultyGUIDFieldTyped", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        if (method == null)
+        {
+            Logger.LogWarning("Unable to find method: EditorEnvironmentNavigationUI.onDifficultyGUIDFieldTyped.", method: Source);
+        }
+        else
+        {
+            try
+            {
+                PatchesMain.Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(OnChangeDifficulty)!));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error patching EditorEnvironmentNavigationUI.onDifficultyGUIDFieldTyped.", method: Source);
+                Logger.LogError(ex, method: Source);
+            }
+        }
+        method = typeof(EditorEnvironmentNavigationUI).GetMethod("onMaxZombiesFieldTyped", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        if (method == null)
+        {
+            Logger.LogWarning("Unable to find method: EditorEnvironmentNavigationUI.onMaxZombiesFieldTyped.", method: Source);
+        }
+        else
+        {
+            try
+            {
+                PatchesMain.Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(OnChangeMaxZombies)!));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error patching EditorEnvironmentNavigationUI.onMaxZombiesFieldTyped.", method: Source);
+                Logger.LogError(ex, method: Source);
+            }
+        }
+        method = typeof(EditorEnvironmentNavigationUI).GetMethod("onMaxBossZombiesFieldTyped", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        if (method == null)
+        {
+            Logger.LogWarning("Unable to find method: EditorEnvironmentNavigationUI.onMaxBossZombiesFieldTyped.", method: Source);
+        }
+        else
+        {
+            try
+            {
+                PatchesMain.Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(OnChangeMaxBossZombies)!));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error patching EditorEnvironmentNavigationUI.onMaxBossZombiesFieldTyped.", method: Source);
+                Logger.LogError(ex, method: Source);
+            }
+        }
+        method = typeof(EditorEnvironmentNavigationUI).GetMethod("onToggledSpawnZombiesToggle", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        if (method == null)
+        {
+            Logger.LogWarning("Unable to find method: EditorEnvironmentNavigationUI.onToggledSpawnZombiesToggle.", method: Source);
+        }
+        else
+        {
+            try
+            {
+                PatchesMain.Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(OnChangeShouldSpawnZombies)!));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error patching EditorEnvironmentNavigationUI.onToggledSpawnZombiesToggle.", method: Source);
+                Logger.LogError(ex, method: Source);
+            }
+        }
+        method = typeof(EditorEnvironmentNavigationUI).GetMethod("onToggledHyperAgroToggle", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        if (method == null)
+        {
+            Logger.LogWarning("Unable to find method: EditorEnvironmentNavigationUI.onToggledHyperAgroToggle.", method: Source);
+        }
+        else
+        {
+            try
+            {
+                PatchesMain.Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(OnChangeInfiniteAgroDistance)!));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error patching EditorEnvironmentNavigationUI.onToggledHyperAgroToggle.", method: Source);
+                Logger.LogError(ex, method: Source);
+            }
+        }
+    }
+
+    [UsedImplicitly]
+    private static bool OnChangeWidth(ISleekSlider slider, float state)
+    {
+        Flag? flag = EditorNavigation.flag;
+        if (_changing || flag == null)
+            return false;
+
+        float oldWidth = flag.width;
+        if (DevkitServerModule.IsEditing && !CanEditFlags())
+        {
+            Change(() => slider.Value = oldWidth);
+            return false;
+        }
+
+        if (oldWidth == state)
+            return false;
+
+        int nav = flag.GetIndex();
+        if (nav < 0)
+            return false;
+
+        Vector2 size = new Vector2(state, flag.height);
+
+        SetNavigationSizeProperties properties = new SetNavigationSizeProperties(GetNetIdOrInvalid((byte)nav), size, new Vector2(oldWidth, flag.height), CachedTime.DeltaTime);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+        {
+            if (ClientEvents.ListeningOnSetNavigationSizeRequested)
+            {
+                bool shouldAllow = true;
+                ClientEvents.InvokeOnSetNavigationSizeRequested(in properties, ref shouldAllow);
+                if (!shouldAllow)
+                {
+                    Change(() => slider.Value = oldWidth);
+                    return false;
+                }
+            }
+        }
+
+        NavigationUtil.SetFlagSizeLocal((byte)nav, size);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+            ClientEvents.InvokeOnSetNavigationSize(in properties);
+        return false;
+    }
+
+    [UsedImplicitly]
+    private static bool OnChangeHeight(ISleekSlider slider, float state)
+    {
+        Flag? flag = EditorNavigation.flag;
+        if (_changing || flag == null)
+            return false;
+
+        float oldHeight = flag.height;
+        if (DevkitServerModule.IsEditing && !CanEditFlags())
+        {
+            Change(() => slider.Value = oldHeight);
+            return false;
+        }
+
+        if (oldHeight == state)
+            return false;
+
+        int nav = flag.GetIndex();
+        if (nav < 0)
+            return false;
+
+        Vector2 size = new Vector2(flag.width, state);
+
+        SetNavigationSizeProperties properties = new SetNavigationSizeProperties(GetNetIdOrInvalid((byte)nav), size, new Vector2(flag.width, oldHeight), CachedTime.DeltaTime);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+        {
+            if (ClientEvents.ListeningOnSetNavigationSizeRequested)
+            {
+                bool shouldAllow = true;
+                ClientEvents.InvokeOnSetNavigationSizeRequested(in properties, ref shouldAllow);
+                if (!shouldAllow)
+                {
+                    Change(() => slider.Value = oldHeight);
+                    return false;
+                }
+            }
+        }
+
+        NavigationUtil.SetFlagSizeLocal((byte)nav, size);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+            ClientEvents.InvokeOnSetNavigationSize(in properties);
+        return false;
+    }
+
+    [UsedImplicitly]
+    private static bool OnChangeDifficulty(ISleekField field, string state)
+    {
+        Flag? flag = EditorNavigation.flag;
+        if (_changing || flag == null)
+            return false;
+
+        if (DevkitServerModule.IsEditing && !CanEditFlags())
+        {
+            Change(() => field.Text = flag.data.difficultyGUID);
+            return false;
+        }
+
+        state = state.Trim();
+
+        if (!Guid.TryParse(state, out Guid guid) && flag.data.difficulty.GUID == Guid.Empty)
+        {
+            if (state.Length >= 32)
+                Change(() => field.Text = flag.data.difficultyGUID);
+            return false;
+        }
+
+        if (flag.data.difficulty.GUID == guid)
+            return false;
+
+        AssetReference<ZombieDifficultyAsset> oldDifficulty = flag.data.difficulty;
+
+        int nav = flag.GetIndex();
+        if (nav < 0)
+            return false;
+
+        AssetReference<ZombieDifficultyAsset> difficulty = new AssetReference<ZombieDifficultyAsset>(guid);
+
+        SetNavigationDifficultyProperties properties = new SetNavigationDifficultyProperties(GetNetIdOrInvalid((byte)nav), difficulty, oldDifficulty, CachedTime.DeltaTime);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+        {
+            if (ClientEvents.ListeningOnSetNavigationDifficultyRequested)
+            {
+                bool shouldAllow = true;
+                ClientEvents.InvokeOnSetNavigationDifficultyRequested(in properties, ref shouldAllow);
+                if (!shouldAllow)
+                {
+                    Change(() => field.Text = flag.data.difficultyGUID);
+                    return false;
+                }
+            }
+        }
+
+        NavigationUtil.SetFlagDifficultyLocal((byte)nav, difficulty);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+            ClientEvents.InvokeOnSetNavigationDifficulty(in properties);
+        return false;
+    }
+    
+    [UsedImplicitly]
+    private static bool OnChangeMaxZombies(ISleekUInt8Field field, byte state)
+    {
+        Flag? flag = EditorNavigation.flag;
+        if (_changing || flag == null)
+            return false;
+
+        byte oldMaxZombies = flag.data.maxZombies;
+        if (DevkitServerModule.IsEditing && !CanEditFlags())
+        {
+            Change(() => field.Value = oldMaxZombies);
+            return false;
+        }
+
+        if (oldMaxZombies == state)
+            return false;
+
+        int nav = flag.GetIndex();
+        if (nav < 0)
+            return false;
+
+        SetNavigationMaximumZombiesProperties properties = new SetNavigationMaximumZombiesProperties(GetNetIdOrInvalid((byte)nav), state, oldMaxZombies, CachedTime.DeltaTime);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+        {
+            if (ClientEvents.ListeningOnSetNavigationMaximumZombiesRequested)
+            {
+                bool shouldAllow = true;
+                ClientEvents.InvokeOnSetNavigationMaximumZombiesRequested(in properties, ref shouldAllow);
+                if (!shouldAllow)
+                {
+                    Change(() => field.Value = oldMaxZombies);
+                    return false;
+                }
+            }
+        }
+
+        NavigationUtil.SetFlagMaximumZombiesLocal((byte)nav, state);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+            ClientEvents.InvokeOnSetNavigationMaximumZombies(in properties);
+        return false;
+    }
+
+    [UsedImplicitly]
+    private static bool OnChangeMaxBossZombies(ISleekInt32Field field, int state)
+    {
+        Flag? flag = EditorNavigation.flag;
+        if (_changing || flag == null)
+            return false;
+
+        int oldMaxBossZombies = flag.data.maxBossZombies;
+        if (DevkitServerModule.IsEditing && !CanEditFlags())
+        {
+            Change(() => field.Value = oldMaxBossZombies);
+            return false;
+        }
+
+        if (oldMaxBossZombies == state)
+            return false;
+
+        int nav = flag.GetIndex();
+        if (nav < 0)
+            return false;
+
+        SetNavigationMaximumBossZombiesProperties properties = new SetNavigationMaximumBossZombiesProperties(GetNetIdOrInvalid((byte)nav), state, oldMaxBossZombies, CachedTime.DeltaTime);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+        {
+            if (ClientEvents.ListeningOnSetNavigationMaximumBossZombiesRequested)
+            {
+                bool shouldAllow = true;
+                ClientEvents.InvokeOnSetNavigationMaximumBossZombiesRequested(in properties, ref shouldAllow);
+                if (!shouldAllow)
+                {
+                    Change(() => field.Value = oldMaxBossZombies);
+                    return false;
+                }
+            }
+        }
+
+        NavigationUtil.SetFlagMaximumBossZombiesLocal((byte)nav, state);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+            ClientEvents.InvokeOnSetNavigationMaximumBossZombies(in properties);
+        return false;
+    }
+
+    [UsedImplicitly]
+    private static bool OnChangeShouldSpawnZombies(ISleekToggle toggle, bool state)
+    {
+        Flag? flag = EditorNavigation.flag;
+        if (_changing || flag == null)
+            return false;
+
+        if (DevkitServerModule.IsEditing && !CanEditFlags())
+        {
+            Change(() => toggle.Value = !state);
+            return false;
+        }
+
+        if (flag.data.spawnZombies == state)
+            return false;
+
+        int nav = flag.GetIndex();
+        if (nav < 0)
+            return false;
+
+        SetNavigationShouldSpawnZombiesProperties properties = new SetNavigationShouldSpawnZombiesProperties(GetNetIdOrInvalid((byte)nav), state, CachedTime.DeltaTime);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+        {
+            if (ClientEvents.ListeningOnSetNavigationShouldSpawnZombiesRequested)
+            {
+                bool shouldAllow = true;
+                ClientEvents.InvokeOnSetNavigationShouldSpawnZombiesRequested(in properties, ref shouldAllow);
+                if (!shouldAllow)
+                {
+                    Change(() => toggle.Value = !state);
+                    return false;
+                }
+            }
+        }
+
+        NavigationUtil.SetFlagShouldSpawnZombiesLocal((byte)nav, state);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+            ClientEvents.InvokeOnSetNavigationShouldSpawnZombies(in properties);
+        return false;
+    }
+
+    [UsedImplicitly]
+    private static bool OnChangeInfiniteAgroDistance(ISleekToggle toggle, bool state)
+    {
+        Flag? flag = EditorNavigation.flag;
+        if (_changing || flag == null)
+            return false;
+
+        if (DevkitServerModule.IsEditing && !CanEditFlags())
+        {
+            Change(() => toggle.Value = !state);
+            return false;
+        }
+
+        if (flag.data.hyperAgro == state)
+            return false;
+
+        int nav = flag.GetIndex();
+        if (nav < 0)
+            return false;
+
+        SetNavigationInfiniteAgroDistanceProperties properties = new SetNavigationInfiniteAgroDistanceProperties(GetNetIdOrInvalid((byte)nav), state, CachedTime.DeltaTime);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+        {
+            if (ClientEvents.ListeningOnSetNavigationInfiniteAgroDistanceRequested)
+            {
+                bool shouldAllow = true;
+                ClientEvents.InvokeOnSetNavigationInfiniteAgroDistanceRequested(in properties, ref shouldAllow);
+                if (!shouldAllow)
+                {
+                    Change(() => toggle.Value = !state);
+                    return false;
+                }
+            }
+        }
+
+        NavigationUtil.SetFlagInfiniteAgroDistanceLocal((byte)nav, state);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+            ClientEvents.InvokeOnSetNavigationInfiniteAgroDistance(in properties);
+        return false;
+    }
+
+    [HarmonyTranspiler]
+    [HarmonyPatch(typeof(EditorNavigation), "Update")]
+    [UsedImplicitly]
+    private static IEnumerable<CodeInstruction> TranspileEditorNavigationUpdate(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
+    {
+        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+
+        MethodInfo? select = typeof(EditorNavigation).GetMethod("select", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[] { typeof(Transform) }, null);
+        if (select == null)
+            Logger.LogWarning($"{method.Format()} - Unable to find method: EditorNavigation.select.", method: Source);
+
+        MethodInfo? removeFlag = typeof(LevelNavigation).GetMethod("removeFlag", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[] { typeof(Transform) }, null);
+        if (removeFlag == null)
+            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelNavigation.removeFlag.", method: Source);
+
+        MethodInfo? addFlag = typeof(LevelNavigation).GetMethod("addFlag", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[] { typeof(Vector3) }, null);
+        if (addFlag == null)
+            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelNavigation.addFlag.", method: Source);
+
+        MethodInfo? moveFlag = typeof(Flag).GetMethod("move", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[] { typeof(Vector3) }, null);
+        if (moveFlag == null)
+            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelNavigation.move.", method: Source);
+
+        bool remove = false, move = false, add = false;
+
+        for (int i = 0; i < ins.Count; ++i)
+        {
+            if (!remove && select != null && removeFlag != null && PatchUtil.MatchPattern(ins, i,
+                    x => x.opcode.IsOfType(OpCodes.Ldfld, fuzzy: true),
+                    x => x.opcode.IsLdc(@null: true),
+                    x => x.Calls(select),
+                    x => x.Calls(removeFlag)
+                    ))
+            {
+                ins[i + 1] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(RemoveFlag)).WithEndingInstructionNeeds(ins[i + 3]);
+                ins.RemoveRange(i + 2, 2);
+                remove = true;
+                i -= 2;
+            }
+            else if (!remove && select != null && removeFlag != null && PatchUtil.MatchPattern(ins, i,
+                    x => x.opcode.IsLdc(@null: true),
+                    x => x.Calls(select),
+                    x => x.opcode.IsOfType(OpCodes.Ldfld, fuzzy: true),
+                    x => x.Calls(removeFlag)
+                    ))
+            {
+                ins[i + 3] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(RemoveFlag)).WithEndingInstructionNeeds(ins[i + 3]);
+                ins.RemoveRange(i, 2);
+                remove = true;
+                i -= 2;
+            }
+            else if (!remove && PatchUtil.MatchPattern(ins, i, x => x.Calls(removeFlag)))
+            {
+                ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(RemoveFlag)).WithEndingInstructionNeeds(ins[i]);
+                remove = true;
+            }
+            
+            if (!move && moveFlag != null && PatchUtil.MatchPattern(ins, i, x => x.Calls(moveFlag)))
+            {
+                ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(MoveFlag)).WithEndingInstructionNeeds(ins[i]);
+                move = true;
+            }
+            
+            if (!add && addFlag != null && PatchUtil.MatchPattern(ins, i, x => x.Calls(addFlag)))
+            {
+                ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(AddFlag)).WithEndingInstructionNeeds(ins[i]);
+                add = true;
+            }
+        }
+
+        if (!remove)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to patch {removeFlag.Format()} call.", method: Source);
+        }
+        if (!add)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to patch {addFlag.Format()} call.", method: Source);
+        }
+        if (!move)
+        {
+            Logger.LogWarning($"{method.Format()} - Unable to patch {moveFlag.Format()} call.", method: Source);
+        }
+
+        return ins;
+    }
+
+    [UsedImplicitly]
+    private static void RemoveFlag(Transform select)
+    {
+        if (DevkitServerModule.IsEditing && !CanEditFlags())
+            return;
+
+        Flag flag = LevelNavigation.getFlag(select);
+        int nav = flag.GetIndex();
+        if (nav < 0)
+            return;
+        
+        DeleteNavigationProperties properties = new DeleteNavigationProperties(GetNetIdOrInvalid((byte)nav), flag.point, CachedTime.DeltaTime);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+        {
+            if (ClientEvents.ListeningOnDeleteNavigationRequested)
+            {
+                bool shouldAllow = true;
+                ClientEvents.InvokeOnDeleteNavigationRequested(in properties, ref shouldAllow);
+                if (!shouldAllow)
+                    return;
+            }
+        }
+
+        NavigationUtil.RemoveFlagLocal((byte)nav);
+
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+            ClientEvents.InvokeOnDeleteNavigation(in properties);
+    }
+
+    [UsedImplicitly]
+    private static void MoveFlag(Flag flag, Vector3 newPoint)
+    {
+        if (DevkitServerModule.IsEditing && !CanEditFlags())
+            return;
+        
+        int nav = flag.GetIndex();
+        if (nav < 0)
+            return;
+        
+        MoveNavigationProperties properties = new MoveNavigationProperties(GetNetIdOrInvalid((byte)nav), newPoint, flag.point, CachedTime.DeltaTime);
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+        {
+            if (ClientEvents.ListeningOnMoveNavigationRequested)
+            {
+                bool shouldAllow = true;
+                ClientEvents.InvokeOnMoveNavigationRequested(in properties, ref shouldAllow);
+                if (!shouldAllow)
+                    return;
+            }
+        }
+
+        NavigationUtil.SetFlagPositionLocal((byte)nav, newPoint);
+
+        if (DevkitServerModule.IsEditing && properties.NavigationNetId.id != 0)
+            ClientEvents.InvokeOnMoveNavigation(in properties);
+    }
+
+    [UsedImplicitly]
+    private static Transform? AddFlag(Vector3 point)
+    {
+        if (NavigationUtil.NavigationFlags.Count >= byte.MaxValue - 1)
+        {
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "TooManyNavigationFlags", new object[] { (byte)(byte.MaxValue - 1) });
+            return null!;
+        }
+
+        if (DevkitServerModule.IsEditing)
+        {
+            if (!CanEditFlags())
+                return null;
+
+            RequestInstantiateNavigationProperties properties = new RequestInstantiateNavigationProperties(point);
+            if (ClientEvents.ListeningOnRequestInstantiateNavigationRequested)
+            {
+                bool shouldAllow = true;
+                ClientEvents.InvokeOnRequestInstantiateNavigationRequested(in properties, ref shouldAllow);
+                if (!shouldAllow)
+                    return null;
+            }
+
+            NavigationUtil.RequestFlagInstantiation(point);
+
+            ClientEvents.EventOnRequestInstantiateNavigation.TryInvoke(in properties);
+
+            return null;
+        }
+
+        return NavigationUtil.AddFlagLocal(point).model;
+    }
+    
+    private static bool CanEditFlags()
+    {
+        if (!VanillaPermissions.EditNavigation.Has() && !VanillaPermissions.AllNavigation.Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.EditNavigation);
+            return false;
+        }
+
+        return true;
+    }
+
+    private static NetId GetNetIdOrInvalid(byte nav)
+    {
+        if (!DevkitServerModule.IsEditing)
+            return NetId.INVALID;
+        if (!NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
+        {
+            Logger.LogWarning($"Unable to find NetId for flag: {nav.Format()}.", method: Source);
+            return NetId.INVALID;
+        }
+
+        return netId;
+    }
+#endif
 }

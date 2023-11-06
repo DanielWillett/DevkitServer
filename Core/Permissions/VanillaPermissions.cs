@@ -34,13 +34,7 @@ public static class VanillaPermissions
     [Permission]
     public static readonly Permission BakeNavigation = new Permission("navigation.bake", core: true);
     [Permission]
-    public static readonly Permission MoveUnownedNavigation = new Permission("navigation.edit.transform", core: true);
-    [Permission]
-    public static readonly Permission RemoveUnownedNavigation = new Permission("navigation.edit.remove", core: true);
-    [Permission]
-    public static readonly Permission PlaceNavigation = new Permission("navigation.edit.place", core: true);
-    [Permission]
-    public static readonly Permission EditNavigation = new Permission("navigation.edit.*", core: true);
+    public static readonly Permission EditNavigation = new Permission("navigation.edit", core: true);
     [Permission]
     public static readonly Permission AllNavigation = new Permission("navigation.*", core: true);
     [Permission]

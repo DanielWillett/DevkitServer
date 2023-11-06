@@ -139,7 +139,10 @@ public sealed class DevkitServerModule : IModuleNexus
         { "RedoNotSupported", "Redo Not Supported" },
         { "TooManySelections", "Too many items selected.\n{0}/{1}"},
         { "AlreadyBakingNavigationName", "Already Baking Navigation\nNavigation: {0} (# {1})" },
-        { "AlreadyBakingNavigationIndex", "Already Baking Navigation\nNavigation # {0}" }
+        { "AlreadyBakingNavigationIndex", "Already Baking Navigation\nNavigation # {0}" },
+        { "TooManyNavigationFlags", "Too Many Navigation Flags\nMax: {0}" },
+        { "TooManyRoads", "Too Many Roads\nMax: {0}" },
+        { "TooManyRoadVerticies", "Too Many Verticies\nMax: {0}" }
     };
 
     public static CultureInfo CommandParseLocale { get; set; } = CultureInfo.InvariantCulture;

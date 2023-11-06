@@ -11,6 +11,58 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
     [UsedImplicitly]
     internal static NetCall<byte, NetId> SendBindNavigation = new NetCall<byte, NetId>(DevkitServerNetCall.SendBindNavigation);
     public ushort CurrentDataVersion => 0;
+    internal static void Init()
+    {
+#if SERVER
+        NavigationUtil.OnFlagRemoved += OnFlagRemoved;
+#endif
+        NavigationUtil.OnFlagIndexUpdated += OnFlagIndexUpdated;
+    }
+
+    internal static void Shutdown()
+    {
+#if SERVER
+        NavigationUtil.OnFlagRemoved -= OnFlagRemoved;
+#endif
+        NavigationUtil.OnFlagIndexUpdated -= OnFlagIndexUpdated;
+    }
+    private static void OnFlagIndexUpdated(Flag flag, byte fromNav, byte toNav)
+    {
+        if (!DevkitServerModule.IsEditing)
+            return;
+
+        NetId blockingNetId = NetIds[toNav];
+        NetId netId = NetIds[fromNav];
+        if (!blockingNetId.IsNull() && blockingNetId == netId || netId.IsNull())
+            return;
+
+        if (!blockingNetId.IsNull())
+        {
+            Logger.LogDebug($"[{Source}] Released blocking net id to save navigation flag: # {fromNav.Format()} ({netId.Format()}, # {toNav.Format()}).");
+            NetIdRegistry.Release(blockingNetId);
+        }
+
+        NetIdRegistry.Release(netId);
+        NetIdRegistry.Assign(netId, toNav);
+        NetIds[fromNav] = NetId.INVALID;
+        NetIds[toNav] = netId;
+        Logger.LogDebug($"[{Source}] Moved navigation flag NetId: # {fromNav.Format()} ({netId.Format()}, # {toNav.Format()}).");
+    }
+#if SERVER
+    private static void OnFlagRemoved(Flag flag, byte nav)
+    {
+        if (!DevkitServerModule.IsEditing)
+            return;
+
+        NetId netId = NetIds[nav];
+        if (netId.IsNull())
+            return;
+
+        NetIdRegistry.Release(netId);
+        NetIds[nav] = NetId.INVALID;
+        Logger.LogDebug($"[{Source}] Removed navigation flag NetId: ({netId.Format()}, # {nav.Format()}).");
+    }
+#endif
 #if CLIENT
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendBindNavigation)]
     private static StandardErrorCode ReceiveBindHierarchyItem(MessageContext ctx, byte nav, NetId netId)
@@ -132,12 +184,10 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
     }
 
 #endif
-
     public void WriteData(ByteWriter writer, NavigationNetIdReplicatedLevelData data)
     {
         writer.WriteZeroCompressed(data.NetIds);
     }
-
     public NavigationNetIdReplicatedLevelData ReadData(ByteReader reader, ushort dataVersion)
     {
         return new NavigationNetIdReplicatedLevelData

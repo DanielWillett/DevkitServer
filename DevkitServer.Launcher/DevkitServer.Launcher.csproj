@@ -28,8 +28,8 @@
     <AssemblyName>DevkitServer.Launcher</AssemblyName>
     <RootNamespace>DevkitServer.Launcher</RootNamespace>
     <NeutralLanguage>en-US</NeutralLanguage>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <AssemblyVersion>1.0.0.2</AssemblyVersion>
+    <FileVersion>1.0.0.2</FileVersion>
     <Configurations>ClientDebug;ClientRelease;ServerDebug;ServerRelease</Configurations>
   </PropertyGroup>
 
@@ -39,10 +39,6 @@
     <PackageReference Include="NuGet.Packaging" Version="6.7.0" />
     <Reference Remove="Newtonsoft.Json"/>
   </ItemGroup>
-
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="SET &quot;sourcedir=$(OutDir)&#xD;&#xA;SET &quot;config=$(ConfigurationName)&#xD;&#xA;ECHO Building %25config%25&#xD;&#xA;XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;$(ClientPath)\Modules\DevkitServer.Launcher\Bin\$(ProjectName).dll*&quot;&#xD;&#xA;XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;$(ClientPath)\Modules\DevkitServer.Launcher\Bin\$(ProjectName).pdb*&quot;&#xD;&#xA;XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).dll*&quot; &quot;$(ServerPath)\Modules\DevkitServer.Launcher\Bin\$(ProjectName).dll*&quot;&#xD;&#xA;XCOPY /v /y &quot;%25sourcedir%25\$(ProjectName).pdb*&quot; &quot;$(ServerPath)\Modules\DevkitServer.Launcher\Bin\$(ProjectName).pdb*&quot;" />
-  </Target>
 
   <ItemGroup>
     <Compile Remove="Module\**" />

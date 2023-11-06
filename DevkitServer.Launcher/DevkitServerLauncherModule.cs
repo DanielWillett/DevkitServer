@@ -58,7 +58,7 @@ public class DevkitServerLauncherModule : IModuleNexus
         Module thisModule = ModuleHook.modules.Find(x => Array.IndexOf(x.assemblies, thisAssembly) != -1) ??
                             throw new Exception("Unable to find module: DevkitServer.Launcher");
 
-        string modulePath = thisModule.config.DirectoryPath;
+        string modulePath = Path.GetFullPath(thisModule.config.DirectoryPath);
         string packagePath = Path.Combine(modulePath, "Packages");
 
         DirectoryInfo dir = Directory.CreateDirectory(packagePath);
@@ -212,7 +212,8 @@ public class DevkitServerLauncherModule : IModuleNexus
             if (unpack && !UnpackResourceAssembly(logger, rscPath, resourcesDllPath))
                 goto main;
 
-            Assembly.Load(File.ReadAllBytes(resourcesDllPath));
+            logger.LogInformation($"Loading resources assembly from: \"{resourcesDllPath}\".");
+            Assembly.LoadFrom(resourcesDllPath);
 
             WriteResources(logger, mainModuleFolder, oldVersion, forceReinstall);
 
@@ -445,7 +446,7 @@ public class DevkitServerLauncherModule : IModuleNexus
 
             logger.LogInformation($"Unpacking assembly: \"{id}://{asmFile}\" -> \"{dllPath}\".");
             reader.ExtractFile(asmFile, dllPath, logger);
-
+            
             try
             {
                 FileAttributes resxFileAttr = File.GetAttributes(dllPath);

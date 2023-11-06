@@ -65,6 +65,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     internal static bool HasProcessedPendingHierarchyObjects;
     internal static bool HasProcessedPendingLevelObjects;
     internal static bool HasProcessedPendingRoads;
+    internal static bool HasProcessedPendingFlags;
     /// <summary>
     /// Is the player catching up after downloading the map.
     /// </summary>
@@ -94,6 +95,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     internal ObjectActions ObjectActions { get; }
     internal SpawnActions SpawnActions { get; }
     internal RoadActions RoadActions { get; }
+    internal NavigationActions NavigationActions { get; }
     public int QueueSize => _pendingActions.Count;
 
     private EditorActions()
@@ -105,6 +107,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         ObjectActions = new ObjectActions(this);
         SpawnActions = new SpawnActions(this);
         RoadActions = new RoadActions(this);
+        NavigationActions = new NavigationActions(this);
     }
     public void Subscribe()
     {
@@ -114,6 +117,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         ObjectActions.Subscribe();
         SpawnActions.Subscribe();
         RoadActions.Subscribe();
+        NavigationActions.Subscribe();
     }
 
     public void Unsubscribe()
@@ -124,6 +128,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         ObjectActions.Unsubscribe();
         SpawnActions.Unsubscribe();
         RoadActions.Unsubscribe();
+        NavigationActions.Unsubscribe();
     }
 
     [UsedImplicitly]
@@ -160,6 +165,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 CanProcess = true;
                 HasProcessedPendingHierarchyObjects = true;
                 HasProcessedPendingLevelObjects = true;
+                HasProcessedPendingFlags = true;
                 HasProcessedPendingRoads = true;
                 if (TemporaryEditorActions != null)
                 {
@@ -190,7 +196,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         }
 #endif
     }
-    internal void QueueAction(IAction action, bool delayWithDeltaTime = false)
+    internal void QueueAction<TAction>(TAction action, bool delayWithDeltaTime = false) where TAction : IAction
     {
         action.Instigator = Provider.client;
         if (IsOwner)
@@ -202,6 +208,26 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             else
                 _queuedThisFrame = true;
         }
+        if (action is IReplacableAction repl)
+        {
+            for (int i = 0; i < _pendingActions.Count; ++i)
+            {
+                if (_pendingActions[i] is TAction t && ((IReplacableAction)t).TryReplaceFrom(repl))
+                {
+#if PRINT_ACTION_DETAIL
+                    Logger.LogDebug($"Action {action.Format()} replaced to {t.Format()}" +
+                                    $", time: {CachedTime.RealtimeSinceStartup:F2}" +
+                                    $", fps: {1f / CachedTime.DeltaTime:F0}" +
+                                    $", queue: {_pendingActions.Count}.{Environment.NewLine}" +
+                                    JsonSerializer.Serialize(t, t.GetType(), DevkitServerConfig.SerializerSettings));
+#elif PRINT_ACTION_SIMPLE
+                    Logger.LogDebug($"Action {action.Format()} replaced to {t.Format()}.");
+#endif
+                    return;
+                }
+            }
+        }
+
         _pendingActions.Add(action);
 #if PRINT_ACTION_DETAIL
         Logger.LogDebug($"Action queued to write: {action.Format()}" +
@@ -655,10 +681,11 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     private readonly List<PendingLevelObjectInstantiation> _lvlObjectInstantiations = new List<PendingLevelObjectInstantiation>();
     private readonly List<PendingRoadInstantiation> _roadInstantiations = new List<PendingRoadInstantiation>();
     private readonly List<PendingRoadVertexInstantiation> _roadVertexInstantiations = new List<PendingRoadVertexInstantiation>();
+    private readonly List<PendingFlagInstantiation> _flagInstantiations = new List<PendingFlagInstantiation>();
     private readonly List<IAction> _actions = new List<IAction>();
     public int QueueSize => _actions.Count;
     public ActionSettings Settings { get; }
-    internal bool NeedsToFlush => _actions.Count > 0 || _hierarchyInstantiations.Count > 0 || _lvlObjectInstantiations.Count > 0 || _roadVertexInstantiations.Count > 0 || _roadInstantiations.Count > 0;
+    internal bool NeedsToFlush => _actions.Count > 0 || _hierarchyInstantiations.Count > 0 || _lvlObjectInstantiations.Count > 0 || _roadVertexInstantiations.Count > 0 || _roadInstantiations.Count > 0 || _flagInstantiations.Count > 0;
     private TemporaryEditorActions()
     {
         Settings = new ActionSettings(this);
@@ -698,6 +725,13 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         _roadVertexInstantiations.Add(new PendingRoadVertexInstantiation(roadNetId, position, tangent1, tangent2, ignoreTerrain, verticalOffset, vertexIndex, owner, vertexNetId, mode));
 #if PRINT_ACTION_SIMPLE
         Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued road vertex instantiation at {position.Format()} (from road {roadNetId.Format()} at #{vertexIndex}) when the level loads.");
+#endif
+    }
+    internal void QueueFlagInstantiation(NetId netId, Vector3 position, Vector2 size, ulong owner, bool infiniteAgroDistance, bool shouldSpawnZombies, byte maxZombies, int maxBossZombies, Guid difficultyAsset)
+    {
+        _flagInstantiations.Add(new PendingFlagInstantiation(netId, position, size, owner, infiniteAgroDistance, shouldSpawnZombies, maxZombies, maxBossZombies, difficultyAsset));
+#if PRINT_ACTION_SIMPLE
+        Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued flag instantiation at {position.Format()} when the level loads.");
 #endif
     }
     internal void HandleReadPackets(CSteamID user, ByteReader reader)
@@ -787,6 +821,16 @@ public class TemporaryEditorActions : IActionListener, IDisposable
                 vertexInstantiation.VerticalOffset, vertexInstantiation.IgnoreTerrain, vertexInstantiation.VertexNetId, vertexInstantiation.Owner);
         }
         EditorActions.HasProcessedPendingRoads = true;
+        if (_roadInstantiations.Count + _roadVertexInstantiations.Count > 50)
+            yield return null;
+        for (int i = 0; i < _flagInstantiations.Count; i++)
+        {
+            PendingFlagInstantiation flagInstantiation = _flagInstantiations[i];
+            NavigationUtil.ReceiveInstantiation(MessageContext.Nil, flagInstantiation.Position, flagInstantiation.Size, flagInstantiation.NetId, flagInstantiation.Owner,
+                flagInstantiation.InfiniteAgroDistance, flagInstantiation.ShouldSpawnZombies, flagInstantiation.MaxZombies,
+                flagInstantiation.MaxBossZombies, flagInstantiation.DifficultyAsset);
+        }
+        EditorActions.HasProcessedPendingFlags = true;
         for (int i = 0; i < _actions.Count; ++i)
         {
             if (i % 30 == 0 && i > 0)
@@ -809,6 +853,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         EditorActions.HasProcessedPendingHierarchyObjects = false;
         EditorActions.HasProcessedPendingLevelObjects = false;
         EditorActions.HasProcessedPendingRoads = false;
+        EditorActions.HasProcessedPendingFlags = false;
         EventOnStartListening.TryInvoke();
     }
     public void Dispose()
@@ -821,7 +866,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
 #endif
     }
 
-    private readonly struct PendingHierarchyInstantiation
+    private class PendingHierarchyInstantiation
     {
         public readonly IHierarchyItemTypeIdentifier Type;
         public readonly NetId NetId;
@@ -839,7 +884,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
             Owner = owner;
         }
     }
-    private readonly struct PendingLevelObjectInstantiation
+    private class PendingLevelObjectInstantiation
     {
         public readonly AssetReference<Asset> Asset;
         public readonly NetId NetId;
@@ -857,7 +902,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
             NetId = netId;
         }
     }
-    private readonly struct PendingRoadInstantiation
+    private class PendingRoadInstantiation
     {
         public readonly long NetIds;
         public readonly ushort Flags;
@@ -877,7 +922,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
             Owner = owner;
         }
     }
-    private readonly struct PendingRoadVertexInstantiation
+    private class PendingRoadVertexInstantiation
     {
         public readonly NetId RoadNetId;
         public readonly Vector3 Position;
@@ -901,6 +946,30 @@ public class TemporaryEditorActions : IActionListener, IDisposable
             Owner = owner;
             VertexNetId = vertexNetId;
             Mode = mode;
+        }
+    }
+    private class PendingFlagInstantiation
+    {
+        public readonly NetId NetId;
+        public readonly Vector3 Position;
+        public readonly Vector2 Size;
+        public readonly ulong Owner;
+        public readonly bool InfiniteAgroDistance;
+        public readonly bool ShouldSpawnZombies;
+        public readonly byte MaxZombies;
+        public readonly int MaxBossZombies;
+        public readonly Guid DifficultyAsset;
+        public PendingFlagInstantiation(NetId netId, Vector3 position, Vector2 size, ulong owner, bool infiniteAgroDistance, bool shouldSpawnZombies, byte maxZombies, int maxBossZombies, Guid difficultyAsset)
+        {
+            NetId = netId;
+            Position = position;
+            Size = size;
+            Owner = owner;
+            InfiniteAgroDistance = infiniteAgroDistance;
+            ShouldSpawnZombies = shouldSpawnZombies;
+            MaxZombies = maxZombies;
+            MaxBossZombies = maxBossZombies;
+            DifficultyAsset = difficultyAsset;
         }
     }
 }

@@ -197,13 +197,22 @@ public sealed class RoadActions
 
 [Action(DevkitServerActionType.SetRoadIsLoop, 5, 4)]
 [EarlyTypeInit]
-public sealed class SetRoadIsLoopAction : IAction, IInstanceIdAction
+public sealed class SetRoadIsLoopAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadIsLoop;
     public CSteamID Instigator { get; set; }
     public uint InstanceId { get; set; }
     public float DeltaTime { get; set; }
     public bool IsLoop { get; set; }
+    public bool TryReplaceFrom(IReplacableAction action)
+    {
+        SetRoadIsLoopAction a = (SetRoadIsLoopAction)action;
+        if (a.InstanceId != InstanceId)
+            return false;
+
+        IsLoop = a.IsLoop;
+        return true;
+    }
     public void Apply()
     {
         NetId netId = new NetId(InstanceId);
@@ -241,13 +250,22 @@ public sealed class SetRoadIsLoopAction : IAction, IInstanceIdAction
 }
 [Action(DevkitServerActionType.SetRoadMaterial, 5, 4)]
 [EarlyTypeInit]
-public sealed class SetRoadMaterialAction : IAction, IInstanceIdAction
+public sealed class SetRoadMaterialAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadMaterial;
     public CSteamID Instigator { get; set; }
     public uint InstanceId { get; set; }
     public float DeltaTime { get; set; }
     public byte MaterialIndex { get; set; }
+    public bool TryReplaceFrom(IReplacableAction action)
+    {
+        SetRoadMaterialAction a = (SetRoadMaterialAction)action;
+        if (a.InstanceId != InstanceId)
+            return false;
+
+        MaterialIndex = a.MaterialIndex;
+        return true;
+    }
     public void Apply()
     {
         NetId netId = new NetId(InstanceId);
@@ -286,13 +304,22 @@ public sealed class SetRoadMaterialAction : IAction, IInstanceIdAction
 
 [Action(DevkitServerActionType.SetRoadVertexIgnoreTerrain, 5, 4)]
 [EarlyTypeInit]
-public sealed class SetRoadVertexIgnoreTerrainAction : IAction, IInstanceIdAction
+public sealed class SetRoadVertexIgnoreTerrainAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadVertexIgnoreTerrain;
     public CSteamID Instigator { get; set; }
     public uint InstanceId { get; set; }
     public float DeltaTime { get; set; }
     public bool IgnoreTerrain { get; set; }
+    public bool TryReplaceFrom(IReplacableAction action)
+    {
+        SetRoadVertexIgnoreTerrainAction a = (SetRoadVertexIgnoreTerrainAction)action;
+        if (a.InstanceId != InstanceId)
+            return false;
+
+        IgnoreTerrain = a.IgnoreTerrain;
+        return true;
+    }
     public void Apply()
     {
         NetId netId = new NetId(InstanceId);
@@ -331,13 +358,22 @@ public sealed class SetRoadVertexIgnoreTerrainAction : IAction, IInstanceIdActio
 
 [Action(DevkitServerActionType.SetRoadVertexVerticalOffset, 8, 4)]
 [EarlyTypeInit]
-public sealed class SetRoadVertexVerticalOffsetAction : IAction, IInstanceIdAction
+public sealed class SetRoadVertexVerticalOffsetAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadVertexVerticalOffset;
     public CSteamID Instigator { get; set; }
     public uint InstanceId { get; set; }
     public float DeltaTime { get; set; }
     public float VerticalOffset { get; set; }
+    public bool TryReplaceFrom(IReplacableAction action)
+    {
+        SetRoadVertexVerticalOffsetAction a = (SetRoadVertexVerticalOffsetAction)action;
+        if (a.InstanceId != InstanceId)
+            return false;
+
+        VerticalOffset = a.VerticalOffset;
+        return true;
+    }
     public void Apply()
     {
         NetId netId = new NetId(InstanceId);
@@ -421,13 +457,22 @@ public sealed class SetRoadVertexTangentHandleModeAction : IAction, IInstanceIdA
 
 [Action(DevkitServerActionType.SetRoadMaterialWidth, 8, 4)]
 [EarlyTypeInit]
-public sealed class SetRoadMaterialWidthAction : IAction, IInstanceIdAction
+public sealed class SetRoadMaterialWidthAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadMaterialWidth;
     public CSteamID Instigator { get; set; }
     public uint InstanceId { get; set; }
     public float DeltaTime { get; set; }
     public float Width { get; set; }
+    public bool TryReplaceFrom(IReplacableAction action)
+    {
+        SetRoadMaterialWidthAction a = (SetRoadMaterialWidthAction)action;
+        if (a.InstanceId != InstanceId)
+            return false;
+
+        Width = a.Width;
+        return true;
+    }
     public void Apply()
     {
         if (InstanceId > byte.MaxValue || InstanceId >= LevelRoads.materials.Length)
@@ -464,13 +509,22 @@ public sealed class SetRoadMaterialWidthAction : IAction, IInstanceIdAction
 
 [Action(DevkitServerActionType.SetRoadMaterialHeight, 8, 4)]
 [EarlyTypeInit]
-public sealed class SetRoadMaterialHeightAction : IAction, IInstanceIdAction
+public sealed class SetRoadMaterialHeightAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadMaterialHeight;
     public CSteamID Instigator { get; set; }
     public uint InstanceId { get; set; }
     public float DeltaTime { get; set; }
     public float Height { get; set; }
+    public bool TryReplaceFrom(IReplacableAction action)
+    {
+        SetRoadMaterialHeightAction a = (SetRoadMaterialHeightAction)action;
+        if (a.InstanceId != InstanceId)
+            return false;
+
+        Height = a.Height;
+        return true;
+    }
     public void Apply()
     {
         if (InstanceId > byte.MaxValue || InstanceId >= LevelRoads.materials.Length)
@@ -507,13 +561,22 @@ public sealed class SetRoadMaterialHeightAction : IAction, IInstanceIdAction
 
 [Action(DevkitServerActionType.SetRoadMaterialDepth, 8, 4)]
 [EarlyTypeInit]
-public sealed class SetRoadMaterialDepthAction : IAction, IInstanceIdAction
+public sealed class SetRoadMaterialDepthAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadMaterialDepth;
     public CSteamID Instigator { get; set; }
     public uint InstanceId { get; set; }
     public float DeltaTime { get; set; }
     public float Depth { get; set; }
+    public bool TryReplaceFrom(IReplacableAction action)
+    {
+        SetRoadMaterialDepthAction a = (SetRoadMaterialDepthAction)action;
+        if (a.InstanceId != InstanceId)
+            return false;
+
+        Depth = a.Depth;
+        return true;
+    }
     public void Apply()
     {
         if (InstanceId > byte.MaxValue || InstanceId >= LevelRoads.materials.Length)
@@ -550,13 +613,22 @@ public sealed class SetRoadMaterialDepthAction : IAction, IInstanceIdAction
 
 [Action(DevkitServerActionType.SetRoadMaterialVerticalOffset, 8, 4)]
 [EarlyTypeInit]
-public sealed class SetRoadMaterialVerticalOffsetAction : IAction, IInstanceIdAction
+public sealed class SetRoadMaterialVerticalOffsetAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadMaterialVerticalOffset;
     public CSteamID Instigator { get; set; }
     public uint InstanceId { get; set; }
     public float DeltaTime { get; set; }
     public float VerticalOffset { get; set; }
+    public bool TryReplaceFrom(IReplacableAction action)
+    {
+        SetRoadMaterialVerticalOffsetAction a = (SetRoadMaterialVerticalOffsetAction)action;
+        if (a.InstanceId != InstanceId)
+            return false;
+
+        VerticalOffset = a.VerticalOffset;
+        return true;
+    }
     public void Apply()
     {
         if (InstanceId > byte.MaxValue || InstanceId >= LevelRoads.materials.Length)
@@ -593,13 +665,22 @@ public sealed class SetRoadMaterialVerticalOffsetAction : IAction, IInstanceIdAc
 
 [Action(DevkitServerActionType.SetRoadMaterialIsConcrete, 5, 4)]
 [EarlyTypeInit]
-public sealed class SetRoadMaterialIsConcreteAction : IAction, IInstanceIdAction
+public sealed class SetRoadMaterialIsConcreteAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadMaterialIsConcrete;
     public CSteamID Instigator { get; set; }
     public uint InstanceId { get; set; }
     public float DeltaTime { get; set; }
     public bool IsConcrete { get; set; }
+    public bool TryReplaceFrom(IReplacableAction action)
+    {
+        SetRoadMaterialIsConcreteAction a = (SetRoadMaterialIsConcreteAction)action;
+        if (a.InstanceId != InstanceId)
+            return false;
+
+        IsConcrete = a.IsConcrete;
+        return true;
+    }
     public void Apply()
     {
         if (InstanceId > byte.MaxValue || InstanceId >= LevelRoads.materials.Length)

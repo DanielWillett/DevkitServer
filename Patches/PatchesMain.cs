@@ -57,6 +57,7 @@ internal static class PatchesMain
             LevelObjectPatches.OptionalPatches();
             SpawnsEditorPatches.ManualPatches();
             RoadsPatches.OptionalPatches();
+            NavigationPatches.OptionalPatches();
 #endif
             DoManualPatches();
             
