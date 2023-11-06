@@ -13,27 +13,19 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
 
     [UsedImplicitly]
     internal static NetCall<bool, int, NetId> SendBindRoadElement = new NetCall<bool, int, NetId>(DevkitServerNetCall.SendBindRoadElement);
-#if SERVER
-    private static bool _initialLoaded;
-#endif
     private RoadNetIdDatabase() { }
     internal static void Init()
     {
-#if SERVER
         RoadUtil.OnRoadRemoved += OnRoadRemoved;
         RoadUtil.OnVertexRemoved += OnVertexRemoved;
-#endif
         RoadUtil.OnRoadIndexUpdated += OnRoadIndexUpdated;
         RoadUtil.OnVertexIndexUpdated += OnVertexIndexUpdated;
     }
 
     internal static void Shutdown()
     {
-#if SERVER
-        _initialLoaded = false;
         RoadUtil.OnRoadRemoved -= OnRoadRemoved;
         RoadUtil.OnVertexRemoved -= OnVertexRemoved;
-#endif
         RoadUtil.OnRoadIndexUpdated -= OnRoadIndexUpdated;
         RoadUtil.OnVertexIndexUpdated -= OnVertexIndexUpdated;
     }
@@ -82,7 +74,6 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
         VertexAssignments[toIndex] = netId;
         Logger.LogDebug($"[{Source}] Moved vertex NetId: {fromIndex.Format()} ({netId.Format()}, {toIndex.Format()}).");
     }
-#if SERVER
     private static void OnRoadRemoved(Road road, int index)
     {
         if (!DevkitServerModule.IsEditing)
@@ -109,7 +100,6 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
         VertexAssignments.Remove(vertex);
         Logger.LogDebug($"[{Source}] Removed road vertex NetId: ({netId.Format()}, {vertex.Format()}).");
     }
-#endif
     
 #if CLIENT
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendBindRoadElement)]
@@ -279,8 +269,6 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
 #if SERVER
     internal static void AssignExisting()
     {
-        _initialLoaded = true;
-
         RoadAssignments.Clear();
         VertexAssignments.Clear();
 

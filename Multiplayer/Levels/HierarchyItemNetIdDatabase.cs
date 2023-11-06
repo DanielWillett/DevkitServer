@@ -25,17 +25,17 @@ public sealed class HierarchyItemNetIdDatabase : IReplicatedLevelDataSource<Hier
     {
 #if SERVER
         _initialLoaded = false;
-        LevelHierarchy.itemRemoved -= LevelHierarchyOnItemRemoved;
 #endif
+        LevelHierarchy.itemRemoved -= LevelHierarchyOnItemRemoved;
     }
-#if SERVER
     private static void LevelHierarchyOnItemRemoved(IDevkitHierarchyItem item)
     {
+#if SERVER
         if (!_initialLoaded) return;
+#endif
         Logger.LogDebug($"[{Source}] Hierarchy item removed: {item.Format()}.");
         RemoveHierarchyItem(item);
     }
-#endif
 #if CLIENT
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendBindHierarchyItem)]
     private static void ReceiveBindHierarchyItem(MessageContext ctx, uint instanceId, NetId netId)

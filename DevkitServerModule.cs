@@ -400,6 +400,8 @@ public sealed class DevkitServerModule : IModuleNexus
             LevelObjectNetIdDatabase.Init();
             HierarchyItemNetIdDatabase.Init();
             SpawnpointNetIdDatabase.Init();
+            RoadNetIdDatabase.Init();
+            NavigationNetIdDatabase.Init();
             ReplicatedLevelDataRegistry.RegisterFromAssembly(Accessor.DevkitServer, null, null);
 
             PluginLoader.LoadPlugins();
@@ -964,6 +966,8 @@ public sealed class DevkitServerModule : IModuleNexus
         LevelObjectNetIdDatabase.Shutdown();
         HierarchyItemNetIdDatabase.Shutdown();
         SpawnpointNetIdDatabase.Shutdown();
+        RoadNetIdDatabase.Shutdown();
+        NavigationNetIdDatabase.Shutdown();
         ReplicatedLevelDataRegistry.Shutdown();
 
         Instance = null!;

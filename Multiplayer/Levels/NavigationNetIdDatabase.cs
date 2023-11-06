@@ -13,17 +13,13 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
     public ushort CurrentDataVersion => 0;
     internal static void Init()
     {
-#if SERVER
         NavigationUtil.OnFlagRemoved += OnFlagRemoved;
-#endif
         NavigationUtil.OnFlagIndexUpdated += OnFlagIndexUpdated;
     }
 
     internal static void Shutdown()
     {
-#if SERVER
         NavigationUtil.OnFlagRemoved -= OnFlagRemoved;
-#endif
         NavigationUtil.OnFlagIndexUpdated -= OnFlagIndexUpdated;
     }
     private static void OnFlagIndexUpdated(Flag flag, byte fromNav, byte toNav)
@@ -48,7 +44,6 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
         NetIds[toNav] = netId;
         Logger.LogDebug($"[{Source}] Moved navigation flag NetId: # {fromNav.Format()} ({netId.Format()}, # {toNav.Format()}).");
     }
-#if SERVER
     private static void OnFlagRemoved(Flag flag, byte nav)
     {
         if (!DevkitServerModule.IsEditing)
@@ -62,7 +57,6 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
         NetIds[nav] = NetId.INVALID;
         Logger.LogDebug($"[{Source}] Removed navigation flag NetId: ({netId.Format()}, # {nav.Format()}).");
     }
-#endif
 #if CLIENT
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendBindNavigation)]
     private static StandardErrorCode ReceiveBindHierarchyItem(MessageContext ctx, byte nav, NetId netId)
@@ -98,6 +92,7 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
     }
     public static bool TryGetNavigation(NetId netId, out byte nav)
     {
+
         object? value = NetIdRegistry.Get(netId);
 
         if (value is byte navId)
