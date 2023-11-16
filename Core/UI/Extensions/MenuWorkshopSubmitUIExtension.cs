@@ -89,7 +89,7 @@ internal class MenuWorkshopSubmitUIExtension : IDisposable
         {
             Logger.LogWarning($"{method.Format()} - Failed to find method: TempSteamworksWorkshop.prepareUGC(...) (prepare step 1). Override mod ID feature for workshop uploading will not work.");
         }
-        MethodInfo? checkEntered = typeof(MenuWorkshopSubmitUI).GetMethod("checkEntered", BindingFlags.NonPublic | BindingFlags.Static, null, Array.Empty<Type>(), null);
+        MethodInfo? checkEntered = typeof(MenuWorkshopSubmitUI).GetMethod("checkEntered", BindingFlags.NonPublic | BindingFlags.Static, null, Type.EmptyTypes, null);
         if (checkEntered == null)
         {
             Logger.LogWarning($"{method.Format()} - Failed to find method: MenuWorkshopSubmitUI.checkEntered(). Override mod ID feature for workshop uploading will not work.");
@@ -104,7 +104,7 @@ internal class MenuWorkshopSubmitUIExtension : IDisposable
         {
             Logger.LogWarning($"{method.Format()} - Failed to find method: TempSteamworksWorkshop.createUgc(bool). Override mod ID feature for workshop uploading will not work.");
         }
-        MethodInfo? updateUGC = typeof(TempSteamworksWorkshop).GetMethod("updateUGC", BindingFlags.Public | BindingFlags.Instance, null, Array.Empty<Type>(), null);
+        MethodInfo? updateUGC = typeof(TempSteamworksWorkshop).GetMethod("updateUGC", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
         if (createUgc == null)
         {
             Logger.LogWarning($"{method.Format()} - Failed to find method: TempSteamworksWorkshop.updateUGC(). Override mod ID feature for workshop uploading will not work.");

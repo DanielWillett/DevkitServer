@@ -376,7 +376,6 @@ internal class EditorLevelObjectsUIExtension : UIExtension
 
     internal void UpdateSelectedObject(bool updateMat)
     {
-        Logger.LogDebug($"Update selected object: {updateMat.Format()}.");
         _preview.Texture = null;
         Asset? asset = LevelObjectUtil.SelectedAsset;
         if (asset != null)

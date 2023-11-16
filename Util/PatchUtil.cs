@@ -1,6 +1,7 @@
 ﻿using DevkitServer.API;
 using DevkitServer.API.Abstractions;
 using HarmonyLib;
+using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -555,32 +556,111 @@ public static class PatchUtil
     /// <summary>
     /// Loads a parameter from an index.
     /// </summary>
-    public static void LoadParameter(this IOpCodeEmitter generator, int index, bool byref = false, Type? type = null, Type? targetType = null)
+    public static void EmitParameter(this IOpCodeEmitter generator, int index, bool byref = false, Type? type = null, Type? targetType = null)
     {
-        if (byref)
+        generator.EmitParameter(null, index, null, byref, type, targetType);
+    }
+
+    /// <summary>
+    /// Loads a parameter from an index.
+    /// </summary>
+    public static void EmitParameter(this IOpCodeEmitter generator, int index, string? castErrorMessage, bool byref = false, Type? type = null, Type? targetType = null)
+    {
+        generator.EmitParameter(null, index, castErrorMessage, byref, type, targetType);
+    }
+    internal static void EmitParameter(this IOpCodeEmitter generator, string? logSource, int index, string? castErrorMessage, bool byref = false, Type? type = null, Type? targetType = null)
+    {
+        if (index > ushort.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(index));
+        if (!byref && type != null && targetType != null && type.IsValueType && targetType.IsValueType && type != targetType)
+            throw new ArgumentException($"Types not compatible; input type: {type.FullName}, target type: {targetType.FullName}.", nameof(type));
+
+        bool resetLogSource = false;
+        if (logSource != null)
         {
-            generator.Emit(index > ushort.MaxValue ? OpCodes.Ldarga : OpCodes.Ldarga_S, index);
-            return;
+            if (generator is not DebuggableEmitter d)
+                generator = new DebuggableEmitter(generator, null) { DebugLog = true };
+            else if (d.LogSource != null && !d.LogSource.Equals(logSource, StringComparison.Ordinal))
+            {
+                (d.LogSource, logSource) = (logSource, d.LogSource);
+                resetLogSource = true;
+            }
         }
-        OpCode code = index switch
+
+        try
         {
-            0 => OpCodes.Ldarg_0,
-            1 => OpCodes.Ldarg_1,
-            2 => OpCodes.Ldarg_2,
-            3 => OpCodes.Ldarg_3,
-            <= ushort.MaxValue => OpCodes.Ldarg_S,
-            _ => OpCodes.Ldarg
-        };
-        if (index > 3)
-            generator.Emit(code, index);
-        else
-            generator.Emit(code);
-        if (type != null && targetType != null && type != typeof(void) && targetType != typeof(void))
-        {
+            if (byref)
+            {
+                OpCode code2 = index > byte.MaxValue ? OpCodes.Ldarga : OpCodes.Ldarga_S;
+                if (index > byte.MaxValue)
+                    generator.Emit(code2, (short)index);
+                else
+                    generator.Emit(code2, (byte)index);
+                return;
+            }
+
+            OpCode code = index switch
+            {
+                0 => OpCodes.Ldarg_0,
+                1 => OpCodes.Ldarg_1,
+                2 => OpCodes.Ldarg_2,
+                3 => OpCodes.Ldarg_3,
+                <= byte.MaxValue => OpCodes.Ldarg_S,
+                _ => OpCodes.Ldarg
+            };
+            if (index > 3)
+            {
+                if (index > byte.MaxValue)
+                    generator.Emit(code, (ushort)index);
+                else
+                    generator.Emit(code, (byte)index);
+            }
+            else
+                generator.Emit(code);
+
+            if (type == null || targetType == null || type == typeof(void) || targetType == typeof(void))
+                return;
+
+            Accessor.CheckExceptionConstructors();
             if (type.IsValueType && !targetType.IsValueType)
+            {
                 generator.Emit(OpCodes.Box, type);
+            }
             else if (!type.IsValueType && targetType.IsValueType)
+            {
                 generator.Emit(OpCodes.Unbox_Any, targetType);
+            }
+            else if (!targetType.IsAssignableFrom(type) && (Accessor.CastExCtor != null || Accessor.NreExCtor != null))
+            {
+                Label lbl = generator.DefineLabel();
+                generator.Emit(OpCodes.Isinst, targetType);
+                generator.Emit(OpCodes.Dup);
+                generator.Emit(OpCodes.Brtrue, lbl);
+                generator.Emit(OpCodes.Pop);
+                if (index > 3)
+                {
+                    if (index > byte.MaxValue)
+                        generator.Emit(code, (ushort)index);
+                    else
+                        generator.Emit(code, (byte)index);
+                }
+                else
+                    generator.Emit(code);
+                generator.Emit(OpCodes.Dup);
+                generator.Emit(OpCodes.Brfalse, lbl);
+                generator.Emit(OpCodes.Pop);
+                castErrorMessage ??= $"Invalid type passed to parameter {index.ToString(CultureInfo.InvariantCulture)}.";
+                if (Accessor.CastExCtor != null)
+                    generator.Emit(OpCodes.Ldstr, castErrorMessage);
+                generator.Emit(OpCodes.Newobj, Accessor.CastExCtor ?? Accessor.NreExCtor!);
+                generator.Emit(OpCodes.Throw);
+                generator.MarkLabel(lbl);
+            }
+        }
+        finally
+        {
+            if (resetLogSource)
+                ((DebuggableEmitter)generator).LogSource = logSource;
         }
     }
 
@@ -1082,6 +1162,7 @@ public static class PatchUtil
     /// <summary>
     /// Return the correct call <see cref="OpCode"/> to use depending on the method. Usually you will use <see cref="GetCallRuntime"/> instead as it doesn't account for possible future keyword changes.
     /// </summary>
+    /// <remarks>Note that not using call instead of callvirt may remove the check for a null instance.</remarks>
     [Pure]
     public static OpCode GetCall(this MethodBase method)
     {
@@ -1091,6 +1172,7 @@ public static class PatchUtil
     /// <summary>
     /// Return the correct call <see cref="OpCode"/> to use depending on the method at runtime. Doesn't account for future changes.
     /// </summary>
+    /// <remarks>Note that not using call instead of callvirt may remove the check for a null instance.</remarks>
     [Pure]
     public static OpCode GetCallRuntime(this MethodBase method)
     {

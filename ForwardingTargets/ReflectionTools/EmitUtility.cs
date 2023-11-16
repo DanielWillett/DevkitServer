@@ -5,12 +5,10 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Runtime.CompilerServices;
 
 namespace DanielWillett.ReflectionTools;
 
-[TypeForwardedFrom("ReflectionTools, Version=1.0.2.0, Culture=neutral, PublicKeyToken=6a3a944a5a8d6b8f")]
-public static class EmitUtilitiy
+public static class EmitUtility
 {
     private static DevkitServer.Util.PatternMatch? ConvertMatch(PatternMatch? match)
     {
@@ -167,7 +165,15 @@ public static class EmitUtilitiy
     
     public static void EmitParameter(this ILGenerator generator, int index, bool byref = false, Type? type = null, Type? targetType = null)
     {
-        DevkitServer.Util.PatchUtil.LoadParameter(generator.AsEmitter(), index, byref, type, targetType);
+        DevkitServer.Util.PatchUtil.EmitParameter(generator.AsEmitter(), index, byref, type, targetType);
+    }
+    public static void EmitParameter(this ILGenerator generator, int index, string? castErrorMessage, bool byref = false, Type? type = null, Type? targetType = null)
+    {
+        DevkitServer.Util.PatchUtil.EmitParameter(generator.AsEmitter(), index, castErrorMessage, byref, type, targetType);
+    }
+    internal static void EmitParameter(this ILGenerator generator, string? logSource, int index, string? castErrorMessage, bool byref = false, Type? type = null, Type? targetType = null)
+    {
+        DevkitServer.Util.PatchUtil.EmitParameter(generator.AsEmitter(), logSource, index, castErrorMessage, byref, type, targetType);
     }
     
     [Pure]
@@ -186,6 +192,12 @@ public static class EmitUtilitiy
     public static bool IsLdLoc(this OpCode opcode, bool byRef = false, bool either = false)
     {
         return DevkitServer.Util.PatchUtil.IsLdLoc(opcode, byRef, either);
+    }
+
+    [Pure]
+    public static bool IsLdFld(this OpCode opcode, bool byRef = false, bool either = false, bool @static = false, bool staticOrInstance = false)
+    {
+        return DevkitServer.Util.PatchUtil.IsLdFld(opcode, byRef, either, @static, staticOrInstance);
     }
 
     [Pure]

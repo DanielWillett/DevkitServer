@@ -99,7 +99,7 @@ internal static class EditorActionsCodeGeneration
 
         MethodInfo? claimFromPool = typeof(Pool<ActionSettingsCollection>).GetMethod(
             nameof(Pool<ActionSettingsCollection>.claim), BindingFlags.Instance | BindingFlags.Public, null,
-            CallingConventions.Any, Array.Empty<Type>(), null);
+            CallingConventions.Any, Type.EmptyTypes, null);
         if (claimFromPool == null)
         {
             Logger.LogWarning($"Failed to find {typeof(Pool<ActionSettingsCollection>).Format()}.claim method.", method: "EDITOR ACTIONS");
@@ -419,7 +419,7 @@ internal static class EditorActionsCodeGeneration
             MethodBase? method = null;
             if (!string.IsNullOrWhiteSpace(attr.CreateMethod))
             {
-                method = type.GetMethod(attr.CreateMethod!, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, CallingConventions.Any, Array.Empty<Type>(), null);
+                method = type.GetMethod(attr.CreateMethod!, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, CallingConventions.Any, Type.EmptyTypes, null);
                 if (method == null || !typeof(IAction).IsAssignableFrom(((MethodInfo)method).ReturnType))
                     Logger.LogWarning($"Unable to find method {type.Format()}.{attr.CreateMethod.Format(false)} when creating the action creator method.", method: "EDITOR ACTIONS");
             }

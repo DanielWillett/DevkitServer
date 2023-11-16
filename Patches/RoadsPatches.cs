@@ -37,7 +37,7 @@ internal static class RoadsPatches
     [HarmonyPatch(typeof(EditorRoads), "Update")]
     private static IEnumerable<CodeInstruction> EditorRoadsUpdateTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
     {
-        MethodInfo? deselect = typeof(EditorRoads).GetMethod("deselect", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+        MethodInfo? deselect = typeof(EditorRoads).GetMethod("deselect", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
         if (deselect == null)
         {
             Logger.LogWarning($"{method.Format()} - Unable to find method: EditorRoads.deselect.", method: Source);

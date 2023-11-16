@@ -25,7 +25,14 @@ internal static class PatchesMain
 {
     public const string HarmonyId = "dw.devkitserver";
     private const string Source = "PATCHING";
-    internal static Harmony Patcher { get; private set; } = null!;
+    private static Harmony? _patcher;
+
+    public static Harmony Patcher
+    {
+        get => _patcher ??= new Harmony(HarmonyId);
+        internal set => _patcher = value;
+    }
+
     internal static void Init()
     {
         try
@@ -129,7 +136,7 @@ internal static class PatchesMain
                 Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(OnLevelSaving)));
             else
                 Logger.LogWarning($"Method not found to patch map saving: {FormattingUtil.FormatMethod(typeof(void), typeof(Level), nameof(Level.save),
-                    arguments: Array.Empty<Type>(), isStatic: true)}.", method: Source);
+                    arguments: Type.EmptyTypes, isStatic: true)}.", method: Source);
         }
         catch (Exception ex)
         {
@@ -161,15 +168,15 @@ internal static class PatchesMain
         // EditorInteract.Update
         try
         {
-            MethodInfo? method = Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract")?.GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+            MethodInfo? method = Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract")?.GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
             if (method != null)
                 Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(EditorInteractUpdatePrefix)));
             else
-                Logger.LogWarning($"Method not found to patch editor looking while not in Editor controller: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Array.Empty<Type>())}.", method: Source);
+                Logger.LogWarning($"Method not found to patch editor looking while not in Editor controller: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.", method: Source);
         }
         catch (Exception ex)
         {
-            Logger.LogWarning($"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Array.Empty<Type>())}.", method: Source);
+            Logger.LogWarning($"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.", method: Source);
             Logger.LogError(ex, method: Source);
         }
 #endif
@@ -210,7 +217,7 @@ internal static class PatchesMain
         // EditorInteract.Update
         try
         {
-            MethodInfo? method = Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract")?.GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+            MethodInfo? method = Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract")?.GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
             if (method != null)
             {
                 Patcher.Unpatch(method, Accessor.GetMethod(EditorInteractUpdatePrefix));
@@ -218,7 +225,7 @@ internal static class PatchesMain
         }
         catch (Exception ex)
         {
-            Logger.LogWarning($"Failed to unpatch method: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Array.Empty<Type>())}.", method: Source);
+            Logger.LogWarning($"Failed to unpatch method: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.", method: Source);
             Logger.LogError(ex, method: Source);
         }
 #endif
@@ -348,12 +355,12 @@ internal static class PatchesMain
 
         if (!patchedOutPlayerUI)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to edit call to {FormattingUtil.FormatMethod(typeof(void), typeof(PlayerUI), "Player_OnGUI", arguments: Array.Empty<Type>())}.", method: Source);
+            Logger.LogWarning($"{method.Format()} - Unable to edit call to {FormattingUtil.FormatMethod(typeof(void), typeof(PlayerUI), "Player_OnGUI", arguments: Type.EmptyTypes)}.", method: Source);
             DevkitServerModule.Fault();
         }
         if (!patchedOutEditorUI)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to edit call to {FormattingUtil.FormatMethod(typeof(void), typeof(EditorUI), "Editor_OnGUI", arguments: Array.Empty<Type>())}.", method: Source);
+            Logger.LogWarning($"{method.Format()} - Unable to edit call to {FormattingUtil.FormatMethod(typeof(void), typeof(EditorUI), "Editor_OnGUI", arguments: Type.EmptyTypes)}.", method: Source);
             DevkitServerModule.Fault();
         }
 

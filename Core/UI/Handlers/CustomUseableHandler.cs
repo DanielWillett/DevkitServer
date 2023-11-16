@@ -25,7 +25,7 @@ internal class CustomUseableHandler : ICustomOnDestroyUIHandler, ICustomOnInitia
             {
                 if (!equip)
                 {
-                    MethodInfo? method = useableInfo.Type.GetMethod(nameof(Useable.equip), BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Instance, null, Array.Empty<Type>(), null);
+                    MethodInfo? method = useableInfo.Type.GetMethod(nameof(Useable.equip), BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
                     if (method != null)
                     {
                         if (!AllowedEquipTypes.TryGetValue(method, out List<Type> allowedTypes))
@@ -40,7 +40,7 @@ internal class CustomUseableHandler : ICustomOnDestroyUIHandler, ICustomOnInitia
                 }
                 if (!dequip)
                 {
-                    MethodInfo? method = useableInfo.Type.GetMethod(nameof(Useable.dequip), BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Instance, null, Array.Empty<Type>(), null);
+                    MethodInfo? method = useableInfo.Type.GetMethod(nameof(Useable.dequip), BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
                     if (method != null)
                     {
                         if (!AllowedDequipTypes.TryGetValue(method, out List<Type> allowedTypes))

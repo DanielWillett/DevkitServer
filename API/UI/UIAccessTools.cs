@@ -672,7 +672,7 @@ public static class UIAccessTools
 
             DynamicMethod method = new DynamicMethod("Get" + uiType.Name + "_Impl", attr,
                 CallingConventions.Standard, rtnType ?? memberType,
-                Array.Empty<Type>(), accessTools, true);
+                Type.EmptyTypes, accessTools, true);
             DebuggableEmitter il = new DebuggableEmitter(method);
             if (field is FieldInfo field2)
             {
@@ -978,7 +978,7 @@ public static class UIAccessTools
             DebuggableEmitter il = new DebuggableEmitter(dmethod);
             LoadUIToILGenerator(il, uiType);
             for (int i = 0; i < types.Length; ++i)
-                il.LoadParameter(i);
+                il.EmitParameter(i);
             il.Emit(method.IsAbstract || method.IsVirtual ? OpCodes.Callvirt : OpCodes.Call, method);
             il.Emit(OpCodes.Ret);
             return dmethod.CreateDelegate(delegateType);
@@ -1026,7 +1026,7 @@ public static class UIAccessTools
             }
             DynamicMethod method = new DynamicMethod("GetEditorTerrainHeightsUI_Impl", attr,
                 CallingConventions.Standard, rtnType,
-                Array.Empty<Type>(), accessTools, true);
+                Type.EmptyTypes, accessTools, true);
             IOpCodeEmitter il = method.GetILGenerator().AsEmitter();
             il.Emit(OpCodes.Call, getEditorTerrainUI);
             il.Emit(OpCodes.Ldfld, field);
@@ -1052,7 +1052,7 @@ public static class UIAccessTools
             }
             method = new DynamicMethod("GetEditorTerrainMaterialsUI_Impl", attr,
                 CallingConventions.Standard, rtnType,
-                Array.Empty<Type>(), accessTools, true);
+                Type.EmptyTypes, accessTools, true);
             il = method.GetILGenerator().AsEmitter();
             il.Emit(OpCodes.Call, getEditorTerrainUI);
             il.Emit(OpCodes.Ldfld, field);
@@ -1078,7 +1078,7 @@ public static class UIAccessTools
             }
             method = new DynamicMethod("GetEditorTerrainDetailsUI_Impl", attr,
                 CallingConventions.Standard, rtnType,
-                Array.Empty<Type>(), accessTools, true);
+                Type.EmptyTypes, accessTools, true);
             il = method.GetILGenerator().AsEmitter();
             il.Emit(OpCodes.Call, getEditorTerrainUI);
             il.Emit(OpCodes.Ldfld, field);
@@ -1104,7 +1104,7 @@ public static class UIAccessTools
             }
             method = new DynamicMethod("GetEditorTerrainTilesUI_Impl", attr,
                 CallingConventions.Standard, rtnType,
-                Array.Empty<Type>(), accessTools, true);
+                Type.EmptyTypes, accessTools, true);
             il = method.GetILGenerator().AsEmitter();
             il.Emit(OpCodes.Call, getEditorTerrainUI);
             il.Emit(OpCodes.Ldfld, field);
@@ -1135,7 +1135,7 @@ public static class UIAccessTools
             }
             method = new DynamicMethod("GetEditorEnvironmentNodesUI_Impl", attr,
                 CallingConventions.Standard, rtnType,
-                Array.Empty<Type>(), accessTools, true);
+                Type.EmptyTypes, accessTools, true);
             il = method.GetILGenerator().AsEmitter();
             il.Emit(OpCodes.Ldsfld, field);
             il.Emit(OpCodes.Ret);
@@ -1165,7 +1165,7 @@ public static class UIAccessTools
             }
             method = new DynamicMethod("GetEditorVolumesUI_Impl", attr,
                 CallingConventions.Standard, rtnType,
-                Array.Empty<Type>(), accessTools, true);
+                Type.EmptyTypes, accessTools, true);
             il = method.GetILGenerator().AsEmitter();
             il.Emit(OpCodes.Ldsfld, field);
             il.Emit(OpCodes.Ret);
@@ -1191,7 +1191,7 @@ public static class UIAccessTools
                     {
                         method = new DynamicMethod("GetItemStoreCartMenu_Impl", attr,
                             CallingConventions.Standard, rtnType,
-                            Array.Empty<Type>(), accessTools, true);
+                            Type.EmptyTypes, accessTools, true);
                         il = method.GetILGenerator().AsEmitter();
                         Label lbl = il.DefineLabel();
                         il.Emit(OpCodes.Call, accessTools.GetProperty(nameof(ItemStoreMenu), BindingFlags.Public | BindingFlags.Static)!.GetMethod);
@@ -1222,7 +1222,7 @@ public static class UIAccessTools
                     {
                         method = new DynamicMethod("GetItemStoreDetailsMenu_Impl", attr,
                             CallingConventions.Standard, rtnType,
-                            Array.Empty<Type>(), accessTools, true);
+                            Type.EmptyTypes, accessTools, true);
                         il = method.GetILGenerator().AsEmitter();
                         Label lbl = il.DefineLabel();
                         il.Emit(OpCodes.Call, accessTools.GetProperty(nameof(ItemStoreMenu), BindingFlags.Public | BindingFlags.Static)!.GetMethod);

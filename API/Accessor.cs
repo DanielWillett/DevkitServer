@@ -3,6 +3,7 @@ using DevkitServer.Patches;
 using HarmonyLib;
 using StackCleaner;
 using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
@@ -34,6 +35,10 @@ public static class Accessor
     private static MethodInfo? _getIsEditor;
     private static MethodInfo? _getIsDevkitServer;
     private static MethodInfo? _logDebug;
+    private static MethodInfo? _logInfo;
+    private static MethodInfo? _logWarning;
+    private static MethodInfo? _logError;
+    private static MethodInfo? _logException;
     private static MethodInfo? _getKeyDown;
     private static MethodInfo? _getKeyUp;
     private static MethodInfo? _getKey;
@@ -42,16 +47,22 @@ public static class Accessor
 
     private static FieldInfo? _getStackCleaner;
 
-    private static ConstructorInfo? _castExCtor;
-    private static ConstructorInfo? _nreExCtor;
+    internal static ConstructorInfo? CastExCtor;
+    internal static ConstructorInfo? NreExCtor;
     private static ConstructorInfo? _stackTraceIntCtor;
 
     internal static Type[]? FuncTypes;
     internal static Type[]? ActionTypes;
+    private static Type? _readonlyAttribute;
     private static Type? _ignoreAttribute;
     private static Type? _priorityAttribute;
     private static bool _castExCtorCalc;
     private static bool _nreExCtorCalc;
+    internal static bool LogILTraceMessages { get; set; } = false;
+    internal static bool LogDebugMessages { get; set; } = true;
+    internal static bool LogInfoMessages { get; set; } = true;
+    internal static bool LogWarningMessages { get; set; } = true;
+    internal static bool LogErrorMessages { get; set; } = true;
 
     /// <summary>
     /// Whether or not the <c>Mono.Runtime</c> class is available. Indicates if the current runtime is Mono.
@@ -69,6 +80,12 @@ public static class Accessor
         }
     }
 
+    private static IOpCodeEmitter CreateEmitter(DynamicMethod method, string logSource)
+    {
+        IOpCodeEmitter emitter = method.GetILGenerator().AsEmitter();
+        return LogILTraceMessages ? new DebuggableEmitter(emitter, method) { DebugLog = true, LogSource = logSource } : emitter;
+    }
+
     /// <summary>
     /// Generates a dynamic method that sets an instance field value. For value types use <see cref="GenerateInstanceSetter{TValue}"/> instead.
     /// </summary>
@@ -80,12 +97,14 @@ public static class Accessor
     [Pure]
     public static InstanceSetter<TInstance, TValue>? GenerateInstanceSetter<TInstance, TValue>(string fieldName, bool throwOnError = false)
     {
+        const string source = "Accessor.GenerateInstanceSetter";
         if (typeof(TInstance).IsValueType)
         {
             if (throwOnError)
                 throw new Exception($"Unable to create instance setter for {typeof(TInstance).FullName}.{fieldName}, you must pass structs ({typeof(TInstance).Name}) as a boxed object.");
 
-            Logger.LogError($"Unable to create instance setter for {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}, you must pass structs ({typeof(TInstance).Format()}) as a boxed object.");
+            if (LogErrorMessages)
+                Logger.LogError($"Unable to create instance setter for {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}, you must pass structs ({typeof(TInstance).Format()}) as a boxed object.", method: source);
             return null;
         }
 
@@ -95,17 +114,23 @@ public static class Accessor
         {
             if (throwOnError)
                 throw new Exception($"Unable to find matching field: {typeof(TInstance).FullName}.{fieldName}.");
-            Logger.LogError($"Unable to find matching property {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
+            if (LogErrorMessages)
+                Logger.LogError($"Unable to find matching property {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
             return null;
         }
 
+        fieldName = field.Name;
+
         try
         {
+            CheckExceptionConstructors();
+
             GetDynamicMethodFlags(false, out MethodAttributes attr, out CallingConventions convention);
-            DynamicMethod method = new DynamicMethod("set_" + fieldName, attr, convention, typeof(void), new Type[] { typeof(TInstance), field.FieldType }, typeof(TInstance), true);
+            DynamicMethod method = new DynamicMethod("set_" + fieldName, attr, convention, typeof(void), new Type[] { typeof(TInstance), typeof(TValue) }, typeof(TInstance), true);
             method.DefineParameter(1, ParameterAttributes.None, "this");
             method.DefineParameter(2, ParameterAttributes.None, "value");
-            ILGenerator il = method.GetILGenerator();
+            IOpCodeEmitter il = CreateEmitter(method, source);
+            Label? typeLbl = null;
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldarg_1);
 
@@ -113,17 +138,45 @@ public static class Accessor
                 il.Emit(OpCodes.Unbox_Any, field.FieldType);
             else if (typeof(TValue).IsValueType && !field.FieldType.IsValueType)
                 il.Emit(OpCodes.Box, typeof(TValue));
+            else if (!field.FieldType.IsAssignableFrom(typeof(TValue)) && (CastExCtor != null || NreExCtor != null))
+            {
+                typeLbl = il.DefineLabel();
+                il.Emit(OpCodes.Isinst, field.FieldType);
+                il.Emit(OpCodes.Dup);
+                il.Emit(OpCodes.Brtrue_S, typeLbl.Value);
+                il.Emit(OpCodes.Pop);
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Dup);
+                il.Emit(OpCodes.Brfalse_S, typeLbl.Value);
+                il.Emit(OpCodes.Pop);
+                il.Emit(OpCodes.Pop);
+                if (CastExCtor != null)
+                    il.Emit(OpCodes.Ldstr, "Invalid argument type passed to setter for " + fieldName + ". Expected " + field.FieldType.FullName + ".");
+                il.Emit(OpCodes.Newobj, CastExCtor ?? NreExCtor!);
+                il.Emit(OpCodes.Throw);
+            }
+
+            if (typeLbl.HasValue)
+                il.MarkLabel(typeLbl.Value);
 
             il.Emit(OpCodes.Stfld, field);
             il.Emit(OpCodes.Ret);
-            return (InstanceSetter<TInstance, TValue>)method.CreateDelegate(typeof(InstanceSetter<TInstance, TValue>));
+            InstanceSetter<TInstance, TValue> setter = (InstanceSetter<TInstance, TValue>)method.CreateDelegate(typeof(InstanceSetter<TInstance, TValue>));
+
+            if (LogDebugMessages || LogILTraceMessages)
+                Logger.LogDebug($"[{source}] Created dynamic method instance setter for {field.Format()}.");
+
+            return setter;
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error generating instance getter for {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             if (throwOnError)
-                throw;
-            Logger.LogError(ex);
+                throw new Exception($"Error generating instance getter for {field.DeclaringType!.FullName}.{fieldName}.", ex);
+            if (LogErrorMessages)
+            {
+                Logger.LogError($"Error generating instance getter for {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
+                Logger.LogError(ex, method: source);
+            }
             return null;
         }
     }
@@ -139,21 +192,26 @@ public static class Accessor
     [Pure]
     public static InstanceGetter<TInstance, TValue>? GenerateInstanceGetter<TInstance, TValue>(string fieldName, bool throwOnError = false)
     {
+        const string source = "Accessor.GenerateInstanceGetter";
         FieldInfo? field = typeof(TInstance).GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         field ??= typeof(TInstance).GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
         if (field is null || field.IsStatic || !typeof(TValue).IsAssignableFrom(field.FieldType) && field.FieldType != typeof(object))
         {
             if (throwOnError)
                 throw new Exception($"Unable to find matching field: {typeof(TInstance).FullName}.{fieldName}.");
-            Logger.LogError($"Unable to find matching property {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
+            if (LogErrorMessages)
+                Logger.LogError($"Unable to find matching property {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
             return null;
         }
+
+        fieldName = field.Name;
+        
         try
         {
             GetDynamicMethodFlags(false, out MethodAttributes attr, out CallingConventions convention);
             DynamicMethod method = new DynamicMethod("get_" + fieldName, attr, convention, typeof(TValue), new Type[] { typeof(TInstance) }, typeof(TInstance), true);
             method.DefineParameter(1, ParameterAttributes.None, "this");
-            ILGenerator il = method.GetILGenerator();
+            IOpCodeEmitter il = CreateEmitter(method, source);
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldfld, field);
 
@@ -163,14 +221,24 @@ public static class Accessor
                 il.Emit(OpCodes.Box, field.FieldType);
 
             il.Emit(OpCodes.Ret);
-            return (InstanceGetter<TInstance, TValue>)method.CreateDelegate(typeof(InstanceGetter<TInstance, TValue>));
+
+            InstanceGetter<TInstance, TValue> getter = (InstanceGetter<TInstance, TValue>)method.CreateDelegate(typeof(InstanceGetter<TInstance, TValue>));
+
+            if (LogDebugMessages || LogILTraceMessages)
+                Logger.LogDebug($"[{source}] Created dynamic method instance getter for {field.Format()}.");
+
+            return getter;
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error generating instance getter for {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             if (throwOnError)
-                throw;
-            Logger.LogError(ex);
+                throw new Exception($"Error generating instance getter for {typeof(TInstance).FullName}.{fieldName}.", ex);
+
+            if (LogErrorMessages)
+            {
+                Logger.LogError($"Error generating instance getter for {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
+                Logger.LogError(ex, method: source);
+            }
             return null;
         }
     }
@@ -192,11 +260,13 @@ public static class Accessor
     [Pure]
     public static InstanceSetter<object, TValue>? GenerateInstanceSetter<TValue>(Type declaringType, string fieldName, bool throwOnError = false)
     {
+        const string source = "Accessor.GenerateInstanceSetter";
         if (declaringType == null)
         {
             if (throwOnError)
                 throw new Exception($"Error generating instance setter for <unknown>.{fieldName}. Declaring type not found.");
-            Logger.LogError($"Error generating instance setter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
+            if (LogErrorMessages)
+                Logger.LogError($"Error generating instance setter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
             return null;
         }
         FieldInfo? field = declaringType.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
@@ -205,41 +275,45 @@ public static class Accessor
         {
             if (throwOnError)
                 throw new Exception($"Unable to find matching field: {declaringType.FullName}.{fieldName}.");
-            Logger.LogError($"Unable to find matching property {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
+            if (LogErrorMessages)
+                Logger.LogError($"Unable to find matching property {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
             return null;
         }
+
+        fieldName = field.Name;
+
         try
         {
             CheckExceptionConstructors();
 
             GetDynamicMethodFlags(false, out MethodAttributes attr, out CallingConventions convention);
-            DynamicMethod method = new DynamicMethod("set_" + fieldName, attr, convention, typeof(void), new Type[] { typeof(object), field.FieldType }, declaringType, true);
+            DynamicMethod method = new DynamicMethod("set_" + fieldName, attr, convention, typeof(void), new Type[] { typeof(object), typeof(TValue) }, declaringType, true);
             method.DefineParameter(1, ParameterAttributes.None, "this");
             method.DefineParameter(2, ParameterAttributes.None, "value");
-            ILGenerator il = method.GetILGenerator();
+            IOpCodeEmitter il = CreateEmitter(method, source);
             Label lbl = il.DefineLabel();
+            Label? typeLbl = null;
             il.Emit(OpCodes.Ldarg_0);
 
             bool isValueType = declaringType.IsValueType;
-            if (_castExCtor != null || !isValueType && _nreExCtor != null)
+            if (CastExCtor != null || !isValueType && NreExCtor != null)
             {
                 Label lbl2 = il.DefineLabel();
                 il.Emit(OpCodes.Isinst, declaringType);
                 if (!isValueType)
                     il.Emit(OpCodes.Dup);
-                il.Emit(OpCodes.Brtrue, lbl);
+                il.Emit(OpCodes.Brtrue_S, lbl);
                 if (!isValueType)
                     il.Emit(OpCodes.Pop);
-                il.Emit(OpCodes.Ldnull);
                 il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Beq_S, lbl2);
-
-                il.Emit(OpCodes.Ldstr, "Invalid instance type passed to getter for " + fieldName + ". Expected " + declaringType.FullName + ".");
-                il.Emit(OpCodes.Newobj, _castExCtor ?? _nreExCtor!);
+                il.Emit(OpCodes.Brfalse_S, lbl2);
+                if (CastExCtor != null)
+                    il.Emit(OpCodes.Ldstr, "Invalid instance type passed to getter for " + fieldName + ". Expected " + declaringType.FullName + ".");
+                il.Emit(OpCodes.Newobj, CastExCtor ?? NreExCtor!);
                 il.Emit(OpCodes.Throw);
                 il.MarkLabel(lbl2);
-                ConstructorInfo ctor = _nreExCtor ?? _castExCtor!;
-                if (ctor == _castExCtor)
+                ConstructorInfo ctor = NreExCtor ?? CastExCtor!;
+                if (ctor == CastExCtor)
                     il.Emit(OpCodes.Ldstr, "Null passed to getter for " + fieldName + ". Expected " + declaringType.FullName + ".");
                 il.Emit(OpCodes.Newobj, ctor);
                 il.Emit(OpCodes.Throw);
@@ -256,6 +330,26 @@ public static class Accessor
                     il.Emit(OpCodes.Unbox_Any, field.FieldType);
                 else if (typeof(TValue).IsValueType && !field.FieldType.IsValueType)
                     il.Emit(OpCodes.Box, typeof(TValue));
+                else if (!field.FieldType.IsAssignableFrom(typeof(TValue)) && (CastExCtor != null || NreExCtor != null))
+                {
+                    typeLbl = il.DefineLabel();
+                    il.Emit(OpCodes.Isinst, field.FieldType);
+                    il.Emit(OpCodes.Dup);
+                    il.Emit(OpCodes.Brtrue_S, typeLbl.Value);
+                    il.Emit(OpCodes.Pop);
+                    il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Dup);
+                    il.Emit(OpCodes.Brfalse_S, typeLbl.Value);
+                    il.Emit(OpCodes.Pop);
+                    il.Emit(OpCodes.Pop);
+                    if (CastExCtor != null)
+                        il.Emit(OpCodes.Ldstr, "Invalid argument type passed to setter for " + fieldName + ". Expected " + field.FieldType.FullName + ".");
+                    il.Emit(OpCodes.Newobj, CastExCtor ?? NreExCtor!);
+                    il.Emit(OpCodes.Throw);
+                }
+
+                if (typeLbl.HasValue)
+                    il.MarkLabel(typeLbl.Value);
 
                 il.Emit(OpCodes.Stobj, field.FieldType);
             }
@@ -267,18 +361,43 @@ public static class Accessor
                     il.Emit(OpCodes.Unbox_Any, field.FieldType);
                 else if (typeof(TValue).IsValueType && !field.FieldType.IsValueType)
                     il.Emit(OpCodes.Box, typeof(TValue));
+                else if (!field.FieldType.IsAssignableFrom(typeof(TValue)) && (CastExCtor != null || NreExCtor != null))
+                {
+                    typeLbl = il.DefineLabel();
+                    il.Emit(OpCodes.Isinst, field.FieldType);
+                    il.Emit(OpCodes.Dup);
+                    il.Emit(OpCodes.Brtrue_S, typeLbl.Value);
+                    il.Emit(OpCodes.Pop);
+                    il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Dup);
+                    il.Emit(OpCodes.Brfalse_S, typeLbl.Value);
+                    il.Emit(OpCodes.Pop);
+                    il.Emit(OpCodes.Pop);
+                    if (CastExCtor != null)
+                        il.Emit(OpCodes.Ldstr, "Invalid argument type passed to setter for " + fieldName + ". Expected " + field.FieldType.FullName + ".");
+                    il.Emit(OpCodes.Newobj, CastExCtor ?? NreExCtor!);
+                    il.Emit(OpCodes.Throw);
+                }
 
                 il.Emit(OpCodes.Stfld, field);
             }
             il.Emit(OpCodes.Ret);
-            return (InstanceSetter<object, TValue>)method.CreateDelegate(typeof(InstanceSetter<object, TValue>));
+            InstanceSetter<object, TValue> setter = (InstanceSetter<object, TValue>)method.CreateDelegate(typeof(InstanceSetter<object, TValue>));
+            
+            if (LogDebugMessages || LogILTraceMessages)
+                Logger.LogDebug($"[{source}] Created dynamic method instance setter for {field.Format()}.");
+
+            return setter;
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error generating instance setter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             if (throwOnError)
-                throw;
-            Logger.LogError(ex);
+                throw new Exception($"Error generating instance setter for {declaringType.FullName}.{fieldName}.", ex);
+            if (LogErrorMessages)
+            {
+                Logger.LogError($"Error generating instance setter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
+                Logger.LogError(ex, method: source);
+            }
             return null;
         }
     }
@@ -294,11 +413,13 @@ public static class Accessor
     [Pure]
     public static InstanceGetter<object, TValue>? GenerateInstanceGetter<TValue>(Type declaringType, string fieldName, bool throwOnError = false)
     {
+        const string source = "Accessor.GenerateInstanceGetter";
         if (declaringType == null)
         {
             if (throwOnError)
                 throw new Exception($"Error generating instance getter for <unknown>.{fieldName}. Declaring type not found.");
-            Logger.LogError($"Error generating instance getter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
+            if (LogErrorMessages)
+                Logger.LogError($"Error generating instance getter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
             return null;
         }
         FieldInfo? field = declaringType.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
@@ -307,9 +428,13 @@ public static class Accessor
         {
             if (throwOnError)
                 throw new Exception($"Unable to find matching field: {declaringType.FullName}.{fieldName}.");
-            Logger.LogError($"Unable to find matching property {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
+            if (LogErrorMessages)
+                Logger.LogError($"Unable to find matching property {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
             return null;
         }
+
+        fieldName = field.Name;
+
         try
         {
             CheckExceptionConstructors();
@@ -317,32 +442,34 @@ public static class Accessor
             GetDynamicMethodFlags(false, out MethodAttributes attr, out CallingConventions convention);
             DynamicMethod method = new DynamicMethod("get_" + fieldName, attr, convention, typeof(TValue), new Type[] { typeof(object) }, declaringType, true);
             method.DefineParameter(1, ParameterAttributes.None, "this");
-            ILGenerator il = method.GetILGenerator();
+            IOpCodeEmitter il = CreateEmitter(method, source);
             il.Emit(OpCodes.Ldarg_0);
-            Label lbl = il.DefineLabel();
+            Label? lbl = null;
 
             bool isValueType = declaringType.IsValueType;
-            if (_castExCtor != null || !isValueType && _nreExCtor != null)
+            if (CastExCtor != null || !isValueType && NreExCtor != null)
             {
+                lbl = il.DefineLabel();
                 Label lbl2 = il.DefineLabel();
                 il.Emit(OpCodes.Isinst, declaringType);
                 il.Emit(OpCodes.Dup);
-                il.Emit(OpCodes.Brtrue, lbl);
+                il.Emit(OpCodes.Brtrue_S, lbl.Value);
                 il.Emit(OpCodes.Pop);
-                il.Emit(OpCodes.Ldnull);
                 il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Beq_S, lbl2);
-                il.Emit(OpCodes.Ldstr, "Invalid instance type passed to getter for " + fieldName + ". Expected " + declaringType.FullName + ".");
-                il.Emit(OpCodes.Newobj, _castExCtor ?? _nreExCtor!);
+                il.Emit(OpCodes.Brfalse_S, lbl2);
+                if (CastExCtor != null)
+                    il.Emit(OpCodes.Ldstr, "Invalid instance type passed to getter for " + fieldName + ". Expected " + declaringType.FullName + ".");
+                il.Emit(OpCodes.Newobj, CastExCtor ?? NreExCtor!);
                 il.Emit(OpCodes.Throw);
                 il.MarkLabel(lbl2);
-                ConstructorInfo ctor = _nreExCtor ?? _castExCtor!;
-                if (ctor == _castExCtor)
+                ConstructorInfo ctor = NreExCtor ?? CastExCtor!;
+                if (ctor == CastExCtor)
                     il.Emit(OpCodes.Ldstr, "Null passed to getter for " + fieldName + ". Expected " + declaringType.FullName + ".");
                 il.Emit(OpCodes.Newobj, ctor);
                 il.Emit(OpCodes.Throw);
             }
-            il.MarkLabel(lbl);
+            if (lbl.HasValue)
+                il.MarkLabel(lbl.Value);
             if (isValueType)
                 il.Emit(OpCodes.Unbox, declaringType);
             il.Emit(OpCodes.Ldfld, field);
@@ -353,14 +480,22 @@ public static class Accessor
                 il.Emit(OpCodes.Box, field.FieldType);
 
             il.Emit(OpCodes.Ret);
-            return (InstanceGetter<object, TValue>)method.CreateDelegate(typeof(InstanceGetter<object, TValue>));
+            InstanceGetter<object, TValue> getter = (InstanceGetter<object, TValue>)method.CreateDelegate(typeof(InstanceGetter<object, TValue>));
+
+            if (LogDebugMessages || LogILTraceMessages)
+                Logger.LogDebug($"[{source}] Created dynamic method instance getter for {field.Format()}.");
+
+            return getter;
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error generating instance getter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             if (throwOnError)
-                throw;
-            Logger.LogError(ex);
+                throw new Exception($"Error generating instance getter for {declaringType.FullName}.{fieldName}.", ex);
+            if (LogErrorMessages)
+            {
+                Logger.LogError($"Error generating instance getter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
+                Logger.LogError(ex, method: source);
+            }
             return null;
         }
     }
@@ -376,12 +511,14 @@ public static class Accessor
     [Pure]
     public static InstanceSetter<TInstance, TValue>? GenerateInstancePropertySetter<TInstance, TValue>(string propertyName, bool throwOnError = false)
     {
+        const string source = "Accessor.GenerateInstancePropertySetter";
         if (typeof(TInstance).IsValueType)
         {
             if (throwOnError)
                 throw new Exception($"Unable to create instance setter for {typeof(TInstance).FullName}.{propertyName}, you must pass structs ({typeof(TInstance).Name}) as a boxed object.");
 
-            Logger.LogError($"Unable to create instance setter for {typeof(TInstance).Format()}.{propertyName.Colorize(FormattingColorType.Property)}, you must pass structs ({typeof(TInstance).Format()}) as a boxed object.");
+            if (LogErrorMessages)
+                Logger.LogError($"Unable to create instance setter for {typeof(TInstance).Format()}.{propertyName.Colorize(FormattingColorType.Property)}, you must pass structs ({typeof(TInstance).Format()}) as a boxed object.", method: source);
             return null;
         }
 
@@ -396,7 +533,8 @@ public static class Accessor
             {
                 if (throwOnError)
                     throw new Exception($"Unable to find matching property: {typeof(TInstance).FullName}.{propertyName} with a setter.");
-                Logger.LogError($"Unable to find matching property {typeof(TInstance).Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a setter.");
+                if (LogErrorMessages)
+                    Logger.LogError($"Unable to find matching property {typeof(TInstance).Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a setter.", method: source);
                 return null;
             }
         }
@@ -415,6 +553,7 @@ public static class Accessor
     [Pure]
     public static InstanceGetter<TInstance, TValue>? GenerateInstancePropertyGetter<TInstance, TValue>(string propertyName, bool throwOnError = false)
     {
+        const string source = "Accessor.GenerateInstancePropertyGetter";
         PropertyInfo? property = typeof(TInstance).GetProperty(propertyName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         MethodInfo? getter = property?.GetGetMethod(true);
         if (getter is null || getter.IsStatic || !typeof(TValue).IsAssignableFrom(getter.ReturnType) && getter.ReturnType != typeof(object))
@@ -426,7 +565,8 @@ public static class Accessor
             {
                 if (throwOnError)
                     throw new Exception($"Unable to find matching property: {typeof(TInstance).FullName}.{propertyName} with a getter.");
-                Logger.LogError($"Unable to find matching property {typeof(TInstance).Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a getter.");
+                if (LogErrorMessages)
+                    Logger.LogError($"Unable to find matching property {typeof(TInstance).Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a getter.", method: source);
                 return null;
             }
         }
@@ -444,7 +584,8 @@ public static class Accessor
     /// </code>
     /// </summary>
     /// <param name="allowUnsafeTypeBinding">Enables unsafe type binding to non-matching delegates, meaning classes of different
-    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).</param>
+    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).
+    /// This also must be <see langword="true"/> to not null-check instance methods of parameter-less reference types with a dynamic method.</param>
     /// <param name="declaringType">Declaring type of the property.</param>
     /// <typeparam name="TValue">Property return type.</typeparam>
     /// <param name="propertyName">Name of property that will be referenced.</param>
@@ -453,11 +594,13 @@ public static class Accessor
     [Pure]
     public static InstanceSetter<object, TValue>? GenerateInstancePropertySetter<TValue>(Type declaringType, string propertyName, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
     {
+        const string source = "Accessor.GenerateInstancePropertySetter";
         if (declaringType == null)
         {
             if (throwOnError)
                 throw new Exception($"Error generating instance setter for <unknown>.{propertyName}. Declaring type not found.");
-            Logger.LogError($"Error generating instance setter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
+            if (LogErrorMessages)
+                Logger.LogError($"Error generating instance setter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
             return null;
         }
         PropertyInfo? property = declaringType.GetProperty(propertyName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
@@ -471,7 +614,8 @@ public static class Accessor
             {
                 if (throwOnError)
                     throw new Exception($"Unable to find matching property: {declaringType.FullName}.{propertyName} with a setter.");
-                Logger.LogError($"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a setter.");
+                if (LogErrorMessages)
+                    Logger.LogError($"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a setter.", method: source);
                 return null;
             }
         }
@@ -483,7 +627,8 @@ public static class Accessor
     /// Generates a delegate if possible, otherwise a dynamic method, that gets an instance property value. Works for reference or value types.
     /// </summary>
     /// <param name="allowUnsafeTypeBinding">Enables unsafe type binding to non-matching delegates, meaning classes of different
-    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).</param>
+    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).
+    /// This also must be <see langword="true"/> to not null-check instance methods of parameter-less reference types with a dynamic method.</param>
     /// <param name="declaringType">Declaring type of the property.</param>
     /// <typeparam name="TValue">Property return type.</typeparam>
     /// <param name="propertyName">Name of property that will be referenced.</param>
@@ -492,11 +637,13 @@ public static class Accessor
     [Pure]
     public static InstanceGetter<object, TValue>? GenerateInstancePropertyGetter<TValue>(Type declaringType, string propertyName, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
     {
+        const string source = "Accessor.GenerateInstancePropertyGetter";
         if (declaringType == null)
         {
             if (throwOnError)
                 throw new Exception($"Error generating instance getter for <unknown>.{propertyName}. Declaring type not found.");
-            Logger.LogError($"Error generating instance getter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
+            if (LogErrorMessages)
+                Logger.LogError($"Error generating instance getter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
             return null;
         }
 
@@ -511,7 +658,8 @@ public static class Accessor
             {
                 if (throwOnError)
                     throw new Exception($"Unable to find matching property: {declaringType.FullName}.{propertyName} with a getter.");
-                Logger.LogError($"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a getter.");
+                if (LogErrorMessages)
+                    Logger.LogError($"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a getter.", method: source);
                 return null;
             }
         }
@@ -554,11 +702,13 @@ public static class Accessor
     [Pure]
     public static StaticSetter<TValue>? GenerateStaticSetter<TValue>(Type declaringType, string fieldName, bool throwOnError = false)
     {
+        const string source = "Accessor.GenerateStaticSetter";
         if (declaringType == null)
         {
             if (throwOnError)
                 throw new Exception($"Error generating static setter for <unknown>.{fieldName}. Declaring type not found.");
-            Logger.LogError($"Error generating static setter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
+            if (LogErrorMessages)
+                Logger.LogError($"Error generating static setter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
             return null;
         }
         FieldInfo? field = declaringType.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
@@ -567,32 +717,66 @@ public static class Accessor
         {
             if (throwOnError)
                 throw new Exception($"Unable to find matching field: {declaringType.FullName}.{fieldName}.");
-            Logger.LogError($"Unable to find matching field {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
+            if (LogErrorMessages)
+                Logger.LogError($"Unable to find matching field {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
             return null;
         }
+
+        fieldName = field.Name;
+
         try
         {
+            CheckExceptionConstructors();
+
             GetDynamicMethodFlags(true, out MethodAttributes attr, out CallingConventions convention);
             DynamicMethod method = new DynamicMethod("set_" + fieldName, attr, convention, typeof(void), new Type[] { typeof(TValue) }, declaringType, true);
             method.DefineParameter(1, ParameterAttributes.None, "value");
-            ILGenerator il = method.GetILGenerator();
+            IOpCodeEmitter il = CreateEmitter(method, source);
+            Label? lbl = null;
             il.Emit(OpCodes.Ldarg_0);
 
             if (!typeof(TValue).IsValueType && field.FieldType.IsValueType)
                 il.Emit(OpCodes.Unbox_Any, field.FieldType);
             else if (typeof(TValue).IsValueType && !field.FieldType.IsValueType)
                 il.Emit(OpCodes.Box, typeof(TValue));
+            else if (!field.FieldType.IsAssignableFrom(typeof(TValue)) && (CastExCtor != null || NreExCtor != null))
+            {
+                lbl = il.DefineLabel();
+                il.Emit(OpCodes.Isinst, field.FieldType);
+                il.Emit(OpCodes.Dup);
+                il.Emit(OpCodes.Brtrue_S, lbl.Value);
+                il.Emit(OpCodes.Pop);
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Dup);
+                il.Emit(OpCodes.Brfalse_S, lbl.Value);
+                il.Emit(OpCodes.Pop);
+                if (CastExCtor != null)
+                    il.Emit(OpCodes.Ldstr, "Invalid argument type passed to getter for " + fieldName + ". Expected " + field.FieldType.FullName + ".");
+                il.Emit(OpCodes.Newobj, CastExCtor ?? NreExCtor!);
+                il.Emit(OpCodes.Throw);
+            }
+
+            if (lbl.HasValue)
+                il.MarkLabel(lbl.Value);
 
             il.Emit(OpCodes.Stsfld, field);
             il.Emit(OpCodes.Ret);
-            return (StaticSetter<TValue>)method.CreateDelegate(typeof(StaticSetter<TValue>));
+            StaticSetter<TValue> setter = (StaticSetter<TValue>)method.CreateDelegate(typeof(StaticSetter<TValue>));
+
+            if (LogDebugMessages || LogErrorMessages)
+                Logger.LogDebug($"[{source}] Created dynamic method static setter for {field.Format()}.");
+
+            return setter;
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error generating static setter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             if (throwOnError)
-                throw;
-            Logger.LogError(ex);
+                throw new Exception($"Error generating static setter for {declaringType.FullName}.{fieldName}.", ex);
+            if (LogErrorMessages)
+            {
+                Logger.LogError($"Error generating static setter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
+                Logger.LogError(ex, method: source);
+            }
             return null;
         }
     }
@@ -608,11 +792,13 @@ public static class Accessor
     [Pure]
     public static StaticGetter<TValue>? GenerateStaticGetter<TValue>(Type declaringType, string fieldName, bool throwOnError = false)
     {
+        const string source = "Accessor.GenerateStaticGetter";
         if (declaringType == null)
         {
             if (throwOnError)
                 throw new Exception($"Error generating static getter for <unknown>.{fieldName}. Declaring type not found.");
-            Logger.LogError($"Error generating static getter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
+            if (LogErrorMessages)
+                Logger.LogError($"Error generating static getter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
             return null;
         }
         FieldInfo? field = declaringType.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
@@ -621,14 +807,18 @@ public static class Accessor
         {
             if (throwOnError)
                 throw new Exception($"Unable to find matching field: {declaringType.FullName}.{fieldName}.");
-            Logger.LogError($"Unable to find matching property {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
+            if (LogErrorMessages)
+                Logger.LogError($"Unable to find matching property {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
             return null;
         }
+
+        fieldName = field.Name;
+
         try
         {
             GetDynamicMethodFlags(true, out MethodAttributes attr, out CallingConventions convention);
-            DynamicMethod method = new DynamicMethod("get_" + fieldName, attr, convention, typeof(TValue), Array.Empty<Type>(), declaringType, true);
-            ILGenerator il = method.GetILGenerator();
+            DynamicMethod method = new DynamicMethod("get_" + fieldName, attr, convention, typeof(TValue), Type.EmptyTypes, declaringType, true);
+            IOpCodeEmitter il = CreateEmitter(method, source);
             il.Emit(OpCodes.Ldsfld, field);
 
             if (typeof(TValue).IsValueType && !field.FieldType.IsValueType)
@@ -637,14 +827,22 @@ public static class Accessor
                 il.Emit(OpCodes.Box, field.FieldType);
 
             il.Emit(OpCodes.Ret);
-            return (StaticGetter<TValue>)method.CreateDelegate(typeof(StaticGetter<TValue>));
+            StaticGetter<TValue> getter = (StaticGetter<TValue>)method.CreateDelegate(typeof(StaticGetter<TValue>));
+
+            if (LogDebugMessages || LogILTraceMessages)
+                Logger.LogDebug($"[{source}] Created dynamic method static getter for {field.Format()}.");
+
+            return getter;
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error generating static getter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             if (throwOnError)
-                throw;
-            Logger.LogError(ex);
+                throw new Exception($"Error generating static getter for {declaringType.FullName}.{fieldName}.", ex);
+            if (LogErrorMessages)
+            {
+                Logger.LogError($"Error generating static getter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
+                Logger.LogError(ex, method: source);
+            }
             return null;
         }
     }
@@ -656,10 +854,13 @@ public static class Accessor
     /// <typeparam name="TValue">Property return type.</typeparam>
     /// <param name="propertyName">Name of property that will be referenced.</param>
     /// <param name="throwOnError">Throw an error instead of writing to console and returning <see langword="null"/>.</param>
+    /// <param name="allowUnsafeTypeBinding">Enables unsafe type binding to non-matching delegates, meaning classes of different
+    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).
+    /// This also must be <see langword="true"/> to not null-check instance methods of parameter-less reference types with a dynamic method.</param>
     /// <remarks>Will never return <see langword="null"/> if <paramref name="throwOnError"/> is <see langword="true"/>.</remarks>
     [Pure]
-    public static StaticSetter<TValue>? GenerateStaticPropertySetter<TDeclaringType, TValue>(string propertyName, bool throwOnError = false)
-        => GenerateStaticPropertySetter<TValue>(typeof(TDeclaringType), propertyName, throwOnError, true);
+    public static StaticSetter<TValue>? GenerateStaticPropertySetter<TDeclaringType, TValue>(string propertyName, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
+        => GenerateStaticPropertySetter<TValue>(typeof(TDeclaringType), propertyName, throwOnError, allowUnsafeTypeBinding);
 
     /// <summary>
     /// Generates a delegate that gets a static property value.
@@ -668,16 +869,20 @@ public static class Accessor
     /// <typeparam name="TValue">Property return type.</typeparam>
     /// <param name="propertyName">Name of property that will be referenced.</param>
     /// <param name="throwOnError">Throw an error instead of writing to console and returning <see langword="null"/>.</param>
+    /// <param name="allowUnsafeTypeBinding">Enables unsafe type binding to non-matching delegates, meaning classes of different
+    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).
+    /// This also must be <see langword="true"/> to not null-check instance methods of parameter-less reference types with a dynamic method.</param>
     /// <remarks>Will never return <see langword="null"/> if <paramref name="throwOnError"/> is <see langword="true"/>.</remarks>
     [Pure]
-    public static StaticGetter<TValue>? GenerateStaticPropertyGetter<TDeclaringType, TValue>(string propertyName, bool throwOnError = false)
-        => GenerateStaticPropertyGetter<TValue>(typeof(TDeclaringType), propertyName, throwOnError, true);
+    public static StaticGetter<TValue>? GenerateStaticPropertyGetter<TDeclaringType, TValue>(string propertyName, bool throwOnError = false, bool allowUnsafeTypeBinding = true)
+        => GenerateStaticPropertyGetter<TValue>(typeof(TDeclaringType), propertyName, throwOnError, allowUnsafeTypeBinding);
 
     /// <summary>
     /// Generates a delegate or dynamic method that sets a static property value.
     /// </summary>
     /// <param name="allowUnsafeTypeBinding">Enables unsafe type binding to non-matching delegates, meaning classes of different
-    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).</param>
+    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).
+    /// This also must be <see langword="true"/> to not null-check instance methods of parameter-less reference types with a dynamic method.</param>
     /// <param name="declaringType">Declaring type of the property.</param>
     /// <typeparam name="TValue">Property return type.</typeparam>
     /// <param name="propertyName">Name of property that will be referenced.</param>
@@ -686,11 +891,13 @@ public static class Accessor
     [Pure]
     public static StaticSetter<TValue>? GenerateStaticPropertySetter<TValue>(Type declaringType, string propertyName, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
     {
+        const string source = "Accessor.GenerateStaticPropertySetter";
         if (declaringType == null)
         {
             if (throwOnError)
                 throw new Exception($"Error generating static setter for <unknown>.{propertyName}. Declaring type not found.");
-            Logger.LogError($"Error generating static setter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
+            if (LogErrorMessages)
+                Logger.LogError($"Error generating static setter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
             return null;
         }
         PropertyInfo? property = declaringType.GetProperty(propertyName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
@@ -700,7 +907,8 @@ public static class Accessor
         {
             if (throwOnError)
                 throw new Exception($"Unable to find matching property: {declaringType.FullName}.{propertyName} with a setter.");
-            Logger.LogError($"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a setter.");
+            if (LogErrorMessages)
+                Logger.LogError($"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a setter.", method: source);
             return null;
         }
 
@@ -711,7 +919,8 @@ public static class Accessor
     /// Generates a delegate that gets a static property value.
     /// </summary>
     /// <param name="allowUnsafeTypeBinding">Enables unsafe type binding to non-matching delegates, meaning classes of different
-    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).</param>
+    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).
+    /// This also must be <see langword="true"/> to not null-check instance methods of parameter-less reference types with a dynamic method.</param>
     /// <param name="declaringType">Declaring type of the property.</param>
     /// <typeparam name="TValue">Property return type.</typeparam>
     /// <param name="propertyName">Name of property that will be referenced.</param>
@@ -720,11 +929,13 @@ public static class Accessor
     [Pure]
     public static StaticGetter<TValue>? GenerateStaticPropertyGetter<TValue>(Type declaringType, string propertyName, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
     {
+        const string source = "Accessor.GenerateStaticPropertyGetter";
         if (declaringType == null)
         {
             if (throwOnError)
                 throw new Exception($"Error generating static getter for <unknown>.{propertyName}. Declaring type not found.");
-            Logger.LogError($"Error generating static getter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
+            if (LogErrorMessages)
+                Logger.LogError($"Error generating static getter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
             return null;
         }
         PropertyInfo? property = declaringType.GetProperty(propertyName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
@@ -734,7 +945,8 @@ public static class Accessor
         {
             if (throwOnError)
                 throw new Exception($"Unable to find matching property: {declaringType.FullName}.{propertyName} with a getter.");
-            Logger.LogError($"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a getter.");
+            if (LogErrorMessages)
+                Logger.LogError($"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a getter.", method: source);
             return null;
         }
 
@@ -746,7 +958,8 @@ public static class Accessor
     /// </summary>
     /// <remarks>The first parameter will be the instance.</remarks>
     /// <param name="allowUnsafeTypeBinding">Enables unsafe type binding to non-matching delegates, meaning classes of different
-    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).</param>
+    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).
+    /// This also must be <see langword="true"/> to not null-check instance methods of parameter-less reference types with a dynamic method.</param>
     /// <returns>A delegate of type <see cref="Action"/> or <see cref="Func{T}"/> (or one of their generic counterparts), depending on the method signature. The first parameter will be the instance.</returns>
     /// <param name="methodName">Name of method that will be called.</param>
     /// <param name="parameters">Optional parameter list for resolving ambiguous methods.</param>
@@ -755,6 +968,7 @@ public static class Accessor
     [Pure]
     public static Delegate? GenerateInstanceCaller<TInstance>(string methodName, Type[]? parameters = null, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
     {
+        const string source = "Accessor.GenerateInstanceCaller";
         MethodInfo? method = null;
         bool noneByName = false;
         try
@@ -781,7 +995,8 @@ public static class Accessor
                 if (throwOnError)
                     throw new Exception($"Unable to find matching instance method: {typeof(TInstance).FullName}.{methodName}.");
 
-                Logger.LogError($"Unable to find matching instance method: {FormattingUtil.FormatMethod(null, typeof(TInstance), methodName, null, parameters, null, isStatic: false)}.");
+                if (LogErrorMessages)
+                    Logger.LogError($"Unable to find matching instance method: {FormattingUtil.FormatMethod(null, typeof(TInstance), methodName, null, parameters, null, isStatic: false)}.", method: source);
                 return null;
             }
         }
@@ -794,7 +1009,8 @@ public static class Accessor
     /// </summary>
     /// <remarks>The first parameter will be the instance.</remarks>
     /// <param name="allowUnsafeTypeBinding">Enables unsafe type binding to non-matching delegates, meaning classes of different
-    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).</param>
+    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).
+    /// This also must be <see langword="true"/> to not null-check instance methods of parameter-less reference types with a dynamic method.</param>
     /// <param name="methodName">Name of method that will be called.</param>
     /// <param name="parameters">Optional parameter list for resolving ambiguous methods.</param>
     /// <param name="throwOnError">Throw an error instead of writing to console and returning <see langword="null"/>.</param>
@@ -802,6 +1018,7 @@ public static class Accessor
     [Pure]
     public static TDelegate? GenerateInstanceCaller<TInstance, TDelegate>(string methodName, bool throwOnError = false, bool allowUnsafeTypeBinding = false, Type[]? parameters = null) where TDelegate : Delegate
     {
+        const string source = "Accessor.GenerateInstanceCaller";
         MethodInfo? method = null;
         bool noneByName = false;
         try
@@ -821,7 +1038,7 @@ public static class Accessor
                 if (parameters == null)
                 {
                     ParameterInfo[] paramInfo = GetParameters<TDelegate>();
-                    parameters = paramInfo.Length < 2 ? Array.Empty<Type>() : new Type[paramInfo.Length - 1];
+                    parameters = paramInfo.Length < 2 ? Type.EmptyTypes : new Type[paramInfo.Length - 1];
                     for (int i = 0; i < parameters.Length; ++i)
                         parameters[i] = paramInfo[i + 1].ParameterType;
                 }
@@ -835,7 +1052,8 @@ public static class Accessor
                 if (throwOnError)
                     throw new Exception($"Unable to find matching instance method: {typeof(TInstance).FullName}.{methodName}.");
 
-                Logger.LogError($"Unable to find matching instance method: {FormattingUtil.FormatMethod<TDelegate>(methodName, declTypeOverride: typeof(TInstance))}.");
+                if (LogErrorMessages)
+                    Logger.LogError($"Unable to find matching instance method: {FormattingUtil.FormatMethod<TDelegate>(methodName, declTypeOverride: typeof(TInstance))}.", method: source);
                 return null;
             }
         }
@@ -849,18 +1067,21 @@ public static class Accessor
     /// <remarks>The first parameter will be the instance.</remarks>
     /// <returns>A delegate of type <see cref="Action"/> or <see cref="Func{T}"/> (or one of their generic counterparts), depending on the method signature. The first parameter will be the instance.</returns>
     /// <param name="allowUnsafeTypeBinding">Enables unsafe type binding to non-matching delegates, meaning classes of different
-    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).</param>
+    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).
+    /// This also must be <see langword="true"/> to not null-check instance methods of parameter-less reference types with a dynamic method.</param>
     /// <param name="method">Method that will be called.</param>
     /// <param name="throwOnError">Throw an error instead of writing to console and returning <see langword="null"/>.</param>
     /// <remarks>Will never return <see langword="null"/> if <paramref name="throwOnError"/> is <see langword="true"/>.</remarks>
     [Pure]
     public static Delegate? GenerateInstanceCaller(MethodInfo method, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
     {
+        const string source = "Accessor.GenerateInstanceCaller";
         if (method == null || method.IsStatic || method.DeclaringType == null)
         {
             if (throwOnError)
                 throw new Exception("Unable to find instance method.");
-            Logger.LogError("Unable to find instance method.");
+            if (LogErrorMessages)
+                Logger.LogError("Unable to find instance method.", method: source);
             return null;
         }
 
@@ -874,7 +1095,8 @@ public static class Accessor
             if (throwOnError)
                 throw new ArgumentException($"Method {method.DeclaringType.FullName}.{method.Name} can not have more than {maxArgs} arguments!", nameof(method));
 
-            Logger.LogError($"Method {method.Format()} can not have more than {maxArgs.Format()} arguments!");
+            if (LogErrorMessages)
+                Logger.LogError($"Method {method.Format()} can not have more than {maxArgs.Format()} arguments!", method: source);
             return null;
         }
 
@@ -887,7 +1109,8 @@ public static class Accessor
     /// </summary>
     /// <remarks>The first parameter will be the instance.</remarks>
     /// <param name="allowUnsafeTypeBinding">Enables unsafe type binding to non-matching delegates, meaning classes of different
-    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).</param>
+    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).
+    /// This also must be <see langword="true"/> to not null-check instance methods of parameter-less reference types with a dynamic method.</param>
     /// <param name="method">Method that will be called.</param>
     /// <param name="throwOnError">Throw an error instead of writing to console and returning <see langword="null"/>.</param>
     /// <remarks>Will never return <see langword="null"/> if <paramref name="throwOnError"/> is <see langword="true"/>.</remarks>
@@ -903,20 +1126,23 @@ public static class Accessor
     /// <remarks>The first parameter will be the instance.</remarks>
     /// <param name="delegateType">Type of delegate to return.</param>
     /// <param name="allowUnsafeTypeBinding">Enables unsafe type binding to non-matching delegates, meaning classes of different
-    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).</param>
+    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).
+    /// This also must be <see langword="true"/> to not null-check instance methods of parameter-less reference types with a dynamic method.</param>
     /// <param name="method">Method that will be called.</param>
     /// <param name="throwOnError">Throw an error instead of writing to console and returning <see langword="null"/>.</param>
     /// <remarks>Will never return <see langword="null"/> if <paramref name="throwOnError"/> is <see langword="true"/>.</remarks>
     [Pure]
     public static Delegate? GenerateInstanceCaller(Type delegateType, MethodInfo method, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
     {
+        const string source = "Accessor.GenerateInstanceCaller";
         if (!typeof(Delegate).IsAssignableFrom(delegateType))
-            throw new ArgumentException(delegateType.Name + " is not a delegate.", nameof(delegateType));
+            throw new ArgumentException(delegateType.FullName + " is not a delegate.", nameof(delegateType));
         if (method == null || method.IsStatic || method.DeclaringType == null)
         {
             if (throwOnError)
-                throw new Exception($"Unable to find instance method for delegate: {delegateType.Name}.");
-            Logger.LogError($"Unable to find matching instance method: {FormattingUtil.FormatMethod(delegateType, "<unknown-name>", isStatic: false)}.");
+                throw new Exception($"Unable to find instance method for delegate: {delegateType.FullName}.");
+            if (LogErrorMessages)
+                Logger.LogError($"Unable to find matching instance method: {FormattingUtil.FormatMethod(delegateType, "<unknown-name>", isStatic: false)}.", method: source);
             return null;
         }
 
@@ -926,18 +1152,27 @@ public static class Accessor
         MethodInfo invokeMethod = delegateType.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.Public)!;
         ParameterInfo[] delegateParameters = invokeMethod.GetParameters();
         Type delegateReturnType = invokeMethod.ReturnType;
-        bool needsDynamicMethod = method.ShouldCallvirtRuntime() || method.ReturnType != typeof(void) && delegateReturnType == typeof(void);
+        bool shouldCallvirt = method.ShouldCallvirtRuntime();
+        bool needsDynamicMethod = shouldCallvirt || (!instance.IsValueType && !allowUnsafeTypeBinding) || method.ReturnType != typeof(void) && delegateReturnType == typeof(void);
         bool isInstanceForValueType = method is { DeclaringType.IsValueType: true };
+        shouldCallvirt |= !instance.IsValueType;
+
+        // for some reason invoking a delegate with zero parameters and a null instance does not throw an exception.
+        // Adding parameters changes this behavior.
+        if (!isInstanceForValueType && p.Length == 0 && !allowUnsafeTypeBinding)
+            needsDynamicMethod = true;
+
         if (p.Length != delegateParameters.Length - 1)
         {
             if (throwOnError)
-                throw new Exception("Unable to create instance caller for " + (method.DeclaringType?.Name ?? "<unknown-type>") + "." + (method.Name ?? "<unknown-name>") + $": incompatable delegate type: {delegateType.Name}.");
+                throw new Exception($"Unable to create instance caller for {instance.FullName}.{method.Name}: incompatable delegate type: {delegateType.FullName}.");
 
-            Logger.LogError($"Unable to create instance caller for {method.Format()}: incompatable delegate type: {delegateType.Format()}.");
+            if (LogErrorMessages)
+                Logger.LogError($"Unable to create instance caller for {method.Format()}: incompatable delegate type: {delegateType.Format()}.", method: source);
             return null;
         }
 
-        if (needsDynamicMethod && method.DeclaringType.IsInterface && !delegateParameters[0].ParameterType.IsInterface)
+        if (needsDynamicMethod && instance.IsInterface && !delegateParameters[0].ParameterType.IsInterface)
             needsDynamicMethod = false;
 
         // exact match
@@ -957,29 +1192,32 @@ public static class Accessor
                 try
                 {
                     Delegate basicDelegate = method.CreateDelegate(delegateType);
-                    Logger.LogDebug($"Created instance delegate caller for {method.Format()} of type {delegateType.Format()}.");
+                    if (LogDebugMessages || LogILTraceMessages)
+                        Logger.LogDebug($"[{source}] Created instance delegate caller for {method.Format()} of type {delegateType.Format()}.");
                     return basicDelegate;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // ignored
+                    if (LogDebugMessages || LogILTraceMessages)
+                    {
+                        Logger.LogDebug($"[{source}] Unable to create basic delegate binding instance caller for {method.Format()}.");
+                        Logger.LogDebug($"[{source}] {ex.GetType().Format()} - {ex.Message.Format(false)}");
+                    }
                 }
             }
         }
 
-        if (isInstanceForValueType && delegateParameters[0].ParameterType != typeof(object)
-#if NET471_OR_GREATER
-                                   && !method.HasAttributeSafe<IsReadOnlyAttribute>()
-#endif
-                                   )
+        if (isInstanceForValueType && delegateParameters[0].ParameterType != typeof(object) && !method.IsReadOnly())
         {
             if (throwOnError)
-                throw new Exception($"Unable to create instance caller for {method.DeclaringType?.Name ?? "<unknown-type>"}.{method.Name ?? "<unknown-name>"} (non-readonly), you must pass structs ({instance.FullName}) as a boxed object (in {delegateType.FullName}).");
+                throw new Exception($"Unable to create instance caller for {instance}.{method.Name} (non-readonly), you must pass structs ({instance.FullName}) as a boxed object (in {delegateType.FullName}).");
 
-            Logger.LogError($"Unable to create instance caller for {method.Format()} (non-readonly), you must pass structs ({instance.Format()}) as a boxed object (in {delegateType.Format()}).");
+            if (LogErrorMessages)
+                Logger.LogError($"Unable to create instance caller for {method.Format()} (non-{"readonly".Colorize(FormattingColorType.Keyword)}), you must pass structs ({instance.Format()}) as a boxed object (in {delegateType.Format()}).", method: source);
             return null;
         }
 
+#if !NET6_0_OR_GREATER // unsafe type binding doesn't work past .NET 5.0
         // rough match, can unsafely cast to actual function arguments.
         if (allowUnsafeTypeBinding && !isInstanceForValueType && !needsDynamicMethod && !instance.IsValueType && delegateParameters[0].ParameterType.IsAssignableFrom(instance) && (method.ReturnType == typeof(void) && delegateReturnType == typeof(void) || !method.ReturnType.IsValueType && delegateReturnType.IsAssignableFrom(method.ReturnType)))
         {
@@ -994,21 +1232,29 @@ public static class Accessor
             }
             if (!foundIncompatibleConversion)
             {
+#line hidden
                 try
                 {
                     IntPtr ptr = method.MethodHandle.GetFunctionPointer();
                     // running the debugger here will crash the program so... don't.
                     object d2 = FormatterServices.GetUninitializedObject(delegateType);
                     delegateType.GetConstructors()[0].Invoke(d2, new object[] { null!, ptr });
-                    Logger.LogDebug($"Created instance delegate caller for {method.Format()} (using unsafe type binding) of type {delegateType.Format()}.");
+                    if (LogDebugMessages || LogILTraceMessages)
+                        Logger.LogDebug($"[{source}] Created instance delegate caller for {method.Format()} (using unsafe type binding) of type {delegateType.Format()}.");
                     return (Delegate)d2;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // ignored
+                    if (LogDebugMessages || LogILTraceMessages)
+                    {
+                        Logger.LogDebug($"[{source}] Unable to create unsafely binded delegate binding instance caller for {method.Format()}.");
+                        Logger.LogDebug($"[{source}] {ex.GetType().Format()} - {ex.Message.Format(false)}");
+                    }
                 }
+#line default
             }
         }
+#endif
 
         // generate dynamic method as a worst-case scenerio
         Type[] parameterTypes = new Type[delegateParameters.Length];
@@ -1022,7 +1268,7 @@ public static class Accessor
         for (int i = 0; i < p.Length; ++i)
             dynMethod.DefineParameter(i + 2, p[i].Attributes, p[i].Name);
 
-        IOpCodeEmitter generator = dynMethod.GetILGenerator().AsEmitter();
+        IOpCodeEmitter generator = CreateEmitter(dynMethod, source);
 
         if (instance.IsValueType)
         {
@@ -1036,9 +1282,12 @@ public static class Accessor
         else generator.Emit(OpCodes.Ldarg_0);
 
         for (int i = 0; i < p.Length; ++i)
-            generator.LoadParameter(i + 1, false, type: parameterTypes[i + 1], p[i].ParameterType);
+        {
+            generator.EmitParameter(source, i + 1, $"Invalid argument type passed to instance caller for {instance.FullName}.{method.Name} at parameter {i.ToString(CultureInfo.InvariantCulture)} ({p[i].Name}). " +
+                                                   $"Expected {p[i].ParameterType.FullName}.", false, type: parameterTypes[i + 1], p[i].ParameterType);
+        }
 
-        generator.Emit(method.GetCallRuntime(), method);
+        generator.Emit(shouldCallvirt ? OpCodes.Callvirt : OpCodes.Call, method);
         if (method.ReturnType != typeof(void) && delegateReturnType == typeof(void))
             generator.Emit(OpCodes.Pop);
         else if (method.ReturnType != typeof(void))
@@ -1065,16 +1314,20 @@ public static class Accessor
         try
         {
             Delegate dynamicDelegate = dynMethod.CreateDelegate(delegateType);
-            Logger.LogDebug($"Created dynamic instance caller for {method.Format()} of type {delegateType.Format()}.");
+            if (LogDebugMessages || LogILTraceMessages)
+                Logger.LogDebug($"[{source}] Created dynamic instance caller for {method.Format()} of type {delegateType.Format()}.");
             return dynamicDelegate;
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Unable to create instance caller for {method.Format()}.");
             if (throwOnError)
                 throw;
 
-            Logger.LogError(ex);
+            if (LogErrorMessages)
+            {
+                Logger.LogError($"Unable to create instance caller for {method.Format()}.", method: source);
+                Logger.LogError(ex);
+            }
             return null;
         }
     }
@@ -1083,7 +1336,8 @@ public static class Accessor
     /// Generates a delegate or dynamic method that calls a static method.
     /// </summary>
     /// <param name="allowUnsafeTypeBinding">Enables unsafe type binding to non-matching delegates, meaning classes of different
-    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).</param>
+    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).
+    /// This also must be <see langword="true"/> to not null-check instance methods of parameter-less reference types with a dynamic method.</param>
     /// <returns>A delegate of type <see cref="Action"/> or <see cref="Func{T}"/> (or one of their generic counterparts), depending on the method signature.</returns>
     /// <param name="methodName">Name of method that will be called.</param>
     /// <param name="parameters">Optional parameter list for resolving ambiguous methods.</param>
@@ -1092,6 +1346,7 @@ public static class Accessor
     [Pure]
     public static Delegate? GenerateStaticCaller<TDeclaringType>(string methodName, Type[]? parameters = null, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
     {
+        const string source = "Accessor.GenerateStaticCaller";
         MethodInfo? method = null;
         try
         {
@@ -1113,7 +1368,7 @@ public static class Accessor
                 if (throwOnError)
                     throw new Exception($"Unable to find matching static method: {typeof(TDeclaringType).FullName}.{methodName}.");
 
-                Logger.LogError($"Unable to find matching static method: {FormattingUtil.FormatMethod(null, typeof(TDeclaringType), methodName, null, parameters, null, isStatic: true)}.");
+                Logger.LogError($"Unable to find matching static method: {FormattingUtil.FormatMethod(null, typeof(TDeclaringType), methodName, null, parameters, null, isStatic: true)}.", method: source);
                 return null;
             }
         }
@@ -1125,7 +1380,8 @@ public static class Accessor
     /// Generates a delegate or dynamic method that calls a static method.
     /// </summary>
     /// <param name="allowUnsafeTypeBinding">Enables unsafe type binding to non-matching delegates, meaning classes of different
-    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).</param>
+    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).
+    /// This also must be <see langword="true"/> to not null-check instance methods of parameter-less reference types with a dynamic method.</param>
     /// <param name="methodName">Name of method that will be called.</param>
     /// <param name="parameters">Optional parameter list for resolving ambiguous methods.</param>
     /// <param name="throwOnError">Throw an error instead of writing to console and returning <see langword="null"/>.</param>
@@ -1133,6 +1389,7 @@ public static class Accessor
     [Pure]
     public static TDelegate? GenerateStaticCaller<TDeclaringType, TDelegate>(string methodName, bool throwOnError = false, bool allowUnsafeTypeBinding = false, Type[]? parameters = null) where TDelegate : Delegate
     {
+        const string source = "Accessor.GenerateStaticCaller";
         MethodInfo? method = null;
         try
         {
@@ -1158,7 +1415,7 @@ public static class Accessor
                 if (throwOnError)
                     throw new Exception($"Unable to find matching static method: {typeof(TDeclaringType).FullName}.{methodName}.");
 
-                Logger.LogError($"Unable to find matching static method: {FormattingUtil.FormatMethod<TDelegate>(methodName, declTypeOverride: typeof(TDeclaringType), isStatic: true)}.");
+                Logger.LogError($"Unable to find matching static method: {FormattingUtil.FormatMethod<TDelegate>(methodName, declTypeOverride: typeof(TDeclaringType), isStatic: true)}.", method: source);
                 return null;
             }
         }
@@ -1170,7 +1427,8 @@ public static class Accessor
     /// Generates a delegate or dynamic method that calls a static method.
     /// </summary>
     /// <param name="allowUnsafeTypeBinding">Enables unsafe type binding to non-matching delegates, meaning classes of different
-    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).</param>
+    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).
+    /// This also must be <see langword="true"/> to not null-check instance methods of parameter-less reference types with a dynamic method.</param>
     /// <returns>A delegate of type <see cref="Action"/> or <see cref="Func{T}"/> (or one of their generic counterparts), depending on the method signature.</returns>
     /// <param name="method">Method that will be called.</param>
     /// <param name="throwOnError">Throw an error instead of writing to console and returning <see langword="null"/>.</param>
@@ -1178,11 +1436,12 @@ public static class Accessor
     [Pure]
     public static Delegate? GenerateStaticCaller(MethodInfo method, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
     {
+        const string source = "Accessor.GenerateStaticCaller";
         if (method == null || !method.IsStatic)
         {
             if (throwOnError)
                 throw new Exception("Unable to find static method.");
-            Logger.LogError("Unable to find static method.");
+            Logger.LogError("Unable to find static method.", method: source);
             return null;
         }
 
@@ -1196,7 +1455,7 @@ public static class Accessor
             if (throwOnError)
                 throw new ArgumentException("Method can not have more than " + maxArgs + " arguments!", nameof(method));
 
-            Logger.LogError("Method " + method.Format() + " can not have more than " + maxArgs.Format() + " arguments!");
+            Logger.LogError("Method " + method.Format() + " can not have more than " + maxArgs.Format() + " arguments!", method: source);
             return null;
         }
 
@@ -1208,7 +1467,8 @@ public static class Accessor
     /// Generates a delegate or dynamic method that calls a static method.
     /// </summary>
     /// <param name="allowUnsafeTypeBinding">Enables unsafe type binding to non-matching delegates, meaning classes of different
-    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).</param>
+    /// types can be passed as parameters and an exception will not be thrown (may cause unintended behavior if the wrong type is passed).
+    /// This also must be <see langword="true"/> to not null-check instance methods of parameter-less reference types with a dynamic method.</param>
     /// <param name="method">Method that will be called.</param>
     /// <param name="throwOnError">Throw an error instead of writing to console and returning <see langword="null"/>.</param>
     /// <remarks>Will never return <see langword="null"/> if <paramref name="throwOnError"/> is <see langword="true"/>.</remarks>
@@ -1230,6 +1490,7 @@ public static class Accessor
     [Pure]
     public static Delegate? GenerateStaticCaller(Type delegateType, MethodInfo method, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
     {
+        const string source = "Accessor.GenerateStaticCaller";
         if (!typeof(Delegate).IsAssignableFrom(delegateType))
             throw new ArgumentException(delegateType.FullName + " is not a delegate.", nameof(delegateType));
 
@@ -1237,7 +1498,9 @@ public static class Accessor
         {
             if (throwOnError)
                 throw new Exception($"Unable to find static method for delegate: {delegateType.Name}.");
-            Logger.LogError($"Unable to find matching static method: {FormattingUtil.FormatMethod(delegateType, "<unknown-name>", isStatic: true)}.");
+
+            if (LogErrorMessages)
+                Logger.LogError($"Unable to find matching static method: {FormattingUtil.FormatMethod(delegateType, "<unknown-name>", isStatic: true)}.", method: source);
             return null;
         }
 
@@ -1250,9 +1513,10 @@ public static class Accessor
         if (p.Length != delegateParameters.Length)
         {
             if (throwOnError)
-                throw new Exception("Unable to create static caller for " + (method.DeclaringType?.Name ?? "<unknown-type>") + "." + (method.Name ?? "<unknown-name>") + $": incompatable delegate type: {delegateType.Name}.");
+                throw new Exception("Unable to create static caller for " + (method.DeclaringType?.FullName ?? "<unknown-type>") + "." + (method.Name ?? "<unknown-name>") + $": incompatable delegate type: {delegateType.FullName}.");
 
-            Logger.LogError($"Unable to create static caller for {method.Format()}: incompatable delegate type: {delegateType.Format()}.");
+            if (LogErrorMessages)
+                Logger.LogError($"Unable to create static caller for {method.Format()}: incompatable delegate type: {delegateType.Format()}.", method: source);
             return null;
         }
 
@@ -1273,16 +1537,21 @@ public static class Accessor
                 try
                 {
                     Delegate basicDelegate = method.CreateDelegate(delegateType);
-                    Logger.LogDebug($"Created static delegate caller for {method.Format()} of type {delegateType.Format()}.");
+                    if (LogDebugMessages || LogILTraceMessages)
+                        Logger.LogDebug($"[{source}] Created static delegate caller for {method.Format()} of type {delegateType.Format()}.");
                     return basicDelegate;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // ignored
+                    if (LogDebugMessages || LogILTraceMessages)
+                    {
+                        Logger.LogDebug($"[{source}] Unable to create basic delegate binding static caller for {method.DeclaringType?.FullName ?? "<unknown-type>"}.{method.Name}.");
+                        Logger.LogDebug($"[{source}] {ex.GetType().Format()} - {ex.Message.Format(false)}");
+                    }
                 }
             }
         }
-
+#if !NET6_0_OR_GREATER // unsafe type binding doesn't work past .NET 5.0
         // rough match, can unsafely cast to actual function arguments.
         if (!needsDynamicMethod && allowUnsafeTypeBinding && (method.ReturnType == typeof(void) && delegateReturnType == typeof(void) || !method.ReturnType.IsValueType && delegateReturnType.IsAssignableFrom(method.ReturnType)))
         {
@@ -1297,21 +1566,29 @@ public static class Accessor
             }
             if (!foundIncompatibleConversion)
             {
+#line hidden
                 try
                 {
                     IntPtr ptr = method.MethodHandle.GetFunctionPointer();
                     // running the debugger here will crash the program so... don't.
                     object d2 = FormatterServices.GetUninitializedObject(delegateType);
                     delegateType.GetConstructors()[0].Invoke(d2, new object[] { null!, ptr });
-                    Logger.LogDebug($"Created static delegate caller for {method.Format()} (using unsafe type binding) of type {delegateType.Format()}.");
+                    if (LogDebugMessages || LogILTraceMessages)
+                        Logger.LogDebug($"[{source}] Created static delegate caller for {method.Format()} (using unsafe type binding) of type {delegateType.Format()}.");
                     return (Delegate)d2;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // ignored
+                    if (LogDebugMessages || LogILTraceMessages)
+                    {
+                        Logger.LogDebug($"[{source}] Unable to create unsafely binded delegate binding static caller for {method.DeclaringType?.Name ?? "<unknown-type>"}.{method.Name}.");
+                        Logger.LogDebug($"[{source}] {ex.GetType().Format()} - {ex.Message.Format()}");
+                    }
                 }
+#line default
             }
         }
+#endif
 
         // generate dynamic method as a worst-case scenerio
         Type[] parameterTypes = new Type[delegateParameters.Length];
@@ -1324,10 +1601,11 @@ public static class Accessor
         for (int i = 0; i < p.Length; ++i)
             dynMethod.DefineParameter(i + 1, p[i].Attributes, p[i].Name);
 
-        IOpCodeEmitter generator = dynMethod.GetILGenerator().AsEmitter();
+        IOpCodeEmitter generator = CreateEmitter(dynMethod, source);
 
         for (int i = 0; i < p.Length; ++i)
-            generator.LoadParameter(i, false, type: parameterTypes[i], p[i].ParameterType);
+            generator.EmitParameter(source, i, $"Invalid argument type passed to static caller for {method.DeclaringType?.Name ?? "<unknown-type>"}.{method.Name} at parameter {i.ToString(CultureInfo.InvariantCulture)} ({p[i].Name}). " +
+                                               $"Expected {p[i].ParameterType.FullName}.", false, type: parameterTypes[i], p[i].ParameterType);
 
         generator.Emit(OpCodes.Call, method);
         if (method.ReturnType != typeof(void) && delegateReturnType == typeof(void))
@@ -1357,16 +1635,20 @@ public static class Accessor
         try
         {
             Delegate dynamicDelegate = dynMethod.CreateDelegate(delegateType);
-            Logger.LogDebug($"Created dynamic static caller for {method.Format()} of type {delegateType.Format()}.");
+            if (LogDebugMessages)
+                Logger.LogDebug($"[{source}] Created dynamic static caller for {method.Format()} of type {delegateType.Format()}.");
             return dynamicDelegate;
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Unable to create static caller for {method.Format()}.");
             if (throwOnError)
-                throw;
+                throw new Exception($"Unable to create static caller for {method.DeclaringType?.FullName ?? "<unknown-type>"}.{method.Name}.", ex);
 
-            Logger.LogError(ex);
+            if (LogErrorMessages)
+            {
+                Logger.LogError($"Unable to create static caller for {method.Format()}.", method: source);
+                Logger.LogError(ex);
+            }
             return null;
         }
     }
@@ -1396,7 +1678,6 @@ public static class Accessor
     {
         if (IsServerGetter == null || IsEditorGetter == null)
         {
-            Logger.LogError("IsServer: " + (IsServerGetter != null) + ", IsEditor: " + (IsEditorGetter != null) + ".");
             foreach (CodeInstruction instr in instructions)
                 yield return instr;
 
@@ -1412,9 +1693,9 @@ public static class Accessor
                 yield return new CodeInstruction(OpCodes.Or);
                 yield return new CodeInstruction(OpCodes.Not);
                 if (__method != null)
-                    Logger.LogDebug("Inserted editor call to " + __method.Format() + ".");
+                    Logger.LogDebug("[Accessor.AddIsEditorCall] Inserted editor call to " + __method.Format() + ".");
                 else
-                    Logger.LogDebug("Inserted editor call to unknown method.");
+                    Logger.LogDebug("[Accessor.AddIsEditorCall] Inserted editor call to unknown method.");
             }
             else
                 yield return instr;
@@ -1427,7 +1708,7 @@ public static class Accessor
     {
         if (method == null)
         {
-            Logger.LogError("Error adding function stepthrough to method, not found.");
+            Logger.LogError("Error adding function stepthrough to method, not found.", method: "Accessor.AddFunctionStepthrough");
             return false;
         }
         try
@@ -1435,12 +1716,12 @@ public static class Accessor
             PatchesMain.Patcher.Patch(method,
                 transpiler: new HarmonyMethod(typeof(Accessor).GetMethod(nameof(AddFunctionStepthroughTranspiler),
                     BindingFlags.NonPublic | BindingFlags.Static)));
-            Logger.LogInfo($"Added stepthrough to: {method.Format()}.");
+            Logger.LogInfo($"[Accessor.AddFunctionStepthrough] Added stepthrough to: {method.Format()}.");
             return true;
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error adding function stepthrough to {method.Format()}.");
+            Logger.LogError($"[Accessor.AddFunctionStepthrough] Error adding function stepthrough to {method.Format()}.");
             Logger.LogError(ex);
             return false;
         }
@@ -1452,7 +1733,7 @@ public static class Accessor
     {
         if (method == null)
         {
-            Logger.LogError("Error adding function IO logging to method, not found.");
+            Logger.LogError("Error adding function IO logging to method, not found.", method: "Accessor.AddFunctionIOLogging");
             return false;
         }
         try
@@ -1460,12 +1741,12 @@ public static class Accessor
             PatchesMain.Patcher.Patch(method,
                 transpiler: new HarmonyMethod(typeof(Accessor).GetMethod(nameof(AddFunctionIOTranspiler),
                     BindingFlags.NonPublic | BindingFlags.Static)));
-            Logger.LogInfo($"Added function IO logging to: {method.Format()}.");
+            Logger.LogInfo($"[Accessor.AddFunctionIOLogging] Added function IO logging to: {method.Format()}.");
             return true;
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error adding function IO logging to {method.Format()}.");
+            Logger.LogError($"[Accessor.AddFunctionIOLogging] Error adding function IO logging to {method.Format()}.");
             Logger.LogError(ex);
             return false;
         }
@@ -1475,7 +1756,7 @@ public static class Accessor
     {
         yield return new CodeInstruction(OpCodes.Ldstr, "In method: " + method.Format() + " (basic entry)");
         yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
-        yield return new CodeInstruction(LogDebug.GetCallRuntime(), LogDebug);
+        yield return new CodeInstruction(LogInfo.GetCallRuntime(), LogInfo);
 
         foreach (CodeInstruction instr in instructions)
         {
@@ -1485,7 +1766,7 @@ public static class Accessor
                 PatchUtil.TransferStartingInstructionNeeds(instr, logInstr);
                 yield return logInstr;
                 yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
-                yield return new CodeInstruction(LogDebug.GetCallRuntime(), LogDebug);
+                yield return new CodeInstruction(LogInfo.GetCallRuntime(), LogInfo);
             }
             yield return instr;
         }
@@ -1498,10 +1779,11 @@ public static class Accessor
     }
     internal static void AddFunctionStepthrough(List<CodeInstruction> ins, MethodBase method)
     {
-        ins.Add(new CodeInstruction(OpCodes.Ldstr, "Stepping through Method: " + method.Format() + ":"));
-        ins.Add(new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green));
-        ins.Add(new CodeInstruction(LogDebug.GetCallRuntime(), LogDebug));
-        for (int i = 0; i < ins.Count; i++)
+        ins.Insert(0, new CodeInstruction(OpCodes.Ldstr, "Stepping through Method: " + method.Format() + ":"));
+        ins.Insert(1, new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green));
+        ins.Insert(2, new CodeInstruction(LogInfo.GetCallRuntime(), LogInfo));
+        ins[0].WithStartingInstructionNeeds(ins[3]);
+        for (int i = 3; i < ins.Count; i++)
         {
             CodeInstruction instr = ins[i];
             CodeInstruction? start = null;
@@ -1511,7 +1793,7 @@ public static class Accessor
                 start ??= blockInst;
                 ins.Insert(i, blockInst);
                 ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green));
-                ins.Insert(i + 2, new CodeInstruction(LogDebug.GetCallRuntime(), LogDebug));
+                ins.Insert(i + 2, new CodeInstruction(LogInfo.GetCallRuntime(), LogInfo));
                 i += 3;
             }
 
@@ -1521,7 +1803,7 @@ public static class Accessor
                 start ??= lblInst;
                 ins.Insert(i, lblInst);
                 ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green));
-                ins.Insert(i + 2, new CodeInstruction(LogDebug.GetCallRuntime(), LogDebug));
+                ins.Insert(i + 2, new CodeInstruction(LogInfo.GetCallRuntime(), LogInfo));
                 i += 3;
             }
 
@@ -1529,7 +1811,7 @@ public static class Accessor
             start ??= mainInst;
             ins.Insert(i, mainInst);
             ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green));
-            ins.Insert(i + 2, new CodeInstruction(LogDebug.GetCallRuntime(), LogDebug));
+            ins.Insert(i + 2, new CodeInstruction(LogInfo.GetCallRuntime(), LogInfo));
             i += 3;
 
             PatchUtil.TransferStartingInstructionNeeds(instr, start);
@@ -1622,6 +1904,7 @@ public static class Accessor
     /// <summary>
     /// Checks for the the attribute of type <typeparamref name="TAttribute"/> on <paramref name="member"/>.
     /// </summary>
+    /// <remarks>Implementation of <see cref="ICustomAttributeProvider.IsDefined"/>.</remarks>
     [Pure]
     public static bool HasAttributeSafe<TAttribute>(this ICustomAttributeProvider member, bool inherit = false) where TAttribute : Attribute => member.HasAttributeSafe(typeof(TAttribute), inherit);
 
@@ -1632,6 +1915,7 @@ public static class Accessor
     /// <param name="attributeType">Type of the attribute to check for.</param>
     /// <param name="inherit">Also check parent members.</param>
     /// <exception cref="ArgumentException"><paramref name="attributeType"/> did not derive from <see cref="Attribute"/>.</exception>
+    /// <remarks>Implementation of <see cref="ICustomAttributeProvider.IsDefined"/>.</remarks>
     [Pure]
     public static bool HasAttributeSafe(this ICustomAttributeProvider member, Type attributeType, bool inherit = false)
     {
@@ -1639,12 +1923,18 @@ public static class Accessor
         {
             return member.IsDefined(attributeType, inherit);
         }
-        catch (TypeLoadException)
+        catch (TypeLoadException ex)
         {
+            if (LogDebugMessages)
+                LogTypeLoadException(ex, "Accessor.HasAttributeSafe", $"Failed to check {member.Format()} for attribute {attributeType.Format()}.");
+
             return false;
         }
-        catch (FileNotFoundException)
+        catch (FileNotFoundException ex)
         {
+            if (LogDebugMessages)
+                LogFileNotFoundException(ex, "Accessor.HasAttributeSafe", $"Failed to check {member.Format()} for attribute {attributeType.Format()}.");
+
             return false;
         }
     }
@@ -1655,7 +1945,8 @@ public static class Accessor
     /// <param name="inherit">Also check parent members.</param>
     /// <param name="member">Member to check for attributes. This can be <see cref="Module"/>, <see cref="Assembly"/>, <see cref="MemberInfo"/>, or <see cref="ParameterInfo"/>.</param>
     /// <typeparam name="TAttribute">Type of the attribute to check for.</typeparam>
-    /// <exception cref="AmbiguousMatchException">There are more than one attributes of type <paramref name="attributeType"/>.</exception>
+    /// <exception cref="AmbiguousMatchException">There are more than one attributes of type <typeparamref name="TAttribute"/>.</exception>
+    /// <remarks>Implementation of <see cref="Attribute.GetCustomAttribute"/>.</remarks>
     [Pure]
     public static TAttribute? GetAttributeSafe<TAttribute>(this ICustomAttributeProvider member, bool inherit = false) where TAttribute : Attribute
         => member.GetAttributeSafe(typeof(TAttribute), inherit) as TAttribute;
@@ -1668,6 +1959,7 @@ public static class Accessor
     /// <param name="inherit">Also check parent members.</param>
     /// <exception cref="ArgumentException"><paramref name="attributeType"/> did not derive from <see cref="Attribute"/>.</exception>
     /// <exception cref="AmbiguousMatchException">There are more than one attributes of type <paramref name="attributeType"/>.</exception>
+    /// <remarks>Implementation of <see cref="Attribute.GetCustomAttribute"/>.</remarks>
     [Pure]
     public static Attribute? GetAttributeSafe(this ICustomAttributeProvider member, Type attributeType, bool inherit = false)
     {
@@ -1689,16 +1981,22 @@ public static class Accessor
                         return null;
                     if (attributes.Length > 1)
                         throw new AmbiguousMatchException($"Multiple attributes of type {attributeType.FullName}.");
-                    
+
                     return attributes[0] as Attribute;
             }
         }
-        catch (TypeLoadException)
+        catch (TypeLoadException ex)
         {
+            if (LogDebugMessages)
+                LogTypeLoadException(ex, "Accessor.GetAttributeSafe", $"Failed to get an attribute of type {attributeType.Format()} from {member.Format()}.");
+
             return null;
         }
-        catch (FileNotFoundException)
+        catch (FileNotFoundException ex)
         {
+            if (LogDebugMessages)
+                LogFileNotFoundException(ex, "Accessor.GetAttributeSafe", $"Failed to get an attribute of type {attributeType.Format()} from {member.Format()}.");
+
             return null;
         }
     }
@@ -1709,6 +2007,7 @@ public static class Accessor
     /// <param name="inherit">Also check parent members.</param>
     /// <param name="member">Member to check for attributes. This can be <see cref="Module"/>, <see cref="Assembly"/>, <see cref="MemberInfo"/>, or <see cref="ParameterInfo"/>.</param>
     /// <typeparam name="TAttribute">Type of the attribute to check for.</typeparam>
+    /// <remarks>Implementation of <see cref="ICustomAttributeProvider.GetCustomAttributes"/>.</remarks>
     [Pure]
     public static TAttribute[] GetAttributesSafe<TAttribute>(this ICustomAttributeProvider member, bool inherit = false) where TAttribute : Attribute
         => (TAttribute[])member.GetAttributesSafe(typeof(TAttribute), inherit);
@@ -1720,6 +2019,7 @@ public static class Accessor
     /// <param name="attributeType">Type of the attribute to check for.</param>
     /// <param name="inherit">Also check parent members.</param>
     /// <exception cref="ArgumentException"><paramref name="attributeType"/> did not derive from <see cref="Attribute"/>.</exception>
+    /// <remarks>Implementation of <see cref="ICustomAttributeProvider.GetCustomAttributes"/>.</remarks>
     [Pure]
     public static Attribute[] GetAttributesSafe(this ICustomAttributeProvider member, Type attributeType, bool inherit = false)
     {
@@ -1748,11 +2048,23 @@ public static class Accessor
                 return array2;
             }
         }
-        catch (TypeLoadException) { }
-        catch (FileNotFoundException) { }
+        catch (TypeLoadException ex)
+        {
+            if (LogDebugMessages)
+                LogTypeLoadException(ex, "Accessor.GetAttributesSafe", $"Failed to get attributes of type {attributeType.Format()} from {member.Format()}.");
+        }
+        catch (FileNotFoundException ex)
+        {
+            if (LogDebugMessages)
+                LogFileNotFoundException(ex, "Accessor.GetAttributesSafe", $"Failed to get attributes of type {attributeType.Format()} from {member.Format()}.");
+        }
 
         return attributeType == typeof(Attribute)
+#if NET461_OR_GREATER || !NETFRAMEWORK
             ? Array.Empty<Attribute>()
+#else
+            ? new Attribute[0]
+#endif
             : (Attribute[])Array.CreateInstance(attributeType, 0);
     }
 
@@ -1763,11 +2075,38 @@ public static class Accessor
     /// <param name="member">Member to check for attributes. This can be <see cref="Module"/>, <see cref="Assembly"/>, <see cref="MemberInfo"/>, or <see cref="ParameterInfo"/>.</param>
     /// <typeparam name="TAttribute">Type of the attribute to check for.</typeparam>
     /// <returns><see langword="true"/> if the attribute was found, otherwise <see langword="false"/>.</returns>
+    /// <remarks>Implementation of <see cref="ICustomAttributeProvider.GetCustomAttribute"/>.</remarks>
     [Pure]
     public static bool TryGetAttributeSafe<TAttribute>(this ICustomAttributeProvider member, out TAttribute attribute, bool inherit = false) where TAttribute : Attribute
     {
         attribute = (member.GetAttributeSafe(typeof(TAttribute), inherit) as TAttribute)!;
         return attribute != null;
+    }
+    private static void LogTypeLoadException(TypeLoadException ex, string source, string context)
+    {
+        string msg = context + $" Can't load type: {ex.TypeName}.";
+        if (ex.InnerException != null)
+            msg += "(" + ex.InnerException.GetType().Name + " | " + ex.InnerException.Message + ")";
+        Logger.LogDebug("[" + source + "] " + msg);
+    }
+    private static void LogFileNotFoundException(FileNotFoundException ex, string source, string context)
+    {
+        string msg = context + $" Missing assembly: {ex.FileName}.";
+        Logger.LogDebug("[" + source + "] " + msg);
+    }
+
+    /// <summary>
+    /// Checks for the <see cref="IsReadOnlyAttribute"/> on <paramref name="member"/>, which signifies the readonly value.
+    /// <remarks>This behavior is overridden on fields to check <see cref="FieldInfo.IsInitOnly"/>.</remarks>
+    /// </summary>
+    [Pure]
+    public static bool IsReadOnly(this ICustomAttributeProvider member)
+    {
+        if (member is FieldInfo field)
+        {
+            return field.IsInitOnly;
+        }
+        return member.HasAttributeSafe(_readonlyAttribute ??= typeof(IsReadOnlyAttribute));
     }
 
     /// <summary>
@@ -1776,9 +2115,10 @@ public static class Accessor
     /// <param name="inherit">Also check parent members.</param>
     [Pure]
     public static bool IsIgnored(this ICustomAttributeProvider member, bool inherit = false) => member.HasAttributeSafe(_ignoreAttribute ??= typeof(IgnoreAttribute), inherit);
+    private static bool IsIgnored(this Type type) => type.HasAttributeSafe(_ignoreAttribute ??= typeof(IgnoreAttribute));
 
     /// <summary>
-    /// Checks for the <see cref="PriorityAttribute"/> on <paramref name="type"/> and returns the priority (or zero if not found).
+    /// Checks for the <see cref="DanielWillett.ReflectionTools.PriorityAttribute"/> on <paramref name="type"/> and returns the priority (or zero if not found).
     /// </summary>
     [Pure]
     public static int GetPriority(this ICustomAttributeProvider member, bool inherit = true) => member.GetAttributeSafe(_priorityAttribute ??= typeof(LoadPriorityAttribute), inherit) is LoadPriorityAttribute attr ? attr.Priority : 0;
@@ -1897,7 +2237,7 @@ public static class Accessor
         type2 = type.BaseType;
 
         int level = 0;
-        for (; type2 != null && (!excludeSystemBase || type2 != typeof(object) && type2 != typeof(ValueType)); type2 = type.BaseType)
+        for (; type2 != null && (!excludeSystemBase || type2 != typeof(object) && type2 != typeof(ValueType)); type2 = type2.BaseType)
         {
             ++level;
             action(type2, level);
@@ -1924,7 +2264,7 @@ public static class Accessor
         type2 = type.BaseType;
 
         int level = 0;
-        for (; type2 != null && (!excludeSystemBase || type2 != typeof(object) && type2 != typeof(ValueType)); type2 = type.BaseType)
+        for (; type2 != null && (!excludeSystemBase || type2 != typeof(object) && type2 != typeof(ValueType)); type2 = type2.BaseType)
         {
             ++level;
             if (!action(type2, level))
@@ -1949,24 +2289,36 @@ public static class Accessor
         }
         catch (FileNotFoundException ex)
         {
-            Logger.LogWarning($"Unable to get any types from assembly {assembly.FullName.Format()}. Missing dependency: {ex.FileName.Format()}.");
+            if (LogDebugMessages)
+                LogFileNotFoundException(ex, "Accessor.GetTypesSafe", $"Unable to get any types from assembly {assembly.FullName.Format()}.");
+
             return new List<Type>(0);
         }
         catch (ReflectionTypeLoadException ex)
         {
-            types = new List<Type?>(ex.Types);
+            if (LogDebugMessages && ex.LoaderExceptions != null)
+            {
+                for (int i = 0; i < ex.LoaderExceptions.Length; ++i)
+                {
+                    if (ex.LoaderExceptions[i] is not TypeLoadException tle)
+                        continue;
+                    
+                    LogTypeLoadException(tle, "Accessor.GetTypesSafe", "Skipped type.");
+                }
+            }
+            types = ex.Types == null ? new List<Type?>(0) : new List<Type?>(ex.Types);
             removeNulls = true;
         }
 
         if (removeNulls)
         {
             if (removeIgnored)
-                types.RemoveAll(x => x == null || x.IsIgnored());
+                types.RemoveAll(x => x is null || IsIgnored(x));
             else
-                types.RemoveAll(x => x == null);
+                types.RemoveAll(x => x is null);
         }
         else if (removeIgnored)
-            types.RemoveAll(x => x!.IsIgnored());
+            types.RemoveAll(IsIgnored!);
 
         types.Sort(SortTypesByPriorityHandler!);
         return types!;
@@ -1986,11 +2338,23 @@ public static class Accessor
             }
             catch (FileNotFoundException ex)
             {
-                Logger.LogWarning($"Unable to get any types from assembly {assembly.FullName.Format()}. Missing dependency: {ex.FileName.Format()}.");
+                if (LogDebugMessages)
+                    LogFileNotFoundException(ex, "Accessor.GetTypesSafe", $"Unable to get any types from assembly \"{assembly.FullName}\".");
             }
             catch (ReflectionTypeLoadException ex)
             {
-                types.AddRange(ex.Types);
+                if (LogDebugMessages && ex.LoaderExceptions != null)
+                {
+                    for (int i = 0; i < ex.LoaderExceptions.Length; ++i)
+                    {
+                        if (ex.LoaderExceptions[i] is not TypeLoadException tle)
+                            continue;
+
+                        LogTypeLoadException(tle, "Accessor.GetTypesSafe", "Skipped type.");
+                    }
+                }
+                if (ex.Types != null)
+                    types.AddRange(ex.Types);
                 removeNulls = true;
             }
         }
@@ -1998,12 +2362,12 @@ public static class Accessor
         if (removeNulls)
         {
             if (removeIgnored)
-                types.RemoveAll(x => x == null || x.IsIgnored());
+                types.RemoveAll(x => x is null || IsIgnored(x));
             else
-                types.RemoveAll(x => x == null);
+                types.RemoveAll(x => x is null);
         }
         else if (removeIgnored)
-            types.RemoveAll(x => x!.IsIgnored());
+            types.RemoveAll(IsIgnored!);
 
         types.Sort(SortTypesByPriorityHandler!);
         return types!;
@@ -2074,37 +2438,43 @@ public static class Accessor
     /// <summary>
     /// Gets the return type of a <paramref name="delegateType"/>.
     /// </summary>
+    /// <exception cref="NotSupportedException">Reflection failure.</exception>
     [Pure]
     public static Type GetReturnType(Type delegateType)
     {
         if (!typeof(Delegate).IsAssignableFrom(delegateType))
             throw new ArgumentException(delegateType.Name + " is not a delegate type.", nameof(delegateType));
 
-        return delegateType.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!.ReturnType;
+        return delegateType.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.ReturnType
+               ?? throw new NotSupportedException($"Unable to find Invoke method in delegate {delegateType.Name}.");
     }
 
     /// <summary>
     /// Gets the parameters of a <paramref name="delegateType"/>.
     /// </summary>
+    /// <exception cref="NotSupportedException">Reflection failure.</exception>
     [Pure]
     public static ParameterInfo[] GetParameters(Type delegateType)
     {
         if (!typeof(Delegate).IsAssignableFrom(delegateType))
             throw new ArgumentException(delegateType.Name + " is not a delegate type.", nameof(delegateType));
 
-        return delegateType.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!.GetParameters();
+        return delegateType.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.GetParameters()
+               ?? throw new NotSupportedException($"Unable to find Invoke method in delegate {delegateType.Name}.");
     }
 
     /// <summary>
     /// Gets the (cached) <see langword="Invoke"/> method of a <paramref name="delegateType"/>. All delegates have one by default.
     /// </summary>
+    /// <exception cref="NotSupportedException">Reflection failure.</exception>
     [Pure]
     public static MethodInfo GetInvokeMethod(Type delegateType)
     {
         if (!typeof(Delegate).IsAssignableFrom(delegateType))
             throw new ArgumentException(delegateType.Name + " is not a delegate type.", nameof(delegateType));
 
-        return delegateType.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
+        return delegateType.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+               ?? throw new NotSupportedException($"Unable to find Invoke method in delegate {delegateType.Name}.");
     }
 
     /// <summary>
@@ -2182,6 +2552,7 @@ public static class Accessor
     /// <summary>
     /// Decide if a method should be callvirt'd instead of call'd. Usually you will use <see cref="ShouldCallvirtRuntime"/> instead as it doesn't account for possible future keyword changes.
     /// </summary>
+    /// <remarks>Note that not using call instead of callvirt may remove the check for a null instance.</remarks>
     [Pure]
     public static bool ShouldCallvirt(this MethodBase method)
     {
@@ -2191,6 +2562,7 @@ public static class Accessor
     /// <summary>
     /// Decide if a method should be callvirt'd instead of call'd at runtime. Doesn't account for future changes.
     /// </summary>
+    /// <remarks>Note that not using call instead of callvirt may remove the check for a null instance.</remarks>
     [Pure]
     public static bool ShouldCallvirtRuntime(this MethodBase method)
     {
@@ -2232,6 +2604,18 @@ public static class Accessor
     /// <exception cref="ArgumentNullException"/>
     public static bool TryGetListVersion<TElementType>(List<TElementType> list, out int version) => ListInfo<TElementType>.TryGetListVersion(list, out version);
 
+    /// <summary>
+    /// Checks if it's possible for a variable of type <paramref name="actualType"/> to have a value of type <paramref name="queriedType"/>. 
+    /// </summary>
+    /// <returns><see langword="true"/> if <paramref name="actualType"/> is assignable from <paramref name="queriedType"/> or if <paramref name="queriedType"/> is assignable from <paramref name="actualType"/>.</returns>
+    public static bool CouldBeAssignedTo(this Type actualType, Type queriedType) => actualType.IsAssignableFrom(queriedType) || queriedType.IsAssignableFrom(actualType);
+
+    /// <summary>
+    /// Checks if it's possible for a variable of type <paramref name="actualType"/> to have a value of type <typeparamref name="T"/>. 
+    /// </summary>
+    /// <returns><see langword="true"/> if <paramref name="actualType"/> is assignable from <typeparamref name="T"/> or if <typeparamref name="T"/> is assignable from <paramref name="actualType"/>.</returns>
+    public static bool CouldBeAssignedTo<T>(this Type actualType) => actualType.CouldBeAssignedTo(typeof(T));
+
     private static class DelegateInfo<TDelegate> where TDelegate : Delegate
     {
         public static MethodInfo InvokeMethod { get; }
@@ -2240,21 +2624,24 @@ public static class Accessor
         static DelegateInfo()
         {
             InvokeMethod = typeof(TDelegate).GetMethod("Invoke", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
+            if (InvokeMethod == null)
+                throw new NotSupportedException($"Unable to find Invoke method in delegate {typeof(TDelegate).Name}.");
+
             Parameters = InvokeMethod.GetParameters();
             ReturnType = InvokeMethod.ReturnType;
         }
     }
-    private static void CheckExceptionConstructors()
+    internal static void CheckExceptionConstructors()
     {
         if (!_castExCtorCalc)
         {
             _castExCtorCalc = true;
-            _castExCtor = typeof(InvalidCastException).GetConstructor(BindingFlags.Public | BindingFlags.Instance, null, new Type[] { typeof(string) }, null)!;
+            CastExCtor = typeof(InvalidCastException).GetConstructor(BindingFlags.Public | BindingFlags.Instance, null, new Type[] { typeof(string) }, null)!;
         }
         if (!_nreExCtorCalc)
         {
             _nreExCtorCalc = true;
-            _nreExCtor = typeof(NullReferenceException).GetConstructor(BindingFlags.Public | BindingFlags.Instance, null, Array.Empty<Type>(), null)!;
+            NreExCtor = typeof(NullReferenceException).GetConstructor(BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null)!;
         }
     }
     private static class ListInfo<TElementType>
@@ -2380,6 +2767,34 @@ public static class Accessor
         typeof(Logger).GetMethod(nameof(Logger.LogDebug), BindingFlags.Public | BindingFlags.Static)
         ?? throw new MemberAccessException("Unable to find Logger.LogDebug.");
 
+    /// <summary><see cref="Logger.LogInfo"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo LogInfo => _logInfo ??=
+        typeof(Logger).GetMethod(nameof(Logger.LogInfo), BindingFlags.Public | BindingFlags.Static)
+        ?? throw new MemberAccessException("Unable to find Logger.LogInfo.");
+
+    /// <summary><see cref="Logger.LogWarning"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo LogWarning => _logWarning ??=
+        typeof(Logger).GetMethod(nameof(Logger.LogWarning), BindingFlags.Public | BindingFlags.Static)
+        ?? throw new MemberAccessException("Unable to find Logger.LogWarning.");
+
+    /// <summary><see cref="Logger.LogError(string, ConsoleColor, string)"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo LogError => _logError ??=
+        typeof(Logger).GetMethod(nameof(Logger.LogError), BindingFlags.Public | BindingFlags.Static)
+        ?? throw new MemberAccessException("Unable to find Logger.LogError (text).");
+
+    /// <summary><see cref="Logger.LogError(Exception, bool, string)"/>.</summary>
+    /// <remarks>Lazily cached.</remarks>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo LogException => _logException ??=
+        typeof(Logger).GetMethod(nameof(Logger.LogError), BindingFlags.Public | BindingFlags.Static)
+        ?? throw new MemberAccessException("Unable to find Logger.LogError (exception).");
+
     /// <summary><see cref="CachedTime.RealtimeSinceStartup"/>.</summary>
     /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
@@ -2488,14 +2903,41 @@ public static class Accessor
         ?? throw new MemberAccessException("Unable to find Logger.StackCleaner.");
 }
 
+/// <summary>
+/// Represents a setter for an instance field or property.
+/// </summary>
+/// <typeparam name="TInstance">The declaring type of the member.</typeparam>
+/// <typeparam name="T">The return type of the member</typeparam>
 public delegate void InstanceSetter<in TInstance, in T>(TInstance owner, T value);
+
+/// <summary>
+/// Represents a getter for an instance field or property.
+/// </summary>
+/// <typeparam name="TInstance">The declaring type of the member.</typeparam>
+/// <typeparam name="T">The return type of the member</typeparam>
 public delegate T InstanceGetter<in TInstance, out T>(TInstance owner);
+
+/// <summary>
+/// Represents a setter for a static field or property.
+/// </summary>
+/// <typeparam name="T">The return type of the member</typeparam>
 public delegate void StaticSetter<in T>(T value);
+
+/// <summary>
+/// Represents a getter for a static field or property.
+/// </summary>
+/// <typeparam name="T">The return type of the member</typeparam>
 public delegate T StaticGetter<out T>();
 
+/// <summary>
+/// Used with <see cref="Accessor.ForEachBaseType(Type, ForEachBaseType, bool, bool)"/>
+/// </summary>
 /// <param name="depth">Number of types below the provided type this base type is. Will be zero if the type returned is the provided type, 1 for its base type, and so on.</param>
 public delegate void ForEachBaseType(Type type, int depth);
 
+/// <summary>
+/// Used with <see cref="Accessor.ForEachBaseType(Type, ForEachBaseTypeWhile, bool, bool)"/>
+/// </summary>
 /// <param name="depth">Number of types below the provided type this base type is. Will be zero if the type returned is the provided type, 1 for its base type, and so on.</param>
 /// <returns><see langword="True"/> to continue, <see langword="false"/> to break.</returns>
 public delegate bool ForEachBaseTypeWhile(Type type, int depth);
@@ -2512,16 +2954,21 @@ public sealed class EarlyTypeInitAttribute : Attribute
     /// Defines the order in which type initializers run. Lower gets ran first. Default priority is zero.
     /// </summary>
     public int Priority { get; }
-
-    /// <remarks>
-    /// Irrelevant for plugins.
-    /// </remarks>
-    public bool RequiresUIAccessTools { get; set; }
+    internal bool RequiresUIAccessTools { get; set; }
 
     public EarlyTypeInitAttribute() : this(0) { }
 
     public EarlyTypeInitAttribute(int priority)
     {
         Priority = priority;
+    }
+    internal EarlyTypeInitAttribute(bool requiresUIAccessTools)
+    {
+        RequiresUIAccessTools = requiresUIAccessTools;
+    }
+    internal EarlyTypeInitAttribute(int priority, bool requiresUIAccessTools)
+    {
+        Priority = priority;
+        RequiresUIAccessTools = requiresUIAccessTools;
     }
 }

@@ -254,7 +254,7 @@ public static class RoadUtil
     private static readonly StaticGetter<int>? GetTangentIndex = Accessor.GenerateStaticGetter<EditorRoads, int>("tangentIndex", false);
     private static readonly StaticGetter<Transform?>? GetSelection = Accessor.GenerateStaticGetter<EditorRoads, Transform?>("selection", false);
     private static readonly Action<Transform?>? CallSelect = Accessor.GenerateStaticCaller<EditorRoads, Action<Transform?>>("select", parameters: new Type[] { typeof(Transform) });
-    private static readonly Action? CallDeselect = Accessor.GenerateStaticCaller<EditorRoads, Action>("deselect", parameters: Array.Empty<Type>());
+    private static readonly Action? CallDeselect = Accessor.GenerateStaticCaller<EditorRoads, Action>("deselect", parameters: Type.EmptyTypes);
 
     /// <summary>
     /// The index of the selected road vertex in <see cref="EditorRoads.road"/>, or -1 if none are selected (or in the case of a reflection failure).

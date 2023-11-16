@@ -23,17 +23,17 @@ internal static class SpawnsEditorPatches
             Type[] types = { typeof(EditorSpawnsItemsUI), typeof(EditorSpawnsVehiclesUI), typeof(EditorSpawnsAnimalsUI), typeof(EditorSpawnsZombiesUI), typeof(EditorLevelPlayersUI) };
             foreach (Type type in types)
             {
-                MethodInfo? openMethod = type.GetMethod("open", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static, null, CallingConventions.Any, Array.Empty<Type>(), null);
-                MethodInfo? closeMethod = type.GetMethod("close", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static, null, CallingConventions.Any, Array.Empty<Type>(), null);
+                MethodInfo? openMethod = type.GetMethod("open", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static, null, CallingConventions.Any, Type.EmptyTypes, null);
+                MethodInfo? closeMethod = type.GetMethod("close", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static, null, CallingConventions.Any, Type.EmptyTypes, null);
                 bool patch = true;
                 if (openMethod == null)
                 {
-                    Logger.LogWarning($"Method not found: {FormattingUtil.FormatMethod(typeof(void), type, "open", arguments: Array.Empty<Type>(), isStatic: true)}.", method: Source);
+                    Logger.LogWarning($"Method not found: {FormattingUtil.FormatMethod(typeof(void), type, "open", arguments: Type.EmptyTypes, isStatic: true)}.", method: Source);
                     patch = false;
                 }
                 if (closeMethod == null)
                 {
-                    Logger.LogWarning($"Method not found: {FormattingUtil.FormatMethod(typeof(void), type, "close", arguments: Array.Empty<Type>(), isStatic: true)}.", method: Source);
+                    Logger.LogWarning($"Method not found: {FormattingUtil.FormatMethod(typeof(void), type, "close", arguments: Type.EmptyTypes, isStatic: true)}.", method: Source);
                     patch = false;
                 }
 

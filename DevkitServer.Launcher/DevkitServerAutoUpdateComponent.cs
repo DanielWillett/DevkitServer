@@ -57,10 +57,10 @@ public class DevkitServerAutoUpdateComponent : MonoBehaviour
             if (_indexResource == null || (_nuGetIndexExpiration >= 0 && _nuGetIndexExpiration < Time.realtimeSinceStartup))
             {
                 _logger.LogDebug("Downloading NuGet index...");
-                UnityWebRequest getIndexRequest = UnityWebRequest.Get(DevkitServerLauncherModule.NugetAPIIndex);
+                using UnityWebRequest getIndexRequest = UnityWebRequest.Get(DevkitServerLauncherModule.NugetAPIIndex);
                 yield return getIndexRequest.SendWebRequest();
 
-                if (getIndexRequest.responseCode is 200 or 304)
+                if (getIndexRequest.responseCode is 200 or 304 && getIndexRequest.downloadHandler?.data is { Length: > 0 })
                 {
                     NuGetIndex? index = IOUtility.jsonDeserializer.deserialize<NuGetIndex>(getIndexRequest.downloadHandler.data, 0);
 

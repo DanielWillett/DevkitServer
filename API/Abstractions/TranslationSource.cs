@@ -637,13 +637,21 @@ public sealed class AssetTranslationSource : ITranslationSource
     {
         string key2 = key.Substring(prefix.Length);
 
-        if (!int.TryParse(key2, NumberStyles.Number, CultureInfo.InvariantCulture, out int rewardIndex) ||
+        int underscoreIndex = key2.IndexOf('_');
+
+        if (!int.TryParse(underscoreIndex == -1 ? key2 : key2.Substring(0, underscoreIndex), NumberStyles.Number, CultureInfo.InvariantCulture, out int rewardIndex) ||
             conditions.Count >= rewardIndex)
             return key;
 
-        
         if (conditions != null)
         {
+            if (underscoreIndex != -1 && key2.Length > underscoreIndex + 1 &&
+                key2.Substring(underscoreIndex + 1).Equals("UI_Requirements", StringComparison.OrdinalIgnoreCase) &&
+                AssetUtil.GetConditionUIRequirements(conditions[rewardIndex]) is { } list)
+            {
+                return string.Join(", ", list);
+            }
+
             return conditions[rewardIndex].formatCondition(
                 Player.player ?? Provider.clients.FirstOrDefault()?.player ?? throw new FormatException("The format: " + (originalKey ?? key) + " requires a player."));
         }

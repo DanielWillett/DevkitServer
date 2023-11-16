@@ -28,6 +28,7 @@ public static class AssetUtil
     private static readonly InstanceGetter<Module, List<IModuleNexus>>? GetNexii = Accessor.GenerateInstanceGetter<Module, List<IModuleNexus>>("nexii");
     private static readonly StaticGetter<Assets>? GetAssetsInstance = Accessor.GenerateStaticGetter<Assets, Assets>("instance");
     private static readonly InstanceSetter<AssetOrigin, bool>? SetOverrideIDs = Accessor.GenerateInstanceSetter<AssetOrigin, bool>("shouldAssetsOverrideExistingIds");
+    private static readonly InstanceGetter<INPCCondition, List<int>>? GetUIRequirements = Accessor.GenerateInstanceGetter<INPCCondition, List<int>>("uiRequirementIndices");
 
     public static event BeginLevelLoading? OnBeginLevelLoading;
 
@@ -170,6 +171,7 @@ public static class AssetUtil
         using StreamReader inputReader = new StreamReader(fileStream);
         return Parser.Parse(inputReader);
     }
+
     /// <summary>
     /// Get internal reward array from an <see cref="NPCRewardsList"/>.
     /// </summary>
@@ -178,6 +180,16 @@ public static class AssetUtil
     public static INPCReward[]? GetRewards(NPCRewardsList list)
     {
         return GetRewardsFromList?.Invoke(list);
+    }
+
+    /// <summary>
+    /// Get internal UI requirement list from a <see cref="INPCCondition"/>.
+    /// </summary>
+    /// <returns><see langword="null"/> in the case of a refelction error, otherwise the internal UI requirement list of a condition.</returns>
+    [Pure]
+    public static IReadOnlyList<int>? GetConditionUIRequirements(INPCCondition condition)
+    {
+        return GetUIRequirements?.Invoke(condition);
     }
 
     /// <summary>

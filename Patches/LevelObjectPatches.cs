@@ -78,7 +78,7 @@ internal static class LevelObjectPatches
         Type lo = typeof(LevelObjects);
         Type dtu = typeof(DevkitTransactionUtility);
 
-        MethodInfo? pointSelection = eo.GetMethod("pointSelection", BindingFlags.Static | BindingFlags.Public, null, Array.Empty<Type>(), null);
+        MethodInfo? pointSelection = eo.GetMethod("pointSelection", BindingFlags.Static | BindingFlags.Public, null, Type.EmptyTypes, null);
         if (pointSelection == null)
         {
             Logger.LogWarning($"{method.Format()} - Unable to find method: EditorObjects.pointSelection.", method: Source);
@@ -121,28 +121,28 @@ internal static class LevelObjectPatches
             DevkitServerModule.Fault();
         }
 
-        MethodInfo? clearSelection = eo.GetMethod("clearSelection", BindingFlags.Static | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+        MethodInfo? clearSelection = eo.GetMethod("clearSelection", BindingFlags.Static | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
         if (clearSelection == null)
         {
             Logger.LogWarning($"{method.Format()} - Unable to find method: EditorObjects.clearSelection.", method: Source);
             DevkitServerModule.Fault();
         }
 
-        MethodInfo? calculateHandleOffsets = eo.GetMethod("calculateHandleOffsets", BindingFlags.Static | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+        MethodInfo? calculateHandleOffsets = eo.GetMethod("calculateHandleOffsets", BindingFlags.Static | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
         if (calculateHandleOffsets == null)
         {
             Logger.LogWarning($"{method.Format()} - Unable to find method: EditorObjects.calculateHandleOffsets.", method: Source);
             DevkitServerModule.Fault();
         }
 
-        MethodInfo? undo = lo.GetMethod("undo", BindingFlags.Static | BindingFlags.Public, null, Array.Empty<Type>(), null);
+        MethodInfo? undo = lo.GetMethod("undo", BindingFlags.Static | BindingFlags.Public, null, Type.EmptyTypes, null);
         if (undo == null)
         {
             Logger.LogWarning($"{method.Format()} - Unable to find method: LevelObjects.undo.", method: Source);
             DevkitServerModule.Fault();
         }
 
-        MethodInfo? redo = lo.GetMethod("redo", BindingFlags.Static | BindingFlags.Public, null, Array.Empty<Type>(), null);
+        MethodInfo? redo = lo.GetMethod("redo", BindingFlags.Static | BindingFlags.Public, null, Type.EmptyTypes, null);
         if (redo == null)
         {
             Logger.LogWarning($"{method.Format()} - Unable to find method: LevelObjects.redo.", method: Source);
@@ -1080,7 +1080,7 @@ internal static class LevelObjectPatches
     [UsedImplicitly]
     private static IEnumerable<CodeInstruction> LevelObjectsRemoveBuildableTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
     {
-        MethodInfo? destroyMethod = typeof(LevelBuildableObject).GetMethod(nameof(LevelBuildableObject.destroy), BindingFlags.Instance | BindingFlags.Public, null, Array.Empty<Type>(), null);
+        MethodInfo? destroyMethod = typeof(LevelBuildableObject).GetMethod(nameof(LevelBuildableObject.destroy), BindingFlags.Instance | BindingFlags.Public, null, Type.EmptyTypes, null);
         if (destroyMethod == null)
         {
             Logger.LogWarning($"{method.Format()} - Unable to find method: LevelBuildableObject.destroy.", method: Source);
@@ -1101,7 +1101,7 @@ internal static class LevelObjectPatches
     [UsedImplicitly]
     private static IEnumerable<CodeInstruction> LevelObjectsRemoveObjectsTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
     {
-        MethodInfo? destroyMethod = typeof(LevelObject).GetMethod(nameof(LevelObject.destroy), BindingFlags.Instance | BindingFlags.Public, null, Array.Empty<Type>(), null);
+        MethodInfo? destroyMethod = typeof(LevelObject).GetMethod(nameof(LevelObject.destroy), BindingFlags.Instance | BindingFlags.Public, null, Type.EmptyTypes, null);
         if (destroyMethod == null)
         {
             Logger.LogWarning($"{method.Format()} - Unable to find method: LevelObject.destroy.", method: Source);

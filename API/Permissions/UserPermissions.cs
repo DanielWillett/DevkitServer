@@ -1,12 +1,12 @@
 ﻿using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Plugins;
 using System.Reflection;
-using System.Text.Json.Serialization;
 #if SERVER
 using DevkitServer.Configuration;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer;
 using DevkitServer.Util.Encoding;
+using System.Text.Json.Serialization;
 #endif
 
 namespace DevkitServer.API.Permissions;

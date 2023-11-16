@@ -55,7 +55,7 @@ public class DevkitServerLauncherModule : IModuleNexus
         DevkitServerLauncherLogger logger = new DevkitServerLauncherLogger();
         Assembly thisAssembly = Assembly.GetExecutingAssembly();
 
-        Module thisModule = ModuleHook.modules.Find(x => Array.IndexOf(x.assemblies, thisAssembly) != -1) ??
+        Module thisModule = ModuleHook.modules.Find(x => x.assemblies != null && Array.IndexOf(x.assemblies, thisAssembly) != -1) ??
                             throw new Exception("Unable to find module: DevkitServer.Launcher");
 
         string modulePath = Path.GetFullPath(thisModule.config.DirectoryPath);

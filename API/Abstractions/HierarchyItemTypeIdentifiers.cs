@@ -239,7 +239,7 @@ public static class HierarchyItemTypeIdentifierEx
             if (!typeof(IHierarchyItemTypeIdentifierFactory).IsAssignableFrom(type))
                 continue;
 
-            ConstructorInfo? ctor = type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+            ConstructorInfo? ctor = type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
             if (ctor == null)
             {
                 Logger.LogError($"Unable to instantiate hierarchy item identifier factory {type.Format()} because it does not have a default constructor.", method: Source);

@@ -46,7 +46,6 @@ public struct Folder
         ".cpp",
         ".h",
         ".py",
-        ".bin",
         ".zip",
         ".rar",
         ".7z",

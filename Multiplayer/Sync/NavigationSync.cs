@@ -19,8 +19,8 @@ namespace DevkitServer.Multiplayer.Sync;
 
 public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
 {
-    private const float Delay = 0.75f;
-    private const float SendDelay = 0.25f;
+    private const float GraphDelay = 0.75f;
+    private const float GraphSendDelay = 0.25f;
 
     private const string Source = "NAVIGATION SYNC";
 
@@ -55,7 +55,8 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
     private float _pendingUINetIdStartTime;
 #endif
 
-    private readonly List<NetId> _syncQueue = new List<NetId>(4);
+    private readonly List<NetId> _graphSyncQueue = new List<NetId>(4);
+    private readonly List<NetId> _dataSyncQueue = new List<NetId>(4);
     private List<PacketInfo>? _packets;
 
     private readonly struct PacketInfo
@@ -76,7 +77,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
     {
         if (!authority)
         {
-            _syncQueue.Clear();
+            _graphSyncQueue.Clear();
         }
     }
     private void ReceiveNavigationData(byte[] data, int offset)
@@ -371,8 +372,8 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
     private void BufferData()
     {
         _index = 0;
-        NetId netId = _syncQueue[_syncQueue.Count - 1];
-        _syncQueue.RemoveAt(_syncQueue.Count - 1);
+        NetId netId = _graphSyncQueue[_graphSyncQueue.Count - 1];
+        _graphSyncQueue.RemoveAt(_graphSyncQueue.Count - 1);
         _pendingNetId = netId;
         Logger.LogDebug($"[{Source}] Buffering navigation data: {netId.Format()}.");
         IReadOnlyList<Flag> flags = NavigationUtil.NavigationFlags;
@@ -531,12 +532,12 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
         if (Provider.clients.Count == 0)
             return;
 #endif
-        if (!HasAuthority || !IsOwner || (_syncQueue.Count == 0 && _packetId == -1))
+        if (!HasAuthority || !IsOwner || (_graphSyncQueue.Count == 0 && _packetId == -1))
             return;
 
-        if (_packetId == -1 && time - _lastSent > Delay)
+        if (_packetId == -1 && time - _lastSent > GraphDelay)
         {
-            if (_syncQueue.Count == 0)
+            if (_graphSyncQueue.Count == 0)
                 return;
 
             BufferData();
@@ -594,22 +595,22 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
     /// Queues a navigation flag to sync if this has authority.
     /// </summary>
     /// <param name="netId">The <see cref="NetId"/> of the navigation flag.</param>
-    public void EnqueueSync(NetId netId)
+    public void EnqueueGraphSync(NetId netId)
     {
         if (!HasAuthority)
             return;
 
-        for (int i = _syncQueue.Count - 1; i >= 0; --i)
+        for (int i = _graphSyncQueue.Count - 1; i >= 0; --i)
         {
-            if (_syncQueue[i].id == netId.id)
+            if (_graphSyncQueue[i].id == netId.id)
             {
-                _syncQueue.RemoveAt(i);
+                _graphSyncQueue.RemoveAt(i);
                 break;
             }
         }
 
-        _syncQueue.Insert(0, netId);
-        _lastSent = CachedTime.RealtimeSinceStartup + Math.Max(-Delay, SendDelay - _syncQueue.Count * Delay);
+        _graphSyncQueue.Insert(0, netId);
+        _lastSent = CachedTime.RealtimeSinceStartup + Math.Max(-GraphDelay, GraphSendDelay - _graphSyncQueue.Count * GraphDelay);
         Logger.LogDebug($"[{Source}] Requested sync for: {netId.Format()}.");
     }
 #if CLIENT

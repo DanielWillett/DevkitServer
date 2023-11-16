@@ -380,23 +380,23 @@ public static class FormattingUtil
         switch (block.blockType)
         {
             case ExceptionBlockType.BeginExceptionBlock:
-                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "try" + GetReset() + Environment.NewLine + "{";
+                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "try" + GetReset() + " {";
             case ExceptionBlockType.EndExceptionBlock:
-                return "}";
+                return "} " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor) + "// end exception block" + GetReset();
             case ExceptionBlockType.BeginExceptFilterBlock:
-                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + " when" + GetReset() + Environment.NewLine + "{";
+                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + " when" + GetReset() + " {";
             case ExceptionBlockType.BeginCatchBlock:
-                string str = "}" + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "catch" + GetReset() + Environment.NewLine;
+                string str = "} " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "catch" + GetReset();
                 if (block.catchType != null)
-                    str += " (" + block.catchType.Format() + ")";
-                return str;
+                    str += " (" + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + block.catchType.Format() + GetReset() + ")";
+                return str + "{";
             case ExceptionBlockType.BeginFinallyBlock:
-                return "}" + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "finally" + GetReset() + Environment.NewLine + "{";
+                return "} " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "finally" + GetReset() + " {";
             case ExceptionBlockType.BeginFaultBlock:
-                return "}" + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "fault" + GetReset() + Environment.NewLine + "{";
+                return "} " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "fault" + GetReset() + " {";
         }
 
-        return "}" + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + block.blockType + GetReset() + Environment.NewLine + "{";
+        return "} " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + block.blockType + GetReset() + " {";
     }
     public static string Format(this Label label) => (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
         ? string.Empty

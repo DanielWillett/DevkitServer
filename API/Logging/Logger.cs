@@ -93,11 +93,11 @@ public static class Logger
 
         try
         {
-            IsExternalFeatureset = !DevkitServerModule.UnturnedLoaded;
+            IsExternalFeatureset = DevkitServerModule.Module == null;
             StackCleanerConfiguration config = new StackCleanerConfiguration
             {
                 ColorFormatting = StackColorFormatType.ExtendedANSIColor,
-                Colors = Type.GetType("System.Drawing.Color, System.Drawing", false, false) == null ? UnityColor32Config.Default : Color32Config.Default,
+                Colors = DevkitServerModule.UnityLoaded ? UnityColor32Config.Default : Color32Config.Default,
                 IncludeNamespaces = false,
                 IncludeLineData = true,
 #if DEBUG

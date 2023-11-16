@@ -1075,7 +1075,7 @@ public static class UIExtensionManager
         FieldInfo? existingField = owningType.GetField(existingMemberAttribute.MemberName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.FlattenHierarchy);
         PropertyInfo? existingProperty = owningType.GetProperty(existingMemberAttribute.MemberName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.FlattenHierarchy);
         MethodInfo? existingMethod = owningType.GetMethod(existingMemberAttribute.MemberName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.FlattenHierarchy,
-            null, CallingConventions.Any, Array.Empty<Type>(), null);
+            null, CallingConventions.Any, Type.EmptyTypes, null);
 
         if (existingField == null &&
             (existingProperty == null ||
@@ -1585,7 +1585,7 @@ public static class UIExtensionManager
         }
         List<CodeInstruction> inst = new List<CodeInstruction>();
 
-        DebuggableEmitter il = new DebuggableEmitter(generator, method, inst);
+        DebuggableEmitter il = new DebuggableEmitter(generator.AsEmitter(), method, inst);
 
         if (!info.MemberInfo.ExistingIsStatic)
         {

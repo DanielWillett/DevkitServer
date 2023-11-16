@@ -1155,7 +1155,7 @@ public sealed class TileModifyAction : IAction, ICoordinatesAction
 }
 
 [Action(DevkitServerActionType.UpdateSplatmapLayers, 132, 8)]
-[EarlyTypeInit(RequiresUIAccessTools = true)]
+[EarlyTypeInit(true)]
 public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinatesAction
 {
 #if CLIENT

@@ -43,7 +43,7 @@ public static class ReplicatedLevelDataRegistry
 
                 Type dataType = interfaceType.GetGenericArguments()[0];
 
-                ConstructorInfo? ctor = type.GetConstructor(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance, null, Array.Empty<Type>(), null);
+                ConstructorInfo? ctor = type.GetConstructor(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
                 if (ctor == null)
                 {
                     if (plugin == null)

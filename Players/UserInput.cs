@@ -228,7 +228,7 @@ public class UserInput : MonoBehaviour
         {
             DynamicMethod method = new DynamicMethod("get_activeTool", attributes,
                 conventions, typeof(IDevkitTool),
-                Array.Empty<Type>(), type, true);
+                Type.EmptyTypes, type, true);
             IOpCodeEmitter il = method.GetILGenerator().AsEmitter();
             il.Emit(OpCodes.Ldsfld, instanceField);
             il.Emit(OpCodes.Ldfld, toolField);

@@ -6,9 +6,16 @@ using System.Runtime.CompilerServices;
 
 namespace DanielWillett.ReflectionTools;
 
-[TypeForwardedFrom("ReflectionTools, Version=1.0.2.0, Culture=neutral, PublicKeyToken=6a3a944a5a8d6b8f")]
 public static class Accessor
 {
+    public static bool LogILTraceMessages { get => DevkitServer.API.Accessor.LogILTraceMessages; set => DevkitServer.API.Accessor.LogILTraceMessages = value; }
+    public static bool LogDebugMessages { get => DevkitServer.API.Accessor.LogDebugMessages; set => DevkitServer.API.Accessor.LogDebugMessages = value; }
+    public static bool LogInfoMessages { get => DevkitServer.API.Accessor.LogInfoMessages; set => DevkitServer.API.Accessor.LogInfoMessages = value; }
+    public static bool LogWarningMessages { get => DevkitServer.API.Accessor.LogWarningMessages; set => DevkitServer.API.Accessor.LogWarningMessages = value; }
+    public static bool LogErrorMessages { get => DevkitServer.API.Accessor.LogErrorMessages; set => DevkitServer.API.Accessor.LogErrorMessages = value; }
+
+    // ReSharper disable once ValueParameterNotUsed
+    public static IReflectionToolsLogger Logger { get => new ConsoleReflectionToolsLogger(); set { } }
     public static Assembly MSCoreLib => DevkitServer.API.Accessor.MSCoreLib;
     public static bool IsMono => DevkitServer.API.Accessor.IsMono;
 
@@ -55,16 +62,16 @@ public static class Accessor
     }
 
     [Pure]
-    public static InstanceSetter<object, TValue>? GenerateInstancePropertySetter<TValue>(Type declaringType, string propertyName, bool throwOnError = false)
+    public static InstanceSetter<object, TValue>? GenerateInstancePropertySetter<TValue>(Type declaringType, string propertyName, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
     {
-        DevkitServer.API.InstanceSetter<object, TValue>? val = DevkitServer.API.Accessor.GenerateInstancePropertySetter<TValue>(declaringType, propertyName, throwOnError);
+        DevkitServer.API.InstanceSetter<object, TValue>? val = DevkitServer.API.Accessor.GenerateInstancePropertySetter<TValue>(declaringType, propertyName, throwOnError, allowUnsafeTypeBinding);
         return (InstanceSetter<object, TValue>?)val?.Method.CreateDelegate(typeof(InstanceSetter<object, TValue>));
     }
 
     [Pure]
-    public static InstanceGetter<object, TValue>? GenerateInstancePropertyGetter<TValue>(Type declaringType, string propertyName, bool throwOnError = false)
+    public static InstanceGetter<object, TValue>? GenerateInstancePropertyGetter<TValue>(Type declaringType, string propertyName, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
     {
-        DevkitServer.API.InstanceGetter<object, TValue>? val = DevkitServer.API.Accessor.GenerateInstancePropertyGetter<TValue>(declaringType, propertyName, throwOnError);
+        DevkitServer.API.InstanceGetter<object, TValue>? val = DevkitServer.API.Accessor.GenerateInstancePropertyGetter<TValue>(declaringType, propertyName, throwOnError, allowUnsafeTypeBinding);
         return (InstanceGetter<object, TValue>?)val?.Method.CreateDelegate(typeof(InstanceGetter<object, TValue>));
     }
 
@@ -99,28 +106,44 @@ public static class Accessor
     [Pure]
     public static StaticSetter<TValue>? GenerateStaticPropertySetter<TDeclaringType, TValue>(string propertyName, bool throwOnError = false)
     {
-        DevkitServer.API.StaticSetter<TValue>? val = DevkitServer.API.Accessor.GenerateStaticPropertySetter<TDeclaringType, TValue>(propertyName, throwOnError);
+        DevkitServer.API.StaticSetter<TValue>? val = DevkitServer.API.Accessor.GenerateStaticPropertySetter<TDeclaringType, TValue>(propertyName, throwOnError, false);
+        return (StaticSetter<TValue>?)val?.Method.CreateDelegate(typeof(StaticSetter<TValue>));
+    }
+
+    [Pure]
+    // ReSharper disable once MethodOverloadWithOptionalParameter
+    public static StaticSetter<TValue>? GenerateStaticPropertySetter<TDeclaringType, TValue>(string propertyName, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
+    {
+        DevkitServer.API.StaticSetter<TValue>? val = DevkitServer.API.Accessor.GenerateStaticPropertySetter<TDeclaringType, TValue>(propertyName, throwOnError, allowUnsafeTypeBinding);
         return (StaticSetter<TValue>?)val?.Method.CreateDelegate(typeof(StaticSetter<TValue>));
     }
 
     [Pure]
     public static StaticGetter<TValue>? GenerateStaticPropertyGetter<TDeclaringType, TValue>(string propertyName, bool throwOnError = false)
     {
-        DevkitServer.API.StaticGetter<TValue>? val = DevkitServer.API.Accessor.GenerateStaticPropertyGetter<TDeclaringType, TValue>(propertyName, throwOnError);
+        DevkitServer.API.StaticGetter<TValue>? val = DevkitServer.API.Accessor.GenerateStaticPropertyGetter<TDeclaringType, TValue>(propertyName, throwOnError, true);
         return (StaticGetter<TValue>?)val?.Method.CreateDelegate(typeof(StaticGetter<TValue>));
     }
 
     [Pure]
-    public static StaticSetter<TValue>? GenerateStaticPropertySetter<TValue>(Type declaringType, string propertyName, bool throwOnError = false)
+    // ReSharper disable once MethodOverloadWithOptionalParameter
+    public static StaticGetter<TValue>? GenerateStaticPropertyGetter<TDeclaringType, TValue>(string propertyName, bool throwOnError = false, bool allowUnsafeTypeBinding = true)
     {
-        DevkitServer.API.StaticSetter<TValue>? val = DevkitServer.API.Accessor.GenerateStaticPropertySetter<TValue>(declaringType, propertyName, throwOnError);
+        DevkitServer.API.StaticGetter<TValue>? val = DevkitServer.API.Accessor.GenerateStaticPropertyGetter<TDeclaringType, TValue>(propertyName, throwOnError, allowUnsafeTypeBinding);
+        return (StaticGetter<TValue>?)val?.Method.CreateDelegate(typeof(StaticGetter<TValue>));
+    }
+
+    [Pure]
+    public static StaticSetter<TValue>? GenerateStaticPropertySetter<TValue>(Type declaringType, string propertyName, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
+    {
+        DevkitServer.API.StaticSetter<TValue>? val = DevkitServer.API.Accessor.GenerateStaticPropertySetter<TValue>(declaringType, propertyName, throwOnError, allowUnsafeTypeBinding);
         return (StaticSetter<TValue>?)val?.Method.CreateDelegate(typeof(StaticSetter<TValue>));
     }
 
     [Pure]
-    public static StaticGetter<TValue>? GenerateStaticPropertyGetter<TValue>(Type declaringType, string propertyName, bool throwOnError = false)
+    public static StaticGetter<TValue>? GenerateStaticPropertyGetter<TValue>(Type declaringType, string propertyName, bool throwOnError = false, bool allowUnsafeTypeBinding = false)
     {
-        DevkitServer.API.StaticGetter<TValue>? val = DevkitServer.API.Accessor.GenerateStaticPropertyGetter<TValue>(declaringType, propertyName, throwOnError);
+        DevkitServer.API.StaticGetter<TValue>? val = DevkitServer.API.Accessor.GenerateStaticPropertyGetter<TValue>(declaringType, propertyName, throwOnError, allowUnsafeTypeBinding);
         return (StaticGetter<TValue>?)val?.Method.CreateDelegate(typeof(StaticGetter<TValue>));
     }
 
@@ -205,6 +228,66 @@ public static class Accessor
     public static bool IsExtern(this PropertyInfo property, bool checkGetterFirst = true)
     {
         return DevkitServer.API.Accessor.IsExtern(property, checkGetterFirst);
+    }
+    
+    [Pure]
+    public static bool IsDefinedSafe<TAttribute>(this ICustomAttributeProvider member, bool inherit = false) where TAttribute : Attribute
+    {
+        return DevkitServer.API.Accessor.HasAttributeSafe<TAttribute>(member, inherit);
+    }
+    
+    [Pure]
+    public static bool IsDefinedSafe(this ICustomAttributeProvider member, Type attributeType, bool inherit = false)
+    {
+        return DevkitServer.API.Accessor.HasAttributeSafe(member, attributeType, inherit);
+    }
+
+    [Pure]
+    public static bool HasAttributeSafe<TAttribute>(this ICustomAttributeProvider member, bool inherit = false) where TAttribute : Attribute
+    {
+        return DevkitServer.API.Accessor.HasAttributeSafe<TAttribute>(member, inherit);
+    }
+    
+    [Pure]
+    public static bool HasAttributeSafe(this ICustomAttributeProvider member, Type attributeType, bool inherit = false)
+    {
+        return DevkitServer.API.Accessor.HasAttributeSafe(member, attributeType, inherit);
+    }
+    
+    [Pure]
+    public static TAttribute? GetAttributeSafe<TAttribute>(this ICustomAttributeProvider member, bool inherit = false) where TAttribute : Attribute
+    {
+        return DevkitServer.API.Accessor.GetAttributeSafe<TAttribute>(member, inherit);
+    }
+    
+    [Pure]
+    public static Attribute? GetAttributeSafe(this ICustomAttributeProvider member, Type attributeType, bool inherit = false)
+    {
+        return DevkitServer.API.Accessor.GetAttributeSafe(member, attributeType, inherit);
+    }
+    
+    [Pure]
+    public static TAttribute[] GetAttributesSafe<TAttribute>(this ICustomAttributeProvider member, bool inherit = false) where TAttribute : Attribute
+    {
+        return DevkitServer.API.Accessor.GetAttributesSafe<TAttribute>(member, inherit);
+    }
+    
+    [Pure]
+    public static Attribute[] GetAttributesSafe(this ICustomAttributeProvider member, Type attributeType, bool inherit = false)
+    {
+        return DevkitServer.API.Accessor.GetAttributesSafe(member, attributeType, inherit);
+    }
+
+    [Pure]
+    public static bool TryGetAttributeSafe<TAttribute>(this ICustomAttributeProvider member, out TAttribute attribute, bool inherit = false) where TAttribute : Attribute
+    {
+        return DevkitServer.API.Accessor.TryGetAttributeSafe(member, out attribute, inherit);
+    }
+
+    [Pure]
+    public static bool IsReadOnly(this ICustomAttributeProvider member)
+    {
+        return DevkitServer.API.Accessor.IsReadOnly(member);
     }
 
     [Pure]
@@ -401,6 +484,50 @@ public static class Accessor
     public static bool ShouldCallvirtRuntime(this MethodBase method)
     {
         return DevkitServer.API.Accessor.ShouldCallvirtRuntime(method);
+    }
+
+    [Pure]
+    public static TElementType[] GetUnderlyingArray<TElementType>(this List<TElementType> list)
+    {
+        return DevkitServer.API.Accessor.GetUnderlyingArray(list);
+    }
+
+    [Pure]
+    public static TElementType[] GetUnderlyingArrayOrCopy<TElementType>(this List<TElementType> list)
+    {
+        return DevkitServer.API.Accessor.GetUnderlyingArrayOrCopy(list);
+    }
+
+    [Pure]
+    public static int GetListVersion<TElementType>(this List<TElementType> list)
+    {
+        return DevkitServer.API.Accessor.GetListVersion(list);
+    }
+
+    public static bool TryGetUnderlyingArray<TElementType>(List<TElementType> list, out TElementType[] underlyingArray)
+    {
+        return DevkitServer.API.Accessor.TryGetUnderlyingArray(list, out underlyingArray);
+    }
+
+    public static bool TryGetListVersion<TElementType>(List<TElementType> list, out int version)
+    {
+        return DevkitServer.API.Accessor.TryGetListVersion(list, out version);
+    }
+
+    [Pure]
+    public static bool CouldBeAssignedTo(this Type actualType, Type queriedType)
+    {
+        return DevkitServer.API.Accessor.CouldBeAssignedTo(actualType, queriedType);
+    }
+
+    [Pure]
+    public static bool CouldBeAssignedTo<T>(this Type actualType)
+    {
+        return DevkitServer.API.Accessor.CouldBeAssignedTo<T>(actualType);
+    }
+    internal static void CheckExceptionConstructors()
+    {
+        DevkitServer.API.Accessor.CheckExceptionConstructors();
     }
 }
 

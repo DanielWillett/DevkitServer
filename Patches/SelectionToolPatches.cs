@@ -49,7 +49,7 @@ internal static class SelectionToolPatches
             DevkitServerModule.Fault();
         }
 
-        MethodInfo? transformSelection = st.GetMethod("transformSelection", BindingFlags.Instance | BindingFlags.NonPublic, null, Array.Empty<Type>(), null);
+        MethodInfo? transformSelection = st.GetMethod("transformSelection", BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
         if (transformSelection == null)
         {
             Logger.LogWarning($"{method.Format()} - Unable to find method: SelectionTool.transformSelection.", method: "CLIENT EVENTS");

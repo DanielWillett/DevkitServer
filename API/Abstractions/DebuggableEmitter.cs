@@ -14,16 +14,18 @@ public class DebuggableEmitter : IOpCodeEmitter
 {
     private bool _init;
     private bool _lastWasPrefix;
+    private string _prefix = string.Empty;
+    private string? _logSource;
 
     /// <summary>
     /// Actively editing method.
     /// </summary>
-    public MethodBase Method { get; }
+    public MethodBase? Method { get; }
 
     /// <summary>
     /// Underlying <see cref="ILGenerator"/>.
     /// </summary>
-    public ILGenerator Generator { get; }
+    public IOpCodeEmitter Generator { get; }
 
     /// <inheritdoc />
     public int ILOffset => Generator.ILOffset;
@@ -54,40 +56,54 @@ public class DebuggableEmitter : IOpCodeEmitter
     /// </summary>
     public int Index { get; private set; }
 
+    public string? LogSource
+    {
+        get => _logSource;
+        set
+        {
+            _logSource = value;
+            _prefix = string.IsNullOrEmpty(value) ? string.Empty : "[" + value + "] ";
+        }
+    }
+
     /// <summary>
     /// Instruction list when being used in transpile mode.
     /// </summary>
     public List<CodeInstruction>? TranspileInstructions { get; }
-    public DebuggableEmitter(ILGenerator generator, MethodBase method, List<CodeInstruction> instructions, int index = -1)
+    public DebuggableEmitter(IOpCodeEmitter generator, MethodBase method, List<CodeInstruction> instructions, int index = -1)
     {
+        if (generator.GetType() == typeof(DebuggableEmitter))
+            generator = ((DebuggableEmitter)generator).Generator;
         Generator = generator;
         Method = method;
         IsTranspileMode = true;
         TranspileInstructions = instructions;
         Index = index == -1 ? instructions.Count : index;
     }
-    public DebuggableEmitter(ILGenerator generator, MethodBase method)
+    public DebuggableEmitter(IOpCodeEmitter generator, MethodBase? method)
     {
+        if (generator.GetType() == typeof(DebuggableEmitter))
+            generator = ((DebuggableEmitter)generator).Generator;
         Generator = generator;
         Method = method;
     }
-    public DebuggableEmitter(DynamicMethod method) : this(method.GetILGenerator(), method) { }
+    public DebuggableEmitter(DynamicMethod method) : this(method.GetILGenerator().AsEmitter(), method) { }
 
     private void CheckInit()
     {
 #if DEBUG
-        if (_init) return;
+        if (_init || Method is null) return;
         if (DebugLog)
         {
-            Logger.LogDebug(".method ".Colorize(ConsoleColor.DarkCyan) + Method.Format());
+            Logger.LogDebug(_prefix + ".method ".Colorize(ConsoleColor.DarkCyan) + Method.Format());
             if (Breakpointing)
-                Logger.LogDebug(" (with breakpointing)", ConsoleColor.DarkRed);
+                Logger.LogDebug(_prefix + " (with breakpointing)", ConsoleColor.DarkRed);
         }
         if (Breakpointing)
         {
             try
             {
-                Generator.Emit(OpCodes.Ldstr, ".method " + Method.Format() + Environment.NewLine);
+                Generator.Emit(OpCodes.Ldstr, _prefix + ".method " + Method.Format() + Environment.NewLine);
                 Generator.Emit(OpCodes.Ldsfld, Accessor.LoggerStackCleanerField);
                 Generator.Emit(OpCodes.Ldc_I4_1);
                 Generator.Emit(OpCodes.Newobj, Accessor.StackTraceIntConstructor);
@@ -96,7 +112,7 @@ public class DebuggableEmitter : IOpCodeEmitter
             }
             catch (MemberAccessException)
             {
-                Generator.Emit(OpCodes.Ldstr, ".method " + Method.Format());
+                Generator.Emit(OpCodes.Ldstr, _prefix + ".method " + Method.Format());
             }
             PatchUtil.LoadConstantI4(this, (int)ConsoleColor.DarkRed);
             Generator.Emit(Accessor.LogDebug.GetCallRuntime(), Accessor.LogDebug);
@@ -624,10 +640,10 @@ public class DebuggableEmitter : IOpCodeEmitter
         else
             msg = "IL" + ILOffset.ToString("X5") + " " + (LogIndent <= 0 ? string.Empty : new string(' ', LogIndent)) + txt.Colorize(ConsoleColor.DarkCyan);
         if (DebugLog)
-            Logger.LogDebug(msg);
+            Logger.LogDebug(_prefix + msg);
         if (Breakpointing)
         {
-            Generator.Emit(OpCodes.Ldstr, msg);
+            Generator.Emit(OpCodes.Ldstr, _prefix + msg);
             PatchUtil.LoadConstantI4(this, (int)ConsoleColor.DarkRed);
             Generator.Emit(Accessor.LogDebug.GetCallRuntime(), Accessor.LogDebug);
         }
@@ -639,21 +655,21 @@ public class DebuggableEmitter : IOpCodeEmitter
         CheckInit();
         string msg = "IL" + ILOffset.ToString("X5") + " " + (LogIndent <= 0 ? string.Empty : new string(' ', LogIndent)) + new CodeInstruction(code, operand).Format();
         if (DebugLog)
-            Logger.LogDebug(msg);
+            Logger.LogDebug(_prefix + msg);
         if (Breakpointing && !_lastWasPrefix)
         {
-            Generator.Emit(OpCodes.Ldstr, msg);
+            Generator.Emit(OpCodes.Ldstr, _prefix + msg);
             PatchUtil.LoadConstantI4(this, (int)ConsoleColor.DarkRed);
             Generator.Emit(Accessor.LogDebug.GetCallRuntime(), Accessor.LogDebug);
         }
         _lastWasPrefix = code.OpCodeType == OpCodeType.Prefix;
     }
     void _ILGenerator.GetIDsOfNames(ref Guid riid, IntPtr rgszNames, uint cNames, uint lcid, IntPtr rgDispId)
-        => ((_ILGenerator)Generator).GetIDsOfNames(ref riid, rgszNames, cNames, lcid, rgDispId);
+        => Generator.GetIDsOfNames(ref riid, rgszNames, cNames, lcid, rgDispId);
     void _ILGenerator.GetTypeInfo(uint iTInfo, uint lcid, IntPtr ppTInfo)
-        => ((_ILGenerator)Generator).GetTypeInfo(iTInfo, lcid, ppTInfo);
+        => Generator.GetTypeInfo(iTInfo, lcid, ppTInfo);
     void _ILGenerator.GetTypeInfoCount(out uint pcTInfo)
-        => ((_ILGenerator)Generator).GetTypeInfoCount(out pcTInfo);
+        => Generator.GetTypeInfoCount(out pcTInfo);
     void _ILGenerator.Invoke(uint dispIdMember, ref Guid riid, uint lcid, short wFlags, IntPtr pDispParams, IntPtr pVarResult, IntPtr pExcepInfo, IntPtr puArgErr)
-        => ((_ILGenerator)Generator).Invoke(dispIdMember, ref riid, lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
+        => Generator.Invoke(dispIdMember, ref riid, lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
 }

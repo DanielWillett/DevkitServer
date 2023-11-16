@@ -383,7 +383,7 @@ public static class NavigationUtil
         if (!CheckSync(out NavigationSync sync) || !flag.TryGetIndex(out byte nav) || !NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
             return false;
 
-        sync.EnqueueSync(netId);
+        sync.EnqueueGraphSync(netId);
         return true;
     }
 
@@ -397,7 +397,7 @@ public static class NavigationUtil
         if (!CheckSync(out NavigationSync sync) || !NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
             return false;
 
-        sync.EnqueueSync(netId);
+        sync.EnqueueGraphSync(netId);
         return true;
     }
 
@@ -411,7 +411,7 @@ public static class NavigationUtil
         if (!CheckSync(out NavigationSync sync))
             return false;
 
-        sync.EnqueueSync(netId);
+        sync.EnqueueGraphSync(netId);
         return true;
     }
 

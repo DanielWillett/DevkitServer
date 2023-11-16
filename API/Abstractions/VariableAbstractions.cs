@@ -53,6 +53,81 @@ public static class Variables
     }
 
     /// <summary>
+    /// Find a variable by declaring type and name.
+    /// </summary>
+    /// <typeparam name="TDeclaringType">Type which declares the member, or a type up the hierarchy of a type that declares the member.</typeparam>
+    public static IVariable? Find<TDeclaringType>(string name, bool ignoreCase = false) => Find(typeof(TDeclaringType), name, ignoreCase);
+
+    /// <summary>
+    /// Find a variable by declaring type and name.
+    /// </summary>
+    /// <param name="declaringType">Type which declares the member, or a type up the hierarchy of a type that declares the member.</param>
+    public static IVariable? Find(Type declaringType, string name, bool ignoreCase = false)
+    {
+        const BindingFlags defaultFlags = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static;
+
+        if (!ignoreCase)
+        {
+            FieldInfo? field = declaringType.GetField(name, defaultFlags);
+            if (field != null)
+                return new FieldVariable(field);
+
+            PropertyInfo? property;
+            try
+            {
+                property = declaringType.GetProperty(name, defaultFlags);
+            }
+            catch (AmbiguousMatchException)
+            {
+                property = declaringType.GetProperties(defaultFlags).FirstOrDefault(x => x.Name.Equals(name, StringComparison.Ordinal));
+            }
+            if (property != null)
+                return new PropertyVariable(property);
+
+            declaringType = declaringType.BaseType!;
+            if (declaringType == null)
+                return null;
+
+            field = declaringType.GetField(name, defaultFlags | BindingFlags.FlattenHierarchy);
+            if (field != null)
+                return new FieldVariable(field);
+            
+            try
+            {
+                property = declaringType.GetProperty(name, defaultFlags | BindingFlags.FlattenHierarchy);
+            }
+            catch (AmbiguousMatchException)
+            {
+                property = declaringType.GetProperties(defaultFlags | BindingFlags.FlattenHierarchy).FirstOrDefault(x => x.Name.Equals(name, StringComparison.Ordinal));
+            }
+
+            return property != null ? new PropertyVariable(property) : null;
+        }
+        else
+        {
+            FieldInfo? field = declaringType.GetFields(defaultFlags).FirstOrDefault(x => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (field != null)
+                return new FieldVariable(field);
+
+            PropertyInfo? property = declaringType.GetProperties(defaultFlags).FirstOrDefault(x => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (property != null)
+                return new PropertyVariable(property);
+
+            declaringType = declaringType.BaseType!;
+            if (declaringType == null)
+                return null;
+
+            field = declaringType.GetFields(defaultFlags | BindingFlags.FlattenHierarchy).FirstOrDefault(x => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (field != null)
+                return new FieldVariable(field);
+
+            property = declaringType.GetProperties(defaultFlags | BindingFlags.FlattenHierarchy).FirstOrDefault(x => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+            return property != null ? new PropertyVariable(property) : null;
+        }
+    }
+
+    /// <summary>
     /// Checks if it is safe to set this variable to a value of <paramref name="type"/>.
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
