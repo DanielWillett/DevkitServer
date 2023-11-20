@@ -28,7 +28,7 @@ internal class DevkitServerResources
         new DevkitServerDirectoryResource("Bundles", new Version(0, 0, 1, 0)),
         new DevkitServerDirectoryResource("Data", new Version(0, 0, 1, 0)),
         new DevkitServerDirectoryResource("Libraries", new Version(0, 0, 1, 0)),
-        new DevkitServerDirectoryResource(Path.Combine("Libraries", "ForwardingTargets"), new Version(0, 0, 15, 0)) { Delete = true },
+        new DevkitServerDirectoryResource(Path.Combine("Libraries", "ForwardingTargets"), new Version(0, 0, 18, 0)),
 
         // Defaults
         new DevkitServerFileResource(Path.Combine("Defaults", "client_config.json"), new Version(0, 0, 15, 0)) { Side = Side.Client },
@@ -43,7 +43,7 @@ internal class DevkitServerResources
         new DevkitServerFileResource(Path.Combine("Schemas", "permission_groups_schema.json"), new Version(0, 0, 15, 0)) { Side = Side.Server },
 
         // Root
-        new DevkitServerFileResource(@"DevkitServer.module", new Version(0, 0, 15, 0)),
+        new DevkitServerFileResource(@"DevkitServer.module", new Version(0, 0, 17, 0)),
         new DevkitServerFileResource(@"English.dat", new Version(0, 0, 1, 0)),
         
         // Bundles
@@ -58,6 +58,7 @@ internal class DevkitServerResources
 
         // Data
         new DevkitServerFileResource(Path.Combine("Data", "Object Icon Presets (Vanilla).json"), new Version(0, 0, 15, 0)),
+        new DevkitServerFileResource("DevkitServer.LICENSE", Path.Combine("Bin", "LICENSE.txt"), new Version(0, 0, 16, 0)),
 
         // Legacy Libraries (Deleted)
         new DevkitServerFileResource(Lib("Library Info.txt"), new Version(0, 0, 15, 0)) { Delete = true },
@@ -94,13 +95,11 @@ internal class DevkitServerResources
         new DevkitServerFileResource("UniTask.pdb", Lib("UniTask.pdb"), new Version(0, 0, 15, 0)) { Delete = true },
         new DevkitServerFileResource("UniTask.xml", Lib("UniTask.xml"), new Version(0, 0, 15, 0)) { Delete = true },
         new DevkitServerFileResource(Lib("UniTask.dll license.txt"), new Version(0, 0, 15, 0)) { Delete = true },
-        new DevkitServerFileResource(Lib("ForwardingTargets", "DanielWillett.ReflectionTools.dll"), new Version(0, 0, 15, 0)) { Delete = true },
-        new DevkitServerFileResource(Lib("ForwardingTargets", "DanielWillett.UnturnedUITools.dll"), new Version(0, 0, 15, 0)) { Delete = true },
 
         // New Libraries
 
         new DevkitServerFileResource("Lib.Harmony",
-            Lib("Lib.Harmony", "0Harmony.dll"), new Version(0, 0, 15, 0)),
+            Lib("Lib.Harmony", "0Harmony.dll"), new Version(0, 0, 23, 0)),
         new DevkitServerFileResource("Lib.Harmony.LICENSE",
             Lib("Lib.Harmony", "LICENSE.txt"), new Version(0, 0, 15, 0)),
         new DevkitServerFileResource("Lib.Harmony.README",
@@ -111,32 +110,32 @@ internal class DevkitServerResources
             Lib("Lib.Harmony", "0Harmony.deps.json"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("Mono.Cecil",
-            Lib("Lib.Harmony", "Mono.Cecil", "Mono.Cecil.dll"), new Version(0, 0, 15, 0)),
+            Lib("Lib.Harmony", "Mono.Cecil", "Mono.Cecil.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("Mono.Cecil.LICENSE",
             Lib("Lib.Harmony", "Mono.Cecil", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("MonoMod.Common",
-            Lib("Lib.Harmony", "MonoMod.Common", "MonoMod.Common.dll"), new Version(0, 0, 15, 0)),
+            Lib("Lib.Harmony", "MonoMod.Common", "MonoMod.Common.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("MonoMod.Common.LICENSE",
             Lib("Lib.Harmony", "MonoMod.Common", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.Reflection.Emit.ILGeneration",
-            Lib("Lib.Harmony", "System.Reflection.Emit.ILGeneration", "System.Reflection.Emit.ILGeneration.dll"), new Version(0, 0, 15, 0)),
+            Lib("Lib.Harmony", "System.Reflection.Emit.ILGeneration", "System.Reflection.Emit.ILGeneration.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("System.Reflection.Emit.ILGeneration.LICENSE",
             Lib("Lib.Harmony", "System.Reflection.Emit.ILGeneration", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.Reflection.Emit.Lightweight",
-            Lib("Lib.Harmony", "System.Reflection.Emit.Lightweight", "System.Reflection.Emit.Lightweight.dll"), new Version(0, 0, 15, 0)),
+            Lib("Lib.Harmony", "System.Reflection.Emit.Lightweight", "System.Reflection.Emit.Lightweight.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("System.Reflection.Emit.Lightweight.LICENSE",
             Lib("Lib.Harmony", "System.Reflection.Emit.Lightweight", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("netstandard",
-            Lib(".NET Standard 2.1", "netstandard.dll"), new Version(0, 0, 15, 0)),
+            Lib(".NET Standard 2.1", "netstandard.dll"), new Version(0, 0, 23, 0)),
         new DevkitServerFileResource("netstandard.LICENSE",
             Lib(".NET Standard 2.1", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("DanielWillett.StackCleaner",
-            Lib("DanielWillett.StackCleaner", "DanielWillett.StackCleaner.dll"), new Version(0, 0, 15, 0)),
+            Lib("DanielWillett.StackCleaner", "DanielWillett.StackCleaner.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("DanielWillett.StackCleaner.LICENSE",
             Lib("DanielWillett.StackCleaner", "LICENSE.txt"), new Version(0, 0, 15, 0)),
         new DevkitServerFileResource("DanielWillett.StackCleaner.XmlDocs",
@@ -145,74 +144,74 @@ internal class DevkitServerResources
             Lib("DanielWillett.StackCleaner", "DanielWillett.StackCleaner.pdb"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("FWD.DanielWillett.ReflectionTools",
-            LibFwd("DanielWillett.ReflectionTools.dll"), new Version(0, 0, 15, 0)),
+            LibFwd("DanielWillett.ReflectionTools.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("FWD.DanielWillett.UnturnedUITools",
-            LibFwd("DanielWillett.UnturnedUITools.dll"), new Version(0, 0, 15, 0)) { Side = Side.Client },
+            LibFwd("DanielWillett.UnturnedUITools.dll"), new Version(0, 0, 22, 0)) { Side = Side.Client },
         new DevkitServerFileResource("FWD.DanielWillett.LevelObjectIcons",
-            LibFwd("DanielWillett.LevelObjectIcons.dll"), new Version(0, 0, 15, 0)) { Side = Side.Client },
+            LibFwd("DanielWillett.LevelObjectIcons.dll"), new Version(0, 0, 22, 0)) { Side = Side.Client },
 
         new DevkitServerFileResource("Microsoft.Bcl.AsyncInterfaces",
-            Lib("Microsoft.Bcl.AsyncInterfaces", "Microsoft.Bcl.AsyncInterfaces.dll"), new Version(0, 0, 15, 0)),
+            Lib("Microsoft.Bcl.AsyncInterfaces", "Microsoft.Bcl.AsyncInterfaces.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("Microsoft.Bcl.AsyncInterfaces.LICENSE",
             Lib("Microsoft.Bcl.AsyncInterfaces", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("Microsoft.Bcl.HashCode",
-            Lib("Microsoft.Bcl.HashCode", "Microsoft.Bcl.HashCode.dll"), new Version(0, 0, 15, 0)),
+            Lib("Microsoft.Bcl.HashCode", "Microsoft.Bcl.HashCode.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("Microsoft.Bcl.HashCode.LICENSE",
             Lib("Microsoft.Bcl.HashCode", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.Buffers",
-            Lib("System.Buffers", "System.Buffers.dll"), new Version(0, 0, 15, 0)),
+            Lib("System.Buffers", "System.Buffers.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("System.Buffers.LICENSE",
             Lib("System.Buffers", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.IO.Compression",
-            Lib("System.IO.Compression", "System.IO.Compression.dll"), new Version(0, 0, 15, 0)),
+            Lib("System.IO.Compression", "System.IO.Compression.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("System.IO.Compression.LICENSE",
             Lib("System.IO.Compression", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.IO.Compression.FileSystem",
-            Lib("System.IO.Compression.FileSystem", "System.IO.Compression.FileSystem.dll"), new Version(0, 0, 15, 0)),
+            Lib("System.IO.Compression.FileSystem", "System.IO.Compression.FileSystem.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("System.IO.Compression.FileSystem.LICENSE",
             Lib("System.IO.Compression.FileSystem", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.Memory",
-            Lib("System.Memory", "System.Memory.dll"), new Version(0, 0, 15, 0)),
+            Lib("System.Memory", "System.Memory.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("System.Memory.LICENSE",
             Lib("System.Memory", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.Numerics.Vectors",
-            Lib("System.Numerics.Vectors", "System.Numerics.Vectors.dll"), new Version(0, 0, 15, 0)),
+            Lib("System.Numerics.Vectors", "System.Numerics.Vectors.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("System.Numerics.Vectors.LICENSE",
             Lib("System.Numerics.Vectors", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.Runtime.CompilerServices.Unsafe",
-            Lib("System.Runtime.CompilerServices.Unsafe", "System.Runtime.CompilerServices.Unsafe.dll"), new Version(0, 0, 15, 0)),
+            Lib("System.Runtime.CompilerServices.Unsafe", "System.Runtime.CompilerServices.Unsafe.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("System.Runtime.CompilerServices.Unsafe.LICENSE",
             Lib("System.Runtime.CompilerServices.Unsafe", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.Text.Encodings.Web",
-            Lib("System.Text.Encodings.Web", "System.Text.Encodings.Web.dll"), new Version(0, 0, 15, 0)),
+            Lib("System.Text.Encodings.Web", "System.Text.Encodings.Web.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("System.Text.Encodings.Web.LICENSE",
             Lib("System.Text.Encodings.Web", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.Text.Json",
-            Lib("System.Text.Json", "System.Text.Json.dll"), new Version(0, 0, 15, 0)),
+            Lib("System.Text.Json", "System.Text.Json.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("System.Text.Json.LICENSE",
             Lib("System.Text.Json", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.Threading.Tasks.Extensions",
-            Lib("System.Threading.Tasks.Extensions", "System.Threading.Tasks.Extensions.dll"), new Version(0, 0, 15, 0)),
+            Lib("System.Threading.Tasks.Extensions", "System.Threading.Tasks.Extensions.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("System.Threading.Tasks.Extensions.LICENSE",
             Lib("System.Threading.Tasks.Extensions", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.ValueTuple",
-            Lib("System.ValueTuple", "System.ValueTuple.dll"), new Version(0, 0, 15, 0)),
+            Lib("System.ValueTuple", "System.ValueTuple.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("System.ValueTuple.LICENSE",
             Lib("System.ValueTuple", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("UniTask",
-            Lib("UniTask", "UniTask.dll"), new Version(0, 0, 15, 0)),
+            Lib("UniTask", "UniTask.dll"), new Version(0, 0, 22, 0)),
         new DevkitServerFileResource("UniTask.LICENSE",
             Lib("UniTask", "LICENSE.txt"), new Version(0, 0, 15, 0)),
         new DevkitServerFileResource("UniTask.XmlDocs",
@@ -235,7 +234,7 @@ internal class DevkitServerResources
         string[] newArgs = new string[args.Length + 2];
         Array.Copy(args, 0, newArgs, 2, args.Length);
         newArgs[0] = "Libraries";
-        newArgs[0] = "ForwardingTargets";
+        newArgs[1] = "ForwardingTargets";
         return Path.Combine(newArgs);
     }
 }

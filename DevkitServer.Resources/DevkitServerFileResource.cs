@@ -21,6 +21,7 @@ internal class DevkitServerFileResource : IDevkitServerResource
         ResourceName = resourceName;
         FilePath = filePath;
         LastUpdated = lastUpdated;
+        AddToDiscoveredAssemblies = Path.GetExtension(filePath).Equals(".dll", StringComparison.OrdinalIgnoreCase);
     }
     public DevkitServerFileResource(string filePath, Version lastUpdated) :
         this(Path.GetFileNameWithoutExtension(filePath), filePath, lastUpdated) { }
@@ -35,8 +36,6 @@ internal class DevkitServerFileResource : IDevkitServerResource
 
         try
         {
-            File.Delete(path);
-
             if (Path.GetExtension(path).Equals(".dll", StringComparison.OrdinalIgnoreCase))
             {
                 try
@@ -66,6 +65,8 @@ internal class DevkitServerFileResource : IDevkitServerResource
                 }
             }
 
+            File.Delete(path);
+
             CommandWindow.Log($"[DEVKITSERVER.RESOURCES] [INFO]   Unadded resource at \"{FilePath}\".");
             return true;
         }
@@ -86,8 +87,6 @@ internal class DevkitServerFileResource : IDevkitServerResource
             {
                 try
                 {
-                    File.Delete(path);
-
                     if (Path.GetExtension(path).Equals(".dll", StringComparison.OrdinalIgnoreCase))
                     {
                         try
@@ -116,6 +115,8 @@ internal class DevkitServerFileResource : IDevkitServerResource
                             CommandWindow.LogError(ex);
                         }
                     }
+
+                    File.Delete(path);
 
                     CommandWindow.Log($"[DEVKITSERVER.RESOURCES] [INFO]   Deleted resource at \"{FilePath}\".");
                 }
@@ -152,6 +153,31 @@ internal class DevkitServerFileResource : IDevkitServerResource
             {
                 stream.Write(data, 0, data.Length);
                 stream.Flush(true);
+            }
+
+            try
+            {
+                File.SetLastAccessTimeUtc(path, DateTime.UtcNow);
+            }
+            catch
+            {
+                // ignored
+            }
+            try
+            {
+                File.SetCreationTimeUtc(path, DateTime.UtcNow);
+            }
+            catch
+            {
+                // ignored
+            }
+            try
+            {
+                File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
+            }
+            catch
+            {
+                // ignored
             }
 
             if (AddToDiscoveredAssemblies && Path.GetExtension(path).Equals(".dll", StringComparison.OrdinalIgnoreCase))
@@ -192,7 +218,7 @@ internal class DevkitServerFileResource : IDevkitServerResource
             return false;
         }
     }
-    public bool ShouldApplyAnyways(string moduleDirectory) => Delete ^ File.Exists(Path.Combine(moduleDirectory, FilePath));
+    public bool ShouldApplyAnyways(string moduleDirectory) => Delete ^ !File.Exists(Path.Combine(moduleDirectory, FilePath));
     public override string ToString() => $"{{ {(Delete ? "Delete File" : "File")} | Last Updated in {LastUpdated} | '{FilePath}' }}";
 }
 
@@ -274,6 +300,31 @@ internal class DevkitServerDirectoryResource : IDevkitServerResource
         try
         {
             Directory.CreateDirectory(path);
+
+            try
+            {
+                Directory.SetLastAccessTimeUtc(path, DateTime.UtcNow);
+            }
+            catch
+            {
+                // ignored
+            }
+            try
+            {
+                Directory.SetCreationTimeUtc(path, DateTime.UtcNow);
+            }
+            catch
+            {
+                // ignored
+            }
+            try
+            {
+                Directory.SetLastWriteTimeUtc(path, DateTime.UtcNow);
+            }
+            catch
+            {
+                // ignored
+            }
             return true;
         }
         catch (Exception ex)
@@ -284,7 +335,7 @@ internal class DevkitServerDirectoryResource : IDevkitServerResource
         }
     }
 
-    public bool ShouldApplyAnyways(string moduleDirectory) => !Directory.Exists(Path.Combine(moduleDirectory, DirectoryName));
+    public bool ShouldApplyAnyways(string moduleDirectory) => Delete ^ !Directory.Exists(Path.Combine(moduleDirectory, DirectoryName));
     public override string ToString() => $"{{ Directory | Last Updated in {LastUpdated} | '{DirectoryName}' }}";
 }
 

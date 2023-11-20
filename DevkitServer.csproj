@@ -18,7 +18,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <DisableImplicitFrameworkReferences>false</DisableImplicitFrameworkReferences>
-    <Version>0.0.15</Version>
+    <Version>0.0.16</Version>
     <Authors>DanielWillett</Authors>
     <Company>DanielWillett</Company>
     <Description>Module for Unturned that enables multi-user map editing.</Description>
@@ -36,6 +36,8 @@
     <AssemblyName>DevkitServer</AssemblyName>
     <RootNamespace>DevkitServer</RootNamespace>
     <NeutralLanguage>en-US</NeutralLanguage>
+    <AssemblyVersion>$(Version).0</AssemblyVersion>
+    <FileVersion>$(Version).0</FileVersion>
   </PropertyGroup>
 
   <Import Project="$(SolutionDir)Common.targets" />
@@ -43,16 +45,12 @@
   <PropertyGroup Condition="$(DefineConstants.Contains(SERVER))">
     <Title>DevkitServer (Server Build)</Title>
     <OutputPath>bin\DevkitServer.Server\</OutputPath>
-    <AssemblyVersion>$(Version).1</AssemblyVersion>
-    <FileVersion>$(Version).1</FileVersion>
     <PackageId>DevkitServer.Server</PackageId>
     <PackageVersion>$(Version)-server</PackageVersion>
   </PropertyGroup>
   <PropertyGroup Condition="$(DefineConstants.Contains(CLIENT))">
     <Title>DevkitServer (Client Build)</Title>
     <OutputPath>bin\DevkitServer.Client\</OutputPath>
-    <AssemblyVersion>$(Version).0</AssemblyVersion>
-    <FileVersion>$(Version).0</FileVersion>
     <PackageId>DevkitServer.Client</PackageId>
     <PackageVersion>$(Version)-client</PackageVersion>
   </PropertyGroup>

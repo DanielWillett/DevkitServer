@@ -11,7 +11,7 @@ Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "Unturned", "C:\SteamCMD\ste
 		Executable = C:\SteamCMD\steamapps\common\U3DS\Unturned.exe
 		RemoteMachine = DANIEL-DESKTOP
 		StartingDirectory = C:\SteamCMD\steamapps\common\U3DS
-		Arguments = -batchmode -nographics -AutoRestartDevkitServerUpdates -DevkitServerCheckUpdateInterval 30 -DevkitServerCheckUpdateShutdownDelay 30 +insecureserver/DevkitServerTest
+		Arguments = -batchmode -nographics -AutoRestartDevkitServerUpdates -DevkitServerDebugLog -DevkitServerCheckUpdateInterval 30 -DevkitServerCheckUpdateShutdownDelay 30 +insecureserver/DevkitServerTest
 		Environment = Default
 		LaunchingEngine = 5fff7536-0c87-462d-8fd2-7971d948e6dc
 		UseLegacyDebugEngines = No
@@ -52,10 +52,10 @@ Global
 		ServerRelease|Any CPU = ServerRelease|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{C0FAB04D-A5EF-4A40-88EC-4F8F9FB24180}.ClientDebug|Any CPU.ActiveCfg = ClientDebug|Any CPU
-		{C0FAB04D-A5EF-4A40-88EC-4F8F9FB24180}.ClientDebug|Any CPU.Build.0 = ClientDebug|Any CPU
-		{C0FAB04D-A5EF-4A40-88EC-4F8F9FB24180}.ClientRelease|Any CPU.ActiveCfg = ClientRelease|Any CPU
-		{C0FAB04D-A5EF-4A40-88EC-4F8F9FB24180}.ClientRelease|Any CPU.Build.0 = ClientRelease|Any CPU
+		{C0FAB04D-A5EF-4A40-88EC-4F8F9FB24180}.ClientDebug|Any CPU.ActiveCfg = ServerRelease|Any CPU
+		{C0FAB04D-A5EF-4A40-88EC-4F8F9FB24180}.ClientDebug|Any CPU.Build.0 = ServerRelease|Any CPU
+		{C0FAB04D-A5EF-4A40-88EC-4F8F9FB24180}.ClientRelease|Any CPU.ActiveCfg = ServerRelease|Any CPU
+		{C0FAB04D-A5EF-4A40-88EC-4F8F9FB24180}.ClientRelease|Any CPU.Build.0 = ServerRelease|Any CPU
 		{C0FAB04D-A5EF-4A40-88EC-4F8F9FB24180}.Debug|Any CPU.ActiveCfg = ServerDebug|Any CPU
 		{C0FAB04D-A5EF-4A40-88EC-4F8F9FB24180}.Debug|Any CPU.Build.0 = ServerDebug|Any CPU
 		{C0FAB04D-A5EF-4A40-88EC-4F8F9FB24180}.Release|Any CPU.ActiveCfg = ServerRelease|Any CPU
@@ -98,7 +98,8 @@ Global
 		{5B03E97D-9E96-4F25-9200-33035CCD1902}.ServerRelease|Any CPU.ActiveCfg = ServerRelease|Any CPU
 		{5B03E97D-9E96-4F25-9200-33035CCD1902}.ServerRelease|Any CPU.Build.0 = ServerRelease|Any CPU
 		{58A685A9-9ACA-4592-8F91-FF574C88C3DD}.ClientDebug|Any CPU.ActiveCfg = ClientRelease|Any CPU
-		{58A685A9-9ACA-4592-8F91-FF574C88C3DD}.ClientRelease|Any CPU.ActiveCfg = ClientRelease|Any CPU
+		{58A685A9-9ACA-4592-8F91-FF574C88C3DD}.ClientRelease|Any CPU.ActiveCfg = ServerRelease|Any CPU
+		{58A685A9-9ACA-4592-8F91-FF574C88C3DD}.ClientRelease|Any CPU.Build.0 = ServerRelease|Any CPU
 		{58A685A9-9ACA-4592-8F91-FF574C88C3DD}.Debug|Any CPU.ActiveCfg = ClientDebug|Any CPU
 		{58A685A9-9ACA-4592-8F91-FF574C88C3DD}.Debug|Any CPU.Build.0 = ClientDebug|Any CPU
 		{58A685A9-9ACA-4592-8F91-FF574C88C3DD}.Release|Any CPU.ActiveCfg = ClientRelease|Any CPU

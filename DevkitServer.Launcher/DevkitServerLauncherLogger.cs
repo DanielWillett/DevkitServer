@@ -1,6 +1,6 @@
 ﻿using NuGet.Common;
+using SDG.Unturned;
 using System;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using ILogger = NuGet.Common.ILogger;
 
@@ -8,7 +8,7 @@ namespace DevkitServer.Launcher;
 internal class DevkitServerLauncherLogger : ILogger
 {
     private const string TimeFormat = "yyyy-MM-dd hh:mm:ss";
-
+    public bool ShouldLogDebug { get; set; }
     private static string GetPrefix(LogLevel lvl) => GetPrefix(lvl, DateTime.UtcNow);
     private static string GetPrefix(LogLevel lvl, DateTime time) => "[" + time.ToString(TimeFormat) +
                                                                     "] [DEVKITSERVER.LAUNCHER] [" + lvl switch
@@ -27,10 +27,8 @@ internal class DevkitServerLauncherLogger : ILogger
                                                                     };
     public void Log(LogLevel level, string data)
     {
-#if !DEBUG
-        if (level == LogLevel.Debug)
+        if (level <= LogLevel.Debug && !ShouldLogDebug)
             return;
-#endif
         if (level == LogLevel.Warning)
             LogWarning(data);
         else if (level == LogLevel.Error)
@@ -52,13 +50,11 @@ internal class DevkitServerLauncherLogger : ILogger
         else
             CommandWindow.Log(data);
     }
-    [Conditional("DEBUG")]
+
     public void LogDebug(string data)
     {
         Log(LogLevel.Debug, data);
     }
-
-    void ILogger.LogDebug(string data) => LogDebug(data);
 
     public void LogVerbose(string data)
     {

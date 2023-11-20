@@ -153,6 +153,16 @@ namespace DevkitServer.Resources.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] DevkitServer_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("DevkitServer.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] devkitserver_linux_masterbundle {
             get {
                 object obj = ResourceManager.GetObject("devkitserver_linux.masterbundle", resourceCulture);
@@ -226,6 +236,16 @@ namespace DevkitServer.Resources.Properties {
         internal static byte[] English {
             get {
                 object obj = ResourceManager.GetObject("English", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] FWD_DanielWillett_LevelObjectIcons {
+            get {
+                object obj = ResourceManager.GetObject("FWD.DanielWillett.LevelObjectIcons", resourceCulture);
                 return ((byte[])(obj));
             }
         }
@@ -326,6 +346,26 @@ namespace DevkitServer.Resources.Properties {
         internal static byte[] Microsoft_Bcl_AsyncInterfaces_LICENSE {
             get {
                 object obj = ResourceManager.GetObject("Microsoft.Bcl.AsyncInterfaces.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Microsoft_Bcl_HashCode {
+            get {
+                object obj = ResourceManager.GetObject("Microsoft.Bcl.HashCode", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Microsoft_Bcl_HashCode_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("Microsoft.Bcl.HashCode.LICENSE", resourceCulture);
                 return ((byte[])(obj));
             }
         }
@@ -686,6 +726,16 @@ namespace DevkitServer.Resources.Properties {
         internal static byte[] UniTask {
             get {
                 object obj = ResourceManager.GetObject("UniTask", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] UniTask_Dependencies {
+            get {
+                object obj = ResourceManager.GetObject("UniTask.Dependencies", resourceCulture);
                 return ((byte[])(obj));
             }
         }

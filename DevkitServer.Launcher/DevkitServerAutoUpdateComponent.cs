@@ -1,15 +1,19 @@
 ﻿using DevkitServer.Launcher.Models;
+using JetBrains.Annotations;
 using NuGet.Packaging.Core;
 using NuGet.Versioning;
 using SDG.Framework.IO;
 using SDG.Framework.Modules;
+using SDG.Unturned;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using UnityEngine;
 using UnityEngine.Networking;
 using Module = SDG.Framework.Modules.Module;
 
@@ -18,8 +22,23 @@ namespace DevkitServer.Launcher;
 public class DevkitServerAutoUpdateComponent : MonoBehaviour
 {
     public static event UpdateReady? OnUpdateReady;
-    public static float CheckTimer = 120f;
-    public static float ShutdownTimer = 120f;
+    public static event Action<DevkitServerAutoUpdateComponent>? OnAutoUpdaterInitialized;
+    public float CheckTimer { get; set; } = 120f;
+    public float ShutdownTimer { get; set; } = 120f;
+    public static bool DebugLog
+    {
+        get
+        {
+            DevkitServerAutoUpdateComponent? inst = Instance;
+            return inst != null && inst._logger.ShouldLogDebug;
+        }
+        set
+        {
+            DevkitServerAutoUpdateComponent? inst = Instance;
+            if (inst != null)
+                inst._logger.ShouldLogDebug = value;
+        }
+    }
 
     private readonly CommandLineFlag _autoRestartFlag = new CommandLineFlag(false, "-AutoRestartDevkitServerUpdates");
     private readonly CommandLineFloat _checkTimerCmd = new CommandLineFloat("-DevkitServerCheckUpdateInterval");
@@ -29,15 +48,40 @@ public class DevkitServerAutoUpdateComponent : MonoBehaviour
     private float _nuGetIndexExpiration = -1f;
     private DevkitServerLauncherLogger _logger = null!;
 
+    public static DevkitServerAutoUpdateComponent? Instance { get; private set; }
+
+    [UsedImplicitly]
+    private void Awake()
+    {
+        if (Instance != null)
+            Destroy(Instance);
+
+        _logger = new DevkitServerLauncherLogger
+        {
+            ShouldLogDebug = false
+        };
+        
+        Instance = this;
+    }
+
+    [UsedImplicitly]
+    private void OnDestroy()
+    {
+        if (ReferenceEquals(Instance, this))
+            Instance = null;
+    }
+
     [UsedImplicitly]
     private void Start()
     {
-        _logger = new DevkitServerLauncherLogger();
         StartCoroutine(CheckForUpdates());
     }
 
     private IEnumerator CheckForUpdates()
     {
+        _logger.LogInformation("Initialized DevkitServer auto-updater.");
+        OnAutoUpdaterInitialized?.Invoke(this);
+
         while (true)
         {
             float checkTimer = _checkTimerCmd.hasValue ? _checkTimerCmd.value : CheckTimer;

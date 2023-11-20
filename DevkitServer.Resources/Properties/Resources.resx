@@ -119,6 +119,9 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
+  <data name="DevkitServer.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Bin\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="Lib.Harmony" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\Lib.Harmony\0Harmony.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>

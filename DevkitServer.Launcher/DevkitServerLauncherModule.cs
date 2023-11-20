@@ -5,6 +5,7 @@ using NuGet.Packaging.Core;
 using NuGet.Versioning;
 using SDG.Framework.IO;
 using SDG.Framework.Modules;
+using SDG.Unturned;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -12,6 +13,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using UnityEngine;
 using UnityEngine.Networking;
 using ILogger = NuGet.Common.ILogger;
 using Module = SDG.Framework.Modules.Module;
@@ -31,8 +33,9 @@ public class DevkitServerLauncherModule : IModuleNexus
         try
         {
             Load(new CommandLineFlag(false, "-ForceDevkitServerReinstall").value,
-                new CommandLineFlag(false, "-DontUpdateDevkitServer").value,
-                new CommandLineFlag(false, "-DontCheckForDevkitServerUpdates").value);
+                 new CommandLineFlag(false, "-DontUpdateDevkitServer").value,
+                 new CommandLineFlag(false, "-DontCheckForDevkitServerUpdates").value,
+                 new CommandLineFlag(false, "-DevkitServerDebugLog").value);
         }
         catch (Exception ex)
         {
@@ -45,14 +48,14 @@ public class DevkitServerLauncherModule : IModuleNexus
     {
         if (_dsLaunchHost != null)
         {
-            Object.Destroy(_dsLaunchHost);
+            UnityEngine.Object.Destroy(_dsLaunchHost);
         }
     }
-    private static void Load(bool forceReinstall, bool dontUpdate, bool dontCheckForUpdates)
+    private static void Load(bool forceReinstall, bool dontUpdate, bool dontCheckForUpdates, bool debugLog)
     {
         string mainPackageId = MainPackageId;
 
-        DevkitServerLauncherLogger logger = new DevkitServerLauncherLogger();
+        DevkitServerLauncherLogger logger = new DevkitServerLauncherLogger { ShouldLogDebug = debugLog };
         Assembly thisAssembly = Assembly.GetExecutingAssembly();
 
         Module thisModule = ModuleHook.modules.Find(x => x.assemblies != null && Array.IndexOf(x.assemblies, thisAssembly) != -1) ??
@@ -186,6 +189,7 @@ public class DevkitServerLauncherModule : IModuleNexus
                     return;
                 }
                 resourcesPackage = ReadPackage(rscPath, logger);
+                
                 if (resourcesPackage == null || resourcesPackage.Version < highestResourceVersion)
                 {
                     logger.LogError($"Unable to update {ResourcePackageId}.");
@@ -204,18 +208,23 @@ public class DevkitServerLauncherModule : IModuleNexus
             }
             else
             {
-                logger.LogInformation($"{ResourcePackageId} is already up to date ({oldVersion}).");
                 if (!CheckAtLeastIsVersion(resourcesDllPath, highestResourceVersion))
+                {
+                    logger.LogInformation($"{ResourcePackageId} is up to date but needs re-extracting to version {highestResourceVersion}.");
                     unpack = true;
+                }
+                else
+                    logger.LogInformation($"{ResourcePackageId} is already up to date ({oldVersion}).");
             }
             
             if (unpack && !UnpackResourceAssembly(logger, rscPath, resourcesDllPath))
                 goto main;
 
             logger.LogInformation($"Loading resources assembly from: \"{resourcesDllPath}\".");
-            Assembly.LoadFrom(resourcesDllPath);
 
-            WriteResources(logger, mainModuleFolder, oldVersion, forceReinstall);
+            Assembly asm = Assembly.LoadFrom(resourcesDllPath);
+
+            ApplyResources(asm, logger, mainModuleFolder, oldVersion, forceReinstall);
 
             main:;
 
@@ -250,9 +259,13 @@ public class DevkitServerLauncherModule : IModuleNexus
             }
             else
             {
-                logger.LogInformation($"{mainPackageId} is already up to date ({oldVersion}).");
                 if (!CheckAtLeastIsVersion(mainDllPath, highestMainVersion))
+                {
+                    logger.LogInformation($"{mainPackageId} is up to date but needs re-extracting to version {highestMainVersion}.");
                     unpack = true;
+                }
+                else
+                    logger.LogInformation($"{mainPackageId} is already up to date ({oldVersion}).");
             }
 
             if (unpack && !UnpackMainAssembly(logger, mainPath, mainDllPath))
@@ -300,6 +313,7 @@ public class DevkitServerLauncherModule : IModuleNexus
                 if (method == null || providerInstance == null || providerInstance.GetValue(null) is not Provider provider || provider == null || !provider.gameObject.TryGetComponent(out ModuleHook moduleHook))
                 {
                     logger.LogError($"Unable to automatically install {mainPackageId}. Restart your {(Dedicator.isStandaloneDedicatedServer ? "server" : "game")} to load it. Closing in 10 seconds.");
+                    logger.LogError(" - Check for a launcher update at https://github.com/DanielWillett/DevkitServer/releases/latest/.");
                     Break();
                     return;
                 }
@@ -308,7 +322,7 @@ public class DevkitServerLauncherModule : IModuleNexus
 
                 if (modules.Count < 1)
                 {
-                    logger.LogError($"Unable to discover {mainPackageId} module file. You may have to do a manual installation if restarting doesn't fix it.");
+                    logger.LogError($"Unable to discover {mainPackageId} module file. Check for a launcher update at https://github.com/DanielWillett/DevkitServer/releases/latest/.");
                     Break();
                     return;
                 }
@@ -352,7 +366,7 @@ public class DevkitServerLauncherModule : IModuleNexus
 
                         config.Assemblies.RemoveAt(i);
 
-                        if (!Path.GetFileName(path).Equals(Dedicator.isStandaloneDedicatedServer ? "DevkitServer_Client.dll" : "DevkitServer_Server.dll", StringComparison.Ordinal))
+                        if (assembly.Role != (Dedicator.isStandaloneDedicatedServer ? EModuleRole.Client : EModuleRole.Server))
                         {
                             logger.LogError($"Missing assembly: \"{path}\".");
                             Break();
@@ -394,7 +408,8 @@ public class DevkitServerLauncherModule : IModuleNexus
         if (!dontCheckForUpdates)
         {
             _dsLaunchHost = new GameObject("DevkitServerLauncher", typeof(DevkitServerAutoUpdateComponent));
-            Object.DontDestroyOnLoad(_dsLaunchHost);
+            DevkitServerAutoUpdateComponent.DebugLog = debugLog;
+            UnityEngine.Object.DontDestroyOnLoad(_dsLaunchHost);
         }
     }
     public static string GetAbsolutePath(ModuleConfig config, ModuleAssembly assembly)
@@ -418,6 +433,32 @@ public class DevkitServerLauncherModule : IModuleNexus
     }
     private static bool UnpackResourceAssembly(ILogger logger, string path, string dllPath)
     {
+        // remove from discovered dll's.
+        if (File.Exists(dllPath))
+        {
+            try
+            {
+                AssemblyName name = AssemblyName.GetAssemblyName(dllPath);
+                FieldInfo? dictionaryField = typeof(ModuleHook).GetField("discoveredNameToPath", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
+                if (dictionaryField == null || dictionaryField.GetValue(null) is not Dictionary<AssemblyName, string> discoveredNameToPath)
+                {
+                    logger.LogError($"Error un-pre-loading {ResourcePackageId} at \"{dllPath}\". Reflection failure.");
+                    return true;
+                }
+
+                if (discoveredNameToPath.ContainsKey(name))
+                {
+                    discoveredNameToPath.Remove(name);
+                    logger.LogDebug($"Un-pre-loaded {ResourcePackageId} at \"{dllPath}\".");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"Error un-preloading {ResourcePackageId} at \"{dllPath}\".");
+                logger.LogError(ex.ToString());
+            }
+        }
+
         string? dir = Path.GetDirectoryName(dllPath);
         if (dir != null)
             Directory.CreateDirectory(dir);
@@ -445,8 +486,11 @@ public class DevkitServerLauncherModule : IModuleNexus
             }
 
             logger.LogInformation($"Unpacking assembly: \"{id}://{asmFile}\" -> \"{dllPath}\".");
+            if (File.Exists(dllPath))
+                File.Delete(dllPath);
             reader.ExtractFile(asmFile, dllPath, logger);
-            
+            SetFileUtcNow(dllPath, logger);
+
             try
             {
                 FileAttributes resxFileAttr = File.GetAttributes(dllPath);
@@ -462,7 +506,10 @@ public class DevkitServerLauncherModule : IModuleNexus
             {
                 string p = basePath + ".xml";
                 logger.LogInformation($"Unpacking xml documentation: \"{id}://{xmlFile}\" -> \"{p}\".");
+                if (File.Exists(p))
+                    File.Delete(p);
                 reader.ExtractFile(xmlFile, p, logger);
+                SetFileUtcNow(p, logger);
 
                 try
                 {
@@ -497,7 +544,10 @@ public class DevkitServerLauncherModule : IModuleNexus
 
             string p = basePath + ".pdb";
             logger.LogInformation($"Unpacking symbols: \"{id}://{symFile}\" -> \"{p}\".");
+            if (File.Exists(p))
+                File.Delete(p);
             reader.ExtractFile(symFile, p, logger);
+            SetFileUtcNow(p, logger);
 
             try
             {
@@ -542,13 +592,19 @@ public class DevkitServerLauncherModule : IModuleNexus
             }
 
             logger.LogInformation($"Unpacking assembly: \"{id}://{asmFile}\" -> \"{dllPath}\".");
+            if (File.Exists(dllPath))
+                File.Delete(dllPath);
             reader.ExtractFile(asmFile, dllPath, logger);
+            SetFileUtcNow(dllPath, logger);
 
             if (xmlFile != null)
             {
                 string p = basePath + ".xml";
                 logger.LogInformation($"Unpacking xml documentation: \"{id}://{xmlFile}\" -> \"{p}\".");
+                if (File.Exists(p))
+                    File.Delete(p);
                 reader.ExtractFile(xmlFile, p, logger);
+                SetFileUtcNow(p, logger);
             }
         }
 
@@ -572,14 +628,46 @@ public class DevkitServerLauncherModule : IModuleNexus
 
             string p = basePath + ".pdb";
             logger.LogInformation($"Unpacking symbols: \"{id}://{symFile}\" -> \"{p}\".");
+            if (File.Exists(p))
+                File.Delete(p);
             reader.ExtractFile(symFile, p, logger);
+            SetFileUtcNow(p, logger);
         }
 
         return true;
     }
-    private static void WriteResources(ILogger logger, string modulesFolder, SemanticVersion? lastVersion, bool forceReinstall)
+    private static void SetFileUtcNow(string path, ILogger logger)
     {
-        DevkitServerResources resources = new DevkitServerResources();
+        try
+        {
+            File.SetLastAccessTimeUtc(path, DateTime.UtcNow);
+        }
+        catch
+        {
+            logger.LogDebug($"Failed to set last access time of {path}.");
+        }
+
+        try
+        {
+            File.SetCreationTimeUtc(path, DateTime.UtcNow);
+        }
+        catch
+        {
+            logger.LogDebug($"Failed to set creation time of {path}.");
+        }
+
+        try
+        {
+            File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
+        }
+        catch
+        {
+            logger.LogDebug($"Failed to set last write time of {path}.");
+        }
+    }
+    private static void ApplyResources(Assembly asm, ILogger logger, string modulesFolder, SemanticVersion? lastVersion, bool forceReinstall)
+    {
+        DevkitServerResources resources = (DevkitServerResources)Activator.CreateInstance(asm.GetType("DevkitServer.Resources.DevkitServerResources"));
 
         Version oldVersion = lastVersion == null ? new Version(0, 0, 0, 0) : new Version(lastVersion.Major, lastVersion.Minor, lastVersion.Patch, 0);
 
@@ -587,9 +675,11 @@ public class DevkitServerLauncherModule : IModuleNexus
             logger.LogInformation($"Checking for resources that have been updated since version {oldVersion}.");
         else
             logger.LogInformation($"Re-installing {resources.Resources.Count} resources.");
+
         foreach (IDevkitServerResource resource in resources.Resources)
         {
-            if (resource.Side == Side.None
+            if (resource.Side <= Side.None
+                || resource.Side > Side.Both
                 || Dedicator.isStandaloneDedicatedServer && resource.Side == Side.Client
                 || !Dedicator.isStandaloneDedicatedServer && resource.Side == Side.Server)
             {
@@ -684,6 +774,8 @@ public class DevkitServerLauncherModule : IModuleNexus
         using (FileStream stream = new FileStream(path + ".nupkg", FileMode.Create, FileAccess.Write, FileShare.Read))
             stream.Write(bytes, 0, bytes.Length);
 
+        SetFileUtcNow(path + ".nupkg", logger);
+
         try
         {
             logger.LogInformation($"Downloading: {packageId} symbols (Version: {v})...");
@@ -704,8 +796,10 @@ public class DevkitServerLauncherModule : IModuleNexus
 
             bytes = getSymNupkgRequest.downloadHandler.data;
 
-            using FileStream stream = new FileStream(path + ".snupkg", FileMode.Create, FileAccess.Write, FileShare.Read);
-            stream.Write(bytes, 0, bytes.Length);
+            using (FileStream stream = new FileStream(path + ".snupkg", FileMode.Create, FileAccess.Write, FileShare.Read))
+                stream.Write(bytes, 0, bytes.Length);
+
+            SetFileUtcNow(path + ".snupkg", logger);
         }
         catch (Exception ex)
         {
@@ -758,7 +852,7 @@ public class DevkitServerLauncherModule : IModuleNexus
         UnityWebRequestAsyncOperation operation = request.SendWebRequest();
 
         while (!operation.isDone)
-            Thread.Sleep(50);
+            Thread.Sleep(15);
         bool err = request.result is UnityWebRequest.Result.ConnectionError or UnityWebRequest.Result.DataProcessingError or UnityWebRequest.Result.ProtocolError && request.responseCode != 404L;
 
         if (!err)
@@ -801,9 +895,7 @@ public class DevkitServerLauncherModule : IModuleNexus
                 return true;
             if (v.Minor < version.Minor)
                 return false;
-            if (v.Build > version.Patch)
-                return true;
-            
+
             return v.Build >= version.Patch;
         }
         catch

@@ -188,7 +188,7 @@ public class Utf8JsonPreProcessingStream : Stream
         if (count == 0)
             return 0;
 
-        if (count + offset < buffer.Length)
+        if (count + offset > buffer.Length)
             throw new ArgumentOutOfRangeException(nameof(count));
 
         int index = 0;

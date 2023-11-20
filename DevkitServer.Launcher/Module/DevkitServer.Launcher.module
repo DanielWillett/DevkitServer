@@ -1,39 +1,39 @@
 {
 	"IsEnabled": true,
 	"Name": "DevkitServer.Launcher",
-	"Version": "1.0.0.1",
+	"Version": "1.0.0.3",
 	"Assemblies":
 	[
 		{
-			"Path": "/Libraries/NuGet.Common.dll",
+			"Path": "/Libraries/NuGet/NuGet.Common.dll",
 			"Role": "Both_Optional"
 		},
 		{
-			"Path": "/Libraries/NuGet.Versioning.dll",
+			"Path": "/Libraries/NuGet/NuGet.Versioning.dll",
 			"Role": "Both_Optional"
 		},
 		{
-			"Path": "/Libraries/NuGet.Configuration.dll",
+			"Path": "/Libraries/NuGet/NuGet.Configuration.dll",
 			"Role": "Both_Optional"
 		},
 		{
-			"Path": "/Libraries/NuGet.Packaging.dll",
+			"Path": "/Libraries/NuGet/NuGet.Packaging.dll",
 			"Role": "Both_Optional"
 		},
 		{
-			"Path": "/Libraries/NuGet.Frameworks.dll",
+			"Path": "/Libraries/NuGet/NuGet.Frameworks.dll",
 			"Role": "Both_Optional"
 		},
 		{
-			"Path": "/Libraries/System.Xml.Linq.dll",
+			"Path": "/Libraries/System.Xml.Linq/System.Xml.Linq.dll",
 			"Role": "Both_Optional"
 		},
 		{
-			"Path": "/Libraries/System.IO.Compression.dll",
+			"Path": "/Libraries/System.IO.Compression/System.IO.Compression.dll",
 			"Role": "Both_Optional"
 		},
 		{
-			"Path": "/Libraries/System.IO.Compression.FileSystem.dll",
+			"Path": "/Libraries/System.IO.Compression.FileSystem/System.IO.Compression.FileSystem.dll",
 			"Role": "Both_Optional"
 		},
 		{

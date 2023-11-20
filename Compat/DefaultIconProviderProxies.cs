@@ -1,4 +1,5 @@
-﻿using DevkitServer.API;
+﻿#if CLIENT
+using DevkitServer.API;
 using DevkitServer.API.UI.Icons;
 
 namespace DevkitServer.Compat;
@@ -15,3 +16,4 @@ internal class DefaultIconProviderProxyToInternal : IDefaultIconProvider
     public bool AppliesTo(ObjectAsset @object) => _implementation.AppliesTo(@object);
     public int Priority => _implementation.Priority;
 }
+#endif
