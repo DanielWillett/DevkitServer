@@ -9,6 +9,9 @@ I would say I partially achieved this, however port-forwarding a TCP server is r
 The server runs from U3DS (Unturned 3 Dedicated Server) as a normal Steam server. Upon connecting you will be put into the editor which is synced up with any other players on the server.
 The client must also install the module, but no further setup is required.
 
+# Contact
+Join the community Discord server at [https://discord.gg/jcnYwN7QFr](https://discord.gg/jcnYwN7QFr).
+
 # Installation (Launcher - recommended)
 Download the latest release of the launcher module zip file from the Releases section.
 
