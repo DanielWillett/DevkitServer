@@ -9,15 +9,18 @@ namespace DevkitServer.Framework;
 internal class AssemblyResolver : IDisposable
 {
     internal bool TriedToLoadUIExtensionModule { get; private set; }
+    internal bool TriedToLoadLevelObjectIcons { get; private set; }
 
     private const int LogColorArgb = -4663389;
 
     private readonly UnsupportedModule[] _unsupportedModules =
     {
         new UnsupportedModule("LevelObjectIcons", new AssemblyName("LevelObjectIcons, Version=1.0.0.0, Culture=neutral, PublicKeyToken=355a72a9074e7dec"),
-            onTriedToLoad: _ =>
+            onTriedToLoad: asmResolver =>
             {
-                Log(" + Module 'LevelObjectIcons' is unsupported because DevkitServer already implements the same LevelObjectIcon UI.");
+                asmResolver.TriedToLoadLevelObjectIcons = true;
+                Log(" + Module 'LevelObjectIcons' is unsupported because DevkitServer already implements the same LevelObjectIcon UI. " +
+                    "Any referencing modules will be forwarded to DevkitServer.");
             }),
 
         new UnsupportedModule("UnturnedUITools", new AssemblyName("UnturnedUITools, Version=1.1.1.0, Culture=neutral, PublicKeyToken=5e66f8e265922cfe"),
@@ -42,19 +45,6 @@ internal class AssemblyResolver : IDisposable
 
     private static Assembly? CurrentDomainOnAssemblyResolve(object sender, ResolveEventArgs args)
     {
-        /*
-         * No clue why System.Runtime.CompilerServices.Unsafe refuses to load but this fixes it.
-         */
-
-        const string sysRtCsUnsafe = "System.Runtime.CompilerServices.Unsafe";
-
-        if (args.Name.StartsWith(sysRtCsUnsafe, StringComparison.Ordinal) && args.Name.Length == sysRtCsUnsafe.Length || args.Name[sysRtCsUnsafe.Length] == ',')
-        {
-            Assembly asm = typeof(Unsafe).Assembly;
-            Log($"Resolved assembly: \"{args.Name}\" -> \"{asm.FullName}\" @ \"{asm.Location}\".");
-            return asm;
-        }
-
         if (DevkitServerModule.InitializedPluginLoader)
         {
             PluginLibrary? library = PluginLoader.ResolveAssembly(args.Name);
@@ -66,12 +56,13 @@ internal class AssemblyResolver : IDisposable
         }
 
         Log($"Unresolved assembly: \"{args.Name}\".");
-        Log($"    - From assembly: \"{args.RequestingAssembly.FullName}\".");
+        if (args.RequestingAssembly != null)
+            Log($"    - From assembly: \"{args.RequestingAssembly.FullName}\".");
 
         return null;
     }
 
-    private static void Log(string msg)
+    internal static void Log(string msg)
     {
         if (!DevkitServerModule.InitializedLogging)
         {

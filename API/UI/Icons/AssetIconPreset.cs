@@ -1,4 +1,4 @@
-﻿using DevkitServer.Configuration;
+﻿using DevkitServer.Configuration.Converters;
 using System.Text.Json.Serialization;
 
 namespace DevkitServer.API.UI.Icons;
@@ -16,7 +16,6 @@ public class AssetIconPreset
     public Quaternion IconRotation { get; set; }
 
     [JsonPropertyName("priority")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int Priority { get; set; }
 
     [JsonIgnore]

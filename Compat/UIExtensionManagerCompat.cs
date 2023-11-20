@@ -44,6 +44,7 @@ internal class UIExtensionManagerCompat : IUIExtensionManager
     }
     internal static void Init()
     {
+        Logger.LogInfo($"Loading compat layer for {"UIExtensionManager".Colorize(new Color32(255, 255, 102, 255))}...");
         if (_instance != null)
             return;
 
@@ -60,10 +61,10 @@ internal class UIExtensionManagerCompat : IUIExtensionManager
 
         lock (_instance!)
         {
-            Logger.LogInfo("Loading compatability module for DanielWillett.UnturnedUITools.");
             UIAccessor.Init();
             UnturnedUIToolsNexus.UIExtensionManager = _instance;
             UnturnedUIToolsNexus.Initialize();
+            Logger.LogInfo($"Loaded compatability extension manager for {"UIExtensionManager".Colorize(new Color32(255, 255, 102, 255))}.");
         }
     }
 

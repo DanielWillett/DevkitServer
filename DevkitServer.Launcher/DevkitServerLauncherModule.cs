@@ -589,6 +589,20 @@ public class DevkitServerLauncherModule : IModuleNexus
             logger.LogInformation($"Re-installing {resources.Resources.Count} resources.");
         foreach (IDevkitServerResource resource in resources.Resources)
         {
+            if (resource.Side == Side.None
+                || Dedicator.isStandaloneDedicatedServer && resource.Side == Side.Client
+                || !Dedicator.isStandaloneDedicatedServer && resource.Side == Side.Server)
+            {
+                logger.LogDebug($"Resource skipped: {resource} (irrelevant platform: {resource.Side}).");
+                if (!resource.ShouldApplyAnyways(modulesFolder))
+                {
+                    logger.LogInformation($"Uninstalling resource {resource}.");
+                    resource.Unapply(modulesFolder);
+                }
+
+                continue;
+            }
+            
             bool applyingAnyways = false;
             if (!forceReinstall && resource.LastUpdated <= oldVersion && !(applyingAnyways = resource.ShouldApplyAnyways(modulesFolder)))
             {

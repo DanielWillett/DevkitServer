@@ -1,23 +1,43 @@
 ﻿#if CLIENT
+using System.Collections.ObjectModel;
+using System.Reflection;
 using DevkitServer.Configuration;
 using DevkitServer.Players;
 using DevkitServer.Plugins;
 using SDG.Framework.Modules;
+using Module = SDG.Framework.Modules.Module;
 
 namespace DevkitServer.API.UI.Icons;
-internal static class ObjectIconPresets
+
+/// <summary>
+/// Storage provider for object icon presets.
+/// </summary>
+public static class ObjectIconPresets
 {
     private static readonly List<JsonConfigurationFile<List<AssetIconPreset>>> _presetProviders = new List<JsonConfigurationFile<List<AssetIconPreset>>>(1);
     private static JsonConfigurationFile<List<AssetIconPreset>>? _customPresets;
-    private static readonly string _customPresetsPath = Path.Combine(DevkitServerConfig.Directory, "configured_icons.json");
-    public static Dictionary<Guid, AssetIconPreset> Presets = new Dictionary<Guid, AssetIconPreset>(128);
+    private static readonly Dictionary<Guid, AssetIconPreset> PresetsIntl = new Dictionary<Guid, AssetIconPreset>(128);
     private static readonly List<AssetIconPreset> DefaultPresets = new List<AssetIconPreset>(128);
+
+    /// <summary>
+    /// File path to the active configured icons file (DevkitServer/configured_icons.json).
+    /// </summary>
+    public static readonly string CustomPresetsPath = Path.Combine(DevkitServerConfig.Directory, "configured_icons.json");
+
+    /// <summary>
+    /// The current asset icon being edited.
+    /// </summary>
     public static AssetIconPreset? ActivelyEditing { get; private set; }
-    public static void Init()
+
+    /// <summary>
+    /// A map of object GUIDs to the highest priority <see cref="AssetIconPreset"/>s.
+    /// </summary>
+    public static IReadOnlyDictionary<Guid, AssetIconPreset> ActivePresets { get; } = new ReadOnlyDictionary<Guid, AssetIconPreset>(PresetsIntl);
+    internal static void Init()
     {
         Level.onPostLevelLoaded += OnLevelLoaded;
     }
-    public static void Deinit()
+    internal static void Deinit()
     {
         Level.onPostLevelLoaded += OnLevelLoaded;
     }
@@ -45,7 +65,7 @@ internal static class ObjectIconPresets
 
         ObjectIconGenerator.ClearCache(asset.GUID);
     }
-    public static void SaveEditCache(bool asNew)
+    internal static void SaveEditCache(bool asNew)
     {
         AssetIconPreset? preset = ActivelyEditing;
         if (preset == null)
@@ -62,7 +82,7 @@ internal static class ObjectIconPresets
                 existing = _customPresets.Configuration.Where(x => x.Asset.GUID == guid).OrderByDescending(x => x.Priority).FirstOrDefault();
                 contains = existing != null;
             }
-            else _presetProviders.Add(_customPresets = new JsonConfigurationFile<List<AssetIconPreset>>(_customPresetsPath) { Defaultable = true });
+            else _presetProviders.Add(_customPresets = new JsonConfigurationFile<List<AssetIconPreset>>(CustomPresetsPath) { Defaultable = true });
 
             existing ??= new AssetIconPreset
             {
@@ -83,7 +103,7 @@ internal static class ObjectIconPresets
             if (!contains)
                 _customPresets.Configuration.Add(existing);
             _customPresets.SaveConfig();
-            Presets[guid] = existing;
+            PresetsIntl[guid] = existing;
 
             Logger.LogInfo($"Updated asset icon preset: {preset.Asset.Format()}, saved to {_customPresets.File.Format()}.");
         }
@@ -113,13 +133,13 @@ internal static class ObjectIconPresets
             existing.IconPosition = preset.IconPosition;
             existing.IconRotation = preset.IconRotation;
             config.SaveConfig();
-            Presets[guid] = existing;
+            PresetsIntl[guid] = existing;
             Logger.LogInfo($"Updated asset icon preset: {preset.Asset.Format()}, saved to {config.File.Format()}.");
         }
 
         ClearEditCache();
     }
-    public static void ClearEditCache()
+    internal static void ClearEditCache()
     {
         if (ActivelyEditing == null)
             return;
@@ -135,7 +155,7 @@ internal static class ObjectIconPresets
         ReloadPresetProviders();
     }
 
-    public static void ReloadPresetProviders()
+    internal static void ReloadPresetProviders()
     {
         ThreadUtil.assertIsGameThread();
 
@@ -243,14 +263,14 @@ internal static class ObjectIconPresets
 
         }
 
-        if (!_presetProviders.Exists(x => x.File.Equals(_customPresetsPath, StringComparison.Ordinal)))
+        if (!_presetProviders.Exists(x => x.File.Equals(CustomPresetsPath, StringComparison.Ordinal)))
         {
-            string path = Path.GetFullPath(_customPresetsPath);
+            string path = Path.GetFullPath(CustomPresetsPath);
             _presetProviders.Add(_customPresets = new JsonConfigurationFile<List<AssetIconPreset>>(path) { Defaultable = true });
             Logger.LogDebug($"[{ObjectIconGenerator.Source}] + Registered working icon provider: {path.Format(false)}.");
         }
 
-        Presets.Clear();
+        PresetsIntl.Clear();
 
         ApplyDefaultProviders();
 
@@ -259,7 +279,7 @@ internal static class ObjectIconPresets
         foreach (AssetIconPreset preset in DefaultPresets)
         {
             preset.File = null;
-            Presets[preset.Asset.GUID] = preset;
+            PresetsIntl[preset.Asset.GUID] = preset;
         }
 
 
@@ -286,12 +306,12 @@ internal static class ObjectIconPresets
                     continue;
                 }
                 preset.File = configFile.File;
-                if (!Presets.TryGetValue(preset.Asset.GUID, out AssetIconPreset existing) || existing.Priority < preset.Priority)
-                    Presets[preset.Asset.GUID] = preset;
+                if (!PresetsIntl.TryGetValue(preset.Asset.GUID, out AssetIconPreset existing) || existing.Priority < preset.Priority)
+                    PresetsIntl[preset.Asset.GUID] = preset;
             }
         }
 
-        Logger.LogInfo($"[{ObjectIconGenerator.Source}] Registered {Presets.Count.Format()} unique icon presets from {ct.Format()} presets.");
+        Logger.LogInfo($"[{ObjectIconGenerator.Source}] Registered {PresetsIntl.Count.Format()} unique icon presets from {ct.Format()} presets.");
 
         GC.Collect();
     }
@@ -322,13 +342,24 @@ internal static class ObjectIconPresets
     }
     private static void ApplyDefaultProviders()
     {
-        List<IDefaultIconProvider> providers = new List<IDefaultIconProvider>(2);
-        foreach (Type type in Accessor.GetTypesSafe(
-                     ModuleHook.modules
-                         .Where(x => x.assemblies != null)
-                         .SelectMany(x => x.assemblies))
-                     .Where(x => x is { IsInterface: false, IsAbstract: false } && typeof(IDefaultIconProvider).IsAssignableFrom(x)))
+        IEnumerable<Type> types = !DevkitServerConfig.Config.DisableDefaultLevelObjectIconProviderSearch
+            ? Accessor.GetTypesSafe(ModuleHook.modules.Where(x => x.assemblies != null).SelectMany(x => x.assemblies).Concat(PluginLoader.Assemblies.Select(x => x.Assembly)), true)
+            : Accessor.GetTypesSafe(true);
+
+        List <IDefaultIconProvider> providers = new List<IDefaultIconProvider>(2);
+        foreach (Type type in types.Where(x => x is { IsInterface: false, IsAbstract: false }))
         {
+            try
+            {
+                if (!typeof(IDefaultIconProvider).IsAssignableFrom(type))
+                    continue;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogInfo($"Unable to check type for {typeof(IDefaultIconProvider).Format()} - {ex.GetType().Format()} {ex.Message.Format(true)}");
+                continue;
+            }
+
             try
             {
                 IDefaultIconProvider provider = (IDefaultIconProvider)Activator.CreateInstance(type);
@@ -339,6 +370,11 @@ internal static class ObjectIconPresets
                 Logger.LogError($"Unable to apply icon provider: {type.FullName}.", method: ObjectIconGenerator.Source);
                 Logger.LogError(ex, method: ObjectIconGenerator.Source);
             }
+        }
+
+        if (DevkitServerModule.AssemblyResolver.TriedToLoadLevelObjectIcons)
+        {
+            Compat.LevelObjectIconsCompat.AddIconProviders(providers);
         }
 
         providers.Sort((a, b) => b.Priority.CompareTo(a.Priority));

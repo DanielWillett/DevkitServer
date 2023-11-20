@@ -7,7 +7,7 @@
     <LangVersion>preview</LangVersion>
     <SignAssembly>True</SignAssembly>
     <AssemblyOriginatorKeyFile>C:\Users\danny\OneDrive\Documents\Strong Name Keys\DanielWillett.UnturnedUITools\DanielWillett.UnturnedUITools.dll.snk</AssemblyOriginatorKeyFile>
-    <Version>1.2.2</Version>
+    <Version>1.3.0</Version>
     <AssemblyVersion>$(Version).999</AssemblyVersion>
     <FileVersion>$(Version).999</FileVersion>
     <Configurations>ClientRelease</Configurations>

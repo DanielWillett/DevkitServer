@@ -2,6 +2,7 @@
 using SDG.Framework.Devkit;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.API;
 
@@ -38,11 +39,8 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
         }
     }
 
-    [JsonIgnore]
     private TConfig _config = null!;
-    [JsonIgnore]
     private readonly object _sync = new object();
-    [JsonIgnore]
     private string _file = null!;
     [JsonIgnore]
     public JsonReaderOptions ReaderOptions { get; set; } = DevkitServerConfig.ReaderOptions;
@@ -161,22 +159,11 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
 
             if (System.IO.File.Exists(path))
             {
-                using FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using Utf8JsonPreProcessingStream fs = new Utf8JsonPreProcessingStream(path);
 
-                DevkitServerUtility.AdvancePastUTF8Bom(fs);
+                ReadOnlySpan<byte> bytes = fs.ReadAllBytes();
 
-                int len = (int)Math.Min(fs.Length - fs.Position, int.MaxValue);
-                byte[] bytes = new byte[len];
-                int l = fs.Read(bytes, 0, len);
-                if (l != len)
-                {
-                    byte[] bytes2 = bytes;
-                    bytes = new byte[l];
-                    Buffer.BlockCopy(bytes2, 0, bytes, 0, Math.Min(l, len));
-                    Array.Resize(ref bytes, l);
-                }
-
-                if (len > 0)
+                if (bytes.Length > 0)
                 {
                     Utf8JsonReader reader = new Utf8JsonReader(bytes, DevkitServerConfig.ReaderOptions);
                     config = JsonSerializer.Deserialize<TConfig>(ref reader,

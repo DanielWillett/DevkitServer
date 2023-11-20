@@ -20,7 +20,10 @@ public static class OpCodeEmitters
 /// <summary>
 /// Abstraction of <see cref="ILGenerator"/>.
 /// </summary>
-public interface IOpCodeEmitter : _ILGenerator
+public interface IOpCodeEmitter
+#if NETFRAMEWORK
+    : _ILGenerator
+#endif
 {
 
     /// <summary>Gets the current offset, in bytes, in the Microsoft intermediate language (MSIL) stream that is being emitted by the <see cref="T:System.Reflection.Emit.ILGenerator" />.</summary>

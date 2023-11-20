@@ -1,14 +1,13 @@
-﻿using DevkitServer.API.Permissions;
+﻿using DevkitServer.API;
+using DevkitServer.API.Permissions;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using DevkitServer.API;
-using DevkitServer.Multiplayer;
-using DevkitServer.Players;
-
-
+using DevkitServer.Configuration.Converters;
+using DevkitServer.Util.Encoding;
 #if CLIENT
 using System.Globalization;
+using DevkitServer.Multiplayer;
 #endif
 
 namespace DevkitServer.Configuration;
@@ -33,32 +32,29 @@ public class DevkitServerConfig
         new PermissionConverter(),
         new PermissionGroupConverter(),
         new GroupPermissionConverter(),
-        new AssetReferenceJsonConverterFactory()
+        new AssetReferenceJsonConverterFactory(),
+        new TimeSpanConverter()
     };
-
-    internal static readonly InstanceSetter<Utf8JsonWriter, JsonWriterOptions>? SetWriterOptions = Accessor.GenerateInstanceSetter<Utf8JsonWriter, JsonWriterOptions>("_options");
 
     public static readonly JsonSerializerOptions SerializerSettings = new JsonSerializerOptions
     {
         WriteIndented = true,
-        IncludeFields = true,
         AllowTrailingCommas = true,
         Encoder = Encoder,
         MaxDepth = 32,
-        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals | JsonNumberHandling.AllowReadingFromString
+        ReadCommentHandling = JsonCommentHandling.Skip
     };
     public static readonly JsonSerializerOptions CondensedSerializerSettings = new JsonSerializerOptions
     {
         WriteIndented = false,
-        IncludeFields = true,
         AllowTrailingCommas = true,
         Encoder = Encoder,
         MaxDepth = 32,
-        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals | JsonNumberHandling.AllowReadingFromString
+        ReadCommentHandling = JsonCommentHandling.Skip
     };
 
-    public static readonly JsonWriterOptions WriterOptions = new JsonWriterOptions { Indented = true, Encoder = Encoder, MaxDepth = 32, SkipValidation = false };
-    public static readonly JsonWriterOptions CondensedWriterOptions = new JsonWriterOptions { Indented = false, Encoder = Encoder, MaxDepth = 32, SkipValidation = false };
+    public static readonly JsonWriterOptions WriterOptions = new JsonWriterOptions { Indented = true, Encoder = Encoder, SkipValidation = false };
+    public static readonly JsonWriterOptions CondensedWriterOptions = new JsonWriterOptions { Indented = false, Encoder = Encoder, SkipValidation = false };
     public static readonly JsonReaderOptions ReaderOptions = new JsonReaderOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip, MaxDepth = 32 };
     static DevkitServerConfig()
     {
@@ -123,11 +119,17 @@ public class DevkitServerConfig
     {
         get
         {
+            SystemConfig? cfg = _config;
+            if (cfg != null)
+                return cfg;
+
             lock (Sync)
             {
-                if (_config == null)
-                    Reload();
-                return _config!;
+                cfg = _config;
+                if (cfg == null)
+                    _config = cfg = Read();
+                
+                return cfg;
             }
         }
     }
@@ -144,34 +146,37 @@ public class DevkitServerConfig
     }
     public static void Reload()
     {
-        _config = Read();
+        lock (Sync)
+            _config = Read();
         // Save();
     }
     public static void Save()
     {
         lock (Sync)
+            Write();
+    }
+    private static void Write()
+    {
+        try
         {
-            try
+            string path = ConfigFilePath;
+            if (Path.GetDirectoryName(path) is { } dir)
+                System.IO.Directory.CreateDirectory(dir);
+            using FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+            SystemConfig? config = _config;
+            if (config == null)
             {
-                string path = ConfigFilePath;
-                if (Path.GetDirectoryName(path) is { } dir)
-                    System.IO.Directory.CreateDirectory(dir);
-                using FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
-                SystemConfig? config = _config;
-                if (config == null)
-                {
-                    config = new SystemConfig();
-                    config.SetDefaults();
-                }
-                Utf8JsonWriter writer = new Utf8JsonWriter(fs, WriterOptions);
-                JsonSerializer.Serialize(writer, config, SerializerSettings);
-                _config = config;
+                config = new SystemConfig();
+                config.SetDefaults();
             }
-            catch (Exception ex)
-            {
-                Logger.LogError("Error writing config file: \"" + ConfigFilePath + "\".", method: Source);
-                Logger.LogError(ex, method: Source);
-            }
+            Utf8JsonWriter writer = new Utf8JsonWriter(fs, WriterOptions);
+            JsonSerializer.Serialize(writer, config, SerializerSettings);
+            _config = config;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Error writing config file: \"" + ConfigFilePath + "\".", method: Source);
+            Logger.LogError(ex, method: Source);
         }
     }
 
@@ -179,65 +184,29 @@ public class DevkitServerConfig
     {
         ThreadUtil.assertIsGameThread();
 
-        lock (Sync)
+        try
         {
+            string path = ConfigFilePath;
             try
             {
-                string path = ConfigFilePath;
-                try
+                if (!File.Exists(path))
                 {
-                    if (!File.Exists(path))
-                    {
 #if SERVER
-                        string? modulePath = DevkitServerModule.FindModuleFile("server_config.json");
+                    string? modulePath = DevkitServerModule.FindModuleFile("server_config.json");
 #else
-                        string? modulePath = DevkitServerModule.FindModuleFile("client_config.json");
+                    string? modulePath = DevkitServerModule.FindModuleFile("client_config.json");
 #endif
-                        if (modulePath != null)
-                        {
-                            string? dir = Path.GetDirectoryName(path);
-                            if (dir != null)
-                                System.IO.Directory.CreateDirectory(dir);
-                            File.Copy(modulePath, path, false);
+                    if (modulePath != null)
+                    {
+                        string? dir = Path.GetDirectoryName(path);
+                        if (dir != null)
+                            System.IO.Directory.CreateDirectory(dir);
+                        File.Copy(modulePath, path, false);
 
-                            if (DevkitServerModule.InitializedLogging)
-                                Logger.LogInfo($"[{Source}] Copied default config file from: \"{modulePath}\".");
-                            else
-                                CommandWindow.Log($"[{Source}] Copied default config file from: \"{modulePath}\".");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    if (DevkitServerModule.InitializedLogging)
-                    {
-                        Logger.LogError("Error copying default config file: \"" + ConfigFilePath + "\".", method: Source);
-                        Logger.LogError(ex, method: Source);
-                    }
-                    else
-                    {
-                        CommandWindow.LogError("Error copying default config file: \"" + ConfigFilePath + "\".");
-                        CommandWindow.LogError(ex);
-                    }
-                }
-                if (File.Exists(path))
-                {
-                    using FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                    DevkitServerUtility.AdvancePastUTF8Bom(fs);
-                    int len = (int)Math.Min(fs.Length - fs.Position, int.MaxValue);
-                    byte[] bytes = new byte[len];
-                    int l = fs.Read(bytes, 0, len);
-                    if (l != len)
-                    {
-                        byte[] bytes2 = bytes;
-                        bytes = new byte[l];
-                        Buffer.BlockCopy(bytes2, 0, bytes, 0, Math.Min(l, len));
-                        Array.Resize(ref bytes, l);
-                    }
-                    if (len > 0)
-                    {
-                        Utf8JsonReader reader = new Utf8JsonReader(bytes, ReaderOptions);
-                        return JsonSerializer.Deserialize<SystemConfig>(ref reader, SerializerSettings) ?? throw new JsonException("Failed to read SystemConfig: returned null.");
+                        if (DevkitServerModule.InitializedLogging)
+                            Logger.LogInfo($"[{Source}] Copied default config file from: \"{modulePath}\".");
+                        else
+                            CommandWindow.Log($"[{Source}] Copied default config file from: \"{modulePath}\".");
                     }
                 }
             }
@@ -245,54 +214,88 @@ public class DevkitServerConfig
             {
                 if (DevkitServerModule.InitializedLogging)
                 {
-                    Logger.LogError("Error reading config file: \"" + ConfigFilePath + "\".", method: Source);
+                    Logger.LogError("Error copying default config file: \"" + ConfigFilePath + "\".", method: Source);
                     Logger.LogError(ex, method: Source);
                 }
                 else
                 {
-                    CommandWindow.LogError("Error reading config file: \"" + ConfigFilePath + "\".");
+                    CommandWindow.LogError("Error copying default config file: \"" + ConfigFilePath + "\".");
                     CommandWindow.LogError(ex);
                 }
+            }
+            if (File.Exists(path))
+            {
+                ReadOnlySpan<byte> bytes;
 
-                try
-                {
-                    int c = 0;
-                    string path;
-                    do
-                    {
-                        ++c;
-                        path = Path.Combine(Path.GetDirectoryName(ConfigFilePath)!, Path.GetFileNameWithoutExtension(ConfigFilePath) + "_backup_" + c + Path.GetExtension(ConfigFilePath));
-                    }
-                    while (File.Exists(path));
-                    File.Copy(ConfigFilePath, path);
-                }
-                catch (Exception ex2)
-                {
-                    if (DevkitServerModule.InitializedLogging)
-                    {
-                        Logger.LogError("Error backing up config file from: \"" + ConfigFilePath + "\".", method: Source);
-                        Logger.LogError(ex2, method: Source);
-                    }
-                    else
-                    {
-                        CommandWindow.LogError("Error backing up config file from: \"" + ConfigFilePath + "\".");
-                        CommandWindow.LogError(ex);
-                    }
-                }
-#if SERVER
-                if (DevkitServerModule.InitializedLogging)
-                    Logger.LogWarning("Server startup halted... fix the config errors or retart the server to use a clean config.", method: Source);
-                else
-                    CommandWindow.LogWarning("Server startup halted... fix the config errors or retart the server to use a clean config.");
+                using (Utf8JsonPreProcessingStream stream = new Utf8JsonPreProcessingStream(path))
+                    bytes = stream.ReadAllBytes();
 
-                DevkitServerModule.Fault();
-#endif
+                if (bytes.Length > 0)
+                {
+                    Utf8JsonReader reader = new Utf8JsonReader(bytes, ReaderOptions);
+                    return JsonSerializer.Deserialize<SystemConfig>(ref reader, SerializerSettings) ?? throw new JsonException("Failed to read SystemConfig: returned null.");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (DevkitServerModule.InitializedLogging)
+            {
+                Logger.LogError("Error reading config file: \"" + ConfigFilePath + "\".", method: Source);
+                Logger.LogError(ex, method: Source);
+            }
+            else
+            {
+                CommandWindow.LogError("Error reading config file: \"" + ConfigFilePath + "\".");
+                CommandWindow.LogError(ex);
             }
 
-            SystemConfig config = new SystemConfig();
-            config.SetDefaults();
-            return config;
+            try
+            {
+                int c = 0;
+                string path;
+                do
+                {
+                    ++c;
+                    path = Path.Combine(Path.GetDirectoryName(ConfigFilePath)!, Path.GetFileNameWithoutExtension(ConfigFilePath) + "_backup_" + c + Path.GetExtension(ConfigFilePath));
+                }
+                while (File.Exists(path));
+                Thread.BeginCriticalRegion();
+                try
+                {
+                    File.Copy(ConfigFilePath, path);
+                }
+                finally
+                {
+                    Thread.EndCriticalRegion();
+                }
+            }
+            catch (Exception ex2)
+            {
+                if (DevkitServerModule.InitializedLogging)
+                {
+                    Logger.LogError("Error backing up config file from: \"" + ConfigFilePath + "\".", method: Source);
+                    Logger.LogError(ex2, method: Source);
+                }
+                else
+                {
+                    CommandWindow.LogError("Error backing up config file from: \"" + ConfigFilePath + "\".");
+                    CommandWindow.LogError(ex);
+                }
+            }
+#if SERVER
+            if (DevkitServerModule.InitializedLogging)
+                Logger.LogWarning("Server startup halted... fix the config errors or retart the server to use a clean config.", method: Source);
+            else
+                CommandWindow.LogWarning("Server startup halted... fix the config errors or retart the server to use a clean config.");
+
+            DevkitServerModule.Fault();
+#endif
         }
+
+        SystemConfig config = new SystemConfig();
+        config.SetDefaults();
+        return config;
     }
     /// <summary>
     /// Recursively deletes all files and folders in <see cref="TempFolder"/>.
@@ -382,6 +385,30 @@ public class SystemConfig : SchemaConfiguration
 
     [JsonPropertyName("enable_better_map_creation")]
     public bool EnableBetterLevelCreation { get; set; }
+
+    /// <summary>
+    /// Key used to toggle the Live Editor checkbox.
+    /// </summary>
+    [JsonPropertyName("edit_keybind")]
+    public KeyCode LevelObjectEditKeybind { get; set; }
+
+    /// <summary>
+    /// Key used to print all objects that don't have an offset to Client.log.
+    /// </summary>
+    [JsonPropertyName("log_mising_keybind")]
+    public KeyCode LogMissingLevelObjectKeybind { get; set; }
+
+    /// <summary>
+    /// Enables cycling between materials in the material palette. May cause some lag on lower end machines.
+    /// </summary>
+    [JsonPropertyName("cycle_material_palette")]
+    public bool ShouldCycleLevelObjectMaterialPalette { get; set; }
+
+    /// <summary>
+    /// Disables searching other modules for default icon providers. Set this to true if errors arise from ApplyDefaultProviders.
+    /// </summary>
+    [JsonPropertyName("disable_default_provider_search")]
+    public bool DisableDefaultLevelObjectIconProviderSearch { get; set; }
 #endif
 
 #if SERVER
@@ -398,7 +425,7 @@ public class SystemConfig : SchemaConfiguration
     public string[] DefaultUserPermissionGroups { get; set; }
 
     [JsonPropertyName("high_speed")]
-    public TcpServerInfo TcpSettings;
+    public TcpServerInfo TcpSettings { get; set; }
 #endif
 #nullable restore
 #if SERVER
@@ -415,6 +442,10 @@ public class SystemConfig : SchemaConfiguration
 #if CLIENT
         EnableObjectUIExtension = true;
         EnableBetterLevelCreation = true;
+        LevelObjectEditKeybind = KeyCode.F8;
+        LogMissingLevelObjectKeybind = KeyCode.Keypad5;
+        ShouldCycleLevelObjectMaterialPalette = true;
+        DisableDefaultLevelObjectIconProviderSearch = false;
 #endif
 #if SERVER
         NewLevelInfo = NewLevelCreationOptions.Default;

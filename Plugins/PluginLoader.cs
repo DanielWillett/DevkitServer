@@ -10,6 +10,7 @@ using HarmonyLib;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using DevkitServer.Compat;
+using DevkitServer.Framework;
 using SDG.Framework.Modules;
 using Module = SDG.Framework.Modules.Module;
 using Type = System.Type;
@@ -762,6 +763,23 @@ public static class PluginLoader
                 library.ForceLoad();
                 if (library.Assembly != null)
                     return library;
+            }
+
+            AssemblyName argName = new AssemblyName(argsName);
+            foreach (KeyValuePair<string, PluginLibrary> lib in LibraryDictionary)
+            {
+                AssemblyName name = new AssemblyName(lib.Key);
+                if (!name.Name.Equals(argName.Name))
+                    continue;
+
+                if (name.Version < argName.Version)
+                    continue;
+
+                AssemblyResolver.Log($"Assembly name ({name.Name}) matched name and version but not an exact match, loading anyway.");
+
+                lib.Value.ForceLoad();
+                if (lib.Value.Assembly != null)
+                    return lib.Value;
             }
         }
 

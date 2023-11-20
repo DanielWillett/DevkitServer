@@ -12,17 +12,17 @@ public sealed class ObjectIconGenerator : MonoBehaviour
     internal const string Source = "OBJECT ICONS";
 
     /// <summary>
-    /// Field of view of the perspective camera used for rendering the icons.
+    /// Camera FOV for creating icons.
     /// </summary>
     public const float FOV = 60f;
 
     /// <summary>
-    /// How much distance affects the far clip plane.
+    /// Distance multiplier for calculating camera position automatically.
     /// </summary>
     public const float DistanceScale = 1;
 
     /// <summary>
-    /// Far clip plane multiplier.
+    /// How much distance effects the far clip plane (how far the camera can see).
     /// </summary>
     public const float FarClipPlaneScale = 2.25f;
     private static readonly Vector3 EulerDefaultCameraRotation = new Vector3(5.298f, -23.733f, 0f);
@@ -285,7 +285,7 @@ public sealed class ObjectIconGenerator : MonoBehaviour
         AssetIconPreset? preset = ObjectIconPresets.ActivelyEditing;
 
         if (preset == null || preset.Asset.GUID != asset.GUID)
-            ObjectIconPresets.Presets.TryGetValue(asset.GUID, out preset);
+            ObjectIconPresets.ActivePresets.TryGetValue(asset.GUID, out preset);
 
         if (preset != null)
         {

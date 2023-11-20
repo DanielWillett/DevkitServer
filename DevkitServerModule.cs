@@ -46,18 +46,27 @@ namespace DevkitServer;
 
 public sealed class DevkitServerModule : IModuleNexus
 {
+#if DEBUG
+    public static readonly bool IsDebug = true;
+#else
+    public static readonly bool IsDebug = false;
+#endif
+    public static readonly bool IsRelease = !IsDebug;
+
     public static readonly string RepositoryUrl = "https://github.com/DanielWillett/DevkitServer"; // don't suffix these with '/'
     public static readonly string RawRepositoryUrl = "https://raw.githubusercontent.com/DanielWillett/DevkitServer";
     public const string ModuleName = "DevkitServer";
     public static readonly string ServerRule = "DevkitServer";
     internal static readonly Color32 ModuleColor = new Color32(0, 255, 153, 255);
     internal static readonly Color32 UnturnedColor = new Color32(99, 123, 99, 255);
-    internal static NetCall ClientAskSave = new NetCall(DevkitServerNetCall.AskSave);
+
     private static CancellationTokenSource? _tknSrc;
     private static string? _asmPath;
     private static IReadOnlyList<string>? _searchLocations;
     private static string? _commitIdShort;
     internal static AssemblyResolver AssemblyResolver = null!;
+
+    internal static NetCall ClientAskSave = new NetCall(DevkitServerNetCall.AskSave);
     public static string CommitId => _commitIdShort ??= DevkitServer.CommitId.Commit.Length > 7 ? DevkitServer.CommitId.Commit.Substring(0, 7) : DevkitServer.CommitId.Commit;
     public static string LongCommitId => DevkitServer.CommitId.Commit;
     public Assembly Assembly { get; } = Assembly.GetExecutingAssembly();
@@ -146,11 +155,13 @@ public sealed class DevkitServerModule : IModuleNexus
     };
 
     public static CultureInfo CommandParseLocale { get; set; } = CultureInfo.InvariantCulture;
-    public static AssetOrigin BundleOrigin { get; }
+    public static AssetOrigin BundleOrigin { get; private set; } = new AssetOrigin
+    {
+        name = ModuleName,
+        workshopFileId = 0ul
+    };
     static DevkitServerModule()
     {
-        BundleOrigin = AssetUtil.CreateAssetOrigin(ModuleName, 0ul, true);
-
         MonoLoaded = Type.GetType("Mono.Runtime", false, false) != null;
         if (!MonoLoaded)
         {
@@ -243,6 +254,7 @@ public sealed class DevkitServerModule : IModuleNexus
 
             Logger.InitLogger();
             InitializedLogging = true;
+            BundleOrigin = AssetUtil.CreateAssetOrigin(ModuleName, 0ul, true);
             PatchesMain.Init();
 #if CLIENT
             MovementUtil.Init();

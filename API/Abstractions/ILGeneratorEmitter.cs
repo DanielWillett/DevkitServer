@@ -96,13 +96,19 @@ public class ILGeneratorEmitter : IOpCodeEmitter
     public virtual void EndScope() => _generator.EndScope();
     /// <inheritdoc />
     public virtual void MarkLabel(Label loc) => _generator.MarkLabel(loc);
+
     /// <inheritdoc />
     public virtual void MarkSequencePoint(ISymbolDocumentWriter document, int startLine, int startColumn, int endLine, int endColumn)
+#if NETFRAMEWORK
         => _generator.MarkSequencePoint(document, startLine, startColumn, endLine, endColumn);
+#else
+        => throw new NotSupportedException();
+#endif
     /// <inheritdoc />
     public virtual void ThrowException(Type excType) => _generator.ThrowException(excType);
     /// <inheritdoc />
     public virtual void UsingNamespace(string usingNamespace) => _generator.UsingNamespace(usingNamespace);
+#if NETFRAMEWORK
     /// <inheritdoc />
     void _ILGenerator.GetIDsOfNames(ref Guid riid, IntPtr rgszNames, uint cNames, uint lcid, IntPtr rgDispId)
         => ((_ILGenerator)_generator).GetIDsOfNames(ref riid, rgszNames, cNames, lcid, rgDispId);
@@ -115,7 +121,7 @@ public class ILGeneratorEmitter : IOpCodeEmitter
     /// <inheritdoc />
     void _ILGenerator.Invoke(uint dispIdMember, ref Guid riid, uint lcid, short wFlags, IntPtr pDispParams, IntPtr pVarResult, IntPtr pExcepInfo, IntPtr puArgErr)
         => ((_ILGenerator)_generator).Invoke(dispIdMember, ref riid, lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
-
+#endif
     public static implicit operator ILGeneratorEmitter(ILGenerator generator) => new ILGeneratorEmitter(generator);
     public static implicit operator ILGenerator(ILGeneratorEmitter emitter) => emitter._generator;
 }

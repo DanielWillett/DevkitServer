@@ -117,6 +117,10 @@ public static class FormattingUtil
                color.g << 8 |
                color.b;
     }
+    
+    /// <summary>
+    /// Get the closest <see cref="ConsoleColor"/> to the given ARGB data.
+    /// </summary>
     public static ConsoleColor ToConsoleColor(int argb)
     {
         int bits = ((argb >> 16) & byte.MaxValue) > 128 || ((argb >> 8) & byte.MaxValue) > 128 || (argb & byte.MaxValue) > 128 ? 8 : 0;
@@ -355,7 +359,7 @@ public static class FormattingUtil
                         sb.Append(", ".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor));
                     sb.Append(Format(type));
                     if (!string.IsNullOrEmpty(paramName))
-                        sb.Append(" " + paramName!.Colorize(FormatProvider.StackCleaner.Configuration.Colors!.ParameterColor));
+                        sb.Append(" " + paramName.Colorize(FormatProvider.StackCleaner.Configuration.Colors!.ParameterColor));
                 }
             }
             else if (arguments is { Length: > 0 })

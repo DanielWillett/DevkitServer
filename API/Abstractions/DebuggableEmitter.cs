@@ -664,6 +664,7 @@ public class DebuggableEmitter : IOpCodeEmitter
         }
         _lastWasPrefix = code.OpCodeType == OpCodeType.Prefix;
     }
+#if NETFRAMEWORK
     void _ILGenerator.GetIDsOfNames(ref Guid riid, IntPtr rgszNames, uint cNames, uint lcid, IntPtr rgDispId)
         => Generator.GetIDsOfNames(ref riid, rgszNames, cNames, lcid, rgDispId);
     void _ILGenerator.GetTypeInfo(uint iTInfo, uint lcid, IntPtr ppTInfo)
@@ -672,4 +673,5 @@ public class DebuggableEmitter : IOpCodeEmitter
         => Generator.GetTypeInfoCount(out pcTInfo);
     void _ILGenerator.Invoke(uint dispIdMember, ref Guid riid, uint lcid, short wFlags, IntPtr pDispParams, IntPtr pVarResult, IntPtr pExcepInfo, IntPtr puArgErr)
         => Generator.Invoke(dispIdMember, ref riid, lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
+#endif
 }

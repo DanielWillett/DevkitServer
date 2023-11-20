@@ -1,5 +1,6 @@
 ﻿using DevkitServer.API;
 using System.Text.Json.Serialization;
+using DevkitServer.Configuration.Converters;
 using DevkitServer.Levels;
 
 namespace DevkitServer.Configuration;
@@ -38,7 +39,7 @@ public sealed class BackupConfiguration : SchemaConfiguration
                 new DateTime(1, 1, 1, 21, 0, 0, DateTimeKind.Local), //  9:00 PM
             },
             MaxBackups = 24,
-            MaxBackupSizeMegabytes = 2097.152d,
+            MaxBackupSizeMegabytes = 2097.152d, // 2GiB
             SaveBackupLogs = true,
             BackupOnStartupCooldown = TimeSpan.FromHours(3),
             BackupOnStartup = true,

@@ -16,6 +16,5 @@ public abstract class SchemaConfiguration
     /// </summary>
     [JsonProperty("$schema", DefaultValueHandling = DefaultValueHandling.Ignore)]
     [JsonPropertyName("$schema")]
-    [System.Text.Json.Serialization.JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public abstract string SchemaURI { get; }
 }

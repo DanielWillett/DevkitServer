@@ -1407,21 +1407,6 @@ public static class DevkitServerUtility
         string path = Path.GetFullPath(config.DirectoryPath);
         return string.IsNullOrEmpty(assembly.Path) ? path : Path.Combine(path, assembly.Path[0] == '/' ? assembly.Path.Substring(1) : assembly.Path);
     }
-
-    /// <summary>
-    /// If present, reads the next 3 bytes of UTF-8 byte order mark.
-    /// </summary>
-    /// <param name="stream">Must be seekable.</param>
-    /// <exception cref="ArgumentException">Stream can not seek or can not read.</exception>
-    public static void AdvancePastUTF8Bom(Stream stream)
-    {
-        if (!stream.CanSeek || !stream.CanRead)
-            throw new ArgumentException("Stream must be able to seek and read.", nameof(stream));
-
-        bool hasBom = stream.ReadByte() == 0xEF && stream.ReadByte() == 0xBB && stream.ReadByte() == 0xBF;
-        if (!hasBom)
-            stream.Seek(0L, SeekOrigin.Begin);
-    }
 }
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]

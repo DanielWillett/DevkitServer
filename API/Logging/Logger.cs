@@ -89,15 +89,13 @@ public static class Logger
     internal const string TimeFormat = "yyyy-MM-dd hh:mm:ss";
     static Logger()
     {
-        CommandWindow.Log("Loading logging...");
-
         try
         {
             IsExternalFeatureset = DevkitServerModule.Module == null;
             StackCleanerConfiguration config = new StackCleanerConfiguration
             {
                 ColorFormatting = StackColorFormatType.ExtendedANSIColor,
-                Colors = DevkitServerModule.UnityLoaded ? UnityColor32Config.Default : Color32Config.Default,
+                Colors = Type.GetType("System.Drawing.Color", false) == null ? UnityColor32Config.Default : Color32Config.Default,
                 IncludeNamespaces = false,
                 IncludeLineData = true,
 #if DEBUG
@@ -169,12 +167,10 @@ public static class Logger
                 if (Application.platform is RuntimePlatform.WindowsPlayer or RuntimePlatform.WindowsEditor or RuntimePlatform.WindowsServer)
                 {
                     Terminal = DevkitServerModule.GameObjectHost.AddComponent<WindowsClientTerminal>();
-                    LogInfo("Initalized Windows terminal.", ConsoleColor.DarkCyan);
                 }
                 else
                 {
                     Terminal = DevkitServerModule.GameObjectHost.AddComponent<BackgroundLoggingTerminal>();
-                    LogInfo("Did not initialize a terminal.", ConsoleColor.DarkCyan);
                 }
 #else
                 Terminal = DevkitServerModule.GameObjectHost.AddComponent<ServerTerminal>();
@@ -388,7 +384,7 @@ public static class Logger
     }
     internal static void PostPatcherSetupInitLogger()
     {
-        if (IsExternalFeatureset) throw new InvalidOperationException("External access violation.");
+        if (IsExternalFeatureset) throw new InvalidOperationException("External featureset loaded.");
         try
         {
             MethodInfo? method = typeof(LogFile).GetMethod(nameof(LogFile.writeLine), BindingFlags.Instance | BindingFlags.Public);

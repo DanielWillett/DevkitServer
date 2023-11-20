@@ -13,10 +13,6 @@ namespace DevkitServer.Core.UI.Extensions;
 [UIExtension(typeof(EditorLevelObjectsUI))]
 internal class EditorLevelObjectsUIExtension : UIExtension
 {
-    // todo add to config
-    public static KeyCode EditToggleKey = KeyCode.F8;
-    public static KeyCode LogMissingKeybind = KeyCode.Keypad5;
-    public static bool ShouldCycleMaterialPalette = true;
     private const int Size = 158;
     private static bool _patched;
 #nullable disable
@@ -103,7 +99,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
 
         _editHint = Glazier.Get().CreateLabel();
         _editHint.TextContrastContext = ETextContrastContext.ColorfulBackdrop;
-        _editHint.Text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorToggleHint", MenuConfigurationControlsUI.getKeyCodeText(EditToggleKey));
+        _editHint.Text = DevkitServerModule.MainLocalization.Translate("ObjectIconEditorToggleHint", MenuConfigurationControlsUI.getKeyCodeText(DevkitServerConfig.Config.LevelObjectEditKeybind));
         _editHint.PositionScale_X = 1f;
         _editHint.PositionScale_Y = 1f;
         _editHint.PositionOffset_X = _assetsScrollBox.PositionOffset_X - (Size + 30);
@@ -330,10 +326,10 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         if (inst == null)
             return;
 
-        if (InputEx.GetKeyDown(EditToggleKey))
+        if (InputEx.GetKeyDown(DevkitServerConfig.Config.LevelObjectEditKeybind))
             inst.EditorActive = !inst.EditorActive;
 
-        if (InputEx.GetKeyDown(LogMissingKeybind))
+        if (InputEx.GetKeyDown(DevkitServerConfig.Config.LogMissingLevelObjectKeybind))
             LogMissingOffsets();
 
         if (inst._isGeneratingIcon)
@@ -370,7 +366,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
             inst.UpdateSelectedObject(true);
         }
 
-        if (ShouldCycleMaterialPalette && inst._materialIndex >= 0 && inst._nextIcon > 0f && inst._nextIcon < Time.realtimeSinceStartup)
+        if (DevkitServerConfig.Config.ShouldCycleLevelObjectMaterialPalette && inst._materialIndex >= 0 && inst._nextIcon > 0f && inst._nextIcon < Time.realtimeSinceStartup)
             inst.UpdateSelectedObject(true);
     }
 
@@ -421,7 +417,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
                 if (updateMat && obj2.materialPalette.isValid && obj2.materialPalette.Find() is { materials.Count: > 0 } palette)
                 {
                     _materialTtl = palette.materials.Count;
-                    _materialIndex = _materialTtl == 1 || !ShouldCycleMaterialPalette ? -1 : (_materialIndex == -1 ? UnityEngine.Random.Range(0, _materialTtl) : (_materialIndex + 1) % _materialTtl);
+                    _materialIndex = _materialTtl == 1 || !DevkitServerConfig.Config.ShouldCycleLevelObjectMaterialPalette ? -1 : (_materialIndex == -1 ? UnityEngine.Random.Range(0, _materialTtl) : (_materialIndex + 1) % _materialTtl);
                 }
                 else if (updateMat) _materialTtl = 0;
                 else _materialIndex = -1;
@@ -487,7 +483,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
                 _preview.SizeOffset_Y = -20f;
             }
 
-            _materialIndexLbl.Text = _materialIndex == -1 || !ShouldCycleMaterialPalette ? string.Empty : $"{_materialIndex} / {_materialTtl - 1}";
+            _materialIndexLbl.Text = _materialIndex == -1 || !DevkitServerConfig.Config.ShouldCycleLevelObjectMaterialPalette ? string.Empty : $"{_materialIndex} / {_materialTtl - 1}";
         }
         else
         {
@@ -543,7 +539,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
                      .OrderByDescending(x => x.GetOrigin()?.workshopFileId ?? 0ul)
                      .ThenBy(x => x.getFilePath()))
         {
-            if (ObjectIconPresets.Presets.ContainsKey(obj.GUID))
+            if (ObjectIconPresets.ActivePresets.ContainsKey(obj.GUID))
                 continue;
 
             AssetOrigin? assetOrigin = obj.GetOrigin();

@@ -14,6 +14,7 @@ internal class DevkitServerFileResource : IDevkitServerResource
     public Version LastUpdated { get; set; }
     public bool AddToDiscoveredAssemblies { get; set; }
     public bool Delete { get; set; }
+    public Side Side { get; set; } = Side.Both;
 
     public DevkitServerFileResource(string resourceName, string filePath, Version lastUpdated)
     {
@@ -25,8 +26,114 @@ internal class DevkitServerFileResource : IDevkitServerResource
         this(Path.GetFileNameWithoutExtension(filePath), filePath, lastUpdated) { }
 
     public byte[]? GetResourceData() => Properties.Resources.ResourceManager.GetObject(ResourceName) as byte[];
+    public bool Unapply(string moduleDirectory)
+    {
+        string path = Path.Combine(moduleDirectory, FilePath);
+
+        if (Delete)
+            return File.Exists(path);
+
+        try
+        {
+            File.Delete(path);
+
+            if (Path.GetExtension(path).Equals(".dll", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    AssemblyName name = AssemblyName.GetAssemblyName(path);
+                    FieldInfo? dictionaryField = typeof(ModuleHook).GetField("discoveredNameToPath", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
+                    if (dictionaryField == null || dictionaryField.GetValue(null) is not Dictionary<AssemblyName, string> discoveredNameToPath)
+                    {
+                        CommandWindow.LogError($"[DEVKITSERVER.RESOURCES] [ERROR]  Error un-pre-loading assembly resource at \"{FilePath}\". Reflection failure.");
+                        return true;
+                    }
+
+                    if (discoveredNameToPath.ContainsKey(name))
+                    {
+                        discoveredNameToPath.Remove(name);
+                        CommandWindow.Log($"[DEVKITSERVER.RESOURCES] [INFO]   Un-pre-loaded assembly resource at \"{FilePath}\".");
+                    }
+                    else
+                    {
+                        CommandWindow.LogWarning($"[DEVKITSERVER.RESOURCES] [WARN]   Deleted assembly {name} for resource at \"{FilePath}\" is not pre-loaded.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    CommandWindow.LogError($"[DEVKITSERVER.RESOURCES] [ERROR]  Error un-preloading assembly resource at \"{FilePath}\".");
+                    CommandWindow.LogError(ex);
+                }
+            }
+
+            CommandWindow.Log($"[DEVKITSERVER.RESOURCES] [INFO]   Unadded resource at \"{FilePath}\".");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            CommandWindow.LogError($"[DEVKITSERVER.RESOURCES] [ERROR]  Unexpected error unadding resource at \"{FilePath}\".");
+            CommandWindow.LogError(ex);
+            return false;
+        }
+    }
     public bool Apply(string moduleDirectory)
     {
+        string path = Path.Combine(moduleDirectory, FilePath);
+
+        if (Delete)
+        {
+            if (File.Exists(path))
+            {
+                try
+                {
+                    File.Delete(path);
+
+                    if (Path.GetExtension(path).Equals(".dll", StringComparison.OrdinalIgnoreCase))
+                    {
+                        try
+                        {
+                            AssemblyName name = AssemblyName.GetAssemblyName(path);
+                            FieldInfo? dictionaryField = typeof(ModuleHook).GetField("discoveredNameToPath", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
+                            if (dictionaryField == null || dictionaryField.GetValue(null) is not Dictionary<AssemblyName, string> discoveredNameToPath)
+                            {
+                                CommandWindow.LogError($"[DEVKITSERVER.RESOURCES] [ERROR]  Error un-pre-loading assembly resource at \"{FilePath}\". Reflection failure.");
+                                return true;
+                            }
+
+                            if (discoveredNameToPath.ContainsKey(name))
+                            {
+                                discoveredNameToPath.Remove(name);
+                                CommandWindow.Log($"[DEVKITSERVER.RESOURCES] [INFO]   Un-pre-loaded assembly resource at \"{FilePath}\".");
+                            }
+                            else
+                            {
+                                CommandWindow.LogWarning($"[DEVKITSERVER.RESOURCES] [WARN]   Deleted assembly {name} for resource at \"{FilePath}\" is not pre-loaded.");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            CommandWindow.LogError($"[DEVKITSERVER.RESOURCES] [ERROR]  Error un-preloading assembly resource at \"{FilePath}\".");
+                            CommandWindow.LogError(ex);
+                        }
+                    }
+
+                    CommandWindow.Log($"[DEVKITSERVER.RESOURCES] [INFO]   Deleted resource at \"{FilePath}\".");
+                }
+                catch (Exception ex)
+                {
+                    CommandWindow.LogError($"[DEVKITSERVER.RESOURCES] [ERROR]  Unexpected error deleting resource at \"{FilePath}\".");
+                    CommandWindow.LogError(ex);
+                    return false;
+                }
+            }
+            else
+            {
+                CommandWindow.Log($"[DEVKITSERVER.RESOURCES] [DEBUG]  Resource already deleted: \"{FilePath}\".");
+            }
+
+            return true;
+        }
+
         byte[]? data = GetResourceData();
         if (data == null)
         {
@@ -36,22 +143,6 @@ internal class DevkitServerFileResource : IDevkitServerResource
         
         try
         {
-            string path = Path.Combine(moduleDirectory, FilePath);
-
-            if (Delete)
-            {
-                if (File.Exists(path))
-                {
-                    File.Delete(path);
-                    CommandWindow.Log($"[DEVKITSERVER.RESOURCES] [INFO]   Deleted resource at \"{FilePath}\".");
-                }
-                else
-                {
-                    CommandWindow.Log($"[DEVKITSERVER.RESOURCES] [DEBUG]  Resource already deleted: \"{FilePath}\".");
-                }
-
-                return true;
-            }
 
             string? dir = Path.GetDirectoryName(path);
             if (dir != null)
@@ -109,11 +200,37 @@ internal class DevkitServerDirectoryResource : IDevkitServerResource
 {
     public string DirectoryName { get; set; }
     public Version LastUpdated { get; set; }
+    public bool Delete { get; set; }
+    public Side Side { get; set; } = Side.Both;
 
     public DevkitServerDirectoryResource(string directoryName, Version lastUpdated)
     {
         DirectoryName = directoryName;
         LastUpdated = lastUpdated;
+    }
+    public bool Unapply(string moduleDirectory)
+    {
+        string path = Path.Combine(moduleDirectory, DirectoryName);
+
+        if (Delete)
+            return Directory.Exists(path);
+
+        try
+        {
+            Directory.Delete(path, Directory.GetFiles(path, "*.dll", SearchOption.AllDirectories).Length == 0);
+            return true;
+        }
+        catch (IOException) // dll's need to be unloaded
+        {
+            CommandWindow.LogError($"[DEVKITSERVER.RESOURCES] [ERROR]  Error deleting resource at \"{DirectoryName}\". Directory is not empty.");
+        }
+        catch (Exception ex)
+        {
+            CommandWindow.LogError($"[DEVKITSERVER.RESOURCES] [ERROR]  Unexpected error deleting resource at \"{DirectoryName}\".");
+            CommandWindow.LogError(ex);
+        }
+
+        return false;
     }
     public bool Apply(string moduleDirectory)
     {
@@ -121,10 +238,39 @@ internal class DevkitServerDirectoryResource : IDevkitServerResource
 
         if (Directory.Exists(path))
         {
-            CommandWindow.Log($"[DEVKITSERVER.RESOURCES] [DEBUG]  Required directory: \"{DirectoryName}\" already exists.");
-            return false;
+            if (!Delete)
+            {
+                CommandWindow.Log($"[DEVKITSERVER.RESOURCES] [DEBUG]  Required directory: \"{DirectoryName}\" already exists.");
+                return false;
+            }
+
+            if (!Directory.Exists(path))
+            {
+                CommandWindow.Log($"[DEVKITSERVER.RESOURCES] [DEBUG]  Resource already deleted: \"{DirectoryName}\".");
+            }
+            else
+            {
+                try
+                {
+                    Directory.Delete(path, Directory.GetFiles(path, "*.dll", SearchOption.AllDirectories).Length == 0);
+                    return true;
+                }
+                catch (IOException) // dll's need to be unloaded
+                {
+                    CommandWindow.LogError($"[DEVKITSERVER.RESOURCES] [ERROR]  Error deleting resource at \"{DirectoryName}\". Directory is not empty.");
+                }
+                catch (Exception ex)
+                {
+                    CommandWindow.LogError($"[DEVKITSERVER.RESOURCES] [ERROR]  Unexpected error deleting resource at \"{DirectoryName}\".");
+                    CommandWindow.LogError(ex);
+                }
+
+                return false;
+            }
         }
-        
+
+        if (Delete)
+            return true;
         try
         {
             Directory.CreateDirectory(path);
@@ -145,6 +291,8 @@ internal class DevkitServerDirectoryResource : IDevkitServerResource
 internal interface IDevkitServerResource
 {
     Version LastUpdated { get; }
+    Side Side { get; }
+    bool Unapply(string moduleDirectory);
     bool Apply(string moduleDirectory);
     bool ShouldApplyAnyways(string moduleDirectory);
 }

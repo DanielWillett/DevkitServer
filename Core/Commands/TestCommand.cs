@@ -151,7 +151,7 @@ internal static class CommandTests
 
         Assets.find(assets);
 
-        assets.RemoveAll(x => x.type == EObjectType.DECAL || ObjectIconPresets.Presets.ContainsKey(x.GUID));
+        assets.RemoveAll(x => x.type == EObjectType.DECAL || ObjectIconPresets.ActivePresets.ContainsKey(x.GUID));
 
 
         for (int i = 0; i < assets.Count; i++)

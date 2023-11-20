@@ -35,5 +35,25 @@
    *
    *  Disable if you're seeing warnings about Level.add on load, or crashes when creating maps.
    */
-  "enable_better_map_creation": true
+  "enable_better_map_creation": true,
+
+  /*
+   *  Key used to toggle the Live Editor checkbox in the LevelObjectIcons extension.
+   */
+  "edit_keybind": "F8",
+
+  /*
+   *  Key used to print all objects that don't have an offset to Client.log for the LevelObjectIcons extension.
+   */
+  "log_mising_keybind": "Keypad5",
+
+  /*
+   *  Enables cycling between materials in the material palette in the LevelObjectIcons extension. May cause some lag on lower end machines.
+   */
+  "cycle_material_palette": true,
+
+  /*
+   *  Disables searching other modules for default icon providers for the LevelObjectIcons extension. Set this to true if errors arise from ApplyDefaultProviders.
+   */
+  "disable_default_provider_search": false
 }

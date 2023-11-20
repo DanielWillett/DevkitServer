@@ -8,7 +8,6 @@ namespace DevkitServer.API.Permissions;
 public sealed class PermissionGroup : IReadOnlyList<GroupPermission>
 {
 #nullable disable
-    [JsonIgnore]
     private readonly List<GroupPermission> _permissions;
 
     [JsonPropertyName("id")]
@@ -275,8 +274,9 @@ public readonly struct GroupPermission
 {
     public Permission Permission { get; }
     public bool IsRemoved { get; }
-
-    [JsonConstructor]
+#nullable disable
+    public GroupPermission() { }
+#nullable restore
     public GroupPermission(Permission permission, bool isRemoved)
     {
         Permission = permission;

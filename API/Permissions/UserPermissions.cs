@@ -885,7 +885,6 @@ public class PermissionGroupsConfig : SchemaConfiguration
 {
     public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/permission_groups_schema.json", true);
 
-    [JsonIgnore]
     private static PermissionGroupsConfig? _default;
 
     [JsonPropertyName("groups")]

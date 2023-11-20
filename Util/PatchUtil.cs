@@ -4,6 +4,7 @@ using HarmonyLib;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
+using DevkitServer.Patches;
 
 namespace DevkitServer.Util;
 
@@ -12,6 +13,11 @@ namespace DevkitServer.Util;
 /// </summary>
 public static class PatchUtil
 {
+    /// <summary>
+    /// The instance of harmony used for patching in <see cref="DevkitServerModule"/>. This shouldn't be used for patching.
+    /// </summary>
+    public static Harmony DevkitServerModulePatcher => PatchesMain.Patcher;
+
     /// <summary>
     /// Returns instructions to throw the provided <typeparamref name="TException"/> with an optional <paramref name="message"/>.
     /// </summary>

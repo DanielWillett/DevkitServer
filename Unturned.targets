@@ -33,23 +33,16 @@
     <!-- Other Libraries -->
     <ItemGroup>
         <Reference Include="UniTask">
-            <HintPath>$(IncludedLibrariesPath)\UniTask.dll</HintPath>
+            <HintPath>$(IncludedLibrariesPath)\UniTask\UniTask.dll</HintPath>
             <Private>false</Private>
         </Reference>
 
         <!-- System.IO.Compression -->
-        <Reference Include="System.Data.DataSetExtensions">
+        <Reference Include="System.IO.Compression" Condition="'$(TargetFramework)' != 'netstandard2.1'" >
             <Private>false</Private>
         </Reference>
-        <Reference Include="System.IO.Compression">
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="System.IO.Compression.FileSystem">
-            <HintPath>$(IncludedLibrariesPath)\System.IO.Compression.FileSystem.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="System.Runtime">
-            <HintPath>$(IncludedLibrariesPath)\System.Runtime.dll</HintPath>
+        <Reference Include="System.IO.Compression.FileSystem" Condition="'$(TargetFramework)' != 'netstandard2.1'" >
+            <HintPath>$(IncludedLibrariesPath)\System.IO.Compression.FileSystem\System.IO.Compression.FileSystem.dll</HintPath>
             <Private>false</Private>
         </Reference>
     </ItemGroup>
@@ -265,38 +258,6 @@
         </Reference>
         <Reference Include="Pathfinding.Poly2Tri">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\Pathfinding.Poly2Tri.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="System.Configuration">
-            <HintPath>$(SharedPath)\Unturned_Data\Managed\System.Configuration.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="System.Core">
-            <HintPath>$(SharedPath)\Unturned_Data\Managed\System.Core.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="System.Data">
-            <HintPath>$(SharedPath)\Unturned_Data\Managed\System.Data.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="System.EnterpriseServices">
-            <HintPath>$(SharedPath)\Unturned_Data\Managed\System.EnterpriseServices.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="System.Numerics">
-            <HintPath>$(SharedPath)\Unturned_Data\Managed\System.Numerics.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="System.Security">
-            <HintPath>$(SharedPath)\Unturned_Data\Managed\System.Security.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="System.Transactions">
-            <HintPath>$(SharedPath)\Unturned_Data\Managed\System.Transactions.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
-        <Reference Include="System.Xml">
-            <HintPath>$(SharedPath)\Unturned_Data\Managed\System.Xml.dll</HintPath>
             <Private>false</Private>
         </Reference>
       

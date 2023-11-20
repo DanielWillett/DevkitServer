@@ -19,6 +19,7 @@ namespace DevkitServer.Resources.Properties {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "17.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class Resources {
@@ -34,6 +35,7 @@ namespace DevkitServer.Resources.Properties {
         /// <summary>
         ///   Returns the cached ResourceManager instance used by this class.
         /// </summary>
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Advanced)]
         internal static global::System.Resources.ResourceManager ResourceManager {
             get {
                 if (object.ReferenceEquals(resourceMan, null)) {
@@ -48,22 +50,13 @@ namespace DevkitServer.Resources.Properties {
         ///   Overrides the current thread's CurrentUICulture property for all
         ///   resource lookups using this strongly typed resource class.
         /// </summary>
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Advanced)]
         internal static global::System.Globalization.CultureInfo Culture {
             get {
                 return resourceCulture;
             }
             set {
                 resourceCulture = value;
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Byte[].
-        /// </summary>
-        internal static byte[] _0Harmony {
-            get {
-                object obj = ResourceManager.GetObject("0Harmony", resourceCulture);
-                return ((byte[])(obj));
             }
         }
         
@@ -103,6 +96,46 @@ namespace DevkitServer.Resources.Properties {
         internal static byte[] client_config_schema {
             get {
                 object obj = ResourceManager.GetObject("client_config_schema", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] DanielWillett_StackCleaner {
+            get {
+                object obj = ResourceManager.GetObject("DanielWillett.StackCleaner", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] DanielWillett_StackCleaner_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("DanielWillett.StackCleaner.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] DanielWillett_StackCleaner_Symbols {
+            get {
+                object obj = ResourceManager.GetObject("DanielWillett.StackCleaner.Symbols", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] DanielWillett_StackCleaner_XmlDocs {
+            get {
+                object obj = ResourceManager.GetObject("DanielWillett.StackCleaner.XmlDocs", resourceCulture);
                 return ((byte[])(obj));
             }
         }
@@ -200,6 +233,76 @@ namespace DevkitServer.Resources.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] FWD_DanielWillett_ReflectionTools {
+            get {
+                object obj = ResourceManager.GetObject("FWD.DanielWillett.ReflectionTools", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] FWD_DanielWillett_UnturnedUITools {
+            get {
+                object obj = ResourceManager.GetObject("FWD.DanielWillett.UnturnedUITools", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Lib_Harmony {
+            get {
+                object obj = ResourceManager.GetObject("Lib.Harmony", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Lib_Harmony_Dependencies {
+            get {
+                object obj = ResourceManager.GetObject("Lib.Harmony.Dependencies", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Lib_Harmony_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("Lib.Harmony.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Lib_Harmony_README {
+            get {
+                object obj = ResourceManager.GetObject("Lib.Harmony.README", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Lib_Harmony_XmlDocs {
+            get {
+                object obj = ResourceManager.GetObject("Lib.Harmony.XmlDocs", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] MasterBundle {
             get {
                 object obj = ResourceManager.GetObject("MasterBundle", resourceCulture);
@@ -213,6 +316,76 @@ namespace DevkitServer.Resources.Properties {
         internal static byte[] Microsoft_Bcl_AsyncInterfaces {
             get {
                 object obj = ResourceManager.GetObject("Microsoft.Bcl.AsyncInterfaces", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Microsoft_Bcl_AsyncInterfaces_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("Microsoft.Bcl.AsyncInterfaces.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Mono_Cecil {
+            get {
+                object obj = ResourceManager.GetObject("Mono.Cecil", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Mono_Cecil_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("Mono.Cecil.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] MonoMod_Common {
+            get {
+                object obj = ResourceManager.GetObject("MonoMod.Common", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] MonoMod_Common_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("MonoMod.Common.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] netstandard {
+            get {
+                object obj = ResourceManager.GetObject("netstandard", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] netstandard_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("netstandard.LICENSE", resourceCulture);
                 return ((byte[])(obj));
             }
         }
@@ -270,9 +443,9 @@ namespace DevkitServer.Resources.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
-        internal static byte[] StackCleaner {
+        internal static byte[] System_Buffers {
             get {
-                object obj = ResourceManager.GetObject("StackCleaner", resourceCulture);
+                object obj = ResourceManager.GetObject("System.Buffers", resourceCulture);
                 return ((byte[])(obj));
             }
         }
@@ -280,9 +453,9 @@ namespace DevkitServer.Resources.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
-        internal static byte[] System_Buffers {
+        internal static byte[] System_Buffers_LICENSE {
             get {
-                object obj = ResourceManager.GetObject("System.Buffers", resourceCulture);
+                object obj = ResourceManager.GetObject("System.Buffers.LICENSE", resourceCulture);
                 return ((byte[])(obj));
             }
         }
@@ -310,9 +483,39 @@ namespace DevkitServer.Resources.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] System_IO_Compression_FileSystem_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("System.IO.Compression.FileSystem.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] System_IO_Compression_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("System.IO.Compression.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] System_Memory {
             get {
                 object obj = ResourceManager.GetObject("System.Memory", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] System_Memory_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("System.Memory.LICENSE", resourceCulture);
                 return ((byte[])(obj));
             }
         }
@@ -330,9 +533,69 @@ namespace DevkitServer.Resources.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] System_Numerics_Vectors_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("System.Numerics.Vectors.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] System_Reflection_Emit_ILGeneration {
+            get {
+                object obj = ResourceManager.GetObject("System.Reflection.Emit.ILGeneration", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] System_Reflection_Emit_ILGeneration_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("System.Reflection.Emit.ILGeneration.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] System_Reflection_Emit_Lightweight {
+            get {
+                object obj = ResourceManager.GetObject("System.Reflection.Emit.Lightweight", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] System_Reflection_Emit_Lightweight_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("System.Reflection.Emit.Lightweight.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] System_Runtime_CompilerServices_Unsafe {
             get {
                 object obj = ResourceManager.GetObject("System.Runtime.CompilerServices.Unsafe", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] System_Runtime_CompilerServices_Unsafe_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("System.Runtime.CompilerServices.Unsafe.LICENSE", resourceCulture);
                 return ((byte[])(obj));
             }
         }
@@ -350,9 +613,29 @@ namespace DevkitServer.Resources.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] System_Text_Encodings_Web_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("System.Text.Encodings.Web.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] System_Text_Json {
             get {
                 object obj = ResourceManager.GetObject("System.Text.Json", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] System_Text_Json_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("System.Text.Json.LICENSE", resourceCulture);
                 return ((byte[])(obj));
             }
         }
@@ -370,6 +653,16 @@ namespace DevkitServer.Resources.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] System_Threading_Tasks_Extensions_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("System.Threading.Tasks.Extensions.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] System_ValueTuple {
             get {
                 object obj = ResourceManager.GetObject("System.ValueTuple", resourceCulture);
@@ -380,9 +673,49 @@ namespace DevkitServer.Resources.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] System_ValueTuple_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("System.ValueTuple.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] UniTask {
             get {
                 object obj = ResourceManager.GetObject("UniTask", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] UniTask_LICENSE {
+            get {
+                object obj = ResourceManager.GetObject("UniTask.LICENSE", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] UniTask_Symbols {
+            get {
+                object obj = ResourceManager.GetObject("UniTask.Symbols", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] UniTask_XmlDocs {
+            get {
+                object obj = ResourceManager.GetObject("UniTask.XmlDocs", resourceCulture);
                 return ((byte[])(obj));
             }
         }
