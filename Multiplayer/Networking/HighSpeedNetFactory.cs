@@ -261,5 +261,6 @@ public enum HighSpeedNetCall : ushort
 {
     Verify = 1,
     VerifyConfirm = 2,
-    SendWholeLevel = 3
+    SendWholeLevel = 3,
+    SendFullLargeTransmission = 4
 }

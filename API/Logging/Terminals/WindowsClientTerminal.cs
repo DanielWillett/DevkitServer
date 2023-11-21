@@ -78,12 +78,11 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
     }
     private void OutputTick()
     {
-        if (_messageQueue.Count > 0)
+        lock (this)
         {
-            _writing = true;
-            if (_inText)
+            if (_messageQueue.Count > 0)
             {
-                lock (this)
+                if (_inText)
                 {
                     int x = Console.CursorLeft;
                     int y = Console.CursorTop;
@@ -111,6 +110,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                         {
                             string message = msg.Message;
                             Logger.TryRemoveDateFromLine(ref message);
+                            _writing = true;
                             CommandHandler.IsLoggingFromDevkitServer = true;
                             try
                             {
@@ -119,6 +119,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                             finally
                             {
                                 CommandHandler.IsLoggingFromDevkitServer = false;
+                                _writing = false;
                             }
                         }
                     }
@@ -127,60 +128,60 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
             }
             else
             {
-                lock (this)
+                while (_messageQueue.Count > 0)
                 {
-                    while (_messageQueue.Count > 0)
-                    {
-                        LogMessage msg = _messageQueue[_msgIndex];
-                        ++_msgIndex;
+                    LogMessage msg = _messageQueue[_msgIndex];
+                    ++_msgIndex;
 
-                        if (_messageQueue.Count <= _msgIndex)
+                    if (_messageQueue.Count <= _msgIndex)
+                    {
+                        _messageQueue.Clear();
+                        _msgIndex = 0;
+                    }
+                    msg.Write();
+                    if (msg.Save)
+                    {
+                        string message = msg.Message;
+                        Logger.TryRemoveDateFromLine(ref message);
+                        _writing = true;
+                        CommandHandler.IsLoggingFromDevkitServer = true;
+                        try
                         {
-                            _messageQueue.Clear();
-                            _msgIndex = 0;
+                            Logs.printLine(FormattingUtil.RemoveANSIFormatting(message));
                         }
-                        msg.Write();
-                        if (msg.Save)
+                        finally
                         {
-                            string message = msg.Message;
-                            Logger.TryRemoveDateFromLine(ref message);
-                            CommandHandler.IsLoggingFromDevkitServer = true;
-                            try
-                            {
-                                Logs.printLine(FormattingUtil.RemoveANSIFormatting(message));
-                            }
-                            finally
-                            {
-                                CommandHandler.IsLoggingFromDevkitServer = false;
-                            }
+                            CommandHandler.IsLoggingFromDevkitServer = false;
+                            _writing = false;
                         }
                     }
                 }
             }
-            _writing = false;
-        }
-        if (_closeHandler.HasValue && _closeHandler.Value != uint.MaxValue)
-        {
-            Write("Closing from control signal \"" +
-                  _closeHandler.Value switch
-                  {
-                      0 => "Ctrl + C",
-                      1 => "Ctrl + Break",
-                      2 => "Window Closed",
-                      5 => "Logging Off",
-                      6 => "Shutting Down",
-                      _ => "Unknown: " + _closeHandler.Value
-                  } + "\".", ConsoleColor.Red, true, Severity.Info);
 
-            TimeUtility.InvokeAfterDelay(() => Application.Quit(0), 0.5f);
-            _closeHandler = uint.MaxValue;
+            if (_closeHandler.HasValue && _closeHandler.Value != uint.MaxValue)
+            {
+                Write("Closing from control signal \"" +
+                      _closeHandler.Value switch
+                      {
+                          0 => "Ctrl + C",
+                          1 => "Ctrl + Break",
+                          2 => "Window Closed",
+                          5 => "Logging Off",
+                          6 => "Shutting Down",
+                          _ => "Unknown: " + _closeHandler.Value
+                      } + "\".", ConsoleColor.Red, true, Severity.Info);
+
+                TimeUtility.InvokeAfterDelay(() => Application.Quit(0), 0.5f);
+                _closeHandler = uint.MaxValue;
+            }
         }
     }
 
     public void Write(string input, ConsoleColor color, bool save, Severity severity)
     {
         OnOutput?.Invoke(ref input, ref color);
-        _messageQueue.Add(new LogMessage(input, color, save));
+        lock (this)
+            _messageQueue.Add(new LogMessage(input, color, save));
         if (DevkitServerModule.IsMainThread)
             OutputTick();
     }
@@ -196,20 +197,23 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
         _inText = false;
         Console.SetCursorPosition(0, Console.CursorTop);
         SetConsoleCtrlHandler(OnExitRequested, false);
-        if (_messageQueue.Count > 0)
+        lock (this)
         {
-            while (_messageQueue.Count > 0)
+            if (_messageQueue.Count > 0)
             {
-                LogMessage msg = _messageQueue[_msgIndex];
-                ++_msgIndex;
-
-                if (_messageQueue.Count <= _msgIndex)
+                while (_messageQueue.Count > 0)
                 {
-                    _messageQueue.Clear();
-                    _msgIndex = 0;
-                }
+                    LogMessage msg = _messageQueue[_msgIndex];
+                    ++_msgIndex;
 
-                msg.Write();
+                    if (_messageQueue.Count <= _msgIndex)
+                    {
+                        _messageQueue.Clear();
+                        _msgIndex = 0;
+                    }
+
+                    msg.Write();
+                }
             }
         }
         _setup = false;

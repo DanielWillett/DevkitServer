@@ -50,5 +50,10 @@ public enum DevkitServerNetCall : ushort
     SendRoadVertexInstantiation = 48,
     SendRoadSyncData = 49,
     RequestFlagInstantiation = 50,
-    SendFlagInstantiation = 51
+    SendFlagInstantiation = 51,
+    SendStartLargeTransmission = 52,
+    SendLargeTransmissionPacket = 53,
+    SendEndLargeTransmission = 54,
+    SendMissedLargeTransmissionPackets = 55,
+    SendLargeTransmissionCheckup = 56
 }

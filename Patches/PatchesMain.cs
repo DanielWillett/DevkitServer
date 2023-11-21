@@ -1,4 +1,5 @@
-﻿using DevkitServer.Multiplayer;
+﻿using System.Diagnostics;
+using DevkitServer.Multiplayer;
 using HarmonyLib;
 using System.Reflection;
 using System.Text;
@@ -37,7 +38,9 @@ internal static class PatchesMain
     {
         try
         {
-#if DEBUG
+            Logger.LogInfo($"[{Source}] Patching game code...");
+            Stopwatch sw = Stopwatch.StartNew();
+
             string path = Path.Combine(UnturnedPaths.RootDirectory.FullName, "Logs", "harmony.log");
             Environment.SetEnvironmentVariable("HARMONY_LOG_FILE", path);
             DevkitServerUtility.CheckDirectory(false, true, DevkitServerConfig.Directory, null);
@@ -54,7 +57,7 @@ internal static class PatchesMain
                 Logger.LogError(ex, method: Source);
             }
             Harmony.DEBUG = true;
-#endif
+
             Patcher = new Harmony(HarmonyId);
             Patcher.PatchAll();
 #if SERVER
@@ -67,8 +70,8 @@ internal static class PatchesMain
             NavigationPatches.OptionalPatches();
 #endif
             DoManualPatches();
-            
-            Logger.LogInfo($"[{Source}] Finished patching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
+            sw.Stop();
+            Logger.LogInfo($"[{Source}] Finished patching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)} ({(sw.GetElapsedMilliseconds() / 1000d).ToString("0.0000").Colorize(FormattingUtil.NumberColor)} seconds).");
         }
         catch (Exception ex)
         {

@@ -201,14 +201,14 @@ internal class DevkitServerResources
             Lib("System.Text.Json", "LICENSE.txt"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("System.Threading.Tasks.Extensions",
-            Lib("System.Threading.Tasks.Extensions", "System.Threading.Tasks.Extensions.dll"), new Version(0, 0, 22, 0)),
+            Lib("System.Threading.Tasks.Extensions", "System.Threading.Tasks.Extensions.dll"), new Version(0, 0, 24, 0)),
         new DevkitServerFileResource("System.Threading.Tasks.Extensions.LICENSE",
-            Lib("System.Threading.Tasks.Extensions", "LICENSE.txt"), new Version(0, 0, 15, 0)),
+            Lib("System.Threading.Tasks.Extensions", "LICENSE.txt"), new Version(0, 0, 24, 0)),
 
         new DevkitServerFileResource("System.ValueTuple",
-            Lib("System.ValueTuple", "System.ValueTuple.dll"), new Version(0, 0, 22, 0)),
+            Lib("System.ValueTuple", "System.ValueTuple.dll"), new Version(0, 0, 24, 0)),
         new DevkitServerFileResource("System.ValueTuple.LICENSE",
-            Lib("System.ValueTuple", "LICENSE.txt"), new Version(0, 0, 15, 0)),
+            Lib("System.ValueTuple", "LICENSE.txt"), new Version(0, 0, 24, 0)),
 
         new DevkitServerFileResource("UniTask",
             Lib("UniTask", "UniTask.dll"), new Version(0, 0, 22, 0)),

@@ -14,29 +14,32 @@ internal sealed class BackgroundLoggingTerminal : MonoBehaviour, ITerminal
         OnOutput?.Invoke(ref input, ref color);
         if (save)
         {
-            _writing = true;
-            CommandHandler.IsLoggingFromDevkitServer = true;
-            try
+            DevkitServerUtility.QueueOnMainThread(() =>
             {
-                switch (severity)
+                _writing = true;
+                CommandHandler.IsLoggingFromDevkitServer = true;
+                try
                 {
-                    case Severity.Warning:
-                        UnturnedLog.warn(input);
-                        break;
-                    case Severity.Error:
-                    case Severity.Fatal:
-                        UnturnedLog.error(input);
-                        break;
-                    default:
-                        UnturnedLog.info(input);
-                        break;
+                    switch (severity)
+                    {
+                        case Severity.Warning:
+                            UnturnedLog.warn(input);
+                            break;
+                        case Severity.Error:
+                        case Severity.Fatal:
+                            UnturnedLog.error(input);
+                            break;
+                        default:
+                            UnturnedLog.info(input);
+                            break;
+                    }
                 }
-            }
-            finally
-            {
-                CommandHandler.IsLoggingFromDevkitServer = false;
-            }
-            _writing = false;
+                finally
+                {
+                    CommandHandler.IsLoggingFromDevkitServer = false;
+                    _writing = false;
+                }
+            });
         }
     }
     public void Init() { }

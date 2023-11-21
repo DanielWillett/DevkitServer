@@ -31,7 +31,8 @@ internal class ServerTerminal : MonoBehaviour, ITerminal
             case Severity.Warning:
                 if (LogWarnIntl == null)
                 {
-                    CommandWindow.LogWarning(str);
+                    DevkitServerUtility.QueueOnMainThread(() => CommandWindow.LogWarning(str));
+                    save = false;
                     return;
                 }
 
@@ -41,7 +42,8 @@ internal class ServerTerminal : MonoBehaviour, ITerminal
             case Severity.Error:
                 if (LogErrorIntl == null)
                 {
-                    CommandWindow.LogError(str);
+                    DevkitServerUtility.QueueOnMainThread(() => CommandWindow.LogError(str));
+                    save = false;
                     return;
                 }
 
@@ -51,7 +53,8 @@ internal class ServerTerminal : MonoBehaviour, ITerminal
             default:
                 if (LogInfoIntl == null)
                 {
-                    CommandWindow.Log(str);
+                    DevkitServerUtility.QueueOnMainThread(() => CommandWindow.Log(str));
+                    save = false;
                     return;
                 }
 
@@ -62,15 +65,18 @@ internal class ServerTerminal : MonoBehaviour, ITerminal
         {
             Logger.TryRemoveDateFromLine(ref str);
             str = FormattingUtil.RemoveANSIFormatting(str);
-            CommandHandler.IsLoggingFromDevkitServer = true;
-            try
+            DevkitServerUtility.QueueOnMainThread(() =>
             {
-                Logs.printLine(str);
-            }
-            finally
-            {
-                CommandHandler.IsLoggingFromDevkitServer = false;
-            }
+                CommandHandler.IsLoggingFromDevkitServer = true;
+                try
+                {
+                    Logs.printLine(str);
+                }
+                finally
+                {
+                    CommandHandler.IsLoggingFromDevkitServer = false;
+                }
+            });
         }
         _writing = false;
     }

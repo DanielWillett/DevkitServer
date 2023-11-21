@@ -37,6 +37,7 @@ It supports the following launch options.
 * `-AutoRestartDevkitServerUpdates` - Automatically restarts the server after an update is pushed. Yes this works for the client, although not really recommended.
 * `-DevkitServerCheckUpdateInterval <seconds>` - Amount of seconds between update checks. *Default is 2 minutes*
 * `-DevkitServerCheckUpdateShutdownDelay <seconds>` - Amount of seconds between when an update is found and when the shutdown occurs. *Default is 2 minutes*
+* `-DevkitServerDebugLog` - Enables debug logging for the launcher and update checker.
 
 Plugins can override the auto-restart behavior by referencing the Launcher and listening to the `DevkitServerAutoUpdateComponent.OnUpdateReady` event.
 This event will not be called if the `DontCheckForDevkitServerUpdates` flag is present in the launch options.
