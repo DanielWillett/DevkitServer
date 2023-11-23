@@ -2661,7 +2661,7 @@ public static class Accessor
         }
         private static bool CheckVer()
         {
-            if (_checkVer)
+            if (!_checkVer)
             {
                 _versionGetter = GenerateInstanceGetter<List<TElementType>, int>("_version", true);
                 _checkVer = true;

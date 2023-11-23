@@ -144,11 +144,11 @@ internal class DevkitServerResources
             Lib("DanielWillett.StackCleaner", "DanielWillett.StackCleaner.pdb"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("FWD.DanielWillett.ReflectionTools",
-            LibFwd("DanielWillett.ReflectionTools.dll"), new Version(0, 0, 22, 0)),
+            LibFwd("DanielWillett.ReflectionTools.dll"), new Version(0, 0, 24, 0)),
         new DevkitServerFileResource("FWD.DanielWillett.UnturnedUITools",
-            LibFwd("DanielWillett.UnturnedUITools.dll"), new Version(0, 0, 22, 0)) { Side = Side.Client },
+            LibFwd("DanielWillett.UnturnedUITools.dll"), new Version(0, 0, 24, 0)) { Side = Side.Client },
         new DevkitServerFileResource("FWD.DanielWillett.LevelObjectIcons",
-            LibFwd("DanielWillett.LevelObjectIcons.dll"), new Version(0, 0, 22, 0)) { Side = Side.Client },
+            LibFwd("DanielWillett.LevelObjectIcons.dll"), new Version(0, 0, 24, 0)) { Side = Side.Client },
 
         new DevkitServerFileResource("Microsoft.Bcl.AsyncInterfaces",
             Lib("Microsoft.Bcl.AsyncInterfaces", "Microsoft.Bcl.AsyncInterfaces.dll"), new Version(0, 0, 22, 0)),

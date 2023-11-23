@@ -14,7 +14,7 @@
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
     <PackageId>DevkitServer.Resources</PackageId>
     <Title>DevkitServer.Resources</Title>
-    <Version>0.0.23</Version>
+    <Version>0.0.24</Version>
     <Authors>DanielWillett</Authors>
     <Company>DanielWillett</Company>
     <Description>Module config resources for DevkitServer, a multiplayer map editor module for nturned.</Description>
@@ -39,19 +39,19 @@
     <DebugType>portable</DebugType>
   </PropertyGroup>
 
-  <Import Project="$(SolutionDir)Unturned.targets"/>
+  <Import Project="$(SolutionDir)Unturned.targets" />
 
 
   <ItemGroup>
-    <Reference Include="System.Runtime"/>
-    <Reference Include="System"/>
+    <Reference Include="System.Runtime" />
+    <Reference Include="System" />
     
 
     <Compile Remove="Module\**" />
     <EmbeddedResource Remove="Module\**" />
     <None Remove="Module\**" />
-    <None Include="README.md" Pack="true" PackagePath="\"/>
-    <None Include="..\Promo\icon.png" Pack="true" PackagePath=""/>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="..\Promo\icon.png" Pack="true" PackagePath="" />
   </ItemGroup>
 
   <ItemGroup>

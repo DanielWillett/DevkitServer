@@ -10,6 +10,8 @@ namespace DevkitServer.API.UI;
 /// </summary>
 public class UITypeInfo
 {
+    internal string ExpectedTypeName;
+
     /// <summary>
     /// Type of the UI.
     /// </summary>
@@ -19,6 +21,12 @@ public class UITypeInfo
     /// Type that 'owns' the UI, or <see langword="null"/> for root types (<see cref="LoadingUI"/>, <see cref="MenuUI"/>, <see cref="PlayerUI"/>, and <see cref="EditorUI"/>).
     /// </summary>
     public Type? Parent { get; set; }
+
+    internal string? ParentName
+    {
+        get => Parent?.FullName;
+        set => Parent = value == null ? null : (UIAccessTools.FindUIType(value) ?? typeof(object));
+    }
 
     /// <summary>
     /// If all the fields and methods (except maybe the constructor) for the UI is static.
@@ -114,6 +122,16 @@ public class UITypeInfo
     /// This UI is destroyed when its parent is destroyed.
     /// </summary>
     public bool DestroyWhenParentDestroys { get; set; }
+
+    internal UITypeInfo(string typeName,
+        IReadOnlyList<MethodBase>? closeMethods = null,
+        IReadOnlyList<MethodBase>? openMethods = null,
+        IReadOnlyList<MethodBase>? initializeMethods = null,
+        IReadOnlyList<MethodBase>? destroyMethods = null,
+        bool hasActiveMember = true) : this(UIAccessTools.FindUIType(typeName) ?? typeof(object), closeMethods, openMethods, initializeMethods, destroyMethods, hasActiveMember)
+    {
+        ExpectedTypeName = Type == typeof(object) ? typeName : Type.FullName!;
+    }
 
     /// <summary>
     /// Create a new <see cref="UITypeInfo"/> and prep the <see cref="OpenMethods"/>, <see cref="CloseMethods"/>, <see cref="InitializeMethods"/>, and <see cref="DestroyMethods"/> properties.

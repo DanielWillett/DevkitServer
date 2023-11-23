@@ -2,12 +2,12 @@
 
   <PropertyGroup>
     <RootNamespace>DanielWillett.UITools</RootNamespace>
-    <TargetFramework>net481</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <Nullable>enable</Nullable>
     <LangVersion>preview</LangVersion>
     <SignAssembly>True</SignAssembly>
     <AssemblyOriginatorKeyFile>C:\Users\danny\OneDrive\Documents\Strong Name Keys\DanielWillett.UnturnedUITools\DanielWillett.UnturnedUITools.dll.snk</AssemblyOriginatorKeyFile>
-    <Version>1.3.0</Version>
+    <Version>1.3.1</Version>
     <AssemblyVersion>$(Version).999</AssemblyVersion>
     <FileVersion>$(Version).999</FileVersion>
     <Configurations>ClientRelease</Configurations>
