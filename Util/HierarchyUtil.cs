@@ -432,7 +432,7 @@ public static class HierarchyUtil
     [Pure]
     public static bool CheckMovePermission(IDevkitHierarchyItem item, ulong user)
     {
-        if (Permission.SuperuserPermission.Has(user))
+        if (PermissionBranch.Superuser.Has(user))
             return true;
 
         return item switch
@@ -455,7 +455,7 @@ public static class HierarchyUtil
     [Pure]
     public static bool CheckPlacePermission(IHierarchyItemTypeIdentifier type, ulong user)
     {
-        if (Permission.SuperuserPermission.Has(user))
+        if (PermissionBranch.Superuser.Has(user))
             return true;
 
         return type switch
@@ -475,7 +475,7 @@ public static class HierarchyUtil
     [Pure]
     public static bool CheckDeletePermission(IDevkitHierarchyItem item, ulong user)
     {
-        if (Permission.SuperuserPermission.Has(user))
+        if (PermissionBranch.Superuser.Has(user))
             return true;
 
         return item switch
@@ -499,7 +499,7 @@ public static class HierarchyUtil
     [Pure]
     public static bool CheckMovePermission(IDevkitHierarchyItem item)
     {
-        if (Permission.SuperuserPermission.Has())
+        if (PermissionBranch.Superuser.Has())
             return true;
 
         return item switch
@@ -522,7 +522,7 @@ public static class HierarchyUtil
     [Pure]
     public static bool CheckPlacePermission(IHierarchyItemTypeIdentifier type)
     {
-        if (Permission.SuperuserPermission.Has())
+        if (PermissionBranch.Superuser.Has())
             return true;
 
         return type switch
@@ -540,7 +540,7 @@ public static class HierarchyUtil
         };
     }
     [Pure]
-    public static Permission? GetPlacePermission(IHierarchyItemTypeIdentifier type)
+    public static PermissionLeaf? GetPlacePermission(IHierarchyItemTypeIdentifier type)
     {
         return type switch
         {
@@ -556,7 +556,7 @@ public static class HierarchyUtil
     [Pure]
     public static bool CheckDeletePermission(IDevkitHierarchyItem item)
     {
-        if (Permission.SuperuserPermission.Has())
+        if (PermissionBranch.Superuser.Has())
             return true;
 
         return item switch

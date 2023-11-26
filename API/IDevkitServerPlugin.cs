@@ -34,6 +34,12 @@ public interface IDevkitServerPlugin
     string LocalizationDirectory { get; }
 
     /// <summary>
+    /// The data path of the command localization folder, etc. This should be a directory.
+    /// </summary>
+    /// <remarks>Must be set in the constructor.</remarks>
+    string CommandLocalizationDirectory { get; }
+
+    /// <summary>
     /// Information about the assembly containing the plugin.
     /// </summary>
     PluginAssembly Assembly { get; set; }

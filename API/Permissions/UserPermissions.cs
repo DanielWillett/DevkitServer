@@ -15,8 +15,8 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
     private static readonly CachedMulticastEvent<Action<PermissionGroup>> EventGlobalPermissionGroupUpdated = new CachedMulticastEvent<Action<PermissionGroup>>(typeof(UserPermissions), nameof(GlobalPermissionGroupUpdated));
     private static readonly CachedMulticastEvent<Action<PermissionGroup>> EventGlobalPermissionGroupRegistered = new CachedMulticastEvent<Action<PermissionGroup>>(typeof(UserPermissions), nameof(GlobalPermissionGroupRegistered));
     private static readonly CachedMulticastEvent<Action<PermissionGroup>> EventGlobalPermissionGroupDeregistered = new CachedMulticastEvent<Action<PermissionGroup>>(typeof(UserPermissions), nameof(GlobalPermissionGroupDeregistered));
-    private static readonly CachedMulticastEvent<Action<Permission>> EventGlobalPermissionRegistered = new CachedMulticastEvent<Action<Permission>>(typeof(UserPermissions), nameof(GlobalPermissionRegistered));
-    private static readonly CachedMulticastEvent<Action<Permission>> EventGlobalPermissionDeregistered = new CachedMulticastEvent<Action<Permission>>(typeof(UserPermissions), nameof(GlobalPermissionDeregistered));
+    private static readonly CachedMulticastEvent<Action<PermissionLeaf>> EventGlobalPermissionRegistered = new CachedMulticastEvent<Action<PermissionLeaf>>(typeof(UserPermissions), nameof(GlobalPermissionRegistered));
+    private static readonly CachedMulticastEvent<Action<PermissionLeaf>> EventGlobalPermissionDeregistered = new CachedMulticastEvent<Action<PermissionLeaf>>(typeof(UserPermissions), nameof(GlobalPermissionDeregistered));
 
     public static event Action<PermissionGroup> GlobalPermissionGroupUpdated
     {
@@ -33,22 +33,22 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         add => EventGlobalPermissionGroupDeregistered.Add(value);
         remove => EventGlobalPermissionGroupDeregistered.Remove(value);
     }
-    public static event Action<Permission> GlobalPermissionRegistered
+    public static event Action<PermissionLeaf> GlobalPermissionRegistered
     {
         add => EventGlobalPermissionRegistered.Add(value);
         remove => EventGlobalPermissionRegistered.Remove(value);
     }
-    public static event Action<Permission> GlobalPermissionDeregistered
+    public static event Action<PermissionLeaf> GlobalPermissionDeregistered
     {
         add => EventGlobalPermissionDeregistered.Add(value);
         remove => EventGlobalPermissionDeregistered.Remove(value);
     }
 
 #if SERVER
-    protected static readonly CachedMulticastEvent<Action<Permission, ulong, bool>> EventGlobalUserPermissionUpdated = new CachedMulticastEvent<Action<Permission, ulong, bool>>(typeof(UserPermissions), nameof(GlobalUserPermissionUpdated));
+    protected static readonly CachedMulticastEvent<Action<PermissionBranch, ulong, bool>> EventGlobalUserPermissionUpdated = new CachedMulticastEvent<Action<PermissionBranch, ulong, bool>>(typeof(UserPermissions), nameof(GlobalUserPermissionUpdated));
     protected static readonly CachedMulticastEvent<Action<PermissionGroup, ulong, bool>> EventGlobalUserPermissionGroupUpdated = new CachedMulticastEvent<Action<PermissionGroup, ulong, bool>>(typeof(UserPermissions), nameof(GlobalUserPermissionGroupUpdated));
 
-    public static event Action<Permission, ulong, bool> GlobalUserPermissionUpdated
+    public static event Action<PermissionBranch, ulong, bool> GlobalUserPermissionUpdated
     {
         add => EventGlobalUserPermissionUpdated.Add(value);
         remove => EventGlobalUserPermissionUpdated.Remove(value);
@@ -59,10 +59,10 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         remove => EventGlobalUserPermissionGroupUpdated.Remove(value);
     }
 #else
-    protected static readonly CachedMulticastEvent<Action<Permission, bool>> EventGlobalUserPermissionUpdated = new CachedMulticastEvent<Action<Permission, bool>>(typeof(UserPermissions), nameof(GlobalUserPermissionUpdated));
+    protected static readonly CachedMulticastEvent<Action<PermissionBranch, bool>> EventGlobalUserPermissionUpdated = new CachedMulticastEvent<Action<PermissionBranch, bool>>(typeof(UserPermissions), nameof(GlobalUserPermissionUpdated));
     protected static readonly CachedMulticastEvent<Action<PermissionGroup, bool>> EventGlobalUserPermissionGroupUpdated = new CachedMulticastEvent<Action<PermissionGroup, bool>>(typeof(UserPermissions), nameof(GlobalUserPermissionGroupUpdated));
 
-    public static event Action<Permission, bool> GlobalUserPermissionUpdated
+    public static event Action<PermissionBranch, bool> GlobalUserPermissionUpdated
     {
         add => EventGlobalUserPermissionUpdated.Add(value);
         remove => EventGlobalUserPermissionUpdated.Remove(value);
@@ -74,15 +74,15 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
     }
 #endif
 
-    internal static readonly NetCallRaw<Permission, bool> SendPermissionState = new NetCallRaw<Permission, bool>((ushort)DevkitServerNetCall.SendPermissionState,
-        Permission.ReadPermission, null, Permission.WritePermission, null);
-    internal static readonly NetCallRaw<PermissionGroup, bool> SendPermissionGroupState = new NetCallRaw<PermissionGroup, bool>((ushort)DevkitServerNetCall.SendPermissionGroupState,
+    internal static readonly NetCallRaw<PermissionBranch, bool> SendPermissionState = new NetCallRaw<PermissionBranch, bool>(DevkitServerNetCall.SendPermissionState,
+        PermissionBranch.Read, null, PermissionBranch.Write, null);
+    internal static readonly NetCallRaw<PermissionGroup, bool> SendPermissionGroupState = new NetCallRaw<PermissionGroup, bool>(DevkitServerNetCall.SendPermissionGroupState,
         PermissionGroup.ReadPermissionGroup, null, PermissionGroup.WritePermissionGroup, null);
     internal static readonly NetCall SendClearPermissions = new NetCall((ushort)DevkitServerNetCall.SendClearPermissions);
     internal static readonly NetCall SendClearPermissionGroups = new NetCall((ushort)DevkitServerNetCall.SendClearPermissionGroups);
 #if SERVER
     public static readonly string DefaultFileLocation = Path.Combine(DevkitServerConfig.Directory, "permissions.json");
-    public const ushort DataVersion = 0;
+    public const ushort DataVersion = 1;
 #endif
     private static IPermissionHandler _handler = new UserPermissions();
     private static IUserPermissionHandler _userHandler = (IUserPermissionHandler)_handler;
@@ -168,9 +168,9 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
             value.UserPermissionUpdated += EventGlobalUserPermissionUpdated.TryInvoke;
         }
     }
-    public static List<Permission> GetDefaultPermissionsFromLoaded()
+    public static List<PermissionLeaf> GetDefaultPermissionsFromLoaded()
     {
-        List<Permission> perms = new List<Permission>(64) { Permission.SuperuserPermission };
+        List<PermissionLeaf> perms = new List<PermissionLeaf>(64);
         Logger.LogDebug("Found superuser permission: " + perms[0].Format() + ".");
         Assembly asm = Assembly.GetExecutingAssembly();
         foreach (Assembly assembly in new Assembly[] { asm }.Concat(PluginLoader.Plugins.Select(x => x.Assembly.Assembly).Distinct()))
@@ -185,14 +185,14 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
                 FieldInfo[] fields = type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
                 foreach (FieldInfo field in fields)
                 {
-                    if (!field.IsStatic || !typeof(Permission).IsAssignableFrom(field.FieldType))
+                    if (!field.IsStatic || !typeof(PermissionLeaf).IsAssignableFrom(field.FieldType))
                         continue;
 
                     if (!field.TryGetAttributeSafe(out PermissionAttribute attribute) || field.IsIgnored())
                         continue;
 
-                    Permission? perm = (Permission?)field.GetValue(null);
-                    if (perm == null) continue;
+                    PermissionLeaf perm = (PermissionLeaf)field.GetValue(null);
+                    if (!perm.Valid) continue;
                     if (!thisAssembly && (perm.Plugin == null || perm.Plugin.Assembly.Assembly != assembly))
                     {
                         IDevkitServerPlugin? plugin2 = null;
@@ -212,11 +212,10 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
                                               "or it defined a type that isn't a loaded plugin type. Try setting the "
                                               + nameof(PermissionAttribute.PluginType).Format() + " field in the "
                                               + typeof(PermissionAttribute).Format() + ".");
-                            perm.Plugin = null;
                             continue;
                         }
 
-                        perm.Plugin = plugin2;
+                        perm = new PermissionLeaf(perm.Path, plugin2);
                     }
                     else if (thisAssembly)
                     {
@@ -235,23 +234,23 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
 
         return perms;
     }
-    private static List<Permission> _perms = null!;
-    private static IReadOnlyList<Permission> _roPerms = null!;
+    private static List<PermissionLeaf> _perms = null!;
+    private static IReadOnlyList<PermissionLeaf> _roPerms = null!;
     private static List<PermissionGroup> _permGrps = null!;
     private static IReadOnlyList<PermissionGroup> _roPermGrps = null!;
 #if CLIENT
-    private static List<Permission> _clientPerms = null!;
-    private static IReadOnlyList<Permission> _roClientPerms = null!;
+    private static List<PermissionBranch> _clientPerms = null!;
+    private static IReadOnlyList<PermissionBranch> _roClientPerms = null!;
     private static List<PermissionGroup> _clientPermGrps = null!;
     private static IReadOnlyList<PermissionGroup> _roClientPermGrps = null!;
-    IReadOnlyList<Permission> IUserPermissionHandler.Permissions => _roClientPerms;
+    IReadOnlyList<PermissionBranch> IUserPermissionHandler.Permissions => _roClientPerms;
     IReadOnlyList<PermissionGroup> IUserPermissionHandler.PermissionGroups => _roClientPermGrps;
 #endif
     protected readonly CachedMulticastEvent<Action<PermissionGroup>> EventPermissionGroupUpdated = new CachedMulticastEvent<Action<PermissionGroup>>(typeof(UserPermissions), nameof(PermissionGroupUpdated));
     protected readonly CachedMulticastEvent<Action<PermissionGroup>> EventPermissionGroupRegistered = new CachedMulticastEvent<Action<PermissionGroup>>(typeof(UserPermissions), nameof(PermissionGroupRegistered));
     protected readonly CachedMulticastEvent<Action<PermissionGroup>> EventPermissionGroupDeregistered = new CachedMulticastEvent<Action<PermissionGroup>>(typeof(UserPermissions), nameof(PermissionGroupDeregistered));
-    protected readonly CachedMulticastEvent<Action<Permission>> EventPermissionRegistered = new CachedMulticastEvent<Action<Permission>>(typeof(UserPermissions), nameof(PermissionRegistered));
-    protected readonly CachedMulticastEvent<Action<Permission>> EventPermissionDeregistered = new CachedMulticastEvent<Action<Permission>>(typeof(UserPermissions), nameof(PermissionDeregistered));
+    protected readonly CachedMulticastEvent<Action<PermissionLeaf>> EventPermissionRegistered = new CachedMulticastEvent<Action<PermissionLeaf>>(typeof(UserPermissions), nameof(PermissionRegistered));
+    protected readonly CachedMulticastEvent<Action<PermissionLeaf>> EventPermissionDeregistered = new CachedMulticastEvent<Action<PermissionLeaf>>(typeof(UserPermissions), nameof(PermissionDeregistered));
 
     public event Action<PermissionGroup> PermissionGroupUpdated
     {
@@ -268,21 +267,21 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         add => EventPermissionGroupDeregistered.Add(value);
         remove => EventPermissionGroupDeregistered.Remove(value);
     }
-    public event Action<Permission> PermissionRegistered
+    public event Action<PermissionLeaf> PermissionRegistered
     {
         add => EventPermissionRegistered.Add(value);
         remove => EventPermissionRegistered.Remove(value);
     }
-    public event Action<Permission> PermissionDeregistered
+    public event Action<PermissionLeaf> PermissionDeregistered
     {
         add => EventPermissionDeregistered.Add(value);
         remove => EventPermissionDeregistered.Remove(value);
     }
 #if SERVER
-    protected readonly CachedMulticastEvent<Action<Permission, ulong, bool>> EventUserPermissionUpdated = new CachedMulticastEvent<Action<Permission, ulong, bool>>(typeof(UserPermissions), nameof(UserPermissionUpdated));
+    protected readonly CachedMulticastEvent<Action<PermissionBranch, ulong, bool>> EventUserPermissionUpdated = new CachedMulticastEvent<Action<PermissionBranch, ulong, bool>>(typeof(UserPermissions), nameof(UserPermissionUpdated));
     protected readonly CachedMulticastEvent<Action<PermissionGroup, ulong, bool>> EventUserPermissionGroupUpdated = new CachedMulticastEvent<Action<PermissionGroup, ulong, bool>>(typeof(UserPermissions), nameof(UserPermissionGroupUpdated));
 
-    public event Action<Permission, ulong, bool> UserPermissionUpdated
+    public event Action<PermissionBranch, ulong, bool> UserPermissionUpdated
     {
         add => EventUserPermissionUpdated.Add(value);
         remove => EventUserPermissionUpdated.Remove(value);
@@ -293,10 +292,10 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         remove => EventUserPermissionGroupUpdated.Remove(value);
     }
 #else
-    protected readonly CachedMulticastEvent<Action<Permission, bool>> EventUserPermissionUpdated = new CachedMulticastEvent<Action<Permission, bool>>(typeof(UserPermissions), nameof(UserPermissionUpdated));
+    protected readonly CachedMulticastEvent<Action<PermissionBranch, bool>> EventUserPermissionUpdated = new CachedMulticastEvent<Action<PermissionBranch, bool>>(typeof(UserPermissions), nameof(UserPermissionUpdated));
     protected readonly CachedMulticastEvent<Action<PermissionGroup, bool>> EventUserPermissionGroupUpdated = new CachedMulticastEvent<Action<PermissionGroup, bool>>(typeof(UserPermissions), nameof(UserPermissionGroupUpdated));
 
-    public event Action<Permission, bool> UserPermissionUpdated
+    public event Action<PermissionBranch, bool> UserPermissionUpdated
     {
         add => EventUserPermissionUpdated.Add(value);
         remove => EventUserPermissionUpdated.Remove(value);
@@ -308,7 +307,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
     }
 #endif
 
-    IReadOnlyList<Permission> IPermissionHandler.Permissions => _roPerms;
+    IReadOnlyList<PermissionLeaf> IPermissionHandler.Permissions => _roPerms;
     IReadOnlyList<PermissionGroup> IPermissionHandler.PermissionGroups => _roPermGrps;
     public virtual void Init()
     {
@@ -316,7 +315,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         _roPerms = _perms.AsReadOnly();
 #if CLIENT
         _permGrps = new List<PermissionGroup>();
-        _clientPerms = new List<Permission>(24);
+        _clientPerms = new List<PermissionLeaf>(24);
         _clientPermGrps = new List<PermissionGroup>(4);
         _roClientPermGrps = _clientPermGrps.AsReadOnly();
         _roClientPerms = _clientPerms.AsReadOnly();
@@ -338,7 +337,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         _roPermGrps = _permGrps.AsReadOnly();
 #endif
     }
-    public virtual bool Register(Permission permission)
+    public virtual bool Register(PermissionLeaf permission)
     {
         for (int i = 0; i < _perms.Count; ++i)
         {
@@ -417,7 +416,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         return false;
     }
 #endif
-    public virtual bool Deregister(Permission permission)
+    public virtual bool Deregister(PermissionLeaf permission)
     {
         for (int i = 0; i < _perms.Count; i++)
         {
@@ -457,7 +456,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
     }
 
 #if SERVER
-    public virtual void AddPermission(ulong user, Permission permission)
+    public virtual void AddPermission(ulong user, PermissionBranch permission)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -475,14 +474,14 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
             if (perms[i].Equals(permission))
                 return;
         }
-        List<Permission> perms2 = new List<Permission>(perms.Count + 1);
+        List<PermissionBranch> perms2 = new List<PermissionBranch>(perms.Count + 1);
         perms2.AddRange(perms);
         perms2.Add(permission);
         SavePermissions(user, perms2);
         EventUserPermissionUpdated.TryInvoke(permission, user, true);
     }
 
-    public virtual void RemovePermission(ulong user, Permission permission)
+    public virtual void RemovePermission(ulong user, PermissionBranch permission)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -495,7 +494,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         }
 
         perms = GetPermissions(user, true);
-        List<Permission> perms2 = new List<Permission>(perms.Count);
+        List<PermissionBranch> perms2 = new List<PermissionBranch>(perms.Count);
         perms2.AddRange(perms);
         for (int i = perms2.Count - 1; i >= 0; --i)
         {
@@ -514,24 +513,24 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         {
             if (!EventUserPermissionUpdated.IsEmpty)
             {
-                foreach (Permission perm in user2.Permissions)
+                foreach (PermissionBranch perm in user2.Permissions)
                     EventUserPermissionUpdated.TryInvoke(perm, user, false);
             }
             user2.ClearPermissions();
-            SavePermissions(user2.SteamId.m_SteamID, Array.Empty<Permission>());
+            SavePermissions(user2.SteamId.m_SteamID, Array.Empty<PermissionBranch>());
             return;
         }
 
         if (!EventUserPermissionUpdated.IsEmpty)
         {
-            IReadOnlyList<Permission> perms = GetPermissions(user, true);
-            foreach (Permission perm in perms)
+            IReadOnlyList<PermissionBranch> perms = GetPermissions(user, true);
+            foreach (PermissionBranch perm in perms)
                 EventUserPermissionUpdated.TryInvoke(perm, user, false);
         }
-        SavePermissions(user, Array.Empty<Permission>());
+        SavePermissions(user, Array.Empty<PermissionBranch>());
     }
 
-    public virtual IReadOnlyList<Permission> GetPermissions(ulong user, bool forceReload = false)
+    public virtual IReadOnlyList<PermissionBranch> GetPermissions(ulong user, bool forceReload = false)
     {
         lock (Writer)
         {
@@ -542,25 +541,41 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
             {
                 using FileStream str = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
                 Reader.LoadNew(str);
-                _ = Reader.ReadUInt16();
+                int version = Reader.ReadUInt16();
                 int ct = Reader.ReadInt32();
-                List<Permission> list = new List<Permission>(ct);
+                List<PermissionBranch> list = new List<PermissionBranch>(ct);
                 for (int i = 0; i < ct; ++i)
                 {
-                    if (Permission.TryParse(Reader.ReadString(), out Permission perm))
-                        list.Add(Handler.TryFindEqualPermission(perm));
-                    if (Reader.HasFailed)
-                        break;
+                    if (version < 1)
+                    {
+                        string id = Reader.ReadString();
+                        if (Reader.HasFailed)
+                            break;
+                        if (PermissionBranch.TryParse(id, out PermissionBranch branch))
+                            list.Add(branch);
+                        else if (branch.Path != null)
+                            Logger.LogDebug($"Invalid permission skipped: {branch.Format()}.");
+                    }
+                    else
+                    {
+                        PermissionBranch branch = PermissionBranch.Read(Reader);
+                        if (Reader.HasFailed)
+                            break;
+                        if (branch.Valid)
+                            list.Add(branch);
+                        else
+                            Logger.LogDebug($"Invalid permission skipped: {branch.Format()}.");
+                    }
                 }
                 return list.AsReadOnly();
             }
             else
             {
                 string[] def = DevkitServerConfig.Config.DefaultUserPermissions ?? Array.Empty<string>();
-                List<Permission> list = new List<Permission>(def.Length);
+                List<PermissionBranch> list = new List<PermissionBranch>(def.Length);
                 for (int i = 0; i < def.Length; ++i)
                 {
-                    if (Permission.TryParse(def[i], out Permission permission))
+                    if (PermissionBranch.TryParse(def[i], out PermissionBranch permission))
                         list.Add(Handler.TryFindEqualPermission(permission));
                     else
                         Logger.LogWarning("Unknown default permission: " + def[i].Format() + ".");
@@ -634,7 +649,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
     {
         ThreadUtil.assertIsGameThread();
 
-        if (UserManager.FromId(user) is { Permissions: { } } user2)
+        if (UserManager.FromId(user) is { Permissions: not null } user2)
         {
             if (!EventUserPermissionGroupUpdated.IsEmpty)
             {
@@ -735,7 +750,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         PermissionsEx.ReplicatePermissionGroupUpdate(group);
         EventPermissionGroupUpdated.TryInvoke(group);
     }
-    private static void SavePermissions(ulong user, IReadOnlyCollection<Permission> permissions)
+    private static void SavePermissions(ulong user, IReadOnlyCollection<PermissionBranch> permissions)
     {
         lock (Writer)
         {
@@ -750,8 +765,8 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
             Writer.Stream = str;
             Writer.Write(DataVersion);
             Writer.Write(permissions.Count);
-            foreach (Permission permission in permissions)
-                Writer.Write(permission.ToString());
+            foreach (PermissionBranch permission in permissions)
+                PermissionBranch.Write(Writer, permission);
             Writer.Flush();
             str.Flush();
             Writer.Stream = null;
@@ -780,11 +795,11 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         }
     }
 #else
-    public virtual void ReceivePermissions(IReadOnlyList<Permission> permissions, IReadOnlyList<PermissionGroup> groups)
+    public virtual void ReceivePermissions(IReadOnlyList<PermissionLeaf> permissions, IReadOnlyList<PermissionGroup> groups)
     {
         if (!EventUserPermissionUpdated.IsEmpty)
         {
-            foreach (Permission permission in _clientPerms)
+            foreach (PermissionLeaf permission in _clientPerms)
                 EventUserPermissionUpdated.TryInvoke(permission, false);
         }
         if (EventUserPermissionGroupUpdated.IsEmpty)
@@ -798,7 +813,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         _clientPermGrps.AddRange(groups);
         if (!EventUserPermissionUpdated.IsEmpty)
         {
-            foreach (Permission permission in _clientPerms)
+            foreach (PermissionLeaf permission in _clientPerms)
                 EventUserPermissionUpdated.TryInvoke(permission, true);
         }
         if (!EventUserPermissionGroupUpdated.IsEmpty)
@@ -808,11 +823,11 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
         }
     }
 
-    public virtual void ReceivePermissionState(Permission permission, bool state)
+    public virtual void ReceivePermissionState(PermissionLeaf permission, bool state)
     {
         for (int i = 0; i < _clientPerms.Count; ++i)
         {
-            Permission p2 = _clientPerms[i];
+            PermissionLeaf p2 = _clientPerms[i];
             if (p2.Equals(permission))
             {
                 if (!state)
@@ -864,7 +879,7 @@ public class UserPermissions : IPermissionHandler, IUserPermissionHandler
     {
         if (!EventUserPermissionUpdated.IsEmpty)
         {
-            foreach (Permission permission in _clientPerms)
+            foreach (PermissionLeaf permission in _clientPerms)
                 EventUserPermissionUpdated.TryInvoke(permission, false);
         }
         _clientPerms.Clear();
@@ -928,7 +943,7 @@ public class PermissionGroupsConfig : SchemaConfiguration
             }),
             new PermissionGroup("director", "Director", new Color32(51, 204, 255, 255), 2, new GroupPermission[]
             {
-                Permission.SuperuserPermission
+                new GroupPermission(PermissionBranch.Superuser, false)
             })
         }
     };

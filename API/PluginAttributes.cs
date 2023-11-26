@@ -18,3 +18,10 @@ public class PluginIdentifierAttribute : Attribute
 {
     public Type? PluginType { get; set; }
 }
+
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+public sealed class PermissionPrefixAttribute : Attribute
+{
+    public string Prefix { get; }
+    public PermissionPrefixAttribute(string prefix) => Prefix = prefix;
+}

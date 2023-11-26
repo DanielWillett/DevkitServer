@@ -1,4 +1,4 @@
-﻿using DevkitServer.Commands.Subsystem;
+﻿using DevkitServer.Core.Commands.Subsystem;
 #if SERVER
 using DevkitServer.Players;
 #endif
@@ -16,7 +16,7 @@ public interface ICommandHandler
     void Init();
     void ExecuteCommand(IExecutableCommand command,
 #if SERVER
-        EditorUser? user,
+        SteamPlayer? user,
 #endif
 #if CLIENT
         bool console,
@@ -24,7 +24,7 @@ public interface ICommandHandler
         string[] args, string originalMessage);
     void SendHelpMessage(
 #if SERVER
-        EditorUser? user
+        SteamPlayer? user
 #endif
 #if CLIENT
         bool console
@@ -32,7 +32,7 @@ public interface ICommandHandler
         );
     void SendNoPermissionMessage(
 #if SERVER
-        EditorUser? user,
+        SteamPlayer? user,
 #endif
 #if CLIENT
         bool console,

@@ -4,85 +4,89 @@
     "title": "DevkitServer Configuration (Server)",
     "description": "Defines general server-side settings for DevkitServer.",
     "type": "object",
-    "properties": {
-        "ansi_log": {
-            "description": "Add a log to Unturned/Logs that includes whatever visual ANSI codes are used to color the console.",
-            "type": "boolean"
+  "properties": {
+    "ansi_log": {
+      "description": "Add a log to Unturned/Logs that includes whatever visual ANSI codes are used to color the console.",
+      "type": "boolean"
+    },
+    "extended_visual_ansi_support": {
+      "description": "Full (24-bit) console color support (works in the Win 11 terminal and most web terminals).",
+      "type": "boolean"
+    },
+    "visual_ansi_support": {
+      "description": "Basic (4-bit) console color support (works in most terminals).",
+      "type": "boolean"
+    },
+    "walmart_pc_support": {
+      "description": "Removes cosmetic improvements.",
+      "type": "boolean"
+    },
+    "new_level_info": {
+      "description": "Options for newly created maps.",
+      "type": "object",
+      "properties": {
+        "gamemode_type": {
+          "description": "Level Type",
+          "type": "string",
+          "enum": [ "Survival", "Horde", "Arena" ]
         },
-        "extended_visual_ansi_support": {
-            "description": "Full (24-bit) console color support (works in the Win 11 terminal and most web terminals).",
-            "type": "boolean"
+        "start_size": {
+          "description": "Starting level size, based on legacy terrain sizes.",
+          "type": "string",
+          "enum": [ "Tiny", "Small", "Medium", "Large", "Insane" ]
         },
-        "visual_ansi_support": {
-            "description": "Basic (4-bit) console color support (works in most terminals).",
-            "type": "boolean"
-        },
-        "walmart_pc_support": {
-            "description": "Removes cosmetic improvements.",
-            "type": "boolean"
-        },
-        "new_level_info": {
-            "description": "Options for newly created maps.",
-            "type": "object",
-            "properties": {
-                "gamemode_type": {
-                    "description": "Level Type",
-                    "type": "string",
-                    "enum": [ "Survival", "Horde", "Arena" ]
-                },
-                "start_size": {
-                    "description": "Starting level size, based on legacy terrain sizes.",
-                    "type": "string",
-                    "enum": [ "Tiny", "Small", "Medium", "Large", "Insane" ]
-                },
-                "map_owner": {
-                    "description": "SteamID of the 'owner' of the map for map metadata.",
-                    "type": [ "integer", "string" ]
-                }
-            },
-            "required": [ "gamemode_type", "start_size", "map_owner" ]
-        },
-        "disable_map_download": {
-            "description": "Try to read the map from your files instead of downloading it on join. Not recommended.",
-            "type": "boolean"
-        },
-        "default_permissions": {
-            "description": "Default individual permissions a user has.",
-            "type": "array",
-            "items": {
-                "type": "string"
-            },
-            "uniqueItems": true
-        },
-        "default_permission_groups": {
-            "description": "Default permission groups a user has.",
-            "type": "array",
-            "items": {
-                "type": "string"
-            },
-            "uniqueItems": true
-        },
-        "user_savedata_override": {
-            "description": "Override the directory where user savedata is stored.",
-            "type": [ "string", "null" ],
-            "format": "uri-reference"
-        },
-        "high_speed": {
-            "description": "Configure a TCP server to send/receive large packets quicker.",
-            "type": "object",
-            "properties": {
-                "enable_high_speed_support": {
-                    "description": "Enables support for the TCP server.",
-                    "type": "boolean"
-                },
-                "high_speed_tcp_port": {
-                    "description": "Port to use for the TCP server. This needs to be port forwarded.",
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 65535
-                },
-                "required": [ "enable_high_speed_support", "high_speed_tcp_port" ]
-            }
+        "map_owner": {
+          "description": "SteamID of the 'owner' of the map for map metadata.",
+          "type": [ "integer", "string" ]
         }
+      },
+      "required": [ "gamemode_type", "start_size", "map_owner" ]
+    },
+    "disable_map_download": {
+      "description": "Try to read the map from your files instead of downloading it on join. Not recommended.",
+      "type": "boolean"
+    },
+    "admins_are_superusers": {
+      "description": "Admins (given with the vanilla /admin command) are treated as having the '*' permission which gives them all permissions.",
+      "type": "boolean"
+    },
+    "default_permissions": {
+      "description": "Default individual permissions a user has.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "default_permission_groups": {
+      "description": "Default permission groups a user has.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "user_savedata_override": {
+      "description": "Override the directory where user savedata is stored.",
+      "type": [ "string", "null" ],
+      "format": "uri-reference"
+    },
+    "high_speed": {
+      "description": "Configure a TCP server to send/receive large packets quicker.",
+      "type": "object",
+      "properties": {
+        "enable_high_speed_support": {
+          "description": "Enables support for the TCP server.",
+          "type": "boolean"
+        },
+        "high_speed_tcp_port": {
+          "description": "Port to use for the TCP server. This needs to be port forwarded.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "required": [ "enable_high_speed_support", "high_speed_tcp_port" ]
+      }
     }
+  }
 }

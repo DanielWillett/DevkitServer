@@ -29,7 +29,8 @@ public class DevkitServerConfig
         new Color32JsonConverter(),
         new CSteamIDJsonConverter(),
         new TypeJsonConverter(),
-        new PermissionConverter(),
+        new PermissionLeafConverter(),
+        new PermissionBranchConverter(),
         new PermissionGroupConverter(),
         new GroupPermissionConverter(),
         new AssetReferenceJsonConverterFactory(),
@@ -418,6 +419,9 @@ public class SystemConfig : SchemaConfiguration
     [JsonPropertyName("disable_map_download")]
     public bool DisableMapDownload { get; set; }
 
+    [JsonPropertyName("admins_are_superusers")]
+    public bool AdminsAreSuperusers { get; set; }
+
     [JsonPropertyName("default_permissions")]
     public string[] DefaultUserPermissions { get; set; }
 
@@ -457,6 +461,7 @@ public class SystemConfig : SchemaConfiguration
             "viewer"
         };
         UserSavedataLocationOverride = null;
+        AdminsAreSuperusers = true;
 #endif
     }
 #if SERVER

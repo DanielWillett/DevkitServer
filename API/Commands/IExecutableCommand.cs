@@ -13,6 +13,11 @@ namespace DevkitServer.API.Commands;
 public interface IExecutableCommand
 {
     /// <summary>
+    /// Defines when a command is allowed to be executed (singleplayer, multiplayer, etc).
+    /// </summary>
+    CommandExecutionMode Mode { get; }
+
+    /// <summary>
     /// Treat <see cref="Permissions"/> as a list of any permission the user must have instead of a list of all permissions a user must have.
     /// </summary>
     /// <remarks>Defaults to <see langword="true"/>.</remarks>
@@ -39,7 +44,7 @@ public interface IExecutableCommand
     /// List of all permissions required to run the command. Change this behavior with <see cref="AnyPermissions"/>. This is safe to add to or remove from at runtime.
     /// </summary>
     /// <remarks>This getter is called each time someone runs a command. It is not a good idea to point it to a new <see cref="List{Permission}"/> each time it's called.</remarks>
-    IList<Permission> Permissions { get; }
+    IList<PermissionLeaf> Permissions { get; }
 
     /// <summary>
     /// Plugin that implements this command. May be <see langword="null"/> if the command comes from <see cref="DevkitServer"/>.
@@ -60,7 +65,7 @@ public interface IExecutableCommand
     /// <returns><see langword="true"/> if the user has permission to run this command, otherwise <see langword="false"/>.</returns>
     bool CheckPermission(
 #if SERVER
-        EditorUser? user
+        SteamPlayer? user
 #endif
         );
 }
@@ -109,6 +114,10 @@ public interface ICommandLocalizationFile : ILocalizedCommand
 #nullable disable
 internal interface ICachedTranslationSourceCommand : IExecutableCommand
 {
+    /// <summary>
+    /// Cache of <see cref="ITranslationSource"/> for <see cref="TranslationSource.FromCommand"/>.
+    /// </summary>
+    /// <remarks>This property will be set during registration unless it already has a value.</remarks>
     ITranslationSource TranslationSource { get; set; }
 }
 #nullable restore

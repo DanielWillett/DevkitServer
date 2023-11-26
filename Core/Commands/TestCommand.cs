@@ -23,12 +23,12 @@ namespace DevkitServer.Core.Commands;
 internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFile
 {
     [Permission]
-    public static readonly Permission Test = new Permission("test", devkitServer: true);
+    public static readonly PermissionLeaf Test = new PermissionLeaf("test", devkitServer: true);
     [Permission]
-    public static readonly Permission TestAll = new Permission("test.*", devkitServer: true);
+    public static readonly PermissionLeaf TestAll = new PermissionLeaf("test.*", devkitServer: true);
 
-    public IReadOnlyList<Permission> SyncSubcommandPermissions { get; }
-    public IReadOnlyList<Permission> AsyncSubcommandPermissions { get; }
+    public IReadOnlyList<PermissionLeaf> SyncSubcommandPermissions { get; }
+    public IReadOnlyList<PermissionLeaf> AsyncSubcommandPermissions { get; }
     Local ILocalizedCommand.Translations { get; set; } = null!;
     public TestCommand() : base("test")
     {
@@ -36,26 +36,26 @@ internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFil
         AddAlias("tets");
         AddPermission(Test);
         AddPermission(TestAll);
-        Permission[] perms = new Permission[CommandTests.Commands.Length];
+        PermissionLeaf[] perms = new PermissionLeaf[CommandTests.Commands.Length];
         for (int i = 0; i < CommandTests.Commands.Length; ++i)
         {
-            Permission perm = new Permission("test." + CommandTests.Commands[i].Method.Name.ToLowerInvariant(), devkitServer: true);
+            PermissionLeaf perm = new PermissionLeaf("test." + CommandTests.Commands[i].Method.Name.ToLowerInvariant(), devkitServer: true);
             AddPermission(perm);
             UserPermissions.Handler.Register(perm);
             perms[i] = perm;
         }
 
-        SyncSubcommandPermissions = new ReadOnlyCollection<Permission>(perms);
-        perms = new Permission[CommandTests.AsyncCommands.Length];
+        SyncSubcommandPermissions = new ReadOnlyCollection<PermissionLeaf>(perms);
+        perms = new PermissionLeaf[CommandTests.AsyncCommands.Length];
         for (int i = 0; i < CommandTests.AsyncCommands.Length; ++i)
         {
-            Permission perm = new Permission("test." + CommandTests.AsyncCommands[i].Method.Name.ToLowerInvariant(), devkitServer: true);
+            PermissionLeaf perm = new PermissionLeaf("test." + CommandTests.AsyncCommands[i].Method.Name.ToLowerInvariant(), devkitServer: true);
             AddPermission(perm);
             UserPermissions.Handler.Register(perm);
             perms[i] = perm;
         }
 
-        AsyncSubcommandPermissions = new ReadOnlyCollection<Permission>(perms);
+        AsyncSubcommandPermissions = new ReadOnlyCollection<PermissionLeaf>(perms);
     }
 
     public override async UniTask Execute(CommandContext ctx, CancellationToken token)

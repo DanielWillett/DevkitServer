@@ -108,7 +108,7 @@ public sealed class PermissionGroup : IReadOnlyList<GroupPermission>
                             {
                                 GroupPermission perm = JsonSerializer.Deserialize<GroupPermission>(ref reader, options);
                                 if (perm.Permission == null) continue;
-                                Permission perm2 = UserPermissions.Handler.TryFindEqualPermission(perm.Permission);
+                                PermissionBranch perm2 = perm.Permission;
                                 group._permissions.Add(new GroupPermission(perm2, perm.IsRemoved));
                                 ++i;
                             }
@@ -204,7 +204,7 @@ public sealed class PermissionGroup : IReadOnlyList<GroupPermission>
         {
             bool rem = reader.ReadBool();
             string str = reader.ReadString();
-            if (Permission.TryParse(str, out Permission perm))
+            if (PermissionLeaf.TryParse(str, out PermissionLeaf perm))
             {
                 group._permissions.Add(new GroupPermission(perm, rem));
             }
@@ -272,12 +272,12 @@ public sealed class PermissionGroup : IReadOnlyList<GroupPermission>
 [JsonConverter(typeof(GroupPermissionConverter))]
 public readonly struct GroupPermission
 {
-    public Permission Permission { get; }
+    public PermissionBranch Permission { get; }
     public bool IsRemoved { get; }
 #nullable disable
     public GroupPermission() { }
 #nullable restore
-    public GroupPermission(Permission permission, bool isRemoved)
+    public GroupPermission(PermissionBranch permission, bool isRemoved)
     {
         Permission = permission;
         IsRemoved = isRemoved;
@@ -304,7 +304,7 @@ public readonly struct GroupPermission
             if (string.IsNullOrEmpty(str))
                 throw new JsonException("Invalid permission in GroupPermission converter: \"+" + str + "\".");
         }
-        if (Permission.TryParse(str, out Permission permission))
+        if (PermissionBranch.TryParse(str, out PermissionBranch permission))
         {
             result = new GroupPermission(permission, rem);
             return true;
@@ -314,7 +314,7 @@ public readonly struct GroupPermission
         return false;
     }
 
-    public static implicit operator GroupPermission(Permission permission) => permission is null ? default : new GroupPermission(permission, false);
+    public static implicit operator GroupPermission(PermissionLeaf permission) => permission.Valid ? default : new GroupPermission(permission, false);
     public override bool Equals(object? obj) => obj is GroupPermission g && g.IsRemoved == IsRemoved && g.Permission.Equals(Permission);
     public override int GetHashCode() => (Permission != null ? Permission.GetHashCode() : 0) + (IsRemoved ? 1 : 0);
     public static bool operator ==(GroupPermission? left, object? right) => right is not null && left.Equals(right);
@@ -331,9 +331,9 @@ public readonly struct GroupPermission
 
 public sealed class PermissionGroupConverter : JsonConverter<PermissionGroup>
 {
-    public override PermissionGroup? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override PermissionGroup Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        return PermissionGroup.ReadJson(ref reader, options);
+        return PermissionGroup.ReadJson(ref reader, options)!;
     }
     public override void Write(Utf8JsonWriter writer, PermissionGroup? value, JsonSerializerOptions options)
     {

@@ -21,9 +21,9 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 #endif
     public CSteamID SteamId { get; private set; }
 #if SERVER
-    private List<Permission> _perms = null!;
+    private List<PermissionBranch> _perms = null!;
     private List<PermissionGroup> _permGrps = null!;
-    public IReadOnlyList<Permission> Permissions { get; private set; } = null!;
+    public IReadOnlyList<PermissionBranch> Permissions { get; private set; } = null!;
     public IReadOnlyList<PermissionGroup> PermissionGroups { get; private set; } = null!;
     public ITransportConnection Connection { get; internal set; } = null!;
 #else
@@ -146,7 +146,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     }
 #endif
 #if SERVER
-    internal void AddPermission(Permission permission)
+    internal void AddPermission(PermissionBranch permission)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -160,7 +160,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         _perms.Add(permission);
     }
 
-    internal void RemovePermission(Permission permission)
+    internal void RemovePermission(PermissionBranch permission)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -231,7 +231,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 
 #if CLIENT
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendPermissionState)]
-    private static void ReceivePermissionState(MessageContext ctx, Permission perm, bool state)
+    private static void ReceivePermissionState(MessageContext ctx, PermissionLeaf perm, bool state)
     {
         UserPermissions.UserHandler.ReceivePermissionState(perm, state);
         ctx.Acknowledge();

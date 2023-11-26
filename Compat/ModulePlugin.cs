@@ -32,6 +32,9 @@ public class ModulePlugin : IDevkitServerColorPlugin
     public string LocalizationDirectory { get; }
 
     /// <inheritdoc/>
+    public string CommandLocalizationDirectory { get; }
+
+    /// <inheritdoc/>
     public PluginAssembly Assembly { get; set; } = null!;
 
     /// <inheritdoc/>
@@ -52,12 +55,17 @@ public class ModulePlugin : IDevkitServerColorPlugin
         Name = Module.config.Name;
         MenuName = Module.config.Name;
         PermissionPrefix = "module::" + module.config.Name.ToLowerInvariant();
+
         string dir = module.config.DirectoryPath;
         string dataDir = Path.Combine(dir, "Data");
         string localDir = Path.Combine(dir, "Localization");
 
         DataDirectory = Directory.Exists(dataDir) ? dataDir : dir;
         LocalizationDirectory = Directory.Exists(localDir) ? localDir : dir;
+
+        string cmdLocalDir = Path.Combine(LocalizationDirectory, "Commands");
+        CommandLocalizationDirectory = Directory.Exists(cmdLocalDir) ? cmdLocalDir : dir;
+
         if (File.Exists(Path.Combine(LocalizationDirectory, "English.dat")) || File.Exists(Path.Combine(LocalizationDirectory, Provider.language + ".dat")))
         {
             Translations = Localization.tryRead(LocalizationDirectory, false);

@@ -14,7 +14,7 @@
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
-    <NoWarn>1701;1702,1591,1587,1711,1735,1573,1574,1570,1584,1658</NoWarn>
+    <NoWarn>1701;1702,1591,1587,1711,1735,1573,1574,1570,1584,1658;CS0162</NoWarn>
   </PropertyGroup>
   <PropertyGroup>
     <DisableImplicitFrameworkReferences>false</DisableImplicitFrameworkReferences>
@@ -108,6 +108,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Commands\" />
     <Folder Include="Module\Bin\" />
   </ItemGroup>
 </Project>

@@ -97,8 +97,13 @@ public static class MapCreation
         }
         else
         {
-            if (owner.m_SteamID == 0ul && SteamAdminlist.list is { Count: > 0 })
-                owner = SteamAdminlist.list[0].playerID;
+            if (owner.m_SteamID == 0ul)
+            {
+                owner = SteamAdminlist.ownerID;
+
+                if (owner.m_SteamID == 0ul && SteamAdminlist.list is { Count: > 0 })
+                    owner = SteamAdminlist.list[0].playerID;
+            }
 
             CSteamID clientOld = (CSteamID)clientField.GetValue(null);
             clientField.SetValue(null, owner);

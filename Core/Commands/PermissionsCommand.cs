@@ -3,7 +3,6 @@ using Cysharp.Threading.Tasks;
 using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
-using DevkitServer.Players;
 using System.Globalization;
 using System.Text;
 
@@ -13,33 +12,33 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
     private readonly string[] _userMatches = { "user", "users", "player", "players", "u", "p" };
     private readonly string[] _permMatches = { "perm", "permission", "perms", "permissions", "p" };
     [Permission]
-    public static readonly Permission All = new Permission("permissions.*", devkitServer: true);
+    public static readonly PermissionLeaf All = new PermissionLeaf("permissions.*", devkitServer: true);
     [Permission]
-    public static readonly Permission SeePermissions = new Permission("permissions", devkitServer: true);
+    public static readonly PermissionLeaf SeePermissions = new PermissionLeaf("permissions", devkitServer: true);
     [Permission]
-    public static readonly Permission AllGroup = new Permission("permissions.group.*", devkitServer: true);
+    public static readonly PermissionLeaf AllGroup = new PermissionLeaf("permissions.group.*", devkitServer: true);
     [Permission]
-    public static readonly Permission EditGroup = new Permission("permissions.group.edit.*", devkitServer: true);
+    public static readonly PermissionLeaf EditGroup = new PermissionLeaf("permissions.group.edit.*", devkitServer: true);
     [Permission]
-    public static readonly Permission EditGroupPermissions = new Permission("permissions.group.edit.permissions.*", devkitServer: true);
+    public static readonly PermissionLeaf EditGroupPermissions = new PermissionLeaf("permissions.group.edit.permissions.*", devkitServer: true);
     [Permission]
-    public static readonly Permission EditGroupAddPermission = new Permission("permissions.group.edit.permissions.add", devkitServer: true);
+    public static readonly PermissionLeaf EditGroupAddPermission = new PermissionLeaf("permissions.group.edit.permissions.add", devkitServer: true);
     [Permission]
-    public static readonly Permission EditGroupRemovePermission = new Permission("permissions.group.edit.permissions.remove", devkitServer: true);
+    public static readonly PermissionLeaf EditGroupRemovePermission = new PermissionLeaf("permissions.group.edit.permissions.remove", devkitServer: true);
     [Permission]
-    public static readonly Permission EditGroupInfo = new Permission("permissions.group.edit.info", devkitServer: true);
+    public static readonly PermissionLeaf EditGroupInfo = new PermissionLeaf("permissions.group.edit.info", devkitServer: true);
     [Permission]
-    public static readonly Permission CreateGroup = new Permission("permissions.group.create", devkitServer: true);
+    public static readonly PermissionLeaf CreateGroup = new PermissionLeaf("permissions.group.create", devkitServer: true);
     [Permission]
-    public static readonly Permission DeleteGroup = new Permission("permissions.group.delete", devkitServer: true);
+    public static readonly PermissionLeaf DeleteGroup = new PermissionLeaf("permissions.group.delete", devkitServer: true);
     [Permission]
-    public static readonly Permission GrantGroup = new Permission("permissions.user.group.grant", devkitServer: true);
+    public static readonly PermissionLeaf GrantGroup = new PermissionLeaf("permissions.user.group.grant", devkitServer: true);
     [Permission]
-    public static readonly Permission RevokeGroup = new Permission("permissions.user.group.revoke", devkitServer: true);
+    public static readonly PermissionLeaf RevokeGroup = new PermissionLeaf("permissions.user.group.revoke", devkitServer: true);
     [Permission]
-    public static readonly Permission GrantPermission = new Permission("permissions.user.permission.grant", devkitServer: true);
+    public static readonly PermissionLeaf GrantPermission = new PermissionLeaf("permissions.user.permission.grant", devkitServer: true);
     [Permission]
-    public static readonly Permission RevokePermission = new Permission("permissions.user.permission.revoke", devkitServer: true);
+    public static readonly PermissionLeaf RevokePermission = new PermissionLeaf("permissions.user.permission.revoke", devkitServer: true);
 
     Local ILocalizedCommand.Translations { get; set; } = null!;
     public PermissionsCommand() : base("permissions")
@@ -62,9 +61,9 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
             StringBuilder sb = new StringBuilder();
             bool init = false;
             foreach (string perm in UserPermissions.UserHandler
-                         .GetPermissions(ctx.Caller.SteamId.m_SteamID, false)
+                         .GetPermissions(ctx.Caller.playerID.steamID.m_SteamID, false)
                          .Select(x => x.ToString())
-                         .Concat(UserPermissions.UserHandler.GetPermissionGroups(ctx.Caller.SteamId.m_SteamID)
+                         .Concat(UserPermissions.UserHandler.GetPermissionGroups(ctx.Caller.playerID.steamID.m_SteamID)
                              .OrderByDescending(x => x.Priority)
                              .SelectMany(x => x.Permissions)
                              .Select(x => x.ToString())))
@@ -263,9 +262,9 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
             if (!group && !ctx.MatchParameter(3, _permMatches))
                 throw ctx.Reply("CorrectUsageUser");
 
-            if (!ctx.TryGet(2, out ulong user, out EditorUser? onlinePlayer, false))
+            if (!ctx.TryGet(2, out ulong user, out SteamPlayer? onlinePlayer, false))
                 throw ctx.Reply("PlayerNotValid", ctx.Get(2));
-            string name = onlinePlayer?.Player != null ? onlinePlayer.Player.playerID.characterName : user.ToString();
+            string name = onlinePlayer != null ? onlinePlayer.playerID.characterName : user.ToString();
             if (ctx.TryGetRange(4, out string id))
             {
                 if (group)
@@ -285,7 +284,7 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
                     throw ctx.Reply(revoke ? "UserRevokedPermissionGroup" : "UserAddedPermissionGroup", grp.Id, "#" + ColorUtility.ToHtmlStringRGB(grp.Color), name);
                 }
 
-                if (!Permission.TryParse(id, out Permission permission))
+                if (!PermissionLeaf.TryParse(id, out PermissionLeaf permission))
                     throw ctx.Reply("PermissionNotFound", id);
 
                 if (revoke)

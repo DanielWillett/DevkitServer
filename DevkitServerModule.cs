@@ -132,7 +132,15 @@ public sealed class DevkitServerModule : IModuleNexus
         { "PlayersOnly", "<#ff8c69>This command can not be called from console." },
         { "Exception", "<#ff8c69>Error executing command: <#4ec9b0>{0}</color>." },
         { "NoPermissions", "<#ff8c69>You do not have permission to use this command." },
-        { "NotDevkitServerClient", "<#ff8c69>You must be connected to a DevkitServer server." }
+        { "NotDevkitServerClient", "<#ff8c69>You must be connected to a DevkitServer server." },
+        { "CommandDisabled", "<#ff8c69>This command is disabled." },
+        { "CommandMustBePlayer", "<#ff8c69>This command can only be ran during play mode." },
+        { "CommandMustBeEditorPlayer", "<#ff8c69>This command can only be ran during player control in editor mode." },
+        { "CommandMustBeEditor", "<#ff8c69>This command can only be ran during edit mode." },
+        { "CommandMustBeMultiplayer", "<#ff8c69>This command can only be ran in multiplayer." },
+        { "CommandMustBeSingleplayer", "<#ff8c69>This command can only be ran in singleplayer." },
+        { "CommandMustBeMenu", "<#ff8c69>This command can only be ran in menu." },
+        { "CommandRequiresCheats", "<#ff8c69>This command can only be ran when cheats are enabled." },
     };
     public static Local MessageLocalization { get; private set; } = null!;
 

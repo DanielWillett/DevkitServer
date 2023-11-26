@@ -302,7 +302,7 @@ internal static class SelectionToolPatches
             // todo events
             if (!HierarchyUtil.CheckPlacePermission(id))
             {
-                Permission? place = HierarchyUtil.GetPlacePermission(id);
+                PermissionLeaf? place = HierarchyUtil.GetPlacePermission(id);
                 EditorMessage.SendEditorMessage(place == null
                     ? DevkitServerModule.MessageLocalization.Translate("NoPermissions")
                     : DevkitServerModule.MessageLocalization.Translate("NoPermissionsWithPermission", place.ToString()));

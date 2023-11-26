@@ -174,7 +174,7 @@ internal static class TerrainEditorPatches
         }
 
         MethodInfo? hasPermission = typeof(PermissionsEx).GetMethod(nameof(PermissionsEx.Has),
-            BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(Permission), typeof(bool) }, null);
+            BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(PermissionLeaf), typeof(bool) }, null);
         if (hasPermission == null)
         {
             Logger.LogWarning("Unable to find method: PermissionsEx.Has.", method: "CLIENT EVENTS");

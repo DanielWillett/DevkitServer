@@ -792,10 +792,10 @@ public class UserInput : MonoBehaviour
 #endif
     )
     {
-        Permission perm = controller == CameraController.Player
+        PermissionLeaf perm = controller == CameraController.Player
             ? VanillaPermissions.UsePlayerController
             : VanillaPermissions.UseEditorController;
-        Permission otherPerm = controller != CameraController.Player
+        PermissionLeaf otherPerm = controller != CameraController.Player
             ? VanillaPermissions.UsePlayerController
             : VanillaPermissions.UseEditorController;
         return perm.Has(

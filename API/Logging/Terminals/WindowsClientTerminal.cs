@@ -1,17 +1,15 @@
 ﻿#if CLIENT
-using DevkitServer.Commands.Subsystem;
-using SDG.Framework.Utilities;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
+using SDG.Framework.Utilities;
 using System.Text;
 using ThreadPriority = System.Threading.ThreadPriority;
 using ThreadState = System.Threading.ThreadState;
+using DevkitServer.Core.Commands.Subsystem;
 
 namespace DevkitServer.API.Logging.Terminals;
 internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
 {
-    private const uint CodepageUTF8 = 65001U;
-    private const int StdOutputHandle = -11;
-
     public event TerminalPreReadDelegate? OnInput;
     public event TerminalPreWriteDelegate? OnOutput;
     private readonly List<LogMessage> _messageQueue = new List<LogMessage>();
@@ -20,40 +18,60 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
     private int _inputIndex;
     private volatile bool _cancellationRequested;
     private Thread? _keyMonitor;
-    private uint? _closeHandler;
+    private volatile uint _closeHandler;
+    private volatile bool _closeRequested;
     private bool _setup;
     private bool _inText;
     private bool _writing;
+    private bool _fallback;
     public bool IsComittingToUnturnedLog => _writing;
     public void Init()
     {
-        FreeConsole();
-        AllocConsole();
-        Thread.Sleep(200);
-        SetConsoleOutputCP(CodepageUTF8);
-        SetConsoleCP(CodepageUTF8);
-        Thread.Sleep(200);
-        IntPtr handle = GetStdHandle(StdOutputHandle);
-        GetConsoleMode(handle, out uint mode1);
-        SetConsoleMode(handle, mode1 | 0x0004); // enable extended ANSI support for older terminals
-        SetConsoleCtrlHandler(OnExitRequested, true);
-        Console.OutputEncoding = new UTF8Encoding(false);
-        Console.InputEncoding = new UTF8Encoding(false);
-        Console.Title = "Devkit Server Client";
-        if (_keyMonitor != null && _keyMonitor.ThreadState == ThreadState.Running)
-            _keyMonitor.Abort();
-        Thread curThread = Thread.CurrentThread;
-        _keyMonitor = new Thread(MonitorKeypress)
+        try
         {
-            Priority = ThreadPriority.Lowest,
-            CurrentCulture = curThread.CurrentCulture,
-            CurrentUICulture = curThread.CurrentUICulture,
-            IsBackground = true,
-            Name = curThread.Name + " Terminal Reader"
-        };
-        _keyMonitor.Start();
-        _setup = true;
+            if (!WindowsConsoleHelper.FreeConsole())
+                WindowsConsoleHelper.PrintLastWin32Error("FreeConsole", 0x7F);
+
+            if (!WindowsConsoleHelper.AllocConsole())
+                WindowsConsoleHelper.ThrowLastWin32Error("AllocConsole");
+
+            WindowsConsoleHelper.SetUTF8CodePage();
+
+            // enable extended ANSI support for older terminals
+            WindowsConsoleHelper.ConfigureConsoleO(x => x | StandardConsoleOutputFlags.ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+
+            // allow scrolling and selecting text
+            WindowsConsoleHelper.ConfigureConsoleI(x => (x & ~StandardConsoleInputFlags.ENABLE_MOUSE_INPUT) | StandardConsoleInputFlags.ENABLE_QUICK_EDIT_MODE);
+
+            WindowsConsoleHelper.OnConsoleControlPressed += OnExitRequested;
+
+            Console.OutputEncoding = new UTF8Encoding(false);
+            Console.InputEncoding = new UTF8Encoding(false);
+            Console.Title = "Devkit Server Client";
+
+            if (_keyMonitor != null && _keyMonitor.ThreadState == ThreadState.Running)
+                _keyMonitor.Abort();
+            Thread curThread = Thread.CurrentThread;
+            _keyMonitor = new Thread(MonitorKeypress)
+            {
+                Priority = ThreadPriority.Lowest,
+                CurrentCulture = curThread.CurrentCulture,
+                CurrentUICulture = curThread.CurrentUICulture,
+                IsBackground = true,
+                Name = curThread.Name + " Terminal Reader"
+            };
+            _keyMonitor.Start();
+            _setup = true;
+            _fallback = false;
+        }
+        catch (Win32Exception ex)
+        {
+            CommandWindow.LogError($"Falling back to basic file logging after WIN32 error: {ex.NativeErrorCode:X8}.");
+            CommandWindow.LogError(ex);
+            _fallback = true;
+        }
     }
+
 
     [UsedImplicitly]
     void Update()
@@ -75,6 +93,8 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
             }
             OutputTick();
         }
+        else if (_fallback)
+            OutputTick();
     }
     private void OutputTick()
     {
@@ -82,7 +102,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
         {
             if (_messageQueue.Count > 0)
             {
-                if (_inText)
+                if (_inText && !_fallback)
                 {
                     int x = Console.CursorLeft;
                     int y = Console.CursorTop;
@@ -125,8 +145,92 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                     }
                     Console.SetCursorPosition(x, y);
                 }
+                else
+                {
+                    while (_messageQueue.Count > 0)
+                    {
+                        LogMessage msg = _messageQueue[_msgIndex];
+                        ++_msgIndex;
+
+                        if (_messageQueue.Count <= _msgIndex)
+                        {
+                            _messageQueue.Clear();
+                            _msgIndex = 0;
+                        }
+                        if (!_fallback)
+                            msg.Write();
+                        if (msg.Save)
+                        {
+                            string message = msg.Message;
+                            Logger.TryRemoveDateFromLine(ref message);
+                            _writing = true;
+                            CommandHandler.IsLoggingFromDevkitServer = true;
+                            try
+                            {
+                                Logs.printLine(FormattingUtil.RemoveANSIFormatting(message));
+                            }
+                            finally
+                            {
+                                CommandHandler.IsLoggingFromDevkitServer = false;
+                                _writing = false;
+                            }
+                        }
+                    }
+                }
             }
-            else
+
+            if (!_fallback && _closeRequested)
+            {
+                string reason = "Closing from control signal \"" +
+                                _closeHandler switch
+                                {
+                                    0 => "Ctrl + C",
+                                    1 => "Ctrl + Break",
+                                    2 => "Window Closed",
+                                    5 => "Logging Off",
+                                    6 => "Shutting Down",
+                                    _ => "Unknown: " + _closeHandler.ToString("X2")
+                                } + "\".";
+                Write(reason, ConsoleColor.Red, true, Severity.Info);
+
+                Provider.QuitGame(reason);
+                _closeHandler = uint.MaxValue;
+            }
+        }
+    }
+
+    public void Write(string input, ConsoleColor color, bool save, Severity severity)
+    {
+        OnOutput?.Invoke(ref input, ref color);
+        lock (this)
+            _messageQueue.Add(new LogMessage(input, color, save));
+        if (DevkitServerModule.IsMainThread)
+            OutputTick();
+    }
+
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private bool OnExitRequested(uint val)
+    {
+        _closeHandler = val;
+        _closeRequested = true;
+        Thread.Sleep(TimeSpan.FromSeconds(4.9d));
+        return true;
+    }
+    public void Close()
+    {
+        _cancellationRequested = true;
+        _keyMonitor?.Abort();
+        _inText = false;
+        if (_setup)
+        {
+            Console.SetCursorPosition(0, Console.CursorTop);
+            WindowsConsoleHelper.OnConsoleControlPressed -= OnExitRequested;
+
+            _setup = false;
+        }
+        lock (this)
+        {
+            if (_messageQueue.Count > 0)
             {
                 while (_messageQueue.Count > 0)
                 {
@@ -138,7 +242,9 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                         _messageQueue.Clear();
                         _msgIndex = 0;
                     }
-                    msg.Write();
+
+                    if (!_fallback)
+                        msg.Write();
                     if (msg.Save)
                     {
                         string message = msg.Message;
@@ -157,94 +263,11 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                     }
                 }
             }
-
-            if (_closeHandler.HasValue && _closeHandler.Value != uint.MaxValue)
-            {
-                Write("Closing from control signal \"" +
-                      _closeHandler.Value switch
-                      {
-                          0 => "Ctrl + C",
-                          1 => "Ctrl + Break",
-                          2 => "Window Closed",
-                          5 => "Logging Off",
-                          6 => "Shutting Down",
-                          _ => "Unknown: " + _closeHandler.Value
-                      } + "\".", ConsoleColor.Red, true, Severity.Info);
-
-                TimeUtility.InvokeAfterDelay(() => Application.Quit(0), 0.5f);
-                _closeHandler = uint.MaxValue;
-            }
         }
+
+
+        WindowsConsoleHelper.FreeConsole();
     }
-
-    public void Write(string input, ConsoleColor color, bool save, Severity severity)
-    {
-        OnOutput?.Invoke(ref input, ref color);
-        lock (this)
-            _messageQueue.Add(new LogMessage(input, color, save));
-        if (DevkitServerModule.IsMainThread)
-            OutputTick();
-    }
-    private bool OnExitRequested(uint val)
-    {
-        _closeHandler = val;
-        return true;
-    }
-    public void Close()
-    {
-        _cancellationRequested = true;
-        _keyMonitor?.Abort();
-        _inText = false;
-        Console.SetCursorPosition(0, Console.CursorTop);
-        SetConsoleCtrlHandler(OnExitRequested, false);
-        lock (this)
-        {
-            if (_messageQueue.Count > 0)
-            {
-                while (_messageQueue.Count > 0)
-                {
-                    LogMessage msg = _messageQueue[_msgIndex];
-                    ++_msgIndex;
-
-                    if (_messageQueue.Count <= _msgIndex)
-                    {
-                        _messageQueue.Clear();
-                        _msgIndex = 0;
-                    }
-
-                    msg.Write();
-                }
-            }
-        }
-        _setup = false;
-        FreeConsole();
-    }
-
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool AllocConsole();
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    static extern IntPtr GetStdHandle(int nStdHandle);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool FreeConsole();
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool SetConsoleOutputCP(uint wCodePageID);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool SetConsoleCP(uint wCodePageID);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool SetConsoleCtrlHandler(Func<uint, bool> handler, bool add);
-
     private void MonitorKeypress()
     {
         Logger.LogDebug("Console keypress monitor thread starting.");

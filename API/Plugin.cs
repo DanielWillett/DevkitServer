@@ -32,6 +32,9 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
     public string MainLocalizationDirectory { get; }
 
     /// <inheritdoc/>
+    public string CommandLocalizationDirectory { get; }
+
+    /// <inheritdoc/>
     public PluginAssembly Assembly { get; set; } = null!;
 
     /// <inheritdoc/>
@@ -51,10 +54,13 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
         string name = Name ?? _defaultName;
         DataDirectory = Path.Combine(PluginLoader.PluginsDirectory, asmName + "." + name);
         LocalizationDirectory = Path.Combine(DataDirectory, "Localization");
+        CommandLocalizationDirectory = Path.Combine(LocalizationDirectory, "Commands");
         MainLocalizationDirectory = Path.Combine(LocalizationDirectory, "Main");
         Translations = Localization.tryRead(MainLocalizationDirectory, false);
         PermissionPrefix = name.ToLowerInvariant().Replace('.', '-');
         if (GetType().TryGetAttributeSafe(out PermissionPrefixAttribute prefixAttr, true) && !string.IsNullOrWhiteSpace(prefixAttr.Prefix))
+            PermissionPrefix = prefixAttr.Prefix;
+        else if (GetType().Assembly.TryGetAttributeSafe(out prefixAttr, true) && !string.IsNullOrWhiteSpace(prefixAttr.Prefix))
             PermissionPrefix = prefixAttr.Prefix;
     }
     protected virtual LocalDatDictionary DefaultLocalization => new LocalDatDictionary();
@@ -127,9 +133,7 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
         UIExtensionManager.RegisterExtension(new UIExtensionInfo(implementationType, parentUIType, priority, this));
     }
 #endif
-#nullable disable
-    ITranslationSource ICachedTranslationSourcePlugin.TranslationSource { get; set; }
-#nullable restore
+    ITranslationSource ICachedTranslationSourcePlugin.TranslationSource { get; set; } = null!;
 }
 
 public abstract class Plugin<TConfig> : Plugin, IDevkitServerPlugin<TConfig> where TConfig : class, new()

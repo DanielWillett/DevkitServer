@@ -1,7 +1,6 @@
 ﻿using DevkitServer.API;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
-using DevkitServer.Commands.Subsystem;
 using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
@@ -14,6 +13,8 @@ using DevkitServer.Framework;
 using SDG.Framework.Modules;
 using Module = SDG.Framework.Modules.Module;
 using Type = System.Type;
+using DevkitServer.Core.Commands.Subsystem;
+
 
 #if CLIENT
 using DevkitServer.API.UI.Extensions;
@@ -164,26 +165,21 @@ public static class PluginLoader
             plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not be empty.");
             throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not be empty.");
         }
-        if (plugin.PermissionPrefix[0] is '-' or '+')
+        if (plugin.PermissionPrefix[0] is '-' or '+' || plugin.PermissionPrefix.IndexOf(':') != -1)
         {
-            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not start with a '-' or '+'.");
-            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not start with a '-' or '+'.");
+            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not start with a '-' or '+' or contain a ':'.");
+            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not start with a '-' or '+' or contain a ':'.");
         }
 
-        if (plugin.PermissionPrefix.IndexOf('.') != -1)
+        if (plugin.PermissionPrefix.Equals(PermissionLeaf.CoreModulePrefix, StringComparison.InvariantCultureIgnoreCase))
         {
-            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not contain a period.");
-            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not contain a period.");
+            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not equal " + PermissionLeaf.CoreModulePrefix.Format() + ".");
+            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not equal " + PermissionLeaf.CoreModulePrefix + ".");
         }
-        if (plugin.PermissionPrefix.Equals(Permission.CoreModuleCode, StringComparison.InvariantCultureIgnoreCase))
+        if (plugin.PermissionPrefix.Equals(PermissionLeaf.DevkitServerModulePrefix, StringComparison.InvariantCultureIgnoreCase))
         {
-            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not equal " + Permission.CoreModuleCode.Format() + ".");
-            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not equal " + Permission.CoreModuleCode + ".");
-        }
-        if (plugin.PermissionPrefix.Equals(Permission.DevkitServerModuleCode, StringComparison.InvariantCultureIgnoreCase))
-        {
-            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not equal " + Permission.DevkitServerModuleCode.Format() + ".");
-            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not equal " + Permission.DevkitServerModuleCode + ".");
+            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not equal " + PermissionLeaf.DevkitServerModulePrefix.Format() + ".");
+            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not equal " + PermissionLeaf.DevkitServerModulePrefix + ".");
         }
         string defaultModuleName = DevkitServerModule.MainLocalization.format("Name");
         if (plugin.MenuName.Equals(defaultModuleName, StringComparison.InvariantCultureIgnoreCase))
@@ -211,8 +207,8 @@ public static class PluginLoader
         {
             if (plugin.PermissionPrefix != null)
             {
-                bool dup = true;
-                while (dup)
+                bool dup;
+                do
                 {
                     dup = false;
                     for (int i = 0; i < PluginsIntl.Count; i++)
@@ -224,9 +220,11 @@ public static class PluginLoader
                             plugin.LogWarning("Conflicting permission prefix with " + plugin2.Format() +
                                               " (" + plugin2.PermissionPrefix.Format() + "). Overriding to " + plugin.PermissionPrefix.Format() + ".");
                             dup = true;
+                            break;
                         }
                     }
                 }
+                while (dup);
             }
 
             try

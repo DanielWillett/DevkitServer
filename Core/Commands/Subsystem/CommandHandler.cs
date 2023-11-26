@@ -12,7 +12,7 @@ using DevkitServer.Players;
 #endif
 using HarmonyLib;
 
-namespace DevkitServer.Commands.Subsystem;
+namespace DevkitServer.Core.Commands.Subsystem;
 /// <summary>
 /// Provides an API for interacting with commands, late-registering custom commands, or completely replacing the command implementation.
 /// </summary>
@@ -52,13 +52,13 @@ public class CommandHandler : ICommandHandler, IDisposable
 
     public delegate void ExecutedCommand(
 #if SERVER
-        EditorUser? user,
+        SteamPlayer? user,
 # endif
         CommandContext context);
 
     public delegate void ExecutingCommand(
 #if SERVER
-        EditorUser? user,
+        SteamPlayer? user,
 #endif
         CommandContext context,
         ref bool shouldExecute
@@ -210,10 +210,10 @@ public class CommandHandler : ICommandHandler, IDisposable
 
     public virtual void ExecuteCommand(IExecutableCommand command,
 #if SERVER
-        EditorUser? user, 
+        SteamPlayer? user, 
 #endif
 #if CLIENT
-        bool console, 
+        bool console,
 #endif
         string[] args, string originalMessage
         )
@@ -353,10 +353,22 @@ public class CommandHandler : ICommandHandler, IDisposable
             SendHelpMessage(null);
 #else
             // run as server command or send chat
-            if (Provider.isConnected)
-                ChatManager.sendChat(EChatMode.GLOBAL, inputmessage[0] == '/' ? inputmessage : ("/" + inputmessage));
+            if (Provider.isConnected && Level.isLoaded)
+            {
+                if (Array.IndexOf(CommandParser.Prefixes, inputmessage[0]) == -1)
+                {
+                    if (inputmessage[0] is '>' && inputmessage.Length > 1)
+                        inputmessage = inputmessage.Substring(char.IsWhiteSpace(inputmessage[1]) && inputmessage.Length > 1 ? 2 : 1);
+                    else
+                        inputmessage = CommandParser.Prefixes[0] + inputmessage;
+                }
+
+                ChatManager.sendChat(EChatMode.GLOBAL, inputmessage);
+            }
             else
+            {
                 SendHelpMessage(true);
+            }
 #endif
         }
     }
@@ -365,14 +377,13 @@ public class CommandHandler : ICommandHandler, IDisposable
     protected virtual void OnChatProcessing(SteamPlayer player, string text, ref bool shouldExecuteCommand, ref bool shouldList)
     {
         shouldExecuteCommand = false;
-        EditorUser? user = UserManager.FromSteamPlayer(player);
-        if (user != null && !Parser.TryRunCommand(user, text, ref shouldList, true))
-            SendHelpMessage(user);
+        if (!Parser.TryRunCommand(player, text, ref shouldList, true))
+            SendHelpMessage(player);
     }
 #endif
     public virtual void SendHelpMessage(
 #if SERVER
-        EditorUser? user
+        SteamPlayer? user
 #endif
 #if CLIENT
         bool console
@@ -388,7 +399,7 @@ public class CommandHandler : ICommandHandler, IDisposable
     }
     public virtual void SendNoPermissionMessage(
 #if SERVER
-        EditorUser? user,
+        SteamPlayer? user,
 #endif
 #if CLIENT
         bool console,
@@ -404,7 +415,7 @@ public class CommandHandler : ICommandHandler, IDisposable
     }
     internal static void SendMessage(string tr
 #if SERVER
-        , EditorUser? user
+        , SteamPlayer? user
 #endif
 #if CLIENT
         , bool console
@@ -415,9 +426,9 @@ public class CommandHandler : ICommandHandler, IDisposable
         if (user != null)
         {
             if (DevkitServerModule.IsMainThread)
-                ChatManager.say(user.SteamId, tr, Palette.AMBIENT, EChatMode.SAY, true);
+                ChatManager.say(user.playerID.steamID, tr, Palette.AMBIENT, EChatMode.SAY, true);
             else
-                DevkitServerUtility.QueueOnMainThread(() => ChatManager.say(user.SteamId, tr, Palette.AMBIENT, EChatMode.SAY, true));
+                DevkitServerUtility.QueueOnMainThread(() => ChatManager.say(user.playerID.steamID, tr, Palette.AMBIENT, EChatMode.SAY, true));
         }
         else
             Log(FormattingUtil.ConvertRichTextToANSI(tr));
@@ -479,29 +490,27 @@ public class CommandHandler : ICommandHandler, IDisposable
             {
                 string dir = file.TranslationsDirectory;
                 if (string.IsNullOrWhiteSpace(dir))
-                    command.LogError("No localization path provided.");
+                    dir = file.CommandName;
+                string basePath = command.Plugin == null ? DevkitServerConfig.CommandLocalizationFilePath : command.Plugin.LocalizationDirectory;
+                dir = Path.Combine(basePath, dir);
+                Local lcl = Localization.tryRead(dir, false);
+                LocalDatDictionary def = file.DefaultTranslations;
+                if (def == null)
+                    command.LogError("No default translations provided.");
                 else
                 {
-                    dir = Path.Combine(command.Plugin == null ? DevkitServerConfig.CommandLocalizationFilePath : command.Plugin.LocalizationDirectory, dir);
-                    Local lcl = Localization.tryRead(dir, false);
-                    LocalDatDictionary def = file.DefaultTranslations;
-                    if (def == null)
-                        command.LogError("No default translations provided.");
-                    else
+                    try
                     {
-                        try
-                        {
-                            DevkitServerUtility.UpdateLocalizationFile(ref lcl, def, dir);
-                        }
-                        catch (Exception ex)
-                        {
-                            command.LogError("Error updating localization file.");
-                            command.LogError(ex);
-                        }
+                        DevkitServerUtility.UpdateLocalizationFile(ref lcl, def, dir);
                     }
-
-                    file.Translations = lcl;
+                    catch (Exception ex)
+                    {
+                        command.LogError("Error updating localization file.");
+                        command.LogError(ex);
+                    }
                 }
+
+                file.Translations = lcl;
             }
             else
             {
@@ -528,7 +537,7 @@ public class CommandHandler : ICommandHandler, IDisposable
         if (!added)
             _registeredCommands.Add(command);
 
-        if (command is ILocalizedCommand localizedCommand and ICachedTranslationSourceCommand cachedTranslationSourceCommand)
+        if (command is ILocalizedCommand localizedCommand and ICachedTranslationSourceCommand { TranslationSource: null } cachedTranslationSourceCommand)
         {
             cachedTranslationSourceCommand.TranslationSource = TranslationSource.FromCommand(localizedCommand);
         }
@@ -568,7 +577,7 @@ public class CommandHandler : ICommandHandler, IDisposable
 
     internal void TryInvokeOnCommandExecuted(
 #if SERVER
-        EditorUser? user,
+        SteamPlayer? user,
 #endif
         CommandContext ctx
     ) => EventOnCommandExecuted.TryInvoke(

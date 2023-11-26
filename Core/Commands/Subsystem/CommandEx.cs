@@ -1,10 +1,11 @@
 ﻿using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
+using DevkitServer.Players;
 using DevkitServer.Plugins;
 using System.Reflection;
 
-namespace DevkitServer.Commands.Subsystem;
+namespace DevkitServer.Core.Commands.Subsystem;
 public static class CommandEx
 {
     public static Type GetPluginType(this IExecutableCommand command) => command.Plugin?.GetType() ?? (command is VanillaCommand ? typeof(Provider) : typeof(DevkitServerModule));
@@ -80,7 +81,7 @@ public static class CommandEx
                     }
                     if (local == asm)
                     {
-                        foreach (Permission perm in command.Permissions)
+                        foreach (PermissionLeaf perm in command.Permissions)
                         {
                             if (!perm.DevkitServer)
                                 command.LogWarning("DevkitServer flag not set in DevkitServer permission: " + perm.Format() + ".");
@@ -92,8 +93,8 @@ public static class CommandEx
                     }
                     else
                     {
-                        foreach (Permission perm in command.Permissions)
-                        { 
+                        foreach (PermissionLeaf perm in command.Permissions)
+                        {
                             if (perm.DevkitServer)
                                 command.LogWarning("DevkitServer flag set in permission: " + perm.Format() + ".");
                             if (perm.Core)
@@ -113,6 +114,89 @@ public static class CommandEx
                     Logger.LogError(ex);
                 }
             }
+        }
+    }
+    public static void AssertMode(this CommandContext ctx, CommandExecutionMode mode)
+    {
+        if (mode == CommandExecutionMode.Always)
+            return;
+
+        if ((mode & CommandExecutionMode.Disabled) != 0)
+            throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandDisabled");
+
+        if ((mode & CommandExecutionMode.RequirePlaying) != 0)
+        {
+#if SERVER
+            if (!Provider.isServer || (mode & CommandExecutionMode.IgnoreControlMode) != 0 || ctx.EditorUser == null || ctx.EditorUser.Input.Controller != CameraController.Player)
+                throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBePlayer");
+#else
+            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserInput.LocalController != CameraController.Player : Level.isEditor)
+                throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBePlayer");
+#endif
+        }
+
+        if ((mode & CommandExecutionMode.RequireEditing) != 0)
+        {
+#if SERVER
+            if (!Provider.isServer || !DevkitServerModule.IsEditing || (mode & CommandExecutionMode.IgnoreControlMode) != 0 || ctx.EditorUser != null && ctx.EditorUser.Input.Controller != CameraController.Editor)
+                throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeEditor");
+#else
+            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserInput.LocalController != CameraController.Editor : !Level.isEditor)
+                throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeEditor");
+#endif
+        }
+
+        if ((mode & CommandExecutionMode.RequireMultiplayer) != 0)
+        {
+#if SERVER
+            if (!Provider.isServer)
+                throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeMultiplayer");
+#else
+            if ((Provider.isServer && Provider.isClient && Provider.clients.Count == 1) || !Level.isLoaded)
+                throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeMultiplayer");
+#endif
+        }
+
+        if ((mode & CommandExecutionMode.RequireSingleplayer) != 0)
+        {
+#if SERVER
+            throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeSingleplayer");
+#else
+            if (!Provider.isServer || !Provider.isClient || Provider.clients.Count != 1 || !Level.isLoaded)
+                throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeSingleplayer");
+#endif
+        }
+
+        if ((mode & CommandExecutionMode.RequireMenu) != 0)
+        {
+#if SERVER
+            throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeMenu");
+#else
+            if (MenuUI.window == null)
+                throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeMenu");
+#endif
+        }
+
+        if ((mode & CommandExecutionMode.RequireCheatsEnabled) != 0)
+        {
+#if SERVER
+            if (!Provider.hasCheats)
+                throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandRequiresCheats");
+#else
+            if (Provider.isServer ? Provider.hasCheats : Provider.currentServerInfo is not { hasCheats: false })
+                throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandRequiresCheats");
+#endif
+        }
+
+        if ((mode & CommandExecutionMode.PlayerControlModeOnly) != 0)
+        {
+#if SERVER
+            if (ctx.EditorUser == null || ctx.EditorUser.Input.Controller != CameraController.Player)
+                throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeEditorPlayer");
+#else
+            if (!DevkitServerModule.IsEditing || UserInput.LocalController != CameraController.Player)
+                throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeEditorPlayer");
+#endif
         }
     }
 }
