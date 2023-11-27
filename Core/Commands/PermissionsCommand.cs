@@ -3,7 +3,6 @@ using Cysharp.Threading.Tasks;
 using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
-using DevkitServer.Players;
 using System.Globalization;
 using System.Text;
 
@@ -12,34 +11,17 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
 {
     private readonly string[] _userMatches = { "user", "users", "player", "players", "u", "p" };
     private readonly string[] _permMatches = { "perm", "permission", "perms", "permissions", "p" };
-    [Permission]
-    public static readonly Permission All = new Permission("permissions.*", devkitServer: true);
-    [Permission]
-    public static readonly Permission SeePermissions = new Permission("permissions", devkitServer: true);
-    [Permission]
-    public static readonly Permission AllGroup = new Permission("permissions.group.*", devkitServer: true);
-    [Permission]
-    public static readonly Permission EditGroup = new Permission("permissions.group.edit.*", devkitServer: true);
-    [Permission]
-    public static readonly Permission EditGroupPermissions = new Permission("permissions.group.edit.permissions.*", devkitServer: true);
-    [Permission]
-    public static readonly Permission EditGroupAddPermission = new Permission("permissions.group.edit.permissions.add", devkitServer: true);
-    [Permission]
-    public static readonly Permission EditGroupRemovePermission = new Permission("permissions.group.edit.permissions.remove", devkitServer: true);
-    [Permission]
-    public static readonly Permission EditGroupInfo = new Permission("permissions.group.edit.info", devkitServer: true);
-    [Permission]
-    public static readonly Permission CreateGroup = new Permission("permissions.group.create", devkitServer: true);
-    [Permission]
-    public static readonly Permission DeleteGroup = new Permission("permissions.group.delete", devkitServer: true);
-    [Permission]
-    public static readonly Permission GrantGroup = new Permission("permissions.user.group.grant", devkitServer: true);
-    [Permission]
-    public static readonly Permission RevokeGroup = new Permission("permissions.user.group.revoke", devkitServer: true);
-    [Permission]
-    public static readonly Permission GrantPermission = new Permission("permissions.user.permission.grant", devkitServer: true);
-    [Permission]
-    public static readonly Permission RevokePermission = new Permission("permissions.user.permission.revoke", devkitServer: true);
+
+    public static readonly PermissionLeaf SeePermissions = new PermissionLeaf("permissions", devkitServer: true);
+    public static readonly PermissionLeaf EditGroupAddPermission = new PermissionLeaf("permissions.group.edit.permissions.add", devkitServer: true);
+    public static readonly PermissionLeaf EditGroupRemovePermission = new PermissionLeaf("permissions.group.edit.permissions.remove", devkitServer: true);
+    public static readonly PermissionLeaf EditGroupInfo = new PermissionLeaf("permissions.group.edit.info", devkitServer: true);
+    public static readonly PermissionLeaf CreateGroup = new PermissionLeaf("permissions.group.create", devkitServer: true);
+    public static readonly PermissionLeaf DeleteGroup = new PermissionLeaf("permissions.group.delete", devkitServer: true);
+    public static readonly PermissionLeaf GrantGroup = new PermissionLeaf("permissions.user.group.grant", devkitServer: true);
+    public static readonly PermissionLeaf RevokeGroup = new PermissionLeaf("permissions.user.group.revoke", devkitServer: true);
+    public static readonly PermissionLeaf GrantPermission = new PermissionLeaf("permissions.user.permission.grant", devkitServer: true);
+    public static readonly PermissionLeaf RevokePermission = new PermissionLeaf("permissions.user.permission.revoke", devkitServer: true);
 
     Local ILocalizedCommand.Translations { get; set; } = null!;
     public PermissionsCommand() : base("permissions")
@@ -61,10 +43,10 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
             int c = 0;
             StringBuilder sb = new StringBuilder();
             bool init = false;
-            foreach (string perm in UserPermissions.UserHandler
-                         .GetPermissions(ctx.Caller.SteamId.m_SteamID, false)
+            foreach (string perm in PermissionManager.UserPermissions
+                         .GetPermissions(ctx.Caller.playerID.steamID.m_SteamID, false)
                          .Select(x => x.ToString())
-                         .Concat(UserPermissions.UserHandler.GetPermissionGroups(ctx.Caller.SteamId.m_SteamID)
+                         .Concat(PermissionManager.UserPermissions.GetPermissionGroups(ctx.Caller.playerID.steamID.m_SteamID)
                              .OrderByDescending(x => x.Priority)
                              .SelectMany(x => x.Permissions)
                              .Select(x => x.ToString())))
@@ -94,33 +76,27 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
             return UniTask.CompletedTask;
         }
 
-        bool pAll = ctx.HasPermission(All);
-
         if (ctx.MatchParameter(0, "group", "grp", "g"))
         {
             ctx.AssertHelpCheckFormat(1, "CorrectUsageGroup");
-
-            pAll |= ctx.HasPermission(AllGroup);
 
             if (ctx.MatchParameter(1, "edit", "set", "e"))
             {
                 ctx.AssertHelpCheckFormat(2, "CorrectUsageGroupEdit");
 
-                pAll |= ctx.HasPermission(EditGroup);
-
                 if (ctx.MatchParameter(2, "name", "display", "n"))
                 {
-                    if (pAll || ctx.HasPermission(EditGroupInfo))
+                    if (ctx.HasPermission(EditGroupInfo))
                     {
                         if (ctx.TryGet(3, out string id) && ctx.TryGet(4, out string? name))
                         {
                             if (string.IsNullOrWhiteSpace(name) ||
                                 name.Equals("null", StringComparison.InvariantCultureIgnoreCase))
                                 name = null;
-                            if (UserPermissions.Handler.TryFindPermissionGroup(id, out PermissionGroup group))
+                            if (PermissionManager.Permissions.TryFindPermissionGroup(id, out PermissionGroup group))
                             {
                                 group.DisplayName = name ?? id;
-                                UserPermissions.Handler.SavePermissionGroup(group, false);
+                                PermissionManager.Permissions.SavePermissionGroup(group);
                                 throw ctx.Reply("ChangedName", group.Id, group.DisplayName, "#" + ColorUtility.ToHtmlStringRGB(group.Color));
                             }
                             
@@ -132,17 +108,17 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
                 }
                 else if (ctx.MatchParameter(2, "color", "clr", "c"))
                 {
-                    if (pAll || ctx.HasPermission(EditGroupInfo))
+                    if (ctx.HasPermission(EditGroupInfo))
                     {
                         if (ctx.TryGet(3, out string id))
                         {
                             if (!ctx.TryGet(4, out Color32 color))
                                 throw ctx.Reply("FailedToParseColor");
-                            if (UserPermissions.Handler.TryFindPermissionGroup(id, out PermissionGroup group))
+                            if (PermissionManager.Permissions.TryFindPermissionGroup(id, out PermissionGroup group))
                             {
                                 Color oldColor = group.Color;
                                 group.Color = color;
-                                UserPermissions.Handler.SavePermissionGroup(group, false);
+                                PermissionManager.Permissions.SavePermissionGroup(group);
                                 throw ctx.Reply("ChangedColor", group.Id, "#" + ColorUtility.ToHtmlStringRGB(group.Color), "#" + ColorUtility.ToHtmlStringRGB(oldColor));
                             }
                             
@@ -154,16 +130,16 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
                 }
                 else if (ctx.MatchParameter(2, "priority", "p"))
                 {
-                    if (pAll || ctx.HasPermission(EditGroupInfo))
+                    if (ctx.HasPermission(EditGroupInfo))
                     {
                         if (ctx.TryGet(3, out string id))
                         {
                             if (!ctx.TryGet(4, out int priority))
                                 throw ctx.Reply("FailedToParsePriority");
-                            if (UserPermissions.Handler.TryFindPermissionGroup(id, out PermissionGroup group))
+                            if (PermissionManager.Permissions.TryFindPermissionGroup(id, out PermissionGroup group))
                             {
                                 group.Priority = priority;
-                                UserPermissions.Handler.SavePermissionGroup(group, true);
+                                PermissionManager.Permissions.SavePermissionGroup(group);
                                 throw ctx.Reply("ChangedPriority", group.Id, group.Priority.ToString(CultureInfo.InvariantCulture), "#" + ColorUtility.ToHtmlStringRGB(group.Color));
                             }
                             
@@ -183,20 +159,19 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
                     ctx.AssertHelpCheckFormat(2, "CorrectUsageGroupEditPermissions");
                     ctx.AssertHelpCheckFormat(3, "CorrectUsageGroupEditPermissions");
 
-                    pAll |= ctx.HasPermission(EditGroupPermissions);
-                    if (pAll || !remove && ctx.HasPermission(EditGroupAddPermission) || remove && ctx.HasPermission(EditGroupRemovePermission))
+                    if (!remove && ctx.HasPermission(EditGroupAddPermission) || remove && ctx.HasPermission(EditGroupRemovePermission))
                     {
                         if (ctx.TryGet(2, out string id) && ctx.TryGet(3, out string permStr))
                         {
-                            if (!GroupPermission.TryParse(permStr, out GroupPermission perm))
+                            if (!PermissionBranch.TryParse(permStr, out PermissionBranch perm))
                                 throw ctx.Reply("PermissionNotFound", permStr);
-                            if (UserPermissions.Handler.TryFindPermissionGroup(id, out PermissionGroup group))
+                            if (PermissionManager.Permissions.TryFindPermissionGroup(id, out PermissionGroup group))
                             {
                                 if (remove)
                                     ctx.Reply(group.RemovePermission(perm) ? "RemovedPermission" : "PermissionAlreadyRemoved", group.Id, perm.ToString(), "#" + ColorUtility.ToHtmlStringRGB(group.Color));
                                 else
                                     ctx.Reply(group.AddPermission(perm) ? "AddedPermission" : "PermissionAlreadyAdded", group.Id, perm.ToString(), "#" + ColorUtility.ToHtmlStringRGB(group.Color));
-                                UserPermissions.Handler.SavePermissionGroup(group, false);
+                                PermissionManager.Permissions.SavePermissionGroup(group);
                                 return UniTask.CompletedTask;
                             }
 
@@ -208,7 +183,7 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
                 }
                 else if (ctx.MatchParameter(1, "create", "new", "c"))
                 {
-                    if (!pAll && !ctx.HasPermission(CreateGroup))
+                    if (!ctx.HasPermission(CreateGroup))
                         throw ctx.SendNoPermission();
 
                     ctx.AssertHelpCheckFormat(2, "CorrectUsageGroupCreate");
@@ -223,8 +198,8 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
                         if (!ctx.TryGet(5, out int priority))
                             priority = 0;
 
-                        PermissionGroup group = new PermissionGroup(id, displayName, color, priority, Array.Empty<GroupPermission>());
-                        if (UserPermissions.Handler.Register(group))
+                        PermissionGroup group = new PermissionGroup(id, displayName, color, priority, Array.Empty<PermissionBranch>());
+                        if (PermissionManager.Permissions.Register(group))
                             throw ctx.Reply("PermissionGroupCreated", group.Id, group.DisplayName, "#" + ColorUtility.ToHtmlStringRGB(group.Color));
 
                         throw ctx.Reply("PermissionGroupCreateAlreadyExists", group.Id, "#" + ColorUtility.ToHtmlStringRGB(group.Color));
@@ -234,14 +209,14 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
                 }
                 else if (ctx.MatchParameter(1, "delete", "remove", "d"))
                 {
-                    if (!pAll && !ctx.HasPermission(DeleteGroup))
+                    if (!ctx.HasPermission(DeleteGroup))
                         throw ctx.SendNoPermission();
 
                     ctx.AssertHelpCheckFormat(2, "CorrectUsageGroupDelete");
 
                     if (ctx.TryGet(2, out string id))
                     {
-                        if (UserPermissions.Handler.TryFindPermissionGroup(id, out PermissionGroup group) && UserPermissions.Handler.Deregister(group))
+                        if (PermissionManager.Permissions.TryFindPermissionGroup(id, out PermissionGroup group) && PermissionManager.Permissions.Deregister(group))
                             throw ctx.Reply("PermissionGroupDeleted", group.Id, "#" + ColorUtility.ToHtmlStringRGB(group.Color));
 
                         FailToFindGroup(id);
@@ -263,38 +238,38 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
             if (!group && !ctx.MatchParameter(3, _permMatches))
                 throw ctx.Reply("CorrectUsageUser");
 
-            if (!ctx.TryGet(2, out ulong user, out EditorUser? onlinePlayer, false))
+            if (!ctx.TryGet(2, out ulong user, out SteamPlayer? onlinePlayer, false))
                 throw ctx.Reply("PlayerNotValid", ctx.Get(2));
-            string name = onlinePlayer?.Player != null ? onlinePlayer.Player.playerID.characterName : user.ToString();
+            string name = onlinePlayer != null ? onlinePlayer.playerID.characterName : user.ToString();
             if (ctx.TryGetRange(4, out string id))
             {
                 if (group)
                 {
-                    if (!UserPermissions.Handler.TryFindPermissionGroup(id, out PermissionGroup grp))
+                    if (!PermissionManager.Permissions.TryFindPermissionGroup(id, out PermissionGroup grp))
                         FailToFindGroup(id); // throws
 
                     if (revoke)
-                        UserPermissions.UserHandler.RemovePermissionGroup(user, grp);
+                        PermissionManager.UserPermissions.RemovePermissionGroup(user, grp);
                     else if (!clear)
-                        UserPermissions.UserHandler.AddPermissionGroup(user, grp);
+                        PermissionManager.UserPermissions.AddPermissionGroup(user, grp);
                     else
                     {
-                        UserPermissions.UserHandler.ClearPermissionGroups(user);
+                        PermissionManager.UserPermissions.ClearPermissionGroups(user);
                         throw ctx.Reply("UserClearedPermissionGroups", name);
                     }
                     throw ctx.Reply(revoke ? "UserRevokedPermissionGroup" : "UserAddedPermissionGroup", grp.Id, "#" + ColorUtility.ToHtmlStringRGB(grp.Color), name);
                 }
 
-                if (!Permission.TryParse(id, out Permission permission))
+                if (!PermissionLeaf.TryParse(id, out PermissionLeaf permission))
                     throw ctx.Reply("PermissionNotFound", id);
 
                 if (revoke)
-                    UserPermissions.UserHandler.RemovePermission(user, permission);
+                    PermissionManager.UserPermissions.RemovePermission(user, permission);
                 else if (!clear)
-                    UserPermissions.UserHandler.AddPermission(user, permission);
+                    PermissionManager.UserPermissions.AddPermission(user, permission);
                 else
                 {
-                    UserPermissions.UserHandler.ClearPermissions(user);
+                    PermissionManager.UserPermissions.ClearPermissions(user);
                     throw ctx.Reply("UserClearedPermissionGroups", name);
                 }
                 throw ctx.Reply(revoke ? "UserRevokedPermission" : "UserAddedPermission", permission.ToString(), name);
@@ -306,7 +281,7 @@ internal sealed class PermissionsCommand : DevkitServerCommand, ICommandLocaliza
         {
             ctx.Reply("GroupNotFound", id);
             StringBuilder sb = new StringBuilder();
-            foreach (PermissionGroup grp in UserPermissions.Handler.PermissionGroups)
+            foreach (PermissionGroup grp in PermissionManager.Permissions.PermissionGroups)
             {
                 if (sb.Length != 0)
                     sb.Append(", ");

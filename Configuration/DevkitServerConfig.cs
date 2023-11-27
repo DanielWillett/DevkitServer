@@ -29,9 +29,9 @@ public class DevkitServerConfig
         new Color32JsonConverter(),
         new CSteamIDJsonConverter(),
         new TypeJsonConverter(),
-        new PermissionConverter(),
+        new PermissionLeafConverter(),
+        new PermissionBranchConverter(),
         new PermissionGroupConverter(),
-        new GroupPermissionConverter(),
         new AssetReferenceJsonConverterFactory(),
         new TimeSpanConverter()
     };
@@ -418,8 +418,11 @@ public class SystemConfig : SchemaConfiguration
     [JsonPropertyName("disable_map_download")]
     public bool DisableMapDownload { get; set; }
 
+    [JsonPropertyName("admins_are_superusers")]
+    public bool AdminsAreSuperusers { get; set; }
+
     [JsonPropertyName("default_permissions")]
-    public string[] DefaultUserPermissions { get; set; }
+    public PermissionBranch[] DefaultUserPermissions { get; set; }
 
     [JsonPropertyName("default_permission_groups")]
     public string[] DefaultUserPermissionGroups { get; set; }
@@ -451,12 +454,13 @@ public class SystemConfig : SchemaConfiguration
         NewLevelInfo = NewLevelCreationOptions.Default;
         DisableMapDownload = false;
         TcpSettings = new TcpServerInfo { EnableHighSpeedSupport = false, HighSpeedPort = (ushort)(Provider.port + 2) };
-        DefaultUserPermissions = Array.Empty<string>();
+        DefaultUserPermissions = Array.Empty<PermissionBranch>();
         DefaultUserPermissionGroups = new string[]
         {
             "viewer"
         };
         UserSavedataLocationOverride = null;
+        AdminsAreSuperusers = true;
 #endif
     }
 #if SERVER

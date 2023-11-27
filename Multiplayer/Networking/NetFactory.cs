@@ -1121,7 +1121,7 @@ public static class NetFactory
                     }
                 }
 
-                call.Name = (core ? Permission.DevkitServerModuleCode : plugin!.PermissionPrefix) + "." + field.Name;
+                call.Name = (core ? PermissionLeaf.DevkitServerModulePrefix : plugin!.PermissionPrefix) + "." + field.Name;
                 call.SetThrowOnError(true);
                 if (call.Id != default)
                     (call.HighSpeed ? HighSpeedInvokers : Invokers).Add(call.Id, call);

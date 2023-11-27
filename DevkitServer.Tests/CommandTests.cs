@@ -2,15 +2,11 @@
 using DevkitServer.API;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
-using DevkitServer.Commands.Subsystem;
+using DevkitServer.Core.Commands.Subsystem;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using System.Threading.Tasks;
-#if SERVER
-using DevkitServer.Players;
-#endif
 
 namespace DevkitServer.Tests;
 
@@ -24,6 +20,12 @@ public class CommandTests
         new TestCommand(1, "action", "action2"),
         new TestCommand(0, "help", "hlp", "h")
     };
+
+    [ClassInitialize]
+    public static void Setup(TestContext context)
+    {
+        TestHelpers.SetupMainThread();
+    }
 
     [TestMethod]
     [DataRow(false)]
@@ -152,15 +154,6 @@ public class CommandTests
             cmd = "/" + cmd;
         IExecutableCommand? command2 = null;
         string[]? args2 = null;
-        try
-        {
-            if (ThreadUtil.gameThread == null)
-                ThreadUtil.setupGameThread();
-        }
-        catch
-        {
-            // ignored
-        }
         TestCommandHandler handler = new TestCommandHandler(_sampleCommands);
         CommandParser parser = new CommandParser(handler);
         handler.OnCommandExecuted +=
@@ -202,7 +195,7 @@ public class CommandTests
         public void Init() => throw new NotImplementedException();
         public void ExecuteCommand(IExecutableCommand command,
 #if SERVER
-            EditorUser? user, 
+            SteamPlayer? user, 
 #elif CLIENT
             bool console,
 #endif
@@ -222,14 +215,14 @@ public class CommandTests
         }
         public void SendHelpMessage(
 #if SERVER
-            EditorUser? user
+            SteamPlayer? user
 #elif CLIENT
             bool console
 #endif
             ) => throw new NotImplementedException();
         public void SendNoPermissionMessage(
 #if SERVER
-            EditorUser? user, 
+            SteamPlayer? user, 
 #elif CLIENT
             bool console,
 #endif
@@ -244,6 +237,7 @@ public class CommandTests
     [API.Ignore]
     private class TestCommand : IExecutableCommand
     {
+        public CommandExecutionMode Mode { get; }
         public string CommandName { get; }
         public IList<string> Aliases { get; }
         public int Priority { get; }
@@ -258,12 +252,12 @@ public class CommandTests
             get => throw new NotImplementedException();
             set => throw new NotImplementedException();
         }
-        public IList<Permission> Permissions => throw new NotImplementedException();
+        public IList<PermissionLeaf> Permissions => throw new NotImplementedException();
         public bool AnyPermissions => throw new NotImplementedException();
         public UniTask Execute(CommandContext ctx, CancellationToken token) => throw new NotImplementedException();
         public bool CheckPermission(
 #if SERVER
-            EditorUser? user
+            SteamPlayer? user
 #endif
             ) => throw new NotImplementedException();
         public override string ToString() => CommandName + " (" + string.Join("|", Aliases) + ") Priority: " + Priority;

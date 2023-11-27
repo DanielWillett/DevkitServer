@@ -1750,7 +1750,7 @@ public static class NavigationUtil
     }
     internal static void CheckEditFlags()
     {
-        if (DevkitServerModule.IsEditing && !VanillaPermissions.EditNavigation.Has() && !VanillaPermissions.AllNavigation.Has(false))
+        if (DevkitServerModule.IsEditing && !VanillaPermissions.EditNavigation.Has())
             throw new NoPermissionsException(VanillaPermissions.EditNavigation);
     }
 #endif

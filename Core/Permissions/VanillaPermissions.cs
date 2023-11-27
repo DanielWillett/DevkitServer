@@ -1,81 +1,118 @@
 ﻿using DevkitServer.API.Permissions;
 
 namespace DevkitServer.Core.Permissions;
+/// <summary>
+/// Contains default permissions for vanilla editor actions.
+/// </summary>
 public static class VanillaPermissions
 {
-    [Permission]
-    public static readonly Permission EditTerrain = new Permission("terrain.*", core: true);
-    [Permission]
-    public static readonly Permission EditTiles = new Permission("tiles.*", core: true);
-    [Permission]
-    public static readonly Permission AddTile = new Permission("tiles.add", core: true);
-    [Permission]
-    public static readonly Permission DeleteTile = new Permission("tiles.delete", core: true);
-    [Permission]
-    public static readonly Permission ResetTile = new Permission("tiles.reset", core: true);
-    [Permission]
-    public static readonly Permission ReplicateTileSplatmap = new Permission("tiles.replicate_splatmap", core: true);
-    [Permission]
-    public static readonly Permission EditHeightmap = new Permission("terrain.heightmap.edit", core: true);
-    [Permission]
-    public static readonly Permission EditSplatmap = new Permission("terrain.splatmap.edit", core: true);
-    [Permission]
-    public static readonly Permission EditHoles = new Permission("terrain.holemap.edit", core: true);
-    [Permission]
-    public static readonly Permission EditFoliage = new Permission("terrain.foliage.edit", core: true);
-    [Permission]
-    public static readonly Permission BakeFoliage = new Permission("terrain.foliage.bake", core: true);
-    [Permission]
-    public static readonly Permission BakeFoliageNearby = new Permission("terrain.foliage.bake.nearby", core: true);
-    [Permission]
-    public static readonly Permission EditRoads = new Permission("roads.edit", core: true);
-    [Permission]
-    public static readonly Permission EditRoadMaterials = new Permission("roads.materials.edit", core: true);
-    [Permission]
-    public static readonly Permission BakeNavigation = new Permission("navigation.bake", core: true);
-    [Permission]
-    public static readonly Permission EditNavigation = new Permission("navigation.edit", core: true);
-    [Permission]
-    public static readonly Permission AllNavigation = new Permission("navigation.*", core: true);
-    [Permission]
-    public static readonly Permission EditLighting = new Permission("lighting.edit", core: true);
-    [Permission]
-    public static readonly Permission EditObjects = new Permission("hierarchy.objects.*", core: true);
-    [Permission]
-    public static readonly Permission PlaceObjects = new Permission("hierarchy.objects.place", core: true);
-    [Permission]
-    public static readonly Permission RemoveUnownedObjects = new Permission("hierarchy.objects.remove", core: true);
-    [Permission]
-    public static readonly Permission MoveUnownedObjects = new Permission("hierarchy.objects.transform", core: true);
-    [Permission]
-    public static readonly Permission PlaceVolumes = new Permission("hierarchy.volumes.place", core: true);
-    [Permission]
-    public static readonly Permission RemoveUnownedVolumes = new Permission("hierarchy.volumes.remove", core: true);
-    [Permission]
-    public static readonly Permission MoveUnownedVolumes = new Permission("hierarchy.volumes.transform", core: true);
-    [Permission]
-    public static readonly Permission EditVolumes = new Permission("hierarchy.volumes.*", core: true);
-    [Permission]
-    public static readonly Permission BakeCartography = new Permission("hierarchy.cartography.bake", core: true);
-    [Permission]
-    public static readonly Permission PlaceCartographyVolumes = new Permission("hierarchy.cartography.volumes.place", core: true);
-    [Permission]
-    public static readonly Permission RemoveUnownedCartographyVolumes = new Permission("hierarchy.cartography.remove", core: true);
-    [Permission]
-    public static readonly Permission MoveUnownedCartographyVolumes = new Permission("hierarchy.cartography.transform", core: true);
-    [Permission]
-    public static readonly Permission EditCartographyVolumes = new Permission("hierarchy.cartography.*", core: true);
-    [Permission]
-    public static readonly Permission PlaceNodes = new Permission("hierarchy.nodes.place", core: true);
-    [Permission]
-    public static readonly Permission RemoveUnownedNodes = new Permission("hierarchy.nodes.remove", core: true);
-    [Permission]
-    public static readonly Permission MoveUnownedNodes = new Permission("hierarchy.nodes.transform", core: true);
-    [Permission]
-    public static readonly Permission EditNodes = new Permission("hierarchy.nodes.*", core: true);
+    private static readonly Dictionary<Type, PermissionLeaf> PermissionsPlace  = new Dictionary<Type, PermissionLeaf>(32);
+    private static readonly Dictionary<Type, PermissionLeaf> PermissionsRemove = new Dictionary<Type, PermissionLeaf>(32);
+    private static readonly Dictionary<Type, PermissionLeaf> PermissionsMove   = new Dictionary<Type, PermissionLeaf>(32);
 
-    [Permission]
-    public static readonly Permission UsePlayerController = new Permission("controller.player", core: true);
-    [Permission]
-    public static readonly Permission UseEditorController = new Permission("controller.editor", core: true);
+    public static readonly PermissionLeaf EditHeightmap         = new PermissionLeaf("level.terrain.heightmap", core: true);
+    public static readonly PermissionLeaf EditSplatmap          = new PermissionLeaf("level.terrain.splatmap", core: true);
+    public static readonly PermissionLeaf EditHoles             = new PermissionLeaf("level.terrain.holemap", core: true);
+    public static readonly PermissionLeaf EditTiles             = new PermissionLeaf("level.terrain.tiles.edit", core: true);
+    public static readonly PermissionLeaf AddTiles              = new PermissionLeaf("level.terrain.tiles.add", core: true);
+    public static readonly PermissionLeaf DeleteTiles           = new PermissionLeaf("level.terrain.tiles.delete", core: true);
+    public static readonly PermissionLeaf ResetTiles            = new PermissionLeaf("level.terrain.tiles.reset", core: true);
+    public static readonly PermissionLeaf EditTileMaterials     = new PermissionLeaf("level.terrain.tiles.materials", core: true);
+    public static readonly PermissionLeaf EditFoliage           = new PermissionLeaf("level.terrain.foliage.edit", core: true);
+    public static readonly PermissionLeaf BakeFoliage           = new PermissionLeaf("level.terrain.foliage.edit.bake.all", core: true);
+    public static readonly PermissionLeaf BakeFoliageNearby     = new PermissionLeaf("level.terrain.foliage.edit.bake.nearby", core: true);
+    public static readonly PermissionLeaf EditRoads             = new PermissionLeaf("level.roads.paths.edit", core: true);
+    public static readonly PermissionLeaf EditRoadMaterials     = new PermissionLeaf("level.roads.materials.edit", core: true);
+    public static readonly PermissionLeaf BakeNavigation        = new PermissionLeaf("level.navigation.edit.bake", core: true);
+    public static readonly PermissionLeaf EditNavigation        = new PermissionLeaf("level.navigation.edit", core: true);
+    public static readonly PermissionLeaf PlaceObjects          = new PermissionLeaf("level.objects.place", core: true);
+    public static readonly PermissionLeaf RemoveUnownedObjects  = new PermissionLeaf("level.objects.remove", core: true);
+    public static readonly PermissionLeaf MoveUnownedObjects    = new PermissionLeaf("level.objects.transform", core: true);
+    public static readonly PermissionLeaf BakeCartographyGPS    = new PermissionLeaf("level.cartography.bake.gps", core: true);
+    public static readonly PermissionLeaf BakeCartographyChart  = new PermissionLeaf("level.cartography.bake.chart", core: true);
+    public static readonly PermissionLeaf UsePlayerController   = new PermissionLeaf("input.controller.player", core: true);
+    public static readonly PermissionLeaf UseEditorController   = new PermissionLeaf("input.controller.editor", core: true);
+
+    public static PermissionLeaf GetNodeVolumePlace(Type type)
+    {
+        lock (PermissionsPlace)
+        {
+            if (PermissionsPlace.TryGetValue(type, out PermissionLeaf leaf))
+                return leaf;
+
+            leaf = GetVolumeNodePermission(type, "place");
+            PermissionsPlace.Add(type, leaf);
+
+            return leaf;
+        }
+    }
+    public static PermissionLeaf GetNodeVolumeRemove(Type type)
+    {
+        lock (PermissionsRemove)
+        {
+            if (PermissionsRemove.TryGetValue(type, out PermissionLeaf leaf))
+                return leaf;
+
+            leaf = GetVolumeNodePermission(type, "remove");
+            PermissionsRemove.Add(type, leaf);
+
+            return leaf;
+        }
+    }
+    public static PermissionLeaf GetNodeVolumeMove(Type type)
+    {
+        lock (PermissionsMove)
+        {
+            if (PermissionsMove.TryGetValue(type, out PermissionLeaf leaf))
+                return leaf;
+
+            leaf = GetVolumeNodePermission(type, "transform");
+            PermissionsMove.Add(type, leaf);
+
+            return leaf;
+        }
+    }
+
+    public static class VolumePermission<T> where T : VolumeBase
+    {
+        public static readonly PermissionLeaf Place;
+        public static readonly PermissionLeaf Remove;
+        public static readonly PermissionLeaf Move;
+
+        static VolumePermission()
+        {
+            Type type = typeof(T);
+            Place = GetNodeVolumePlace(type);
+            Remove = GetNodeVolumeRemove(type);
+            Move = GetNodeVolumeMove(type);
+        }
+    }
+    public static class NodePermission<T> where T : TempNodeBase
+    {
+        public static readonly PermissionLeaf Place;
+        public static readonly PermissionLeaf Remove;
+        public static readonly PermissionLeaf Move;
+        static NodePermission()
+        {
+            Type type = typeof(T);
+            Place = GetNodeVolumePlace(type);
+            Remove = GetNodeVolumeRemove(type);
+            Move = GetNodeVolumeMove(type);
+        }
+    }
+
+    public static PermissionLeaf GetVolumeNodePermission(Type type, string leaf)
+    {
+        bool node = typeof(TempNodeBase).IsAssignableFrom(type);
+        string name = type.Name;
+        if (!node && name.EndsWith("Volume", StringComparison.Ordinal))
+            name = name[..^6];
+        else if (node && name.EndsWith("Node", StringComparison.Ordinal))
+            name = name[..^4];
+        name = FormattingUtil.SpaceProperCaseString(name, '_').ToLowerInvariant();
+        return new PermissionLeaf("level.hierarchy." + (node ? "nodes" : "volumes") + "." + name + "." + leaf, core: true);
+    }
+
+
+
 }

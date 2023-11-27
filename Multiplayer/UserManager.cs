@@ -218,27 +218,27 @@ public static class UserManager
         Object.Destroy(user);
     }
 
-    public static EditorUser? FromName(string name, NameSearchType type) => FromName(name, type, UsersIntl);
-    public static EditorUser? FromName(string name, NameSearchType type, IEnumerable<EditorUser> selection)
+    public static SteamPlayer? FromName(string name, NameSearchType type) => FromName(name, type, Provider.clients);
+    public static SteamPlayer? FromName(string name, NameSearchType type, IEnumerable<SteamPlayer> selection)
     {
         lock (UsersIntl)
         {
-            IEnumerable<EditorUser> editorUsers = selection as EditorUser[] ?? selection.ToArray();
+            IEnumerable<SteamPlayer> steamPlayers = selection as SteamPlayer[] ?? selection.ToArray();
             if (type == NameSearchType.CharacterName)
             {
-                foreach (EditorUser current in editorUsers.OrderBy(SelectCharacterName))
+                foreach (SteamPlayer current in steamPlayers.OrderBy(SelectCharacterName))
                 {
-                    if (current.Player!.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    if (current.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
                         return current;
                 }
-                foreach (EditorUser current in editorUsers.OrderBy(SelectNickName))
+                foreach (SteamPlayer current in steamPlayers.OrderBy(SelectNickName))
                 {
-                    if (current.Player!.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    if (current.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
                         return current;
                 }
-                foreach (EditorUser current in editorUsers.OrderBy(SelectPlayerName))
+                foreach (SteamPlayer current in steamPlayers.OrderBy(SelectPlayerName))
                 {
-                    if (current.Player!.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    if (current.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
                         return current;
                 }
                 return null;
@@ -246,19 +246,19 @@ public static class UserManager
 
             if (type == NameSearchType.NickName)
             {
-                foreach (EditorUser current in editorUsers.OrderBy(SelectNickName))
+                foreach (SteamPlayer current in steamPlayers.OrderBy(SelectNickName))
                 {
-                    if (current.Player!.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    if (current.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
                         return current;
                 }
-                foreach (EditorUser current in editorUsers.OrderBy(SelectCharacterName))
+                foreach (SteamPlayer current in steamPlayers.OrderBy(SelectCharacterName))
                 {
-                    if (current.Player!.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    if (current.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
                         return current;
                 }
-                foreach (EditorUser current in editorUsers.OrderBy(SelectPlayerName))
+                foreach (SteamPlayer current in steamPlayers.OrderBy(SelectPlayerName))
                 {
-                    if (current.Player!.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    if (current.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
                         return current;
                 }
                 return null;
@@ -266,30 +266,30 @@ public static class UserManager
 
             if (type == NameSearchType.PlayerName)
             {
-                foreach (EditorUser current in editorUsers.OrderBy(SelectPlayerName))
+                foreach (SteamPlayer current in steamPlayers.OrderBy(SelectPlayerName))
                 {
-                    if (current.Player!.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    if (current.playerID.playerName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
                         return current;
                 }
-                foreach (EditorUser current in editorUsers.OrderBy(SelectNickName))
+                foreach (SteamPlayer current in steamPlayers.OrderBy(SelectNickName))
                 {
-                    if (current.Player!.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    if (current.playerID.nickName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
                         return current;
                 }
-                foreach (EditorUser current in editorUsers.OrderBy(SelectCharacterName))
+                foreach (SteamPlayer current in steamPlayers.OrderBy(SelectCharacterName))
                 {
-                    if (current.Player!.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
+                    if (current.playerID.characterName.IndexOf(name, StringComparison.InvariantCultureIgnoreCase) != -1)
                         return current;
                 }
                 return null;
             }
 
-            return FromName(name, NameSearchType.CharacterName, editorUsers);
+            return FromName(name, NameSearchType.CharacterName, steamPlayers);
         }
         
-        int SelectPlayerName(EditorUser u) => u.Player!.playerID.playerName.Length;
-        int SelectNickName(EditorUser u) => u.Player!.playerID.nickName.Length;
-        int SelectCharacterName(EditorUser u) => u.Player!.playerID.characterName.Length;
+        int SelectPlayerName(SteamPlayer u) => u.playerID.playerName.Length;
+        int SelectNickName(SteamPlayer u) => u.playerID.nickName.Length;
+        int SelectCharacterName(SteamPlayer u) => u.playerID.characterName.Length;
     }
 }
 public enum NameSearchType : byte

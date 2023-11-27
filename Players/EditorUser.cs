@@ -21,9 +21,9 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 #endif
     public CSteamID SteamId { get; private set; }
 #if SERVER
-    private List<Permission> _perms = null!;
+    private List<PermissionBranch> _perms = null!;
     private List<PermissionGroup> _permGrps = null!;
-    public IReadOnlyList<Permission> Permissions { get; private set; } = null!;
+    public IReadOnlyList<PermissionBranch> Permissions { get; private set; } = null!;
     public IReadOnlyList<PermissionGroup> PermissionGroups { get; private set; } = null!;
     public ITransportConnection Connection { get; internal set; } = null!;
 #else
@@ -146,7 +146,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     }
 #endif
 #if SERVER
-    internal void AddPermission(Permission permission)
+    internal void AddPermission(PermissionBranch permission)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -156,11 +156,11 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
                 return;
         }
 
-        UserPermissions.SendPermissionState.Invoke(Connection, permission, true);
+        PermissionManager.SendPermissionState.Invoke(Connection, permission, true);
         _perms.Add(permission);
     }
 
-    internal void RemovePermission(Permission permission)
+    internal void RemovePermission(PermissionBranch permission)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -168,7 +168,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         {
             if (_perms[i].Equals(permission))
             {
-                UserPermissions.SendPermissionState.Invoke(Connection, permission, false);
+                PermissionManager.SendPermissionState.Invoke(Connection, permission, false);
                 _perms.RemoveAt(i);
                 break;
             }
@@ -184,7 +184,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
                 return;
         }
 
-        UserPermissions.SendPermissionGroupState.Invoke(Connection, group, true);
+        PermissionManager.SendPermissionGroupState.Invoke(Connection, group, true);
         bool added = false;
         for (int i = 0; i < _permGrps.Count; ++i)
         {
@@ -206,7 +206,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         {
             if (_permGrps[i].Equals(group))
             {
-                UserPermissions.SendPermissionGroupState.Invoke(Connection, group, false);
+                PermissionManager.SendPermissionGroupState.Invoke(Connection, group, false);
                 _permGrps.RemoveAt(i);
                 break;
             }
@@ -218,40 +218,40 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         ThreadUtil.assertIsGameThread();
 
         _permGrps.Clear();
-        UserPermissions.SendClearPermissionGroups.Invoke(Connection);
+        PermissionManager.SendClearPermissionGroups.Invoke(Connection);
     }
     internal void ClearPermissions()
     {
         ThreadUtil.assertIsGameThread();
 
         _perms.Clear();
-        UserPermissions.SendClearPermissions.Invoke(Connection);
+        PermissionManager.SendClearPermissions.Invoke(Connection);
     }
 #endif
 
 #if CLIENT
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendPermissionState)]
-    private static void ReceivePermissionState(MessageContext ctx, Permission perm, bool state)
+    private static void ReceivePermissionState(MessageContext ctx, PermissionBranch perm, bool state)
     {
-        UserPermissions.UserHandler.ReceivePermissionState(perm, state);
+        PermissionManager.UserPermissions.ReceivePermissionState(perm, state);
         ctx.Acknowledge();
     }
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendClearPermissions)]
     private static void ReceiveClearPermissions(MessageContext ctx)
     {
-        UserPermissions.UserHandler.ReceiveClearPermissions();
+        PermissionManager.UserPermissions.ReceiveClearPermissions();
         ctx.Acknowledge();
     }
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendPermissionGroupState)]
     private static void ReceivePermissionGroupState(MessageContext ctx, PermissionGroup group, bool state)
     {
-        UserPermissions.UserHandler.ReceivePermissionGroupState(group, state);
+        PermissionManager.UserPermissions.ReceivePermissionGroupState(group, state);
         ctx.Acknowledge();
     }
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendClearPermissionGroups)]
     private static void ReceiveClearPermissionGroups(MessageContext ctx)
     {
-        UserPermissions.UserHandler.ReceiveClearPermissions();
+        PermissionManager.UserPermissions.ReceiveClearPermissions();
         ctx.Acknowledge();
     }
 #endif

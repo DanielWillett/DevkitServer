@@ -1,11 +1,11 @@
 ﻿using DevkitServer.API.Commands;
-using DevkitServer.Commands.Subsystem;
 using DevkitServer.Plugins;
 using DevkitServer.Util.Encoding;
 using System.Globalization;
 using System.Reflection;
 using SDG.Framework.Modules;
 using Module = SDG.Framework.Modules.Module;
+using DevkitServer.Core.Commands.Subsystem;
 
 namespace DevkitServer.API.Abstractions;
 /// <summary>

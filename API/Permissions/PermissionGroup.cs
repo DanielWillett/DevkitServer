@@ -2,13 +2,16 @@
 using DevkitServer.Util.Encoding;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+#if CLIENT
+using DevkitServer.Core.Commands.Subsystem;
+#endif
 
 namespace DevkitServer.API.Permissions;
 [JsonConverter(typeof(PermissionGroupConverter))]
-public sealed class PermissionGroup : IReadOnlyList<GroupPermission>
+public sealed class PermissionGroup : IReadOnlyList<PermissionBranch>
 {
 #nullable disable
-    private readonly List<GroupPermission> _permissions;
+    private readonly List<PermissionBranch> _permissions;
 
     [JsonPropertyName("id")]
     public string Id { get; private set; }
@@ -23,20 +26,20 @@ public sealed class PermissionGroup : IReadOnlyList<GroupPermission>
     public int Priority { get; internal set; }
 
     [JsonPropertyName("permissions")]
-    public IReadOnlyList<GroupPermission> Permissions { get; }
+    public IReadOnlyList<PermissionBranch> Permissions { get; }
 #nullable restore
     private PermissionGroup()
     {
-        _permissions = new List<GroupPermission>(8);
+        _permissions = new List<PermissionBranch>(8);
         Permissions = _permissions.AsReadOnly();
     }
-    public PermissionGroup(string id, string displayName, Color color, int priority, IEnumerable<GroupPermission> permissions)
+    public PermissionGroup(string id, string displayName, Color color, int priority, IEnumerable<PermissionBranch> permissions)
     {
         Id = id;
         DisplayName = displayName;
         Color = color;
         Priority = priority;
-        _permissions = new List<GroupPermission>(permissions);
+        _permissions = new List<PermissionBranch>(permissions);
         Permissions = _permissions.AsReadOnly();
     }
     internal static PermissionGroup? ReadJson(ref Utf8JsonReader reader, JsonSerializerOptions? options = null)
@@ -49,75 +52,93 @@ public sealed class PermissionGroup : IReadOnlyList<GroupPermission>
         {
             if (reader.TokenType == JsonTokenType.EndObject)
                 break;
-            if (reader.TokenType == JsonTokenType.PropertyName)
+            if (reader.TokenType != JsonTokenType.PropertyName)
+                continue;
+
+            string? prop = reader.GetString();
+            if (!reader.Read() || prop == null)
+                continue;
+
+            if (prop.Equals("id", StringComparison.InvariantCultureIgnoreCase))
             {
-                string? prop = reader.GetString();
-                if (reader.Read() && prop != null)
+                if (reader.TokenType != JsonTokenType.String || reader.GetString() is not { } str || string.IsNullOrWhiteSpace(str))
+                    throw new JsonException("Failed to read PermissionGroup.Id (\"id\").");
+                (group ??= new PermissionGroup()).Id = str;
+                if (string.IsNullOrWhiteSpace(group.DisplayName))
+                    group.DisplayName = str;
+            }
+            else if (prop.Equals("name", StringComparison.InvariantCultureIgnoreCase))
+            {
+                if (reader.TokenType == JsonTokenType.Null)
                 {
-                    if (prop.Equals("id", StringComparison.InvariantCultureIgnoreCase))
+                    (group ??= new PermissionGroup()).DisplayName = group.Id;
+                    continue;
+                }
+                if (reader.TokenType != JsonTokenType.String || reader.GetString() is not { } str || string.IsNullOrWhiteSpace(str))
+                    throw new JsonException("Failed to read PermissionGroup.DisplayName (\"name\").");
+                (group ??= new PermissionGroup()).DisplayName = str;
+            }
+            else if (prop.Equals("color", StringComparison.InvariantCultureIgnoreCase))
+            {
+                if (reader.TokenType == JsonTokenType.Null)
+                    continue;
+                try
+                {
+                    (group ??= new PermissionGroup()).Color = JsonSerializer.Deserialize<Color>(ref reader, options);
+                }
+                catch (Exception ex)
+                {
+                    throw new JsonException("Failed to read PermissionGroup.Color (\"color\").", ex);
+                }
+            }
+            else if (prop.Equals("priority", StringComparison.InvariantCultureIgnoreCase))
+            {
+                if (reader.TokenType == JsonTokenType.Null)
+                    continue;
+                if (reader.TokenType != JsonTokenType.Number || !reader.TryGetInt32(out int z))
+                    throw new JsonException("Failed to read PermissionGroup.Priority (\"priority\").");
+                (group ??= new PermissionGroup()).Priority = z;
+            }
+            else if (prop.Equals("permissions", StringComparison.InvariantCultureIgnoreCase))
+            {
+                if (reader.TokenType == JsonTokenType.Null)
+                    continue;
+                if (reader.TokenType != JsonTokenType.StartArray)
+                    throw new JsonException("Failed to read PermissionGroup.Permissions (\"permissions\").");
+                group ??= new PermissionGroup();
+                int i = 0;
+                while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+                {
+                    switch (reader.TokenType)
                     {
-                        if (reader.TokenType != JsonTokenType.String || reader.GetString() is not { } str || string.IsNullOrWhiteSpace(str))
-                            throw new JsonException("Failed to read PermissionGroup.Id (\"id\").");
-                        (group ??= new PermissionGroup()).Id = str;
-                        if (string.IsNullOrWhiteSpace(group.DisplayName))
-                            group.DisplayName = str;
-                    }
-                    else if (prop.Equals("name", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        if (reader.TokenType == JsonTokenType.Null)
-                        {
-                            (group ??= new PermissionGroup()).DisplayName = group.Id;
-                            continue;
-                        }
-                        if (reader.TokenType != JsonTokenType.String || reader.GetString() is not { } str || string.IsNullOrWhiteSpace(str))
-                            throw new JsonException("Failed to read PermissionGroup.DisplayName (\"name\").");
-                        (group ??= new PermissionGroup()).DisplayName = str;
-                    }
-                    else if (prop.Equals("color", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        if (reader.TokenType == JsonTokenType.Null)
-                            continue;
-                        try
-                        {
-                            (group ??= new PermissionGroup()).Color = JsonSerializer.Deserialize<Color>(ref reader, options);
-                        }
-                        catch (Exception ex)
-                        {
-                            throw new JsonException("Failed to read PermissionGroup.Color (\"color\").", ex);
-                        }
-                    }
-                    else if (prop.Equals("priority", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        if (reader.TokenType == JsonTokenType.Null)
-                            continue;
-                        if (reader.TokenType != JsonTokenType.Number || !reader.TryGetInt32(out int z))
-                            throw new JsonException("Failed to read PermissionGroup.Proiority (\"priority\").");
-                        (group ??= new PermissionGroup()).Priority = z;
-                    }
-                    else if (prop.Equals("permissions", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        if (reader.TokenType == JsonTokenType.Null)
-                            continue;
-                        if (reader.TokenType != JsonTokenType.StartArray)
-                            throw new JsonException("Failed to read PermissionGroup.Permissions (\"permissions\").");
-                        group ??= new PermissionGroup();
-                        int i = 0;
-                        try
-                        {
-                            while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+                        case JsonTokenType.Null:
+                            return default;
+                        case JsonTokenType.String:
+                            string? str = reader.GetString();
+                            if (string.IsNullOrEmpty(str) || str.Equals("null", StringComparison.Ordinal))
+                                return default;
+                            if (!PermissionBranch.TryParse(str, out PermissionBranch branch))
                             {
-                                GroupPermission perm = JsonSerializer.Deserialize<GroupPermission>(ref reader, options);
-                                if (perm.Permission == null) continue;
-                                Permission perm2 = UserPermissions.Handler.TryFindEqualPermission(perm.Permission);
-                                group._permissions.Add(new GroupPermission(perm2, perm.IsRemoved));
-                                ++i;
+                                if (branch.Path == null)
+                                    throw new JsonException($"Invalid syntax for permission[{i}] in permission group: \"{str}\".");
+
+#if SERVER
+                                Logger.LogWarning($"Unrecognized prefix in permission[{i.Format()}] in permission group: \"{branch.Format()}\".");
+#else
+                                if (DevkitServerPermissions.DebugLogging)
+                                    Logger.LogInfo($"[ReadPermissionGroup] Unrecognized prefix in permission[{i.Format()}] in permission group: \"{branch.Format()}\".");
+#endif
                             }
-                        }
-                        catch (Exception ex)
-                        {
-                            throw new JsonException("Failed to read PermissionGroup.Permissions[" + i + "] (\"permissions[" + i + "]\").", ex);
-                        }
+                            else
+                            {
+                                group._permissions.Add(branch);
+                            }
+                            break;
+
+                        default:
+                            throw new JsonException("Unexpected token " + reader.TokenType + $" while reading permission[{i}] in permission group.");
                     }
+                    ++i;
                 }
             }
         }
@@ -158,14 +179,7 @@ public sealed class PermissionGroup : IReadOnlyList<GroupPermission>
         writer.WriteStartArray();
         for (int i = 0; i < group._permissions.Count; ++i)
         {
-            try
-            {
-                JsonSerializer.Serialize(writer, group._permissions[i], options);
-            }
-            catch (Exception ex)
-            {
-                throw new JsonException("Failed to write PermissionGroup.Permissions[" + i + "] (\"permissions[" + i + "]\").", ex);
-            }
+            writer.WriteStringValue(group._permissions[i].ToString());
         }
         writer.WriteEndArray();
 
@@ -177,11 +191,10 @@ public sealed class PermissionGroup : IReadOnlyList<GroupPermission>
         writer.Write(group.DisplayName);
         writer.Write(group.Color);
         writer.Write(group.Priority);
-        writer.Write(group.Permissions.Count);
-        for (int j = 0; j < group.Permissions.Count; ++j)
+        writer.Write(group._permissions.Count);
+        for (int j = 0; j < group._permissions.Count; ++j)
         {
-            writer.Write(group.Permissions[j].IsRemoved);
-            writer.Write(group.Permissions[j].Permission.ToString());
+            PermissionBranch.Write(writer, group._permissions[j]);
         }
     }
     public static PermissionGroup ReadPermissionGroup(ByteReader reader)
@@ -198,67 +211,67 @@ public sealed class PermissionGroup : IReadOnlyList<GroupPermission>
             Color = clr,
             Priority = priority
         };
-        if (group._permissions.Capacity < len)
-            group._permissions.Capacity = len;
-        for (int j = 0; j < len; ++j)
+        group._permissions.IncreaseCapacity(len);
+        for (int i = 0; i < len; ++i)
         {
-            bool rem = reader.ReadBool();
-            string str = reader.ReadString();
-            if (Permission.TryParse(str, out Permission perm))
-            {
-                group._permissions.Add(new GroupPermission(perm, rem));
-            }
-#if SERVER
+            PermissionBranch branch = PermissionBranch.Read(reader);
+            if (branch.Valid)
+                group._permissions.Add(branch);
             else
-                Logger.LogWarning("Unable to find permission: " + str.Format() + ".");
+            {
+#if SERVER
+                Logger.LogWarning($"Unrecognized prefix in permission[{i.Format()}] in permission group: \"{branch.Format()}\".");
+#else
+                if (DevkitServerPermissions.DebugLogging)
+                    Logger.LogInfo($"[ReadPermissionGroup] Unrecognized prefix in permission[{i.Format()}] in permission group: \"{branch.Format()}\".");
 #endif
+            }
         }
 
         return group;
     }
-    internal bool AddPermission(GroupPermission permission)
+    internal bool AddPermission(PermissionBranch branch)
     {
         for (int i = 0; i < _permissions.Count; ++i)
         {
-            if (_permissions[i].Equals(permission))
+            if (_permissions[i].Equals(branch))
                 return false;
         }
         for (int i = _permissions.Count - 1; i >= 0; --i)
         {
-            if (_permissions[i].Permission.Equals(permission.Permission))
+            if (_permissions[i].EqualsWithoutMode(branch))
                 _permissions.RemoveAt(i);
         }
-        _permissions.Add(permission);
+        _permissions.Add(branch);
         return true;
     }
-    internal bool RemovePermission(GroupPermission permission)
+    internal bool RemovePermission(PermissionBranch permission)
     {
-        for (int i = 0; i < _permissions.Count; ++i)
+        bool removed = false;
+        for (int i = _permissions.Count - 1; i >= 0; --i)
         {
             if (_permissions[i].Equals(permission))
             {
                 _permissions.RemoveAt(i);
-                return true;
+                removed = true;
             }
         }
-        return false;
+
+        return removed;
     }
 
-    /// <returns><see langword="true"/> if priority was changed.</returns>
-    internal bool UpdateFrom(PermissionGroup group)
+    internal void UpdateFrom(PermissionGroup group)
     {
         DisplayName = group.DisplayName;
         Color = group.Color;
-        int oldPriority = Priority;
         Priority = group.Priority;
         _permissions.Clear();
         _permissions.AddRange(group._permissions);
-        return Priority != oldPriority;
     }
-    public IEnumerator<GroupPermission> GetEnumerator() => _permissions.GetEnumerator();
+    public IEnumerator<PermissionBranch> GetEnumerator() => _permissions.GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable)_permissions).GetEnumerator();
     public int Count => _permissions.Count;
-    public GroupPermission this[int index] => _permissions[index];
+    public PermissionBranch this[int index] => _permissions[index];
     public override string ToString() => $"{{Permission Group | \"{Id}\" ({DisplayName}) | {Permissions.Count} permission(s)}}";
     public override bool Equals(object? obj) => obj is PermissionGroup g && g.Id.Equals(Id, StringComparison.InvariantCultureIgnoreCase);
     // ReSharper disable NonReadonlyMemberInGetHashCode
@@ -268,107 +281,14 @@ public sealed class PermissionGroup : IReadOnlyList<GroupPermission>
     public static bool operator ==(PermissionGroup? left, object? right) => left is null ? right is null : left.Equals(right);
     public static bool operator !=(PermissionGroup? left, object? right) => !(left == right);
 }
-
-[JsonConverter(typeof(GroupPermissionConverter))]
-public readonly struct GroupPermission
-{
-    public Permission Permission { get; }
-    public bool IsRemoved { get; }
-#nullable disable
-    public GroupPermission() { }
-#nullable restore
-    public GroupPermission(Permission permission, bool isRemoved)
-    {
-        Permission = permission;
-        IsRemoved = isRemoved;
-    }
-    public static bool TryParse(string str, out GroupPermission result)
-    {
-        if (string.IsNullOrWhiteSpace(str))
-        {
-            result = default;
-            return false;
-        }
-
-        bool rem = false;
-        if (str[0] == '-')
-        {
-            rem = true;
-            str = str.Substring(1);
-            if (string.IsNullOrEmpty(str))
-                throw new JsonException("Invalid permission in GroupPermission converter: \"-" + str + "\".");
-        }
-        else if (str[0] == '+')
-        {
-            str = str.Substring(1);
-            if (string.IsNullOrEmpty(str))
-                throw new JsonException("Invalid permission in GroupPermission converter: \"+" + str + "\".");
-        }
-        if (Permission.TryParse(str, out Permission permission))
-        {
-            result = new GroupPermission(permission, rem);
-            return true;
-        }
-
-        result = new GroupPermission(permission, rem);
-        return false;
-    }
-
-    public static implicit operator GroupPermission(Permission permission) => permission is null ? default : new GroupPermission(permission, false);
-    public override bool Equals(object? obj) => obj is GroupPermission g && g.IsRemoved == IsRemoved && g.Permission.Equals(Permission);
-    public override int GetHashCode() => (Permission != null ? Permission.GetHashCode() : 0) + (IsRemoved ? 1 : 0);
-    public static bool operator ==(GroupPermission? left, object? right) => right is not null && left.Equals(right);
-    public static bool operator !=(GroupPermission? left, object? right) => !(left == right);
-    public override string ToString()
-    {
-        string str = Permission.ToString();
-        if (IsRemoved)
-            str = "-" + str;
-
-        return str;
-    }
-}
-
 public sealed class PermissionGroupConverter : JsonConverter<PermissionGroup>
 {
-    public override PermissionGroup? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override PermissionGroup Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        return PermissionGroup.ReadJson(ref reader, options);
+        return PermissionGroup.ReadJson(ref reader, options)!;
     }
     public override void Write(Utf8JsonWriter writer, PermissionGroup? value, JsonSerializerOptions options)
     {
         PermissionGroup.WriteJson(writer, value, options);
-    }
-}
-public sealed class GroupPermissionConverter : JsonConverter<GroupPermission>
-{
-    public override GroupPermission Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-    {
-        switch (reader.TokenType)
-        {
-            case JsonTokenType.Null:
-                return default;
-            case JsonTokenType.String:
-                string? str = reader.GetString();
-                if (string.IsNullOrWhiteSpace(str) || str!.Equals("null", StringComparison.Ordinal))
-                    return default;
-
-                if (GroupPermission.TryParse(str, out GroupPermission permission))
-                    return permission;
-
-                if (permission == null)
-                    throw new JsonException("Invalid string value for permission: \"" + str + "\".");
-                
-                return default;
-            default:
-                throw new JsonException("Unexpected token " + reader.TokenType + " while reading permission.");
-        }
-    }
-    public override void Write(Utf8JsonWriter writer, GroupPermission value, JsonSerializerOptions options)
-    {
-        if (value.Permission == null)
-            writer.WriteNullValue();
-        else
-            writer.WriteStringValue(value.ToString());
     }
 }

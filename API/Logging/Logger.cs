@@ -87,6 +87,9 @@ public static class Logger
         }
     }
     internal const string TimeFormat = "yyyy-MM-dd hh:mm:ss";
+
+    private static ColorConfig GetUnityConfig() => UnityColor32Config.Default;
+    private static ColorConfig GetSystemConfig() => Color32Config.Default;
     static Logger()
     {
         try
@@ -95,7 +98,7 @@ public static class Logger
             StackCleanerConfiguration config = new StackCleanerConfiguration
             {
                 ColorFormatting = StackColorFormatType.ExtendedANSIColor,
-                Colors = Type.GetType("System.Drawing.Color", false) == null ? UnityColor32Config.Default : Color32Config.Default,
+                Colors = DevkitServerModule.UnityLoaded ? GetUnityConfig() : GetSystemConfig(),
                 IncludeNamespaces = false,
                 IncludeLineData = true,
 #if DEBUG
@@ -203,7 +206,7 @@ public static class Logger
             StackCleanerConfiguration config = new StackCleanerConfiguration
             {
                 ColorFormatting = StackColorFormatType.None,
-                Colors = Type.GetType("System.Drawing.Color, System.Drawing", false, false) == null ? UnityColor32Config.Default : Color32Config.Default,
+                Colors = DevkitServerModule.UnityLoaded ? GetUnityConfig() : GetSystemConfig(),
                 IncludeNamespaces = true,
                 IncludeFileData = true,
                 IncludeSourceData = true,
@@ -532,12 +535,11 @@ public static class Logger
         else
         {
             method ??= string.Empty;
-            method = FormattingUtil.SpaceProperCaseString(method);
             DateTime now = DateTime.UtcNow;
             ReplaceResetsWithConsoleColor(ref message, color);
             if (!Level.isLoaded)
                 _loadingErrors?.Add((now, Severity.Warning, message, color, method));
-            Terminal.Write("[" + now.ToString(TimeFormat) + "] [DEVKIT SERVER] [WARN]  [" + method.ToUpperInvariant() + "] " + message, color, true, Severity.Warning);
+            Terminal.Write("[" + now.ToString(TimeFormat) + "] [DEVKIT SERVER] [WARN]  [" + method + "] " + message, color, true, Severity.Warning);
         }
     }
     public static void LogError(string message, ConsoleColor color = ConsoleColor.Red, [CallerMemberName] string method = "")
@@ -547,12 +549,11 @@ public static class Logger
         else
         {
             method ??= string.Empty;
-            method = FormattingUtil.SpaceProperCaseString(method);
             DateTime now = DateTime.UtcNow;
             ReplaceResetsWithConsoleColor(ref message, color);
             if (!Level.isLoaded)
                 _loadingErrors?.Add((now, Severity.Error, message, color, method));
-            Terminal.Write("[" + now.ToString(TimeFormat) + "] [DEVKIT SERVER] [ERROR] [" + method.ToUpperInvariant() + "] " + message, color, true, Severity.Error);
+            Terminal.Write("[" + now.ToString(TimeFormat) + "] [DEVKIT SERVER] [ERROR] [" + method + "] " + message, color, true, Severity.Error);
         }
     }
     public static void DumpJson<T>(T obj, ConsoleColor color = ConsoleColor.DarkGray, bool condensed = false)

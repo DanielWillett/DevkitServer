@@ -11,7 +11,7 @@ namespace DevkitServer.Util;
 public static class FormattingUtil
 {
     // For unit tests
-    internal static ITerminalFormatProvider FormatProvider = new LoggerFormatProvider();
+    public static ITerminalFormatProvider FormatProvider { get; set; } = new LoggerFormatProvider();
     private static char[][]? _tags;
     private static RemoveRichTextOptions[]? _tagFlags;
     public static Func<object, string> FormatSelector = x => x.Format();
@@ -137,13 +137,13 @@ public static class FormattingUtil
     /// Adds spaces to a proper-case string. For example: DevkitServer -> Devkit Server.
     /// </summary>
     /// <remarks>Also replaces underscores with spaces.</remarks>
-    public static string SpaceProperCaseString(string text)
+    public static string SpaceProperCaseString(string text, char space = ' ')
     {
         if (text.Length < 1)
             return text;
 
-        if (text.IndexOf('_', 1) != -1)
-            text = text.Replace('_', ' ');
+        if (text.IndexOf('_', 1) != -1 && space != '_')
+            text = text.Replace('_', space);
 
         for (int i = 1; i < text.Length; ++i)
         {
@@ -157,7 +157,7 @@ public static class FormattingUtil
                 upper && char.IsUpper(text[i - 1]) && (i == text.Length - 1 || char.IsUpper(text[i + 1])))
                 continue;
 
-            text = text.Substring(0, i) + " " + text.Substring(i, text.Length - i);
+            text = text.Substring(0, i) + space + text.Substring(i, text.Length - i);
             ++i;
         }
 
@@ -627,6 +627,17 @@ public static class FormattingUtil
             string name = (asset.FriendlyName ?? asset.name).Colorize(color);
             return ("[" + asset.assetCategory + "] {" + asset.GUID.ToString("N") + "}").Colorize(color) + " : ".Colorize(ConsoleColor.White) + name;
         }
+
+        if (obj is SteamPlayer pl)
+        {
+            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + pl.playerID.steamID.m_SteamID.ToString("D17") + " " + pl.playerID.characterName.Format(false);
+        }
+        if (obj is Player pl2)
+        {
+            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + pl2.channel.owner.playerID.steamID.m_SteamID.ToString("D17") +
+                   " " + pl2.channel.owner.playerID.characterName.Format(false);
+        }
+
         if (obj is MemberInfo)
         {
             if (obj is FieldInfo field)
@@ -807,7 +818,7 @@ public static class FormattingUtil
         StackCleanerConfiguration config = FormatProvider.StackCleaner.Configuration;
         if (config.ColorFormatting != StackColorFormatType.None)
         {
-            ColorConfig colors = config.Colors ?? (config.ColorFormatting == StackColorFormatType.ExtendedANSIColor ? (DevkitServerModule.UnityLoaded ? UnityColor32Config.Default : Color32Config.Default) : Color4Config.Default);
+            ColorConfig colors = config.Colors ?? Color4Config.Default;
             int argb = tokenType switch
             {
                 FormattingColorType.Keyword => colors.KeywordColor,

@@ -1,19 +1,20 @@
 ﻿using DevkitServer.API;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
-using DevkitServer.Commands.Subsystem;
+using DevkitServer.Compat;
 using DevkitServer.Configuration;
+using DevkitServer.Core.Commands.Subsystem;
+using DevkitServer.Framework;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Patches;
 using HarmonyLib;
+using SDG.Framework.Modules;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using DevkitServer.Compat;
-using DevkitServer.Framework;
-using SDG.Framework.Modules;
 using Module = SDG.Framework.Modules.Module;
 using Type = System.Type;
+
 
 #if CLIENT
 using DevkitServer.API.UI.Extensions;
@@ -22,15 +23,18 @@ using DevkitServer.API.UI.Extensions;
 namespace DevkitServer.Plugins;
 public static class PluginLoader
 {
+    private static string? _pluginsDir;
+    private static string? _libraryDir;
+
     /// <summary>
     /// Path to the directory that plugins are read from.
     /// </summary>
-    public static readonly string PluginsDirectory = Path.Combine(DevkitServerConfig.Directory, "Plugins");
+    public static string PluginsDirectory => _pluginsDir ??= Path.Combine(DevkitServerConfig.Directory, "Plugins");
 
     /// <summary>
     /// Path to the directory that libraries are read from.
     /// </summary>
-    public static readonly string LibrariesDirectory = Path.Combine(DevkitServerConfig.Directory, "Libraries");
+    public static string LibrariesDirectory => _libraryDir ??= Path.Combine(DevkitServerConfig.Directory, "Libraries");
 
     private static readonly CachedMulticastEvent<Action<IDevkitServerPlugin>> OnPluginLoadedEvent = new CachedMulticastEvent<Action<IDevkitServerPlugin>>(typeof(PluginLoader), nameof(OnPluginLoaded));
     private static readonly CachedMulticastEvent<Action<IDevkitServerPlugin>> OnPluginUnloadedEvent = new CachedMulticastEvent<Action<IDevkitServerPlugin>>(typeof(PluginLoader), nameof(OnPluginUnloaded));
@@ -104,7 +108,13 @@ public static class PluginLoader
     /// Gets the color of a plugin, or default color if one is not defined.
     /// </summary>
     [Pure]
-    public static Color GetColor(this IDevkitServerPlugin? plugin) => plugin == null ? DevkitServerModule.ModuleColor : (plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor);
+    public static Color32 GetColor(this IDevkitServerPlugin? plugin)
+        => plugin switch
+        {
+            null => DevkitServerModule.ModuleColor,
+            IDevkitServerColorPlugin p => p.Color,
+            _ => Plugin.DefaultColor
+        };
 
     /// <summary>
     /// Gets whether or not a plugin is currently loaded (if it's in <see cref="Plugins"/>.)
@@ -143,53 +153,67 @@ public static class PluginLoader
     }
     private static void AssertPluginValid(IDevkitServerPlugin plugin)
     {
-        if (string.IsNullOrWhiteSpace(plugin.DataDirectory) || !Uri.TryCreate(plugin.DataDirectory, UriKind.Absolute, out Uri uri) || !uri.IsFile)
+        try
         {
-            plugin.LogError("DataDirectory invalid: " + plugin.DataDirectory.Format() + ".");
-            throw new Exception("DataDirectory invalid: \"" + plugin.DataDirectory + "\".");
+            if (string.IsNullOrWhiteSpace(plugin.DataDirectory) || !Uri.TryCreate(plugin.DataDirectory, UriKind.Absolute, out Uri uri) || !uri.IsFile)
+            {
+                plugin.LogError("DataDirectory invalid: " + plugin.DataDirectory.Format() + ".");
+                throw new Exception("DataDirectory invalid: \"" + plugin.DataDirectory + "\".");
+            }
+            if (string.IsNullOrWhiteSpace(plugin.LocalizationDirectory) || !Uri.TryCreate(plugin.LocalizationDirectory, UriKind.Absolute, out uri) || !uri.IsFile)
+            {
+                plugin.LogError("LocalizationDirectory invalid: " + plugin.LocalizationDirectory.Format() + ".");
+                throw new Exception("LocalizationDirectory invalid: \"" + plugin.LocalizationDirectory + "\".");
+            }
+            if (plugin is Plugin p && (string.IsNullOrWhiteSpace(p.MainLocalizationDirectory) || !Uri.TryCreate(p.MainLocalizationDirectory, UriKind.Absolute, out uri) || !uri.IsFile))
+            {
+                plugin.LogError("MainLocalizationDirectory invalid: " + p.MainLocalizationDirectory.Format() + ".");
+                throw new Exception("MainLocalizationDirectory invalid: \"" + p.MainLocalizationDirectory + "\".");
+            }
         }
-        if (string.IsNullOrWhiteSpace(plugin.LocalizationDirectory) || !Uri.TryCreate(plugin.LocalizationDirectory, UriKind.Absolute, out uri) || !uri.IsFile)
+        catch (NotImplementedException) // for unit tests
         {
-            plugin.LogError("LocalizationDirectory invalid: " + plugin.LocalizationDirectory.Format() + ".");
-            throw new Exception("LocalizationDirectory invalid: \"" + plugin.LocalizationDirectory + "\".");
-        }
-        if (plugin is Plugin p && (string.IsNullOrWhiteSpace(p.MainLocalizationDirectory) || !Uri.TryCreate(p.MainLocalizationDirectory, UriKind.Absolute, out uri) || !uri.IsFile))
-        {
-            plugin.LogError("MainLocalizationDirectory invalid: " + p.MainLocalizationDirectory.Format() + ".");
-            throw new Exception("MainLocalizationDirectory invalid: \"" + p.MainLocalizationDirectory + "\".");
+            if (DevkitServerModule.Module != null)
+                throw;
+
+            Logger.LogWarning($"Directories not implemented for plugin {plugin.Name}.");
         }
 
         if (string.IsNullOrWhiteSpace(plugin.PermissionPrefix))
         {
             plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not be empty.");
-            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not be empty.");
+            throw new Exception($"Plugin {plugin.Name}'s 'PermissionPrefix' can not be empty.");
         }
-        if (plugin.PermissionPrefix[0] is '-' or '+')
+        if (plugin.PermissionPrefix.IndexOf("::", StringComparison.Ordinal) != -1)
         {
-            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not start with a '-' or '+'.");
-            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not start with a '-' or '+'.");
+            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not contain '::'.");
+            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not contain '::'.");
+        }
+        if (PermissionBranch.IsPlus(plugin.PermissionPrefix[0]) || PermissionBranch.IsDash(plugin.PermissionPrefix[0]))
+        {
+            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not start with a plus or minus.");
+            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not start with a plus or minus.");
         }
 
-        if (plugin.PermissionPrefix.IndexOf('.') != -1)
+        if (plugin.PermissionPrefix.Equals(PermissionLeaf.CoreModulePrefix, StringComparison.InvariantCultureIgnoreCase))
         {
-            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not contain a period.");
-            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not contain a period.");
+            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not equal " + PermissionLeaf.CoreModulePrefix.Format() + ".");
+            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not equal " + PermissionLeaf.CoreModulePrefix + ".");
         }
-        if (plugin.PermissionPrefix.Equals(Permission.CoreModuleCode, StringComparison.InvariantCultureIgnoreCase))
+        if (plugin.PermissionPrefix.Equals(PermissionLeaf.DevkitServerModulePrefix, StringComparison.InvariantCultureIgnoreCase))
         {
-            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not equal " + Permission.CoreModuleCode.Format() + ".");
-            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not equal " + Permission.CoreModuleCode + ".");
+            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not equal " + PermissionLeaf.DevkitServerModulePrefix.Format() + ".");
+            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not equal " + PermissionLeaf.DevkitServerModulePrefix + ".");
         }
-        if (plugin.PermissionPrefix.Equals(Permission.DevkitServerModuleCode, StringComparison.InvariantCultureIgnoreCase))
+
+        if (DevkitServerModule.Module != null) // for unit tests
         {
-            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not equal " + Permission.DevkitServerModuleCode.Format() + ".");
-            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not equal " + Permission.DevkitServerModuleCode + ".");
-        }
-        string defaultModuleName = DevkitServerModule.MainLocalization.format("Name");
-        if (plugin.MenuName.Equals(defaultModuleName, StringComparison.InvariantCultureIgnoreCase))
-        {
-            plugin.LogError("Invalid MenuName: " + plugin.MenuName.Format() + ". MenuName can't be equal to " + defaultModuleName.Format() + ".");
-            throw new Exception("Plugin " + plugin.Name + "'s 'MenuName' can't be equal to \"" + defaultModuleName + "\".");
+            string defaultModuleName = DevkitServerModule.MainLocalization?.format("Name") ?? DevkitServerModule.ModuleName;
+            if (plugin.MenuName.Equals(defaultModuleName, StringComparison.InvariantCultureIgnoreCase))
+            {
+                plugin.LogError("Invalid MenuName: " + plugin.MenuName.Format() + ". MenuName can't be equal to " + defaultModuleName.Format() + ".");
+                throw new Exception("Plugin " + plugin.Name + "'s 'MenuName' can't be equal to \"" + defaultModuleName + "\".");
+            }
         }
     }
 
@@ -211,8 +235,8 @@ public static class PluginLoader
         {
             if (plugin.PermissionPrefix != null)
             {
-                bool dup = true;
-                while (dup)
+                bool dup;
+                do
                 {
                     dup = false;
                     for (int i = 0; i < PluginsIntl.Count; i++)
@@ -224,9 +248,11 @@ public static class PluginLoader
                             plugin.LogWarning("Conflicting permission prefix with " + plugin2.Format() +
                                               " (" + plugin2.PermissionPrefix.Format() + "). Overriding to " + plugin.PermissionPrefix.Format() + ".");
                             dup = true;
+                            break;
                         }
                     }
                 }
+                while (dup);
             }
 
             try
@@ -234,7 +260,10 @@ public static class PluginLoader
                 AssertPluginValid(plugin);
                 InitPlugin(plugin);
                 plugin.Load();
-                PluginAdvertising.Get().AddPlugin(plugin.MenuName);
+
+                if (DevkitServerModule.UnturnedLoaded) // for unit tests
+                    PluginAdvertising.Get().AddPlugin(plugin.MenuName);
+
                 PluginsIntl.Add(plugin);
                 Assembly asm = plugin.GetType().Assembly;
                 for (int i = 0; i < AssembliesIntl.Count; ++i)
@@ -528,7 +557,7 @@ public static class PluginLoader
                 }
             }
 
-            UserPermissions.InitHandlers();
+            PermissionManager.InitHandlers();
 
             pluginsTemp = PluginsIntl.OrderByDescending(x => x.GetType().GetPriority()).ToList();
 

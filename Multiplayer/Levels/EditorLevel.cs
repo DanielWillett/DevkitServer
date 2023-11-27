@@ -398,8 +398,8 @@ public static class EditorLevel
     }
 #endif
 #if CLIENT
-    private static readonly Func<string, bool, ulong, LevelInfo?> LoadLevelInfo =
-        Accessor.GenerateStaticCaller<Level, Func<string, bool, ulong, LevelInfo?>>("loadLevelInfo", throwOnError: true, allowUnsafeTypeBinding: true)!;
+    private static readonly Func<string, ulong, LevelInfo?> ReadLevelInfo =
+        Accessor.GenerateStaticCaller<Level, Func<string, ulong, LevelInfo?>>("ReadLevelInfo", throwOnError: true)!;
 
     internal static LevelData? ServerPendingLevelData;
 
@@ -819,7 +819,8 @@ public static class EditorLevel
     {
         GC.Collect();
         Resources.UnloadUnusedAssets();
-        LevelInfo? info = LoadLevelInfo(dir, false, 0ul);
+
+        LevelInfo? info = ReadLevelInfo(dir, 0ul);
         if (info == null)
         {
             Logger.LogWarning("[RECEIVE LEVEL] Failed to read received level at: \"" + dir + "\".", ConsoleColor.DarkCyan);

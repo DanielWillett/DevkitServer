@@ -1,10 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net481</TargetFramework>
+    <TargetFramework>net50</TargetFramework>
     <ProjectTypeGuids>{3AC096D0-A1C2-E12C-1390-A8335801FDAB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
     <ReferencePath>$(ProgramFiles)\Common Files\microsoft shared\VSTT\$(VisualStudioVersion)\UITestExtensionPackages</ReferencePath>
     <IsCodedUITest>False</IsCodedUITest>
+    <IsTestProject>true</IsTestProject>
     <TestProjectType>UnitTest</TestProjectType>
     <AssemblyTitle>DevkitServer.Tests</AssemblyTitle>
     <Product>DevkitServer.Tests</Product>
@@ -15,6 +16,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Configurations>ServerRelease;ServerDebug;ClientDebug;ClientRelease</Configurations>
     <UserSecretsId>4c764434-f553-478a-85a4-097ac2bea241</UserSecretsId>
+    <NoWarn>NU1605</NoWarn>
   </PropertyGroup>
   <Import Project="$(SolutionDir)Common.targets"/>
   <Import Project="$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets" Condition="Exists('$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets')" />
@@ -22,6 +24,7 @@
     <PackageReference Include="MSTest.TestAdapter" Version="2.2.10" />
     <PackageReference Include="MSTest.TestFramework" Version="2.2.10" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.0.1" />
+    <PackageReference Include="System.Text.Json" Version="4.7.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DevkitServer.csproj" />

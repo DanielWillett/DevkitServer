@@ -48,7 +48,7 @@ internal static class NavigationPatches
 #if SERVER
     internal static bool CanBake => true;
 #else
-    internal static bool CanBake => !DevkitServerModule.IsEditing || (VanillaPermissions.AllNavigation.Has() || VanillaPermissions.BakeNavigation.Has(false));
+    internal static bool CanBake => !DevkitServerModule.IsEditing || VanillaPermissions.BakeNavigation.Has(true);
 #endif
 
     private static readonly MethodInfo CurrentCanBakeGetter = typeof(NavigationPatches).GetProperty(nameof(CanBake), BindingFlags.Static | BindingFlags.NonPublic)!.GetMethod;
@@ -1010,7 +1010,7 @@ internal static class NavigationPatches
     
     private static bool CanEditFlags()
     {
-        if (!VanillaPermissions.EditNavigation.Has() && !VanillaPermissions.AllNavigation.Has())
+        if (!VanillaPermissions.EditNavigation.Has())
         {
             EditorMessage.SendNoPermissionMessage(VanillaPermissions.EditNavigation);
             return false;

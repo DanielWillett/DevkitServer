@@ -1,7 +1,6 @@
 ﻿using DevkitServer.API;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
-using DevkitServer.Core.Permissions;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Levels;
@@ -10,6 +9,7 @@ using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players;
 #if SERVER
 using DevkitServer.API.UI;
+using DevkitServer.Core.Permissions;
 #elif CLIENT
 using DevkitServer.Multiplayer.Actions;
 #endif
@@ -93,15 +93,12 @@ public static class HierarchyUtil
             return;
         }
 
-        if (!CheckPlacePermission(type, user))
+        PermissionLeaf leaf = VanillaPermissions.GetNodeVolumePlace(type.Type);
+
+        if (!leaf.Has(user))
         {
             ctx.Acknowledge(StandardErrorCode.NoPermissions);
-            EditorMessage.SendNoPermissionMessage(user, type switch
-            {
-                NodeItemTypeIdentifier => VanillaPermissions.PlaceNodes,
-                VolumeItemTypeIdentifier v => v.Type.IsAssignableFrom(typeof(CartographyVolume)) ? VanillaPermissions.PlaceCartographyVolumes : VanillaPermissions.PlaceVolumes,
-                _ => null
-            });
+            EditorMessage.SendNoPermissionMessage(user, leaf);
             return;
         }
 
@@ -427,155 +424,5 @@ public static class HierarchyUtil
 
         return closestNode == null ? null : closestNode as TVolume;
     }
-
-#if SERVER
-    [Pure]
-    public static bool CheckMovePermission(IDevkitHierarchyItem item, ulong user)
-    {
-        if (Permission.SuperuserPermission.Has(user))
-            return true;
-
-        return item switch
-        {
-            TempNodeBase => VanillaPermissions.EditNodes.Has(user, false) ||
-                            VanillaPermissions.MoveUnownedNodes.Has(user, false) ||
-                            VanillaPermissions.PlaceNodes.Has(user, false) && HierarchyResponsibilities.IsPlacer(item.instanceID, user),
-
-            CartographyVolume => VanillaPermissions.EditCartographyVolumes.Has(user, false) ||
-                                 VanillaPermissions.MoveUnownedCartographyVolumes.Has(user, false) ||
-                                 VanillaPermissions.PlaceCartographyVolumes.Has(user, false) && HierarchyResponsibilities.IsPlacer(item.instanceID, user),
-
-            VolumeBase =>   VanillaPermissions.EditVolumes.Has(user, false) ||
-                            VanillaPermissions.MoveUnownedVolumes.Has(user, false) ||
-                            VanillaPermissions.PlaceVolumes.Has(user, false) && HierarchyResponsibilities.IsPlacer(item.instanceID, user),
-
-            _ => false
-        };
-    }
-    [Pure]
-    public static bool CheckPlacePermission(IHierarchyItemTypeIdentifier type, ulong user)
-    {
-        if (Permission.SuperuserPermission.Has(user))
-            return true;
-
-        return type switch
-        {
-            NodeItemTypeIdentifier => VanillaPermissions.EditNodes.Has(user, false) ||
-                                      VanillaPermissions.PlaceNodes.Has(user, false),
-
-            VolumeItemTypeIdentifier v => typeof(CartographyVolume).IsAssignableFrom(v.Type)
-                ? (VanillaPermissions.EditCartographyVolumes.Has(user, false) ||
-                   VanillaPermissions.PlaceCartographyVolumes.Has(user, false))
-                : (VanillaPermissions.EditVolumes.Has(user, false) ||
-                   VanillaPermissions.PlaceVolumes.Has(user, false)),
-
-            _ => false
-        };
-    }
-    [Pure]
-    public static bool CheckDeletePermission(IDevkitHierarchyItem item, ulong user)
-    {
-        if (Permission.SuperuserPermission.Has(user))
-            return true;
-
-        return item switch
-        {
-            TempNodeBase => VanillaPermissions.EditNodes.Has(user, false) ||
-                            VanillaPermissions.RemoveUnownedNodes.Has(user, false) ||
-                            VanillaPermissions.PlaceNodes.Has(user, false) && HierarchyResponsibilities.IsPlacer(item.instanceID, user),
-
-            CartographyVolume => VanillaPermissions.EditCartographyVolumes.Has(user, false) ||
-                                 VanillaPermissions.RemoveUnownedCartographyVolumes.Has(user, false) ||
-                                 VanillaPermissions.PlaceCartographyVolumes.Has(user, false) && HierarchyResponsibilities.IsPlacer(item.instanceID, user),
-
-            VolumeBase => VanillaPermissions.EditVolumes.Has(user, false) ||
-                          VanillaPermissions.RemoveUnownedVolumes.Has(user, false) ||
-                          VanillaPermissions.PlaceVolumes.Has(user, false) && HierarchyResponsibilities.IsPlacer(item.instanceID, user),
-
-            _ => false
-        };
-    }
-#elif CLIENT
-    [Pure]
-    public static bool CheckMovePermission(IDevkitHierarchyItem item)
-    {
-        if (Permission.SuperuserPermission.Has())
-            return true;
-
-        return item switch
-        {
-            TempNodeBase => VanillaPermissions.EditNodes.Has(false) ||
-                            VanillaPermissions.MoveUnownedNodes.Has(false) ||
-                            VanillaPermissions.PlaceNodes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
-
-            CartographyVolume => VanillaPermissions.EditCartographyVolumes.Has(false) ||
-                                 VanillaPermissions.MoveUnownedCartographyVolumes.Has(false) ||
-                                 VanillaPermissions.PlaceCartographyVolumes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
-
-            VolumeBase => VanillaPermissions.EditVolumes.Has(false) ||
-                            VanillaPermissions.MoveUnownedVolumes.Has(false) ||
-                            VanillaPermissions.PlaceVolumes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
-
-            _ => false
-        };
-    }
-    [Pure]
-    public static bool CheckPlacePermission(IHierarchyItemTypeIdentifier type)
-    {
-        if (Permission.SuperuserPermission.Has())
-            return true;
-
-        return type switch
-        {
-            NodeItemTypeIdentifier => VanillaPermissions.EditNodes.Has(false) ||
-                                      VanillaPermissions.PlaceNodes.Has(false),
-
-            VolumeItemTypeIdentifier v => typeof(CartographyVolume).IsAssignableFrom(v.Type)
-                ? (VanillaPermissions.EditCartographyVolumes.Has(false) ||
-                   VanillaPermissions.PlaceCartographyVolumes.Has(false))
-                : (VanillaPermissions.EditVolumes.Has(false) ||
-                   VanillaPermissions.PlaceVolumes.Has(false)),
-
-            _ => false
-        };
-    }
-    [Pure]
-    public static Permission? GetPlacePermission(IHierarchyItemTypeIdentifier type)
-    {
-        return type switch
-        {
-            NodeItemTypeIdentifier => VanillaPermissions.PlaceNodes,
-
-            VolumeItemTypeIdentifier v => typeof(CartographyVolume).IsAssignableFrom(v.Type)
-                ? VanillaPermissions.PlaceCartographyVolumes
-                : VanillaPermissions.PlaceVolumes,
-
-            _ => null
-        };
-    }
-    [Pure]
-    public static bool CheckDeletePermission(IDevkitHierarchyItem item)
-    {
-        if (Permission.SuperuserPermission.Has())
-            return true;
-
-        return item switch
-        {
-            TempNodeBase => VanillaPermissions.EditNodes.Has(false) ||
-                            VanillaPermissions.RemoveUnownedNodes.Has(false) ||
-                            VanillaPermissions.PlaceNodes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
-
-            CartographyVolume => VanillaPermissions.EditCartographyVolumes.Has(false) ||
-                                 VanillaPermissions.RemoveUnownedCartographyVolumes.Has(false) ||
-                                 VanillaPermissions.PlaceCartographyVolumes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
-
-            VolumeBase => VanillaPermissions.EditVolumes.Has(false) ||
-                          VanillaPermissions.RemoveUnownedVolumes.Has(false) ||
-                          VanillaPermissions.PlaceVolumes.Has(false) && HierarchyResponsibilities.IsPlacer(item.instanceID),
-
-            _ => false
-        };
-    }
-#endif
 }
 

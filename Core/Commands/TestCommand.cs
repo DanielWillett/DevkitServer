@@ -6,14 +6,12 @@ using DevkitServer.Models;
 using DevkitServer.Multiplayer.Sync;
 using System.Collections.ObjectModel;
 using System.Reflection;
-using DevkitServer.API.UI.Icons;
-
-
 #if CLIENT
 using DevkitServer.AssetTools;
 using DevkitServer.Configuration;
 using DevkitServer.Util.Debugging;
 using System.Diagnostics;
+using DevkitServer.API.UI.Icons;
 using DevkitServer.Players;
 using SDG.Framework.Devkit;
 using Unturned.SystemEx;
@@ -22,40 +20,34 @@ using Unturned.SystemEx;
 namespace DevkitServer.Core.Commands;
 internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFile
 {
-    [Permission]
-    public static readonly Permission Test = new Permission("test", devkitServer: true);
-    [Permission]
-    public static readonly Permission TestAll = new Permission("test.*", devkitServer: true);
+    public static readonly PermissionLeaf Test = new PermissionLeaf("test", devkitServer: true);
 
-    public IReadOnlyList<Permission> SyncSubcommandPermissions { get; }
-    public IReadOnlyList<Permission> AsyncSubcommandPermissions { get; }
+    public IReadOnlyList<PermissionLeaf> SyncSubcommandPermissions { get; }
+    public IReadOnlyList<PermissionLeaf> AsyncSubcommandPermissions { get; }
     Local ILocalizedCommand.Translations { get; set; } = null!;
     public TestCommand() : base("test")
     {
         AddAlias("tset");
         AddAlias("tets");
         AddPermission(Test);
-        AddPermission(TestAll);
-        Permission[] perms = new Permission[CommandTests.Commands.Length];
+        PermissionLeaf[] perms = new PermissionLeaf[CommandTests.Commands.Length];
         for (int i = 0; i < CommandTests.Commands.Length; ++i)
         {
-            Permission perm = new Permission("test." + CommandTests.Commands[i].Method.Name.ToLowerInvariant(), devkitServer: true);
+            PermissionLeaf perm = new PermissionLeaf("test." + CommandTests.Commands[i].Method.Name.ToLowerInvariant(), devkitServer: true);
             AddPermission(perm);
-            UserPermissions.Handler.Register(perm);
             perms[i] = perm;
         }
 
-        SyncSubcommandPermissions = new ReadOnlyCollection<Permission>(perms);
-        perms = new Permission[CommandTests.AsyncCommands.Length];
+        SyncSubcommandPermissions = new ReadOnlyCollection<PermissionLeaf>(perms);
+        perms = new PermissionLeaf[CommandTests.AsyncCommands.Length];
         for (int i = 0; i < CommandTests.AsyncCommands.Length; ++i)
         {
-            Permission perm = new Permission("test." + CommandTests.AsyncCommands[i].Method.Name.ToLowerInvariant(), devkitServer: true);
+            PermissionLeaf perm = new PermissionLeaf("test." + CommandTests.AsyncCommands[i].Method.Name.ToLowerInvariant(), devkitServer: true);
             AddPermission(perm);
-            UserPermissions.Handler.Register(perm);
             perms[i] = perm;
         }
 
-        AsyncSubcommandPermissions = new ReadOnlyCollection<Permission>(perms);
+        AsyncSubcommandPermissions = new ReadOnlyCollection<PermissionLeaf>(perms);
     }
 
     public override async UniTask Execute(CommandContext ctx, CancellationToken token)
@@ -69,7 +61,7 @@ internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFil
                 if (CommandTests.Commands[i].Method.Name.Equals(method, StringComparison.InvariantCultureIgnoreCase))
                 {
                     if (DevkitServerModule.IsEditing)
-                        ctx.AssertPermissionsOr(TestAll, SyncSubcommandPermissions[i]);
+                        ctx.AssertPermissionsOr(Test, SyncSubcommandPermissions[i]);
 
                     ++ctx.ArgumentOffset;
                     try
@@ -97,7 +89,7 @@ internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFil
                 if (CommandTests.AsyncCommands[i].Method.Name.Equals(method, StringComparison.InvariantCultureIgnoreCase))
                 {
                     if (DevkitServerModule.IsEditing)
-                        ctx.AssertPermissionsOr(TestAll, AsyncSubcommandPermissions[i]);
+                        ctx.AssertPermissionsOr(Test, AsyncSubcommandPermissions[i]);
 
                     ++ctx.ArgumentOffset;
                     try

@@ -38,7 +38,7 @@ public sealed class ClientInfo
     private static void ReceiveClientInfo(MessageContext ctx, ClientInfo info)
     {
         Info = info;
-        UserPermissions.UserHandler.ReceivePermissions(info.Permissions, info.PermissionGroups);
+        PermissionManager.UserPermissions.ReceivePermissions(info.Permissions, info.PermissionGroups);
         Logger.LogInfo("Received client info.");
 #if DEBUG
         Logger.LogDebug("=======================================");
@@ -61,7 +61,7 @@ public sealed class ClientInfo
     /// <remarks>
     /// This is not kept updated after initial connection. To access an updated list use <see cref="Permissions.PlayerHandler"/>.
     /// </remarks>
-    public Permission[] Permissions { get; internal set; }
+    public PermissionBranch[] Permissions { get; internal set; }
 
     /// <remarks>
     /// This is not kept updated after initial connection. To access an updated list use <see cref="Permissions.PlayerHandler"/>.
@@ -69,6 +69,7 @@ public sealed class ClientInfo
     public PermissionGroup[] PermissionGroups { get; internal set; }
 
     public bool ServerRemovesCosmeticImprovements { get; internal set; }
+    public bool ServerTreatsAdminsAsSuperuser { get; internal set; }
 #nullable restore
     internal ClientInfo() { }
 
@@ -84,14 +85,14 @@ public sealed class ClientInfo
     {
         _ = reader.ReadUInt16(); // version
         int len = reader.ReadInt32();
-        List<Permission> perms = new List<Permission>(len);
+        List<PermissionBranch> perms = new List<PermissionBranch>(len);
         for (int i = 0; i < len; ++i)
         {
-            string str = reader.ReadString();
-            if (Permission.TryParse(str, out Permission p))
-                perms.Add(p);
+            PermissionBranch branch = PermissionBranch.Read(reader);
+            if (branch.Valid)
+                perms.Add(branch);
             else
-                Logger.LogInfo("Unable to find permission: " + str.Format() + ", usually not a problem.");
+                Logger.LogDebug($"Invalid permission skipped: {branch.Format()}.");
         }
 
         Permissions = perms.ToArrayFast();
@@ -102,6 +103,7 @@ public sealed class ClientInfo
 
         byte flag = reader.ReadUInt8();
         ServerRemovesCosmeticImprovements = (flag & 1) != 0;
+        ServerTreatsAdminsAsSuperuser = (flag & 2) == 0;
     }
     public void Write(ByteWriter writer)
     {
@@ -110,8 +112,7 @@ public sealed class ClientInfo
         writer.Write(Permissions == null ? 0 : Permissions.Length);
         for (int i = 0; i < Permissions!.Length; i++)
         {
-            Permission permission = Permissions[i];
-            writer.Write(permission.ToString());
+            PermissionBranch.Write(writer, Permissions[i]);
         }
 
         writer.Write(PermissionGroups == null ? 0 : PermissionGroups.Length);
@@ -121,6 +122,8 @@ public sealed class ClientInfo
         byte flag = 0;
         if (ServerRemovesCosmeticImprovements)
             flag |= 1;
+        if (!ServerTreatsAdminsAsSuperuser)
+            flag |= 2;
 
         writer.Write(flag);
     }
@@ -129,6 +132,7 @@ public sealed class ClientInfo
     {
         SystemConfig systemConfig = DevkitServerConfig.Config;
         info.ServerRemovesCosmeticImprovements = systemConfig.RemoveCosmeticImprovements;
+        info.ServerTreatsAdminsAsSuperuser = systemConfig.AdminsAreSuperusers;
     }
 #endif
 }

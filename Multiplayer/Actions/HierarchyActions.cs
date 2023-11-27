@@ -1,5 +1,6 @@
 ﻿#if SERVER
 using DevkitServer.API.Permissions;
+using DevkitServer.Core.Permissions;
 #endif
 using DevkitServer.API;
 using DevkitServer.Models;
@@ -95,14 +96,14 @@ public sealed class MovedHierarchyObjectsAction : IAction
 #if SERVER
     public bool CheckCanApply()
     {
-        if (Permission.SuperuserPermission.Has(Instigator.m_SteamID, false))
+        if (default(PermissionLeaf).Has(Instigator.m_SteamID))
             return true;
         for (int i = 0; i < Transformations.Length; ++i)
         {
             ref FinalTransformation transformation = ref Transformations[i];
             if (!HierarchyItemNetIdDatabase.TryGetHierarchyItem(transformation.NetId, out IDevkitHierarchyItem item))
                 continue;
-            if (!HierarchyUtil.CheckMovePermission(item, Instigator.m_SteamID))
+            if (!VanillaPermissions.GetNodeVolumeMove(item.GetType()).Has(Instigator.m_SteamID))
                 return false;
         }
 
@@ -176,13 +177,13 @@ public sealed class DeleteHierarchyItemsAction : IAction
 #if SERVER
     public bool CheckCanApply()
     {
-        if (Permission.SuperuserPermission.Has(Instigator.m_SteamID, false))
+        if (default(PermissionLeaf).Has(Instigator.m_SteamID, false))
             return true;
         for (int i = 0; i < NetIds.Length; ++i)
         {
             if (!HierarchyItemNetIdDatabase.TryGetHierarchyItem(NetIds[i], out IDevkitHierarchyItem item))
                 continue;
-            if (!HierarchyUtil.CheckDeletePermission(item, Instigator.m_SteamID))
+            if (!VanillaPermissions.GetNodeVolumeRemove(item.GetType()).Has(Instigator.m_SteamID))
                 return false;
         }
         return true;

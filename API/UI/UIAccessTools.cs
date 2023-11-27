@@ -90,9 +90,6 @@ public static class UIAccessTools
     private static readonly InstanceGetter<MenuPlayUI, MenuPlayConnectUI?>? GetMenuPlayConnectUI
         = Accessor.GenerateInstanceGetter<MenuPlayUI, MenuPlayConnectUI?>("connectUI");
 
-    private static readonly InstanceGetter<MenuPlayUI, MenuPlayServersUI?>? GetMenuPlayServersUI
-        = Accessor.GenerateInstanceGetter<MenuPlayUI, MenuPlayServersUI?>("serverListUI");
-
     private static readonly InstanceGetter<MenuPlayUI, MenuPlayServerInfoUI?>? GetMenuPlayServerInfoUI
         = Accessor.GenerateInstanceGetter<MenuPlayUI, MenuPlayServerInfoUI?>("serverInfoUI");
 
@@ -401,14 +398,10 @@ public static class UIAccessTools
             return menuPlayUI != null ? GetMenuPlayConnectUI?.Invoke(menuPlayUI) : null;
         }
     }
-    public static MenuPlayServersUI? MenuPlayServersUI
-    {
-        get
-        {
-            MenuPlayUI? menuPlayUI = MenuPlayUI;
-            return menuPlayUI != null ? GetMenuPlayServersUI?.Invoke(menuPlayUI) : null;
-        }
-    }
+
+    [Obsolete("Just use MenuPlayUI.serverListUI to access.")]
+    public static MenuPlayServersUI? MenuPlayServersUI => MenuPlayUI.serverListUI;
+
     public static MenuPlayServerInfoUI? MenuPlayServerInfoUI
     {
         get
@@ -1495,7 +1488,7 @@ public static class UIAccessTools
                 ParentName = nameof(SDG.Unturned.MenuPlayServersUI),
                 Scene = UIScene.Menu,
                 CustomEmitter =
-                    FindUIType(nameof(SDG.Unturned.MenuPlayServersUI))?.GetField("serverListFiltersUI", BindingFlags.Static | BindingFlags.Public) is { } field
+                    FindUIType(nameof(SDG.Unturned.MenuPlayServersUI))?.GetField("serverListFiltersUI", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } field
                         ? (_, generator) => generator.Emit(OpCodes.Ldsfld, field)
                         : null
             });
@@ -1511,7 +1504,10 @@ public static class UIAccessTools
             {
                 ParentName = nameof(SDG.Unturned.MenuPlayUI),
                 Scene = UIScene.Menu,
-                EmitProperty = nameof(MenuPlayServersUI)
+                CustomEmitter =
+                    FindUIType(nameof(SDG.Unturned.MenuPlayUI))?.GetField("serverListUI", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } field2
+                        ? (_, generator) => generator.Emit(OpCodes.Ldsfld, field2)
+                        : null
             });
 
             Add(new UITypeInfo(nameof(SDG.Unturned.MenuPlaySingleplayerUI))

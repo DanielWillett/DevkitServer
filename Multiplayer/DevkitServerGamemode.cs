@@ -3,7 +3,6 @@ using DevkitServer.Players;
 using DevkitServer.Multiplayer.Sync;
 #if SERVER
 using DevkitServer.API.Permissions;
-using DevkitServer.Configuration;
 #endif
 #if CLIENT
 using DevkitServer.Multiplayer.Networking;
@@ -35,8 +34,8 @@ public class DevkitServerGamemode : GameMode
     {
         return new ClientInfo
         {
-            Permissions = UserPermissions.UserHandler.GetPermissions(user.SteamId.m_SteamID, true)?.ToArray() ?? Array.Empty<Permission>(),
-            PermissionGroups = UserPermissions.UserHandler.GetPermissionGroups(user.SteamId.m_SteamID, true)?.ToArray() ?? Array.Empty<PermissionGroup>()
+            Permissions = PermissionManager.UserPermissions.GetPermissions(user.SteamId.m_SteamID, true)?.ToArray() ?? Array.Empty<PermissionBranch>(),
+            PermissionGroups = PermissionManager.UserPermissions.GetPermissionGroups(user.SteamId.m_SteamID, true)?.ToArray() ?? Array.Empty<PermissionGroup>()
         };
     }
 #endif

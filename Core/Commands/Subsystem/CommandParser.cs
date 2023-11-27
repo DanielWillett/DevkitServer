@@ -3,13 +3,13 @@
 using DevkitServer.Players;
 #endif
 
-namespace DevkitServer.Commands.Subsystem;
+namespace DevkitServer.Core.Commands.Subsystem;
 public class CommandParser
 {
     public const int MaxArgCount = 32;
 
-    public char[] Prefixes = { '/', '@', '\\' };
-    public char[] ContinueArgChars = { '\'', '"', '`', '“', '”', '‘', '’' };
+    public static char[] Prefixes = { '/', '@', '\\' };
+    public static char[] ContinueArgChars = { '\'', '"', '`', '“', '”', '‘', '’' };
     protected readonly ArgumentInfo[] ArgumentBuffer = new ArgumentInfo[MaxArgCount];
     private readonly ICommandHandler _handler;
     public ICommandHandler Handler => _handler;
@@ -24,15 +24,15 @@ public class CommandParser
     }
     public virtual unsafe bool TryRunCommand(
 #if SERVER
-        EditorUser? user, 
+        SteamPlayer? user, 
 #endif
 #if CLIENT
-        bool console, 
+        bool console,
 #endif
         string message, ref bool shouldList, bool requirePrefix)
     {
         ThreadUtil.assertIsGameThread();
-        
+
         if (message == null || message.Length < (requirePrefix ? 2 : 1)) goto notCommand;
         int cmdStart = -1;
         int cmdEnd = -1;
@@ -76,7 +76,7 @@ public class CommandParser
                         }
                     }
                     cmdStart = i;
-                    c:;
+                c:;
                 }
 
                 // finish finding command name
@@ -171,9 +171,9 @@ public class CommandParser
                             goto c;
                     }
                     goto n;
-                    c:
+                c:
                     continue;
-                    n:
+                n:
                     // end the current argument
                     if (argCt != -1)
                     {
@@ -192,7 +192,7 @@ public class CommandParser
                 }
                 continue;
 
-                contArgChr:
+            contArgChr:
                 if (inArg)
                 {
                     // end current quotation mark argument
@@ -247,7 +247,7 @@ public class CommandParser
                 }
                 continue;
 
-                getCommand:
+            getCommand:
                 shouldList = false;
                 if (cmdStart < 0 || cmdEnd - cmdStart < 0)
                     goto notCommand;
@@ -282,7 +282,7 @@ public class CommandParser
                     if (cmdInd != -1)
                         break;
                 }
-                
+
                 if (cmdInd == -1)
                     goto notCommand;
                 if (i == len - 1) goto runCommand;
@@ -377,7 +377,7 @@ public class CommandParser
 
         shouldList = false;
         return true;
-        notCommand:
+    notCommand:
         return false;
     }
 }

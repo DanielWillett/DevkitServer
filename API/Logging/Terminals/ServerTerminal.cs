@@ -1,5 +1,5 @@
 ﻿#if SERVER
-using DevkitServer.Commands.Subsystem;
+using DevkitServer.Core.Commands.Subsystem;
 
 namespace DevkitServer.API.Logging.Terminals;
 internal class ServerTerminal : MonoBehaviour, ITerminal

@@ -124,7 +124,7 @@ public sealed class DeleteLevelObjectsAction : IAction
     private Transform?[]? _objects;
     public bool CheckCanApply()
     {
-        if (Permission.SuperuserPermission.Has(Instigator.m_SteamID, false))
+        if (default(PermissionLeaf).Has(Instigator.m_SteamID, false))
             return true;
         _objects = new Transform[NetIds.Length];
         for (int i = 0; i < NetIds.Length; ++i)
@@ -221,7 +221,7 @@ public class MoveLevelObjectsFinalAction : IAction
     private Transform?[]? _objects;
     public bool CheckCanApply()
     {
-        if (Permission.SuperuserPermission.Has(Instigator.m_SteamID, false))
+        if (default(PermissionLeaf).Has(Instigator.m_SteamID, false))
             return true;
         _objects = new Transform[Transformations.Length];
         for (int i = 0; i < Transformations.Length; ++i)
@@ -391,7 +391,7 @@ public sealed class UpdateObjectsCustomMaterialPaletteOverrideAction : IReplacab
     private LevelObject?[]? _objects;
     public bool CheckCanApply()
     {
-        if (Permission.SuperuserPermission.Has(Instigator.m_SteamID, false))
+        if (default(PermissionLeaf).Has(Instigator.m_SteamID, false))
             return true;
         _objects = new LevelObject[NetIds.Length];
         for (int i = 0; i < NetIds.Length; ++i)
@@ -496,7 +496,7 @@ public sealed class UpdateObjectsMaterialIndexOverrideAction : IReplacableAction
     private LevelObject?[]? _objects;
     public bool CheckCanApply()
     {
-        if (Permission.SuperuserPermission.Has(Instigator.m_SteamID, false))
+        if (default(PermissionLeaf).Has(Instigator.m_SteamID, false))
             return true;
         _objects = new LevelObject[NetIds.Length];
         for (int i = 0; i < NetIds.Length; ++i)

@@ -1,9 +1,6 @@
 ﻿using Cysharp.Threading.Tasks;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
-#if SERVER
-using DevkitServer.Players;
-#endif
 
 namespace DevkitServer.API.Commands;
 
@@ -12,11 +9,12 @@ namespace DevkitServer.API.Commands;
 /// </summary>
 public abstract class DevkitServerCommand : ICachedTranslationSourceCommand
 {
+    public virtual CommandExecutionMode Mode => CommandExecutionMode.RequireMultiEditing;
     public virtual bool AnyPermissions => true;
     public string CommandName { get; }
     public int Priority { get; }
     public IList<string> Aliases { get; } = new List<string>(0);
-    public IList<Permission> Permissions { get; } = new List<Permission>(0);
+    public IList<PermissionLeaf> Permissions { get; } = new List<PermissionLeaf>(0);
     public IDevkitServerPlugin? Plugin { get; set; }
     protected DevkitServerCommand(string name, int priority = 0)
     {
@@ -26,13 +24,13 @@ public abstract class DevkitServerCommand : ICachedTranslationSourceCommand
     
     public abstract UniTask Execute(CommandContext ctx, CancellationToken token);
 #if SERVER
-    public virtual bool CheckPermission(EditorUser? user) => user.CheckPermission(Permissions, AnyPermissions);
+    public virtual bool CheckPermission(SteamPlayer? user) => user.CheckPermission(Permissions, AnyPermissions);
 #else
     public virtual bool CheckPermission() => true;
 #endif
 
     protected void AddAlias(string alias) => Aliases.Add(alias);
-    protected void AddPermission(Permission permission) => Permissions.Add(permission);
+    protected void AddPermission(PermissionLeaf permission) => Permissions.Add(permission);
     ITranslationSource ICachedTranslationSourceCommand.TranslationSource { get; set; } = null!;
 }
 

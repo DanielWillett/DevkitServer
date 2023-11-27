@@ -1,7 +1,7 @@
 ﻿using Cysharp.Threading.Tasks;
 using DevkitServer.API.Logging;
 using DevkitServer.API.Permissions;
-using DevkitServer.Commands.Subsystem;
+using DevkitServer.Core.Commands.Subsystem;
 using DevkitServer.Multiplayer;
 using DevkitServer.Players;
 using System.Globalization;
@@ -45,8 +45,14 @@ public class CommandContext : Exception
     /// Caller of the command, or <see langword="null"/> if the caller was the console.
     /// </summary>
     /// <remarks><see langword="null"/> when <see cref="IsConsole"/> is <see langword="true"/>. Not marked nullable for convenience.</remarks>
-    public EditorUser Caller { get; }
+    public SteamPlayer Caller { get; }
 #nullable enable
+
+    /// <summary>
+    /// Caller of the command as <see cref="EditorUser"/>.
+    /// </summary>
+    public EditorUser? EditorUser { get; }
+
     /// <summary>
     /// Useful for sub-commands, offsets any parsing methods.
     /// </summary>
@@ -80,7 +86,7 @@ public class CommandContext : Exception
 
     public CommandContext(IExecutableCommand command, string[] arguments, string originalMessage
 #if SERVER
-        , EditorUser? caller
+        , SteamPlayer? caller
 #endif
 #if CLIENT
         , bool console
@@ -93,12 +99,26 @@ public class CommandContext : Exception
 #if SERVER
         Caller = caller!;
         IsConsole = Caller == null;
-        CallerId = caller == null ? CSteamID.Nil : caller.SteamId;
+        CallerId = caller == null ? CSteamID.Nil : caller.playerID.steamID;
+        if (DevkitServerModule.IsEditing && Caller != null)
+            EditorUser = UserManager.FromId(CallerId.m_SteamID);
 #else
-        IsConsole = false;
-        Caller = EditorUser.User!;
-        CallerId = Provider.client;
         InvokedFromConsole = console;
+        if (Player.player != null)
+        {
+            IsConsole = false;
+            Caller = Player.player?.channel.owner;
+            CallerId = Provider.client;
+            if (DevkitServerModule.IsEditing)
+                EditorUser = EditorUser.User;
+        }
+        else
+        {
+            InvokedFromConsole = true;
+            IsConsole = true;
+            CallerId = Provider.client;
+            Caller = null;
+        }
 #endif
     }
 
@@ -109,7 +129,7 @@ public class CommandContext : Exception
     {
         get
         {
-            if (Command is ILocalizedCommand { Translations: { } } loc)
+            if (Command is ILocalizedCommand { Translations: not null } loc)
                 return loc.Translations;
             return Plugin?.Translations ?? DevkitServerModule.CommandLocalization;
         }
@@ -986,7 +1006,7 @@ public class CommandContext : Exception
     /// <param name="remainder">Select the rest of the arguments instead of just one.</param>
     /// <remarks>Zero based indexing.</remarks>
     /// <returns><see langword="true"/> if a valid Steam64 id is parsed (even when the user is offline).</returns>
-    public bool TryGet(int parameter, out ulong steam64, out EditorUser? onlinePlayer, bool remainder = false, NameSearchType type = NameSearchType.CharacterName)
+    public bool TryGet(int parameter, out ulong steam64, out SteamPlayer? onlinePlayer, bool remainder = false, NameSearchType type = NameSearchType.CharacterName)
     {
         parameter += ArgumentOffset;
         if (parameter < 0 || parameter >= Arguments.Length)
@@ -998,7 +1018,7 @@ public class CommandContext : Exception
         if (!IsConsole && MatchParameter(parameter, "me"))
         {
             onlinePlayer = Caller;
-            steam64 = Caller.SteamId.m_SteamID;
+            steam64 = Caller.playerID.steamID.m_SteamID;
             return true;
         }
 
@@ -1007,14 +1027,14 @@ public class CommandContext : Exception
         {
             if (DevkitServerUtility.TryParseSteamId(s, out CSteamID csteam64) && csteam64.UserSteam64())
             {
-                onlinePlayer = UserManager.FromId(csteam64);
+                onlinePlayer = PlayerTool.getSteamPlayer(csteam64);
                 steam64 = csteam64.m_SteamID;
                 return true;
             }
             onlinePlayer = UserManager.FromName(s, type);
             if (onlinePlayer is not null)
             {
-                steam64 = onlinePlayer.SteamId.m_SteamID;
+                steam64 = onlinePlayer.playerID.steamID.m_SteamID;
                 return true;
             }
         }
@@ -1031,7 +1051,7 @@ public class CommandContext : Exception
     /// <param name="remainder">Select the rest of the arguments instead of just one.</param>
     /// <remarks>Zero based indexing.</remarks>
     /// <returns><see langword="true"/> if a valid Steam64 id is parsed and that player is in <paramref name="selection"/>.</returns>
-    public bool TryGet(int parameter, out ulong steam64, out EditorUser onlinePlayer, IEnumerable<EditorUser> selection, bool remainder = false, NameSearchType type = NameSearchType.CharacterName)
+    public bool TryGet(int parameter, out ulong steam64, out SteamPlayer onlinePlayer, IEnumerable<SteamPlayer> selection, bool remainder = false, NameSearchType type = NameSearchType.CharacterName)
     {
         parameter += ArgumentOffset;
         if (parameter < 0 || parameter >= Arguments.Length)
@@ -1043,7 +1063,7 @@ public class CommandContext : Exception
         if (!IsConsole && MatchParameter(parameter, "me"))
         {
             onlinePlayer = Caller;
-            steam64 = Caller.SteamId.m_SteamID;
+            steam64 = Caller.playerID.steamID.m_SteamID;
             return selection.Contains(onlinePlayer);
         }
 
@@ -1053,21 +1073,21 @@ public class CommandContext : Exception
             if (DevkitServerUtility.TryParseSteamId(s, out CSteamID csteam64) && csteam64.UserSteam64())
             {
                 steam64 = csteam64.m_SteamID;
-                foreach (EditorUser player in selection)
+                foreach (SteamPlayer player in selection)
                 {
-                    if (player.SteamId.m_SteamID == steam64)
+                    if (player.playerID.steamID.m_SteamID == steam64)
                     {
                         onlinePlayer = player;
                         return true;
                     }
                 }
-                onlinePlayer = UserManager.FromId(steam64)!;
+                onlinePlayer = PlayerTool.getSteamPlayer(csteam64);
                 return false;
             }
             onlinePlayer = UserManager.FromName(s, type, selection)!;
             if (onlinePlayer is not null)
             {
-                steam64 = onlinePlayer.SteamId.m_SteamID;
+                steam64 = onlinePlayer.playerID.steamID.m_SteamID;
                 return true;
             }
         }
@@ -1205,7 +1225,17 @@ public class CommandContext : Exception
     }
     private float GetDistance(float distance)
     {
-        return distance >= 0 ? distance : (Caller.Input.Controller == CameraController.Player ? 4f : 16f);
+        return distance >= 0 ? distance : ((EditorUser == null ? !Level.isEditor : EditorUser.Input.Controller == CameraController.Player) ? 4f : 16f);
+    }
+    private Transform? GetAim()
+    {
+        if (IsConsole)
+            return null;
+
+        if (EditorUser != null)
+            return EditorUser.IsOnline ? EditorUser.Input.Aim : null;
+
+        return Caller?.player != null ? Caller.player.look.aim : MainCamera.instance.transform;
     }
 
     /// <summary>
@@ -1215,13 +1245,13 @@ public class CommandContext : Exception
     /// <param name="distance">Default distance is 4m for players and 16m for editors.</param>
     public bool TryGetTarget(out Transform transform, int mask = 0, float distance = -1)
     {
-        if (IsConsole || Caller == null || Caller.Input.Aim == null || !Caller.IsOnline)
+        Transform? aim = GetAim();
+        if (aim == null)
         {
             transform = null!;
             return false;
         }
-        Transform aim = Caller.Input.Aim;
-        RaycastInfo info = DamageTool.raycast(new Ray(aim.position, aim.forward), GetDistance(distance), mask == 0 ? RayMasks.PLAYER_INTERACT : mask, Caller.Player?.player);
+        RaycastInfo info = DamageTool.raycast(new Ray(aim.position, aim.forward), GetDistance(distance), mask == 0 ? RayMasks.PLAYER_INTERACT : mask, Caller?.player);
         transform = info.transform;
         return transform != null;
     }
@@ -1233,13 +1263,13 @@ public class CommandContext : Exception
     /// <param name="distance">Default distance is 4m for players and 16m for editors.</param>
     public bool TryRaycast(out RaycastInfo info, int mask, float distance = -1)
     {
-        if (IsConsole || Caller == null || Caller.Input.Aim == null || !Caller.IsOnline)
+        Transform? aim = GetAim();
+        if (aim == null)
         {
             info = null!;
             return false;
         }
-        Transform aim = Caller.Input.Aim;
-        info = DamageTool.raycast(new Ray(aim.position, aim.forward), GetDistance(distance), mask == 0 ? RayMasks.PLAYER_INTERACT : mask, Caller.Player?.player);
+        info = DamageTool.raycast(new Ray(aim.position, aim.forward), GetDistance(distance), mask == 0 ? RayMasks.PLAYER_INTERACT : mask, Caller?.player);
         return info.transform != null;
     }
 
@@ -1250,13 +1280,13 @@ public class CommandContext : Exception
     /// <param name="distance">Default distance is 4m for players and 16m for editors.</param>
     public bool TryGetTarget<T>(out T interactable, int mask = 0, float distance = 4f) where T : Interactable
     {
-        if (IsConsole || Caller == null || Caller.Input.Aim == null || !Caller.IsOnline)
+        Transform? aim = GetAim();
+        if (aim == null)
         {
             interactable = null!;
             return false;
         }
-        Transform aim = Caller.Input.Aim;
-        RaycastInfo info = DamageTool.raycast(new Ray(aim.position, aim.forward), GetDistance(distance), mask == 0 ? RayMasks.PLAYER_INTERACT : mask, Caller.Player?.player);
+        RaycastInfo info = DamageTool.raycast(new Ray(aim.position, aim.forward), GetDistance(distance), mask == 0 ? RayMasks.PLAYER_INTERACT : mask, Caller?.player);
         if (info.transform == null)
         {
             interactable = null!;
@@ -1286,13 +1316,13 @@ public class CommandContext : Exception
     /// <param name="distance">Default distance is 4m for players and 16m for editors.</param>
     public bool TryGetTarget(out BarricadeDrop drop, float distance = 4f)
     {
-        if (IsConsole || Caller == null || Caller.Input.Aim == null || !Caller.IsOnline)
+        Transform? aim = GetAim();
+        if (aim == null)
         {
             drop = null!;
             return false;
         }
-        Transform aim = Caller.Input.Aim;
-        RaycastInfo info = DamageTool.raycast(new Ray(aim.position, aim.forward), GetDistance(distance), RayMasks.BARRICADE, Caller.Player?.player);
+        RaycastInfo info = DamageTool.raycast(new Ray(aim.position, aim.forward), GetDistance(distance), RayMasks.BARRICADE, Caller?.player);
         if (info.transform == null)
         {
             drop = null!;
@@ -1308,13 +1338,13 @@ public class CommandContext : Exception
     /// <param name="distance">Default distance is 4m for players and 16m for editors.</param>
     public bool TryGetTarget(out StructureDrop drop, float distance = 4f)
     {
-        if (IsConsole || Caller == null || Caller.Input.Aim == null || !Caller.IsOnline)
+        Transform? aim = GetAim();
+        if (aim == null)
         {
             drop = null!;
             return false;
         }
-        Transform aim = Caller.Input.Aim;
-        RaycastInfo info = DamageTool.raycast(new Ray(aim.position, aim.forward), GetDistance(distance), RayMasks.STRUCTURE, Caller.Player?.player);
+        RaycastInfo info = DamageTool.raycast(new Ray(aim.position, aim.forward), GetDistance(distance), RayMasks.STRUCTURE, Caller?.player);
         if (info.transform == null)
         {
             drop = null!;
@@ -1330,20 +1360,20 @@ public class CommandContext : Exception
     /// <param name="distance">Default distance is 4m for players and 16m for editors.</param>
     public bool TryGetTarget(out InteractableVehicle vehicle, float distance = 4f, bool allowDead = false)
     {
-        if (IsConsole || Caller == null || Caller.Input.Aim == null || !Caller.IsOnline)
+        Transform? aim = GetAim();
+        if (aim == null)
         {
             vehicle = null!;
             return false;
         }
-        if (Caller.Input.Controller == CameraController.Player && Caller.Player?.player != null)
+        if (Caller != null && Caller.player != null)
         {
-            vehicle = Caller.Player.player.movement.getVehicle();
+            vehicle = Caller.player.movement.getVehicle();
             if (vehicle != null)
                 return true;
         }
 
-        Transform aim = Caller.Input.Aim;
-        RaycastInfo info = DamageTool.raycast(new Ray(aim.position, aim.forward), GetDistance(distance), RayMasks.VEHICLE, Caller.Player?.player);
+        RaycastInfo info = DamageTool.raycast(new Ray(aim.position, aim.forward), GetDistance(distance), RayMasks.VEHICLE, Caller?.player);
 
         vehicle = info.vehicle;
         return vehicle != null && (allowDead || !vehicle.isDead);
@@ -1352,13 +1382,13 @@ public class CommandContext : Exception
     /// <summary>
     /// Check if <see cref="Caller"/> has <paramref name="permission"/>. Always returns <see langword="true"/> when ran with console.
     /// </summary>
-    public bool HasPermission(Permission permission)
+    public bool HasPermission(PermissionLeaf permission)
     { 
         if (IsConsole) return true;
 #if SERVER
-        return UserPermissions.UserHandler.HasPermission(Caller.SteamId.m_SteamID, permission);
+        return permission.Has(Caller.playerID.steamID.m_SteamID);
 #else
-        return UserPermissions.UserHandler.HasPermission(permission);
+        return permission.Has();
 #endif
     }
 
@@ -1366,7 +1396,7 @@ public class CommandContext : Exception
     /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have <paramref name="permission"/>.
     /// </summary>
     /// <exception cref="CommandContext"/>
-    public void AssertPermissions(Permission permission)
+    public void AssertPermissions(PermissionLeaf permission)
     {
         if (!HasPermission(permission))
             throw SendNoPermission();
@@ -1376,7 +1406,7 @@ public class CommandContext : Exception
     /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have at least one of the provided permissions.
     /// </summary>
     /// <exception cref="CommandContext"/>
-    public void AssertPermissionsOr(Permission permission1, Permission permission2)
+    public void AssertPermissionsOr(PermissionLeaf permission1, PermissionLeaf permission2)
     {
         if (!HasPermission(permission1) && !HasPermission(permission2))
             throw SendNoPermission();
@@ -1386,7 +1416,7 @@ public class CommandContext : Exception
     /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have at least one of the provided permissions.
     /// </summary>
     /// <exception cref="CommandContext"/>
-    public void AssertPermissionsOr(Permission permission1, Permission permission2, Permission permission3)
+    public void AssertPermissionsOr(PermissionLeaf permission1, PermissionLeaf permission2, PermissionLeaf permission3)
     {
         if (!HasPermission(permission1) && !HasPermission(permission2) && !HasPermission(permission3))
             throw SendNoPermission();
@@ -1396,7 +1426,7 @@ public class CommandContext : Exception
     /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have at least one of the provided <paramref name="permissions"/>.
     /// </summary>
     /// <exception cref="CommandContext"/>
-    public void AssertPermissionsOr(params Permission[] permissions)
+    public void AssertPermissionsOr(params PermissionLeaf[] permissions)
     {
         for (int i = 0; i < permissions.Length; i++)
         {
@@ -1411,7 +1441,7 @@ public class CommandContext : Exception
     /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have all of the provided permissions.
     /// </summary>
     /// <exception cref="CommandContext"/>
-    public void AssertPermissionsAnd(Permission permission1, Permission permission2)
+    public void AssertPermissionsAnd(PermissionLeaf permission1, PermissionLeaf permission2)
     {
         if (!HasPermission(permission1) || !HasPermission(permission2))
             throw SendNoPermission();
@@ -1421,7 +1451,7 @@ public class CommandContext : Exception
     /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have all of the provided permissions.
     /// </summary>
     /// <exception cref="CommandContext"/>
-    public void AssertPermissionsAnd(Permission permission1, Permission permission2, Permission permission3)
+    public void AssertPermissionsAnd(PermissionLeaf permission1, PermissionLeaf permission2, PermissionLeaf permission3)
     {
         if (!HasPermission(permission1) || !HasPermission(permission2) || !HasPermission(permission3))
             throw SendNoPermission();
@@ -1431,7 +1461,7 @@ public class CommandContext : Exception
     /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have all of the provided <paramref name="permissions"/>.
     /// </summary>
     /// <exception cref="CommandContext"/>
-    public void AssertPermissionsAnd(params Permission[] permissions)
+    public void AssertPermissionsAnd(params PermissionLeaf[] permissions)
     {
         for (int i = 0; i < permissions.Length; i++)
         {
@@ -1456,8 +1486,18 @@ public class CommandContext : Exception
     /// <exception cref="CommandContext"/>
     public void AssertRanByPlayer()
     {
-        if (IsConsole || !Caller.IsOnline)
+        if (IsConsole || EditorUser == null && Caller?.player == null || EditorUser != null && !EditorUser.IsOnline)
             throw SendPlayerOnlyError();
+    }
+
+    /// <summary>
+    /// Throws an exception if the command was called from console or the player has left the server since the command was executed or the player is not an <see cref="Players.EditorUser"/>.
+    /// </summary>
+    /// <exception cref="CommandContext"/>
+    public void AssertRanByEditorUser()
+    {
+        if (IsConsole || EditorUser == null || !EditorUser.IsOnline)
+            throw Reply(DevkitServerModule.CommandLocalization, "CommandMustBeEditorPlayer");
     }
 
     /// <summary>
@@ -1562,12 +1602,14 @@ public class CommandContext : Exception
     public Exception SendCorrectUsage(string usage) => Reply(DevkitServerModule.CommandLocalization, "CorrectUsage", usage);
 
 
-    public override string ToString() => $"\"/{Command.CommandName.ToLower()}\" ran by {(IsConsole ? "{CONSOLE}" : Caller)} with args [{string.Join(", ", Arguments)}].";
+    public override string ToString() => $"\"/{Command.CommandName.ToLower()}\" ran by {(IsConsole ? "{CONSOLE}" : Caller)} with args [{string.Join(", ", Arguments)}]";
 
     internal async UniTask ExecuteAsync()
     {
         CancellationToken token = DevkitServerModule.UnloadToken;
         await UniTask.SwitchToMainThread(token);
+
+        this.AssertMode(Command.Mode);
 
         SemaphoreSlim? waited = null;
         if (Command is ISynchronizedCommand { Semaphore: not null } sync)

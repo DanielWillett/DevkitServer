@@ -1045,77 +1045,51 @@ public static class LevelObjectUtil
     [Pure]
     internal static bool CheckMovePermission(uint instanceId, ulong user)
     {
-        return VanillaPermissions.EditObjects.Has(user, true) ||
-               VanillaPermissions.MoveUnownedObjects.Has(user, false) ||
-               VanillaPermissions.PlaceObjects.Has(user, false) &&
-               LevelObjectResponsibilities.IsPlacer(instanceId, user);
-    }
-    [Pure]
-    internal static bool CheckPlacePermission(ulong user)
-    {
-        return VanillaPermissions.EditObjects.Has(user, true) ||
-               VanillaPermissions.PlaceObjects.Has(user, false);
+        return VanillaPermissions.MoveUnownedObjects.Has(user, true) ||
+               VanillaPermissions.PlaceObjects.Has(user, false) && LevelObjectResponsibilities.IsPlacer(instanceId, user);
     }
     [Pure]
     internal static bool CheckDeletePermission(uint instanceId, ulong user)
     {
-        return VanillaPermissions.EditObjects.Has(user, true) ||
-               VanillaPermissions.RemoveUnownedObjects.Has(user, false) ||
+        return VanillaPermissions.RemoveUnownedObjects.Has(user, true) ||
                VanillaPermissions.PlaceObjects.Has(user, false) && HierarchyResponsibilities.IsPlacer(instanceId, user);
     }
     [Pure]
     internal static bool CheckMoveBuildablePermission(RegionIdentifier id, ulong user)
     {
-        return VanillaPermissions.EditObjects.Has(user, true) ||
-               VanillaPermissions.MoveUnownedObjects.Has(user, false) ||
-               VanillaPermissions.PlaceObjects.Has(user, false) &&
-               BuildableResponsibilities.IsPlacer(id, user);
+        return VanillaPermissions.MoveUnownedObjects.Has(user, true) ||
+               VanillaPermissions.PlaceObjects.Has(user, false) && BuildableResponsibilities.IsPlacer(id, user);
     }
     [Pure]
     internal static bool CheckDeleteBuildablePermission(RegionIdentifier id, ulong user)
     {
-        return VanillaPermissions.EditObjects.Has(user, true) ||
-               VanillaPermissions.RemoveUnownedObjects.Has(user, false) ||
-               VanillaPermissions.PlaceObjects.Has(user, false) &&
-               BuildableResponsibilities.IsPlacer(id, user);
+        return VanillaPermissions.RemoveUnownedObjects.Has(user, true) ||
+               VanillaPermissions.PlaceObjects.Has(user, false) && BuildableResponsibilities.IsPlacer(id, user);
     }
 #elif CLIENT
     [Pure]
     internal static bool CheckMovePermission(uint instanceId)
     {
-        return VanillaPermissions.EditObjects.Has(true) ||
-               VanillaPermissions.MoveUnownedObjects.Has(false) ||
-               VanillaPermissions.PlaceObjects.Has(false) &&
-               LevelObjectResponsibilities.IsPlacer(instanceId);
-    }
-    [Pure]
-    internal static bool CheckPlacePermission()
-    {
-        return VanillaPermissions.EditObjects.Has(true) ||
-               VanillaPermissions.PlaceObjects.Has(false);
+        return VanillaPermissions.MoveUnownedObjects.Has(true) ||
+               VanillaPermissions.PlaceObjects.Has(false) && LevelObjectResponsibilities.IsPlacer(instanceId);
     }
     [Pure]
     internal static bool CheckDeletePermission(uint instanceId)
     {
-        return VanillaPermissions.EditObjects.Has(true) ||
-               VanillaPermissions.RemoveUnownedObjects.Has(false) ||
+        return VanillaPermissions.RemoveUnownedObjects.Has(true) ||
                VanillaPermissions.PlaceObjects.Has(false) && HierarchyResponsibilities.IsPlacer(instanceId);
     }
     [Pure]
     internal static bool CheckMoveBuildablePermission(RegionIdentifier id)
     {
-        return VanillaPermissions.EditObjects.Has(true) ||
-               VanillaPermissions.MoveUnownedObjects.Has(false) ||
-               VanillaPermissions.PlaceObjects.Has(false) &&
-               BuildableResponsibilities.IsPlacer(id);
+        return VanillaPermissions.MoveUnownedObjects.Has(true) ||
+               VanillaPermissions.PlaceObjects.Has(false) && BuildableResponsibilities.IsPlacer(id);
     }
     [Pure]
     internal static bool CheckDeleteBuildablePermission(RegionIdentifier id)
     {
-        return VanillaPermissions.EditObjects.Has(true) ||
-               VanillaPermissions.RemoveUnownedObjects.Has(false) ||
-               VanillaPermissions.PlaceObjects.Has(false) &&
-               BuildableResponsibilities.IsPlacer(id);
+        return VanillaPermissions.RemoveUnownedObjects.Has(true) ||
+               VanillaPermissions.PlaceObjects.Has(false) && BuildableResponsibilities.IsPlacer(id);
     }
 #endif
 

@@ -8,14 +8,14 @@ public class NoPermissionsException : Exception
     /// <summary>
     /// Permission that was required to perform the action.
     /// </summary>
-    public Permission? RequiredPermission { get; }
+    public PermissionLeaf? RequiredPermission { get; }
 
-    public NoPermissionsException(Permission? requiredPermission) : base(requiredPermission != null ? "Missing permission: \"" + requiredPermission + "\"" : "Missing permissions")
+    public NoPermissionsException(PermissionLeaf? requiredPermission) : base(requiredPermission != null ? "Missing permission: \"" + requiredPermission + "\"" : "Missing permissions")
     {
         RequiredPermission = requiredPermission;
     }
 
-    public NoPermissionsException(Permission? requiredPermission, Exception inner) : base(requiredPermission != null ? "Missing permission: \"" + requiredPermission + "\"" : "Missing permissions", inner)
+    public NoPermissionsException(PermissionLeaf? requiredPermission, Exception inner) : base(requiredPermission != null ? "Missing permission: \"" + requiredPermission + "\"" : "Missing permissions", inner)
     {
         RequiredPermission = requiredPermission;
     }

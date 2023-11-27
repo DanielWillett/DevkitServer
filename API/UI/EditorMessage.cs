@@ -204,7 +204,7 @@ public static class EditorMessage
 #if SERVER
         EditorUser user,
 #endif
-        Permission? missingPermission = null)
+        PermissionLeaf? missingPermission = null)
     {
 #if CLIENT
         return

@@ -34,6 +34,12 @@ public interface IDevkitServerPlugin
     string LocalizationDirectory { get; }
 
     /// <summary>
+    /// The data path of the command localization folder, etc. This should be a directory.
+    /// </summary>
+    /// <remarks>Must be set in the constructor.</remarks>
+    string CommandLocalizationDirectory { get; }
+
+    /// <summary>
     /// Information about the assembly containing the plugin.
     /// </summary>
     PluginAssembly Assembly { get; set; }
@@ -106,7 +112,7 @@ public interface IDevkitServerColorPlugin : IDevkitServerPlugin
     /// Color a plugin uses with logging.
     /// </summary>
     /// <remarks>Default: rgb(204, 153, 255), <see cref="Plugin.DefaultColor"/>.</remarks>
-    Color Color { get; }
+    Color32 Color { get; }
 }
 internal interface ICachedTranslationSourcePlugin : IDevkitServerPlugin
 {

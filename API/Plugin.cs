@@ -1,5 +1,4 @@
 ﻿using DevkitServer.API.Abstractions;
-using DevkitServer.API.Permissions;
 using DevkitServer.Plugins;
 #if CLIENT
 using DevkitServer.API.UI.Extensions;
@@ -8,7 +7,7 @@ using DevkitServer.API.UI.Extensions;
 namespace DevkitServer.API;
 public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourcePlugin, IReflectionDoneListenerDevkitServerPlugin
 {
-    public static readonly Color DefaultColor = new Color32(204, 153, 255, 255);
+    public static readonly Color32 DefaultColor = new Color32(204, 153, 255, 255);
     private readonly string _defaultName;
 
     /// <inheritdoc/>
@@ -18,7 +17,7 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
     public virtual string MenuName => Name;
 
     /// <inheritdoc/>
-    public virtual Color Color => DefaultColor;
+    public virtual Color32 Color => DefaultColor;
 
     /// <inheritdoc/>
     public string DataDirectory { get; }
@@ -30,6 +29,9 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
     /// The data path of the main localization file. This should be a directory.
     /// </summary>
     public string MainLocalizationDirectory { get; }
+
+    /// <inheritdoc/>
+    public string CommandLocalizationDirectory { get; }
 
     /// <inheritdoc/>
     public PluginAssembly Assembly { get; set; } = null!;
@@ -51,10 +53,13 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
         string name = Name ?? _defaultName;
         DataDirectory = Path.Combine(PluginLoader.PluginsDirectory, asmName + "." + name);
         LocalizationDirectory = Path.Combine(DataDirectory, "Localization");
+        CommandLocalizationDirectory = Path.Combine(LocalizationDirectory, "Commands");
         MainLocalizationDirectory = Path.Combine(LocalizationDirectory, "Main");
         Translations = Localization.tryRead(MainLocalizationDirectory, false);
         PermissionPrefix = name.ToLowerInvariant().Replace('.', '-');
         if (GetType().TryGetAttributeSafe(out PermissionPrefixAttribute prefixAttr, true) && !string.IsNullOrWhiteSpace(prefixAttr.Prefix))
+            PermissionPrefix = prefixAttr.Prefix;
+        else if (GetType().Assembly.TryGetAttributeSafe(out prefixAttr, true) && !string.IsNullOrWhiteSpace(prefixAttr.Prefix))
             PermissionPrefix = prefixAttr.Prefix;
     }
     protected virtual LocalDatDictionary DefaultLocalization => new LocalDatDictionary();
@@ -127,9 +132,7 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
         UIExtensionManager.RegisterExtension(new UIExtensionInfo(implementationType, parentUIType, priority, this));
     }
 #endif
-#nullable disable
-    ITranslationSource ICachedTranslationSourcePlugin.TranslationSource { get; set; }
-#nullable restore
+    ITranslationSource ICachedTranslationSourcePlugin.TranslationSource { get; set; } = null!;
 }
 
 public abstract class Plugin<TConfig> : Plugin, IDevkitServerPlugin<TConfig> where TConfig : class, new()

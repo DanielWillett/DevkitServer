@@ -161,20 +161,14 @@ internal static class TerrainEditorPatches
         FieldInfo? permissionWriteHeightmap = vp.GetField(nameof(VanillaPermissions.EditHeightmap));
         FieldInfo? permissionWriteSplatmap = vp.GetField(nameof(VanillaPermissions.EditSplatmap));
         FieldInfo? permissionWriteHoles = vp.GetField(nameof(VanillaPermissions.EditHoles));
-        FieldInfo? permissionAll = vp.GetField(nameof(VanillaPermissions.EditTerrain));
         if (permissionWriteHeightmap == null || permissionWriteSplatmap == null || permissionWriteHoles == null)
         {
             Logger.LogWarning("Unable to find one or more of the VanillaPermissions fields.", method: "CLIENT EVENTS");
             DevkitServerModule.Fault();
         }
-        if (permissionAll == null)
-        {
-            Logger.LogWarning("Unable to find field: VanillaPermissions.EditTerrain.", method: "CLIENT EVENTS");
-            DevkitServerModule.Fault();
-        }
 
-        MethodInfo? hasPermission = typeof(PermissionsEx).GetMethod(nameof(PermissionsEx.Has),
-            BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(Permission), typeof(bool) }, null);
+        MethodInfo? hasPermission = typeof(PermissionManager).GetMethod(nameof(PermissionManager.Has),
+            BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(PermissionLeaf), typeof(bool) }, null);
         if (hasPermission == null)
         {
             Logger.LogWarning("Unable to find method: PermissionsEx.Has.", method: "CLIENT EVENTS");
@@ -215,7 +209,7 @@ internal static class TerrainEditorPatches
                         permission = permissionWriteHoles;
 
                     Label? lbl = null;
-                    if ((permission != null || permissionAll != null) && hasPermission != null)
+                    if (permission != null && hasPermission != null)
                     {
                         lbl = generator.DefineLabel();
                         yield return new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter);
@@ -224,13 +218,6 @@ internal static class TerrainEditorPatches
                         {
                             yield return new CodeInstruction(OpCodes.Ldsfld, permission);
                             yield return new CodeInstruction(OpCodes.Ldc_I4_1);
-                            yield return new CodeInstruction(OpCodes.Call, hasPermission);
-                            yield return new CodeInstruction(OpCodes.Brtrue, lbl.Value);
-                        }
-                        if (permissionAll != null)
-                        {
-                            yield return new CodeInstruction(OpCodes.Ldsfld, permissionAll);
-                            yield return new CodeInstruction(permission != null ? OpCodes.Ldc_I4_0 : OpCodes.Ldc_I4_1);
                             yield return new CodeInstruction(OpCodes.Call, hasPermission);
                             yield return new CodeInstruction(OpCodes.Brtrue, lbl.Value);
                         }

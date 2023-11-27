@@ -164,11 +164,9 @@ public sealed class AddFoliageToSurfaceAction : IServersideAction, IAssetAction
 #if SERVER
     public bool CheckCanApply()
     {
-        if (!VanillaPermissions.EditFoliage.Has(Instigator.m_SteamID) &&
-            !VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID, false))
-        {
+        if (!VanillaPermissions.EditFoliage.Has(Instigator.m_SteamID))
             return false;
-        }
+        
         if (FoliageAsset.Find() is { } asset && asset is FoliageObjectInfoAsset)
         {
             IsObject = true;
@@ -295,8 +293,7 @@ public sealed class RemoveFoliageInstancesAction : IAction, ICoordinatesAction, 
 #if SERVER
     public bool CheckCanApply()
     {
-        return VanillaPermissions.EditFoliage.Has(Instigator.m_SteamID) ||
-               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+        return VanillaPermissions.EditFoliage.Has(Instigator.m_SteamID);
     }
 #endif
     public void Write(ByteWriter writer)
@@ -358,8 +355,7 @@ public sealed class RemoveResourceSpawnpointAction : IAction, IAssetAction
 #if SERVER
     public bool CheckCanApply()
     {
-        return VanillaPermissions.EditFoliage.Has(Instigator.m_SteamID) ||
-               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+        return VanillaPermissions.EditFoliage.Has(Instigator.m_SteamID);
     }
 #endif
     public void Write(ByteWriter writer)
