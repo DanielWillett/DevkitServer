@@ -4,6 +4,7 @@ using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
 using DevkitServer.API;
+using DevkitServer.API.Permissions;
 
 
 #if CLIENT
@@ -598,7 +599,7 @@ internal static class LevelObjectPatches
             return;
         }
 
-        if (!LevelObjectUtil.CheckPlacePermission())
+        if (!VanillaPermissions.PlaceObjects.Has())
         {
             EditorMessage.SendNoPermissionMessage(VanillaPermissions.PlaceObjects);
             return;
@@ -722,7 +723,7 @@ internal static class LevelObjectPatches
             return false;
         }
 
-        if (LevelObjectUtil.CheckPlacePermission()) return true;
+        if (VanillaPermissions.PlaceObjects.Has()) return true;
         EditorMessage.SendNoPermissionMessage(VanillaPermissions.PlaceObjects);
         return false;
     }

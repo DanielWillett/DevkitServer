@@ -22,9 +22,7 @@ using Unturned.SystemEx;
 namespace DevkitServer.Core.Commands;
 internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFile
 {
-    [Permission]
     public static readonly PermissionLeaf Test = new PermissionLeaf("test", devkitServer: true);
-    [Permission]
     public static readonly PermissionLeaf TestAll = new PermissionLeaf("test.*", devkitServer: true);
 
     public IReadOnlyList<PermissionLeaf> SyncSubcommandPermissions { get; }
@@ -41,7 +39,6 @@ internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFil
         {
             PermissionLeaf perm = new PermissionLeaf("test." + CommandTests.Commands[i].Method.Name.ToLowerInvariant(), devkitServer: true);
             AddPermission(perm);
-            UserPermissions.Handler.Register(perm);
             perms[i] = perm;
         }
 
@@ -51,7 +48,6 @@ internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFil
         {
             PermissionLeaf perm = new PermissionLeaf("test." + CommandTests.AsyncCommands[i].Method.Name.ToLowerInvariant(), devkitServer: true);
             AddPermission(perm);
-            UserPermissions.Handler.Register(perm);
             perms[i] = perm;
         }
 

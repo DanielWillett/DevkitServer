@@ -32,7 +32,6 @@ public class DevkitServerConfig
         new PermissionLeafConverter(),
         new PermissionBranchConverter(),
         new PermissionGroupConverter(),
-        new GroupPermissionConverter(),
         new AssetReferenceJsonConverterFactory(),
         new TimeSpanConverter()
     };
@@ -423,7 +422,7 @@ public class SystemConfig : SchemaConfiguration
     public bool AdminsAreSuperusers { get; set; }
 
     [JsonPropertyName("default_permissions")]
-    public string[] DefaultUserPermissions { get; set; }
+    public PermissionBranch[] DefaultUserPermissions { get; set; }
 
     [JsonPropertyName("default_permission_groups")]
     public string[] DefaultUserPermissionGroups { get; set; }
@@ -455,7 +454,7 @@ public class SystemConfig : SchemaConfiguration
         NewLevelInfo = NewLevelCreationOptions.Default;
         DisableMapDownload = false;
         TcpSettings = new TcpServerInfo { EnableHighSpeedSupport = false, HighSpeedPort = (ushort)(Provider.port + 2) };
-        DefaultUserPermissions = Array.Empty<string>();
+        DefaultUserPermissions = Array.Empty<PermissionBranch>();
         DefaultUserPermissionGroups = new string[]
         {
             "viewer"

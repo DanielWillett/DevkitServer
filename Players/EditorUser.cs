@@ -156,7 +156,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
                 return;
         }
 
-        UserPermissions.SendPermissionState.Invoke(Connection, permission, true);
+        PermissionManager.SendPermissionState.Invoke(Connection, permission, true);
         _perms.Add(permission);
     }
 
@@ -168,7 +168,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         {
             if (_perms[i].Equals(permission))
             {
-                UserPermissions.SendPermissionState.Invoke(Connection, permission, false);
+                PermissionManager.SendPermissionState.Invoke(Connection, permission, false);
                 _perms.RemoveAt(i);
                 break;
             }
@@ -184,7 +184,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
                 return;
         }
 
-        UserPermissions.SendPermissionGroupState.Invoke(Connection, group, true);
+        PermissionManager.SendPermissionGroupState.Invoke(Connection, group, true);
         bool added = false;
         for (int i = 0; i < _permGrps.Count; ++i)
         {
@@ -206,7 +206,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         {
             if (_permGrps[i].Equals(group))
             {
-                UserPermissions.SendPermissionGroupState.Invoke(Connection, group, false);
+                PermissionManager.SendPermissionGroupState.Invoke(Connection, group, false);
                 _permGrps.RemoveAt(i);
                 break;
             }
@@ -218,14 +218,14 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         ThreadUtil.assertIsGameThread();
 
         _permGrps.Clear();
-        UserPermissions.SendClearPermissionGroups.Invoke(Connection);
+        PermissionManager.SendClearPermissionGroups.Invoke(Connection);
     }
     internal void ClearPermissions()
     {
         ThreadUtil.assertIsGameThread();
 
         _perms.Clear();
-        UserPermissions.SendClearPermissions.Invoke(Connection);
+        PermissionManager.SendClearPermissions.Invoke(Connection);
     }
 #endif
 
@@ -233,25 +233,25 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendPermissionState)]
     private static void ReceivePermissionState(MessageContext ctx, PermissionLeaf perm, bool state)
     {
-        UserPermissions.UserHandler.ReceivePermissionState(perm, state);
+        PermissionManager.UserPermissions.ReceivePermissionState(perm, state);
         ctx.Acknowledge();
     }
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendClearPermissions)]
     private static void ReceiveClearPermissions(MessageContext ctx)
     {
-        UserPermissions.UserHandler.ReceiveClearPermissions();
+        PermissionManager.UserPermissions.ReceiveClearPermissions();
         ctx.Acknowledge();
     }
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendPermissionGroupState)]
     private static void ReceivePermissionGroupState(MessageContext ctx, PermissionGroup group, bool state)
     {
-        UserPermissions.UserHandler.ReceivePermissionGroupState(group, state);
+        PermissionManager.UserPermissions.ReceivePermissionGroupState(group, state);
         ctx.Acknowledge();
     }
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendClearPermissionGroups)]
     private static void ReceiveClearPermissionGroups(MessageContext ctx)
     {
-        UserPermissions.UserHandler.ReceiveClearPermissions();
+        PermissionManager.UserPermissions.ReceiveClearPermissions();
         ctx.Acknowledge();
     }
 #endif

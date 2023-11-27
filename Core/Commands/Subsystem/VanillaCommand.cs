@@ -3,12 +3,8 @@ using DevkitServer.API;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
-#if SERVER
-using DevkitServer.Players;
-#endif
 
 namespace DevkitServer.Core.Commands.Subsystem;
-
 
 [Ignore]
 internal sealed class VanillaCommand : ICachedTranslationSourceCommand
@@ -26,12 +22,13 @@ internal sealed class VanillaCommand : ICachedTranslationSourceCommand
     public IList<string> Aliases { get; } = new List<string>(0);
     public IList<PermissionLeaf> Permissions { get; }
     IDevkitServerPlugin? IExecutableCommand.Plugin { get; set; }
+    public PermissionLeaf Permission { get; }
     public VanillaCommand(Command command)
     {
         Command = command;
-        PermissionLeaf permission = new PermissionLeaf(Command.command.ToLowerInvariant(), true, false);
+        PermissionLeaf permission = new PermissionLeaf("commands." + Command.command.ToLowerInvariant(), true, false);
         Permissions = new List<PermissionLeaf>(1) { permission };
-        UserPermissions.Handler.Register(permission);
+        Permission = permission;
 
         VanillaCommandInfo.GetInfo(command.GetType(), out _mode, out _isConsoleOnly, out _isDedicatedServerOnly, out _isServerOnly, out _isStartupOnly);
     }

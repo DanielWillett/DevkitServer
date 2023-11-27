@@ -1,5 +1,4 @@
 ﻿using DevkitServer.API.Abstractions;
-using DevkitServer.API.Permissions;
 using DevkitServer.Plugins;
 #if CLIENT
 using DevkitServer.API.UI.Extensions;
@@ -8,7 +7,7 @@ using DevkitServer.API.UI.Extensions;
 namespace DevkitServer.API;
 public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourcePlugin, IReflectionDoneListenerDevkitServerPlugin
 {
-    public static readonly Color DefaultColor = new Color32(204, 153, 255, 255);
+    public static readonly Color32 DefaultColor = new Color32(204, 153, 255, 255);
     private readonly string _defaultName;
 
     /// <inheritdoc/>
@@ -18,7 +17,7 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
     public virtual string MenuName => Name;
 
     /// <inheritdoc/>
-    public virtual Color Color => DefaultColor;
+    public virtual Color32 Color => DefaultColor;
 
     /// <inheritdoc/>
     public string DataDirectory { get; }

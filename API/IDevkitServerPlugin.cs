@@ -112,7 +112,7 @@ public interface IDevkitServerColorPlugin : IDevkitServerPlugin
     /// Color a plugin uses with logging.
     /// </summary>
     /// <remarks>Default: rgb(204, 153, 255), <see cref="Plugin.DefaultColor"/>.</remarks>
-    Color Color { get; }
+    Color32 Color { get; }
 }
 internal interface ICachedTranslationSourcePlugin : IDevkitServerPlugin
 {

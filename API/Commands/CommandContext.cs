@@ -1372,13 +1372,13 @@ public class CommandContext : Exception
     /// <summary>
     /// Check if <see cref="Caller"/> has <paramref name="permission"/>. Always returns <see langword="true"/> when ran with console.
     /// </summary>
-    public bool HasPermission(PermissionBranch permission)
+    public bool HasPermission(PermissionLeaf permission)
     { 
         if (IsConsole) return true;
 #if SERVER
-        return UserPermissions.UserHandler.HasPermission(Caller.playerID.steamID.m_SteamID, permission);
+        return permission.Has(Caller.playerID.steamID.m_SteamID);
 #else
-        return UserPermissions.UserHandler.HasPermission(permission);
+        return permission.Has();
 #endif
     }
 
@@ -1386,7 +1386,7 @@ public class CommandContext : Exception
     /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have <paramref name="permission"/>.
     /// </summary>
     /// <exception cref="CommandContext"/>
-    public void AssertPermissions(PermissionBranch permission)
+    public void AssertPermissions(PermissionLeaf permission)
     {
         if (!HasPermission(permission))
             throw SendNoPermission();
@@ -1396,7 +1396,7 @@ public class CommandContext : Exception
     /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have at least one of the provided permissions.
     /// </summary>
     /// <exception cref="CommandContext"/>
-    public void AssertPermissionsOr(PermissionBranch permission1, PermissionBranch permission2)
+    public void AssertPermissionsOr(PermissionLeaf permission1, PermissionLeaf permission2)
     {
         if (!HasPermission(permission1) && !HasPermission(permission2))
             throw SendNoPermission();
@@ -1406,7 +1406,7 @@ public class CommandContext : Exception
     /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have at least one of the provided permissions.
     /// </summary>
     /// <exception cref="CommandContext"/>
-    public void AssertPermissionsOr(PermissionBranch permission1, PermissionBranch permission2, PermissionBranch permission3)
+    public void AssertPermissionsOr(PermissionLeaf permission1, PermissionLeaf permission2, PermissionLeaf permission3)
     {
         if (!HasPermission(permission1) && !HasPermission(permission2) && !HasPermission(permission3))
             throw SendNoPermission();
@@ -1416,7 +1416,7 @@ public class CommandContext : Exception
     /// Throws an exception and sends the generic 'no permission' message if the caller doesn't have at least one of the provided <paramref name="permissions"/>.
     /// </summary>
     /// <exception cref="CommandContext"/>
-    public void AssertPermissionsOr(params PermissionBranch[] permissions)
+    public void AssertPermissionsOr(params PermissionLeaf[] permissions)
     {
         for (int i = 0; i < permissions.Length; i++)
         {

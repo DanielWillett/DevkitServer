@@ -10,7 +10,10 @@ public sealed class BackupConfiguration : SchemaConfiguration
     public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/backup_schema.json", true);
     private sealed class ConfigContainer : JsonConfigurationFile<BackupConfiguration>
     {
-        internal ConfigContainer() : base(FilePath) { }
+        internal ConfigContainer() : base(FilePath)
+        {
+            ReadOnlyReloading = true;
+        }
 
         protected override void OnReload()
         {

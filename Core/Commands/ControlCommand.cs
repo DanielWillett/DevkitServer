@@ -9,13 +9,9 @@ using DevkitServer.Players;
 namespace DevkitServer.Core.Commands;
 internal sealed class ControlCommand : DevkitServerCommand, ICommandLocalizationFile
 {
-    [Permission]
     public static readonly PermissionLeaf ChangeController = new PermissionLeaf("control", devkitServer: true);
-    [Permission]
     public static readonly PermissionLeaf ChangeControllerPlayer = new PermissionLeaf("control.player", devkitServer: true);
-    [Permission]
     public static readonly PermissionLeaf ChangeControllerEditor = new PermissionLeaf("control.editor", devkitServer: true);
-    [Permission]
     public static readonly PermissionLeaf ChangeControllerAll = new PermissionLeaf("control.*", devkitServer: true);
 
     Local ILocalizedCommand.Translations { get; set; } = null!;

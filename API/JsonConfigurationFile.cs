@@ -94,8 +94,8 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
                 Logger.LogError($"Exception in {nameof(OnReload).Colorize(ConsoleColor.White)} after reading {typeof(TConfig).Format()} config at {File.Format(false)}.", method: "JSON CONFIG");
                 Logger.LogError(ex, method: "JSON CONFIG");
             }
-            // if (!ReadOnlyReloading)
-            //      WriteToFile(File, _config);
+            if (!ReadOnlyReloading)
+                WriteToFile(File, _config);
         }
     }
     public void SaveConfig()

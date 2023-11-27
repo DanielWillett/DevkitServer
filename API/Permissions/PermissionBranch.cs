@@ -1,8 +1,8 @@
-﻿extern alias NSJ;
+﻿using DevkitServer.Plugins;
+using DevkitServer.Util.Encoding;
+using StackCleaner;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using DevkitServer.Plugins;
-using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.API.Permissions;
 
@@ -106,6 +106,9 @@ public readonly struct PermissionBranch : IEquatable<PermissionBranch>, IEquatab
     /// <remarks>Can optionally have a prefix.</remarks>
     public static int GetWildcardLevel(string path)
     {
+        if (path.Length == 1 && path[0] == '*')
+            return 1;
+
         int prefixSeparator = -1;
 
         do
@@ -150,11 +153,26 @@ public readonly struct PermissionBranch : IEquatable<PermissionBranch>, IEquatab
 
     public override string ToString()
     {
-        string str = GetPrefix() + "::" + Path;
+        string str = !IsSuperuser ? GetPrefix() + "::" + Path : "*";
 
         if (Mode == PermissionMode.Subtractive)
             str = "-" + str;
         
+        return str;
+    }
+    private static readonly Color32 SubtractiveColor = new Color32(255, 80, 80, 255);
+    public string Format(ITerminalFormatProvider provider)
+    {
+        if (provider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
+            return ToString();
+
+        string str = GetPrefix().Colorize(Core ? DevkitServerModule.UnturnedColor : Plugin.GetColor()) +
+               "::".Colorize(FormattingColorType.Punctuation) +
+               Path.Colorize(FormattingColorType.Struct);
+
+        if (Mode == PermissionMode.Subtractive)
+            str = "-".Colorize(SubtractiveColor) + str;
+
         return str;
     }
 
@@ -172,6 +190,13 @@ public readonly struct PermissionBranch : IEquatable<PermissionBranch>, IEquatab
     {
         return WildcardLevel == branch.WildcardLevel
                && _flags == branch._flags
+               && Equals(Plugin, branch.Plugin)
+               && string.Equals(Path, branch.Path, StringComparison.InvariantCultureIgnoreCase);
+    }
+    public bool EqualsWithoutMode(PermissionBranch branch)
+    {
+        return WildcardLevel == branch.WildcardLevel
+               && (_flags & ~(1 << 3)) == (branch._flags & ~(1 << 3))
                && Equals(Plugin, branch.Plugin)
                && string.Equals(Path, branch.Path, StringComparison.InvariantCultureIgnoreCase);
     }
@@ -206,12 +231,22 @@ public readonly struct PermissionBranch : IEquatable<PermissionBranch>, IEquatab
     public static bool TryParse(string path, out PermissionBranch permissionBranch)
     {
         permissionBranch = default;
-
         if (string.IsNullOrEmpty(path))
             return false;
 
         char firstChar = path[0];
         PermissionMode mode = firstChar == '-' ? PermissionMode.Subtractive : PermissionMode.Additive;
+
+        if (path.Length == 1 && path[0] == '*')
+        {
+            permissionBranch = new PermissionBranch(PermissionMode.Additive);
+            return true;
+        }
+        if (path.Length == 2 && path[1] == '*' && path[0] is '-' or '+')
+        {
+            permissionBranch = new PermissionBranch(mode);
+            return true;
+        }
 
         int startIndex = firstChar is '+' or '-' || path.Length > 1 && firstChar == '\\' && path[1] is '+' or '-' ? 0 : -1;
         int prefixSeparator = startIndex;
@@ -224,7 +259,7 @@ public readonly struct PermissionBranch : IEquatable<PermissionBranch>, IEquatab
         }
         while (path[prefixSeparator + 1] != ':');
 
-        string prefix = path[(startIndex + 1)..prefixSeparator];
+        ReadOnlySpan<char> prefix = path.AsSpan(startIndex + 1, prefixSeparator - startIndex - 1);
 
         prefixSeparator += 2;
 
@@ -232,15 +267,9 @@ public readonly struct PermissionBranch : IEquatable<PermissionBranch>, IEquatab
         if (wildcardIndex <= 0)
             wildcardIndex = path.Length;
 
-        if (wildcardIndex == prefixSeparator)
-        {
-            permissionBranch = new PermissionBranch(mode);
-            return true;
-        }
-
         string value = path[prefixSeparator..wildcardIndex];
 
-        if (string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(prefix))
+        if (string.IsNullOrWhiteSpace(value) || prefix.IsWhiteSpace())
             return false;
 
         if (prefix.Equals(PermissionLeaf.CoreModulePrefix, StringComparison.InvariantCultureIgnoreCase))
@@ -328,12 +357,45 @@ public readonly struct PermissionBranch : IEquatable<PermissionBranch>, IEquatab
             : new PermissionBranch(mode, path, plugin);
     }
 
+    /// <summary>
+    /// If <paramref name="leaf"/> would be included in this branch.
+    /// </summary>
+    /// <remarks>Does not check <see cref="Mode"/>.</remarks>
     public bool Contains(PermissionLeaf leaf)
     {
+        if (IsSuperuser)
+            return true;
+
+        if (leaf.Core != Core || leaf.DevkitServer != DevkitServer || !Equals(leaf.Plugin, Plugin))
+            return false;
+
         if (WildcardLevel == 0)
             return Path.Equals(leaf.Path, StringComparison.InvariantCultureIgnoreCase);
         
-        return leaf.Level >= WildcardLevel && leaf.Path.AsSpan().Equals(Path.AsSpan(0, Path.Length - 1), StringComparison.InvariantCultureIgnoreCase);
+        return leaf.Level >= WildcardLevel && leaf.Path.AsSpan().StartsWith(Path.AsSpan(0, Path.Length - 1), StringComparison.InvariantCultureIgnoreCase);
+    }
+
+    /// <summary>
+    /// If <paramref name="branch"/> (and any leaves it contains) would be included in this branch.
+    /// </summary>
+    /// <remarks>Does not check <see cref="Mode"/>.</remarks>
+    public bool Contains(PermissionBranch branch)
+    {
+        if (IsSuperuser)
+            return true;
+
+        if (branch.Core != Core || branch.DevkitServer != DevkitServer || !Equals(branch.Plugin, Plugin))
+            return false;
+
+        if (WildcardLevel == 0)
+            return branch.WildcardLevel == 0 && Path.Equals(branch.Path, StringComparison.InvariantCultureIgnoreCase);
+
+        if (branch.WildcardLevel == 0)
+            return branch.Path.AsSpan().StartsWith(Path.AsSpan(0, Path.Length - 1), StringComparison.InvariantCultureIgnoreCase);
+
+        return branch.WildcardLevel >= WildcardLevel &&
+               branch.Path.AsSpan(0, branch.Path.Length - 1)
+                          .StartsWith(Path.AsSpan(0, Path.Length - 1), StringComparison.InvariantCultureIgnoreCase);
     }
 
     public static explicit operator PermissionLeaf(PermissionBranch branch)

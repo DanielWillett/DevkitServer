@@ -87,6 +87,9 @@ public static class Logger
         }
     }
     internal const string TimeFormat = "yyyy-MM-dd hh:mm:ss";
+
+    private static ColorConfig GetUnityConfig() => UnityColor32Config.Default;
+    private static ColorConfig GetSystemConfig() => Color32Config.Default;
     static Logger()
     {
         try
@@ -95,7 +98,7 @@ public static class Logger
             StackCleanerConfiguration config = new StackCleanerConfiguration
             {
                 ColorFormatting = StackColorFormatType.ExtendedANSIColor,
-                Colors = Type.GetType("System.Drawing.Color", false) == null ? UnityColor32Config.Default : Color32Config.Default,
+                Colors = DevkitServerModule.UnityLoaded ? GetUnityConfig() : GetSystemConfig(),
                 IncludeNamespaces = false,
                 IncludeLineData = true,
 #if DEBUG
@@ -203,7 +206,7 @@ public static class Logger
             StackCleanerConfiguration config = new StackCleanerConfiguration
             {
                 ColorFormatting = StackColorFormatType.None,
-                Colors = Type.GetType("System.Drawing.Color, System.Drawing", false, false) == null ? UnityColor32Config.Default : Color32Config.Default,
+                Colors = DevkitServerModule.UnityLoaded ? GetUnityConfig() : GetSystemConfig(),
                 IncludeNamespaces = true,
                 IncludeFileData = true,
                 IncludeSourceData = true,

@@ -2,6 +2,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DevkitServer.Util.Encoding;
+using StackCleaner;
 
 namespace DevkitServer.API.Permissions;
 
@@ -9,7 +10,7 @@ namespace DevkitServer.API.Permissions;
 /// Represents an absolute permission with no wildcards or additive/subtractive metadata.
 /// </summary>
 [JsonConverter(typeof(PermissionLeafConverter))]
-public readonly struct PermissionLeaf : IEquatable<PermissionLeaf>, IEquatable<PermissionBranch>
+public readonly struct PermissionLeaf : IEquatable<PermissionLeaf>, IEquatable<PermissionBranch>, ITerminalFormattable
 {
     /// <summary>
     /// Prefix for Core permissions.
@@ -124,6 +125,15 @@ public readonly struct PermissionLeaf : IEquatable<PermissionLeaf>, IEquatable<P
     }
 
     public override string ToString() => GetPrefix() + "::" + Path;
+    public string Format(ITerminalFormatProvider provider)
+    {
+        if (provider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
+            return ToString();
+
+        return GetPrefix().Colorize(Core ? DevkitServerModule.UnturnedColor : Plugin.GetColor()) +
+               "::".Colorize(FormattingColorType.Punctuation) +
+               Path.Colorize(FormattingColorType.Struct);
+    }
 
     public bool Equals(PermissionBranch branch) => branch.Equals(this);
     public bool Equals(PermissionLeaf leaf)
@@ -176,21 +186,23 @@ public readonly struct PermissionLeaf : IEquatable<PermissionLeaf>, IEquatable<P
         }
         while (path[prefixSeparator + 1] != ':');
 
-        string prefix = path[..prefixSeparator];
+        ReadOnlySpan<char> prefix = path.AsSpan(0, prefixSeparator);
         string value = path[(prefixSeparator + 2)..];
-        if (string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(prefix))
+        if (string.IsNullOrWhiteSpace(value) || prefix.IsWhiteSpace())
             return false;
+
+        int wildcardIndex = value.IndexOf('*');
 
         if (prefix.Equals(CoreModulePrefix, StringComparison.InvariantCultureIgnoreCase))
         {
             permissionLeaf = new PermissionLeaf(value, core: true);
-            return true;
+            return wildcardIndex < 0;
         }
 
         if (prefix.Equals(DevkitServerModulePrefix, StringComparison.InvariantCultureIgnoreCase))
         {
             permissionLeaf = new PermissionLeaf(value, devkitServer: true);
-            return true;
+            return wildcardIndex < 0;
         }
 
         foreach (IDevkitServerPlugin plugin in PluginLoader.Plugins)
@@ -198,7 +210,7 @@ public readonly struct PermissionLeaf : IEquatable<PermissionLeaf>, IEquatable<P
             if (prefix.Equals(plugin.PermissionPrefix, StringComparison.InvariantCultureIgnoreCase))
             {
                 permissionLeaf = new PermissionLeaf(value, plugin);
-                return true;
+                return wildcardIndex < 0;
             }
         }
 

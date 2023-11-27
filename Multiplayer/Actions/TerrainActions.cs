@@ -279,8 +279,7 @@ public sealed class HeightmapRampAction : ITerrainAction, IBrushRadiusAction, IB
 #if SERVER
     public bool CheckCanApply()
     {
-        return VanillaPermissions.EditHeightmap.Has(Instigator.m_SteamID) ||
-               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+        return VanillaPermissions.EditHeightmap.Has(Instigator.m_SteamID);
     }
 #endif
     public void Read(ByteReader reader)
@@ -346,8 +345,7 @@ public sealed class HeightmapAdjustAction : ITerrainAction, IBrushRadiusAction, 
 #if SERVER
     public bool CheckCanApply()
     {
-        return VanillaPermissions.EditHeightmap.Has(Instigator.m_SteamID) ||
-               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+        return VanillaPermissions.EditHeightmap.Has(Instigator.m_SteamID);
     }
 #endif
     public void Read(ByteReader reader)
@@ -403,8 +401,7 @@ public sealed class HeightmapFlattenAction : ITerrainAction, IBrushRadiusAction,
 #if SERVER
     public bool CheckCanApply()
     {
-        return VanillaPermissions.EditHeightmap.Has(Instigator.m_SteamID) ||
-               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+        return VanillaPermissions.EditHeightmap.Has(Instigator.m_SteamID);
     }
 #endif
     public void Read(ByteReader reader)
@@ -507,8 +504,7 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadiusAction, 
 #if SERVER
     public bool CheckCanApply()
     {
-        return VanillaPermissions.EditHeightmap.Has(Instigator.m_SteamID) ||
-               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+        return VanillaPermissions.EditHeightmap.Has(Instigator.m_SteamID);
     }
 #endif
     public void Read(ByteReader reader)
@@ -712,8 +708,7 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadiusAction, IB
 #if SERVER
     public bool CheckCanApply()
     {
-        return VanillaPermissions.EditSplatmap.Has(Instigator.m_SteamID) ||
-               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+        return VanillaPermissions.EditSplatmap.Has(Instigator.m_SteamID);
     }
 #endif
     public void Read(ByteReader reader)
@@ -910,8 +905,7 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadiusAction, I
 #if SERVER
     public bool CheckCanApply()
     {
-        return VanillaPermissions.EditSplatmap.Has(Instigator.m_SteamID) ||
-               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+        return VanillaPermissions.EditSplatmap.Has(Instigator.m_SteamID);
     }
 #endif
     private static void AddOrIncrementSample(AssetReference<LandscapeMaterialAsset> material, float weight)
@@ -1088,8 +1082,7 @@ public sealed class HolemapPaintAction : ITerrainAction, IBrushRadiusAction
 #if SERVER
     public bool CheckCanApply()
     {
-        return VanillaPermissions.EditHoles.Has(Instigator.m_SteamID) ||
-               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+        return VanillaPermissions.EditHoles.Has(Instigator.m_SteamID);
     }
 #endif
     private bool IntlHandleHolesWriteCut(Vector3 worldPosition, bool currentlyVisible)
@@ -1134,8 +1127,7 @@ public sealed class TileModifyAction : IAction, ICoordinatesAction
 #if SERVER
     public bool CheckCanApply()
     {
-        return (IsDelete ? VanillaPermissions.DeleteTile : VanillaPermissions.AddTile).Has(Instigator.m_SteamID) ||
-               VanillaPermissions.EditTiles.Has(Instigator.m_SteamID);
+        return (IsDelete ? VanillaPermissions.DeleteTiles : VanillaPermissions.AddTiles).Has(Instigator.m_SteamID);
     }
 #endif
     public void Write(ByteWriter writer)
@@ -1234,8 +1226,7 @@ public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinatesAction
 #if SERVER
     public bool CheckCanApply()
     {
-        return VanillaPermissions.EditSplatmap.Has(Instigator.m_SteamID) ||
-               VanillaPermissions.EditTerrain.Has(Instigator.m_SteamID);
+        return VanillaPermissions.EditSplatmap.Has(Instigator.m_SteamID);
     }
 #endif
     public void Write(ByteWriter writer)

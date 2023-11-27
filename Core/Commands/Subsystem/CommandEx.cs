@@ -121,10 +121,10 @@ public static class CommandEx
         if (mode == CommandExecutionMode.Always)
             return;
 
-        if ((mode & CommandExecutionMode.Disabled) != 0)
+        if ((mode & CommandExecutionMode.Disabled) == CommandExecutionMode.Disabled)
             throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandDisabled");
 
-        if ((mode & CommandExecutionMode.RequirePlaying) != 0)
+        if ((mode & CommandExecutionMode.RequirePlaying) == CommandExecutionMode.RequirePlaying)
         {
 #if SERVER
             if (!Provider.isServer || (mode & CommandExecutionMode.IgnoreControlMode) != 0 || ctx.EditorUser == null || ctx.EditorUser.Input.Controller != CameraController.Player)
@@ -135,7 +135,7 @@ public static class CommandEx
 #endif
         }
 
-        if ((mode & CommandExecutionMode.RequireEditing) != 0)
+        if ((mode & CommandExecutionMode.RequireEditing) == CommandExecutionMode.RequireEditing)
         {
 #if SERVER
             if (!Provider.isServer || !DevkitServerModule.IsEditing || (mode & CommandExecutionMode.IgnoreControlMode) != 0 || ctx.EditorUser != null && ctx.EditorUser.Input.Controller != CameraController.Editor)
@@ -146,7 +146,7 @@ public static class CommandEx
 #endif
         }
 
-        if ((mode & CommandExecutionMode.RequireMultiplayer) != 0)
+        if ((mode & CommandExecutionMode.RequireMultiplayer) == CommandExecutionMode.RequireMultiplayer)
         {
 #if SERVER
             if (!Provider.isServer)
@@ -157,7 +157,7 @@ public static class CommandEx
 #endif
         }
 
-        if ((mode & CommandExecutionMode.RequireSingleplayer) != 0)
+        if ((mode & CommandExecutionMode.RequireSingleplayer) == CommandExecutionMode.RequireSingleplayer)
         {
 #if SERVER
             throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeSingleplayer");
@@ -167,7 +167,7 @@ public static class CommandEx
 #endif
         }
 
-        if ((mode & CommandExecutionMode.RequireMenu) != 0)
+        if ((mode & CommandExecutionMode.RequireMenu) == CommandExecutionMode.RequireMenu)
         {
 #if SERVER
             throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeMenu");
@@ -177,7 +177,7 @@ public static class CommandEx
 #endif
         }
 
-        if ((mode & CommandExecutionMode.RequireCheatsEnabled) != 0)
+        if ((mode & CommandExecutionMode.RequireCheatsEnabled) == CommandExecutionMode.RequireCheatsEnabled)
         {
 #if SERVER
             if (!Provider.hasCheats)
@@ -188,7 +188,7 @@ public static class CommandEx
 #endif
         }
 
-        if ((mode & CommandExecutionMode.PlayerControlModeOnly) != 0)
+        if ((mode & CommandExecutionMode.PlayerControlModeOnly) == CommandExecutionMode.PlayerControlModeOnly)
         {
 #if SERVER
             if (ctx.EditorUser == null || ctx.EditorUser.Input.Controller != CameraController.Player)

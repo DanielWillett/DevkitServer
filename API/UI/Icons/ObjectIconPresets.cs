@@ -1,10 +1,9 @@
 ﻿#if CLIENT
-using System.Collections.ObjectModel;
-using System.Reflection;
 using DevkitServer.Configuration;
 using DevkitServer.Players;
 using DevkitServer.Plugins;
 using SDG.Framework.Modules;
+using System.Collections.ObjectModel;
 using Module = SDG.Framework.Modules.Module;
 
 namespace DevkitServer.API.UI.Icons;
@@ -260,7 +259,6 @@ public static class ObjectIconPresets
                 foreach (string directory in Directory.EnumerateDirectories(module.config.DirectoryPath, "*", SearchOption.AllDirectories))
                     DiscoverAssetIconPresetProvidersIn(directory, true);
             }
-
         }
 
         if (!_presetProviders.Exists(x => x.File.Equals(CustomPresetsPath, StringComparison.Ordinal)))

@@ -38,7 +38,7 @@ public sealed class ClientInfo
     private static void ReceiveClientInfo(MessageContext ctx, ClientInfo info)
     {
         Info = info;
-        UserPermissions.UserHandler.ReceivePermissions(info.Permissions, info.PermissionGroups);
+        PermissionManager.UserPermissions.ReceivePermissions(info.Permissions, info.PermissionGroups);
         Logger.LogInfo("Received client info.");
 #if DEBUG
         Logger.LogDebug("=======================================");

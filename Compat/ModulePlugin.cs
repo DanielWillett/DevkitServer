@@ -44,7 +44,7 @@ public class ModulePlugin : IDevkitServerColorPlugin
     public bool DeveloperMode => false;
 
     /// <inheritdoc/>
-    public Color Color { get; } = new Color32(255, 255, 204, 255);
+    public Color32 Color { get; } = new Color32(255, 255, 204, 255);
 
     /// <summary>
     /// Create a new plugin based on a foreign module.

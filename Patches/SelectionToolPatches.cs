@@ -3,6 +3,7 @@ using DevkitServer.API;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
 using DevkitServer.API.UI;
+using DevkitServer.Core.Permissions;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Levels;
@@ -67,7 +68,7 @@ internal static class SelectionToolPatches
 
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
         int i = 0;
-        PatchUtil.InsertActionRateLimiter(ref i, stLbl, ins);
+        // todo PatchUtil.InsertActionRateLimiter(ref i, stLbl, ins);
         StackTracker tracker = new StackTracker(ins, method);
         for (; i < ins.Count; ++i)
         {
@@ -174,9 +175,10 @@ internal static class SelectionToolPatches
         {
             for (int i = 0; i < HierarchyUtil.HierarchyItemBuffer.Count; ++i)
             {
-                if (!HierarchyUtil.CheckMovePermission(HierarchyUtil.HierarchyItemBuffer[i]))
+                PermissionLeaf leaf = VanillaPermissions.GetNodeVolumeMove(HierarchyUtil.HierarchyItemBuffer[i].GetType());
+                if (!leaf.Has())
                 {
-                    EditorMessage.SendNoPermissionMessage(null);
+                    EditorMessage.SendNoPermissionMessage(leaf);
                     _skippedMoveHandle = true;
                     return false;
                 }
@@ -300,12 +302,10 @@ internal static class SelectionToolPatches
         if (id != null)
         {
             // todo events
-            if (!HierarchyUtil.CheckPlacePermission(id))
+            PermissionLeaf leaf = VanillaPermissions.GetNodeVolumePlace(id.Type);
+            if (!leaf.Has())
             {
-                PermissionLeaf? place = HierarchyUtil.GetPlacePermission(id);
-                EditorMessage.SendEditorMessage(place == null
-                    ? DevkitServerModule.MessageLocalization.Translate("NoPermissions")
-                    : DevkitServerModule.MessageLocalization.Translate("NoPermissionsWithPermission", place.ToString()));
+                EditorMessage.SendNoPermissionMessage(leaf);
                 return;
             }
             bool allow = true;
