@@ -48,15 +48,104 @@ public static class CommandEx
     }
     public static void RegisterVanillaCommands()
     {
-#if SERVER
-        foreach (Command command in Commander.commands)
+        try
         {
-            if (command == null) continue;
-            VanillaCommand cmd = new VanillaCommand(command);
+            if (Commander.commands == null)
+                Commander.init();
+            if (CommandHandler.Handler.Commands != null)
+            {
+                foreach (VanillaCommand command in CommandHandler.Handler.Commands.OfType<VanillaCommand>().ToList())
+                {
+                    if (!Commander.commands!.Contains(command.Command))
+                    {
+                        Logger.LogDebug($"Removing command: {command.Format()}, outdated.");
+                        CommandHandler.Handler.TryDeregisterCommand(command);
+                        continue;
+                    }
 
-            CommandHandler.Handler.TryRegisterCommand(cmd);
-        }
+                    VanillaCommandInfo.GetInfo(command.Command.GetType(), out CommandExecutionMode mode, out _, out bool dedicatedServerOnly, out bool serverOnly, out bool startupOnly);
+                    if (mode == CommandExecutionMode.Disabled)
+                    {
+                        Logger.LogDebug($"Removing command: {command.Format()}, disabled.");
+                        CommandHandler.Handler.TryDeregisterCommand(command);
+                        continue;
+                    }
+
+                    if (startupOnly)
+                    {
+                        Logger.LogDebug($"Removing command: {command.Format()}, startup only.");
+                        CommandHandler.Handler.TryDeregisterCommand(command);
+                        continue;
+                    }
+#if CLIENT
+                    if (dedicatedServerOnly)
+                    {
+                        Logger.LogDebug($"Removing command: {command.Format()}, dedicated server only.");
+                        CommandHandler.Handler.TryDeregisterCommand(command);
+                        continue;
+                    }
 #endif
+                    if (serverOnly && !Provider.isServer)
+                    {
+                        Logger.LogDebug($"Removing command: {command.Format()}, authority only.");
+                        CommandHandler.Handler.TryDeregisterCommand(command);
+                    }
+
+                    if (!PassesMode(mode))
+                    {
+                        Logger.LogDebug($"Removing command: {command.Format()}, not executable in this mode.");
+                        CommandHandler.Handler.TryDeregisterCommand(command);
+                    }
+                }
+            }
+
+            foreach (Command command in Commander.commands!)
+            {
+                if (command == null || CommandHandler.Handler.Commands!.Any(x => x is VanillaCommand cmd && cmd.Command == command))
+                    continue;
+
+                VanillaCommandInfo.GetInfo(command.GetType(), out CommandExecutionMode mode, out _, out bool dedicatedServerOnly, out bool serverOnly, out bool startupOnly);
+
+                if (mode == CommandExecutionMode.Disabled)
+                {
+                    Logger.LogDebug($"Skipping command: {command.Format()}, disabled.");
+                    continue;
+                }
+
+                if (startupOnly)
+                {
+                    Logger.LogDebug($"Skipping command: {command.Format()}, startup only.");
+                    continue;
+                }
+#if CLIENT
+                if (dedicatedServerOnly)
+                {
+                    Logger.LogDebug($"Skipping command: {command.Format()}, dedicated server only.");
+                    continue;
+                }
+#endif
+                if (serverOnly && !Provider.isServer)
+                {
+                    Logger.LogDebug($"Skipping command: {command.Format()}, authority only.");
+                    continue;
+                }
+
+                if (!PassesMode(mode))
+                {
+                    Logger.LogDebug($"Skipping command: {command.Format()}, not executable in this mode.");
+                    continue;
+                }
+
+                VanillaCommand cmd = new VanillaCommand(command);
+
+                CommandHandler.Handler.TryRegisterCommand(cmd);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Failed to register vanilla commands.");
+            Logger.LogError(ex);
+        }
     }
     public static void DefaultReflectCommands()
     {
@@ -198,5 +287,88 @@ public static class CommandEx
                 throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeEditorPlayer");
 #endif
         }
+
+        if ((mode & CommandExecutionMode.NoMenu) == CommandExecutionMode.NoMenu)
+        {
+            if (Level.editing == null)
+                throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandRequiresNotMenu");
+        }
+    }
+    public static bool PassesMode(CommandExecutionMode mode)
+    {
+        if (mode == CommandExecutionMode.Always)
+            return true;
+
+        if ((mode & CommandExecutionMode.Disabled) == CommandExecutionMode.Disabled)
+            return false;
+
+        if ((mode & CommandExecutionMode.RequirePlaying) == CommandExecutionMode.RequirePlaying)
+        {
+#if SERVER
+            if (!Provider.isServer)
+                return false;
+#else
+            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserInput.LocalController != CameraController.Player : Level.isEditor)
+                return false;
+#endif
+        }
+
+        if ((mode & CommandExecutionMode.RequireEditing) == CommandExecutionMode.RequireEditing)
+        {
+#if SERVER
+            if (!Provider.isServer || !DevkitServerModule.IsEditing)
+                return false;
+#else
+            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserInput.LocalController != CameraController.Editor : !Level.isEditor)
+                return false;
+#endif
+        }
+
+        if ((mode & CommandExecutionMode.RequireMultiplayer) == CommandExecutionMode.RequireMultiplayer)
+        {
+#if SERVER
+            if (!Provider.isServer)
+                return false;
+#else
+            if (Level.editing == null)
+                return false;
+#endif
+        }
+
+        if ((mode & CommandExecutionMode.RequireSingleplayer) == CommandExecutionMode.RequireSingleplayer)
+        {
+#if SERVER
+            return false;
+#else
+            if (!Provider.isServer || !Provider.isClient || Level.editing == null)
+                return false;
+#endif
+        }
+
+        if ((mode & CommandExecutionMode.RequireMenu) == CommandExecutionMode.RequireMenu)
+        {
+#if SERVER
+            return false;
+#else
+            if (MenuUI.window == null)
+                return false;
+#endif
+        }
+
+        if ((mode & CommandExecutionMode.PlayerControlModeOnly) == CommandExecutionMode.PlayerControlModeOnly)
+        {
+#if CLIENT
+            if (!DevkitServerModule.IsEditing)
+                return false;
+#endif
+        }
+
+        if ((mode & CommandExecutionMode.NoMenu) == CommandExecutionMode.NoMenu)
+        {
+            if (Level.editing == null)
+                return false;
+        }
+
+        return true;
     }
 }

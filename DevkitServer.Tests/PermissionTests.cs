@@ -23,6 +23,7 @@ public class PermissionTests
         PluginLoader.RegisterPlugin(new TestPlugin("plugin2", "Plugin2"));
         PluginLoader.RegisterPlugin(new TestPlugin("plugin3", "Plugin3"));
         PluginLoader.RegisterPlugin(new TestPlugin("plugin4", "Plugin4"));
+        PluginLoader.RegisterPlugin(new TestPlugin("plugin:5", "Plugin5"));
         PluginLoader.RegisterPlugin(new TestPlugin(LongPluginId, "Test Long Plugin"));
     }
 
@@ -38,6 +39,7 @@ public class PermissionTests
     [DataRow("plugin2::context.test.test2")]
     [DataRow("unturned::context.test.test2")]
     [DataRow(LongPluginId + "::context.test.test2")]
+    [DataRow("plugin4::context.test:test2")]
     [DataRow("a::b")]
     public void ParseBasicPermissionLeaf(string leafStr)
     {
@@ -51,6 +53,7 @@ public class PermissionTests
     [DataRow("plugin2::*")]
     [DataRow("plugin5::context.test")]
     [DataRow("devkitserver::context.*")]
+    [DataRow("plugin4::context.test::test2")]
     [DataRow("devkitserver::*")]
     [DataRow("devkitserver::")]
     [DataRow("::context.test")]
@@ -79,10 +82,39 @@ public class PermissionTests
     [DataRow("plugin2::context.test.test2.*")]
     [DataRow("unturned::*")]
     [DataRow("a::b.*")]
+    [DataRow("plugin4::context.test:test2")]
+    [DataRow("plugin:5::context.test:test2")]
+    [DataRow("+devkitserver::context.test")]
+    [DataRow("+plugin2::context.test.test2")]
+    [DataRow("+unturned::context.test.test2")]
+    [DataRow("+" + LongPluginId + "::context.test.test2")]
+    [DataRow("+a::b")]
+    [DataRow("+devkitserver::context.test")]
+    [DataRow("+*")]
+    [DataRow("+plugin2::context.test.test2.*")]
+    [DataRow("+unturned::*")]
+    [DataRow("+a::b.*")]
+    [DataRow("+plugin4::context.test:test2")]
+    [DataRow("+plugin:5::context.test:test2")]
+    [DataRow("-devkitserver::context.test")]
+    [DataRow("-plugin2::context.test.test2")]
+    [DataRow("-unturned::context.test.test2")]
+    [DataRow("-" + LongPluginId + "::context.test.test2")]
+    [DataRow("-a::b")]
+    [DataRow("-devkitserver::context.test")]
+    [DataRow("-*")]
+    [DataRow("-plugin2::context.test.test2.*")]
+    [DataRow("-unturned::*")]
+    [DataRow("-a::b.*")]
+    [DataRow("-plugin4::context.test:test2")]
+    [DataRow("+plugin:5::context.test:test2")]
     public void ParseBasicPermissionBranch(string branchStr)
     {
         PermissionBranch branch = PermissionBranch.Parse(branchStr);
-        Logger.LogInfo($"{branch.Format()} (lvl {branch.WildcardLevel.Format()}).");
+        Logger.LogInfo($"{branchStr.Format()} -> {branch.Format()} (lvl {branch.WildcardLevel.Format()}).");
+
+        if (branchStr.Length > 0 && branchStr[0] == '+')
+            branchStr = branchStr[1..];
 
         Assert.AreEqual(branchStr, branch.ToString());
     }
@@ -90,6 +122,8 @@ public class PermissionTests
     [TestMethod]
     [DataRow("context.test")]
     [DataRow("plugin5::context.test")]
+    [DataRow("plugin4::context.test::test2")]
+    [DataRow("plugin::5::context.test:test2")]
     [DataRow("devkitserver::")]
     [DataRow("::context.test")]
     [DataRow("")]

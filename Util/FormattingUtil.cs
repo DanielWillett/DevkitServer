@@ -627,6 +627,17 @@ public static class FormattingUtil
             string name = (asset.FriendlyName ?? asset.name).Colorize(color);
             return ("[" + asset.assetCategory + "] {" + asset.GUID.ToString("N") + "}").Colorize(color) + " : ".Colorize(ConsoleColor.White) + name;
         }
+
+        if (obj is SteamPlayer pl)
+        {
+            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + pl.playerID.steamID.m_SteamID.ToString("D17") + " " + pl.playerID.characterName.Format(false);
+        }
+        if (obj is Player pl2)
+        {
+            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + pl2.channel.owner.playerID.steamID.m_SteamID.ToString("D17") +
+                   " " + pl2.channel.owner.playerID.characterName.Format(false);
+        }
+
         if (obj is MemberInfo)
         {
             if (obj is FieldInfo field)

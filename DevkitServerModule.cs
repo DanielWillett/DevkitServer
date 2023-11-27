@@ -141,6 +141,7 @@ public sealed class DevkitServerModule : IModuleNexus
         { "CommandMustBeSingleplayer", "<#ff8c69>This command can only be ran in singleplayer." },
         { "CommandMustBeMenu", "<#ff8c69>This command can only be ran in menu." },
         { "CommandRequiresCheats", "<#ff8c69>This command can only be ran when cheats are enabled." },
+        { "CommandRequiresNotMenu", "<#ff8c69>This command can not be ran in menu." },
     };
     public static Local MessageLocalization { get; private set; } = null!;
 

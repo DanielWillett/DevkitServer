@@ -270,7 +270,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
     }
     private void MonitorKeypress()
     {
-        Logger.LogDebug("Console keypress monitor thread starting.");
+        CommandWindow.Log("Console keypress monitor thread starting.");
         try
         {
             while (!_cancellationRequested)
@@ -346,8 +346,8 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error in key monitor thread.");
-            Logger.LogError(ex);
+            CommandWindow.LogError("Error in key monitor thread.");
+            CommandWindow.LogError(ex);
         }
     }
     internal readonly struct LogMessage

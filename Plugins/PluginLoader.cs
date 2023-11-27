@@ -182,12 +182,17 @@ public static class PluginLoader
         if (string.IsNullOrWhiteSpace(plugin.PermissionPrefix))
         {
             plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not be empty.");
-            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not be empty.");
+            throw new Exception($"Plugin {plugin.Name}'s 'PermissionPrefix' can not be empty.");
         }
-        if (plugin.PermissionPrefix[0] is '-' or '+' || plugin.PermissionPrefix.IndexOf(':') != -1)
+        if (plugin.PermissionPrefix.IndexOf("::", StringComparison.Ordinal) != -1)
         {
-            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not start with a '-' or '+' or contain a ':'.");
-            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not start with a '-' or '+' or contain a ':'.");
+            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not contain '::'.");
+            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not contain '::'.");
+        }
+        if (PermissionBranch.IsPlus(plugin.PermissionPrefix[0]) || PermissionBranch.IsDash(plugin.PermissionPrefix[0]))
+        {
+            plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not start with a plus or minus.");
+            throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not start with a plus or minus.");
         }
 
         if (plugin.PermissionPrefix.Equals(PermissionLeaf.CoreModulePrefix, StringComparison.InvariantCultureIgnoreCase))
@@ -200,7 +205,8 @@ public static class PluginLoader
             plugin.LogError("Invalid PermissionPrefix: " + plugin.PermissionPrefix.Format() + ". PermissionPrefix can not equal " + PermissionLeaf.DevkitServerModulePrefix.Format() + ".");
             throw new Exception("Plugin " + plugin.Name + "'s 'PermissionPrefix' can not equal " + PermissionLeaf.DevkitServerModulePrefix + ".");
         }
-        if (DevkitServerModule.Module != null)
+
+        if (DevkitServerModule.Module != null) // for unit tests
         {
             string defaultModuleName = DevkitServerModule.MainLocalization?.format("Name") ?? DevkitServerModule.ModuleName;
             if (plugin.MenuName.Equals(defaultModuleName, StringComparison.InvariantCultureIgnoreCase))

@@ -82,6 +82,11 @@ public enum CommandExecutionMode
     VanillaSituationsOnly = RequireSinglePlaying | RequireMultiPlaying,
 
     /// <summary>
+    /// This command can not be ran in menu.
+    /// </summary>
+    NoMenu = 1 << 8,
+
+    /// <summary>
     /// This command can not be used.
     /// </summary>
     Disabled = 1 << 31

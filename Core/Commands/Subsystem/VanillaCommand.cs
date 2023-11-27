@@ -7,7 +7,7 @@ using DevkitServer.API.Permissions;
 namespace DevkitServer.Core.Commands.Subsystem;
 
 [Ignore]
-internal sealed class VanillaCommand : ICachedTranslationSourceCommand
+internal sealed class VanillaCommand : ICachedTranslationSourceCommand, IEquatable<IExecutableCommand>
 {
     private readonly CommandExecutionMode _mode;
     private readonly bool _isDedicatedServerOnly;
@@ -61,4 +61,12 @@ internal sealed class VanillaCommand : ICachedTranslationSourceCommand
 
         return true;
     }
+
+    public bool Equals(IExecutableCommand? other) => other != null && CommandName.Equals(other.CommandName, StringComparison.Ordinal);
+    public override bool Equals(object? obj) => ReferenceEquals(this, obj) || obj is IExecutableCommand other && Equals(other);
+    public override int GetHashCode() => CommandName.GetHashCode();
+    public static bool operator ==(VanillaCommand? left, VanillaCommand? right) => Equals(left, right);
+    public static bool operator !=(VanillaCommand? left, VanillaCommand? right) => !Equals(left, right);
+
+    public string Format(ITerminalFormatProvider provider) => Command.GetType().Format();
 }

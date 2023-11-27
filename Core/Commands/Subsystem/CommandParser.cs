@@ -331,8 +331,8 @@ public class CommandParser
                 }
             }
 
-        // prepare command for execution
-        runCommand:
+            // prepare command for execution
+            runCommand:
             if (cmdInd == -1) goto notCommand;
             int ct2 = 0;
             for (int i = 0; i <= argCt; ++i)

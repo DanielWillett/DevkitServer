@@ -1,8 +1,8 @@
 ﻿using DevkitServer.Plugins;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using DevkitServer.Util.Encoding;
 using StackCleaner;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace DevkitServer.API.Permissions;
 
@@ -186,7 +186,12 @@ public readonly struct PermissionLeaf : IEquatable<PermissionLeaf>, IEquatable<P
         }
         while (path[prefixSeparator + 1] != ':');
 
+        int laterIndex = path.IndexOf(':', prefixSeparator + 2);
+        if (laterIndex != -1 && laterIndex < path.Length - 1 && path[laterIndex + 1] == ':')
+            return false;
+
         ReadOnlySpan<char> prefix = path.AsSpan(0, prefixSeparator);
+
         string value = path[(prefixSeparator + 2)..];
         if (string.IsNullOrWhiteSpace(value) || prefix.IsWhiteSpace())
             return false;

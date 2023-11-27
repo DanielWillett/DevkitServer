@@ -6,14 +6,12 @@ using DevkitServer.Models;
 using DevkitServer.Multiplayer.Sync;
 using System.Collections.ObjectModel;
 using System.Reflection;
-using DevkitServer.API.UI.Icons;
-
-
 #if CLIENT
 using DevkitServer.AssetTools;
 using DevkitServer.Configuration;
 using DevkitServer.Util.Debugging;
 using System.Diagnostics;
+using DevkitServer.API.UI.Icons;
 using DevkitServer.Players;
 using SDG.Framework.Devkit;
 using Unturned.SystemEx;
@@ -23,7 +21,6 @@ namespace DevkitServer.Core.Commands;
 internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFile
 {
     public static readonly PermissionLeaf Test = new PermissionLeaf("test", devkitServer: true);
-    public static readonly PermissionLeaf TestAll = new PermissionLeaf("test.*", devkitServer: true);
 
     public IReadOnlyList<PermissionLeaf> SyncSubcommandPermissions { get; }
     public IReadOnlyList<PermissionLeaf> AsyncSubcommandPermissions { get; }
@@ -33,7 +30,6 @@ internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFil
         AddAlias("tset");
         AddAlias("tets");
         AddPermission(Test);
-        AddPermission(TestAll);
         PermissionLeaf[] perms = new PermissionLeaf[CommandTests.Commands.Length];
         for (int i = 0; i < CommandTests.Commands.Length; ++i)
         {
@@ -65,7 +61,7 @@ internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFil
                 if (CommandTests.Commands[i].Method.Name.Equals(method, StringComparison.InvariantCultureIgnoreCase))
                 {
                     if (DevkitServerModule.IsEditing)
-                        ctx.AssertPermissionsOr(TestAll, SyncSubcommandPermissions[i]);
+                        ctx.AssertPermissionsOr(Test, SyncSubcommandPermissions[i]);
 
                     ++ctx.ArgumentOffset;
                     try
@@ -93,7 +89,7 @@ internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFil
                 if (CommandTests.AsyncCommands[i].Method.Name.Equals(method, StringComparison.InvariantCultureIgnoreCase))
                 {
                     if (DevkitServerModule.IsEditing)
-                        ctx.AssertPermissionsOr(TestAll, AsyncSubcommandPermissions[i]);
+                        ctx.AssertPermissionsOr(Test, AsyncSubcommandPermissions[i]);
 
                     ++ctx.ArgumentOffset;
                     try

@@ -231,7 +231,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 
 #if CLIENT
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendPermissionState)]
-    private static void ReceivePermissionState(MessageContext ctx, PermissionLeaf perm, bool state)
+    private static void ReceivePermissionState(MessageContext ctx, PermissionBranch perm, bool state)
     {
         PermissionManager.UserPermissions.ReceivePermissionState(perm, state);
         ctx.Acknowledge();

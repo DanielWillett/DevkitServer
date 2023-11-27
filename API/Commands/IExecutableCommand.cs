@@ -10,7 +10,7 @@ namespace DevkitServer.API.Commands;
 /// <summary>
 /// Represents a command ran by either a <see cref="EditorUser"/> or the console.
 /// </summary>
-public interface IExecutableCommand
+public interface IExecutableCommand : ITerminalFormattable
 {
     /// <summary>
     /// Defines when a command is allowed to be executed (singleplayer, multiplayer, etc).
@@ -68,6 +68,8 @@ public interface IExecutableCommand
         SteamPlayer? user
 #endif
         );
+
+    string ITerminalFormattable.Format(ITerminalFormatProvider provider) => GetType().Format();
 }
 
 /// <summary>

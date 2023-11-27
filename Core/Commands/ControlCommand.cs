@@ -9,20 +9,18 @@ using DevkitServer.Players;
 namespace DevkitServer.Core.Commands;
 internal sealed class ControlCommand : DevkitServerCommand, ICommandLocalizationFile
 {
-    public static readonly PermissionLeaf ChangeController = new PermissionLeaf("control", devkitServer: true);
     public static readonly PermissionLeaf ChangeControllerPlayer = new PermissionLeaf("control.player", devkitServer: true);
     public static readonly PermissionLeaf ChangeControllerEditor = new PermissionLeaf("control.editor", devkitServer: true);
-    public static readonly PermissionLeaf ChangeControllerAll = new PermissionLeaf("control.*", devkitServer: true);
+
+    public override CommandExecutionMode Mode => CommandExecutionMode.Always;
 
     Local ILocalizedCommand.Translations { get; set; } = null!;
     public ControlCommand() : base("control")
     {
         AddAlias("ctrl");
         AddAlias("controller");
-        AddPermission(ChangeController);
         AddPermission(ChangeControllerPlayer);
         AddPermission(ChangeControllerEditor);
-        AddPermission(ChangeControllerAll);
     }
 
     public override UniTask Execute(CommandContext ctx, CancellationToken token)
@@ -41,7 +39,7 @@ internal sealed class ControlCommand : DevkitServerCommand, ICommandLocalization
         if (ctx.MatchParameter(0, "edit", "editor", "e"))
         {
             string fmt = ctx.Translate("ControllerEditor");
-            if (ChangeControllerEditor.Has(ctx.CallerId.m_SteamID) || ChangeControllerAll.Has(ctx.CallerId.m_SteamID))
+            if (ChangeControllerEditor.Has(ctx.CallerId.m_SteamID))
             {
                 if (ctx.EditorUser!.Input.Controller == CameraController.Editor)
                     throw ctx.Reply("AlreadySet", fmt);
@@ -54,7 +52,7 @@ internal sealed class ControlCommand : DevkitServerCommand, ICommandLocalization
         else if (ctx.MatchParameter(0, "player", "character", "p"))
         {
             string fmt = ctx.Translate("ControllerPlayer");
-            if (ChangeControllerPlayer.Has(ctx.CallerId.m_SteamID) || ChangeControllerAll.Has(ctx.CallerId.m_SteamID))
+            if (ChangeControllerPlayer.Has(ctx.CallerId.m_SteamID))
             {
                 if (ctx.EditorUser!.Input.Controller == CameraController.Player)
                     throw ctx.Reply("AlreadySet", fmt);

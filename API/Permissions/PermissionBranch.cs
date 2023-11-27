@@ -82,7 +82,7 @@ public readonly struct PermissionBranch : IEquatable<PermissionBranch>, IEquatab
 
     internal PermissionBranch(PermissionMode mode)
     {
-        _flags = (byte)(((int)mode << 2) | 0b100);
+        _flags = (byte)(((int)mode << 3) | 0b100);
         Path = "*";
         WildcardLevel = 1;
     }
@@ -91,11 +91,11 @@ public readonly struct PermissionBranch : IEquatable<PermissionBranch>, IEquatab
         Plugin = plugin ?? throw new ArgumentNullException(nameof(plugin));
         WildcardLevel = GetWildcardLevel(path);
         Path = path;
-        _flags = (byte)((int)mode << 2);
+        _flags = (byte)((int)mode << 3);
     }
     internal PermissionBranch(PermissionMode mode, string path, bool core = false, bool devkitServer = false)
     {
-        _flags = (byte)(((int)mode << 2) | (core ? 0b001 : 0) | (devkitServer ? 0b010 : 0));
+        _flags = (byte)(((int)mode << 3) | (core ? 0b001 : 0) | (devkitServer ? 0b010 : 0));
         WildcardLevel = GetWildcardLevel(path);
         Path = path;
     }
@@ -224,6 +224,9 @@ public readonly struct PermissionBranch : IEquatable<PermissionBranch>, IEquatab
         return leaf;
     }
 
+    internal static bool IsDash(char character) => character is '-' or '‐' or '‑' or '‒' or '–' or '—' or '―' or '⸺' or '⸻' or '﹘';
+    internal static bool IsPlus(char character) => character is '+' or '＋';
+
     /// <summary>
     /// Parse a permission branch with a prefix.
     /// </summary>
@@ -235,20 +238,21 @@ public readonly struct PermissionBranch : IEquatable<PermissionBranch>, IEquatab
             return false;
 
         char firstChar = path[0];
-        PermissionMode mode = firstChar == '-' ? PermissionMode.Subtractive : PermissionMode.Additive;
+        bool hasFirstChar = IsPlus(firstChar) || IsDash(firstChar);
+        PermissionMode mode = hasFirstChar && !IsPlus(firstChar) ? PermissionMode.Subtractive : PermissionMode.Additive;
 
-        if (path.Length == 1 && path[0] == '*')
+        if (!hasFirstChar && mode == PermissionMode.Additive && path is ['*'])
         {
             permissionBranch = new PermissionBranch(PermissionMode.Additive);
             return true;
         }
-        if (path.Length == 2 && path[1] == '*' && path[0] is '-' or '+')
+        if (hasFirstChar && path is [_, '*'])
         {
             permissionBranch = new PermissionBranch(mode);
             return true;
         }
 
-        int startIndex = firstChar is '+' or '-' || path.Length > 1 && firstChar == '\\' && path[1] is '+' or '-' ? 0 : -1;
+        int startIndex = hasFirstChar || path.Length > 1 && firstChar == '\\' && (IsPlus(path[1]) || IsDash(path[1])) ? 0 : -1;
         int prefixSeparator = startIndex;
 
         do
@@ -258,6 +262,10 @@ public readonly struct PermissionBranch : IEquatable<PermissionBranch>, IEquatab
                 return false;
         }
         while (path[prefixSeparator + 1] != ':');
+
+        int laterIndex = path.IndexOf(':', prefixSeparator + 2);
+        if (laterIndex != -1 && laterIndex < path.Length - 1 && path[laterIndex + 1] == ':')
+            return false;
 
         ReadOnlySpan<char> prefix = path.AsSpan(startIndex + 1, prefixSeparator - startIndex - 1);
 

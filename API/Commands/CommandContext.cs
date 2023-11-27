@@ -103,12 +103,22 @@ public class CommandContext : Exception
         if (DevkitServerModule.IsEditing && Caller != null)
             EditorUser = UserManager.FromId(CallerId.m_SteamID);
 #else
-        IsConsole = false;
-        Caller = Player.player?.channel.owner;
-        CallerId = Provider.client;
         InvokedFromConsole = console;
-        if (DevkitServerModule.IsEditing)
-            EditorUser = EditorUser.User;
+        if (Player.player != null)
+        {
+            IsConsole = false;
+            Caller = Player.player?.channel.owner;
+            CallerId = Provider.client;
+            if (DevkitServerModule.IsEditing)
+                EditorUser = EditorUser.User;
+        }
+        else
+        {
+            InvokedFromConsole = true;
+            IsConsole = true;
+            CallerId = Provider.client;
+            Caller = null;
+        }
 #endif
     }
 
@@ -1592,7 +1602,7 @@ public class CommandContext : Exception
     public Exception SendCorrectUsage(string usage) => Reply(DevkitServerModule.CommandLocalization, "CorrectUsage", usage);
 
 
-    public override string ToString() => $"\"/{Command.CommandName.ToLower()}\" ran by {(IsConsole ? "{CONSOLE}" : Caller)} with args [{string.Join(", ", Arguments)}].";
+    public override string ToString() => $"\"/{Command.CommandName.ToLower()}\" ran by {(IsConsole ? "{CONSOLE}" : Caller)} with args [{string.Join(", ", Arguments)}]";
 
     internal async UniTask ExecuteAsync()
     {

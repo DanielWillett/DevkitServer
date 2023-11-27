@@ -124,7 +124,7 @@ public static class VanillaCommandInfo
         }
         else if (command.Name.Equals("CommandFlag", StringComparison.Ordinal))
         {
-            mode = CommandExecutionMode.RequireCheatsEnabled | CommandExecutionMode.RequireMultiplayer;
+            mode = CommandExecutionMode.RequireCheatsEnabled | CommandExecutionMode.RequirePlaying;
             serverOnly = true;
         }
         else if (command.Name.Equals("CommandGameMode", StringComparison.Ordinal))
@@ -180,7 +180,8 @@ public static class VanillaCommandInfo
         }
         else if (command.Name.Equals("CommandLogMemoryUsage", StringComparison.Ordinal))
         {
-            mode = CommandExecutionMode.Always;
+            mode = CommandExecutionMode.NoMenu;
+            serverOnly = true;
         }
         else if (command.Name.Equals("CommandMap", StringComparison.Ordinal))
         {
@@ -211,7 +212,7 @@ public static class VanillaCommandInfo
         }
         else if (command.Name.Equals("CommandNight", StringComparison.Ordinal))
         {
-            mode = CommandExecutionMode.Always;
+            mode = CommandExecutionMode.NoMenu;
             serverOnly = true;
         }
         else if (command.Name.Equals("CommandNpcEvent", StringComparison.Ordinal))
@@ -287,12 +288,12 @@ public static class VanillaCommandInfo
         }
         else if (command.Name.Equals("CommandSave", StringComparison.Ordinal))
         {
-            mode = CommandExecutionMode.Always;
+            mode = CommandExecutionMode.NoMenu;
             serverOnly = true;
         }
         else if (command.Name.Equals("CommandSay", StringComparison.Ordinal))
         {
-            mode = CommandExecutionMode.Always;
+            mode = CommandExecutionMode.NoMenu;
             dedicatedServerOnly = true;
         }
         else if (command.Name.Equals("CommandScheduledShutdownInfo", StringComparison.Ordinal))
@@ -334,7 +335,7 @@ public static class VanillaCommandInfo
         }
         else if (command.Name.Equals("CommandTime", StringComparison.Ordinal))
         {
-            mode = CommandExecutionMode.Always;
+            mode = CommandExecutionMode.NoMenu;
             serverOnly = true;
         }
         else if (command.Name.Equals("CommandTimeout", StringComparison.Ordinal))
@@ -379,7 +380,7 @@ public static class VanillaCommandInfo
         }
         else if (command.Name.Equals("CommandWeather", StringComparison.Ordinal))
         {
-            mode = CommandExecutionMode.Always;
+            mode = CommandExecutionMode.NoMenu;
             serverOnly = true;
         }
         else if (command.Name.Equals("CommandWelcome", StringComparison.Ordinal))
@@ -399,6 +400,5 @@ public static class VanillaCommandInfo
         }
 
         serverOnly |= dedicatedServerOnly;
-        return ;
     }
 }
