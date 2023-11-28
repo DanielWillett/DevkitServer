@@ -71,6 +71,10 @@
       "type": [ "string", "null" ],
       "format": "uri-reference"
     },
+    "max_client_edit_fps": {
+      "description": "Sets the maximum FPS a client can have while sending editor actions like terrain and foliage, which effectively translates to edits per second needed to be processed by the server and all clients. When not editing, client FPS will stay at whatever is in their settings.",
+      "type": "integer"
+    },
     "high_speed": {
       "description": "Configure a TCP server to send/receive large packets quicker.",
       "type": "object",

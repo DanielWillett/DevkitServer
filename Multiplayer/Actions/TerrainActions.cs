@@ -1,24 +1,26 @@
-﻿using DevkitServer.Patches;
+﻿using DevkitServer.API;
+using DevkitServer.Patches;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
 using SDG.Framework.Devkit;
 using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Landscapes;
+using SDG.Framework.Utilities;
 using System.Reflection;
 using System.Reflection.Emit;
-using DevkitServer.API.UI;
-using DevkitServer.API;
-
 #if SERVER
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;
 #endif
 #if CLIENT
+using DevkitServer.API.UI;
 #endif
 
 namespace DevkitServer.Multiplayer.Actions;
 public sealed class TerrainActions
 {
+    private static readonly Dictionary<LandscapeCoord, float> PendingLODUpdates = new Dictionary<LandscapeCoord, float>(16);
+    private static bool _isUpdating;
     public EditorActions EditorActions { get; }
     internal TerrainActions(EditorActions actions)
     {
@@ -26,9 +28,16 @@ public sealed class TerrainActions
     }
     public void Subscribe()
     {
-#if CLIENT
         if (EditorActions.IsOwner)
         {
+            if (!_isUpdating)
+            {
+                TimeUtility.updated += OnUpdate;
+                _isUpdating = true;
+                PendingLODUpdates.Clear();
+            }
+
+#if CLIENT
             ClientEvents.OnPaintRamp += OnPaintRamp;
             ClientEvents.OnAdjustHeightmap += OnAdjustHeightmap;
             ClientEvents.OnFlattenHeightmap += OnFlattenHeightmap;
@@ -40,15 +49,21 @@ public sealed class TerrainActions
             ClientEvents.OnAddTile += OnAddTile;
             ClientEvents.OnDeleteTile += OnDeleteTile;
             ClientEvents.OnUpdateTileSplatmapLayers += OnUpdateTileSplatmapLayers;
-        }
 #endif
+        }
     }
-
     public void Unsubscribe()
     {
-#if CLIENT
         if (EditorActions.IsOwner)
         {
+            if (_isUpdating)
+            {
+                TimeUtility.updated -= OnUpdate;
+                _isUpdating = false;
+                PendingLODUpdates.Clear();
+            }
+
+#if CLIENT
             ClientEvents.OnPaintRamp -= OnPaintRamp;
             ClientEvents.OnAdjustHeightmap -= OnAdjustHeightmap;
             ClientEvents.OnFlattenHeightmap -= OnFlattenHeightmap;
@@ -60,8 +75,44 @@ public sealed class TerrainActions
             ClientEvents.OnAddTile -= OnAddTile;
             ClientEvents.OnDeleteTile -= OnDeleteTile;
             ClientEvents.OnUpdateTileSplatmapLayers -= OnUpdateTileSplatmapLayers;
-        }
 #endif
+        }
+    }
+    public static void ApplyBoundsLODSoon(Bounds worldBounds)
+    {
+        LandscapeBounds bounds = new LandscapeBounds(worldBounds);
+        float t = CachedTime.RealtimeSinceStartup;
+        for (int x = bounds.min.x; x <= bounds.max.x; ++x)
+        {
+            for (int y = bounds.min.y; y <= bounds.max.y; ++y)
+                PendingLODUpdates[new LandscapeCoord(x, y)] = t;
+        }
+    }
+    private static void OnUpdate()
+    {
+        if (PendingLODUpdates.Count == 0)
+            return;
+
+        float t = CachedTime.RealtimeSinceStartup;
+        LandscapeCoord? toRemove = null;
+        foreach (KeyValuePair<LandscapeCoord, float> pendingLODUpdate in PendingLODUpdates)
+        {
+            if (pendingLODUpdate.Value < t + 0.25f)
+                continue;
+
+            toRemove = pendingLODUpdate.Key;
+
+            LandscapeTile? tile = Landscape.getTile(pendingLODUpdate.Key);
+            if (tile == null)
+                continue;
+
+            tile.SyncHeightmap();
+            Logger.LogDebug($"Synced heightmap: {pendingLODUpdate.Key.Format()}.");
+            break;
+        }
+
+        if (toRemove.HasValue)
+            PendingLODUpdates.Remove(toRemove.Value);
     }
 #if CLIENT
     private void OnPaintRamp(in PaintRampProperties properties)
@@ -223,7 +274,6 @@ public sealed class TerrainActions
         });
     }
 #endif
-
 }
 
 public enum TerrainEditorType
@@ -275,6 +325,8 @@ public sealed class HeightmapRampAction : ITerrainAction, IBrushRadiusAction, IB
     public void Apply()
     {
         LandscapeUtil.WriteHeightmapNoTransactions(Bounds, IntlHandleHeightmapWriteRamp);
+
+        TerrainActions.ApplyBoundsLODSoon(Bounds);
     }
 #if SERVER
     public bool CheckCanApply()
@@ -315,7 +367,7 @@ public sealed class HeightmapRampAction : ITerrainAction, IBrushRadiusAction, IB
         float distance = Mathf.Abs(magnitude2 * dot / BrushRadius);
         if (distance > 1f)
             return currentHeight;
-        float brushAlpha = this.GetBrushAlpha(distance);
+        float brushAlpha = LandscapeUtil.GetBrushAlpha(this, distance);
         float a = (StartPosition.y + Landscape.TILE_HEIGHT / 2f) / Landscape.TILE_HEIGHT;
         float b = (EndPosition.y + Landscape.TILE_HEIGHT / 2f) / Landscape.TILE_HEIGHT;
         currentHeight = Mathf.Lerp(currentHeight, Mathf.Lerp(a, b, t), brushAlpha);
@@ -341,6 +393,8 @@ public sealed class HeightmapAdjustAction : ITerrainAction, IBrushRadiusAction, 
     public void Apply()
     {
         LandscapeUtil.WriteHeightmapNoTransactions(Bounds, IntlHandleHeightmapWriteAdjust);
+
+        TerrainActions.ApplyBoundsLODSoon(Bounds);
     }
 #if SERVER
     public bool CheckCanApply()
@@ -370,10 +424,10 @@ public sealed class HeightmapAdjustAction : ITerrainAction, IBrushRadiusAction, 
             return currentHeight;
         }
         distance = Mathf.Sqrt(distance) / BrushRadius;
-        float num = DeltaTime * BrushStrength * this.GetBrushAlpha(distance) * BrushSensitivity;
+        float deltaHeight = DeltaTime * BrushStrength * LandscapeUtil.GetBrushAlpha(this, distance) * BrushSensitivity;
         if (Subtracting)
-            num = -num;
-        currentHeight += num;
+            deltaHeight = -deltaHeight;
+        currentHeight += deltaHeight;
         return currentHeight;
     }
 }
@@ -397,6 +451,8 @@ public sealed class HeightmapFlattenAction : ITerrainAction, IBrushRadiusAction,
     public void Apply()
     {
         LandscapeUtil.WriteHeightmapNoTransactions(Bounds, IntlHandleHeightmapWriteFlatten);
+
+        TerrainActions.ApplyBoundsLODSoon(Bounds);
     }
 #if SERVER
     public bool CheckCanApply()
@@ -425,12 +481,12 @@ public sealed class HeightmapFlattenAction : ITerrainAction, IBrushRadiusAction,
         if (distance > BrushRadius * BrushRadius)
             return currentHeight;
         distance = Mathf.Sqrt(distance) / BrushRadius;
-        float brushAlpha = this.GetBrushAlpha(distance);
+        float brushAlpha = LandscapeUtil.GetBrushAlpha(this, distance);
         float a = (BrushTarget + Landscape.TILE_HEIGHT / 2f) / Landscape.TILE_HEIGHT;
         a = FlattenMethod switch
         {
-            EDevkitLandscapeToolHeightmapFlattenMethod.MIN => Mathf.Min(a, currentHeight),
-            EDevkitLandscapeToolHeightmapFlattenMethod.MAX => Mathf.Max(a, currentHeight),
+            EDevkitLandscapeToolHeightmapFlattenMethod.MIN => a < currentHeight ? a : currentHeight,
+            EDevkitLandscapeToolHeightmapFlattenMethod.MAX => a > currentHeight ? a : currentHeight,
             _ => a
         };
         float amt = DeltaTime * BrushStrength * brushAlpha;
@@ -500,6 +556,8 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadiusAction, 
         LandscapeUtil.WriteHeightmapNoTransactions(Bounds, IntlHandleHeightmapWriteSmooth);
         if (SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE)
             LandscapeUtil.ReleaseHeightmapBuffer(PixelSmoothBuffer);
+
+        TerrainActions.ApplyBoundsLODSoon(Bounds);
     }
 #if SERVER
     public bool CheckCanApply()
@@ -527,6 +585,9 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadiusAction, 
     public int CalculateSize() => EncodingEx.MaxTerrainToolBoundsSize + 12 + (SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE ? 4 : 0);
     private static void SampleHeightPixelSmooth(object? instance, Vector3 worldPosition, ref int sampleCount, ref float sampleAverage)
     {
+        _ = Transpiler(null!);
+        throw new NotImplementedException();
+
         IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             FieldInfo? field = typeof(TerrainEditor).GetField("heightmapPixelSmoothBuffer", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -560,9 +621,6 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadiusAction, 
                 Logger.LogWarning("Unable to replace load of " + field?.Format() + " with " + buffer.Format() + ".");
             }
         }
-
-        _ = Transpiler(null!);
-        throw new NotImplementedException();
     }
     private float IntlHandleHeightmapWriteSmooth(LandscapeCoord tileCoord, HeightmapCoord heightmapCoord, Vector3 worldPosition, float currentHeight)
     {
@@ -570,7 +628,7 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadiusAction, 
         if (distance > BrushRadius * BrushRadius)
             return currentHeight;
         distance = Mathf.Sqrt(distance) / BrushRadius;
-        float brushAlpha = this.GetBrushAlpha(distance);
+        float brushAlpha = LandscapeUtil.GetBrushAlpha(this, distance);
         float target = SmoothTarget;
         if (SmoothMethod == EDevkitLandscapeToolHeightmapSmoothMethod.PIXEL_AVERAGE)
         {
@@ -842,7 +900,7 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadiusAction, IB
         else
             targetWeight = UseWeightTarget ? BrushTarget : (IsRemoving ? 0f : 1f);
 
-        float speed = DeltaTime * BrushStrength * this.GetBrushAlpha(distance) * BrushSensitivity;
+        float speed = DeltaTime * BrushStrength * LandscapeUtil.GetBrushAlpha(this, distance) * BrushSensitivity;
 
         BlendSplatmapWeights(null, currentWeights, materialLayerIndex, targetWeight, speed);
     }
@@ -1000,7 +1058,7 @@ public sealed class SplatmapSmoothAction : ITerrainAction, IBrushRadiusAction, I
                 return;
         }
 
-        float speed = DeltaTime * BrushStrength * this.GetBrushAlpha(distance);
+        float speed = DeltaTime * BrushStrength * LandscapeUtil.GetBrushAlpha(this, distance);
         float total = 0f;
         for (int i = 0; i < Landscape.SPLATMAP_LAYERS; ++i)
         {

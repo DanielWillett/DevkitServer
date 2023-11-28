@@ -32,13 +32,13 @@ internal class DevkitServerResources
 
         // Defaults
         new DevkitServerFileResource(Path.Combine("Defaults", "client_config.json"), new Version(0, 0, 15, 0)) { Side = Side.Client },
-        new DevkitServerFileResource(Path.Combine("Defaults", "server_config.json"), new Version(0, 0, 15, 0)) { Side = Side.Server },
+        new DevkitServerFileResource(Path.Combine("Defaults", "server_config.json"), new Version(0, 0, 26, 0)) { Side = Side.Server },
         new DevkitServerFileResource(Path.Combine("Defaults", "backup_config.json"), new Version(0, 0, 10, 0)),
         new DevkitServerFileResource(Path.Combine("Defaults", "permission_groups.json"), new Version(0, 0, 15, 0)) { Side = Side.Server },
 
         // Schemas
         new DevkitServerFileResource(Path.Combine("Schemas", "client_config_schema.json"), new Version(0, 0, 15, 0)) { Side = Side.Client },
-        new DevkitServerFileResource(Path.Combine("Schemas", "server_config_schema.json"), new Version(0, 0, 10, 0)) { Side = Side.Server },
+        new DevkitServerFileResource(Path.Combine("Schemas", "server_config_schema.json"), new Version(0, 0, 26, 0)) { Side = Side.Server },
         new DevkitServerFileResource(Path.Combine("Schemas", "backup_schema.json"), new Version(0, 0, 1, 0)),
         new DevkitServerFileResource(Path.Combine("Schemas", "permission_groups_schema.json"), new Version(0, 0, 15, 0)) { Side = Side.Server },
 

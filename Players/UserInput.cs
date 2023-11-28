@@ -6,8 +6,6 @@ using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 using SDG.NetPak;
 using DevkitServer.API;
-
-
 #if CLIENT
 using DevkitServer.API.Abstractions;
 using HarmonyLib;

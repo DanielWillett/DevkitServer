@@ -1,55 +1,6 @@
 {
-  "$schema": "https://raw.githubusercontent.com/DanielWillett/DevkitServer/master/Module/Schemas/permission_groups_schema.json",
+  "SchemaURI": "https://raw.githubusercontent.com/DanielWillett/DevkitServer/c1f2ece/Module/Schemas/permission_groups_schema.json",
   "groups": [
-    {
-      "id": "viewer",
-      "name": "Viewer",
-      "color": "#ffcc66",
-      "priority": 0,
-      "permissions": []
-    },
-    {
-      "id": "terrain_editor",
-      "name": "Terrain Editor",
-      "color": "#33cc33",
-      "priority": 1,
-      "permissions": [
-        "unturned.terrain.heightmap.edit",
-        "unturned.terrain.splatmap.edit",
-        "unturned.terrain.holemap.edit",
-        "unturned.terrain.foliage.edit",
-        "unturned.terrain.foliage.bake",
-        "unturned.terrain.foliage.bake.nearby",
-        "unturned.hierarchy.objects.*",
-        "unturned.hierarchy.volumes.*",
-        "unturned.hierarchy.nodes.*",
-        "unturned.hierarchy.cartography.*",
-        "unturned.hierarchy.cartography.bake",
-        "unturned.roads.edit",
-        "unturned.roads.bake",
-        "unturned.lighting.edit"
-      ]
-    },
-    {
-      "id": "location_builder",
-      "name": "Location Builder",
-      "color": "#ffff99",
-      "priority": 1,
-      "permissions": [
-        "unturned.terrain.heightmap.edit",
-        "unturned.terrain.splatmap.edit",
-        "unturned.terrain.holemap.edit",
-        "unturned.terrain.foliage.edit",
-        "unturned.terrain.foliage.bake.nearby",
-        "unturned.hierarchy.objects.*",
-        "unturned.hierarchy.volumes.*",
-        "unturned.hierarchy.nodes.*",
-        "unturned.hierarchy.cartography.*",
-        "unturned.hierarchy.cartography.bake",
-        "unturned.roads.edit",
-        "unturned.roads.bake"
-      ]
-    },
     {
       "id": "director",
       "name": "Director",
@@ -58,6 +9,42 @@
       "permissions": [
         "*"
       ]
+    },
+    {
+      "id": "terrain_editor",
+      "name": "Terrain Editor",
+      "color": "#33cc33",
+      "priority": 1,
+      "permissions": [
+        "unturned::level.terrain.*",
+        "unturned::level.roads.*",
+        "unturned::level.cartography.bake.*"
+      ]
+    },
+    {
+      "id": "location_builder",
+      "name": "Location Builder",
+      "color": "#ffff99",
+      "priority": 1,
+      "permissions": [
+        "unturned::level.terrain.*",
+        "unturned::level.roads.*",
+        "unturned::level.cartography.bake.*",
+        "unturned::level.objects.*",
+        "unturned::level.volumes.*",
+        "unturned::level.volumes.arena_compactor.*",
+        "unturned::level.volumes.cartography.*",
+        "unturned::level.volumes.foliage.*",
+        "unturned::level.volumes.landscape_hole.*",
+        "unturned::level.nodes.*"
+      ]
+    },
+    {
+      "id": "viewer",
+      "name": "Viewer",
+      "color": "#ffcc66",
+      "priority": 0,
+      "permissions": []
     }
   ]
 }

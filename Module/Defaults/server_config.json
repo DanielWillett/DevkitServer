@@ -88,6 +88,12 @@
   "user_savedata_override": null,
 
   /*
+   *  Sets the maximum FPS a client can have while sending editor actions like terrain and foliage, which effectively translates to edits per second
+   *  needed to be processed by the server and all clients. When not editing, client FPS will stay at whatever is in their settings.
+   */
+  "max_client_edit_fps": 50,
+
+  /*
    *  Configure a TCP server to send/receive large packets (like the map, cartography renders, etc) much quicker than over Steamworks servers.
    *  It is secured using a key sent over your Steam connection.
    *

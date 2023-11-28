@@ -29,7 +29,7 @@ public sealed class ClientInfo
 
     internal static readonly NetCallRaw<ClientInfo> SendClientInfo = new NetCallRaw<ClientInfo>((ushort)DevkitServerNetCall.SendClientInfo, ReadInfo, WriteInfo);
 
-    public const ushort DataVersion = 0;
+    public const ushort DataVersion = 1;
 #if CLIENT
     public static ClientInfo? Info { get; private set; }
 
@@ -68,8 +68,9 @@ public sealed class ClientInfo
     /// </remarks>
     public PermissionGroup[] PermissionGroups { get; internal set; }
 
-    public bool ServerRemovesCosmeticImprovements { get; internal set; }
-    public bool ServerTreatsAdminsAsSuperuser { get; internal set; }
+    public bool ServerRemovesCosmeticImprovements { get; private set; }
+    public bool ServerTreatsAdminsAsSuperuser { get; private set; }
+    public int ServerMaxClientEditFPS { get; private set; }
 #nullable restore
     internal ClientInfo() { }
 
@@ -83,7 +84,7 @@ public sealed class ClientInfo
     }
     public void Read(ByteReader reader)
     {
-        _ = reader.ReadUInt16(); // version
+        ushort v = reader.ReadUInt16(); // version
         int len = reader.ReadInt32();
         List<PermissionBranch> perms = new List<PermissionBranch>(len);
         for (int i = 0; i < len; ++i)
@@ -104,6 +105,9 @@ public sealed class ClientInfo
         byte flag = reader.ReadUInt8();
         ServerRemovesCosmeticImprovements = (flag & 1) != 0;
         ServerTreatsAdminsAsSuperuser = (flag & 2) == 0;
+
+        if (v > 0)
+            ServerMaxClientEditFPS = reader.ReadInt32();
     }
     public void Write(ByteWriter writer)
     {
@@ -126,6 +130,7 @@ public sealed class ClientInfo
             flag |= 2;
 
         writer.Write(flag);
+        writer.Write(ServerMaxClientEditFPS);
     }
 #if SERVER
     internal static void ApplyServerSettings(ClientInfo info, EditorUser user)
@@ -133,6 +138,7 @@ public sealed class ClientInfo
         SystemConfig systemConfig = DevkitServerConfig.Config;
         info.ServerRemovesCosmeticImprovements = systemConfig.RemoveCosmeticImprovements;
         info.ServerTreatsAdminsAsSuperuser = systemConfig.AdminsAreSuperusers;
+        info.ServerMaxClientEditFPS = systemConfig.MaxClientEditFPS;
     }
 #endif
 }

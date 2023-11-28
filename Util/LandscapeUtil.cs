@@ -1,8 +1,14 @@
-﻿using DevkitServer.API;
+﻿#define TIME_TRANSACTIONS
+using DevkitServer.API;
 using SDG.Framework.Devkit;
 using SDG.Framework.Landscapes;
 using System.Globalization;
 using System.Reflection;
+using DevkitServer.Multiplayer.Actions;
+
+#if DEBUG && TIME_TRANSACTIONS
+using System.Diagnostics;
+#endif
 
 namespace DevkitServer.Util;
 
@@ -604,8 +610,14 @@ public static class LandscapeUtil
         ThreadUtil.assertIsGameThread();
 
         SaveTransactions = false;
+#if DEBUG && TIME_TRANSACTIONS
+        Stopwatch sw = new Stopwatch();
+#endif
         try
         {
+#if DEBUG && TIME_TRANSACTIONS
+            sw.Start();
+#endif
             Landscape.writeHeightmap(worldBounds, callback);
         }
         catch (Exception ex)
@@ -615,16 +627,28 @@ public static class LandscapeUtil
         }
         finally
         {
+#if DEBUG && TIME_TRANSACTIONS
+            sw.Stop();
+#endif
             SaveTransactions = true;
         }
+#if DEBUG && TIME_TRANSACTIONS
+        Logger.LogDebug($"Heightmap on {worldBounds.Format()} ({callback.Method.Name.Format(false)}): {sw.GetElapsedMilliseconds().Format("F2")} ms.");
+#endif
     }
     public static void WriteSplatmapNoTransactions(Bounds worldBounds, Landscape.LandscapeWriteSplatmapHandler callback)
     {
         ThreadUtil.assertIsGameThread();
 
         SaveTransactions = false;
+#if DEBUG && TIME_TRANSACTIONS
+        Stopwatch sw = new Stopwatch();
+#endif
         try
         {
+#if DEBUG && TIME_TRANSACTIONS
+            sw.Start();
+#endif
             Landscape.writeSplatmap(worldBounds, callback);
         }
         catch (Exception ex)
@@ -634,16 +658,28 @@ public static class LandscapeUtil
         }
         finally
         {
+#if DEBUG && TIME_TRANSACTIONS
+            sw.Stop();
+#endif
             SaveTransactions = true;
         }
+#if DEBUG && TIME_TRANSACTIONS
+        Logger.LogDebug($"Splatmap on {worldBounds.Format()} ({callback.Method.Name.Format(false)}): {sw.GetElapsedMilliseconds().Format("F2")} ms.");
+#endif
     }
     public static void WriteHolesNoTransactions(Bounds worldBounds, Landscape.LandscapeWriteHolesHandler callback)
     {
         ThreadUtil.assertIsGameThread();
 
         SaveTransactions = false;
+#if DEBUG && TIME_TRANSACTIONS
+        Stopwatch sw = new Stopwatch();
+#endif
         try
         {
+#if DEBUG && TIME_TRANSACTIONS
+            sw.Start();
+#endif
             Landscape.writeHoles(worldBounds, callback);
         }
         catch (Exception ex)
@@ -653,10 +689,16 @@ public static class LandscapeUtil
         }
         finally
         {
+#if DEBUG && TIME_TRANSACTIONS
+            sw.Stop();
+#endif
             SaveTransactions = true;
         }
+#if DEBUG && TIME_TRANSACTIONS
+        Logger.LogDebug($"Holes on {worldBounds.Format()} ({callback.Method.Name.Format(false)}): {sw.GetElapsedMilliseconds().Format("F2")} ms.");
+#endif
     }
-    public static float GetBrushAlpha(this Multiplayer.Actions.IBrushFalloffAction action, float distance)
+    public static float GetBrushAlpha(IBrushFalloffAction action, float distance)
     {
         return distance < action.BrushFalloff ? 1f : (1f - distance) / (1f - action.BrushFalloff);
     }

@@ -593,6 +593,7 @@ public sealed class DevkitServerModule : IModuleNexus
                     Logger.LogError(ex);
                 }
             }
+            ClientFPSLimiter.StopPlayingOnEditorServer();
         }
 #endif
         if (!IsEditing || level != Level.BUILD_INDEX_GAME)
@@ -616,6 +617,8 @@ public sealed class DevkitServerModule : IModuleNexus
             OptionsSettings.hints = true;
             if (Level.isEditor)
                 DevkitServerSpawnsTool.CheckExistingSpawnsForNodeComponents();
+            if (IsEditing)
+                ClientFPSLimiter.StartPlayingOnEditorServer();
 #endif
         }
     }

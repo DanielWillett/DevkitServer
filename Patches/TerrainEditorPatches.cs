@@ -1,24 +1,24 @@
 ﻿#if CLIENT
+using DevkitServer.API;
 using DevkitServer.API.Permissions;
+using DevkitServer.API.UI;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players;
 using HarmonyLib;
-using JetBrains.Annotations;
 using SDG.Framework.Devkit;
 using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Landscapes;
 using System.Reflection;
 using System.Reflection.Emit;
-using DevkitServer.Multiplayer.Sync;
-using DevkitServer.API.UI;
-using DevkitServer.API;
 
 namespace DevkitServer.Patches;
 [HarmonyPatch]
 internal static class TerrainEditorPatches
 {
+    internal static bool LastEditedTerrain;
 
     [HarmonyPatch(typeof(TerrainEditor), nameof(TerrainEditor.update))]
     [HarmonyTranspiler]
@@ -179,6 +179,9 @@ internal static class TerrainEditorPatches
         MethodInfo? onPermissionInvoker = tep.GetMethod(nameof(OnPermissionsInvoker), BindingFlags.Static | BindingFlags.NonPublic);
         if (hasPermission == null)
             Logger.LogWarning("Unable to find method: ClientEvents.OnNoPermissionsInvoker.", method: "CLIENT EVENTS");
+
+        FieldInfo lastEditedTerrainField = typeof(TerrainEditorPatches).GetField(nameof(LastEditedTerrain), BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static)!;
+
         LocalBuilder localBounds = generator.DeclareLocal(typeof(Bounds));
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
         int addTileCt = 0;
@@ -188,7 +191,8 @@ internal static class TerrainEditorPatches
         bool pAddTile = false, pRemoveTile = false;
         Label stLbl = generator.DefineLabel();
         int i = 0;
-        PatchUtil.InsertActionRateLimiter(ref i, stLbl, ins);
+        yield return new CodeInstruction(OpCodes.Ldc_I4_0);
+        yield return new CodeInstruction(OpCodes.Stsfld, lastEditedTerrainField);
         for (; i < ins.Count; ++i)
         {
             CodeInstruction c = ins[i];
@@ -204,7 +208,7 @@ internal static class TerrainEditorPatches
                     if (ins[i + 3].Calls(writeHeightmap))
                         permission = permissionWriteHeightmap;
                     else if (ins[i + 3].Calls(writeSplatmap))
-                        permission = permissionWriteHoles;
+                        permission = permissionWriteSplatmap;
                     else
                         permission = permissionWriteHoles;
 
@@ -271,6 +275,8 @@ internal static class TerrainEditorPatches
                         invoker = autoPaintInvoker;
                     else if (method == paintSmoothHandler)
                         invoker = paintSmoothInvoker;
+
+                    // holes
                     else if (method == holesHandler)
                         invoker = holesInvoker;
 
@@ -285,6 +291,9 @@ internal static class TerrainEditorPatches
                         yield return new CodeInstruction(OpCodes.Pop);
                         Logger.LogWarning("Unknown function pointer-based method call: " + method.Format() + ".", method: "CLIENT EVENTS");
                     }
+
+                    yield return new CodeInstruction(OpCodes.Ldc_I4_1);
+                    yield return new CodeInstruction(OpCodes.Stsfld, lastEditedTerrainField);
 
                     i += 3;
                     continue;
@@ -530,7 +539,6 @@ internal static class TerrainEditorPatches
     {
         if (!DevkitServerModule.IsEditing) return;
 
-        Logger.LogDebug("[CLIENT EVENTS] Tile added: " + tile.coord.Format() + ".");
         ClientEvents.InvokeOnAddTile(new UpdateLandscapeTileProperties(tile, CachedTime.DeltaTime));
     }
     [UsedImplicitly]

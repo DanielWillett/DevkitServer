@@ -429,6 +429,9 @@ public class SystemConfig : SchemaConfiguration
 
     [JsonPropertyName("high_speed")]
     public TcpServerInfo TcpSettings { get; set; }
+
+    [JsonPropertyName("max_client_edit_fps")]
+    public int MaxClientEditFPS { get; set; } = 50;
 #endif
 #nullable restore
 #if SERVER
@@ -461,6 +464,7 @@ public class SystemConfig : SchemaConfiguration
         };
         UserSavedataLocationOverride = null;
         AdminsAreSuperusers = true;
+        MaxClientEditFPS = 50;
 #endif
     }
 #if SERVER
