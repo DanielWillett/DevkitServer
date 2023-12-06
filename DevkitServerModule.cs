@@ -244,12 +244,14 @@ public sealed class DevkitServerModule : IModuleNexus
             if (!Dedicator.isStandaloneDedicatedServer)
             {
                 CommandWindow.LogError("You are running a dedicated server build on a game client.");
+                SystemTextJsonPatches.Unpatch();
                 goto fault;
             }
 #elif CLIENT
             if (Dedicator.isStandaloneDedicatedServer)
             {
                 CommandWindow.LogError("You are running a client build on a dedicated server.");
+                SystemTextJsonPatches.Unpatch();
                 goto fault;
             }
 #endif
@@ -267,6 +269,8 @@ public sealed class DevkitServerModule : IModuleNexus
             Logger.InitLogger();
             InitializedLogging = true;
             BundleOrigin = AssetUtil.CreateAssetOrigin(ModuleName, 0ul, true);
+
+            PatchesMain.Init();
 #if CLIENT
             MovementUtil.Init();
             Logger.PostPatcherSetupInitLogger();

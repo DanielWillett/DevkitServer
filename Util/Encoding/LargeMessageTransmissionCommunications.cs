@@ -506,6 +506,37 @@ internal class LargeMessageTransmissionCommunications : IDisposable
     private void HandleSlowEnd(in MessageContext ctx, ByteReader reader, byte verison)
     {
         bool cancelled = reader.ReadBool();
+
+        if (IsServer)
+        {
+            if (!cancelled)
+            {
+                Logger.LogWarning($"Received server transmission: {Transmission.TransmissionId.Format()}, but expected client.", method: Transmission.LogSource);
+                return;
+            }
+
+            ctx.Acknowledge();
+            Logger.LogInfo($"[{Transmission.LogSource}] Cancelled level load.");
+            MessageContext ctx2 = ctx;
+            UniTask.Create(async () =>
+            {
+                bool val;
+                try
+                {
+                    val = await Transmission.Cancel();
+                }
+                catch (InvalidOperationException)
+                {
+                    Logger.LogWarning($"Received cancel message when invalid for transmission: {Transmission.TransmissionId.Format()}.", method: Transmission.LogSource);
+                    ctx2.Acknowledge(StandardErrorCode.NotSupported);
+                    return;
+                }
+
+                ctx2.Acknowledge(val ? StandardErrorCode.Success : StandardErrorCode.GenericError);
+            });
+            return;
+        }
+
         if (cancelled)
         {
             ctx.Reply(SendSlowMissedPackets, Array.Empty<int>());
@@ -573,12 +604,37 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             Transmission.Handler.InitialMissingPackets = 0;
             Transmission.Handler.TotalMissingPackets = 0;
             Transmission.Handler.IsDownloaded = true;
+            Transmission.Handler.EndTimestamp = DateTime.UtcNow;
             Transmission.Handler.ReceivedBytes = Transmission.FinalSize;
             Transmission.Handler.ReceivedPackets = _pendingSlowPacketCount;
             Transmission.Handler.IsDirty = true;
         }
 
         Transmission.OnFinalContentCompleted();
+    }
+
+    internal async UniTask<bool> Cancel(CancellationToken token = default)
+    {
+        if (IsServer)
+        {
+#if SERVER
+            RequestResponse sendEndResponse = await SendSlowEnd.Request(SendSlowMissedPackets, Connection, Transmission.WriteEndCancelled);
+#else
+            RequestResponse sendEndResponse = await SendSlowEnd.Request(SendSlowMissedPackets, Transmission.WriteEndCancelled);
+#endif
+
+            return sendEndResponse.Responded && sendEndResponse.TryGetParameter(0, out int[] arr) && arr.Length == 0;
+        }
+        else
+        {
+#if SERVER
+            RequestResponse sendEndResponse = await SendSlowEnd.RequestAck(Connection, Transmission.WriteEndCancelled);
+#else
+            RequestResponse sendEndResponse = await SendSlowEnd.RequestAck(SendSlowMissedPackets, Transmission.WriteEndCancelled);
+#endif
+
+            return sendEndResponse.ErrorCode is (int)StandardErrorCode.Success;
+        }
     }
 
     [UsedImplicitly]
@@ -606,6 +662,14 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         Transmission.FinalContent = new ArraySegment<byte>(bytes);
             
         ctx.Acknowledge(StandardErrorCode.Success);
+
+        if (Transmission.Handler != null)
+        {
+            Transmission.Handler.IsDownloaded = true;
+            Transmission.Handler.EndTimestamp = DateTime.UtcNow;
+            Transmission.Handler.ReceivedBytes = Transmission.FinalSize;
+            Transmission.Handler.IsDirty = true;
+        }
 
         Transmission.OnFinalContentCompleted();
     }
@@ -691,7 +755,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
         if (transmission.Comms.IsServer)
         {
-            Logger.LogWarning($"Received server transmission: {guid.Format()}, but expected client.", method: "LARGE MSG");
+            Logger.LogWarning($"Received server transmission: {guid.Format()}, but expected client.", method: transmission.LogSource);
             ctx.Acknowledge(StandardErrorCode.AccessViolation);
             return;
         }
@@ -711,12 +775,6 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             return;
         }
 
-        if (transmission.Comms.IsServer)
-        {
-            Logger.LogWarning($"Received server transmission: {guid.Format()}, but expected client.", method: "LARGE MSG");
-            return;
-        }
-
         transmission.Comms.HandleSlowEnd(in ctx, reader, v);
     }
 
@@ -732,7 +790,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
         if (transmission.Comms.IsServer)
         {
-            Logger.LogWarning($"Received server transmission: {guid.Format()}, but expected client.", method: "LARGE MSG");
+            Logger.LogWarning($"Received server transmission: {guid.Format()}, but expected client.", method: transmission.LogSource);
             ctx.Acknowledge(-2);
             return;
         }
@@ -755,7 +813,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
         if (transmission.Comms.IsServer)
         {
-            Logger.LogWarning($"Received server transmission: {guid.Format()}, but expected client.", method: "LARGE MSG");
+            Logger.LogWarning($"Received server transmission: {guid.Format()}, but expected client.", method: transmission.LogSource);
             ctx.Acknowledge(StandardErrorCode.AccessViolation);
             return;
         }

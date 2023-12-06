@@ -10,6 +10,11 @@ public class LargeMessageTransmission : IDisposable
 {
     private volatile int _disposed;
     private const ushort Version = 0;
+    private bool _hasSent;
+    private bool _hasSentData;
+    private bool _hasFullSent;
+    private bool _isCancelled;
+    private CancellationTokenSource _tknSource;
     public const int HeaderCapacity = 64;
     public const int FooterCapacity = 16;
     public const int PacketCapacity = ushort.MaxValue;
@@ -140,6 +145,7 @@ public class LargeMessageTransmission : IDisposable
         TransmissionId = Guid.NewGuid();
         OriginalSize = content.Count;
         Bandwidth = bandwidth;
+        _tknSource = new CancellationTokenSource();
         Comms = new LargeMessageTransmissionCommunications(this, true);
     }
 
@@ -188,6 +194,8 @@ public class LargeMessageTransmission : IDisposable
             }
         }
 
+        _hasSent = true;
+        _tknSource = new CancellationTokenSource();
         Comms = new LargeMessageTransmissionCommunications(this, false);
 
         if (Handler == null)
@@ -217,16 +225,54 @@ public class LargeMessageTransmission : IDisposable
 
         writer.Write(TransmissionId);
 
-        writer.Write(false);
+        writer.Write(cancelled);
     }
     internal void WriteEnd(ByteWriter writer) => WriteEnd(writer, false);
     internal void WriteEndCancelled(ByteWriter writer) => WriteEnd(writer, true);
+    public async UniTask<bool> Cancel(CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+        if (Comms.IsServer)
+        {
+            if (!_hasSent)
+                throw new InvalidOperationException("Can not cancel an unsent message.");
+
+            if (_hasFullSent)
+                return false;
+
+            UniTask<bool> task = Comms.Cancel(token);
+            _tknSource.Cancel();
+            return await task;
+        }
+
+        if (_hasFullSent)
+            return false;
+
+        if (!_hasSentData)
+        {
+            UniTask<bool> task = Comms.Cancel(token);
+            _tknSource.Cancel();
+            return await task;
+        }
+        
+        _tknSource.Cancel();
+        await UniTask.WaitUntil(() => _isCancelled, PlayerLoopTiming.Update, new CancellationTokenSource(250).Token);
+        return true;
+    }
     public async UniTask Send(CancellationToken token = default)
     {
+        token = token == default ? _tknSource.Token : CancellationTokenSource.CreateLinkedTokenSource(token, _tknSource.Token).Token;
+        token.ThrowIfCancellationRequested();
+
         if (Comms.IsServer)
             throw new InvalidOperationException("Can not send from the client-side.");
 
+        _hasSent = true;
+
         await Comms.Send(token, Finalize(token));
+
+        _hasSentData = true;
+        _hasFullSent = true;
     }
     private async UniTask Compress(CancellationToken token = default)
     {
@@ -271,7 +317,6 @@ public class LargeMessageTransmission : IDisposable
 
         await UniTask.SwitchToMainThread(token);
     }
-
     private async UniTask Decompress(CancellationToken token = default)
     {
         ArraySegment<byte> source = FinalContent;
@@ -317,6 +362,8 @@ public class LargeMessageTransmission : IDisposable
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
 
+        _tknSource.Dispose();
+
         if (Handler is IDisposable handler)
         {
             try
@@ -332,13 +379,30 @@ public class LargeMessageTransmission : IDisposable
 
         Comms.Dispose();
     }
-
-    public void OnFinalContentCompleted()
+    internal void OnFinalContentCompleted()
     {
+        _hasSentData = true;
         UniTask.Create(async () =>
         {
-            await Unfinalize();
-            Handler?.OnFinished(false);
+            try
+            {
+                _tknSource.Token.ThrowIfCancellationRequested();
+                await Unfinalize(_tknSource.Token);
+            }
+            catch (OperationCanceledException) when (_tknSource.IsCancellationRequested)
+            {
+                _isCancelled = true;
+                return;
+            }
+
+            _hasFullSent = true;
+            if (Handler == null)
+                return;
+
+            Handler.FinalizedTimestamp = DateTime.UtcNow;
+            Handler.IsFinalized = true;
+            Handler.IsDirty = true;
+            Handler.OnFinished(false);
         });
     }
 }

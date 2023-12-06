@@ -86,6 +86,7 @@ internal static class PatchesMain
     {
         try
         {
+            SystemTextJsonPatches.Unpatch();
             DoManualUnpatches();
             Patcher.UnpatchAll(HarmonyId);
             Logger.LogInfo($"[{Source}] Finished unpatching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
