@@ -227,6 +227,9 @@ public sealed class DevkitServerModule : IModuleNexus
 
             Module = module;
 
+            PatchesMain.EarlyInitPatcher();
+            SystemTextJsonPatches.Patch();
+
             AssemblyResolver = new AssemblyResolver();
             AssemblyResolver.ShutdownUnsupportedModules();
 
@@ -264,7 +267,6 @@ public sealed class DevkitServerModule : IModuleNexus
             Logger.InitLogger();
             InitializedLogging = true;
             BundleOrigin = AssetUtil.CreateAssetOrigin(ModuleName, 0ul, true);
-            PatchesMain.Init();
 #if CLIENT
             MovementUtil.Init();
             Logger.PostPatcherSetupInitLogger();

@@ -70,6 +70,7 @@ public sealed class ClientInfo
 
     public bool ServerRemovesCosmeticImprovements { get; private set; }
     public bool ServerTreatsAdminsAsSuperuser { get; private set; }
+    public bool ServerHasHighSpeedSupport { get; private set; }
     public int ServerMaxClientEditFPS { get; private set; }
 #nullable restore
     internal ClientInfo() { }
@@ -105,6 +106,7 @@ public sealed class ClientInfo
         byte flag = reader.ReadUInt8();
         ServerRemovesCosmeticImprovements = (flag & 1) != 0;
         ServerTreatsAdminsAsSuperuser = (flag & 2) == 0;
+        ServerHasHighSpeedSupport = (flag & 4) != 0;
 
         if (v > 0)
             ServerMaxClientEditFPS = reader.ReadInt32();
@@ -128,6 +130,8 @@ public sealed class ClientInfo
             flag |= 1;
         if (!ServerTreatsAdminsAsSuperuser)
             flag |= 2;
+        if (ServerHasHighSpeedSupport)
+            flag |= 4;
 
         writer.Write(flag);
         writer.Write(ServerMaxClientEditFPS);
@@ -139,6 +143,7 @@ public sealed class ClientInfo
         info.ServerRemovesCosmeticImprovements = systemConfig.RemoveCosmeticImprovements;
         info.ServerTreatsAdminsAsSuperuser = systemConfig.AdminsAreSuperusers;
         info.ServerMaxClientEditFPS = systemConfig.MaxClientEditFPS;
+        info.ServerHasHighSpeedSupport = systemConfig.TcpSettings.EnableHighSpeedSupport;
     }
 #endif
 }

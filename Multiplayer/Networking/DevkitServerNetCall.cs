@@ -53,5 +53,7 @@ public enum DevkitServerNetCall : ushort
     SendLargeTransmissionPacket = 50,
     SendEndLargeTransmission = 51,
     SendMissedLargeTransmissionPackets = 52,
-    SendLargeTransmissionCheckup = 53
+    SendLargeTransmissionCheckup = 53,
+    RequestOpenHighSpeedConnection = 54,
+    RequestReleaseOrTakeHighSpeedConnection = 55
 }

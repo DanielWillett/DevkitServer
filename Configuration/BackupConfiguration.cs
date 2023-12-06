@@ -1,12 +1,16 @@
-﻿using DevkitServer.API;
-using System.Text.Json.Serialization;
+﻿extern alias NSJ;
+using DevkitServer.API;
 using DevkitServer.Configuration.Converters;
 using DevkitServer.Levels;
+using NSJ::Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace DevkitServer.Configuration;
 [EarlyTypeInit(-2)]
 public sealed class BackupConfiguration : SchemaConfiguration
 {
+    [JsonProperty("$schema", DefaultValueHandling = DefaultValueHandling.Ignore)]
+    [JsonPropertyName("$schema")]
     public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/backup_schema.json", true);
     private sealed class ConfigContainer : JsonConfigurationFile<BackupConfiguration>
     {
@@ -67,18 +71,18 @@ public sealed class BackupConfiguration : SchemaConfiguration
     static BackupConfiguration() { IntlConfig.ReloadConfig(); }
 
     [JsonPropertyName("backup_behavior")]
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(JsonStringEnumConverter))]
     public BackupBehavior Behavior { get; set; }
 
     [JsonPropertyName("backup_interval")]
     public TimeSpan? BackupInterval { get; set; }
 
     [JsonPropertyName("backup_schedule")]
-    [JsonConverter(typeof(ScheduleConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(ScheduleConverter))]
     public DateTime[]? BackupSchedule { get; set; }
 
     [JsonPropertyName("backup_schedule_interval")]
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [System.Text.Json.Serialization.JsonConverter(typeof(JsonStringEnumConverter))]
     public ScheduleInterval BackupScheduleInterval { get; set; }
 
     [JsonPropertyName("backup_schedule_is_utc")]

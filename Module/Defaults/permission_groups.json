@@ -1,5 +1,5 @@
 {
-  "SchemaURI": "https://raw.githubusercontent.com/DanielWillett/DevkitServer/c1f2ece/Module/Schemas/permission_groups_schema.json",
+  "$schema": "https://raw.githubusercontent.com/DanielWillett/DevkitServer/master/Module/Schemas/permission_groups_schema.json",
   "groups": [
     {
       "id": "director",

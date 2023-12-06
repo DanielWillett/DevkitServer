@@ -907,6 +907,9 @@ public readonly struct MessageContext
     }
 }
 
+/// <summary>
+/// Standard error codes for net messages. Negative numbers can be used for special error codes.
+/// </summary>
 public enum StandardErrorCode
 {
     Success = 0,

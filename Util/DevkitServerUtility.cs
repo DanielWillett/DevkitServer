@@ -1407,6 +1407,17 @@ public static class DevkitServerUtility
         string path = Path.GetFullPath(config.DirectoryPath);
         return string.IsNullOrEmpty(assembly.Path) ? path : Path.Combine(path, assembly.Path[0] == '/' ? assembly.Path.Substring(1) : assembly.Path);
     }
+
+    /// <summary>
+    /// Check if a <see cref="ITransportConnection"/> is valid.
+    /// </summary>
+    public static bool IsConnected(this ITransportConnection connection)
+    {
+        if (connection is HighSpeedConnection conn)
+            return conn.Client.Connected;
+
+        return connection.TryGetPort(out _);
+    }
 }
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]

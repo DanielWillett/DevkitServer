@@ -1450,7 +1450,7 @@ public static class NavigationUtil
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditNavigation"/>.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="MemberAccessException">Failed to fetch <see cref="NavigationFlags"/>.</exception>
-    /// <exception cref="ArgumentException"><paramref name="flag"/> is not found in <see cref="NavigationFlags"/>.</exception>
+    /// <exception cref="ArgumentException">The flag at <paramref name="nav"/> is not found in <see cref="NavigationFlags"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">No flag found at index <paramref name="nav"/> or <paramref name="maximumZombies"/> is not within <c>byte</c> range.</exception>
     /// <returns><see langword="true"/> if <paramref name="maximumZombies"/> was different than the current value and the value was changed, otherwise <see langword="false"/>.</returns>
     public static bool SetFlagMaximumZombies(byte nav, int maximumZombies)

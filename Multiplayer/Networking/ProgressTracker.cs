@@ -51,6 +51,8 @@ public class ProgressTracker(int totalTicks) : IProgressTracker
         get => totalTicks;
         set
         {
+            if (value == totalTicks)
+                return;
             int oldTicks = (int)Math.Round(ProgressTicks / (double)TotalTicks * value);
             totalTicks = value;
             OnProgressUpdated?.Invoke(this, oldTicks);
@@ -63,6 +65,8 @@ public class ProgressTracker(int totalTicks) : IProgressTracker
         get => _progressTicks;
         set
         {
+            if (value == _progressTicks)
+                return;
             int oldTicks = _progressTicks;
             _progressTicks = value;
 

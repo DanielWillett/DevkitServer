@@ -1,4 +1,5 @@
 ﻿#if SERVER
+using Cysharp.Threading.Tasks;
 using DevkitServer.Configuration;
 #endif
 #if CLIENT
@@ -7,14 +8,20 @@ using System.Net.Sockets;
 #endif
 
 namespace DevkitServer.Multiplayer.Networking;
+
+/// <summary>
+/// Interface for creating and using high-speed (TCP) connections.
+/// </summary>
 public static class HighSpeedNetFactory
 {
-    public const int BufferSize = 4194304; // 4 MiB
+    internal const int BufferSize = 4194304; // 4 MiB
 
     internal static readonly NetCall<Guid> HighSpeedVerify = new NetCall<Guid>((ushort)HighSpeedNetCall.Verify, highSpeed: true);
     internal static readonly NetCall HighSpeedVerifyConfirm = new NetCall((ushort)HighSpeedNetCall.VerifyConfirm, highSpeed: true);
     internal static readonly NetCall<Guid, ulong> SteamVerify = new NetCall<Guid, ulong>((ushort)DevkitServerNetCall.SendSteamVerificationToken);
     internal static readonly NetCall<ushort> OpenHighSpeedClient = new NetCall<ushort>((ushort)DevkitServerNetCall.OpenHighSpeedClient);
+    internal static readonly NetCall RequestHighSpeedServer = new NetCall((ushort)DevkitServerNetCall.RequestOpenHighSpeedConnection);
+    internal static readonly NetCall<bool> RequestReleaseOrTakeHighSpeedServer = new NetCall<bool>((ushort)DevkitServerNetCall.RequestReleaseOrTakeHighSpeedConnection);
 #if SERVER
     internal static void StartVerifying(HighSpeedConnection pending)
     {
@@ -33,7 +40,7 @@ public static class HighSpeedNetFactory
     public static int ReleaseConnection(HighSpeedConnection connection)
     {
         int c = Interlocked.Decrement(ref connection.IntlTakeCounter);
-        if (c <= 0)
+        if (c == 0)
             connection.CloseConnection();
         return c;
     }
@@ -54,7 +61,7 @@ public static class HighSpeedNetFactory
     /// <remarks>If you <paramref name="take"/> the connection or call <see cref="TakeConnection"/> on it, make sure you call <see cref="ReleaseConnection"/> when you're done.</remarks>
     public static async Task<HighSpeedConnection?> TryGetOrCreateAndVerify(ITransportConnection connection, bool take, CancellationToken token = default)
     {
-        HighSpeedConnection? hsConn = FindConnection(connection);
+        HighSpeedConnection? hsConn = FindHighSpeedConnection(connection);
         if (hsConn is not { Client.Connected: true })
             hsConn = null;
 
@@ -73,7 +80,7 @@ public static class HighSpeedNetFactory
             else return null;
 
 
-            hsConn = connection.FindConnection();
+            hsConn = connection.FindHighSpeedConnection();
             if (hsConn == null)
             {
                 Logger.LogWarning("Unable to find created high-speed connection.");
@@ -88,7 +95,7 @@ public static class HighSpeedNetFactory
                 CancellationTokenSource tknSrc = CancellationTokenSource.CreateLinkedTokenSource(token, new CancellationTokenSource(5000).Token);
                 while (!hsConn.Verified)
                 {
-                    await DevkitServerUtility.SkipFrame(tknSrc.Token);
+                    await UniTask.NextFrame(PlayerLoopTiming.Update, cancellationToken: token);
                     tknSrc.Token.ThrowIfCancellationRequested();
                 }
             }
@@ -103,14 +110,14 @@ public static class HighSpeedNetFactory
             TakeConnection(hsConn);
         return hsConn;
     }
-    public static HighSpeedConnection? FindConnection(this ITransportConnection connection)
+    public static HighSpeedConnection? FindHighSpeedConnection(this ITransportConnection connection)
     {
         HighSpeedConnection? hs = connection as HighSpeedConnection;
         bool Filter(HighSpeedConnection x) => x is { Client.Connected: true, SteamConnection: not null } && x.SteamConnection.Equals(connection);
         hs ??= HighSpeedServer.Instance.VerifiedConnections.FirstOrDefault(Filter) ?? HighSpeedServer.Instance.PendingConnections.FirstOrDefault(Filter);
         return hs;
     }
-    public static HighSpeedConnection? FindConnection(ulong steam64)
+    public static HighSpeedConnection? FindHighSpeedConnection(ulong steam64)
     {
         if (!steam64.UserSteam64())
             return null;
@@ -141,16 +148,66 @@ public static class HighSpeedNetFactory
 
         return OpenHighSpeedClient.RequestAck(connection, DevkitServerConfig.Config.TcpSettings.HighSpeedPort);
     }
+
+    [NetCall(NetCallSource.FromClient, DevkitServerNetCall.RequestOpenHighSpeedConnection)]
+    private static async Task<StandardErrorCode> ReceiveOpenHighSpeedConnectionRequest(MessageContext ctx)
+    {
+        if (DevkitServerConfig.Config.TcpSettings is not { EnableHighSpeedSupport: true })
+            return StandardErrorCode.NotSupported;
+
+        HighSpeedConnection? connection = await TryGetOrCreateAndVerify(ctx.Connection, true);
+        return connection != null ? StandardErrorCode.Success : StandardErrorCode.GenericError;
+    }
+
+    [NetCall(NetCallSource.FromClient, DevkitServerNetCall.RequestReleaseOrTakeHighSpeedConnection)]
+    private static StandardErrorCode ReceiveRequestReleaseOrTakeHighSpeedConnection(MessageContext ctx, bool isTake)
+    {
+        HighSpeedConnection? connection = ctx.Connection.FindHighSpeedConnection();
+
+        if (connection == null)
+            return StandardErrorCode.NotFound;
+
+        if (isTake)
+            TakeConnection(connection);
+        else
+            ReleaseConnection(connection);
+        return StandardErrorCode.Success;
+    }
 #endif
 #if CLIENT
     private static readonly List<MessageContext> PendingConnects = new List<MessageContext>();
+
+    public static async Task<HighSpeedConnection?> TryGetOrCreateAndVerify(CancellationToken token = default)
+    {
+        HighSpeedConnection? instance = HighSpeedConnection.Instance;
+
+        if (instance is { Client.Connected: true })
+            return instance;
+
+        if (ClientInfo.Info is { ServerHasHighSpeedSupport: false })
+            return null;
+
+        RequestResponse response = await RequestHighSpeedServer.RequestAck();
+        return response.ErrorCode is not (int)StandardErrorCode.Success ? null : HighSpeedConnection.Instance;
+    }
+
+    public static void TakeConnection()
+    {
+        RequestReleaseOrTakeHighSpeedServer.Invoke(true);
+    }
+    public static void ReleaseConnection()
+    {
+        RequestReleaseOrTakeHighSpeedServer.Invoke(false);
+    }
+
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.OpenHighSpeedClient)]
     private static void ReceiveOpenHighSpeedClient(MessageContext ctx, ushort port)
     {
         HighSpeedConnection? connection = HighSpeedConnection.Instance;
         if (connection == null)
         {
-            PendingConnects.Add(ctx);
+            lock (PendingConnects)
+                PendingConnects.Add(ctx);
             BeginGetConnectionToServer(port);
         }
         else ctx.Acknowledge(StandardErrorCode.Success);
@@ -181,13 +238,16 @@ public static class HighSpeedNetFactory
 
         conn.Verified = true;
         Logger.LogDebug("Verified high-speed connection.");
-        for (int i = 0; i < PendingConnects.Count; i++)
-            PendingConnects[i].Acknowledge(StandardErrorCode.Success);
+        lock (PendingConnects)
+        {
+            for (int i = 0; i < PendingConnects.Count; i++)
+                PendingConnects[i].Acknowledge(StandardErrorCode.Success);
 
-        PendingConnects.Clear();
+            PendingConnects.Clear();
+        }
     }
 
-    public static void BeginGetConnectionToServer(ushort port)
+    private static void BeginGetConnectionToServer(ushort port)
     {
         IPAddress ip = new IPAddress(DevkitServerUtility.ReverseUInt32(Provider.currentServerInfo.ip));
         Logger.LogInfo("Connecting to server at " + ip.Format() + ":" + port.Format() + ".");
@@ -211,11 +271,14 @@ public static class HighSpeedNetFactory
             Logger.LogError("Error connecting: ");
             Logger.LogError(ex);
         }
-        
-        for (int i = 0; i < PendingConnects.Count; i++)
-            PendingConnects[i].Acknowledge(StandardErrorCode.GenericError);
 
-        PendingConnects.Clear();
+        lock (PendingConnects)
+        {
+            for (int i = 0; i < PendingConnects.Count; i++)
+                PendingConnects[i].Acknowledge(StandardErrorCode.GenericError);
+
+            PendingConnects.Clear();
+        }
     }
     private static void EndConnect(IAsyncResult ar)
     {
@@ -243,10 +306,13 @@ public static class HighSpeedNetFactory
 
         DevkitServerUtility.QueueOnMainThread(() =>
         {
-            for (int i = 0; i < PendingConnects.Count; i++)
-                PendingConnects[i].Acknowledge(StandardErrorCode.GenericError);
+            lock (PendingConnects)
+            {
+                for (int i = 0; i < PendingConnects.Count; i++)
+                    PendingConnects[i].Acknowledge(StandardErrorCode.GenericError);
 
-            PendingConnects.Clear();
+                PendingConnects.Clear();
+            }
         });
     }
 
@@ -257,7 +323,7 @@ public static class HighSpeedNetFactory
     }
 }
 
-public enum HighSpeedNetCall : ushort
+internal enum HighSpeedNetCall : ushort
 {
     Verify = 1,
     VerifyConfirm = 2,

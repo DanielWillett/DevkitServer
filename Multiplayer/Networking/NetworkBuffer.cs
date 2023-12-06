@@ -135,28 +135,19 @@ public class NetworkBuffer : IDisposable
         }
     }
 
-    protected virtual void Dispose(bool disposing)
-    {
-        if (!_disposed)
-        {
-            Buffer = null!;
-            if (_pendingData != null)
-            {
-                _pendingData = null;
-                GC.Collect();
-            }
-            PendingOverhead = default;
-            _disposed = true;
-        }
-    }
-    ~NetworkBuffer()
-    {
-        Dispose(disposing: false);
-    }
     public void Dispose()
     {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
+        if (_disposed)
+            return;
+
+        Buffer = null!;
+        if (_pendingData != null)
+        {
+            _pendingData = null;
+            GC.Collect();
+        }
+        PendingOverhead = default;
+        _disposed = true;
     }
 }
 

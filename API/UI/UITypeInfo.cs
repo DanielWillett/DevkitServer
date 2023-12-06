@@ -10,7 +10,7 @@ namespace DevkitServer.API.UI;
 /// </summary>
 public class UITypeInfo
 {
-    internal string ExpectedTypeName;
+    internal readonly string? ExpectedTypeName;
 
     /// <summary>
     /// Type of the UI.

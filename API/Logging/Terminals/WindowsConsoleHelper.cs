@@ -25,7 +25,6 @@ internal static class WindowsConsoleHelper
     internal static void SetUTF8CodePage()
     {
         const uint utf8 = 65001U;
-        const uint fallbackCodepage = 1;
         
         if (!SetConsoleOutputCP(utf8))
         {

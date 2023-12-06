@@ -1,53 +1,131 @@
 ﻿using Cysharp.Threading.Tasks;
 using DevkitServer.Multiplayer.Networking;
 using System.IO.Compression;
+using DevkitServer.API.Multiplayer;
 using CompressionLevel = System.IO.Compression.CompressionLevel;
 using DeflateStream = System.IO.Compression.DeflateStream;
 
 namespace DevkitServer.Util.Encoding;
-public class LargeMessageTransmission
+public class LargeMessageTransmission : IDisposable
 {
+    private volatile int _disposed;
     private const ushort Version = 0;
-    internal readonly LargeMessageTransmissionCommunications Comms;
     public const int HeaderCapacity = 64;
     public const int FooterCapacity = 16;
     public const int PacketCapacity = ushort.MaxValue;
 
-    public bool AllowHighSpeed { get; set; } = true;
-    public bool AllowCompression { get; set; } = true;
+    internal readonly LargeMessageTransmissionCommunications Comms;
+    private Type? _handlerType;
+
+    /// <summary>
+    /// Unique ID of the transmission.
+    /// </summary>
     public Guid TransmissionId { get; }
+
+    /// <summary>
+    /// If using a TCP connection is allowed.
+    /// </summary>
+    public bool AllowHighSpeed { get; set; } = true;
+
+    /// <summary>
+    /// If compression using a <see cref="DeflateStream"/> is allowed.
+    /// </summary>
+    public bool AllowCompression { get; set; } = true;
+
+    /// <summary>
+    /// Connection to use for sending data.
+    /// </summary>
 #if SERVER
-    public ITransportConnection Connection { get; set; }
+    public ITransportConnection Connection { get; }
 #elif CLIENT
-    public IClientTransport Connection { get; set; }
+    public IClientTransport Connection { get; }
 #endif
-    public ArraySegment<byte> Content { get; private set; }
-    public ArraySegment<byte> FinalContent { get; private set; }
+
+    /// <summary>
+    /// Original content sent.
+    /// </summary>
+    public ArraySegment<byte> Content { get; internal set; }
+
+    /// <summary>
+    /// Finalized (compressed) content.
+    /// </summary>
+    public ArraySegment<byte> FinalContent { get; internal set; }
+
+    /// <summary>
+    /// Log source to use for debug and warning logs.
+    /// </summary>
     public string LogSource { get; set; } = "LARGE MSG";
+
+    /// <summary>
+    /// Was the data compressed? Will be set after beginning sending for server-side.
+    /// </summary>
     public bool IsCompressed { get; private set; }
+
+    /// <summary>
+    /// Was the data sent over a high-speed (TCP) connection? Will be set after beginning sending for server-side.
+    /// </summary>
+    public bool IsHighSpeed { get; internal set; }
+
+    /// <summary>
+    /// Expected size of <see cref="Content"/>.
+    /// </summary>
     public int OriginalSize { get; set; }
+
+    /// <summary>
+    /// Expected size of <see cref="FinalContent"/>.
+    /// </summary>
+    public int FinalSize { get; set; }
+
+    /// <summary>
+    /// Max packet size for low-speed (Steam Networking) connections.
+    /// </summary>
     public int Bandwidth { get; set; }
-    public IProgressTracker? ProgressTracker { get; set; }
+
+    /// <summary>
+    /// Type to use to handle data on the client.
+    /// </summary>
+    public Type? HandlerType
+    {
+        get => _handlerType;
+        set
+        {
+            if (value != null && !typeof(BaseLargeMessageTransmissionClientHandler).IsAssignableFrom(value))
+                throw new ArgumentException("Handler must derive from BaseLargeMessageTransmissionClientHandler.", nameof(value));
+
+            _handlerType = value;
+        }
+    }
+
+    /// <summary>
+    /// Client handler to add custom receive event handling.
+    /// </summary>
+    public BaseLargeMessageTransmissionClientHandler? Handler { get; set; }
 
     internal byte Flags
     {
         get => (byte)(
             (AllowHighSpeed ? 1 : 0) |
             (AllowCompression ? 2 : 0) |
-            (IsCompressed ? 4 : 0));
+            (IsCompressed ? 4 : 0) |
+            (IsHighSpeed ? 8 : 0));
         set
         {
             AllowHighSpeed = (value & 1) != 0;
             AllowCompression = (value & 2) != 0;
             IsCompressed = (value & 4) != 0;
+            IsHighSpeed = (value & 8) != 0;
         }
     }
+    internal int LowSpeedPacketCount => (int)Math.Ceiling(FinalSize / (double)Bandwidth);
 
+    /// <summary>
+    /// Create a new transmission for the given <see cref="ITransportConnection"/>.
+    /// </summary>
     public LargeMessageTransmission(
 #if SERVER
-        ITransportConnection? targetConnection,
+        ITransportConnection targetConnection,
 #endif
-        ArraySegment<byte> content, int bandwidth)
+        ArraySegment<byte> content, int bandwidth = NetFactory.MaxPacketSize)
     {
         if (bandwidth is > ushort.MaxValue or <= 0)
             throw new ArgumentOutOfRangeException(nameof(bandwidth), bandwidth, $"(0, {ushort.MaxValue}]");
@@ -65,9 +143,9 @@ public class LargeMessageTransmission
         Comms = new LargeMessageTransmissionCommunications(this, true);
     }
 
-    public LargeMessageTransmission(
+    internal LargeMessageTransmission(
 #if SERVER
-        ITransportConnection? sendingConnection,
+        ITransportConnection sendingConnection,
 #endif
         ByteReader reader)
     {
@@ -86,10 +164,39 @@ public class LargeMessageTransmission
         LogSource = reader.ReadAsciiSmall();
 
         OriginalSize = reader.ReadInt32();
-        Comms = new LargeMessageTransmissionCommunications(this, false);
-    }
+        FinalSize = reader.ReadInt32();
+        HandlerType = reader.ReadType();
 
-    public void Write(ByteWriter writer)
+        if (HandlerType != null)
+        {
+            if (typeof(BaseLargeMessageTransmissionClientHandler).IsAssignableFrom(HandlerType))
+            {
+                try
+                {
+                    Handler = (BaseLargeMessageTransmissionClientHandler)Activator.CreateInstance(HandlerType);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Failed to create a large transmission handler for {HandlerType.Format()}.", method: LogSource);
+                    Logger.LogError(ex, method: LogSource);
+                }
+            }
+            else
+            {
+                Logger.LogError($"Failed to create a large transmission handler for {HandlerType.Format()}, " +
+                                $"must be assignable from {typeof(BaseLargeMessageTransmissionClientHandler).Format()}.", method: LogSource);
+            }
+        }
+
+        Comms = new LargeMessageTransmissionCommunications(this, false);
+
+        if (Handler == null)
+            return;
+
+        Handler.Transmission = this;
+        Handler.OnStart();
+    }
+    internal void WriteStart(ByteWriter writer)
     {
         writer.Write(Version);
 
@@ -100,38 +207,37 @@ public class LargeMessageTransmission
         writer.WriteAsciiSmall(LogSource);
 
         writer.Write(OriginalSize);
+        writer.Write(FinalSize);
+        writer.Write(HandlerType);
     }
 
-    public async UniTask Unfinalize(CancellationToken token = default)
+    internal void WriteEnd(ByteWriter writer, bool cancelled)
     {
-        if (IsCompressed)
-        {
-            await Decompress(token);
-        }
+        writer.Write(Version);
 
-        await UniTask.SwitchToMainThread(PlayerLoopTiming.EarlyUpdate, token);
+        writer.Write(TransmissionId);
+
+        writer.Write(false);
     }
-
-    public async UniTask Finalize(CancellationToken token = default)
+    internal void WriteEnd(ByteWriter writer) => WriteEnd(writer, false);
+    internal void WriteEndCancelled(ByteWriter writer) => WriteEnd(writer, true);
+    public async UniTask Send(CancellationToken token = default)
     {
-        if (IsCompressed)
-        {
-            await Compress(token);
-        }
+        if (Comms.IsServer)
+            throw new InvalidOperationException("Can not send from the client-side.");
 
-        await UniTask.SwitchToMainThread(PlayerLoopTiming.EarlyUpdate, token);
+        await Comms.Send(token, Finalize(token));
     }
-
     private async UniTask Compress(CancellationToken token = default)
     {
-        ArraySegment<byte> content = Content;
-        using MemoryStream mem = new MemoryStream(content.Count);
+        ArraySegment<byte> source = Content;
+        using MemoryStream mem = new MemoryStream(source.Count);
 
         bool disposed = false;
         DeflateStream stream = new DeflateStream(mem, CompressionLevel.Optimal);
         try
         {
-            await stream.WriteAsync(content, token).ConfigureAwait(false);
+            await stream.WriteAsync(source, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
 
             disposed = true;
@@ -148,44 +254,91 @@ public class LargeMessageTransmission
         int length = (int)mem.Position;
         token.ThrowIfCancellationRequested();
 
-        if (length < content.Count)
+        if (length < source.Count)
         {
             IsCompressed = true;
             FinalContent = new ArraySegment<byte>(compressedContent, 0, length);
-            Logger.LogInfo($"[{LogSource}] Compresssed data from {DevkitServerUtility.FormatBytes(content.Count).Colorize(FormattingUtil.NumberColor)} " +
+            FinalSize = length;
+            Logger.LogInfo($"[{LogSource}] Compresssed data from {DevkitServerUtility.FormatBytes(source.Count).Colorize(FormattingUtil.NumberColor)} " +
                            $"to {DevkitServerUtility.FormatBytes(FinalContent.Count).Colorize(FormattingUtil.NumberColor)}.");
         }
         else
         {
             IsCompressed = false;
-            FinalContent = content;
+            FinalContent = source;
+            FinalSize = source.Count;
         }
+
+        await UniTask.SwitchToMainThread(token);
     }
 
     private async UniTask Decompress(CancellationToken token = default)
     {
+        ArraySegment<byte> source = FinalContent;
         if (!IsCompressed)
         {
-            Content = FinalContent;
+            Content = source;
             return;
         }
 
-        using MemoryStream mem = new MemoryStream(FinalContent.Count);
+        using MemoryStream mem = new MemoryStream(source.Array!, source.Offset, source.Count);
 
         byte[] buffer = new byte[OriginalSize];
 
-        await using DeflateStream stream = new DeflateStream(mem, CompressionMode.Decompress);
+        using DeflateStream stream = new DeflateStream(mem, CompressionMode.Decompress);
+
+        await UniTask.SwitchToThreadPool();
 
         int count = await stream.ReadAsync(buffer, token).ConfigureAwait(false);
+        await stream.FlushAsync(token).ConfigureAwait(false);
 
         await UniTask.SwitchToMainThread(PlayerLoopTiming.EarlyUpdate, token);
         if (OriginalSize != count)
         {
             Logger.LogWarning($"Expected data of length {DevkitServerUtility.FormatBytes(OriginalSize).Colorize(FormattingUtil.NumberColor)} " +
                               $"but instead got data of length {DevkitServerUtility.FormatBytes(count).Colorize(FormattingUtil.NumberColor)}.", method: LogSource);
-
         }
 
         Content = new ArraySegment<byte>(buffer, 0, count);
+
+        await UniTask.SwitchToMainThread(token);
+    }
+    private UniTask Unfinalize(CancellationToken token = default)
+    {
+        return IsCompressed ? Decompress(token) : UniTask.CompletedTask;
+    }
+    private UniTask Finalize(CancellationToken token = default)
+    {
+        return AllowCompression && !IsCompressed ? Compress(token) : UniTask.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
+        if (Handler is IDisposable handler)
+        {
+            try
+            {
+                handler.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to dispose handler: {Handler.GetType().Format()}.", method: LogSource);
+                Logger.LogError(ex, method: LogSource);
+            }
+        }
+
+        Comms.Dispose();
+    }
+
+    public void OnFinalContentCompleted()
+    {
+        UniTask.Create(async () =>
+        {
+            await Unfinalize();
+            Handler?.OnFinished(false);
+        });
     }
 }

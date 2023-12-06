@@ -1,9 +1,7 @@
-﻿
+﻿#if CLIENT
+using DevkitServer.API;
 using DevkitServer.API.Iterators;
 using DevkitServer.API.UI;
-
-#if CLIENT
-using DevkitServer.API;
 using DevkitServer.Models;
 using DevkitServer.Util.Region;
 using SDG.Framework.Devkit.Interactable;

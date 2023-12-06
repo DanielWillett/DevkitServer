@@ -33,32 +33,34 @@ internal static class PatchesMain
         get => _patcher ??= new Harmony(HarmonyId);
         internal set => _patcher = value;
     }
+    internal static void EarlyInitPatcher()
+    {
+        Logger.LogInfo($"[{Source}] Patching game code...");
 
+        string path = Path.Combine(UnturnedPaths.RootDirectory.FullName, "Logs", "harmony.log");
+        Environment.SetEnvironmentVariable("HARMONY_LOG_FILE", path);
+        DevkitServerUtility.CheckDirectory(false, true, DevkitServerConfig.Directory, null);
+        try
+        {
+            using FileStream str = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+            byte[] bytes = Encoding.UTF8.GetBytes(DateTimeOffset.UtcNow.ToString("R") + Environment.NewLine);
+            str.Write(bytes, 0, bytes.Length);
+            str.Flush();
+        }
+        catch (Exception ex)
+        {
+            CommandWindow.LogError("Unable to clear previous harmony log.");
+            CommandWindow.LogError(ex);
+        }
+        Harmony.DEBUG = true;
+
+        Patcher = new Harmony(HarmonyId);
+    }
     internal static void Init()
     {
         try
         {
-            Logger.LogInfo($"[{Source}] Patching game code...");
             Stopwatch sw = Stopwatch.StartNew();
-
-            string path = Path.Combine(UnturnedPaths.RootDirectory.FullName, "Logs", "harmony.log");
-            Environment.SetEnvironmentVariable("HARMONY_LOG_FILE", path);
-            DevkitServerUtility.CheckDirectory(false, true, DevkitServerConfig.Directory, null);
-            try
-            {
-                using FileStream str = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
-                byte[] bytes = Encoding.UTF8.GetBytes(DateTimeOffset.UtcNow.ToString("R") + Environment.NewLine);
-                str.Write(bytes, 0, bytes.Length);
-                str.Flush();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Unable to clear previous harmony log.", method: Source);
-                Logger.LogError(ex, method: Source);
-            }
-            Harmony.DEBUG = true;
-
-            Patcher = new Harmony(HarmonyId);
             Patcher.PatchAll();
 #if SERVER
             ServerGizmoPatches.Patch();
