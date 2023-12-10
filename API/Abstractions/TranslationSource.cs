@@ -30,6 +30,11 @@ public class TranslationSource
     public static ITranslationSource DevkitServerCommandLocalizationSource { get; } = new PluginTranslationSource(2);
 
     /// <summary>
+    /// Translation source referencing <see cref="DevkitServerModule.LevelLoadingLocalization"/>.
+    /// </summary>
+    public static ITranslationSource DevkitServerLevelLoadingLocalizationSource { get; } = new PluginTranslationSource(3);
+
+    /// <summary>
     /// Uses <see cref="ILocalizedCommand.Translations"/>. The command must be registered on the receiving party.
     /// </summary>
     public static ITranslationSource FromCommand(ILocalizedCommand command)
@@ -556,6 +561,8 @@ public sealed class PluginTranslationSource : ITranslationSource
                 return DevkitServerModule.MessageLocalization.Translate(key, parameters);
             if (Index == 2 && DevkitServerModule.CommandLocalization.has(key))
                 return DevkitServerModule.CommandLocalization.Translate(key, parameters);
+            if (Index == 3 && DevkitServerModule.LevelLoadingLocalization.has(key))
+                return DevkitServerModule.LevelLoadingLocalization.Translate(key, parameters);
         }
         else
         {

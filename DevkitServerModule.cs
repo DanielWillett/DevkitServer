@@ -162,6 +162,17 @@ public sealed class DevkitServerModule : IModuleNexus
         { "TooManyRoads", "Too Many Roads\nMax: {0}" },
         { "TooManyRoadVerticies", "Too Many Verticies\nMax: {0}" }
     };
+    public static Local LevelLoadingLocalization { get; private set; } = null!;
+
+    private static readonly LocalDatDictionary DefaultLevelLoadingLocalization = new LocalDatDictionary
+    {
+        // {0} = level name, {1} = amt downloaded, {2} = total size, {3} = download speed, {4} = time remaining
+        { "CalculatingSpeed", "{0} [ {1} / {2} ] | Calculating Speed" },
+        { "Downloading", "{0} [ {1} / {2} ] @ {3} / sec | Remaining: {4}" },
+        { "Installing", "{0} | Installing" },
+        { "RecoveringMissingPackets", "{0} [ {1} / {2} ] | Recovering Missing Packets" },
+        { "DownloadFailed", "Level failed to download. Try joining again." }
+    };
 
     public static CultureInfo CommandParseLocale { get; set; } = CultureInfo.InvariantCulture;
     public static AssetOrigin BundleOrigin { get; private set; } = new AssetOrigin
@@ -228,7 +239,6 @@ public sealed class DevkitServerModule : IModuleNexus
             Module = module;
 
             PatchesMain.EarlyInitPatcher();
-            SystemTextJsonPatches.Patch();
 
             AssemblyResolver = new AssemblyResolver();
             AssemblyResolver.ShutdownUnsupportedModules();
@@ -244,14 +254,12 @@ public sealed class DevkitServerModule : IModuleNexus
             if (!Dedicator.isStandaloneDedicatedServer)
             {
                 CommandWindow.LogError("You are running a dedicated server build on a game client.");
-                SystemTextJsonPatches.Unpatch();
                 goto fault;
             }
 #elif CLIENT
             if (Dedicator.isStandaloneDedicatedServer)
             {
                 CommandWindow.LogError("You are running a client build on a dedicated server.");
-                SystemTextJsonPatches.Unpatch();
                 goto fault;
             }
 #endif
@@ -306,6 +314,7 @@ public sealed class DevkitServerModule : IModuleNexus
             ReloadMainLocalization();
             ReloadCommandsLocalization();
             ReloadMessagesLocalization();
+            ReloadLevelLoadingLocalization();
             PluginAdvertising.Get().AddPlugin(MainLocalization.format("Name"));
             _tknSrc = new CancellationTokenSource();
             Logger.LogInfo("DevkitServer loading...");
@@ -1034,6 +1043,13 @@ public sealed class DevkitServerModule : IModuleNexus
         Local lcl = Localization.tryRead(path, false);
         DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultMessageLocalization, path);
         MessageLocalization = lcl;
+    }
+    public static void ReloadLevelLoadingLocalization()
+    {
+        string path = Path.Combine(DevkitServerConfig.LocalizationFilePath, "Level Loading");
+        Local lcl = Localization.tryRead(path, false);
+        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultLevelLoadingLocalization, path);
+        LevelLoadingLocalization = lcl;
     }
     public static bool IsCompatibleWith(Version otherVersion)
     {

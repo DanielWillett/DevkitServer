@@ -274,19 +274,20 @@ public class ByteReader
     /// Loads a new byte array to be read from.
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
-    public void LoadNew(byte[] bytes)
+    public void LoadNew(ArraySegment<byte> bytes)
     {
-        _buffer = bytes ?? throw new ArgumentNullException(nameof(bytes));
-        _length = _buffer.Length;
+        _buffer = bytes.Array ?? throw new ArgumentNullException(nameof(bytes));
+        _length = bytes.Count;
         _streamMode = false;
-        _index = 0;
-        _position = 0;
+        _index = bytes.Offset;
+        _position = bytes.Offset;
         _hasFailed = false;
     }
     private static unsafe void Reverse(byte* litEndStrt, int size)
     {
         byte* stack = stackalloc byte[size];
-        Buffer.MemoryCopy(litEndStrt, stack, size, size);
+        for (int i = 0; i < size; ++i)
+            stack[i] = litEndStrt[i];
         for (int i = 0; i < size; i++)
             litEndStrt[i] = stack[size - i - 1];
     }

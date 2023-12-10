@@ -35,11 +35,11 @@ internal static class PatchesMain
     }
     internal static void EarlyInitPatcher()
     {
-        Logger.LogInfo($"[{Source}] Patching game code...");
+        string path = Path.Combine(UnturnedPaths.RootDirectory.FullName, "Logs");
+        Directory.CreateDirectory(path);
 
-        string path = Path.Combine(UnturnedPaths.RootDirectory.FullName, "Logs", "harmony.log");
+        path = Path.Combine(path, "harmony.log");
         Environment.SetEnvironmentVariable("HARMONY_LOG_FILE", path);
-        DevkitServerUtility.CheckDirectory(false, true, DevkitServerConfig.Directory, null);
         try
         {
             using FileStream str = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
@@ -58,6 +58,8 @@ internal static class PatchesMain
     }
     internal static void Init()
     {
+        Logger.LogInfo($"[{Source}] Patching game code...");
+
         try
         {
             Stopwatch sw = Stopwatch.StartNew();
@@ -86,7 +88,6 @@ internal static class PatchesMain
     {
         try
         {
-            SystemTextJsonPatches.Unpatch();
             DoManualUnpatches();
             Patcher.UnpatchAll(HarmonyId);
             Logger.LogInfo($"[{Source}] Finished unpatching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");

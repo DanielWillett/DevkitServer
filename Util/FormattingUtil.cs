@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
+using DevkitServer.Multiplayer.Networking;
 using Version = System.Version;
 
 namespace DevkitServer.Util;
@@ -290,7 +291,7 @@ public static class FormattingUtil
 
         type += " }";
 
-        return type + GetReset();
+        return type + GetResetSuffix();
     }
     public static string Format(this MethodBase? method) => method == null ? ((object)null!).Format() : FormatProvider.StackCleaner.GetString(method);
     public static string FormatMethod(Type delegateType, string name, bool removeInstance = false, bool isStatic = false, bool isAsync = false, bool isGetter = false, bool isSetter = false, bool isIndexer = false, Type? declTypeOverride = null)
@@ -384,30 +385,30 @@ public static class FormattingUtil
         switch (block.blockType)
         {
             case ExceptionBlockType.BeginExceptionBlock:
-                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "try" + GetReset() + " {";
+                return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "try" + GetResetSuffix() + " {";
             case ExceptionBlockType.EndExceptionBlock:
-                return "} " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor) + "// end exception block" + GetReset();
+                return "} " + GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor) + "// end exception block" + GetResetSuffix();
             case ExceptionBlockType.BeginExceptFilterBlock:
-                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + " when" + GetReset() + " {";
+                return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + " when" + GetResetSuffix() + " {";
             case ExceptionBlockType.BeginCatchBlock:
-                string str = "} " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "catch" + GetReset();
+                string str = "} " + GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "catch" + GetResetSuffix();
                 if (block.catchType != null)
-                    str += " (" + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + block.catchType.Format() + GetReset() + ")";
+                    str += " (" + GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + block.catchType.Format() + GetResetSuffix() + ")";
                 return str + "{";
             case ExceptionBlockType.BeginFinallyBlock:
-                return "} " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "finally" + GetReset() + " {";
+                return "} " + GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "finally" + GetResetSuffix() + " {";
             case ExceptionBlockType.BeginFaultBlock:
-                return "} " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "fault" + GetReset() + " {";
+                return "} " + GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + "fault" + GetResetSuffix() + " {";
         }
 
-        return "} " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + block.blockType + GetReset() + " {";
+        return "} " + GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + block.blockType + GetResetSuffix() + " {";
     }
     public static string Format(this Label label) => (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
         ? string.Empty
         : (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
             ? GetExtendedANSIString(FormatProvider.StackCleaner.Configuration.Colors!.StructColor, false)
             : GetANSIString(ToConsoleColor(FormatProvider.StackCleaner.Configuration.Colors!.StructColor), false))) + "Label #" + label.GetLabelId() +
-                                                     GetReset();
+                                                     GetResetSuffix();
     public static string Format(this CodeInstruction? instruction)
     {
         if (instruction == null)
@@ -429,7 +430,7 @@ public static class FormattingUtil
                 try
                 {
                     int num = Convert.ToInt32(instruction.operand);
-                    op += " " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + num + GetReset();
+                    op += " " + GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + num + GetResetSuffix();
                 }
                 catch
                 {
@@ -440,7 +441,7 @@ public static class FormattingUtil
                 try
                 {
                     long lng = Convert.ToInt64(instruction.operand);
-                    op += " " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + lng + GetReset();
+                    op += " " + GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + lng + GetResetSuffix();
                 }
                 catch
                 {
@@ -456,7 +457,7 @@ public static class FormattingUtil
                 try
                 {
                     double dbl = Convert.ToDouble(instruction.operand);
-                    op += " " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + dbl + GetReset();
+                    op += " " + GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + dbl + GetResetSuffix();
                 }
                 catch
                 {
@@ -467,7 +468,7 @@ public static class FormattingUtil
                 try
                 {
                     int num = Convert.ToInt32(instruction.operand);
-                    op += " " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + num + GetReset();
+                    op += " " + GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + num + GetResetSuffix();
                 }
                 catch
                 {
@@ -476,14 +477,14 @@ public static class FormattingUtil
                 break;
             case OperandType.InlineString:
                 if (instruction.operand is string str)
-                    op += " " + GetColor(ToArgb(new Color32(214, 157, 133, 255))) + "\"" + str + "\"" + GetReset();
+                    op += " " + GetColorPrefix(ToArgb(new Color32(214, 157, 133, 255))) + "\"" + str + "\"" + GetResetSuffix();
                 break;
             case OperandType.InlineSwitch:
                 if (instruction.operand is Label[] jumps)
                 {
                     op += Environment.NewLine + "{";
                     for (int i = 0; i < jumps.Length; ++i)
-                        op += Environment.NewLine + "  " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + i + GetReset() + " => " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.StructColor) + " Label #" + jumps[i].GetLabelId() + GetReset();
+                        op += Environment.NewLine + "  " + GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + i + GetResetSuffix() + " => " + GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.StructColor) + " Label #" + jumps[i].GetLabelId() + GetResetSuffix();
 
                     op += Environment.NewLine + "}";
                 }
@@ -509,9 +510,9 @@ public static class FormattingUtil
             case OperandType.ShortInlineVar:
             case OperandType.InlineVar:
                 if (instruction.operand is LocalBuilder lb)
-                    op += " " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + lb.LocalIndex + GetReset() + " : " + lb.LocalType!.Format();
+                    op += " " + GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + lb.LocalIndex + GetResetSuffix() + " : " + lb.LocalType!.Format();
                 else if (instruction.operand is int index)
-                    op += " " + GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + index + GetReset();
+                    op += " " + GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.ExtraDataColor) + index + GetResetSuffix();
                 break;
         }
 
@@ -572,7 +573,7 @@ public static class FormattingUtil
         if (obj == null || obj.Equals(null))
         {
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
-                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) + "null" + ANSIForegroundReset;
+                return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) + "null" + ANSIForegroundReset;
             return "null";
         }
 
@@ -596,7 +597,7 @@ public static class FormattingUtil
         if (obj is IDevkitServerPlugin plugin)
         {
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
-                return GetColor(ToArgb(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor)) + plugin.Name + ANSIForegroundReset;
+                return GetColorPrefix(ToArgb(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor)) + plugin.Name + ANSIForegroundReset;
             return "null";
         }
 
@@ -630,11 +631,11 @@ public static class FormattingUtil
 
         if (obj is SteamPlayer pl)
         {
-            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + pl.playerID.steamID.m_SteamID.ToString("D17") + " " + pl.playerID.characterName.Format(false);
+            return GetColorPrefix(ToArgb(new Color32(102, 192, 244, 255))) + pl.playerID.steamID.m_SteamID.ToString("D17") + " " + pl.playerID.characterName.Format(false);
         }
         if (obj is Player pl2)
         {
-            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + pl2.channel.owner.playerID.steamID.m_SteamID.ToString("D17") +
+            return GetColorPrefix(ToArgb(new Color32(102, 192, 244, 255))) + pl2.channel.owner.playerID.steamID.m_SteamID.ToString("D17") +
                    " " + pl2.channel.owner.playerID.characterName.Format(false);
         }
 
@@ -656,14 +657,14 @@ public static class FormattingUtil
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
                 return s64.ToString("D17");
 
-            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + s64.ToString("D17") + ANSIForegroundReset;
+            return GetColorPrefix(ToArgb(new Color32(102, 192, 244, 255))) + s64.ToString("D17") + ANSIForegroundReset;
         }
         if (obj is CSteamID cs64 && cs64.UserSteam64())
         {
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
                 return cs64.m_SteamID.ToString("D17");
 
-            return GetColor(ToArgb(new Color32(102, 192, 244, 255))) + cs64.m_SteamID.ToString("D17") + ANSIForegroundReset;
+            return GetColorPrefix(ToArgb(new Color32(102, 192, 244, 255))) + cs64.m_SteamID.ToString("D17") + ANSIForegroundReset;
         }
         if (obj is ITransportConnection connection)
         {
@@ -672,17 +673,22 @@ public static class FormattingUtil
 
             if (connection.TryGetIPv4Address(out uint addr))
             {
-                str = GetColor(ToArgb(new Color32(204, 255, 102, 255)))
+                str = GetColorPrefix(ToArgb(new Color32(204, 255, 102, 255)))
                       + Parser.getIPFromUInt32(addr);
                 if (connection.TryGetPort(out ushort port))
-                    str += GetColor(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor) + ":" +
-                           GetColor(ToArgb(new Color32(170, 255, 0, 255))) +
+                    str += GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor) + ":" +
+                           GetColorPrefix(ToArgb(new Color32(170, 255, 0, 255))) +
                            port.ToString(CultureInfo.InvariantCulture);
 
                 return str + ANSIForegroundReset;
             }
 
-            return GetColor(ToArgb(new Color32(204, 255, 102, 255))) + (connection.GetAddressString(true) ?? "<unknown address>") + ANSIForegroundReset;
+            return GetColorPrefix(ToArgb(new Color32(204, 255, 102, 255))) + (connection.GetAddressString(true) ?? "<unknown address>") + ANSIForegroundReset;
+        }
+
+        if (obj is IClientTransport)
+        {
+            return "server".Colorize(new Color32(204, 255, 102, 255));
         }
 
         if (obj is Version version)
@@ -700,54 +706,54 @@ public static class FormattingUtil
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             if (obj is string or char)
-                return GetColor(ToArgb(new Color32(214, 157, 133, 255))) + "\"" + str + "\"" + ANSIForegroundReset;
+                return GetColorPrefix(ToArgb(new Color32(214, 157, 133, 255))) + "\"" + str + "\"" + ANSIForegroundReset;
 
             if (type.IsEnum)
-                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.EnumColor) + str + ANSIForegroundReset;
+                return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.EnumColor) + str + ANSIForegroundReset;
 
             if (type.IsPrimitive)
             {
                 if (obj is bool)
-                    return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) + str + ANSIForegroundReset;
+                    return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) + str + ANSIForegroundReset;
                 
                 if (format != null)
                 {
                     switch (obj)
                     {
                         case float n:
-                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case double n:
-                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case decimal n:
-                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case int n:
-                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case uint n:
-                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case short n:
-                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case ushort n:
-                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case sbyte n:
-                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case byte n:
-                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case long n:
-                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                         case ulong n:
-                            return GetColor(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
                     }
                 }
 
 
-                return GetColor(ToArgb(NumberColor)) + str + ANSIForegroundReset;
+                return GetColorPrefix(ToArgb(NumberColor)) + str + ANSIForegroundReset;
             }
 
             if (type.IsInterface)
-                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.InterfaceColor) + str + ANSIForegroundReset;
+                return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.InterfaceColor) + str + ANSIForegroundReset;
 
             if (type.IsValueType)
-                return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.StructColor) + str + ANSIForegroundReset;
+                return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.StructColor) + str + ANSIForegroundReset;
 
             if (type.IsArray)
             {
@@ -756,7 +762,7 @@ public static class FormattingUtil
                         "]".Colorize(FormattingColorType.Punctuation));
             }
 
-            return GetColor(FormatProvider.StackCleaner.Configuration.Colors!.ClassColor) + str + ANSIForegroundReset;
+            return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.ClassColor) + str + ANSIForegroundReset;
         }
 
         return str;
@@ -813,31 +819,35 @@ public static class FormattingUtil
             return ColorizeNoReset(str, tokenType) + ANSIForegroundReset;
         return str;
     }
+    private static int ToArgb(FormattingColorType tokenType)
+    {
+        ColorConfig colors = FormatProvider.StackCleaner.Configuration.Colors ?? Color4Config.Default;
+        return tokenType switch
+        {
+            FormattingColorType.Keyword => colors.KeywordColor,
+            FormattingColorType.Method => colors.MethodColor,
+            FormattingColorType.Property => colors.PropertyColor,
+            FormattingColorType.Parameter => colors.ParameterColor,
+            FormattingColorType.Class => colors.ClassColor,
+            FormattingColorType.Struct => colors.StructColor,
+            FormattingColorType.FlowKeyword => colors.FlowKeywordColor,
+            FormattingColorType.Interface => colors.InterfaceColor,
+            FormattingColorType.GenericParameter => colors.GenericParameterColor,
+            FormattingColorType.Enum => colors.EnumColor,
+            FormattingColorType.Namespace => colors.NamespaceColor,
+            FormattingColorType.Punctuation => colors.PunctuationColor,
+            FormattingColorType.ExtraData => colors.ExtraDataColor,
+            FormattingColorType.LinesHiddenWarning => colors.LinesHiddenWarningColor,
+            FormattingColorType.HtmlBackground => colors.HtmlBackgroundColor,
+            _ => unchecked((int)0xFFFFFFFF)
+        };
+    }
     public static string ColorizeNoReset(this string str, FormattingColorType tokenType)
     {
         StackCleanerConfiguration config = FormatProvider.StackCleaner.Configuration;
         if (config.ColorFormatting != StackColorFormatType.None)
         {
-            ColorConfig colors = config.Colors ?? Color4Config.Default;
-            int argb = tokenType switch
-            {
-                FormattingColorType.Keyword => colors.KeywordColor,
-                FormattingColorType.Method => colors.MethodColor,
-                FormattingColorType.Property => colors.PropertyColor,
-                FormattingColorType.Parameter => colors.ParameterColor,
-                FormattingColorType.Class => colors.ClassColor,
-                FormattingColorType.Struct => colors.StructColor,
-                FormattingColorType.FlowKeyword => colors.FlowKeywordColor,
-                FormattingColorType.Interface => colors.InterfaceColor,
-                FormattingColorType.GenericParameter => colors.GenericParameterColor,
-                FormattingColorType.Enum => colors.EnumColor,
-                FormattingColorType.Namespace => colors.NamespaceColor,
-                FormattingColorType.Punctuation => colors.PunctuationColor,
-                FormattingColorType.ExtraData => colors.ExtraDataColor,
-                FormattingColorType.LinesHiddenWarning => colors.LinesHiddenWarningColor,
-                FormattingColorType.HtmlBackground => colors.HtmlBackgroundColor,
-                _ => unchecked((int)0xFFFFFFFF)
-            };
+            int argb = ToArgb(tokenType);
 
             string ansiString = (config.ColorFormatting == StackColorFormatType.ExtendedANSIColor
                 ? GetExtendedANSIString(argb, false)
@@ -861,9 +871,9 @@ public static class FormattingUtil
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            string ansiString = (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+            string ansiString = FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
                 ? GetExtendedANSIString(ToArgb(color), false)
-                : GetANSIString(ToConsoleColor(ToArgb(color)), false));
+                : GetANSIString(ToConsoleColor(ToArgb(color)), false);
             return ansiString + str.Replace(ANSIForegroundReset, ansiString);
         }
 
@@ -873,9 +883,9 @@ public static class FormattingUtil
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            string ansiString = (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+            string ansiString = FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
                 ? GetExtendedANSIString(ToArgb(color), false)
-                : GetANSIString(ToConsoleColor(ToArgb(color)), false));
+                : GetANSIString(ToConsoleColor(ToArgb(color)), false);
             return ansiString + str.Replace(ANSIForegroundReset, ansiString);
         }
 
@@ -885,59 +895,70 @@ public static class FormattingUtil
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            string ansiString = (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+            string ansiString = FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
                 ? GetExtendedANSIString(argb, false)
-                : GetANSIString(ToConsoleColor(argb), false));
+                : GetANSIString(ToConsoleColor(argb), false);
             return ansiString + str.Replace(ANSIForegroundReset, ansiString) + ANSIForegroundReset;
         }
 
         return str;
     }
-    private static string GetColor(int argb)
+    public static string GetColorPrefix(int argb)
     {
-        return (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
+        return FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
             ? string.Empty
             : (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
                 ? GetExtendedANSIString(argb, false)
-                : GetANSIString(ToConsoleColor(argb), false)));
+                : GetANSIString(ToConsoleColor(argb), false));
     }
-    private static string GetReset() => FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIForegroundReset;
 
-    public static void PrintBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
+    public static string GetColorPrefix(ConsoleColor color)
     {
-        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, columnCount, offset, len));
+        return FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
+            ? string.Empty
+            : GetANSIString(color, false);
     }
-    public static void PrintBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
+
+    public static string GetColorPrefix(Color color) => GetColorPrefix(ToArgb(color));
+    public static string GetColorPrefix(Color32 color) => GetColorPrefix(ToArgb(color));
+    public static string GetColorPrefix(FormattingColorType color) => GetColorPrefix(ToArgb(color));
+    public static string GetResetSuffix() => FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIForegroundReset;
+
+    public static void PrintBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1, bool formatMessageOverhead = false)
     {
-        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, columnCount, offset, len));
+        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, columnCount, offset, len, formatMessageOverhead));
     }
-    [Pure]
-    public static string GetBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
+    public static void PrintBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1, bool formatMessageOverhead = false)
     {
-        return BytesToString(bytes, columnCount, offset, len, "X2");
-    }
-    [Pure]
-    public static string GetBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1)
-    {
-        return BytesToString(bytes, columnCount, offset, len, "000");
-    }
-    public static unsafe void PrintBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0)
-    {
-        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, len, columnCount, offset));
-    }
-    public static unsafe void PrintBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0)
-    {
-        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, len, columnCount, offset));
+        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, columnCount, offset, len, formatMessageOverhead));
     }
     [Pure]
-    public static unsafe string GetBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0)
+    public static string GetBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1, bool formatMessageOverhead = false)
     {
-        return BytesToString(bytes, columnCount, offset, len, "X2");
+        return BytesToString(bytes, columnCount, offset, len, "X2", formatMessageOverhead);
     }
     [Pure]
-    public static unsafe string GetBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0)
+    public static string GetBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1, bool formatMessageOverhead = false)
     {
-        return BytesToString(bytes, columnCount, offset, len, "000");
+        return BytesToString(bytes, columnCount, offset, len, "000", formatMessageOverhead);
+    }
+    public static unsafe void PrintBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0, bool formatMessageOverhead = false)
+    {
+        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, len, columnCount, offset, formatMessageOverhead));
+    }
+    public static unsafe void PrintBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0, bool formatMessageOverhead = false)
+    {
+        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, len, columnCount, offset, formatMessageOverhead));
+    }
+    [Pure]
+    public static unsafe string GetBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0, bool formatMessageOverhead = false)
+    {
+        return BytesToString(bytes, columnCount, offset, len, "X2", formatMessageOverhead);
+    }
+    [Pure]
+    public static unsafe string GetBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0, bool formatMessageOverhead = false)
+    {
+        return BytesToString(bytes, columnCount, offset, len, "000", formatMessageOverhead);
     }
     public static unsafe void PrintBytesHex<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
     {
@@ -958,37 +979,101 @@ public static class FormattingUtil
         return BytesToString(bytes, columnCount, offset, len);
     }
     [Pure]
-    public static string BytesToString(byte[] bytes, int columnCount, int offset, int len, string fmt)
+    public static unsafe string BytesToString(byte[] bytes, int columnCount, int offset, int len, string fmt, bool formatMessageOverhead = false)
     {
         if (offset >= bytes.Length)
             offset = bytes.Length - 1;
         if (len < 0 || len + offset < 0 || len + offset > bytes.Length)
             len = bytes.Length - offset;
-        StringBuilder sb = new StringBuilder(len * 4);
-        for (int i = 0; i < len; ++i)
-        {
-            if (i != 0 && i % columnCount == 0)
-                sb.Append(Environment.NewLine);
-            else if (i != 0)
-                sb.Append(' ');
-            sb.Append(bytes[i + offset].ToString(fmt));
-        }
-        return sb.ToString();
+        fixed (byte* ptr = &bytes[offset])
+            return BytesToString(ptr, columnCount, offset, len, fmt, formatMessageOverhead);
     }
+
+    private static readonly Color32 MessageOverheadFlag    = new Color32(0,   255, 255, 255);
+    private static readonly Color32 MessageOverheadId      = new Color32(186, 222, 192, 255);
+    private static readonly Color32 MessageOverheadSize    = new Color32(102, 255, 153, 255);
+    private static readonly Color32 MessageOverheadReqKey  = new Color32(75,  155, 88,  255);
+    private static readonly Color32 MessageOverheadRespKey = new Color32(51,  255, 119, 255);
     [Pure]
-    public static unsafe string BytesToString(byte* bytes, int columnCount, int offset, int len, string fmt)
+    public static unsafe string BytesToString(byte* bytes, int columnCount, int offset, int len, string fmt, bool formatMessageOverhead = false)
     {
         if (offset >= len)
             offset = len - 1;
         StringBuilder sb = new StringBuilder(len * 4);
+        MessageOverhead ovh = default;
+        int reset = -1;
         for (int i = 0; i < len; ++i)
         {
             if (i != 0 && i % columnCount == 0)
                 sb.Append(Environment.NewLine);
             else if (i != 0)
                 sb.Append(' ');
+            if (formatMessageOverhead && i <= 41)
+            {
+                if (reset == i)
+                {
+                    sb.Append(GetResetSuffix());
+                    reset = -1;
+                }
+
+                switch (i)
+                {
+                    case 0:
+                        ovh = new MessageOverhead(bytes + offset);
+                        sb.Append(GetColorPrefix(MessageOverheadFlag));
+                        reset = 1;
+                        break;
+
+                    // uint16
+                    case 1:
+                        sb.Append(GetColorPrefix(MessageOverheadId));
+                        reset = (ovh.Flags & MessageFlags.Guid) == 0 ? 17 : 3;
+                        break;
+                    case 3 when (ovh.Flags & MessageFlags.Guid) == 0:
+                        sb.Append(GetColorPrefix(MessageOverheadSize));
+                        reset = 7;
+                        break;
+                    case 7 when (ovh.Flags & MessageFlags.Guid) == 0 && (ovh.Flags & MessageOverhead.RequestKeyMask) != 0:
+                        sb.Append(GetColorPrefix(MessageOverheadReqKey));
+                        reset = 15;
+                        break;
+                    case 7 when ((ovh.Flags | MessageOverhead.RequestKeyMask) & MessageFlags.Guid) == 0 && (ovh.Flags & MessageOverhead.ResponseKeyMask) != 0:
+                        sb.Append(GetColorPrefix(MessageOverheadRespKey));
+                        reset = 15;
+                        break;
+                    case 15 when (ovh.Flags & MessageFlags.Guid) == 0 && (ovh.Flags & MessageOverhead.RequestKeyMask) != 0 && (ovh.Flags & MessageOverhead.ResponseKeyMask) != 0:
+                        sb.Append(GetColorPrefix(MessageOverheadRespKey));
+                        reset = 23;
+                        break;
+
+                    // guid
+                    case 17 when (ovh.Flags & MessageFlags.Guid) != 0:
+                        sb.Append(GetColorPrefix(MessageOverheadSize));
+                        reset = 21;
+                        break;
+                    case 21 when (ovh.Flags & MessageFlags.Guid) != 0:
+                        sb.Append(GetColorPrefix(MessageOverheadSize));
+                        reset = 25;
+                        break;
+                    case 25 when (ovh.Flags & MessageFlags.Guid) != 0 && (ovh.Flags & MessageOverhead.RequestKeyMask) != 0:
+                        sb.Append(GetColorPrefix(MessageOverheadReqKey));
+                        reset = 33;
+                        break;
+                    case 25 when (ovh.Flags & MessageFlags.Guid) != 0 && (ovh.Flags & MessageOverhead.RequestKeyMask) == 0 && (ovh.Flags & MessageOverhead.ResponseKeyMask) != 0:
+                        sb.Append(GetColorPrefix(MessageOverheadRespKey));
+                        reset = 33;
+                        break;
+                    case 33 when (ovh.Flags & MessageFlags.Guid) == 0 && (ovh.Flags & MessageOverhead.RequestKeyMask) != 0 && (ovh.Flags & MessageOverhead.ResponseKeyMask) != 0:
+                        sb.Append(GetColorPrefix(MessageOverheadRespKey));
+                        reset = 41;
+                        break;
+                }
+            }
             sb.Append(bytes[i + offset].ToString(fmt));
         }
+
+        if (reset != -1)
+            sb.Append(GetResetSuffix());
         return sb.ToString();
     }
     [Pure]

@@ -11,7 +11,6 @@ using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players;
 #if SERVER
 using DevkitServer.API.UI;
-using DevkitServer.Players;
 #endif
 
 namespace DevkitServer.Util;

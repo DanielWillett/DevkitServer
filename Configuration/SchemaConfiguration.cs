@@ -16,5 +16,8 @@ public abstract class SchemaConfiguration
     /// </summary>
     [JsonProperty("$schema", DefaultValueHandling = DefaultValueHandling.Ignore)]
     [JsonPropertyName("$schema")]
-    public abstract string SchemaURI { get; }
+    public string SchemaURI => GetSchemaURI();
+
+    // not using an abstract property here because older versions of System.Text.Json ignore base member attributes.
+    protected abstract string GetSchemaURI();
 }

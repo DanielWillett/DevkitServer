@@ -1,4 +1,5 @@
-﻿using DevkitServer.Util.Encoding;
+﻿using System.Text.Json.Serialization;
+using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.API.Multiplayer;
 
@@ -7,6 +8,7 @@ namespace DevkitServer.API.Multiplayer;
 /// </summary>
 public abstract class BaseLargeMessageTransmissionClientHandler
 {
+    [JsonIgnore]
     /// <summary>
     /// The transmission linked to this handler.
     /// </summary>
@@ -100,5 +102,23 @@ public abstract class BaseLargeMessageTransmissionClientHandler
     /// <summary>
     /// Called when the message is fully sent or fails. If this derives from <see cref="IDisposable"/>, <see cref="IDisposable.Dispose"/> will be called soon after.
     /// </summary>
-    protected internal virtual void OnFinished(bool failed) { }
+    protected internal virtual void OnFinished(LargeMessageTransmissionStatus status) { }
+}
+
+public enum LargeMessageTransmissionStatus
+{
+    /// <summary>
+    /// The transmission completed successfully.
+    /// </summary>
+    Success,
+
+    /// <summary>
+    /// The transmission failed but wasn't cancelled.
+    /// </summary>
+    Failure,
+
+    /// <summary>
+    /// The transmission was cancelled.
+    /// </summary>
+    Cancelled
 }

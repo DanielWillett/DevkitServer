@@ -31,21 +31,20 @@ public abstract class BaseNetCall
         HighSpeed = highSpeed;
     }
 
-    protected BaseNetCall(Delegate method, bool highSpeed = false)
+    protected BaseNetCall(Delegate method)
     {
         MethodInfo info = method.GetMethodInfo();
         if (info.TryGetAttributeSafe(out NetCallAttribute attribute))
         {
             Id = attribute.MethodID;
             Guid = string.IsNullOrEmpty(attribute.GuidString) || !Guid.TryParse(attribute.GuidString, out Guid g) ? Guid.Empty : g;
+            HighSpeed = attribute.HighSpeed;
         }
 
         if (Id == 0 && Guid == Guid.Empty)
             throw new ArgumentException($"Method provided for {info.Format()} does not contain a {typeof(NetCallAttribute).Format()} attribute, or has invalid data.", nameof(method));
         if (Guid != Guid.Empty)
             DefaultFlags = MessageFlags.Guid;
-
-        HighSpeed = highSpeed;
     }
     public abstract bool Read(byte[] message, int index, out object[] parameters);
     public NetTask Listen(int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
@@ -90,11 +89,11 @@ public class NetCallCustom : BaseNetCall
     {
         _writer = new ByteWriter(true, capacity);
     }
-    public NetCallCustom(Method method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCallCustom(Method method, int capacity = 0) : base(method)
     {
         _writer = new ByteWriter(true, capacity);
     }
-    public NetCallCustom(MethodAsync method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCallCustom(MethodAsync method, int capacity = 0) : base(method)
     {
         _writer = new ByteWriter(true, capacity);
     }
@@ -295,14 +294,14 @@ public abstract class NetCallRaw : BaseNetCall
 {
     protected internal NetCallRaw(ushort method, bool highSpeed = false) : base(method, highSpeed) { }
     protected NetCallRaw(Guid method, bool highSpeed = false) : base(method, highSpeed) { }
-    protected NetCallRaw(Delegate method, bool highSpeed = false) : base(method, highSpeed) { }
+    protected NetCallRaw(Delegate method) : base(method) { }
 }
 /// <summary> For querying only </summary>
 public abstract class DynamicNetCall : BaseNetCall
 {
     protected internal DynamicNetCall(ushort method, bool highSpeed = false) : base(method, highSpeed) { }
     protected DynamicNetCall(Guid method, bool highSpeed = false) : base(method, highSpeed) { }
-    protected DynamicNetCall(Delegate method, bool highSpeed = false) : base(method, highSpeed) { }
+    protected DynamicNetCall(Delegate method) : base(method) { }
 }
 public sealed class NetCall : BaseNetCall
 {
@@ -311,8 +310,8 @@ public sealed class NetCall : BaseNetCall
     internal NetCall(DevkitServerNetCall method) : this((ushort)method) { }
     internal NetCall(ushort method, bool highSpeed = false) : base(method, highSpeed) { }
     public NetCall(Guid method, bool highSpeed = false) : base(method, highSpeed) { }
-    public NetCall(Method method, bool highSpeed = false) : base(method, highSpeed) { }
-    public NetCall(MethodAsync method, bool highSpeed = false) : base(method, highSpeed) { }
+    public NetCall(Method method) : base(method) { }
+    public NetCall(MethodAsync method) : base(method) { }
     private byte[]? _bytes;
     public byte[] Write() => _bytes ??= new MessageOverhead(DefaultFlags, Guid, Id, 0).GetBytes();
     public byte[] Write(ref MessageOverhead overhead) => overhead.GetBytes();
@@ -452,13 +451,13 @@ public sealed class NetCallRaw<T> : NetCallRaw
         _reader = new ByteReaderRaw<T>(reader);
     }
     /// <summary>Leave <paramref name="reader"/> or <paramref name="writer"/> null to auto-fill.</summary>
-    public NetCallRaw(Method method, Reader<T>? reader, Writer<T>? writer, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCallRaw(Method method, Reader<T>? reader, Writer<T>? writer, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T>(writer, capacity: capacity);
         _reader = new ByteReaderRaw<T>(reader);
     }
     /// <summary>Leave <paramref name="reader"/> or <paramref name="writer"/> null to auto-fill.</summary>
-    public NetCallRaw(MethodAsync method, Reader<T>? reader, Writer<T>? writer, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCallRaw(MethodAsync method, Reader<T>? reader, Writer<T>? writer, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T>(writer, capacity: capacity);
         _reader = new ByteReaderRaw<T>(reader);
@@ -657,13 +656,13 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
         _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Writer<T1>? writer1, Writer<T2>? writer2, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Writer<T1>? writer1, Writer<T2>? writer2, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Writer<T1>? writer1, Writer<T2>? writer2, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Writer<T1>? writer1, Writer<T2>? writer2, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
@@ -865,13 +864,13 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
         _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
@@ -1075,13 +1074,13 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
         _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
@@ -1285,13 +1284,13 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5>(reader1, reader2, reader3, reader4, reader5);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5>(reader1, reader2, reader3, reader4, reader5);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5>(reader1, reader2, reader3, reader4, reader5);
@@ -1496,13 +1495,13 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5, T6> : NetCallRaw
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5, T6>(reader1, reader2, reader3, reader4, reader5, reader6);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Reader<T6>? reader6, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, Writer<T6>? writer6, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Reader<T6>? reader6, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, Writer<T6>? writer6, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5, T6>(reader1, reader2, reader3, reader4, reader5, reader6);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
-    public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Reader<T6>? reader6, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, Writer<T6>? writer6, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Reader<T6>? reader6, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, Writer<T6>? writer6, int capacity = 0) : base(method)
     {
         _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5, T6>(reader1, reader2, reader3, reader4, reader5, reader6);
@@ -1703,12 +1702,12 @@ public sealed class NetCall<T> : DynamicNetCall
         _reader = new DynamicByteReader<T>();
         _writer = new DynamicByteWriter<T>(capacity: capacity);
     }
-    public NetCall(Method method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(Method method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T>();
         _writer = new DynamicByteWriter<T>(capacity: capacity);
     }
-    public NetCall(MethodAsync method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(MethodAsync method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T>();
         _writer = new DynamicByteWriter<T>(capacity: capacity);
@@ -1903,12 +1902,12 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
         _reader = new DynamicByteReader<T1, T2>();
         _writer = new DynamicByteWriter<T1, T2>(capacity: capacity);
     }
-    public NetCall(Method method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(Method method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2>();
         _writer = new DynamicByteWriter<T1, T2>(capacity: capacity);
     }
-    public NetCall(MethodAsync method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(MethodAsync method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2>();
         _writer = new DynamicByteWriter<T1, T2>(capacity: capacity);
@@ -2104,12 +2103,12 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
         _reader = new DynamicByteReader<T1, T2, T3>();
         _writer = new DynamicByteWriter<T1, T2, T3>(capacity: capacity);
     }
-    public NetCall(Method method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(Method method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3>();
         _writer = new DynamicByteWriter<T1, T2, T3>(capacity: capacity);
     }
-    public NetCall(MethodAsync method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(MethodAsync method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3>();
         _writer = new DynamicByteWriter<T1, T2, T3>(capacity: capacity);
@@ -2306,12 +2305,12 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
         _reader = new DynamicByteReader<T1, T2, T3, T4>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4>(capacity: capacity);
     }
-    public NetCall(Method method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(Method method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4>(capacity: capacity);
     }
-    public NetCall(MethodAsync method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(MethodAsync method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4>(capacity: capacity);
@@ -2509,12 +2508,12 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5>(capacity: capacity);
     }
-    public NetCall(Method method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(Method method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5>(capacity: capacity);
     }
-    public NetCall(MethodAsync method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(MethodAsync method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5>(capacity: capacity);
@@ -2713,12 +2712,12 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6>(capacity: capacity);
     }
-    public NetCall(Method method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(Method method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6>(capacity: capacity);
     }
-    public NetCall(MethodAsync method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(MethodAsync method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6>(capacity: capacity);
@@ -2923,12 +2922,12 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7>(capacity: capacity);
     }
-    public NetCall(Method method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(Method method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7>(capacity: capacity);
     }
-    public NetCall(MethodAsync method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(MethodAsync method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7>(capacity: capacity);
@@ -3139,12 +3138,12 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8>(capacity: capacity);
     }
-    public NetCall(Method method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(Method method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8>(capacity: capacity);
     }
-    public NetCall(MethodAsync method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(MethodAsync method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8>(capacity: capacity);
@@ -3345,12 +3344,12 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9>(capacity: capacity);
     }
-    public NetCall(Method method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(Method method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9>(capacity: capacity);
     }
-    public NetCall(MethodAsync method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(MethodAsync method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9>(capacity: capacity);
@@ -3552,12 +3551,12 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(capacity: capacity);
     }
-    public NetCall(Method method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(Method method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(capacity: capacity);
     }
-    public NetCall(MethodAsync method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
+    public NetCall(MethodAsync method, int capacity = 0) : base(method)
     {
         _reader = new DynamicByteReader<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>();
         _writer = new DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(capacity: capacity);

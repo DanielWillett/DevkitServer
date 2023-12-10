@@ -51,7 +51,6 @@
     <!-- Build Settings -->
     <PropertyGroup Condition="$(DefineConstants.Contains(DEBUG))">
         <DebugType>full</DebugType>
-        <DebugType>pdbonly</DebugType>
     </PropertyGroup>
     <PropertyGroup Condition="$(DefineConstants.Contains(RELEASE))">
         <Optimize>True</Optimize>

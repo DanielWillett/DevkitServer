@@ -6,6 +6,7 @@ using DevkitServer.Models;
 using DevkitServer.Multiplayer.Sync;
 using System.Collections.ObjectModel;
 using System.Reflection;
+using DevkitServer.Util.Encoding;
 #if CLIENT
 using DevkitServer.AssetTools;
 using DevkitServer.Configuration;
@@ -21,6 +22,8 @@ namespace DevkitServer.Core.Commands;
 internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFile
 {
     public static readonly PermissionLeaf Test = new PermissionLeaf("test", devkitServer: true);
+
+    public override CommandExecutionMode Mode => CommandExecutionMode.Always;
 
     public IReadOnlyList<PermissionLeaf> SyncSubcommandPermissions { get; }
     public IReadOnlyList<PermissionLeaf> AsyncSubcommandPermissions { get; }
@@ -136,6 +139,14 @@ internal static class CommandTests
 {
     public static readonly Action<CommandContext>[] Commands;
     public static readonly Func<CommandContext, CancellationToken, UniTask>[] AsyncCommands;
+    private static void printtransmissions(CommandContext ctx)
+    {
+#if CLIENT
+        if (!ctx.InvokedFromConsole)
+            throw ctx.SendConsoleOnlyError();
+#endif
+        LargeMessageTransmissionCommunications.DumpDebug();
+    }
 #if CLIENT
     private static void missingobjects(CommandContext ctx)
     {
@@ -230,7 +241,6 @@ internal static class CommandTests
         ctx.ReplyString($"Tile Debug: {RegionDebug.RegionsEnabled}.");
     }
 #endif
-
 #endif
     private static void syncall(CommandContext ctx)
     {

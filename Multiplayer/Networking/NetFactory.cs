@@ -17,7 +17,10 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+
+#if CLIENT
 using DevkitServer.Multiplayer.Sync;
+#endif
 
 namespace DevkitServer.Multiplayer.Networking;
 
@@ -455,10 +458,27 @@ public static class NetFactory
         NetPakReader reader)
     {
         if (!reader.ReadUInt16(out ushort len))
+        {
+            Logger.LogWarning("Received invalid message, can't read length"
+#if SERVER
+                              + $" from {transportConnection.Format()}"
+#endif
+                              + "."
+                , method: Source);
             return;
+        }
         byte[] bytes = new byte[len];
         if (!reader.ReadBytes(bytes, len))
+        {
+            Logger.LogWarning($"Received invalid message, can't read bytes of length {len.Format()} B"
+#if SERVER
+                              + $" from {transportConnection.Format()}"
+#endif
+                              + $". Expected length <= {reader.RemainingSegmentLength.Format()}."
+                , method: Source);
             return;
+        }
+
         IncrementByteCount(false, DevkitServerMessage.InvokeMethod, len + sizeof(ushort));
 
         MessageOverhead ovh = new MessageOverhead(bytes);
@@ -577,7 +597,7 @@ public static class NetFactory
         parameters[0] = ctx = new MessageContext(connection, overhead, hs);
         Array.Copy(old, 0, parameters, 1, old.Length);
 #if METHOD_LOGGING
-        Logger.LogDebug($"  Read net method: {overhead.Format()}: {string.Join(", ", parameters.Select(x => x.Format()))}.");
+        Logger.LogDebug($"  Read net method: {overhead.Format()}: {string.Join(", ", parameters.Select(x => x.Format()))}.", ConsoleColor.DarkYellow);
 #endif
         return true;
     }
@@ -706,7 +726,7 @@ public static class NetFactory
             });
         }
 #if METHOD_LOGGING
-        Logger.LogDebug($"  Invoked net method: {methodInfo.Method.Format()}.");
+        Logger.LogDebug($"  Invoked net method: {methodInfo.Method.Format()}.", ConsoleColor.DarkYellow);
 #endif
 
         return true;
@@ -744,13 +764,13 @@ public static class NetFactory
                         if (!FillParameters(in overhead, ref ctx, connection, call, message, index, hs, ref parameters))
                         {
 #if METHOD_LOGGING
-                            Logger.LogDebug($"  Failed to read method: {overhead.Format()}.");
+                            Logger.LogDebug($"  Failed to read method: {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
                             return;
                         }
 
 #if METHOD_LOGGING
-                        Logger.LogDebug("  Satisfied local listener.");
+                        Logger.LogDebug("  Satisfied local listener.", ConsoleColor.DarkYellow);
 #endif
                         listener.Task.TellCompleted(parameters!, true);
                     }
@@ -774,7 +794,7 @@ public static class NetFactory
                         }
 
 #if METHOD_LOGGING
-                        Logger.LogDebug($"  Satisfied local acknowledgement listener {(errorCode.HasValue ? errorCode.Value.Format() : ((object?)null).Format())}.");
+                        Logger.LogDebug($"  Satisfied local acknowledgement listener {(errorCode.HasValue ? errorCode.Value.Format() : ((object?)null).Format())}.", ConsoleColor.DarkYellow);
 #endif
 
                         listener.Task.TellCompleted(new MessageContext(connection, overhead, hs), true, errorCode);
@@ -809,7 +829,7 @@ public static class NetFactory
                 if (!InvokeMethod(in overhead, ref ctx, connection, netMethodInfo, call, message, index, hs, parameters))
                 {
 #if METHOD_LOGGING
-                    Logger.LogDebug($"  Failed to read method: {overhead.Format()}.");
+                    Logger.LogDebug($"  Failed to read method: {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
                     return;
                 }
@@ -844,9 +864,9 @@ public static class NetFactory
 
 #if METHOD_LOGGING
 #if SERVER
-        Logger.LogDebug($"Received message from {connection.Format()}: {overhead.Format()}.");
+        Logger.LogDebug($"Received message from {connection.Format()}: {overhead.Format()}.", ConsoleColor.DarkYellow);
 #elif CLIENT
-        Logger.LogDebug($"Received message: {overhead.Format()}.");
+        Logger.LogDebug($"Received message: {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
 #endif
 
@@ -926,7 +946,7 @@ public static class NetFactory
                         GuidMethods[guid] = new NetMethodInfo[] { kvp };
                     }
 #if REFLECTION_LOGGING
-                    Logger.LogDebug($"Registered net method: {method.Format()} to {guid.Format("N")}.");
+                    Logger.LogDebug($"Registered net method: {method.Format()} to {guid.Format("N")}.", ConsoleColor.DarkYellow);
 #endif
                 }
                 else if (attribute.MethodID != 0)
@@ -944,7 +964,7 @@ public static class NetFactory
                         Methods[attribute.MethodID] = new NetMethodInfo[] { kvp };
                     }
 #if REFLECTION_LOGGING
-                    Logger.LogDebug($"Registered net method: {method.Format()} to {attribute.MethodID.Format()}.");
+                    Logger.LogDebug($"Registered net method: {method.Format()} to {attribute.MethodID.Format()}.", ConsoleColor.DarkYellow);
 #endif
                 }
                 else continue;
@@ -987,7 +1007,7 @@ public static class NetFactory
                     if (!call.HighSpeed && Invokers.TryGetValue(call.Id, out BaseNetCall c2) || call.HighSpeed && HighSpeedInvokers.TryGetValue(call.Id, out c2))
                     {
                         if (c2.GetType() != call.GetType())
-                            Logger.LogWarning($"Inconsistant duplicate invoker {call.Id.Format()} {(call.HighSpeed ? " (HS)" : string.Empty)} at field {field.Format()}.",
+                            Logger.LogWarning($"Inconsistant duplicate invoker {call.Id.Format()}{(call.HighSpeed ? " (HS)" : string.Empty)} at field {field.Format()}.",
                                 method: "NET REFLECT");
                         continue;
                     }
@@ -997,7 +1017,7 @@ public static class NetFactory
                     if (!call.HighSpeed && GuidInvokers.TryGetValue(call.Guid, out BaseNetCall c2) || call.HighSpeed && GuidHighSpeedInvokers.TryGetValue(call.Guid, out c2))
                     {
                         if (c2.GetType() != call.GetType())
-                            Logger.LogWarning($"Inconsistant duplicate invoker {call.Guid.Format()} {(call.HighSpeed ? " (HS)" : string.Empty)} at field {field.Format()}.",
+                            Logger.LogWarning($"Inconsistant duplicate invoker {call.Guid.Format()}{(call.HighSpeed ? " (HS)" : string.Empty)} at field {field.Format()}.",
                                 method: "NET REFLECT");
                         continue;
                     }
@@ -1116,7 +1136,7 @@ public static class NetFactory
 
                         outList?.Add(info);
 #if REFLECTION_LOGGING
-                        Logger.LogDebug($"Registered net call: {field.Format()} to {(call.Guid != Guid.Empty ? call.Guid.Format("N") : call.Id.Format())}.");
+                        Logger.LogDebug($"Registered net call: {field.Format()} to {(call.Guid != Guid.Empty ? call.Guid.Format("N") : call.Id.Format())}.", ConsoleColor.DarkYellow);
 #endif
                     }
                 }
@@ -1242,11 +1262,20 @@ public static class NetFactory
         connection, byte[] bytes, bool reliable = true, int count = -1, int offset = -1)
     {
         ThreadUtil.assertIsGameThread();
+
+        if (offset < 0)
+            offset = 0;
+        if (count < 0)
+            count = bytes.Length - offset;
+
+        if (offset + count > bytes.Length)
+            throw new ArgumentOutOfRangeException(nameof(count));
+
 #if METHOD_LOGGING
         MessageOverhead overhead;
         unsafe
         {
-            fixed (byte* ptr = &bytes[offset < 0 ? 0 : offset])
+            fixed (byte* ptr = &bytes[offset])
                 overhead = new MessageOverhead(ptr);
         }
 #endif
@@ -1259,16 +1288,16 @@ public static class NetFactory
                 Buffer.BlockCopy(bytes, offset, newBytes, 0, count);
                 bytes = newBytes;
             }
-            conn2.Send(bytes, count < 0 ? bytes.Length : count, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
+            conn2.Send(bytes, count, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
 #if METHOD_LOGGING
 
-            Logger.LogDebug("[NET FACTORY] Sending " + bytes.Length.Format() + " B (HS) to " +
+            Logger.LogDebug("[NET FACTORY] Sending " + count.Format() + " B (HS) to " +
 #if SERVER
                             connection.Format()
 #else
                             "server"
 #endif
-                            + $": {overhead.Format()}.");
+                            + $": {overhead.Format()}.", ConsoleColor.DarkYellow);
 
 #endif
             return;
@@ -1281,19 +1310,24 @@ public static class NetFactory
 #else
         Writer.WriteEnum((EServerMessage)msg);
 #endif
-        int len = Math.Min(ushort.MaxValue, bytes.Length);
+        int len = Math.Min(ushort.MaxValue, count);
+        if (len < count)
+        {
+            Logger.LogWarning($"[NET FACTORY] Message to be sent to {connection.Format()} truncated.");
+        }
+
         Writer.WriteUInt16((ushort)len);
-        Writer.WriteBytes(bytes, offset < 0 ? 0 : offset, count < 0 ? bytes.Length : count);
+        Writer.WriteBytes(bytes, offset, len);
         IncrementByteCount(true, DevkitServerMessage.InvokeMethod, len);
         Writer.Flush();
 #if METHOD_LOGGING
-        Logger.LogDebug("[NET FACTORY] Sending " + bytes.Length.Format() + " B to " +
+        Logger.LogDebug("[NET FACTORY] Sending " + len.Format() + " B to " +
 #if SERVER
             connection.Format()
 #else
             "server"
 #endif
-            + $": {overhead.Format()}.");
+            + $": {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
         connection.Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
     }
@@ -1312,11 +1346,22 @@ public static class NetFactory
             fixed (byte* ptr = bytes)
                 overhead = new MessageOverhead(ptr);
         }
-        Logger.LogDebug("[NET FACTORY] Sending " + bytes.Length.Format() + " B to " + connections.Count.Format() + " user(s): " + overhead.Format() + ".");
+        Logger.LogDebug($"[NET FACTORY] Sending {bytes.Length.Format()} B to {connections.Count.Format()} user(s): {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
         IncrementByteCount(true, DevkitServerMessage.InvokeMethod, bytes.Length * connections.Count);
         for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] is HighSpeedConnection conn)
+            {
+                conn.Send(bytes, bytes.Length, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
+#if METHOD_LOGGING
+
+                Logger.LogDebug($"[NET FACTORY] Sending {bytes.Length.Format()} B (HS) to {conn.Format()}: {overhead.Format()}.", ConsoleColor.DarkYellow);
+#endif
+            }
+
             connections[i].Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
+        }
     }
 #endif
 
@@ -1330,54 +1375,30 @@ public static class NetFactory
             if (LocalListeners[i].Task == task)
                 LocalListeners[i] = new Listener(task, LocalListeners[i].Caller);
     }
-    private readonly struct ListenerTimestamp
+    private readonly struct ListenerTimestamp(NetTask task)
     {
-        public readonly long RequestId;
-        public readonly DateTime Timestamp;
-        public readonly bool IsAcknowledgeRequest;
-        public ListenerTimestamp(NetTask task)
-        {
-            RequestId = task.RequestId;
-            Timestamp = DateTime.UtcNow;
-            IsAcknowledgeRequest = task.IsAcknowledgementRequest;
-        }
+        public readonly long RequestId = task.RequestId;
+        public readonly DateTime Timestamp = DateTime.UtcNow;
+        public readonly bool IsAcknowledgeRequest = task.IsAcknowledgementRequest;
     }
 
-    private readonly struct Listener
+    private readonly struct Listener(NetTask task, BaseNetCall caller)
     {
-        public readonly long RequestId;
-        public readonly NetTask? Task;
-        public readonly BaseNetCall Caller;
-        public Listener(NetTask task, BaseNetCall caller)
-        {
-            Task = task;
-            RequestId = task.RequestId;
-            Caller = caller;
-        }
+        public readonly NetTask? Task = task;
+        public readonly BaseNetCall Caller = caller;
     }
 }
-public readonly struct NetMethodInfo
+public readonly struct NetMethodInfo(MethodInfo method, NetCallAttribute attribute)
 {
-    public readonly MethodInfo Method;
-    public readonly NetCallAttribute Attribute;
-    public NetMethodInfo(MethodInfo method, NetCallAttribute attribute)
-    {
-        Method = method;
-        Attribute = attribute;
-    }
+    public readonly MethodInfo Method = method;
+    public readonly NetCallAttribute Attribute = attribute;
 }
 
-public readonly struct NetInvokerInfo
+public readonly struct NetInvokerInfo(FieldInfo field, BaseNetCall invoker, NetMethodInfo[] methods)
 {
-    public readonly FieldInfo Field;
-    public readonly BaseNetCall Invoker;
-    public readonly NetMethodInfo[] Methods;
-    public NetInvokerInfo(FieldInfo field, BaseNetCall invoker, NetMethodInfo[] methods)
-    {
-        Field = field;
-        Invoker = invoker;
-        Methods = methods;
-    }
+    public readonly FieldInfo Field = field;
+    public readonly BaseNetCall Invoker = invoker;
+    public readonly NetMethodInfo[] Methods = methods;
 }
 
 [MeansImplicitUse]

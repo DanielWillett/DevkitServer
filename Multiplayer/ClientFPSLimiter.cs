@@ -57,6 +57,14 @@ internal static class ClientFPSLimiter
             case TerrainEditor:
                 isEditing = TerrainEditorPatches.LastEditedTerrain;
                 break;
+            case null:
+                break;
+            default:
+                if (FoliageEditorPatches.FoliageEditor.IsInstanceOfType(UserInput.ActiveTool))
+                {
+                    // todo isEditing =
+                }
+                break;
         }
 
         if (isEditing)

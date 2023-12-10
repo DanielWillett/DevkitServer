@@ -733,7 +733,7 @@ public static class DevkitServerUtility
         SteamPending? pending = Provider.pending.Find(x => ReferenceEquals(x.transportConnection, user));
         if (pending != null)
         {
-            Provider.reject(pending.playerID.steamID, ESteamRejection.PLUGIN, message);
+            Provider.reject(pending.playerID.steamID, failureType, message);
         }
         else
         {

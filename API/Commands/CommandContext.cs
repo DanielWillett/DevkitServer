@@ -101,7 +101,11 @@ public class CommandContext : Exception
         IsConsole = Caller == null;
         CallerId = caller == null ? CSteamID.Nil : caller.playerID.steamID;
         if (DevkitServerModule.IsEditing && Caller != null)
+        {
             EditorUser = UserManager.FromId(CallerId.m_SteamID);
+            if (EditorUser == null || !EditorUser.IsOnline)
+                Logger.LogWarning($"Unable to find EditorUser for player {Caller.playerID.steamID.Format()}.");
+        }
 #else
         InvokedFromConsole = console;
         if (Player.player != null)

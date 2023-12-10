@@ -8,7 +8,7 @@ namespace DevkitServer.Core.Permissions;
 
 public class PermissionGroupsConfig : SchemaConfiguration
 {
-    public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/permission_groups_schema.json", true);
+    protected override string GetSchemaURI() => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/permission_groups_schema.json", true);
 
     private static PermissionGroupsConfig? _default;
 

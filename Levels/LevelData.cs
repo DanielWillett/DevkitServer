@@ -15,7 +15,7 @@ public sealed class LevelData
 
     private string? _lclPath;
     public uint Version { get; private set; }
-    public byte[] Data { get; internal set; } = null!;
+    public ArraySegment<byte> Data { get; internal set; } = null!;
     internal List<object>? ReplicatedLevelData { get; set; }
     public Folder LevelFolderContent { get; private set; }
     public bool Compressed { get; internal set; }
@@ -88,7 +88,7 @@ public sealed class LevelData
 
     private static ByteWriter? _levelWriter;
     private static ByteReader? _levelReader;
-    public static LevelData Read(byte[] payload)
+    public static LevelData Read(ArraySegment<byte> payload)
     {
         ThreadUtil.assertIsGameThread();
         ByteReader reader = _levelReader ??= new ByteReader { ThrowOnError = true };
@@ -107,7 +107,7 @@ public sealed class LevelData
         reader.LoadNew(Array.Empty<byte>());
         return data;
     }
-    public void WriteToData()
+    public void WriteToData(bool flush)
     {
         ThreadUtil.assertIsGameThread();
         ByteWriter writer = _levelWriter ??= new ByteWriter(false, 134217728); // 128 MiB
@@ -126,9 +126,15 @@ public sealed class LevelData
 
         Folder.Write(writer, in folder);
 
-        byte[] data = writer.ToArray();
-        Data = data;
-        writer.Flush();
+        if (flush)
+        {
+            Data = writer.ToArray();
+            writer.Flush();
+        }
+        else
+        {
+            Data = writer.ToArraySegmentAndDontFlush();
+        }
     }
 
     internal static bool ShouldSendFile(FileInfo file)

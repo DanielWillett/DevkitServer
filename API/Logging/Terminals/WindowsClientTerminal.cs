@@ -350,15 +350,11 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
             CommandWindow.LogError(ex);
         }
     }
-    internal readonly struct LogMessage
+    internal readonly struct LogMessage(string message, ConsoleColor color, bool save)
     {
-        public readonly string Message;
-        public readonly bool Save;
-        public LogMessage(string message, ConsoleColor color, bool save)
-        {
-            Message = FormattingUtil.GetANSIString(color, false) + message + FormattingUtil.ANSIForegroundReset;
-            Save = save;
-        }
+        public readonly string Message = FormattingUtil.GetANSIString(color, false) + message + FormattingUtil.ANSIForegroundReset;
+        public readonly bool Save = save;
+
         public void Write()
         {
             Console.WriteLine(Message);

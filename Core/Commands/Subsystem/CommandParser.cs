@@ -4,19 +4,14 @@ using DevkitServer.Players;
 #endif
 
 namespace DevkitServer.Core.Commands.Subsystem;
-public class CommandParser
+public class CommandParser(ICommandHandler handler)
 {
     public const int MaxArgCount = 32;
 
     public static char[] Prefixes = { '/', '@', '\\' };
     public static char[] ContinueArgChars = { '\'', '"', '`', '“', '”', '‘', '’' };
     protected readonly ArgumentInfo[] ArgumentBuffer = new ArgumentInfo[MaxArgCount];
-    private readonly ICommandHandler _handler;
-    public ICommandHandler Handler => _handler;
-    public CommandParser(ICommandHandler handler)
-    {
-        _handler = handler;
-    }
+    public ICommandHandler Handler => handler;
     protected struct ArgumentInfo
     {
         public int Start;
@@ -254,9 +249,9 @@ public class CommandParser
 
                 // find command, assumes already sorted by priority
                 string command = new string(ptr, cmdStart, cmdEnd - cmdStart + 1);
-                for (int k = 0; k < _handler.Commands.Count; ++k)
+                for (int k = 0; k < handler.Commands.Count; ++k)
                 {
-                    IExecutableCommand cmd = _handler.Commands[k];
+                    IExecutableCommand cmd = handler.Commands[k];
                     string c2 = cmd.CommandName;
                     if (command.Equals(c2, StringComparison.InvariantCultureIgnoreCase))
                     {
@@ -365,7 +360,7 @@ public class CommandParser
                 originalMessage = Prefixes[0] + originalMessage;
             }
             brk2:
-            _handler.ExecuteCommand(_handler.Commands[cmdInd],
+            handler.ExecuteCommand(handler.Commands[cmdInd],
 #if SERVER
                 user, 
 #endif

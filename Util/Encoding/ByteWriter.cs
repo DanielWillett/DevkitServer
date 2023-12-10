@@ -207,6 +207,31 @@ public class ByteWriter
         System.Buffer.BlockCopy(_buffer, 0, rtn, 0, _size);
         return rtn;
     }
+
+    /// <summary>
+    /// This can be more resource-intensive when used on a reusable writer as the buffer will have to be reallocated afterwards.
+    /// </summary>
+    public ArraySegment<byte> ToArraySegmentAndFlush()
+    {
+        if (_streamMode)
+            throw new NotSupportedException("Exporting to an array segment is not supported in stream mode.");
+
+        ArraySegment<byte> segment = new ArraySegment<byte>(_buffer, 0, _size);
+        _buffer = Array.Empty<byte>();
+        _size = 0;
+        return segment;
+    }
+
+    /// <summary>
+    /// This can be dangerous if the data is used after the next time the writer is used.
+    /// </summary>
+    public ArraySegment<byte> ToArraySegmentAndDontFlush()
+    {
+        if (_streamMode)
+            throw new NotSupportedException("Exporting to an array segment is not supported in stream mode.");
+
+        return new ArraySegment<byte>(_buffer, 0, _size);
+    }
     public void ExtendBuffer(int newsize)
     {
         if (_streamMode)
@@ -329,7 +354,8 @@ public class ByteWriter
     private static unsafe void Reverse(byte* litEndStrt, int size)
     {
         byte* stack = stackalloc byte[size];
-        System.Buffer.MemoryCopy(litEndStrt, stack, size, size);
+        for (int i = 0; i < size; ++i)
+            stack[i] = litEndStrt[i];
         for (int i = 0; i < size; i++)
             litEndStrt[i] = stack[size - i - 1];
     }

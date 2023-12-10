@@ -361,9 +361,9 @@ public class DevkitServerConfig
 public class SystemConfig : SchemaConfiguration
 {
 #if SERVER
-    public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/server_config_schema.json", true);
+    protected override string GetSchemaURI() => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/server_config_schema.json", true);
 #else
-    public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/client_config_schema.json", true);
+    protected override string GetSchemaURI() => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/client_config_schema.json", true);
 #endif
 
 #nullable disable
@@ -390,12 +390,14 @@ public class SystemConfig : SchemaConfiguration
     /// Key used to toggle the Live Editor checkbox.
     /// </summary>
     [JsonPropertyName("edit_keybind")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public KeyCode LevelObjectEditKeybind { get; set; }
 
     /// <summary>
     /// Key used to print all objects that don't have an offset to Client.log.
     /// </summary>
     [JsonPropertyName("log_mising_keybind")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public KeyCode LogMissingLevelObjectKeybind { get; set; }
 
     /// <summary>

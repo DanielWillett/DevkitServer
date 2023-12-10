@@ -1,6 +1,9 @@
 ﻿using Cysharp.Threading.Tasks;
+using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Networking;
 using System.Collections.Concurrent;
+using System.Text.Json;
+using DevkitServer.API.Multiplayer;
 
 namespace DevkitServer.Util.Encoding;
 internal class LargeMessageTransmissionCommunications : IDisposable
@@ -38,10 +41,12 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         IsServer = isServer;
         Connection = transmission.Connection;
 
-        ActiveMessages.TryAdd(transmission.TransmissionId, transmission);
-
         if (isServer)
+        {
+            ActiveMessages.TryAdd(transmission.TransmissionId, transmission);
+            Logger.LogDebug($"[{Transmission.LogSource}] Registered transmission as server.");
             return;
+        }
         
         _pendingSlowPacketCount = Transmission.LowSpeedPacketCount;
         Transmission.Bandwidth = _pendingSlowPacketCount <= 1 ? Math.Min(Transmission.Bandwidth, Transmission.FinalContent.Count) : Transmission.Bandwidth;
@@ -78,7 +83,15 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         Transmission.Handler.ReceivedBytes = 0;
         Transmission.Handler.TotalBytes = Transmission.FinalSize;
         Transmission.Handler.IsStarted = true;
-        Transmission.Handler.IsDirty = true;
+        try
+        {
+            Transmission.Handler.IsDirty = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
+            Logger.LogError(ex, method: Transmission.LogSource);
+        }
     }
 
 #if CLIENT
@@ -89,7 +102,15 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         
         Transmission.Handler.ReceivedBytes = bytesDownloaded;
         Transmission.Handler.TotalBytes = totalBytes;
-        Transmission.Handler.IsDirty = true;
+        try
+        {
+            Transmission.Handler.IsDirty = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
+            Logger.LogError(ex, method: Transmission.LogSource);
+        }
     }
 #endif
 
@@ -132,7 +153,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         catch (Exception ex)
         {
             Logger.LogError("Error uploading connection.", method: Transmission.LogSource);
-            Logger.LogError(ex);
+            Logger.LogError(ex, method: Transmission.LogSource);
 
             if (highSpeedConnection != null)
             {
@@ -143,7 +164,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 #endif
             }
         }
-        Logger.LogInfo($"[{Transmission.LogSource}] Sent data ({Transmission.FinalContent.Count:N} B) in {CachedTime.RealtimeSinceStartup - startTime:F3} seconds.", ConsoleColor.DarkCyan);
+        Logger.LogInfo($"[{Transmission.LogSource}] Sent data ({Transmission.OriginalSize.Format()} B -> {Transmission.FinalSize.Format()} B) in {(CachedTime.RealtimeSinceStartup - startTime).Format("F2")} seconds.", ConsoleColor.DarkCyan);
 
         return true;
     }
@@ -201,26 +222,21 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 #endif
 
         if (uploadTask.Parameters is { Responded: true, ErrorCode: (int)StandardErrorCode.Success })
-        {
-            Logger.LogInfo($"[{Transmission.LogSource}] Uploaded {DevkitServerUtility.FormatBytes(Transmission.FinalContent.Count)}.", ConsoleColor.DarkCyan);
-        }
-        else
-        {
-            Logger.LogWarning($"Failed to send {DevkitServerUtility.FormatBytes(Transmission.FinalContent.Count)} of data over a high-speed connection.", ConsoleColor.DarkCyan, method: Transmission.LogSource);
-            
-            if (!ReferenceEquals(Connection, highSpeedConnection))
-                await Send(token, UniTask.CompletedTask, true);
+            return true;
 
-            return false;
-        }
 
-        return true;
+        Logger.LogWarning($"Failed to send {DevkitServerUtility.FormatBytes(Transmission.FinalContent.Count)} of data over a high-speed connection, trying low speed.",
+            ConsoleColor.DarkCyan, method: Transmission.LogSource);
+
+        if (!ReferenceEquals(Connection, highSpeedConnection))
+            await Send(token, UniTask.CompletedTask, true);
+
+        return false;
+
     }
     private async UniTask<bool> LowSpeedSend(CancellationToken token, UniTask finalize)
     {
-        float averagePing = await PingLowSpeed(token);
-
-        await finalize;
+        const byte packetVersion = 0;
 
         bool isLocalConnection = false;
 
@@ -233,14 +249,21 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         if (ip != null && ip.Equals("127.0.0.1", StringComparison.Ordinal))
             isLocalConnection = true;
 
+        float averagePing = await PingLowSpeed(token); // todo isLocalConnection ? -1f : await PingLowSpeed(token);
+
+        await finalize;
+        await UniTask.SwitchToMainThread(token);
+
 #if SERVER
         RequestResponse sendStartResponse = await SendStart.RequestAck(Connection, Transmission.WriteStart);
 #else
         RequestResponse sendStartResponse = await SendStart.RequestAck(Transmission.WriteStart);
 #endif
+        await UniTask.SwitchToMainThread(token);
+
         if (!sendStartResponse.Responded || sendStartResponse.ErrorCode is not (int)StandardErrorCode.Success)
         {
-            Logger.LogWarning("Failed to initialize a high-speed connection.", ConsoleColor.DarkCyan, method: Transmission.LogSource);
+            Logger.LogWarning("Failed to start sending data.", ConsoleColor.DarkCyan, method: Transmission.LogSource);
             return false;
         }
 
@@ -251,20 +274,20 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             packetDelay = 0.05f;
         }
 
-        MessageOverhead overhead = new MessageOverhead(MessageFlags.None, (ushort)DevkitServerNetCall.SendLevel, 0, 0);
+        MessageOverhead overhead;
 
         int packetCount = Transmission.LowSpeedPacketCount;
 
-        int firstCheckupPosition = Math.Min(25, (int)Math.Round(packetCount / 11d * 4d)); // idk it just fit
+        const int maxPacketCheckupInterval = 24;
+        const float maxPacketDelay = 1f;
+
+        int firstCheckupPosition = Math.Min(maxPacketCheckupInterval, (int)Math.Round(packetCount / 11d * 4d)); // idk it just fit
         int nextCheckupPacketIndex = firstCheckupPosition;
         int lastCheckupPacketIndex = 0;
 
         int bandwidth = packetCount <= 1 ? Math.Min(Transmission.Bandwidth, Transmission.FinalContent.Count) : Transmission.Bandwidth;
 
-        int bufferSize = overhead.Length + sizeof(int) + bandwidth;
-
-        byte[] dataBuffer = new byte[MessageOverhead.MaximumSize + sizeof(int) + bandwidth];
-        float startTime = CachedTime.RealtimeSinceStartup;
+        byte[] dataBuffer = new byte[MessageOverhead.MaximumSize + sizeof(int) + 17 + bandwidth];
 
         int currentDataIndex = 0;
 
@@ -275,20 +298,27 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             if (packetSize <= 0)
                 break;
 
-            overhead = new MessageOverhead(MessageFlags.None, (ushort)DevkitServerNetCall.SendLargeTransmissionPacket, sizeof(int) + packetSize);
-            Buffer.BlockCopy(Transmission.FinalContent.Array!, Transmission.FinalContent.Offset + currentDataIndex, dataBuffer, overhead.Length + sizeof(int), packetSize);
+            overhead = new MessageOverhead(MessageFlags.None, (ushort)DevkitServerNetCall.SendLargeTransmissionPacket, sizeof(int) + 17 + packetSize);
+
+            int headerSize = overhead.Length + sizeof(int) + 17;
+
+            Buffer.BlockCopy(Transmission.FinalContent.Array!, Transmission.FinalContent.Offset + currentDataIndex, dataBuffer, headerSize, packetSize);
             overhead.GetBytes(dataBuffer, 0);
+            UnsafeBitConverter.GetBytes(dataBuffer, Transmission.TransmissionId, overhead.Length);
+            dataBuffer[overhead.Length + 16] = packetVersion;
+            UnsafeBitConverter.GetBytes(dataBuffer, packetIndex, overhead.Length + 17);
 
             ++packetIndex;
             currentDataIndex += packetSize;
 
-            UnsafeBitConverter.GetBytes(dataBuffer, packetIndex - 1, overhead.Length);
-            Connection.Send(dataBuffer, false, count: bufferSize);
+            Connection.Send(dataBuffer, true, offset: 0, count: headerSize + packetSize);
+            Logger.LogDebug($"[{Transmission.LogSource}] Sent packet {packetIndex}/{packetCount}: packetSize: {packetSize}, headerSize: {headerSize} transmission: {Transmission.TransmissionId}.");
+            Logger.LogDebug($"[{Transmission.LogSource}] Header:{Environment.NewLine}{FormattingUtil.GetBytesHex(dataBuffer, 16, 0, headerSize, formatMessageOverhead: true)}");
 
             // run checkups to see if we need to slow down our send interval
             if (packetIndex - 1 == nextCheckupPacketIndex)
             {
-                await UniTask.Delay(325, true, cancellationToken: token);
+                await UniTask.Delay(TimeSpan.FromSeconds(Math.Min(maxPacketDelay, packetDelay * 1.5f)), true, cancellationToken: token);
 
                 RequestResponse checkupResponse = default;
                 for (int retry = 0; retry < 2; ++retry)
@@ -298,6 +328,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 #else
                     checkupResponse = await SendSlowCheckup.RequestAck(Transmission.TransmissionId, lastCheckupPacketIndex, packetIndex - 1);
 #endif
+                    await UniTask.SwitchToMainThread(token);
 
                     if (checkupResponse is { Responded: true, ErrorCode: not null })
                         break;
@@ -305,34 +336,46 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                     if (retry > 0)
                     {
                         Logger.LogInfo($"[{Transmission.LogSource}] User failed to respond to checkup at packet {packetIndex.Format()} / {packetCount.Format()}.", ConsoleColor.DarkCyan);
+                        await Transmission.Cancel(token);
                         return false;
                     }
 
-                    await UniTask.Delay(500, true, cancellationToken: token);
+                    await UniTask.Delay(TimeSpan.FromSeconds(0.5), true, cancellationToken: token);
                 }
 
-                int misses = checkupResponse.ErrorCode!.Value;
-                if (misses < 0)
+                if (!checkupResponse.Responded)
                 {
-                    Logger.LogInfo($"[{Transmission.LogSource}] User errored during checkup at packet {packetIndex.Format()} / {packetCount.Format()}.", ConsoleColor.DarkCyan);
+                    Logger.LogInfo($"[{Transmission.LogSource}] User didn't respond to checkup at packet {packetIndex.Format()} / {packetCount.Format()}.", ConsoleColor.DarkCyan);
+                    await Transmission.Cancel(token);
                     return false;
                 }
 
-                if (misses == 0 && packetDelay > 0.06f)
+                if (packetDelay < maxPacketDelay)
                 {
-                    float old = packetDelay;
-                    packetDelay *= 0.75f;
-                    nextCheckupPacketIndex += firstCheckupPosition;
-                    Logger.LogDebug($"[{Transmission.LogSource}] Packet delay decreased from {old.Format()} -> {packetDelay.Format()}.");
-                }
-                if (misses > 0)
-                {
-                    float old = packetDelay;
-                    packetDelay /= (float)misses / (packetIndex - lastCheckupPacketIndex);
-                    Logger.LogDebug($"[{Transmission.LogSource}] Packet delay increasesd from {old.Format()} -> {packetDelay.Format()} after missing {misses.Format()} / {(packetIndex - lastCheckupPacketIndex).Format()} packet(s).");
-                }
+                    int misses = checkupResponse.ErrorCode!.Value;
+                    if (misses < 0)
+                    {
+                        Logger.LogInfo($"[{Transmission.LogSource}] User errored during checkup at packet {packetIndex.Format()} / {packetCount.Format()}.", ConsoleColor.DarkCyan);
+                        await Transmission.Cancel(token);
+                        return false;
+                    }
 
-                lastCheckupPacketIndex = packetIndex;
+                    if (misses == 0 && packetDelay > 0.06f)
+                    {
+                        float old = packetDelay;
+                        packetDelay *= 0.75f;
+                        Logger.LogDebug($"[{Transmission.LogSource}] Packet delay decreased from {old.Format()} -> {packetDelay.Format()}.");
+                    }
+                    if (misses > 0)
+                    {
+                        float old = packetDelay;
+                        packetDelay = Math.Min(1f, packetDelay / ((float)misses / ((packetIndex - lastCheckupPacketIndex) * 2)));
+                        Logger.LogDebug($"[{Transmission.LogSource}] Packet delay increasesd from {old.Format()} -> {packetDelay.Format()} after missing {misses.Format()} / {(packetIndex - lastCheckupPacketIndex).Format()} packet(s).");
+                    }
+
+                    nextCheckupPacketIndex += firstCheckupPosition;
+                    lastCheckupPacketIndex = packetIndex;
+                }
             }
 
             await UniTask.Delay(TimeSpan.FromSeconds(packetDelay), true, cancellationToken: token);
@@ -342,11 +385,12 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                 continue;
 
             Logger.LogInfo($"[{Transmission.LogSource}] User disconnected at packet {packetIndex.Format()} / {packetCount.Format()}.", ConsoleColor.DarkCyan);
+            await Transmission.Cancel(token);
             return false;
 #endif
         }
 
-        await UniTask.Delay(250, true, cancellationToken: token);
+        await UniTask.Delay(TimeSpan.FromSeconds(0.25), true, cancellationToken: token);
 
         // recover missed packets
         while (true)
@@ -356,14 +400,19 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 #else
             RequestResponse sendEndResponse = await SendSlowEnd.Request(SendSlowMissedPackets, Transmission.WriteEnd);
 #endif
+            await UniTask.SwitchToMainThread(token);
+
+            if (!sendEndResponse.Responded)
+            {
+                await Transmission.Cancel(token);
+                Logger.LogInfo($"[{Transmission.LogSource}] User disconnected before finalizing transmission.", ConsoleColor.DarkCyan);
+                return false;
+            }
 
             if (!sendEndResponse.TryGetParameter(0, out int[] packets) || packets.Length <= 0)
                 break;
 
             Array.Sort(packets);
-
-            overhead = new MessageOverhead(MessageFlags.AcknowledgeRequest, (ushort)DevkitServerNetCall.SendLargeTransmissionPacket, 0, 0);
-            bufferSize = overhead.Length + sizeof(int) + bandwidth;
 
             for (int i = 0; i < packets.Length; ++i)
             {
@@ -376,21 +425,29 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                     continue;
                 NetTask slowPacketListener = SendSlowPacket.ListenAck(1500);
                 overhead = new MessageOverhead(MessageFlags.AcknowledgeRequest, (ushort)DevkitServerNetCall.SendLargeTransmissionPacket,
-                    sizeof(int) + packetSize, slowPacketListener.RequestId);
+                    sizeof(int) + 17 + packetSize, slowPacketListener.RequestId);
 
-                Buffer.BlockCopy(Transmission.FinalContent.Array!, Transmission.FinalContent.Offset + currentDataIndex, dataBuffer, overhead.Length + sizeof(int), packetSize);
+                int headerSize = overhead.Length + sizeof(int) + 17;
+
+                Buffer.BlockCopy(Transmission.FinalContent.Array!, Transmission.FinalContent.Offset + currentDataIndex, dataBuffer, headerSize, packetSize);
+
                 overhead.GetBytes(dataBuffer, 0);
-
-                UnsafeBitConverter.GetBytes(dataBuffer, packetIndex, overhead.Length);
+                UnsafeBitConverter.GetBytes(dataBuffer, Transmission.TransmissionId, overhead.Length);
+                dataBuffer[overhead.Length + 16] = packetVersion;
+                UnsafeBitConverter.GetBytes(dataBuffer, packetIndex, overhead.Length + 17);
 
                 for (int retry = 0; retry < 2; ++retry)
                 {
-                    Connection.Send(dataBuffer, true, count: bufferSize);
+                    Connection.Send(dataBuffer, true, count: headerSize + packetSize);
                     RequestResponse response = await slowPacketListener;
+                    await UniTask.SwitchToMainThread(token);
 
-                    if (response.Responded)
+                    if (response.ErrorCode is (int)StandardErrorCode.Success)
                         break;
                     
+                    if (response.ErrorCode.HasValue)
+                        Logger.LogWarning($"Recovery packet failed with error code: {response.ErrorCode.Value.Format("X8")}.", method: Transmission.LogSource);
+
                     if (i == 0)
                     {
                         Logger.LogWarning($"Retrying recovery packet {(packetIndex + 1).Format()}.", method: Transmission.LogSource);
@@ -403,7 +460,6 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             }
         }
 
-        Logger.LogInfo($"[{Transmission.LogSource}] Sent data ({Transmission.Content.Count:N} B) in {(CachedTime.RealtimeSinceStartup - startTime).Format("0.##")} second(s).", ConsoleColor.DarkCyan);
         return true;
     }
     private async UniTask<float> PingLowSpeed(CancellationToken token)
@@ -420,6 +476,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 #else
             RequestResponse response = await Ping.RequestAck(2000);
 #endif
+            await UniTask.SwitchToMainThread(token);
             if (!response.Responded)
             {
                 Logger.LogInfo($"[{Transmission.LogSource}] User failed to respond to ping check #{(i + 1).Format()}.", ConsoleColor.DarkCyan);
@@ -427,7 +484,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             }
 
             avgPing += CachedTime.RealtimeSinceStartup - start;
-            await UniTask.Delay(pingSpacingMs, ignoreTimeScale: true, cancellationToken: token);
+            await UniTask.Delay(TimeSpan.FromMilliseconds(pingSpacingMs), ignoreTimeScale: true, cancellationToken: token);
 
 #if SERVER
             if (Connection.IsConnected())
@@ -451,12 +508,14 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         if (_pendingSlowPacketCount <= 0)
         {
             Logger.LogError($"[{Transmission.LogSource}] Received data before a start level message.");
+            ctx.Acknowledge(StandardErrorCode.AccessViolation);
             return;
         }
 
         if (packetIndex < 0 || packetIndex >= _pendingSlowPacketCount)
         {
             Logger.LogError($"[{Transmission.LogSource}] Received data packet out of range of expected ({(packetIndex + 1).Format()} / {_pendingSlowPacketCount.Format()}), ignoring.");
+            ctx.Acknowledge(StandardErrorCode.InvalidData);
             return;
         }
 
@@ -496,10 +555,18 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             Transmission.Handler.TotalMissingPackets = _missingSlowPackets;
             Transmission.Handler.ReceivedBytes += packetLength;
             Transmission.Handler.ReceivedPackets = _receivedSlowPackets;
-            Transmission.Handler.IsDirty = true;
+            try
+            {
+                Transmission.Handler.IsDirty = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
+                Logger.LogError(ex, method: Transmission.LogSource);
+            }
         }
 
-        ctx.Acknowledge();
+        ctx.Acknowledge(StandardErrorCode.Success);
     }
 
     [UsedImplicitly]
@@ -534,6 +601,27 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
                 ctx2.Acknowledge(val ? StandardErrorCode.Success : StandardErrorCode.GenericError);
             });
+            if (Transmission.Handler == null)
+                return;
+
+            try
+            {
+                Transmission.Handler.IsDirty = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
+                Logger.LogError(ex, method: Transmission.LogSource);
+            }
+            try
+            {
+                Transmission.Handler.OnFinished(LargeMessageTransmissionStatus.Cancelled);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to run OnFinished(Cancelled) on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
+                Logger.LogError(ex, method: Transmission.LogSource);
+            }
             return;
         }
 
@@ -587,7 +675,15 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             {
                 Transmission.Handler.InitialMissingPackets = _initialMissingSlowPackets;
                 Transmission.Handler.TotalMissingPackets = _missingSlowPackets;
-                Transmission.Handler.IsDirty = true;
+                try
+                {
+                    Transmission.Handler.IsDirty = true;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
+                    Logger.LogError(ex, method: Transmission.LogSource);
+                }
             }
 
             ctx.Reply(SendSlowMissedPackets, missingPackets);
@@ -607,7 +703,15 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             Transmission.Handler.EndTimestamp = DateTime.UtcNow;
             Transmission.Handler.ReceivedBytes = Transmission.FinalSize;
             Transmission.Handler.ReceivedPackets = _pendingSlowPacketCount;
-            Transmission.Handler.IsDirty = true;
+            try
+            {
+                Transmission.Handler.IsDirty = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
+                Logger.LogError(ex, method: Transmission.LogSource);
+            }
         }
 
         Transmission.OnFinalContentCompleted();
@@ -630,7 +734,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 #if SERVER
             RequestResponse sendEndResponse = await SendSlowEnd.RequestAck(Connection, Transmission.WriteEndCancelled);
 #else
-            RequestResponse sendEndResponse = await SendSlowEnd.RequestAck(SendSlowMissedPackets, Transmission.WriteEndCancelled);
+            RequestResponse sendEndResponse = await SendSlowEnd.RequestAck(Transmission.WriteEndCancelled);
 #endif
 
             return sendEndResponse.ErrorCode is (int)StandardErrorCode.Success;
@@ -668,7 +772,15 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             Transmission.Handler.IsDownloaded = true;
             Transmission.Handler.EndTimestamp = DateTime.UtcNow;
             Transmission.Handler.ReceivedBytes = Transmission.FinalSize;
-            Transmission.Handler.IsDirty = true;
+            try
+            {
+                Transmission.Handler.IsDirty = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
+                Logger.LogError(ex, method: Transmission.LogSource);
+            }
         }
 
         Transmission.OnFinalContentCompleted();
@@ -718,25 +830,16 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             ctx.Connection, 
 #endif
             reader);
-
-        LargeMessageTransmission? old = null;
-
-        ActiveMessages.AddOrUpdate(transmission.TransmissionId, _ =>
-        {
-            old = null;
-            return transmission;
-        }, (_, current) =>
-        {
-            old = current;
-            return transmission;
-        });
-
-        if (old != null)
+        
+        if (ActiveMessages.TryRemove(transmission.TransmissionId, out LargeMessageTransmission old))
         {
             Logger.LogWarning($"Received duplicate transmission: {transmission.TransmissionId.Format()}, disposing.", method: transmission.LogSource);
             old.Dispose();
         }
 
+        ActiveMessages[transmission.TransmissionId] = transmission;
+        Logger.LogDebug($"[{transmission.LogSource}] Started transmission as client.");
+        transmission.Handler?.OnStart();
         ctx.Acknowledge(StandardErrorCode.Success);
     }
 
@@ -778,7 +881,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         transmission.Comms.HandleSlowEnd(in ctx, reader, v);
     }
 
-    [NetCall(NetCallSource.FromEither, DevkitServerNetCall.SendLargeTransmissionCheckup, HighSpeed = true)]
+    [NetCall(NetCallSource.FromEither, DevkitServerNetCall.SendLargeTransmissionCheckup)]
     private static void ReceiveSlowCheckup(MessageContext ctx, Guid guid, int start, int end)
     {
         if (!ActiveMessages.TryGetValue(guid, out LargeMessageTransmission transmission))
@@ -821,4 +924,29 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         transmission.Comms.HandleFullData(in ctx, reader, v);
     }
     #endregion
+
+    internal static void DumpDebug()
+    {
+        foreach (LargeMessageTransmission transmission in ActiveMessages.Values)
+        {
+            Logger.LogDebug("== Large Message Transmission ==");
+            Logger.LogDebug($"  ID: {transmission.TransmissionId.Format()}");
+            Logger.LogDebug($"  Is Server: {transmission.Comms.IsServer.Format()}");
+            Logger.LogDebug($"  Allow; High Speed: {transmission.AllowHighSpeed.Format()}, Compression: {transmission.AllowCompression.Format()}");
+            Logger.LogDebug($"  Connection: {transmission.Connection.Format()}");
+            Logger.LogDebug($"  Compressed: {transmission.IsCompressed.Format()}, High Speed: {transmission.IsHighSpeed.Format()}");
+            Logger.LogDebug($"  Original Size: {transmission.OriginalSize.Format()} B, Final Size: {transmission.FinalSize.Format()} B");
+            Logger.LogDebug($"  Bandwidth: {transmission.Bandwidth.Format()} B");
+            Logger.LogDebug($"  Handler type: {transmission.HandlerType.Format()}");
+            Logger.LogDebug($"   Projected packet count: {transmission.LowSpeedPacketCount.Format()}");
+            Logger.LogDebug($"   Flags: 0b{Convert.ToString(transmission.Flags, 2)}");
+            if (transmission.Handler != null)
+            {
+                Logger.LogDebug("Handler: " + Environment.NewLine + JsonSerializer.Serialize(transmission.Handler, transmission.HandlerType, DevkitServerConfig.SerializerSettings));
+            }
+
+            Logger.LogDebug(string.Empty);
+            Logger.LogDebug(string.Empty);
+        }
+    }
 }

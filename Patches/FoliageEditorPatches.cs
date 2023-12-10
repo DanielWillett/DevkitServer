@@ -66,7 +66,8 @@ internal static class FoliageEditorPatches
         LocalBuilder lvlObjectPos = generator.DeclareLocal(typeof(Vector3));
         Label stLbl = generator.DefineLabel();
 
-        // limits to 60 actions per second
+        // limits to 60 actions per second todo fix this cause bad
+
         yield return new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter);
         yield return new CodeInstruction(OpCodes.Brfalse_S, stLbl);
         yield return new CodeInstruction(OpCodes.Call, Accessor.GetRealtimeSinceStartup);

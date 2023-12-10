@@ -2,16 +2,13 @@
 using DevkitServer.API;
 using DevkitServer.Configuration.Converters;
 using DevkitServer.Levels;
-using NSJ::Newtonsoft.Json;
 using System.Text.Json.Serialization;
 
 namespace DevkitServer.Configuration;
 [EarlyTypeInit(-2)]
 public sealed class BackupConfiguration : SchemaConfiguration
 {
-    [JsonProperty("$schema", DefaultValueHandling = DefaultValueHandling.Ignore)]
-    [JsonPropertyName("$schema")]
-    public override string SchemaURI => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/backup_schema.json", true);
+    protected override string GetSchemaURI() => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/backup_schema.json", true);
     private sealed class ConfigContainer : JsonConfigurationFile<BackupConfiguration>
     {
         internal ConfigContainer() : base(FilePath)
