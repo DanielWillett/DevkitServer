@@ -16,6 +16,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
     private const int Size = 158;
     private static bool _patched;
 #nullable disable
+#pragma warning disable CS0649
     [ExistingMember("container")]
     private readonly SleekFullscreenBox _container;
 
@@ -24,6 +25,8 @@ internal class EditorLevelObjectsUIExtension : UIExtension
 
     [ExistingMember("selectedBox")]
     private ISleekBox SelectedBox { get; }
+
+#pragma warning restore CS0649
 
     private readonly ISleekBox _displayTitle;
     private readonly ISleekImage _preview;

@@ -27,7 +27,6 @@ public static class PluginLoader
 {
     private static string? _pluginsDir;
     private static string? _libraryDir;
-    private static bool _isUnloading;
 
     /// <summary>
     /// Path to the directory that plugins are read from.
@@ -657,28 +656,20 @@ public static class PluginLoader
     internal static void Unload()
     {
         OnPluginsUnloadingEvent.TryInvoke();
-        _isUnloading = true;
-        try
-        {
-            IDevkitServerPlugin[] plugins;
-            lock (PluginsIntl)
-                plugins = PluginsIntl.ToArray();
+        IDevkitServerPlugin[] plugins;
+        lock (PluginsIntl)
+            plugins = PluginsIntl.ToArray();
 
-            for (int i = 0; i < plugins.Length; i++)
-            {
-                try
-                {
-                    DeregisterPlugin(plugins[i]);
-                }
-                catch
-                {
-                    // ignored
-                }
-            }
-        }
-        finally
+        for (int i = 0; i < plugins.Length; i++)
         {
-            _isUnloading = false;
+            try
+            {
+                DeregisterPlugin(plugins[i]);
+            }
+            catch
+            {
+                // ignored
+            }
         }
     }
 
@@ -1102,6 +1093,7 @@ public class PluginAssembly
                 try
                 {
                     ICustomNetMessageListener listener = (ICustomNetMessageListener)Activator.CreateInstance(type);
+                    listener.Assembly = this;
                     _customNetMessageListeners.Add(listener);
                 }
                 catch (Exception ex)

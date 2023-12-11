@@ -512,7 +512,7 @@ public class UserInput : MonoBehaviour
             byte[] sendBytes = new byte[sizeof(ulong) + len];
             Buffer.BlockCopy(buffer, offset, sendBytes, sizeof(ulong), len);
             UnsafeBitConverter.GetBytes(sendBytes, user.SteamId.m_SteamID);
-            IList<ITransportConnection> list = NetFactory.GetPooledTransportConnectionList(Provider.clients.Count - 1);
+            PooledTransportConnectionList list = NetFactory.GetPooledTransportConnectionList(Provider.clients.Count - 1);
             for (int i = 0; i < Provider.clients.Count; ++i)
             {
                 SteamPlayer pl = Provider.clients[i];

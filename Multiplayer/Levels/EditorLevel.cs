@@ -58,14 +58,32 @@ public static class EditorLevel
         {
             try
             {
-                await transmission.Send(DevkitServerModule.UnloadToken);
+                if (await transmission.Send(DevkitServerModule.UnloadToken))
+                {
+                    Logger.LogInfo($"[{transmission.LogSource}] Sent level {Provider.map.Format(false)} (size: {DevkitServerUtility.FormatBytes(transmission.OriginalSize)}) to {connection.Format()}.");
+                    return;
+                }
+
+                Logger.LogWarning($"Failed to send level {Provider.map.Format(false)} (size: {DevkitServerUtility.FormatBytes(transmission.OriginalSize)}) to {connection.Format()}.", method: transmission.LogSource);
+            }
+            catch (OperationCanceledException)
+            {
+                if (connection.IsConnected())
+                    DevkitServerUtility.CustomDisconnect(connection, DevkitServerModule.LevelLoadingLocalization.Translate("DownloadCancelled"));
+                
+                return;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to send level to connection: {connection.Format()}.", method: transmission.LogSource);
+                Logger.LogError(ex, method: transmission.LogSource);
             }
             finally
             {
                 transmission.Dispose();
             }
 
-            if (transmission.WasCancelled && connection.IsConnected())
+            if (connection.IsConnected())
             {
                 DevkitServerUtility.CustomDisconnect(connection, DevkitServerModule.LevelLoadingLocalization.Translate("DownloadFailed"));
             }

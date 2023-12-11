@@ -1,5 +1,4 @@
 ﻿using DevkitServer.Core.Tools;
-using DevkitServer.Levels;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
@@ -31,9 +30,6 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
 
     [UsedImplicitly]
     internal static NetCall<byte, int, NetId> SendBindSpawnpoint = new NetCall<byte, int, NetId>(DevkitServerNetCall.SendBindSpawnpoint);
-#if SERVER
-    private static bool _initialLoaded;
-#endif
     private SpawnpointNetIdDatabase() { }
     internal static void Init()
     {
@@ -54,7 +50,6 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
     internal static void Shutdown()
     {
 #if SERVER
-        _initialLoaded = false;
         SpawnUtil.OnAnimalSpawnpointRemoved -= OnAnimalSpawnRemoved;
         SpawnUtil.OnPlayerSpawnpointRemoved -= OnPlayerSpawnRemoved;
         SpawnUtil.OnVehicleSpawnpointRemoved -= OnVehicleSpawnRemoved;
@@ -544,8 +539,6 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
 #if SERVER
     internal static void AssignExisting()
     {
-        _initialLoaded = true;
-
         AnimalSpawnAssignments.Clear();
         PlayerSpawnAssignments.Clear();
         VehicleSpawnAssignments.Clear();

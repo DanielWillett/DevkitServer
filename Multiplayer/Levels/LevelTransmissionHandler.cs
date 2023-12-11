@@ -33,7 +33,8 @@ internal class LevelTransmissionHandler : BaseLargeMessageTransmissionClientHand
         LoadingUI.SetIsDownloading(false);
         if (status != LargeMessageTransmissionStatus.Success)
         {
-            DevkitServerUtility.CustomDisconnect(DevkitServerModule.LevelLoadingLocalization.Translate("DownloadFailed"));
+            string disconnectMessage = DevkitServerModule.LevelLoadingLocalization.Translate(status == LargeMessageTransmissionStatus.Cancelled ? "DownloadCancelled" : "DownloadFailed");
+            DevkitServerUtility.CustomDisconnect(disconnectMessage);
             return;
         }
 

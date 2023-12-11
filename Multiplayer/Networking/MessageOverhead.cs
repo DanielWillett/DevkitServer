@@ -79,7 +79,9 @@ public readonly struct MessageOverhead
     }
     private static unsafe void Read(byte* ptr, int len, out MessageFlags flags, out ushort messageId, out int size, out long requestKey, out long responseKey, out int length, out Guid guid)
     {
-        if (len != -1 && len < MinimumSize) throw new IndexOutOfRangeException();
+        if (len != -1 && len < MinimumSize)
+            throw new IndexOutOfRangeException();
+
         requestKey = default;
         responseKey = default;
         length = 7;
@@ -94,6 +96,8 @@ public readonly struct MessageOverhead
         else
         {
             messageId = 0;
+            if (len != -1 && len < offset + 16)
+                throw new IndexOutOfRangeException();
             byte[] bytes = t_GuidBuffer ??= new byte[16];
 
             fixed (byte* bufferPtr = bytes)
@@ -103,15 +107,24 @@ public readonly struct MessageOverhead
             offset += 16;
         }
 
+        if (len != -1 && len < offset + sizeof(int))
+            throw new IndexOutOfRangeException();
+
         size = UnsafeBitConverter.GetInt32(ptr, offset);
         offset += sizeof(int);
         if ((flags & RequestKeyMask) != 0 && (len == -1 || len >= offset + sizeof(long)))
         {
+            if (len != -1 && len < offset + sizeof(long))
+                throw new IndexOutOfRangeException();
+
             requestKey = UnsafeBitConverter.GetInt64(ptr, offset);
             offset += sizeof(long);
         }
         if ((flags & ResponseKeyMask) != 0 && (len == -1 || len >= offset + sizeof(long)))
         {
+            if (len != -1 && len < offset + sizeof(long))
+                throw new IndexOutOfRangeException();
+
             responseKey = UnsafeBitConverter.GetInt64(ptr, offset);
             offset += sizeof(long);
         }

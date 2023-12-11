@@ -1,5 +1,4 @@
-﻿using JetBrains.Annotations;
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 
@@ -16,7 +15,7 @@ public class HighSpeedConnection : ITransportConnection
     private readonly byte[] _buffer = new byte[HighSpeedNetFactory.BufferSize];
     private readonly NetworkBuffer _netBuffer;
     public event NetworkBufferProgressUpdate? BufferProgressUpdated;
-    private bool _disposed;
+    private int _disposed;
     public bool Verified { get; internal set; }
     public Guid SteamToken { get; internal set; }
     public TcpClient Client { get; }
@@ -66,7 +65,9 @@ public class HighSpeedConnection : ITransportConnection
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
         Logger.LogDebug("[HIGH SPEED CONNECTION] Closing high-speed connection.");
 #if SERVER
         if (Server != null)
@@ -79,7 +80,6 @@ public class HighSpeedConnection : ITransportConnection
         _netBuffer.BufferProgressUpdated -= OnBufferProgressUpdatedIntl;
         _netBuffer.Buffer = Array.Empty<byte>();
         Client.Dispose();
-        _disposed = true;
     }
 
     public bool Equals(ITransportConnection other) => ReferenceEquals(other, this);
@@ -152,10 +152,8 @@ public class HighSpeedConnection : ITransportConnection
         {
             NetworkExceptionCaught(ex);
         }
-        catch (ObjectDisposedException ex)
+        catch (ObjectDisposedException)
         {
-            Logger.LogError("[HIGH SPEED CONNECTION] ObjectDisposedException in Send.");
-            Logger.LogError(ex);
             CloseConnection();
         }
         catch (Exception ex)
@@ -177,12 +175,8 @@ public class HighSpeedConnection : ITransportConnection
         {
             NetworkExceptionCaught(ex);
         }
-        catch (ObjectDisposedException ex)
+        catch (ObjectDisposedException)
         {
-            if (_disposed)
-                return;
-            Logger.LogError("[HIGH SPEED CONNECTION] ObjectDisposedException in EndWrite.");
-            Logger.LogError(ex);
             CloseConnection();
         }
         catch (Exception ex)
@@ -235,12 +229,8 @@ public class HighSpeedConnection : ITransportConnection
         {
             NetworkExceptionCaught(ex);
         }
-        catch (ObjectDisposedException ex)
+        catch (ObjectDisposedException)
         {
-            if (_disposed)
-                return;
-            Logger.LogError("[HIGH SPEED CONNECTION] ObjectDisposedException in EndRead.");
-            Logger.LogError(ex);
             CloseConnection();
         }
         catch (Exception ex)

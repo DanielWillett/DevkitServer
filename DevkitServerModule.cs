@@ -171,7 +171,8 @@ public sealed class DevkitServerModule : IModuleNexus
         { "Downloading", "{0} [ {1} / {2} ] @ {3} / sec | Remaining: {4}" },
         { "Installing", "{0} | Installing" },
         { "RecoveringMissingPackets", "{0} [ {1} / {2} ] | Recovering Missing Packets" },
-        { "DownloadFailed", "Level failed to download. Try joining again." }
+        { "DownloadFailed", "Level failed to download. Try joining again." },
+        { "DownloadCancelled", "Level download cancelled." }
     };
 
     public static CultureInfo CommandParseLocale { get; set; } = CultureInfo.InvariantCulture;
@@ -1067,8 +1068,11 @@ public sealed class DevkitServerModule : IModuleNexus
     {
         if (IsEditing)
             return;
-
+#if CLIENT
         throw new InvalidOperationException("This operation can only be performed while a client on a DevkitServer server.");
+#else
+        throw new InvalidOperationException("This operation can only be performed while running a DevkitServer server.");
+#endif
     }
 #if CLIENT
     public static void AskSave()

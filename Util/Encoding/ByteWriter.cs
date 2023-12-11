@@ -372,28 +372,47 @@ public class ByteWriter
     private unsafe void WriteInternal<T>(T value) where T : unmanaged
     {
         int size = sizeof(T);
-        if (_streamMode)
+        if (size == 1)
         {
-            if (_buffer.Length < size)
-                _buffer = new byte[size];
-            fixed (byte* ptr = _buffer)
+            if (_streamMode)
+            {
+                _stream!.WriteByte(*(byte*)&value);
+                ++_size;
+                return;
+            }
+
+            int newsize = _size + 1;
+            if (newsize > _buffer.Length)
+                ExtendBufferIntl(newsize);
+
+            _buffer[_size] = *(byte*)&value;
+            _size = newsize;
+        }
+        else
+        {
+            if (_streamMode)
+            {
+                if (_buffer.Length < size)
+                    _buffer = new byte[size];
+                fixed (byte* ptr = _buffer)
+                {
+                    *(T*)ptr = value;
+                    EndianCheck(ptr, size);
+                }
+                _stream!.Write(_buffer, 0, size);
+                _size += size;
+                return;
+            }
+            int newsize = _size + size;
+            if (newsize > _buffer.Length)
+                ExtendBufferIntl(newsize);
+            fixed (byte* ptr = &_buffer[_size])
             {
                 *(T*)ptr = value;
                 EndianCheck(ptr, size);
             }
-            _stream!.Write(_buffer, 0, size);
-            _size += size;
-            return;
+            _size = newsize;
         }
-        int newsize = _size + size;
-        if (newsize > _buffer.Length)
-            ExtendBufferIntl(newsize);
-        fixed (byte* ptr = &_buffer[_size])
-        {
-            *(T*)ptr = value;
-            EndianCheck(ptr, size);
-        }
-        _size = newsize;
     }
     private unsafe void WriteInternal<T>(T[] value) where T : unmanaged
     {
@@ -477,7 +496,7 @@ public class ByteWriter
         }
         else Write(false);
     }
-    public void Write(bool n) => WriteInternal((byte)(n ? 1 : 0));
+    public void Write(bool n) => WriteInternal(n ? (byte)1 : (byte)0);
     public void WriteNullable(bool? n)
     {
         if (n.HasValue)
@@ -1217,6 +1236,12 @@ public class ByteWriter
         System.Buffer.BlockCopy(n, 0, _buffer, _size, n.Length);
         _size = newsize;
     }
+
+    /// <summary>
+    /// Does not write length.
+    /// </summary>
+    public void WriteBlock(ArraySegment<byte> n) => WriteBlock(n.Array!, n.Offset, n.Count);
+
     /// <summary>
     /// Does not write length.
     /// </summary>
@@ -1226,7 +1251,7 @@ public class ByteWriter
             count = n.Length - index;
         if (index < 0)
             index = 0;
-        if (index + count > _buffer.Length)
+        if (index + count > n.Length)
             throw new ArgumentOutOfRangeException(nameof(index));
         if (_streamMode)
         {

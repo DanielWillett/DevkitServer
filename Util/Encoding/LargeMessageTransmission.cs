@@ -6,10 +6,15 @@ using CompressionLevel = System.IO.Compression.CompressionLevel;
 using DeflateStream = System.IO.Compression.DeflateStream;
 
 namespace DevkitServer.Util.Encoding;
+
+/// <summary>
+/// Represents a large transmission that has to be split over multiple packets on low-speed connections. Implements <see cref="IDisposable"/>.
+/// </summary>
+/// <remarks>Uses high-speed unless specified otherwise.</remarks>
 public class LargeMessageTransmission : IDisposable
 {
     private volatile int _disposed;
-    private const ushort Version = 0;
+    internal const ushort GlobalProtocolVersion = 0;
     private bool _hasSent;
     private bool _hasSentData;
     private bool _hasFullSent;
@@ -126,6 +131,11 @@ public class LargeMessageTransmission : IDisposable
     /// </summary>
     public CancellationToken CancellationToken => _tknSource.Token;
 
+    /// <summary>
+    /// Protocol version of the other side of the transmission, or -1 if it has not been received yet.
+    /// </summary>
+    public int ProtocolVersion { get; internal set; }
+
     internal byte Flags
     {
         get => (byte)(
@@ -168,6 +178,7 @@ public class LargeMessageTransmission : IDisposable
         Bandwidth = bandwidth;
         _tknSource = new CancellationTokenSource();
         Comms = new LargeMessageTransmissionCommunications(this, true);
+        ProtocolVersion = -1;
     }
 
     internal LargeMessageTransmission(
@@ -182,7 +193,7 @@ public class LargeMessageTransmission : IDisposable
         Connection = NetFactory.GetPlayerTransportConnection();
 #endif
 
-        _ = reader.ReadUInt16();
+        ProtocolVersion = reader.ReadUInt16();
 
         TransmissionId = reader.ReadGuid();
         Flags = reader.ReadUInt8();
@@ -235,7 +246,7 @@ public class LargeMessageTransmission : IDisposable
     }
     internal void WriteStart(ByteWriter writer)
     {
-        writer.Write(Version);
+        writer.Write(GlobalProtocolVersion);
 
         writer.Write(TransmissionId);
         writer.Write(Flags);
@@ -252,12 +263,16 @@ public class LargeMessageTransmission : IDisposable
     {
         writer.Write(TransmissionId);
 
-        writer.Write(Version);
-
         writer.Write(cancelled);
     }
     internal void WriteEnd(ByteWriter writer) => WriteEnd(writer, false);
     internal void WriteEndCancelled(ByteWriter writer) => WriteEnd(writer, true);
+
+    /// <summary>
+    /// Cancels the large transmission from either side.
+    /// </summary>
+    /// <returns><see langword="false"/> if the message has either already sent or already been cancelled, otherwise <see langword="true"/>.</returns>
+    /// <exception cref="InvalidOperationException">Message has yet to be sent.</exception>
     public async UniTask<bool> Cancel(CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
@@ -296,7 +311,14 @@ public class LargeMessageTransmission : IDisposable
         await UniTask.WaitUntil(() => _isCancelled, PlayerLoopTiming.Update, new CancellationTokenSource(250).Token);
         return true;
     }
-    public async UniTask Send(CancellationToken token = default)
+
+    /// <summary>
+    /// Begins sending the large transmission.
+    /// </summary>
+    /// <returns><see langword="false"/> if the message sending failed somehow, otherwise <see langword="true"/>.</returns>
+    /// <exception cref="InvalidOperationException">Tried to send from the wrong side.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="token"/> is cancelled.</exception>
+    public async UniTask<bool> Send(CancellationToken token = default)
     {
         token = token == default ? _tknSource.Token : CancellationTokenSource.CreateLinkedTokenSource(token, _tknSource.Token).Token;
         token.ThrowIfCancellationRequested();
@@ -318,22 +340,27 @@ public class LargeMessageTransmission : IDisposable
                 Logger.LogError(ex, method: LogSource);
             }
         }
-
+        bool sent;
         try
         {
-            await Comms.Send(token, Finalize(token));
+            sent = await Comms.Send(token, Finalize(token));
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             Logger.LogError("Error sending transmission.", method: LogSource);
             Logger.LogError(ex, method: LogSource);
+            sent = false;
         }
 
         _hasSentData = true;
         _hasFullSent = true;
 
         if (Handler == null)
-            return;
+            return sent;
 
         try
         {
@@ -344,6 +371,8 @@ public class LargeMessageTransmission : IDisposable
             Logger.LogError($"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.", method: LogSource);
             Logger.LogError(ex, method: LogSource);
         }
+
+        return sent;
     }
     private async UniTask Compress(CancellationToken token = default)
     {
@@ -423,6 +452,8 @@ public class LargeMessageTransmission : IDisposable
 
         Content = new ArraySegment<byte>(buffer, 0, count);
 
+        Logger.LogDebug($"[{LogSource}] Decompressed content from {DevkitServerUtility.FormatBytes(source.Count)} to {DevkitServerUtility.FormatBytes(count)}.");
+
         await UniTask.SwitchToMainThread(token);
     }
     private UniTask Unfinalize(CancellationToken token = default)
@@ -483,33 +514,36 @@ public class LargeMessageTransmission : IDisposable
             catch (OperationCanceledException) when (_tknSource.IsCancellationRequested)
             {
                 _isCancelled = true;
+                Dispose();
                 return;
             }
 
             _hasFullSent = true;
-            if (Handler == null)
-                return;
+            if (Handler != null)
+            {
+                Handler.FinalizedTimestamp = DateTime.UtcNow;
+                Handler.IsFinalized = true;
+                try
+                {
+                    Handler.IsDirty = true;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.", method: LogSource);
+                    Logger.LogError(ex, method: LogSource);
+                }
+                try
+                {
+                    Handler.OnFinished(LargeMessageTransmissionStatus.Success);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Failed to run OnFinished(Success) on handler: {Handler.GetType().Format()}.", method: LogSource);
+                    Logger.LogError(ex, method: LogSource);
+                }
+            }
 
-            Handler.FinalizedTimestamp = DateTime.UtcNow;
-            Handler.IsFinalized = true;
-            try
-            {
-                Handler.IsDirty = true;
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError($"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.", method: LogSource);
-                Logger.LogError(ex, method: LogSource);
-            }
-            try
-            {
-                Handler.OnFinished(LargeMessageTransmissionStatus.Success);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError($"Failed to run OnFinished(Success) on handler: {Handler.GetType().Format()}.", method: LogSource);
-                Logger.LogError(ex, method: LogSource);
-            }
+            Dispose();
         });
     }
 

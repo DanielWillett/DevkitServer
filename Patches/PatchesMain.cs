@@ -1,20 +1,21 @@
-﻿using System.Diagnostics;
-using DevkitServer.Multiplayer;
-using HarmonyLib;
-using System.Reflection;
-using System.Text;
-using DevkitServer.Configuration;
-using DevkitServer.Players;
-using SDG.Framework.Landscapes;
-using System.Reflection.Emit;
-using Cysharp.Threading.Tasks;
-using Version = System.Version;
+﻿using Cysharp.Threading.Tasks;
 using DevkitServer.API;
-using DevkitServer.Util.Encoding;
+using DevkitServer.Configuration;
+using DevkitServer.Multiplayer;
+using DevkitServer.Players;
+using HarmonyLib;
+using SDG.Framework.Landscapes;
+using System.Diagnostics;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Text;
+using Version = System.Version;
 
 #if CLIENT
 using DevkitServer.API.UI;
+using DevkitServer.API.Multiplayer;
 using DevkitServer.Multiplayer.Levels;
+using DevkitServer.Util.Encoding;
 #endif
 #if SERVER
 using DevkitServer.Multiplayer.Networking;
@@ -75,6 +76,7 @@ internal static class PatchesMain
             RoadsPatches.OptionalPatches();
             NavigationPatches.OptionalPatches();
 #endif
+            TransportPatcher.ManualPatch();
             DoManualPatches();
             sw.Stop();
             Logger.LogInfo($"[{Source}] Finished patching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)} ({(sw.GetElapsedMilliseconds() / 1000d).ToString("0.0000").Colorize(FormattingUtil.NumberColor)} seconds).");
@@ -90,6 +92,7 @@ internal static class PatchesMain
     {
         try
         {
+            TransportPatcher.ManualUnpatch();
             DoManualUnpatches();
             Patcher.UnpatchAll(HarmonyId);
             Logger.LogInfo($"[{Source}] Finished unpatching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
@@ -505,9 +508,13 @@ internal static class PatchesMain
                     version?.ToString(4) ?? "[Unspecified]", Accessor.DevkitServer.GetName().Version.ToString(4)), ESteamConnectionFailureInfo.CUSTOM);
                 return;
             }
+
             DevkitServerModule.IsEditing = true;
+            CustomNetMessageListeners.SendLocalMappings();
+
             Logger.LogInfo($"Connecting to a server running {DevkitServerModule.ModuleName.Colorize(DevkitServerModule.ModuleColor)} " +
                            $"v{version.Format()} (You are running {Accessor.DevkitServer.GetName().Version.Format()})...");
+
             EditorLevel.RequestLevel();
         }
         else
@@ -707,6 +714,7 @@ internal static class PatchesMain
 
     [HarmonyPatch("ServerMessageHandler_GetWorkshopFiles", "ReadMessage", MethodType.Normal)]
     [HarmonyPrefix]
+    [UsedImplicitly]
     private static void OnConnectionPending(ITransportConnection transportConnection, NetPakReader reader)
     {
         RemoveExpiredConnections();

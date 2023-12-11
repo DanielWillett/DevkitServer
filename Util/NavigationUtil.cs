@@ -872,7 +872,7 @@ public static class NavigationUtil
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <param name="nav">Flag index in <see cref="NavigationFlags"/>.</param>
-    /// <param name="difficulty">Specifies zombie difficulty properties for zombies spawned in <paramref name="flag"/>.</param>
+    /// <param name="difficulty">Specifies zombie difficulty properties for zombies spawned in <paramref name="nav"/>.</param>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="MemberAccessException">Failed to fetch <see cref="NavigationFlags"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">No flag found at index <paramref name="nav"/>.</exception>
@@ -956,7 +956,7 @@ public static class NavigationUtil
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <param name="nav">Flag index in <see cref="NavigationFlags"/>.</param>
-    /// <param name="maximumZombies">Maximum number of zombies that can be alive in <paramref name="flag"/> at once. Default is 64.</param>
+    /// <param name="maximumZombies">Maximum number of zombies that can be alive in <paramref name="nav"/> at once. Default is 64.</param>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="MemberAccessException">Failed to fetch <see cref="NavigationFlags"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">No flag found at index <paramref name="nav"/> or <paramref name="maximumZombies"/> is not within <c>byte</c> range.</exception>
@@ -1041,7 +1041,7 @@ public static class NavigationUtil
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <param name="nav">Flag index in <see cref="NavigationFlags"/>.</param>
-    /// <param name="maximumBossZombies">Maximum number of boss zombies that can be alive in <paramref name="flag"/> at once (or -1 for infinite). Default is -1.</param>
+    /// <param name="maximumBossZombies">Maximum number of boss zombies that can be alive in <paramref name="nav"/> at once (or -1 for infinite). Default is -1.</param>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="MemberAccessException">Failed to fetch <see cref="NavigationFlags"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">No flag found at index <paramref name="nav"/>.</exception>
@@ -1126,7 +1126,7 @@ public static class NavigationUtil
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <param name="nav">Flag index in <see cref="NavigationFlags"/>.</param>
-    /// <param name="shouldSpawnZombies">If zombies should spawn in <paramref name="flag"/>.</param>
+    /// <param name="shouldSpawnZombies">If zombies should spawn in <paramref name="nav"/>.</param>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="MemberAccessException">Failed to fetch <see cref="NavigationFlags"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">No flag found at index <paramref name="nav"/>.</exception>
@@ -1206,7 +1206,7 @@ public static class NavigationUtil
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <param name="nav">Flag index in <see cref="NavigationFlags"/>.</param>
-    /// <param name="infiniteAgroDistance">If zombies should be able to see players from any distance within <paramref name="flag"/>.</param>
+    /// <param name="infiniteAgroDistance">If zombies should be able to see players from any distance within <paramref name="nav"/>.</param>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="MemberAccessException">Failed to fetch <see cref="NavigationFlags"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">No flag found at index <paramref name="nav"/>.</exception>
@@ -1393,7 +1393,7 @@ public static class NavigationUtil
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <param name="nav">Flag index in <see cref="NavigationFlags"/>.</param>
-    /// <param name="difficulty">Specifies zombie difficulty properties for zombies spawned in <paramref name="flag"/>.</param>
+    /// <param name="difficulty">Specifies zombie difficulty properties for zombies spawned in <paramref name="nav"/>.</param>
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditNavigation"/>.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="MemberAccessException">Failed to fetch <see cref="NavigationFlags"/>.</exception>
@@ -1446,7 +1446,7 @@ public static class NavigationUtil
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <param name="nav">Flag index in <see cref="NavigationFlags"/>.</param>
-    /// <param name="maximumZombies">Maximum number of zombies that can be alive in <paramref name="flag"/> at once. Default is 64.</param>
+    /// <param name="maximumZombies">Maximum number of zombies that can be alive in <paramref name="nav"/> at once. Default is 64.</param>
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditNavigation"/>.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="MemberAccessException">Failed to fetch <see cref="NavigationFlags"/>.</exception>
@@ -1503,7 +1503,7 @@ public static class NavigationUtil
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <param name="nav">Flag index in <see cref="NavigationFlags"/>.</param>
-    /// <param name="maximumBossZombies">Maximum number of boss zombies that can be alive in <paramref name="flag"/> at once (or -1 for infinite). Default is -1.</param>
+    /// <param name="maximumBossZombies">Maximum number of boss zombies that can be alive in <paramref name="nav"/> at once (or -1 for infinite). Default is -1.</param>
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditNavigation"/>.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="MemberAccessException">Failed to fetch <see cref="NavigationFlags"/>.</exception>
@@ -1556,7 +1556,7 @@ public static class NavigationUtil
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <param name="nav">Flag index in <see cref="NavigationFlags"/>.</param>
-    /// <param name="shouldSpawnZombies">If zombies should spawn in <paramref name="flag"/>.</param>
+    /// <param name="shouldSpawnZombies">If zombies should spawn in <paramref name="nav"/>.</param>
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditNavigation"/>.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="MemberAccessException">Failed to fetch <see cref="NavigationFlags"/>.</exception>
@@ -1608,7 +1608,7 @@ public static class NavigationUtil
     /// </summary>
     /// <remarks>Replicates to remote.</remarks>
     /// <param name="nav">Flag index in <see cref="NavigationFlags"/>.</param>
-    /// <param name="infiniteAgroDistance">If zombies should be able to see players from any distance within <paramref name="flag"/>.</param>
+    /// <param name="infiniteAgroDistance">If zombies should be able to see players from any distance within <paramref name="nav"/>.</param>
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditNavigation"/>.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="MemberAccessException">Failed to fetch <see cref="NavigationFlags"/>.</exception>

@@ -65,10 +65,16 @@ public class ByteReader
     /// </summary>
     public int Position => _streamMode ? (_position - (_length - _index)) : _index;
 
+    // ReSharper disable once MergeConditionalExpression (pretty sure this things wrong here idk)
     /// <summary>
     /// Number of bytes left in the stream or buffer.
     /// </summary>
-    public int BytesLeft => _streamMode ? (_streamLengthSupport ? (int)Math.Min(_stream!.Length - _stream!.Position, int.MaxValue) : (_buffer is not null ? _buffer.Length - _index : 0)) : _buffer!.Length - _index;
+    public int BytesLeft => _streamMode ? (_streamLengthSupport ? (int)Math.Min(_stream!.Length - _stream!.Position, int.MaxValue) : (_buffer != null ? _buffer.Length - _index : 0)) : _buffer!.Length - _index;
+
+    /// <summary>
+    /// Allocated length the buffer (important when a <see cref="ArraySegment{byte}"/> is passed.
+    /// </summary>
+    public int Length => _length;
 
     /// <summary>
     /// When <see langword="true"/>, will throw a <see cref="ByteEncoderException"/> or <see cref="ByteBufferOverflowException"/> when there's a read failure. Otherwise it will just set <see cref="HasFailed"/> to <see langword="true"/>.
@@ -276,7 +282,7 @@ public class ByteReader
     public void LoadNew(ArraySegment<byte> bytes)
     {
         _buffer = bytes.Array ?? throw new ArgumentNullException(nameof(bytes));
-        _length = bytes.Count;
+        _length = bytes.Offset + bytes.Count;
         _streamMode = false;
         _index = bytes.Offset;
         _position = bytes.Offset;

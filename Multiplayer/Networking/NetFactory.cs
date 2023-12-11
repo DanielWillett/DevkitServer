@@ -5,6 +5,7 @@
 
 using Cysharp.Threading.Tasks;
 using DevkitServer.API;
+using DevkitServer.API.Multiplayer;
 using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Patches;
@@ -13,11 +14,11 @@ using DevkitServer.Plugins;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
 using SDG.NetPak;
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using DevkitServer.API.Multiplayer;
 
 #if CLIENT
 using DevkitServer.Multiplayer.Sync;
@@ -51,17 +52,17 @@ public static class NetFactory
     private static float _outByteCtStTime;
 
     private static readonly List<ListenerTimestamp> LocalListenerTimestamps = new List<ListenerTimestamp>(32);
-    private static readonly Dictionary<long, Listener> LocalListeners = new Dictionary<long, Listener>(16);
-    private static readonly Dictionary<long, Listener> LocalAckRequests = new Dictionary<long, Listener>(16);
+    private static readonly ConcurrentDictionary<long, Listener> LocalListeners = new ConcurrentDictionary<long, Listener>();
+    private static readonly ConcurrentDictionary<long, Listener> LocalAckRequests = new ConcurrentDictionary<long, Listener>();
 
-    private static readonly Dictionary<ushort, NetMethodInfo[]> Methods = new Dictionary<ushort, NetMethodInfo[]>(16);
-    private static readonly Dictionary<Guid, NetMethodInfo[]> GuidMethods = new Dictionary<Guid, NetMethodInfo[]>(16);
+    private static readonly ConcurrentDictionary<ushort, NetMethodInfo[]> Methods = new ConcurrentDictionary<ushort, NetMethodInfo[]>();
+    private static readonly ConcurrentDictionary<Guid, NetMethodInfo[]> GuidMethods = new ConcurrentDictionary<Guid, NetMethodInfo[]>();
 
-    private static readonly Dictionary<ushort, BaseNetCall> Invokers = new Dictionary<ushort, BaseNetCall>(16);
-    private static readonly Dictionary<ushort, BaseNetCall> HighSpeedInvokers = new Dictionary<ushort, BaseNetCall>(16);
+    private static readonly ConcurrentDictionary<ushort, BaseNetCall> Invokers = new ConcurrentDictionary<ushort, BaseNetCall>();
+    private static readonly ConcurrentDictionary<ushort, BaseNetCall> HighSpeedInvokers = new ConcurrentDictionary<ushort, BaseNetCall>();
 
-    private static readonly Dictionary<Guid, BaseNetCall> GuidInvokers = new Dictionary<Guid, BaseNetCall>(16);
-    private static readonly Dictionary<Guid, BaseNetCall> GuidHighSpeedInvokers = new Dictionary<Guid, BaseNetCall>(16);
+    private static readonly ConcurrentDictionary<Guid, BaseNetCall> GuidInvokers = new ConcurrentDictionary<Guid, BaseNetCall>();
+    private static readonly ConcurrentDictionary<Guid, BaseNetCall> GuidHighSpeedInvokers = new ConcurrentDictionary<Guid, BaseNetCall>();
 
     private static Func<PooledTransportConnectionList>? PullFromTransportConnectionListPool;
     private static readonly NetPakWriter Writer = new NetPakWriter();
@@ -116,8 +117,10 @@ public static class NetFactory
         Type vanilla = typeof(EClientMessage);
         Type vanillaSend = typeof(EServerMessage);
 #endif
-        List<(ICustomNetMessageListener, PluginAssembly)> pluginListeners = new List<(ICustomNetMessageListener, PluginAssembly)>();
-        foreach (PluginAssembly assembly in PluginLoader.Assemblies)
+        List<(ICustomNetMessageListener, PluginAssembly)> pluginListeners = [];
+        foreach (PluginAssembly assembly in PluginLoader.Assemblies
+                     .OrderBy(x => x.Assembly.GetName().Name)
+                     .ThenByDescending(x => x.Assembly.GetName().Version))
         {
             if (assembly.CustomNetMessageListeners.Count > 0)
                 pluginListeners.AddRange(assembly.CustomNetMessageListeners.Select(x => (x, assembly)));
@@ -153,9 +156,9 @@ public static class NetFactory
         methods[(int)DevkitServerMessage.SendNavigationData] = typeof(NavigationSync).GetMethod(nameof(NavigationSync.ReceiveNavigationData), BindingFlags.NonPublic | BindingFlags.Static)!;
 #endif
         methods[(int)DevkitServerMessage.ActionRelay] = typeof(EditorActions).GetMethod(nameof(EditorActions.ReceiveActionRelay), BindingFlags.NonPublic | BindingFlags.Static)!;
-        
+
         // plugin callbacks
-        MethodInfo? interfaceMethod = typeof(ICustomNetMessageListener).GetMethod("OnInvoked", BindingFlags.Public | BindingFlags.Instance);
+        MethodInfo? interfaceMethod = typeof(ICustomNetMessageListener).GetMethod(nameof(ICustomNetMessageListener.OnRawMessageReceived), BindingFlags.Public | BindingFlags.Instance);
         if (interfaceMethod != null)
         {
             for (int i = DevkitServerBlockSize; i < BlockSize; ++i)
@@ -165,7 +168,7 @@ public static class NetFactory
                 MethodInfo? implMethod = Accessor.GetImplementedMethod(listenerType, interfaceMethod);
                 if (implMethod == null)
                 {
-                    assembly.LogWarning($"Unable to find {typeof(ICustomNetMessageListener).Format()}.{"OnInvoked".Colorize(FormattingColorType.Method)} " +
+                    assembly.LogWarning($"Unable to find {typeof(ICustomNetMessageListener).Format()}.{nameof(ICustomNetMessageListener.OnRawMessageReceived).Colorize(FormattingColorType.Method)} " +
                                       $"implementation in {listenerType.Format()}.", method: Source);
                     continue;
                 }
@@ -177,7 +180,7 @@ public static class NetFactory
         }
         else
         {
-            Logger.LogWarning($"Unable to find {typeof(ICustomNetMessageListener).Format()}.{nameof(ICustomNetMessageListener.OnInvoked).Colorize(FormattingColorType.Method)}.", method: Source);
+            Logger.LogWarning($"Unable to find {typeof(ICustomNetMessageListener).Format()}.{nameof(ICustomNetMessageListener.OnRawMessageReceived).Colorize(FormattingColorType.Method)}.", method: Source);
         }
 
         Delegate[] listeners = new Delegate[methods.Length];
@@ -285,29 +288,40 @@ public static class NetFactory
         const ConnectionSide receivingSide = ConnectionSide.Client;
 #endif
 
+        CustomNetMessageListeners.LocalMappings.Clear();
+        CustomNetMessageListeners.InverseLocalMappings.Clear();
+
         for (int i = 0; i < methods.Length; ++i)
         {
             MethodInfo? m = methods[i];
 
             int index = readCallbacks.Length + i;
 
+            DevkitServerMessage messageIndex = (DevkitServerMessage)i;
             if (i >= DevkitServerBlockSize)
             {
                 (ICustomNetMessageListener listener, PluginAssembly assembly) = pluginListeners[i - DevkitServerBlockSize];
+                Type listenerType = listener.GetType();
                 if ((listener.ReceivingSide & receivingSide) == 0)
                 {
-                    assembly.LogInfo($"Skipping implementing {listener.GetType().Format()} as it's not received on this connection side ({receivingSide.Format()}).");
+                    assembly.LogInfo($"Skipping implementing {listenerType.Format()} as it's not received on this connection side ({receivingSide.Format()}).");
                     continue;
                 }
 
+                if (m == null)
+                    continue;
+
                 try
                 {
+                    listener.LocalMessageIndex = messageIndex;
+                    CustomNetMessageListeners.LocalMappings[listenerType] = messageIndex;
+                    CustomNetMessageListeners.InverseLocalMappings[messageIndex] = listenerType;
                     nArr.SetValue(listeners[i] = m.CreateDelegate(callbackType, listener), index);
                 }
                 catch (Exception ex)
                 {
-                    assembly.LogError($"Implemented {nameof(ICustomNetMessageListener.OnInvoked).Colorize(FormattingColorType.Method)} method for " +
-                                      $"{listener.GetType().Format()} can not be converted to {callbackType.Format()}. Ensure your side settings are correct.", method: Source);
+                    assembly.LogError($"Implemented {nameof(ICustomNetMessageListener.OnRawMessageReceived).Colorize(FormattingColorType.Method)} method for " +
+                                      $"{listenerType.Format()} can not be converted to {callbackType.Format()}. Ensure your side settings are correct.", method: Source);
                     assembly.LogError(ex, method: Source);
                 }
             }
@@ -322,7 +336,7 @@ public static class NetFactory
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError($"Implemented method for {((DevkitServerMessage)i).Format()} can not be converted to {callbackType.Format()}.", method: Source);
+                    Logger.LogError($"Implemented method for {messageIndex.Format()} can not be converted to {callbackType.Format()}.", method: Source);
                     Logger.LogError(ex, method: Source);
                     goto reset;
                 }
@@ -330,6 +344,12 @@ public static class NetFactory
         }
 
         field.SetValue(null, nArr);
+
+        CustomNetMessageListeners.AreLocalMappingsDirty = true;
+
+        if (DevkitServerModule.IsEditing)
+            CustomNetMessageListeners.SendLocalMappings();
+
         return true;
 
     reset:
@@ -337,30 +357,35 @@ public static class NetFactory
         NewWriteBitCount = origWriteBitCount;
         BlockSize = 0;
         Listeners = Array.Empty<Delegate>();
-        if (p1)
+
+        // undo patches
+
+        if (!p1)
+            return false;
+
+        try
         {
-            try
-            {
-                PatchesMain.Patcher.Unpatch(readMethod, HarmonyPatchType.Prefix, PatchesMain.HarmonyId);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogWarning("Unable to unpatch " + readEnum.Format() + ".ReadEnum(...) while cancelling initialization.", method: Source);
-                Logger.LogError(ex, method: Source);
-            }
-            if (p2)
-            {
-                try
-                {
-                    PatchesMain.Patcher.Unpatch(writeMethod, HarmonyPatchType.Prefix, PatchesMain.HarmonyId);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning("Unable to unpatch " + writeEnum.Format() + ".WriteEnum(...) while cancelling initialization.", method: Source);
-                    Logger.LogError(ex, method: Source);
-                }
-            }
+            PatchesMain.Patcher.Unpatch(readMethod, HarmonyPatchType.Prefix, PatchesMain.HarmonyId);
         }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("Unable to unpatch " + readEnum.Format() + ".ReadEnum(...) while cancelling initialization.", method: Source);
+            Logger.LogError(ex, method: Source);
+        }
+
+        if (!p2)
+            return false;
+
+        try
+        {
+            PatchesMain.Patcher.Unpatch(writeMethod, HarmonyPatchType.Prefix, PatchesMain.HarmonyId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("Unable to unpatch " + writeEnum.Format() + ".WriteEnum(...) while cancelling initialization.", method: Source);
+            Logger.LogError(ex, method: Source);
+        }
+
         return false;
     }
 
@@ -394,7 +419,7 @@ public static class NetFactory
     /// <summary>
     /// Gets the average data speed (either in or out, depending on the value of <paramref name="send"/>) in B/s per message type.
     /// </summary>
-    public static float GetBytesPerSecondAvg(ICustomNetMessageListener listener, bool send) => GetBytesTotal((DevkitServerMessage)listener.MessageIndex, send, out float timespan) / timespan;
+    public static float GetBytesPerSecondAvg(ICustomNetMessageListener listener, bool send) => GetBytesTotal(listener.LocalMessageIndex, send, out float timespan) / timespan;
 
     /// <summary>
     /// Gets the average data speed (either in or out, depending on the value of <paramref name="send"/>) in B/s total.
@@ -408,17 +433,14 @@ public static class NetFactory
     public static long GetBytesTotal(DevkitServerMessage message, bool send, out float timespan)
     {
         timespan = CachedTime.RealtimeSinceStartup - (send ? _outByteCtStTime : _inByteCtStTime);
-        if ((int)message < BlockSize)
-            return (send ? _outByteCt : _inByteCt)[(int)message];
-
-        return 0;
+        return (int)message < BlockSize ? (send ? _outByteCt : _inByteCt)[(int)message] : 0;
     }
 
     /// <summary>
     /// Gets the total amount of data (either in or out, depending on the value of <paramref name="send"/>) in B per message type.
     /// </summary>
     /// <param name="timespan">The amount of time in seconds this data was tracked over.</param>
-    public static long GetBytesTotal(ICustomNetMessageListener listener, bool send, out float timespan) => GetBytesTotal((DevkitServerMessage)listener.MessageIndex, send, out timespan);
+    public static long GetBytesTotal(ICustomNetMessageListener listener, bool send, out float timespan) => GetBytesTotal(listener.LocalMessageIndex, send, out timespan);
 
     /// <summary>
     /// Gets the total amount of data (either in or out, depending on the value of <paramref name="send"/>) in B.
@@ -437,8 +459,7 @@ public static class NetFactory
     /// <summary>
     /// Increment the amount of bytes (either in or out, depending on the value of <paramref name="send"/>) by a listener.
     /// </summary>
-    public static void IncrementByteCount(ICustomNetMessageListener listener, bool send, long length)
-        => IncrementByteCount((DevkitServerMessage)listener.MessageIndex, send, length);
+    public static void IncrementByteCount(ICustomNetMessageListener listener, bool send, long length) => IncrementByteCount(listener.LocalMessageIndex, send, length);
     internal static void IncrementByteCount(DevkitServerMessage msg, bool send, long length)
     {
         if ((int)msg >= BlockSize)
@@ -574,18 +595,31 @@ public static class NetFactory
         }
 
         ArraySegment<byte> data = new ArraySegment<byte>(bytes, offset, len);
-
-        MessageOverhead ovh = new MessageOverhead(data);
+        if (len < MessageOverhead.MinimumSize)
+        {
+            Logger.LogError($"Message too small to create overhead ({len.Format()} B).", method: Source);
+            return;
+        }
+        MessageOverhead ovh;
+        try
+        {
+            ovh = new MessageOverhead(data);
+        }
+        catch (IndexOutOfRangeException)
+        {
+            Logger.LogError($"Message too small to create overhead ({len.Format()} B).", method: Source);
+            return;
+        }
 #if SERVER
-        OnReceived(data, transportConnection, ovh, false);
+        OnReceived(data, transportConnection, in ovh, false);
 #else
-        OnReceived(data, GetPlayerTransportConnection(), ovh, false);
+        OnReceived(data, GetPlayerTransportConnection(), in ovh, false);
 #endif
     }
     [UsedImplicitly]
     private static bool ReadEnumPatch(NetPakReader reader,
 #if SERVER
-        ref EServerMessage value, 
+        ref EServerMessage value,
 #else
         ref EClientMessage value,
 #endif
@@ -632,7 +666,7 @@ public static class NetFactory
 #else
             // if (value != EServerMessage.InvokeMethod)
 #endif
-                // Logger.LogDebug($"Writing net message enum {v, 2}: {(v < WriteBlockOffset ? ("Unturned." + value) : ("DevkitServer." + (DevkitMessage)(v - WriteBlockOffset)))}");
+            // Logger.LogDebug($"Writing net message enum {v, 2}: {(v < WriteBlockOffset ? ("Unturned." + value) : ("DevkitServer." + (DevkitMessage)(v - WriteBlockOffset)))}");
             __result = writer.WriteBits(v, NewWriteBitCount);
             return false;
         }
@@ -689,7 +723,7 @@ public static class NetFactory
         ctx = new MessageContext(connection, overhead, hs);
 
         if (parameters is not { Length: > 0 })
-            parameters = [ ctx ];
+            parameters = [ctx];
         else
             parameters[0] = ctx;
 
@@ -872,7 +906,7 @@ public static class NetFactory
                         listener.Task.TellCompleted(parameters!, true);
                     }
 
-                    LocalListeners.Remove(rk);
+                    LocalListeners.Remove(rk, out _);
                 }
             }
             else if ((overhead.Flags & MessageFlags.AcknowledgeResponse) == MessageFlags.AcknowledgeResponse)
@@ -897,7 +931,7 @@ public static class NetFactory
                         listener.Task.TellCompleted(new MessageContext(connection, overhead, hs), true, errorCode);
                     }
 
-                    LocalAckRequests.Remove(rk);
+                    LocalAckRequests.Remove(rk, out _);
                 }
             }
         }
@@ -946,16 +980,10 @@ public static class NetFactory
 #endif
             connection, in MessageOverhead overhead, bool hs)
     {
-        if (message.Count < MessageOverhead.MinimumSize)
-        {
-            Logger.LogError("Received too short of a message.", method: Source);
-            goto rtn;
-        }
-
         int size = overhead.Size;
         if (size > message.Count)
         {
-            Logger.LogError("Message overhead read a size larger than the message payload: " + size + " bytes.", method: Source);
+            Logger.LogError($"Message overhead read a size larger than the message payload: {size.Format()} B.", method: Source);
             goto rtn;
         }
 
@@ -984,13 +1012,16 @@ public static class NetFactory
     private static void RemoveExpiredListeners()
     {
         DateTime now = DateTime.UtcNow;
-        for (int i = LocalListenerTimestamps.Count - 1; i >= 0; --i)
+        lock (LocalListenerTimestamps)
         {
-            if ((now - LocalListenerTimestamps[i].Timestamp).TotalSeconds > MaxListenTimeout)
+            for (int i = LocalListenerTimestamps.Count - 1; i >= 0; --i)
             {
+                if ((now - LocalListenerTimestamps[i].Timestamp).TotalSeconds <= MaxListenTimeout)
+                    continue;
+
                 ListenerTimestamp ts = LocalListenerTimestamps[i];
                 LocalListenerTimestamps.RemoveAt(i);
-                (ts.IsAcknowledgeRequest ? LocalAckRequests : LocalListeners).Remove(ts.RequestId);
+                (ts.IsAcknowledgeRequest ? LocalAckRequests : LocalListeners).Remove(ts.RequestId, out _);
                 Logger.LogDebug($"[NET FACTORY] {(ts.IsAcknowledgeRequest ? "Acknowledge request" : "Listener")} expired: {ts.RequestId.Format()}.");
             }
         }
@@ -1026,7 +1057,7 @@ public static class NetFactory
                     attribute.Type == NetCallSource.None ||
                     !(attribute.Type == NetCallSource.FromEither || search == NetCallSource.FromEither || search == attribute.Type))
                     continue;
-                
+
                 NetMethodInfo kvp = new NetMethodInfo(method, attribute);
                 if (!string.IsNullOrEmpty(attribute.GuidString) && Guid.TryParse(attribute.GuidString, out Guid guid))
                 {
@@ -1080,7 +1111,7 @@ public static class NetFactory
             {
                 if (!fields[f].IsStatic || fields[f].IsIgnored() || !fields[f].FieldType.IsSubclassOf(typeof(BaseNetCall)))
                     continue;
-                
+
                 FieldInfo field = fields[f];
                 if (field.GetValue(null) is not BaseNetCall call)
                     continue;
@@ -1241,9 +1272,9 @@ public static class NetFactory
                 call.Name = (core ? PermissionLeaf.DevkitServerModulePrefix : plugin!.PermissionPrefix) + "." + field.Name;
                 call.SetThrowOnError(true);
                 if (call.Id != default)
-                    (call.HighSpeed ? HighSpeedInvokers : Invokers).Add(call.Id, call);
+                    (call.HighSpeed ? HighSpeedInvokers : Invokers)[call.Id] = call;
                 else
-                    (call.HighSpeed ? GuidHighSpeedInvokers : GuidInvokers).Add(call.Guid, call);
+                    (call.HighSpeed ? GuidHighSpeedInvokers : GuidInvokers)[call.Guid] = call;
 
                 outCalls?.Add(new NetInvokerInfo(field, call, outList?.ToArray() ?? Array.Empty<NetMethodInfo>()));
             }
@@ -1256,8 +1287,9 @@ public static class NetFactory
     public static void RegisterListener(NetTask netTask, BaseNetCall caller)
     {
         Listener listener = new Listener(netTask, caller);
-        (netTask.IsAcknowledgementRequest ? LocalAckRequests : LocalListeners).Add(netTask.RequestId, listener);
-        LocalListenerTimestamps.Add(new ListenerTimestamp(netTask));
+        (netTask.IsAcknowledgementRequest ? LocalAckRequests : LocalListeners)[netTask.RequestId] = listener;
+        lock (LocalListenerTimestamps)
+            LocalListenerTimestamps.Add(new ListenerTimestamp(netTask));
     }
 
     /// <summary>
@@ -1267,53 +1299,79 @@ public static class NetFactory
     {
         if (task.IsAcknowledgementRequest)
         {
-            LocalAckRequests.Remove(task.RequestId);
+            LocalAckRequests.Remove(task.RequestId, out _);
         }
         else
         {
-            LocalListeners.Remove(task.RequestId);
+            LocalListeners.Remove(task.RequestId, out _);
         }
 
-        for (int i = LocalListenerTimestamps.Count - 1; i >= 0; --i)
+        lock (LocalListenerTimestamps)
         {
-            if (LocalListenerTimestamps[i].RequestId == task.RequestId)
+            for (int i = LocalListenerTimestamps.Count - 1; i >= 0; --i)
             {
+                if (LocalListenerTimestamps[i].RequestId != task.RequestId)
+                    continue;
+
                 LocalListenerTimestamps.RemoveAt(i);
                 break;
             }
         }
     }
-    
+
     /// <summary>
     /// Send data of message type <see cref="DevkitServerMessage"/>. Writes the message type, length (unsigned int16), and the byte data using a <see cref="NetPakWriter"/>.
     /// </summary>
-    /// <exception cref="ArgumentException">Length is too long (must be at most <see cref="ushort.MaxValue"/>).</exception>
+    /// <exception cref="ArgumentException">Length is too long (must be at most <see cref="ushort.MaxValue"/>) or a <see cref="HighSpeedConnection"/> is used with a <see cref="ICustomNetMessageListener"/>.</exception>
     public static void SendGeneric(DevkitServerMessage message,
 #if SERVER
         ITransportConnection connection,
 #endif
         byte[] bytes, int offset = 0, int length = -1, bool reliable = true)
     {
+        DevkitServerModule.AssertIsDevkitServerClient();
+
+#if SERVER
+        if ((int)message >= DevkitServerBlockSize && connection is HighSpeedConnection)
+            throw new ArgumentException("Not allowed to use HighSpeedConnections with ICustomNetMessageListeners.", nameof(connection));
+#endif
         if (length == -1)
             length = bytes.Length - offset;
 
         if (length > ushort.MaxValue)
             throw new ArgumentException($"Length must be less than {ushort.MaxValue} B.", length == bytes.Length - offset ? nameof(bytes) : nameof(length));
 
-        Writer.Reset();
+        DevkitServerMessage mapping = message;
+        if ((int)mapping >= DevkitServerBlockSize && CustomNetMessageListeners.InverseLocalMappings.TryGetValue(mapping, out Type localMappingType))
+        {
 #if CLIENT
-        Writer.WriteEnum((EServerMessage)(WriteBlockOffset + (int)message));
-#else
-        Writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)message));
+            if (CustomNetMessageListeners.RemoteMappings.TryGetValue(localMappingType, out DevkitServerMessage remoteMapping))
+                mapping = remoteMapping;
+#elif SERVER
+            if (CustomNetMessageListeners.RemoteMappings.TryGetValue(connection, out ConcurrentDictionary<Type, DevkitServerMessage> mappings)
+                && mappings.TryGetValue(localMappingType, out DevkitServerMessage remoteMapping))
+            {
+                mapping = remoteMapping;
+            }
 #endif
-        Writer.WriteUInt16((ushort)length);
-        Writer.WriteBytes(bytes, offset, length);
-        Writer.Flush();
+        }
+
+        NetPakWriter writer = DevkitServerModule.IsMainThread ? Writer : new NetPakWriter { buffer = new byte[length + 8] };
+        writer.Reset();
+
+#if CLIENT
+        writer.WriteEnum((EServerMessage)(WriteBlockOffset + (int)mapping));
+#else
+        writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)mapping));
+#endif
+        writer.WriteUInt16((ushort)length);
+        writer.WriteBytes(bytes, offset, length);
+        writer.Flush();
         IncrementByteCount(message, true, length);
 #if CLIENT
-        GetPlayerTransportConnection().Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
+        GetPlayerTransportConnection().Send(writer.buffer, writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
 #else
-        connection.Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
+        connection.Send(writer.buffer, writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
 #endif
     }
 #if SERVER
@@ -1322,34 +1380,105 @@ public static class NetFactory
     /// Send data of message type <see cref="DevkitServerMessage"/> to multiple users. Writes the message type, length (unsigned int16), and the byte data using a <see cref="NetPakWriter"/>.
     /// </summary>
     /// <param name="connections">Leave <see langword="null"/> to select all online users.</param>
-    /// <exception cref="ArgumentException">Length is too long (must be at most <see cref="ushort.MaxValue"/>).</exception>
+    /// <exception cref="ArgumentException">Length is too long (must be at most <see cref="ushort.MaxValue"/>) or a <see cref="HighSpeedConnection"/> is used with a <see cref="ICustomNetMessageListener"/>.</exception>
     public static void SendGeneric(DevkitServerMessage message, byte[] bytes, IReadOnlyList<ITransportConnection>? connections = null, int offset = 0, int length = -1, bool reliable = true)
     {
+        ThreadUtil.assertIsGameThread();
+
+        DevkitServerModule.AssertIsDevkitServerClient();
+
         if (length == -1)
             length = bytes.Length - offset;
 
         if (length > ushort.MaxValue)
             throw new ArgumentException($"Length must be less than {ushort.MaxValue} B.", length == bytes.Length - offset ? nameof(bytes) : nameof(length));
 
+        if (connections != null && (int)message >= DevkitServerBlockSize)
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                if (connections[i] is HighSpeedConnection)
+                    throw new ArgumentException("Not allowed to use HighSpeedConnections with ICustomNetMessageListeners.", nameof(connections));
+            }
+        }
+
         connections ??= Provider.GatherRemoteClientConnections();
         if (connections.Count == 0)
             return;
-        Writer.Reset();
+        bool anyConnectionsHaveAlteredIndexes = false;
+        Type? localMappingType = null;
+        if ((int)message >= DevkitServerBlockSize && CustomNetMessageListeners.InverseLocalMappings.TryGetValue(message, out localMappingType))
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                if (!CustomNetMessageListeners.RemoteMappings.TryGetValue(connections[i], out ConcurrentDictionary<Type, DevkitServerMessage> mappings)
+                    || !mappings.TryGetValue(localMappingType, out DevkitServerMessage remoteMessage)
+                    || remoteMessage == message)
+                {
+                    continue;
+                }
+
+                anyConnectionsHaveAlteredIndexes = true;
+                break;
+            }
+        }
+        NetPakWriter writer = DevkitServerModule.IsMainThread ? Writer : new NetPakWriter { buffer = new byte[length + 8] };
+        writer.Reset();
+        int enumIndex = writer.writeByteIndex;
 #if CLIENT
-        Writer.WriteEnum((EServerMessage)(WriteBlockOffset + (int)message));
+        writer.WriteEnum((EServerMessage)(WriteBlockOffset + (int)message));
 #else
-        Writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)message));
+        writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)message));
 #endif
-        Writer.WriteUInt16((ushort)length);
-        Writer.WriteBytes(bytes, offset, length);
-        Writer.Flush();
+        writer.WriteUInt16((ushort)length);
+        writer.WriteBytes(bytes, offset, length);
+        writer.Flush();
         ENetReliability reliability = reliable ? ENetReliability.Reliable : ENetReliability.Unreliable;
-        IncrementByteCount(true, message, length * connections.Count);
-        for (int i = 0; i < connections.Count; ++i)
-            connections[i].Send(Writer.buffer, Writer.writeByteIndex, reliability);
+        IncrementByteCount(message, true, length * connections.Count);
+
+        if (!anyConnectionsHaveAlteredIndexes)
+        {
+            for (int i = 0; i < connections.Count; ++i)
+                connections[i].Send(writer.buffer, writer.writeByteIndex, reliability);
+        }
+        else
+        {
+            // apply mappings
+            int oldIndex = writer.writeByteIndex;
+            DevkitServerMessage last = message;
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection connection = connections[i];
+
+                if (!CustomNetMessageListeners.RemoteMappings.TryGetValue(connection, out ConcurrentDictionary<Type, DevkitServerMessage> mappings)
+                    || !mappings.TryGetValue(localMappingType!, out DevkitServerMessage remoteMessage)
+                    || remoteMessage == message)
+                {
+                    remoteMessage = message;
+                }
+
+                if (remoteMessage != last)
+                {
+                    last = remoteMessage;
+
+                    writer.writeByteIndex = enumIndex;
+#if CLIENT
+                    writer.WriteEnum((EServerMessage)(WriteBlockOffset + (int)remoteMessage));
+#else
+                    writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)remoteMessage));
+#endif
+                    writer.WriteUInt16((ushort)length); // this has to be rewritten because the 32 bit scratch could intersect with the enum written above.
+                    writer.AlignToByte();
+                    writer.Flush();
+                    writer.writeByteIndex = oldIndex;
+                }
+
+                connection.Send(writer.buffer, oldIndex, reliability);
+            }
+        }
     }
 #endif
-    
+
     internal static void Send(this
 #if SERVER
         ITransportConnection
@@ -1358,7 +1487,7 @@ public static class NetFactory
 #endif
         connection, byte[] bytes, bool reliable = true, int count = -1, int offset = -1)
     {
-        ThreadUtil.assertIsGameThread();
+        DevkitServerModule.AssertIsDevkitServerClient();
 
         if (offset < 0)
             offset = 0;
@@ -1400,6 +1529,8 @@ public static class NetFactory
             return;
         }
 
+        ThreadUtil.assertIsGameThread();
+
         Writer.Reset();
         int msg = WriteBlockOffset + (int)DevkitServerMessage.InvokeMethod;
 #if SERVER
@@ -1429,13 +1560,33 @@ public static class NetFactory
         connection.Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
     }
 #if SERVER
-    internal static void Send(this IReadOnlyList<ITransportConnection> connections, byte[] bytes, bool reliable = true)
+    internal static void Send(IReadOnlyList<ITransportConnection>? connections, byte[] bytes, bool reliable = true)
     {
-        Writer.Reset();
-        Writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)DevkitServerMessage.InvokeMethod));
-        Writer.WriteUInt16((ushort)bytes.Length);
-        Writer.WriteBytes(bytes);
-        Writer.Flush();
+        if (connections == null)
+        {
+            ThreadUtil.assertIsGameThread();
+            connections = Provider.GatherRemoteClientConnections();
+        }
+        else
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                if (connections[i] is not HighSpeedConnection)
+                    ThreadUtil.assertIsGameThread();
+            }
+        }
+
+        DevkitServerModule.AssertIsDevkitServerClient();
+
+        if (connections.Count == 0)
+            return;
+        NetPakWriter writer = DevkitServerModule.IsMainThread ? Writer : new NetPakWriter { buffer = new byte[bytes.Length + 8] };
+
+        writer.Reset();
+        writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)DevkitServerMessage.InvokeMethod));
+        writer.WriteUInt16((ushort)bytes.Length);
+        writer.WriteBytes(bytes);
+        writer.Flush();
 #if METHOD_LOGGING
         MessageOverhead overhead;
         unsafe
@@ -1445,7 +1596,7 @@ public static class NetFactory
         }
         Logger.LogDebug($"[NET FACTORY] Sending {bytes.Length.Format()} B to {connections.Count.Format()} user(s): {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
-        IncrementByteCount(true, DevkitServerMessage.InvokeMethod, bytes.Length * connections.Count);
+        IncrementByteCount(DevkitServerMessage.InvokeMethod, true, bytes.Length * connections.Count);
         for (int i = 0; i < connections.Count; ++i)
         {
             if (connections[i] is HighSpeedConnection conn)
@@ -1456,8 +1607,8 @@ public static class NetFactory
                 Logger.LogDebug($"[NET FACTORY] Sending {bytes.Length.Format()} B (HS) to {conn.Format()}: {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
             }
-
-            connections[i].Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
+            
+            connections[i].Send(writer.buffer, writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
         }
     }
 #endif
@@ -1505,7 +1656,7 @@ public sealed class NetCallAttribute : Attribute
     readonly NetCallSource type;
     readonly ushort methodId;
     readonly string? methodGuid;
-    internal NetCallAttribute(NetCallSource type, DevkitServerNetCall methodId) : this (type, (ushort)methodId) { }
+    internal NetCallAttribute(NetCallSource type, DevkitServerNetCall methodId) : this(type, (ushort)methodId) { }
     internal NetCallAttribute(NetCallSource type, ushort methodId)
     {
         this.type = type;

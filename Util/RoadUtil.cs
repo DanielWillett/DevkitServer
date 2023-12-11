@@ -1198,7 +1198,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally call <see cref="LevelRoads.removeRoad"/> and call the necessary events.
+    /// Locally call <see cref="LevelRoads.removeRoad(Road)"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1214,7 +1214,7 @@ public static class RoadUtil
     }
 
     /// <summary>
-    /// Locally call <see cref="LevelRoads.removeRoad"/> and call the necessary events.
+    /// Locally call <see cref="LevelRoads.removeRoad(Road)"/> and call the necessary events.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1802,7 +1802,7 @@ public static class RoadUtil
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditRoads"/>.</exception>
-    /// <returns><see langword="true"/> if <paramref name="isLoop"/> was different than the current value and the value was changed, otherwise <see langword="false"/>.</returns>
+    /// <returns><see langword="true"/> if <paramref name="materialIndex"/> was different than the current value and the value was changed, otherwise <see langword="false"/>.</returns>
     public static bool SetMaterial(Road road, int materialIndex)
     {
         ThreadUtil.assertIsGameThread();
@@ -1823,7 +1823,7 @@ public static class RoadUtil
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditRoads"/>.</exception>
-    /// <returns><see langword="true"/> if <paramref name="isLoop"/> was different than the current value and the value was changed, otherwise <see langword="false"/>.</returns>
+    /// <returns><see langword="true"/> if <paramref name="materialIndex"/> was different than the current value and the value was changed, otherwise <see langword="false"/>.</returns>
     public static bool SetMaterial(int roadIndex, int materialIndex)
     {
         ThreadUtil.assertIsGameThread();
@@ -2043,7 +2043,7 @@ public static class RoadUtil
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditRoads"/>.</exception>
-    /// <returns><see langword="true"/> if <paramref name="verticalOffset"/> was different than the current value and the value was changed, otherwise <see langword="false"/>.</returns>
+    /// <returns><see langword="true"/> if <paramref name="tangentHandleMode"/> was different than the current value and the value was changed, otherwise <see langword="false"/>.</returns>
     public static bool SetVertexTangentHandleMode(Road road, int vertexIndex, ERoadMode tangentHandleMode)
     {
         ThreadUtil.assertIsGameThread();
@@ -2064,7 +2064,7 @@ public static class RoadUtil
     /// <remarks>Replicates to remote.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     /// <exception cref="NoPermissionsException">Missing client-side permission for <see cref="VanillaPermissions.EditRoads"/>.</exception>
-    /// <returns><see langword="true"/> if <paramref name="verticalOffset"/> was different than the current value and the value was changed, otherwise <see langword="false"/>.</returns>
+    /// <returns><see langword="true"/> if <paramref name="tangentHandleMode"/> was different than the current value and the value was changed, otherwise <see langword="false"/>.</returns>
     public static bool SetVertexTangentHandleMode(int roadIndex, int vertexIndex, ERoadMode tangentHandleMode)
     {
         ThreadUtil.assertIsGameThread();

@@ -1946,7 +1946,7 @@ public static class Accessor
     /// <param name="member">Member to check for attributes. This can be <see cref="Module"/>, <see cref="Assembly"/>, <see cref="MemberInfo"/>, or <see cref="ParameterInfo"/>.</param>
     /// <typeparam name="TAttribute">Type of the attribute to check for.</typeparam>
     /// <exception cref="AmbiguousMatchException">There are more than one attributes of type <typeparamref name="TAttribute"/>.</exception>
-    /// <remarks>Implementation of <see cref="Attribute.GetCustomAttribute"/>.</remarks>
+    /// <remarks>Implementation of <see cref="Attribute.GetCustomAttribute(MemberInfo, Type)"/>.</remarks>
     [Pure]
     public static TAttribute? GetAttributeSafe<TAttribute>(this ICustomAttributeProvider member, bool inherit = false) where TAttribute : Attribute
         => member.GetAttributeSafe(typeof(TAttribute), inherit) as TAttribute;
@@ -1959,7 +1959,7 @@ public static class Accessor
     /// <param name="inherit">Also check parent members.</param>
     /// <exception cref="ArgumentException"><paramref name="attributeType"/> did not derive from <see cref="Attribute"/>.</exception>
     /// <exception cref="AmbiguousMatchException">There are more than one attributes of type <paramref name="attributeType"/>.</exception>
-    /// <remarks>Implementation of <see cref="Attribute.GetCustomAttribute"/>.</remarks>
+    /// <remarks>Implementation of <see cref="Attribute.GetCustomAttribute(MemberInfo, Type)"/>.</remarks>
     [Pure]
     public static Attribute? GetAttributeSafe(this ICustomAttributeProvider member, Type attributeType, bool inherit = false)
     {
@@ -2007,7 +2007,7 @@ public static class Accessor
     /// <param name="inherit">Also check parent members.</param>
     /// <param name="member">Member to check for attributes. This can be <see cref="Module"/>, <see cref="Assembly"/>, <see cref="MemberInfo"/>, or <see cref="ParameterInfo"/>.</param>
     /// <typeparam name="TAttribute">Type of the attribute to check for.</typeparam>
-    /// <remarks>Implementation of <see cref="ICustomAttributeProvider.GetCustomAttributes"/>.</remarks>
+    /// <remarks>Implementation of <see cref="ICustomAttributeProvider.GetCustomAttributes(Type, bool)"/>.</remarks>
     [Pure]
     public static TAttribute[] GetAttributesSafe<TAttribute>(this ICustomAttributeProvider member, bool inherit = false) where TAttribute : Attribute
         => (TAttribute[])member.GetAttributesSafe(typeof(TAttribute), inherit);
@@ -2019,7 +2019,7 @@ public static class Accessor
     /// <param name="attributeType">Type of the attribute to check for.</param>
     /// <param name="inherit">Also check parent members.</param>
     /// <exception cref="ArgumentException"><paramref name="attributeType"/> did not derive from <see cref="Attribute"/>.</exception>
-    /// <remarks>Implementation of <see cref="ICustomAttributeProvider.GetCustomAttributes"/>.</remarks>
+    /// <remarks>Implementation of <see cref="ICustomAttributeProvider.GetCustomAttributes(Type, bool)"/>.</remarks>
     [Pure]
     public static Attribute[] GetAttributesSafe(this ICustomAttributeProvider member, Type attributeType, bool inherit = false)
     {
@@ -2094,6 +2094,7 @@ public static class Accessor
         string msg = context + $" Missing assembly: {ex.FileName}.";
         Logger.LogDebug("[" + source + "] " + msg);
     }
+#pragma warning disable CS0419
 
     /// <summary>
     /// Checks for the <see cref="IsReadOnlyAttribute"/> on <paramref name="member"/>, which signifies the readonly value.
@@ -2109,8 +2110,10 @@ public static class Accessor
         return member.HasAttributeSafe(_readonlyAttribute ??= typeof(IsReadOnlyAttribute));
     }
 
+#pragma warning restore CS0419
+
     /// <summary>
-    /// Checks for the <see cref="IgnoreAttribute"/> on <paramref name="type"/>.
+    /// Checks for the <see cref="IgnoreAttribute"/> on <paramref name="member"/>.
     /// </summary>
     /// <param name="inherit">Also check parent members.</param>
     [Pure]
@@ -2118,7 +2121,7 @@ public static class Accessor
     private static bool IsIgnored(this Type type) => type.HasAttributeSafe(_ignoreAttribute ??= typeof(IgnoreAttribute));
 
     /// <summary>
-    /// Checks for the <see cref="DanielWillett.ReflectionTools.PriorityAttribute"/> on <paramref name="type"/> and returns the priority (or zero if not found).
+    /// Checks for the <see cref="LoadPriorityAttribute"/> on <paramref name="member"/> and returns the priority (or zero if not found).
     /// </summary>
     [Pure]
     public static int GetPriority(this ICustomAttributeProvider member, bool inherit = true) => member.GetAttributeSafe(_priorityAttribute ??= typeof(LoadPriorityAttribute), inherit) is LoadPriorityAttribute attr ? attr.Priority : 0;
@@ -2408,6 +2411,10 @@ public static class Accessor
                 return mapping.TargetMethods[i];
             }
         }
+
+        // default implementation
+        if (interfaceMethod.IsVirtual)
+            return interfaceMethod;
 
         return null;
     }

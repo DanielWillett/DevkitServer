@@ -19,7 +19,8 @@ public interface ICustomNetMessageListener
     /// <summary>
     /// Set by DevkitServer when your plugin loads. Represents the value of type <see cref="DevkitServerMessage"/> to use for this message.
     /// </summary>
-    uint MessageIndex { get; set; }
+    /// <remarks>Although this is represented by <see cref="DevkitServerMessage"/> it will not have a text representation in the enum for obvious reasons.</remarks>
+    DevkitServerMessage LocalMessageIndex { get; set; }
 
     /// <summary>
     /// Set by DevkitServer when your plugin loads. The owning assembly of this <see cref="ICustomNetMessageListener"/>.
@@ -29,17 +30,16 @@ public interface ICustomNetMessageListener
     /// <summary>
     /// Invoked when the message is received from either a client or the connected server.
     /// </summary>
-    /// <param name="reader"></param>
     void OnInvoked(
 #if SERVER
         ITransportConnection connection,
 #endif
-        ArraySegment<byte> data)
-    {
-        
-    }
+        ReadOnlySpan<byte> data);
 
-    void OnInvokedListener(
+    /// <summary>
+    /// Defualt implementation reads length and invokes <see cref="OnInvoked"/> with an <see cref="ReadOnlySpan{byte}"/> which directly references the <see cref="NetPakReader"/> buffer.
+    /// </summary>
+    void OnRawMessageReceived(
 #if SERVER
         ITransportConnection connection,
 #endif
@@ -49,9 +49,9 @@ public interface ICustomNetMessageListener
 
         if (!reader.ReadUInt16(out ushort len))
         {
-            Logger.LogWarning("Received invalid message, can't read length"
+            Assembly.LogWarning("Received invalid message, can't read length"
 #if SERVER
-                              + $" from {transportConnection.Format()}"
+                              + $" from {connection.Format()}"
 #endif
                               + "."
                 , method: "Invoke " + GetType().Name);
@@ -59,11 +59,11 @@ public interface ICustomNetMessageListener
         }
         if (!reader.ReadBytesPtr(len, out byte[] buffer, out int offset))
         {
-            Logger.LogWarning($"Received invalid message, can't read bytes of length {len.Format()} B"
+            Assembly.LogWarning($"Received invalid message, can't read bytes of length {len.Format()} B"
 #if SERVER
-                              + $" from {transportConnection.Format()}"
+                                + $" from {connection.Format()}"
 #endif
-                              + $". Expected length <= {reader.RemainingSegmentLength.Format()}."
+                                + $". Expected length <= {reader.RemainingSegmentLength.Format()}."
                 , method: "Invoke " + GetType().Name);
             return;
         }
@@ -72,13 +72,14 @@ public interface ICustomNetMessageListener
         {
             OnInvoked(
 #if SERVER
-            connection,
+                      connection,
 #endif
-                new ArraySegment<byte>(buffer, offset, len));
+                      new ReadOnlySpan<byte>(buffer, offset, len));
         }
         catch (Exception ex)
         {
-
+            Assembly.LogError($"Error invoking {GetType().Format()}.{nameof(OnInvoked).Colorize(FormattingColorType.Method)}.", method: "Invoke " + GetType().Name);
+            Assembly.LogError(ex, method: "Invoke " + GetType().Name);
         }
     }
 }

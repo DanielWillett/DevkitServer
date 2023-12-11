@@ -165,9 +165,9 @@ public class NetCallCustom : BaseNetCall
         }
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, WriterTask task)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, WriterTask task)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         try
         {
@@ -180,7 +180,7 @@ public class NetCallCustom : BaseNetCall
                 bytes = _writer.ToArray();
             }
 
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -349,11 +349,11 @@ public sealed class NetCall : BaseNetCall
 #endif
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         _bytes ??= new MessageOverhead(DefaultFlags, Guid, Id, 0).GetBytes();
-        connections.Send(_bytes);
+        NetFactory.Send(connections, _bytes);
     }
 #endif
     public bool Read(ArraySegment<byte> message) => true;
@@ -513,14 +513,14 @@ public sealed class NetCallRaw<T> : NetCallRaw
             arg);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T arg)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T arg)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -718,14 +718,14 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
             arg1, arg2);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T1 arg1, T2 arg2)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -926,14 +926,14 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
             arg1, arg2, arg3);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T1 arg1, T2 arg2, T3 arg3)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -1136,14 +1136,14 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
             arg1, arg2, arg3, arg4);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -1346,14 +1346,14 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
             arg1, arg2, arg3, arg4, arg5);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -1557,14 +1557,14 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5, T6> : NetCallRaw
             arg1, arg2, arg3, arg4, arg5, arg6);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -1762,14 +1762,14 @@ public sealed class NetCall<T> : DynamicNetCall
             arg);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T arg)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T arg)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -1962,14 +1962,14 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
             arg1, arg2);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T1 arg1, T2 arg2)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -2163,14 +2163,14 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
             arg1, arg2, arg3);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T1 arg1, T2 arg2, T3 arg3)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -2365,14 +2365,14 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
             arg1, arg2, arg3, arg4);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -2568,14 +2568,14 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
             arg1, arg2, arg3, arg4, arg5);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -2772,14 +2772,14 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
             arg1, arg2, arg3, arg4, arg5, arg6);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -2986,14 +2986,14 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
             arg1, arg2, arg3, arg4, arg5, arg6, arg7);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -3198,14 +3198,14 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
             arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -3404,14 +3404,14 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
             arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
@@ -3611,14 +3611,14 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
             arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
     }
 #if SERVER
-    public void Invoke(IList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)
+    public void Invoke(IReadOnlyList<ITransportConnection>? connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)
     {
-        if (connections.Count == 0) return;
+        if (connections is { Count: 0 }) return;
         MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
         byte[] bytes = _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
         try
         {
-            connections.Send(bytes);
+            NetFactory.Send(connections, bytes);
         }
         catch (Exception ex)
         {
