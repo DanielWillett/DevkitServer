@@ -12,6 +12,8 @@ using HarmonyLib;
 using SDG.Framework.Modules;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using DevkitServer.API.Multiplayer;
+using Unturned.SystemEx;
 using Module = SDG.Framework.Modules.Module;
 using Type = System.Type;
 
@@ -25,6 +27,7 @@ public static class PluginLoader
 {
     private static string? _pluginsDir;
     private static string? _libraryDir;
+    private static bool _isUnloading;
 
     /// <summary>
     /// Path to the directory that plugins are read from.
@@ -281,6 +284,9 @@ public static class PluginLoader
                 AssembliesIntl.Add(assemblyWrapper);
                 assemblyWrapper.ReflectAndPatch();
 
+                if (assemblyWrapper.CustomNetMessageListeners.Count > 0)
+                    NetFactory.ReclaimMessageBlock();
+
                 plugin.Assembly = assemblyWrapper;
                 skipAssemblyAdd:
                 OnPluginLoadedEvent.TryInvoke(plugin);
@@ -427,7 +433,7 @@ public static class PluginLoader
                         OnPluginUnloadedEvent.TryInvoke(plugin);
                     }
 
-                    if (assemblyWrapper != null && assemblyWrapper.Plugins.Count == 0)
+                    if (assemblyWrapper is { Plugins.Count: 0 })
                     {
                         assemblyWrapper.Unpatch();
                     }
@@ -609,6 +615,8 @@ public static class PluginLoader
                 pluginsTemp[i].Assembly.ReflectAndPatch();
             }
 
+            NetFactory.ReclaimMessageBlock();
+
             for (int i = 0; i < pluginsTemp.Count; ++i)
             {
                 if (pluginsTemp[i] is not IReflectionDoneListenerDevkitServerPlugin refl)
@@ -649,21 +657,28 @@ public static class PluginLoader
     internal static void Unload()
     {
         OnPluginsUnloadingEvent.TryInvoke();
-
-        IDevkitServerPlugin[] plugins;
-        lock (PluginsIntl)
-            plugins = PluginsIntl.ToArray();
-
-        for (int i = 0; i < plugins.Length; i++)
+        _isUnloading = true;
+        try
         {
-            try
+            IDevkitServerPlugin[] plugins;
+            lock (PluginsIntl)
+                plugins = PluginsIntl.ToArray();
+
+            for (int i = 0; i < plugins.Length; i++)
             {
-                DeregisterPlugin(plugins[i]);
+                try
+                {
+                    DeregisterPlugin(plugins[i]);
+                }
+                catch
+                {
+                    // ignored
+                }
             }
-            catch
-            {
-                // ignored
-            }
+        }
+        finally
+        {
+            _isUnloading = false;
         }
     }
 
@@ -960,6 +975,7 @@ public class PluginAssembly
     private readonly List<NetMethodInfo> _netMethods;
     private readonly List<HierarchyItemTypeIdentifierFactoryInfo> _hierarchyItemFactories;
     private readonly List<ReplicatedLevelDataSourceInfo> _replicatedLevelDataSources;
+    private readonly List<ICustomNetMessageListener> _customNetMessageListeners;
     public IReadOnlyList<IDevkitServerPlugin> Plugins { get; }
     public Assembly Assembly { get; }
     public string? File { get; }
@@ -971,34 +987,41 @@ public class PluginAssembly
     public IReadOnlyList<NetMethodInfo> NetMethods { get; }
     public IReadOnlyList<HierarchyItemTypeIdentifierFactoryInfo> HierarchyItemFactories { get; }
     public IReadOnlyList<ReplicatedLevelDataSourceInfo> ReplicatedLevelDataSources { get; }
+    public IReadOnlyList<ICustomNetMessageListener> CustomNetMessageListeners { get; }
     public PluginAssembly(Assembly assembly, string file, bool autoPatch = true)
     {
-        _plugins = new List<IDevkitServerPlugin>();
-        _netCalls = new List<NetInvokerInfo>();
-        _netMethods = new List<NetMethodInfo>();
-        _hierarchyItemFactories = new List<HierarchyItemTypeIdentifierFactoryInfo>();
-        _replicatedLevelDataSources = new List<ReplicatedLevelDataSourceInfo>();
+        _plugins = new List<IDevkitServerPlugin>(0);
+        _netCalls = new List<NetInvokerInfo>(0);
+        _netMethods = new List<NetMethodInfo>(0);
+        _hierarchyItemFactories = new List<HierarchyItemTypeIdentifierFactoryInfo>(0);
+        _replicatedLevelDataSources = new List<ReplicatedLevelDataSourceInfo>(0);
+        _customNetMessageListeners = new List<ICustomNetMessageListener>(0);
         Assembly = assembly;
         Plugins = _plugins.AsReadOnly();
         NetCalls = _netCalls.AsReadOnly();
         NetMethods = _netMethods.AsReadOnly();
         HierarchyItemFactories = _hierarchyItemFactories.AsReadOnly();
         ReplicatedLevelDataSources = _replicatedLevelDataSources.AsReadOnly();
-        Patcher = autoPatch ? new Harmony(PatchesMain.HarmonyId + ".assembly." + assembly.GetName().Name.ToLowerInvariant()) : null;
+        CustomNetMessageListeners = _customNetMessageListeners.AsReadOnly();
+        Patcher = autoPatch ? new Harmony(PatchesMain.HarmonyId + ".assembly." + assembly.GetName().Name.ToLowerInvariant().Replace('_', '.').Replace(' ', '.')) : null;
         File = string.IsNullOrEmpty(file) ? null : file;
     }
     internal PluginAssembly()
     {
+        _plugins = new List<IDevkitServerPlugin>(1);
         _netCalls = new List<NetInvokerInfo>(0);
         _netMethods = new List<NetMethodInfo>(0);
         _hierarchyItemFactories = new List<HierarchyItemTypeIdentifierFactoryInfo>(0);
         _replicatedLevelDataSources = new List<ReplicatedLevelDataSourceInfo>(0);
-        _plugins = new List<IDevkitServerPlugin>(1);
+        _customNetMessageListeners = new List<ICustomNetMessageListener>(0);
+
         Plugins = _plugins.AsReadOnly();
-        NetCalls = Array.Empty<NetInvokerInfo>();
-        NetMethods = Array.Empty<NetMethodInfo>();
-        HierarchyItemFactories = Array.Empty<HierarchyItemTypeIdentifierFactoryInfo>();
-        ReplicatedLevelDataSources = Array.Empty<ReplicatedLevelDataSourceInfo>();
+        NetCalls = _netCalls.AsReadOnly();
+        NetMethods = _netMethods.AsReadOnly();
+        HierarchyItemFactories = _hierarchyItemFactories.AsReadOnly();
+        ReplicatedLevelDataSources = _replicatedLevelDataSources.AsReadOnly();
+        CustomNetMessageListeners = _customNetMessageListeners.AsReadOnly();
+
         File = null!;
         Assembly = null!;
         Patcher = null!;
@@ -1036,7 +1059,9 @@ public class PluginAssembly
             HierarchyItemTypeIdentifierEx.RegisterFromAssembly(Assembly, _hierarchyItemFactories);
             ReplicatedLevelDataRegistry.RegisterFromAssembly(Assembly, _replicatedLevelDataSources, this);
 
-            foreach (Type type in Accessor.GetTypesSafe(Assembly)
+            List<Type> types = Accessor.GetTypesSafe(Assembly);
+
+            foreach (Type type in types
                          .Select(x => new KeyValuePair<Type, EarlyTypeInitAttribute?>(x, x.GetAttributeSafe<EarlyTypeInitAttribute>()))
                          .Where(x => x.Value != null)
                          .OrderByDescending(x => x.Value!.Priority)
@@ -1048,23 +1073,41 @@ public class PluginAssembly
                     RuntimeHelpers.RunClassConstructor(type.TypeHandle);
                     CreateDirectoryAttribute.CreateInType(type);
                     if (Plugins.Count == 1)
-                        Plugins[0].LogDebug("Initialized static module " + type.Format() + ".");
+                        Plugins[0].LogDebug($"Initialized static module {type.Format()}.");
                     else
-                        Logger.LogDebug($"[{src}] Initialized static module {type.Name.Format()}.");
+                        Logger.LogDebug($"[{src}] Initialized static module {type.Format()}.");
                 }
                 catch (Exception ex)
                 {
                     if (Plugins.Count == 1)
                     {
-                        Plugins[0].LogError("Error while initializing static module " + type.Format() + ".");
+                        Plugins[0].LogError($"Error while initializing static module {type.Format()}.");
                         Plugins[0].LogError(ex);
                     }
                     else
                     {
-                        Logger.LogError("Error while initializing static module " + type.Format() + ".", method: src);
+                        Logger.LogError($"Error while initializing static module {type.Format()}.", method: src);
                         Logger.LogError(ex, method: src);
                     }
                     break;
+                }
+            }
+
+            foreach (Type type in types
+                         .Where(typeof(ICustomNetMessageListener).TryIsAssignableFrom))
+            {
+                if (type.IsAbstract || type.IsInterface)
+                    continue;
+
+                try
+                {
+                    ICustomNetMessageListener listener = (ICustomNetMessageListener)Activator.CreateInstance(type);
+                    _customNetMessageListeners.Add(listener);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Error creating custom net message listener {type.Format()}.", method: src);
+                    Logger.LogError(ex, method: src);
                 }
             }
 

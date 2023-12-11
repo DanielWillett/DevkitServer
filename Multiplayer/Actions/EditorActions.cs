@@ -251,7 +251,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             Logger.LogError("Failed to read incoming action packet length.", method: "EDITOR ACTIONS");
             return;
         }
-        NetFactory.IncrementByteCount(false, DevkitServerMessage.ActionRelay, len + sizeof(ushort));
+        NetFactory.IncrementByteCount(DevkitServerMessage.ActionRelay, false, len + sizeof(ushort));
 
 #if SERVER
         EditorUser? user = UserManager.FromConnection(transportConnection);
@@ -266,8 +266,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             Logger.LogError("Failed to read action packet.", method: "EDITOR ACTIONS");
             return;
         }
-        Reader.LoadNew(buffer);
-        Reader.Skip(offset);
+        Reader.LoadNew(new ArraySegment<byte>(buffer, offset, len));
 #if CLIENT
         ulong s64 = Reader.ReadUInt64();
         if (!CanProcess && TemporaryEditorActions.Instance != null)
@@ -348,7 +347,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         }
         while (_pendingActions.Count > 0 && t >= _nextApply)
         {
-            IAction action = _pendingActions[_pendingActions.Count - 1];
+            IAction action = _pendingActions[^1];
             _nextApply += action.DeltaTime;
             try
             {
@@ -595,7 +594,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             }
         }
 #if SERVER
-        if (Provider.clients.Count > 1)
+        if (Provider.clients.Count + EditorLevel.PendingToReceiveActions.Count > 1)
         {
             Logger.LogDebug("[EDITOR ACTIONS] Relaying " + (_pendingActions.Count - stInd).Format() + " action(s).");
             int capacity = Provider.clients.Count - 1 + EditorLevel.PendingToReceiveActions.Count;
@@ -610,6 +609,15 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 
             // also send to pending users
             list.AddRange(EditorLevel.PendingToReceiveActions);
+            for (int i = list.Count - 1; i >= 0; --i)
+            {
+                ITransportConnection conn = list[i];
+                for (int j = i - 1; j >= 0; --j)
+                {
+                    if (ReferenceEquals(conn, list[j]))
+                        list.RemoveAt(j);
+                }
+            } 
             if (anyInvalid)
             {
                 WriteEditBuffer(Writer, stInd, _pendingActions.Count - stInd);
@@ -866,111 +874,59 @@ public class TemporaryEditorActions : IActionListener, IDisposable
 #endif
     }
 
-    private class PendingHierarchyInstantiation
+    private class PendingHierarchyInstantiation(IHierarchyItemTypeIdentifier type, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
     {
-        public readonly IHierarchyItemTypeIdentifier Type;
-        public readonly NetId NetId;
-        public readonly Vector3 Position;
-        public readonly Quaternion Rotation;
-        public readonly Vector3 Scale;
-        public readonly ulong Owner;
-        public PendingHierarchyInstantiation(IHierarchyItemTypeIdentifier type, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
-        {
-            Type = type;
-            NetId = netId;
-            Position = position;
-            Rotation = rotation;
-            Scale = scale;
-            Owner = owner;
-        }
+        public readonly IHierarchyItemTypeIdentifier Type = type;
+        public readonly NetId NetId = netId;
+        public readonly Vector3 Position = position;
+        public readonly Quaternion Rotation = rotation;
+        public readonly Vector3 Scale = scale;
+        public readonly ulong Owner = owner;
     }
-    private class PendingLevelObjectInstantiation
+    private class PendingLevelObjectInstantiation(AssetReference<Asset> assetAsset, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
     {
-        public readonly AssetReference<Asset> Asset;
-        public readonly NetId NetId;
-        public readonly Vector3 Position;
-        public readonly Quaternion Rotation;
-        public readonly Vector3 Scale;
-        public readonly ulong Owner;
-        public PendingLevelObjectInstantiation(AssetReference<Asset> assetAsset, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
-        {
-            Asset = assetAsset;
-            Position = position;
-            Rotation = rotation;
-            Scale = scale;
-            Owner = owner;
-            NetId = netId;
-        }
+        public readonly AssetReference<Asset> Asset = assetAsset;
+        public readonly NetId NetId = netId;
+        public readonly Vector3 Position = position;
+        public readonly Quaternion Rotation = rotation;
+        public readonly Vector3 Scale = scale;
+        public readonly ulong Owner = owner;
     }
-    private class PendingRoadInstantiation
+    private class PendingRoadInstantiation(long netIds, ushort flags, Vector3 position, Vector3 tangent1, Vector3 tangent2, float offset, ulong owner)
     {
-        public readonly long NetIds;
-        public readonly ushort Flags;
-        public readonly Vector3 Position;
-        public readonly Vector3 Tangent1;
-        public readonly Vector3 Tangent2;
-        public readonly float Offset;
-        public readonly ulong Owner;
-        public PendingRoadInstantiation(long netIds, ushort flags, Vector3 position, Vector3 tangent1, Vector3 tangent2, float offset, ulong owner)
-        {
-            NetIds = netIds;
-            Flags = flags;
-            Position = position;
-            Tangent1 = tangent1;
-            Tangent2 = tangent2;
-            Offset = offset;
-            Owner = owner;
-        }
+        public readonly long NetIds = netIds;
+        public readonly ushort Flags = flags;
+        public readonly Vector3 Position = position;
+        public readonly Vector3 Tangent1 = tangent1;
+        public readonly Vector3 Tangent2 = tangent2;
+        public readonly float Offset = offset;
+        public readonly ulong Owner = owner;
     }
-    private class PendingRoadVertexInstantiation
+    private class PendingRoadVertexInstantiation(NetId roadNetId, Vector3 position, Vector3 tangent1, Vector3 tangent2, bool ignoreTerrain,
+        float verticalOffset, int vertexIndex, ulong owner, NetId vertexNetId, ERoadMode mode)
     {
-        public readonly NetId RoadNetId;
-        public readonly Vector3 Position;
-        public readonly Vector3 Tangent1;
-        public readonly Vector3 Tangent2;
-        public readonly bool IgnoreTerrain;
-        public readonly float VerticalOffset;
-        public readonly int VertexIndex;
-        public readonly ulong Owner;
-        public readonly NetId VertexNetId;
-        public readonly ERoadMode Mode;
-        public PendingRoadVertexInstantiation(NetId roadNetId, Vector3 position, Vector3 tangent1, Vector3 tangent2, bool ignoreTerrain, float verticalOffset, int vertexIndex, ulong owner, NetId vertexNetId, ERoadMode mode)
-        {
-            RoadNetId = roadNetId;
-            Position = position;
-            Tangent1 = tangent1;
-            Tangent2 = tangent2;
-            IgnoreTerrain = ignoreTerrain;
-            VerticalOffset = verticalOffset;
-            VertexIndex = vertexIndex;
-            Owner = owner;
-            VertexNetId = vertexNetId;
-            Mode = mode;
-        }
+        public readonly NetId RoadNetId = roadNetId;
+        public readonly Vector3 Position = position;
+        public readonly Vector3 Tangent1 = tangent1;
+        public readonly Vector3 Tangent2 = tangent2;
+        public readonly bool IgnoreTerrain = ignoreTerrain;
+        public readonly float VerticalOffset = verticalOffset;
+        public readonly int VertexIndex = vertexIndex;
+        public readonly ulong Owner = owner;
+        public readonly NetId VertexNetId = vertexNetId;
+        public readonly ERoadMode Mode = mode;
     }
-    private class PendingFlagInstantiation
+    private class PendingFlagInstantiation(NetId netId, Vector3 position, Vector2 size, ulong owner, bool infiniteAgroDistance, bool shouldSpawnZombies, byte maxZombies, int maxBossZombies, Guid difficultyAsset)
     {
-        public readonly NetId NetId;
-        public readonly Vector3 Position;
-        public readonly Vector2 Size;
-        public readonly ulong Owner;
-        public readonly bool InfiniteAgroDistance;
-        public readonly bool ShouldSpawnZombies;
-        public readonly byte MaxZombies;
-        public readonly int MaxBossZombies;
-        public readonly Guid DifficultyAsset;
-        public PendingFlagInstantiation(NetId netId, Vector3 position, Vector2 size, ulong owner, bool infiniteAgroDistance, bool shouldSpawnZombies, byte maxZombies, int maxBossZombies, Guid difficultyAsset)
-        {
-            NetId = netId;
-            Position = position;
-            Size = size;
-            Owner = owner;
-            InfiniteAgroDistance = infiniteAgroDistance;
-            ShouldSpawnZombies = shouldSpawnZombies;
-            MaxZombies = maxZombies;
-            MaxBossZombies = maxBossZombies;
-            DifficultyAsset = difficultyAsset;
-        }
+        public readonly NetId NetId = netId;
+        public readonly Vector3 Position = position;
+        public readonly Vector2 Size = size;
+        public readonly ulong Owner = owner;
+        public readonly bool InfiniteAgroDistance = infiniteAgroDistance;
+        public readonly bool ShouldSpawnZombies = shouldSpawnZombies;
+        public readonly byte MaxZombies = maxZombies;
+        public readonly int MaxBossZombies = maxBossZombies;
+        public readonly Guid DifficultyAsset = difficultyAsset;
     }
 }
 #endif

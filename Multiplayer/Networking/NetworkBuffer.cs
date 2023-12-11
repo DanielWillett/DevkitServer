@@ -3,15 +3,15 @@ public class NetworkBuffer : IDisposable
 {
     public byte[] Buffer;
     public readonly int BufferSize;
-    private readonly Action<byte[]> _onMsgReady;
+    private readonly Action<ArraySegment<byte>> _onMsgReady;
     private byte[]? _pendingData;
     private int _pendingLength;
     public MessageOverhead PendingOverhead;
     private bool _disposed;
     public readonly ITransportConnection Owner;
     public event NetworkBufferProgressUpdate? BufferProgressUpdated;
-    public NetworkBuffer(Action<byte[]> onMsgReady, int capacity, ITransportConnection owner) : this (onMsgReady, owner, new byte[capacity]) { }
-    public NetworkBuffer(Action<byte[]> onMsgReady, ITransportConnection owner, byte[] buffer)
+    public NetworkBuffer(Action<ArraySegment<byte>> onMsgReady, int capacity, ITransportConnection owner) : this (onMsgReady, owner, new byte[capacity]) { }
+    public NetworkBuffer(Action<ArraySegment<byte>> onMsgReady, ITransportConnection owner, byte[] buffer)
     {
         _onMsgReady = onMsgReady;
         BufferSize = buffer.Length;

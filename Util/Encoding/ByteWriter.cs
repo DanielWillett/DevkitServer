@@ -156,6 +156,8 @@ public class ByteWriter
             { typeof(string[]), GetNullableMethod(typeof(string[])) },
             { typeof(NetId?), GetNullableMethod(typeof(NetId?)) }
         };
+        
+        return;
 
         MethodInfo GetMethod(Type writeType) => typeof(ByteWriter).GetMethod("Write", BindingFlags.Instance | BindingFlags.Public, null, new Type[] { writeType }, null)
                                                 ?? throw new MemberAccessException("Unable to find write method for " + writeType.Name + ".");
@@ -186,17 +188,20 @@ public class ByteWriter
         if (_size + ttl <= _buffer.Length)
         {
             fixed (byte* ptr = _buffer)
+            {
                 System.Buffer.MemoryCopy(ptr, ptr + ttl, _buffer.Length - ttl, _size);
+                System.Buffer.MemoryCopy(overheadBytes, ptr, ttl, ttl);
+            }
         }
         else
         {
             byte[] old = _buffer;
             _buffer = new byte[_size + ttl];
             System.Buffer.BlockCopy(old, 0, _buffer, ttl, _size);
+            for (int i = 0; i < ttl; ++i)
+                _buffer[i] = overheadBytes[i];
         }
 
-        fixed (byte* ptr = _buffer)
-            System.Buffer.MemoryCopy(overheadBytes, ptr, ttl, ttl);
         _size += ttl;
     }
     public byte[] ToArray()
@@ -2043,18 +2048,18 @@ public delegate void Writer<in T>(ByteWriter writer, T arg1);
 
 public sealed class ByteWriterRaw<T> : ByteWriter
 {
-    private readonly Writer<T> writer;
+    private readonly Writer<T> _writer;
     /// <summary>Leave <paramref name="writer"/> null to auto-fill.</summary>
     public ByteWriterRaw(Writer<T>? writer, bool allowPrepending = true, int capacity = 0) : base(allowPrepending, capacity)
     {
-        this.writer = writer ?? WriterHelper<T>.Writer;
+        _writer = writer ?? WriterHelper<T>.Writer;
     }
     public byte[] Get(ref MessageOverhead overhead, T obj)
     {
         lock (this)
         {
             Flush();
-            writer.Invoke(this, obj);
+            _writer.Invoke(this, obj);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2064,28 +2069,28 @@ public sealed class ByteWriterRaw<T> : ByteWriter
         lock (this)
         {
             Flush();
-            writer.Invoke(this, obj);
+            _writer.Invoke(this, obj);
             return ToArray();
         }
     }
 }
 public sealed class ByteWriterRaw<T1, T2> : ByteWriter
 {
-    private readonly Writer<T1> writer1;
-    private readonly Writer<T2> writer2;
+    private readonly Writer<T1> _writer1;
+    private readonly Writer<T2> _writer2;
     /// <summary>Leave any writer null to auto-fill.</summary>
     public ByteWriterRaw(Writer<T1>? writer1, Writer<T2>? writer2, bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity)
     {
-        this.writer1 = writer1 ?? WriterHelper<T1>.Writer;
-        this.writer2 = writer2 ?? WriterHelper<T2>.Writer;
+        _writer1 = writer1 ?? WriterHelper<T1>.Writer;
+        _writer2 = writer2 ?? WriterHelper<T2>.Writer;
     }
     public byte[] Get(ref MessageOverhead overhead, T1 arg1, T2 arg2)
     {
         lock (this)
         {
             Flush();
-            writer1.Invoke(this, arg1);
-            writer2.Invoke(this, arg2);
+            _writer1.Invoke(this, arg1);
+            _writer2.Invoke(this, arg2);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2095,32 +2100,32 @@ public sealed class ByteWriterRaw<T1, T2> : ByteWriter
         lock (this)
         {
             Flush();
-            writer1.Invoke(this, arg1);
-            writer2.Invoke(this, arg2);
+            _writer1.Invoke(this, arg1);
+            _writer2.Invoke(this, arg2);
             return ToArray();
         }
     }
 }
 public sealed class ByteWriterRaw<T1, T2, T3> : ByteWriter
 {
-    private readonly Writer<T1> writer1;
-    private readonly Writer<T2> writer2;
-    private readonly Writer<T3> writer3;
+    private readonly Writer<T1> _writer1;
+    private readonly Writer<T2> _writer2;
+    private readonly Writer<T3> _writer3;
     /// <summary>Leave any writer null to auto-fill.</summary>
     public ByteWriterRaw(Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity)
     {
-        this.writer1 = writer1 ?? WriterHelper<T1>.Writer;
-        this.writer2 = writer2 ?? WriterHelper<T2>.Writer;
-        this.writer3 = writer3 ?? WriterHelper<T3>.Writer;
+        _writer1 = writer1 ?? WriterHelper<T1>.Writer;
+        _writer2 = writer2 ?? WriterHelper<T2>.Writer;
+        _writer3 = writer3 ?? WriterHelper<T3>.Writer;
     }
     public byte[] Get(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3)
     {
         lock (this)
         {
             Flush();
-            writer1.Invoke(this, arg1);
-            writer2.Invoke(this, arg2);
-            writer3.Invoke(this, arg3);
+            _writer1.Invoke(this, arg1);
+            _writer2.Invoke(this, arg2);
+            _writer3.Invoke(this, arg3);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2130,36 +2135,36 @@ public sealed class ByteWriterRaw<T1, T2, T3> : ByteWriter
         lock (this)
         {
             Flush();
-            writer1.Invoke(this, arg1);
-            writer2.Invoke(this, arg2);
-            writer3.Invoke(this, arg3);
+            _writer1.Invoke(this, arg1);
+            _writer2.Invoke(this, arg2);
+            _writer3.Invoke(this, arg3);
             return ToArray();
         }
     }
 }
 public sealed class ByteWriterRaw<T1, T2, T3, T4> : ByteWriter
 {
-    private readonly Writer<T1> writer1;
-    private readonly Writer<T2> writer2;
-    private readonly Writer<T3> writer3;
-    private readonly Writer<T4> writer4;
+    private readonly Writer<T1> _writer1;
+    private readonly Writer<T2> _writer2;
+    private readonly Writer<T3> _writer3;
+    private readonly Writer<T4> _writer4;
     /// <summary>Leave any writer null to auto-fill.</summary>
     public ByteWriterRaw(Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity)
     {
-        this.writer1 = writer1 ?? WriterHelper<T1>.Writer;
-        this.writer2 = writer2 ?? WriterHelper<T2>.Writer;
-        this.writer3 = writer3 ?? WriterHelper<T3>.Writer;
-        this.writer4 = writer4 ?? WriterHelper<T4>.Writer;
+        _writer1 = writer1 ?? WriterHelper<T1>.Writer;
+        _writer2 = writer2 ?? WriterHelper<T2>.Writer;
+        _writer3 = writer3 ?? WriterHelper<T3>.Writer;
+        _writer4 = writer4 ?? WriterHelper<T4>.Writer;
     }
     public byte[] Get(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
     {
         lock (this)
         {
             Flush();
-            writer1.Invoke(this, arg1);
-            writer2.Invoke(this, arg2);
-            writer3.Invoke(this, arg3);
-            writer4.Invoke(this, arg4);
+            _writer1.Invoke(this, arg1);
+            _writer2.Invoke(this, arg2);
+            _writer3.Invoke(this, arg3);
+            _writer4.Invoke(this, arg4);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2169,40 +2174,40 @@ public sealed class ByteWriterRaw<T1, T2, T3, T4> : ByteWriter
         lock (this)
         {
             Flush();
-            writer1.Invoke(this, arg1);
-            writer2.Invoke(this, arg2);
-            writer3.Invoke(this, arg3);
-            writer4.Invoke(this, arg4);
+            _writer1.Invoke(this, arg1);
+            _writer2.Invoke(this, arg2);
+            _writer3.Invoke(this, arg3);
+            _writer4.Invoke(this, arg4);
             return ToArray();
         }
     }
 }
 public sealed class ByteWriterRaw<T1, T2, T3, T4, T5> : ByteWriter
 {
-    private readonly Writer<T1> writer1;
-    private readonly Writer<T2> writer2;
-    private readonly Writer<T3> writer3;
-    private readonly Writer<T4> writer4;
-    private readonly Writer<T5> writer5;
+    private readonly Writer<T1> _writer1;
+    private readonly Writer<T2> _writer2;
+    private readonly Writer<T3> _writer3;
+    private readonly Writer<T4> _writer4;
+    private readonly Writer<T5> _writer5;
     /// <summary>Leave any writer null to auto-fill.</summary>
     public ByteWriterRaw(Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity)
     {
-        this.writer1 = writer1 ?? WriterHelper<T1>.Writer;
-        this.writer2 = writer2 ?? WriterHelper<T2>.Writer;
-        this.writer3 = writer3 ?? WriterHelper<T3>.Writer;
-        this.writer4 = writer4 ?? WriterHelper<T4>.Writer;
-        this.writer5 = writer5 ?? WriterHelper<T5>.Writer;
+        _writer1 = writer1 ?? WriterHelper<T1>.Writer;
+        _writer2 = writer2 ?? WriterHelper<T2>.Writer;
+        _writer3 = writer3 ?? WriterHelper<T3>.Writer;
+        _writer4 = writer4 ?? WriterHelper<T4>.Writer;
+        _writer5 = writer5 ?? WriterHelper<T5>.Writer;
     }
     public byte[] Get(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
     {
         lock (this)
         {
             Flush();
-            writer1.Invoke(this, arg1);
-            writer2.Invoke(this, arg2);
-            writer3.Invoke(this, arg3);
-            writer4.Invoke(this, arg4);
-            writer5.Invoke(this, arg5);
+            _writer1.Invoke(this, arg1);
+            _writer2.Invoke(this, arg2);
+            _writer3.Invoke(this, arg3);
+            _writer4.Invoke(this, arg4);
+            _writer5.Invoke(this, arg5);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2212,44 +2217,44 @@ public sealed class ByteWriterRaw<T1, T2, T3, T4, T5> : ByteWriter
         lock (this)
         {
             Flush();
-            writer1.Invoke(this, arg1);
-            writer2.Invoke(this, arg2);
-            writer3.Invoke(this, arg3);
-            writer4.Invoke(this, arg4);
-            writer5.Invoke(this, arg5);
+            _writer1.Invoke(this, arg1);
+            _writer2.Invoke(this, arg2);
+            _writer3.Invoke(this, arg3);
+            _writer4.Invoke(this, arg4);
+            _writer5.Invoke(this, arg5);
             return ToArray();
         }
     }
 }
 public sealed class ByteWriterRaw<T1, T2, T3, T4, T5, T6> : ByteWriter
 {
-    private readonly Writer<T1> writer1;
-    private readonly Writer<T2> writer2;
-    private readonly Writer<T3> writer3;
-    private readonly Writer<T4> writer4;
-    private readonly Writer<T5> writer5;
-    private readonly Writer<T6> writer6;
+    private readonly Writer<T1> _writer1;
+    private readonly Writer<T2> _writer2;
+    private readonly Writer<T3> _writer3;
+    private readonly Writer<T4> _writer4;
+    private readonly Writer<T5> _writer5;
+    private readonly Writer<T6> _writer6;
     /// <summary>Leave any writer null to auto-fill.</summary>
     public ByteWriterRaw(Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, Writer<T6>? writer6, bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity)
     {
-        this.writer1 = writer1 ?? WriterHelper<T1>.Writer;
-        this.writer2 = writer2 ?? WriterHelper<T2>.Writer;
-        this.writer3 = writer3 ?? WriterHelper<T3>.Writer;
-        this.writer4 = writer4 ?? WriterHelper<T4>.Writer;
-        this.writer5 = writer5 ?? WriterHelper<T5>.Writer;
-        this.writer6 = writer6 ?? WriterHelper<T6>.Writer;
+        _writer1 = writer1 ?? WriterHelper<T1>.Writer;
+        _writer2 = writer2 ?? WriterHelper<T2>.Writer;
+        _writer3 = writer3 ?? WriterHelper<T3>.Writer;
+        _writer4 = writer4 ?? WriterHelper<T4>.Writer;
+        _writer5 = writer5 ?? WriterHelper<T5>.Writer;
+        _writer6 = writer6 ?? WriterHelper<T6>.Writer;
     }
     public byte[] Get(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
     {
         lock (this)
         {
             Flush();
-            writer1.Invoke(this, arg1);
-            writer2.Invoke(this, arg2);
-            writer3.Invoke(this, arg3);
-            writer4.Invoke(this, arg4);
-            writer5.Invoke(this, arg5);
-            writer6.Invoke(this, arg6);
+            _writer1.Invoke(this, arg1);
+            _writer2.Invoke(this, arg2);
+            _writer3.Invoke(this, arg3);
+            _writer4.Invoke(this, arg4);
+            _writer5.Invoke(this, arg5);
+            _writer6.Invoke(this, arg6);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2259,30 +2264,31 @@ public sealed class ByteWriterRaw<T1, T2, T3, T4, T5, T6> : ByteWriter
         lock (this)
         {
             Flush();
-            writer1.Invoke(this, arg1);
-            writer2.Invoke(this, arg2);
-            writer3.Invoke(this, arg3);
-            writer4.Invoke(this, arg4);
-            writer5.Invoke(this, arg5);
-            writer6.Invoke(this, arg6);
+            _writer1.Invoke(this, arg1);
+            _writer2.Invoke(this, arg2);
+            _writer3.Invoke(this, arg3);
+            _writer4.Invoke(this, arg4);
+            _writer5.Invoke(this, arg5);
+            _writer6.Invoke(this, arg6);
             return ToArray();
         }
     }
 }
+// ReSharper disable ConvertToPrimaryConstructor
 public sealed class DynamicByteWriter<T1> : ByteWriter
 {
     static DynamicByteWriter()
     {
-        writer = WriterHelper<T1>.Writer;
+        Writer = WriterHelper<T1>.Writer;
     }
-    private static readonly Writer<T1> writer;
-    public DynamicByteWriter(bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity < 1 ? GetMinimumSize<T1>() : capacity) { }
+    private static readonly Writer<T1> Writer;
+    public DynamicByteWriter(bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity < 1 ? GetMinimumSize<T1>() + MessageOverhead.MaximumSize : capacity) { }
     public byte[] Get(ref MessageOverhead overhead, T1 obj)
     {
         lock (this)
         {
             Flush();
-            writer.Invoke(this, obj);
+            Writer.Invoke(this, obj);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2292,7 +2298,7 @@ public sealed class DynamicByteWriter<T1> : ByteWriter
         lock (this)
         {
             Flush();
-            writer.Invoke(this, obj);
+            Writer.Invoke(this, obj);
             return ToArray();
         }
     }
@@ -2301,19 +2307,19 @@ public sealed class DynamicByteWriter<T1, T2> : ByteWriter
 {
     static DynamicByteWriter()
     {
-        writer1 = WriterHelper<T1>.Writer;
-        writer2 = WriterHelper<T2>.Writer;
+        Writer1 = WriterHelper<T1>.Writer;
+        Writer2 = WriterHelper<T2>.Writer;
     }
-    private static readonly Writer<T1> writer1;
-    private static readonly Writer<T2> writer2;
-    public DynamicByteWriter(bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity < 1 ? GetMinimumSize<T1>() + GetMinimumSize<T2>() : capacity) { }
+    private static readonly Writer<T1> Writer1;
+    private static readonly Writer<T2> Writer2;
+    public DynamicByteWriter(bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity < 1 ? GetMinimumSize<T1>() + GetMinimumSize<T2>() + MessageOverhead.MaximumSize : capacity) { }
     public byte[] Get(ref MessageOverhead overhead, T1 arg1, T2 arg2)
     {
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2323,8 +2329,8 @@ public sealed class DynamicByteWriter<T1, T2> : ByteWriter
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
             return ToArray();
         }
     }
@@ -2333,22 +2339,23 @@ public sealed class DynamicByteWriter<T1, T2, T3> : ByteWriter
 {
     static DynamicByteWriter()
     {
-        writer1 = WriterHelper<T1>.Writer;
-        writer2 = WriterHelper<T2>.Writer;
-        writer3 = WriterHelper<T3>.Writer;
+        Writer1 = WriterHelper<T1>.Writer;
+        Writer2 = WriterHelper<T2>.Writer;
+        Writer3 = WriterHelper<T3>.Writer;
     }
-    private static readonly Writer<T1> writer1;
-    private static readonly Writer<T2> writer2;
-    private static readonly Writer<T3> writer3;
-    public DynamicByteWriter(bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity < 1 ? GetMinimumSize<T1>() + GetMinimumSize<T2>() + GetMinimumSize<T3>() : capacity) { }
+    private static readonly Writer<T1> Writer1;
+    private static readonly Writer<T2> Writer2;
+    private static readonly Writer<T3> Writer3;
+    public DynamicByteWriter(bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity < 1 ? GetMinimumSize<T1>() + GetMinimumSize<T2>() + GetMinimumSize<T3>()
+                                                                                                               + MessageOverhead.MaximumSize : capacity) { }
     public byte[] Get(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3)
     {
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2358,9 +2365,9 @@ public sealed class DynamicByteWriter<T1, T2, T3> : ByteWriter
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
             return ToArray();
         }
     }
@@ -2369,28 +2376,28 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4> : ByteWriter
 {
     static DynamicByteWriter()
     {
-        writer1 = WriterHelper<T1>.Writer;
-        writer2 = WriterHelper<T2>.Writer;
-        writer3 = WriterHelper<T3>.Writer;
-        writer4 = WriterHelper<T4>.Writer;
+        Writer1 = WriterHelper<T1>.Writer;
+        Writer2 = WriterHelper<T2>.Writer;
+        Writer3 = WriterHelper<T3>.Writer;
+        Writer4 = WriterHelper<T4>.Writer;
     }
-    private static readonly Writer<T1> writer1;
-    private static readonly Writer<T2> writer2;
-    private static readonly Writer<T3> writer3;
-    private static readonly Writer<T4> writer4;
+    private static readonly Writer<T1> Writer1;
+    private static readonly Writer<T2> Writer2;
+    private static readonly Writer<T3> Writer3;
+    private static readonly Writer<T4> Writer4;
     public DynamicByteWriter(bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity < 1 ?
                                                                                                                                GetMinimumSize<T1>() + GetMinimumSize<T2>() + GetMinimumSize<T3>() +
-                                                                                                                               GetMinimumSize<T4>() : capacity)
+                                                                                                                               GetMinimumSize<T4>() + MessageOverhead.MaximumSize : capacity)
     { }
     public byte[] Get(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
     {
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
-            Write(writer4, arg4);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
+            Write(Writer4, arg4);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2400,10 +2407,10 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4> : ByteWriter
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
-            Write(writer4, arg4);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
+            Write(Writer4, arg4);
             return ToArray();
         }
     }
@@ -2412,31 +2419,31 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5> : ByteWriter
 {
     static DynamicByteWriter()
     {
-        writer1 = WriterHelper<T1>.Writer;
-        writer2 = WriterHelper<T2>.Writer;
-        writer3 = WriterHelper<T3>.Writer;
-        writer4 = WriterHelper<T4>.Writer;
-        writer5 = WriterHelper<T5>.Writer;
+        Writer1 = WriterHelper<T1>.Writer;
+        Writer2 = WriterHelper<T2>.Writer;
+        Writer3 = WriterHelper<T3>.Writer;
+        Writer4 = WriterHelper<T4>.Writer;
+        Writer5 = WriterHelper<T5>.Writer;
     }
-    private static readonly Writer<T1> writer1;
-    private static readonly Writer<T2> writer2;
-    private static readonly Writer<T3> writer3;
-    private static readonly Writer<T4> writer4;
-    private static readonly Writer<T5> writer5;
+    private static readonly Writer<T1> Writer1;
+    private static readonly Writer<T2> Writer2;
+    private static readonly Writer<T3> Writer3;
+    private static readonly Writer<T4> Writer4;
+    private static readonly Writer<T5> Writer5;
     public DynamicByteWriter(bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity < 1 ?
                                                                                                                                GetMinimumSize<T1>() + GetMinimumSize<T2>() + GetMinimumSize<T3>() +
-                                                                                                                               GetMinimumSize<T4>() + GetMinimumSize<T5>() : capacity)
+                                                                                                                               GetMinimumSize<T4>() + GetMinimumSize<T5>() + MessageOverhead.MaximumSize : capacity)
     { }
     public byte[] Get(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
     {
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
-            Write(writer4, arg4);
-            Write(writer5, arg5);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
+            Write(Writer4, arg4);
+            Write(Writer5, arg5);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2446,11 +2453,11 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5> : ByteWriter
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
-            Write(writer4, arg4);
-            Write(writer5, arg5);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
+            Write(Writer4, arg4);
+            Write(Writer5, arg5);
             return ToArray();
         }
     }
@@ -2459,34 +2466,35 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5, T6> : ByteWriter
 {
     static DynamicByteWriter()
     {
-        writer1 = WriterHelper<T1>.Writer;
-        writer2 = WriterHelper<T2>.Writer;
-        writer3 = WriterHelper<T3>.Writer;
-        writer4 = WriterHelper<T4>.Writer;
-        writer5 = WriterHelper<T5>.Writer;
-        writer6 = WriterHelper<T6>.Writer;
+        Writer1 = WriterHelper<T1>.Writer;
+        Writer2 = WriterHelper<T2>.Writer;
+        Writer3 = WriterHelper<T3>.Writer;
+        Writer4 = WriterHelper<T4>.Writer;
+        Writer5 = WriterHelper<T5>.Writer;
+        Writer6 = WriterHelper<T6>.Writer;
     }
-    private static readonly Writer<T1> writer1;
-    private static readonly Writer<T2> writer2;
-    private static readonly Writer<T3> writer3;
-    private static readonly Writer<T4> writer4;
-    private static readonly Writer<T5> writer5;
-    private static readonly Writer<T6> writer6;
+    private static readonly Writer<T1> Writer1;
+    private static readonly Writer<T2> Writer2;
+    private static readonly Writer<T3> Writer3;
+    private static readonly Writer<T4> Writer4;
+    private static readonly Writer<T5> Writer5;
+    private static readonly Writer<T6> Writer6;
     public DynamicByteWriter(bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity < 1 ?
                                                                                                                                GetMinimumSize<T1>() + GetMinimumSize<T2>() + GetMinimumSize<T3>() +
-                                                                                                                               GetMinimumSize<T4>() + GetMinimumSize<T5>() + GetMinimumSize<T6>() : capacity)
+                                                                                                                               GetMinimumSize<T4>() + GetMinimumSize<T5>() + GetMinimumSize<T6>()
+                                                                                                                               + MessageOverhead.MaximumSize : capacity)
     { }
     public byte[] Get(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
     {
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
-            Write(writer4, arg4);
-            Write(writer5, arg5);
-            Write(writer6, arg6);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
+            Write(Writer4, arg4);
+            Write(Writer5, arg5);
+            Write(Writer6, arg6);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2496,12 +2504,12 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5, T6> : ByteWriter
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
-            Write(writer4, arg4);
-            Write(writer5, arg5);
-            Write(writer6, arg6);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
+            Write(Writer4, arg4);
+            Write(Writer5, arg5);
+            Write(Writer6, arg6);
             return ToArray();
         }
     }
@@ -2510,38 +2518,38 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7> : ByteWriter
 {
     static DynamicByteWriter()
     {
-        writer1 = WriterHelper<T1>.Writer;
-        writer2 = WriterHelper<T2>.Writer;
-        writer3 = WriterHelper<T3>.Writer;
-        writer4 = WriterHelper<T4>.Writer;
-        writer5 = WriterHelper<T5>.Writer;
-        writer6 = WriterHelper<T6>.Writer;
-        writer7 = WriterHelper<T7>.Writer;
+        Writer1 = WriterHelper<T1>.Writer;
+        Writer2 = WriterHelper<T2>.Writer;
+        Writer3 = WriterHelper<T3>.Writer;
+        Writer4 = WriterHelper<T4>.Writer;
+        Writer5 = WriterHelper<T5>.Writer;
+        Writer6 = WriterHelper<T6>.Writer;
+        Writer7 = WriterHelper<T7>.Writer;
     }
-    private static readonly Writer<T1> writer1;
-    private static readonly Writer<T2> writer2;
-    private static readonly Writer<T3> writer3;
-    private static readonly Writer<T4> writer4;
-    private static readonly Writer<T5> writer5;
-    private static readonly Writer<T6> writer6;
-    private static readonly Writer<T7> writer7;
+    private static readonly Writer<T1> Writer1;
+    private static readonly Writer<T2> Writer2;
+    private static readonly Writer<T3> Writer3;
+    private static readonly Writer<T4> Writer4;
+    private static readonly Writer<T5> Writer5;
+    private static readonly Writer<T6> Writer6;
+    private static readonly Writer<T7> Writer7;
     public DynamicByteWriter(bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity < 1 ?
                                                                                                                                GetMinimumSize<T1>() + GetMinimumSize<T2>() + GetMinimumSize<T3>() +
                                                                                                                                GetMinimumSize<T4>() + GetMinimumSize<T5>() + GetMinimumSize<T6>() +
-                                                                                                                               GetMinimumSize<T7>() : capacity)
+                                                                                                                               GetMinimumSize<T7>() + MessageOverhead.MaximumSize : capacity)
     { }
     public byte[] Get(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
     {
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
-            Write(writer4, arg4);
-            Write(writer5, arg5);
-            Write(writer6, arg6);
-            Write(writer7, arg7);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
+            Write(Writer4, arg4);
+            Write(Writer5, arg5);
+            Write(Writer6, arg6);
+            Write(Writer7, arg7);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2551,13 +2559,13 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7> : ByteWriter
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
-            Write(writer4, arg4);
-            Write(writer5, arg5);
-            Write(writer6, arg6);
-            Write(writer7, arg7);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
+            Write(Writer4, arg4);
+            Write(Writer5, arg5);
+            Write(Writer6, arg6);
+            Write(Writer7, arg7);
             return ToArray();
         }
     }
@@ -2566,41 +2574,41 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8> : ByteWrit
 {
     static DynamicByteWriter()
     {
-        writer1 = WriterHelper<T1>.Writer;
-        writer2 = WriterHelper<T2>.Writer;
-        writer3 = WriterHelper<T3>.Writer;
-        writer4 = WriterHelper<T4>.Writer;
-        writer5 = WriterHelper<T5>.Writer;
-        writer6 = WriterHelper<T6>.Writer;
-        writer7 = WriterHelper<T7>.Writer;
-        writer8 = WriterHelper<T8>.Writer;
+        Writer1 = WriterHelper<T1>.Writer;
+        Writer2 = WriterHelper<T2>.Writer;
+        Writer3 = WriterHelper<T3>.Writer;
+        Writer4 = WriterHelper<T4>.Writer;
+        Writer5 = WriterHelper<T5>.Writer;
+        Writer6 = WriterHelper<T6>.Writer;
+        Writer7 = WriterHelper<T7>.Writer;
+        Writer8 = WriterHelper<T8>.Writer;
     }
-    private static readonly Writer<T1> writer1;
-    private static readonly Writer<T2> writer2;
-    private static readonly Writer<T3> writer3;
-    private static readonly Writer<T4> writer4;
-    private static readonly Writer<T5> writer5;
-    private static readonly Writer<T6> writer6;
-    private static readonly Writer<T7> writer7;
-    private static readonly Writer<T8> writer8;
+    private static readonly Writer<T1> Writer1;
+    private static readonly Writer<T2> Writer2;
+    private static readonly Writer<T3> Writer3;
+    private static readonly Writer<T4> Writer4;
+    private static readonly Writer<T5> Writer5;
+    private static readonly Writer<T6> Writer6;
+    private static readonly Writer<T7> Writer7;
+    private static readonly Writer<T8> Writer8;
     public DynamicByteWriter(bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity < 1 ?
                                                                                                                                GetMinimumSize<T1>() + GetMinimumSize<T2>() + GetMinimumSize<T3>() +
                                                                                                                                GetMinimumSize<T4>() + GetMinimumSize<T5>() + GetMinimumSize<T6>() +
-                                                                                                                               GetMinimumSize<T7>() + GetMinimumSize<T8>() : capacity)
+                                                                                                                               GetMinimumSize<T7>() + GetMinimumSize<T8>() + MessageOverhead.MaximumSize : capacity)
     { }
     public byte[] Get(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
     {
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
-            Write(writer4, arg4);
-            Write(writer5, arg5);
-            Write(writer6, arg6);
-            Write(writer7, arg7);
-            Write(writer8, arg8);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
+            Write(Writer4, arg4);
+            Write(Writer5, arg5);
+            Write(Writer6, arg6);
+            Write(Writer7, arg7);
+            Write(Writer8, arg8);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2610,14 +2618,14 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8> : ByteWrit
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
-            Write(writer4, arg4);
-            Write(writer5, arg5);
-            Write(writer6, arg6);
-            Write(writer7, arg7);
-            Write(writer8, arg8);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
+            Write(Writer4, arg4);
+            Write(Writer5, arg5);
+            Write(Writer6, arg6);
+            Write(Writer7, arg7);
+            Write(Writer8, arg8);
             return ToArray();
         }
     }
@@ -2626,44 +2634,45 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9> : Byte
 {
     static DynamicByteWriter()
     {
-        writer1 = WriterHelper<T1>.Writer;
-        writer2 = WriterHelper<T2>.Writer;
-        writer3 = WriterHelper<T3>.Writer;
-        writer4 = WriterHelper<T4>.Writer;
-        writer5 = WriterHelper<T5>.Writer;
-        writer6 = WriterHelper<T6>.Writer;
-        writer7 = WriterHelper<T7>.Writer;
-        writer8 = WriterHelper<T8>.Writer;
-        writer9 = WriterHelper<T9>.Writer;
+        Writer1 = WriterHelper<T1>.Writer;
+        Writer2 = WriterHelper<T2>.Writer;
+        Writer3 = WriterHelper<T3>.Writer;
+        Writer4 = WriterHelper<T4>.Writer;
+        Writer5 = WriterHelper<T5>.Writer;
+        Writer6 = WriterHelper<T6>.Writer;
+        Writer7 = WriterHelper<T7>.Writer;
+        Writer8 = WriterHelper<T8>.Writer;
+        Writer9 = WriterHelper<T9>.Writer;
     }
-    private static readonly Writer<T1> writer1;
-    private static readonly Writer<T2> writer2;
-    private static readonly Writer<T3> writer3;
-    private static readonly Writer<T4> writer4;
-    private static readonly Writer<T5> writer5;
-    private static readonly Writer<T6> writer6;
-    private static readonly Writer<T7> writer7;
-    private static readonly Writer<T8> writer8;
-    private static readonly Writer<T9> writer9;
+    private static readonly Writer<T1> Writer1;
+    private static readonly Writer<T2> Writer2;
+    private static readonly Writer<T3> Writer3;
+    private static readonly Writer<T4> Writer4;
+    private static readonly Writer<T5> Writer5;
+    private static readonly Writer<T6> Writer6;
+    private static readonly Writer<T7> Writer7;
+    private static readonly Writer<T8> Writer8;
+    private static readonly Writer<T9> Writer9;
     public DynamicByteWriter(bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity < 1 ?
                                                                                                                                GetMinimumSize<T1>() + GetMinimumSize<T2>() + GetMinimumSize<T3>() +
                                                                                                                                GetMinimumSize<T4>() + GetMinimumSize<T5>() + GetMinimumSize<T6>() +
-                                                                                                                               GetMinimumSize<T7>() + GetMinimumSize<T8>() + GetMinimumSize<T9>() : capacity)
+                                                                                                                               GetMinimumSize<T7>() + GetMinimumSize<T8>() + GetMinimumSize<T9>()
+                                                                                                                               + MessageOverhead.MaximumSize : capacity)
     { }
     public byte[] Get(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
     {
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
-            Write(writer4, arg4);
-            Write(writer5, arg5);
-            Write(writer6, arg6);
-            Write(writer7, arg7);
-            Write(writer8, arg8);
-            Write(writer9, arg9);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
+            Write(Writer4, arg4);
+            Write(Writer5, arg5);
+            Write(Writer6, arg6);
+            Write(Writer7, arg7);
+            Write(Writer8, arg8);
+            Write(Writer9, arg9);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2673,15 +2682,15 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9> : Byte
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
-            Write(writer4, arg4);
-            Write(writer5, arg5);
-            Write(writer6, arg6);
-            Write(writer7, arg7);
-            Write(writer8, arg8);
-            Write(writer9, arg9);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
+            Write(Writer4, arg4);
+            Write(Writer5, arg5);
+            Write(Writer6, arg6);
+            Write(Writer7, arg7);
+            Write(Writer8, arg8);
+            Write(Writer9, arg9);
             return ToArray();
         }
     }
@@ -2690,48 +2699,48 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> :
 {
     static DynamicByteWriter()
     {
-        writer1 = WriterHelper<T1>.Writer;
-        writer2 = WriterHelper<T2>.Writer;
-        writer3 = WriterHelper<T3>.Writer;
-        writer4 = WriterHelper<T4>.Writer;
-        writer5 = WriterHelper<T5>.Writer;
-        writer6 = WriterHelper<T6>.Writer;
-        writer7 = WriterHelper<T7>.Writer;
-        writer8 = WriterHelper<T8>.Writer;
-        writer9 = WriterHelper<T9>.Writer;
-        writer10 = WriterHelper<T10>.Writer;
+        Writer1 = WriterHelper<T1>.Writer;
+        Writer2 = WriterHelper<T2>.Writer;
+        Writer3 = WriterHelper<T3>.Writer;
+        Writer4 = WriterHelper<T4>.Writer;
+        Writer5 = WriterHelper<T5>.Writer;
+        Writer6 = WriterHelper<T6>.Writer;
+        Writer7 = WriterHelper<T7>.Writer;
+        Writer8 = WriterHelper<T8>.Writer;
+        Writer9 = WriterHelper<T9>.Writer;
+        Writer10 = WriterHelper<T10>.Writer;
     }
-    private static readonly Writer<T1> writer1;
-    private static readonly Writer<T2> writer2;
-    private static readonly Writer<T3> writer3;
-    private static readonly Writer<T4> writer4;
-    private static readonly Writer<T5> writer5;
-    private static readonly Writer<T6> writer6;
-    private static readonly Writer<T7> writer7;
-    private static readonly Writer<T8> writer8;
-    private static readonly Writer<T9> writer9;
-    private static readonly Writer<T10> writer10;
+    private static readonly Writer<T1> Writer1;
+    private static readonly Writer<T2> Writer2;
+    private static readonly Writer<T3> Writer3;
+    private static readonly Writer<T4> Writer4;
+    private static readonly Writer<T5> Writer5;
+    private static readonly Writer<T6> Writer6;
+    private static readonly Writer<T7> Writer7;
+    private static readonly Writer<T8> Writer8;
+    private static readonly Writer<T9> Writer9;
+    private static readonly Writer<T10> Writer10;
     public DynamicByteWriter(bool shouldPrepend = true, int capacity = 0) : base(shouldPrepend, capacity < 1 ?
                                                                                                                                GetMinimumSize<T1>() + GetMinimumSize<T2>() + GetMinimumSize<T3>() +
                                                                                                                                GetMinimumSize<T4>() + GetMinimumSize<T5>() + GetMinimumSize<T6>() +
                                                                                                                                GetMinimumSize<T7>() + GetMinimumSize<T8>() + GetMinimumSize<T9>() +
-                                                                                                                               GetMinimumSize<T10>() : capacity)
+                                                                                                                               GetMinimumSize<T10>() + MessageOverhead.MaximumSize : capacity)
     { }
     public byte[] Get(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)
     {
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
-            Write(writer4, arg4);
-            Write(writer5, arg5);
-            Write(writer6, arg6);
-            Write(writer7, arg7);
-            Write(writer8, arg8);
-            Write(writer9, arg9);
-            Write(writer10, arg10);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
+            Write(Writer4, arg4);
+            Write(Writer5, arg5);
+            Write(Writer6, arg6);
+            Write(Writer7, arg7);
+            Write(Writer8, arg8);
+            Write(Writer9, arg9);
+            Write(Writer10, arg10);
             PrependOverhead(ref overhead);
             return ToArray();
         }
@@ -2741,17 +2750,18 @@ public sealed class DynamicByteWriter<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> :
         lock (this)
         {
             Flush();
-            Write(writer1, arg1);
-            Write(writer2, arg2);
-            Write(writer3, arg3);
-            Write(writer4, arg4);
-            Write(writer5, arg5);
-            Write(writer6, arg6);
-            Write(writer7, arg7);
-            Write(writer8, arg8);
-            Write(writer9, arg9);
-            Write(writer10, arg10);
+            Write(Writer1, arg1);
+            Write(Writer2, arg2);
+            Write(Writer3, arg3);
+            Write(Writer4, arg4);
+            Write(Writer5, arg5);
+            Write(Writer6, arg6);
+            Write(Writer7, arg7);
+            Write(Writer8, arg8);
+            Write(Writer9, arg9);
+            Write(Writer10, arg10);
             return ToArray();
         }
     }
 }
+// ReSharper restore ConvertToPrimaryConstructor

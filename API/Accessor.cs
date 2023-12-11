@@ -2147,7 +2147,7 @@ public static class Accessor
     /// MethodInfo? method = Accessor.GetMethod(Guid.Parse);
     /// </code>
     /// </summary>
-    /// <returns>A method info of a passed delegate</returns>
+    /// <returns>A method info of a passed delegate.</returns>
     [Pure]
     public static MethodInfo? GetMethod(Delegate @delegate)
     {
@@ -2159,6 +2159,20 @@ public static class Accessor
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Safely gets the reflection method info of the passed method. Works best with static methods.<br/><br/>
+    /// <code>
+    /// HarmonyMethod? method = Accessor.GetHarmonyMethod(Guid.Parse);
+    /// </code>
+    /// </summary>
+    /// <returns>A harmony method info of a passed delegate.</returns>
+    [Pure]
+    public static HarmonyMethod? GetHarmonyMethod(Delegate @delegate)
+    {
+        MethodInfo? method = GetMethod(@delegate);
+        return method == null ? null : new HarmonyMethod(method);
     }
 
     /// <param name="returnType">Return type of the method.</param>

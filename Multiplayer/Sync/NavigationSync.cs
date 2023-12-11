@@ -290,7 +290,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             Logger.LogError("Failed to read incoming navigation data packet length.", method: Source);
             return;
         }
-        NetFactory.IncrementByteCount(false, DevkitServerMessage.MovementRelay, len + sizeof(ushort));
+        NetFactory.IncrementByteCount(DevkitServerMessage.MovementRelay, false, len + sizeof(ushort));
 
         if (!reader.ReadBytesPtr(len, out byte[] buffer, out int offset))
         {

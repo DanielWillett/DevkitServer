@@ -264,7 +264,7 @@ public class HighSpeedConnection : ITransportConnection
         Logger.LogError(ex);
         CloseConnection();
     }
-    private void MessageReady(byte[] payload)
+    private void MessageReady(ArraySegment<byte> payload)
     {
         DevkitServerUtility.QueueOnMainThread(() =>
         {

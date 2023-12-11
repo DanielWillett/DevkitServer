@@ -1,6 +1,7 @@
 ﻿#if CLIENT
 using DevkitServer.Patches;
 using DevkitServer.Players;
+using SDG.Framework.Devkit;
 using SDG.Framework.Utilities;
 
 namespace DevkitServer.Multiplayer;
@@ -50,19 +51,24 @@ internal static class ClientFPSLimiter
             return;
 
         bool isEditing = false;
-        switch (UserInput.ActiveTool)
+        IDevkitTool? activeTool = UserInput.ActiveTool;
+        switch (activeTool)
         {
-            // todo add others, although terrain is the main one
-
             case TerrainEditor:
                 isEditing = TerrainEditorPatches.LastEditedTerrain;
                 break;
             case null:
                 break;
             default:
-                if (FoliageEditorPatches.FoliageEditor.IsInstanceOfType(UserInput.ActiveTool))
+                if (FoliageEditorPatches.FoliageEditor.IsInstanceOfType(activeTool))
                 {
-                    // todo isEditing =
+                    isEditing = !(EditorInteractEx.IsFlying || !Glazier.Get().ShouldGameProcessInput) && InputEx.GetKey(KeyCode.Mouse0);
+                    if (isEditing && FoliageEditorPatches.GetEditMode != null && FoliageEditorPatches.FoliageModeExact != null)
+                    {
+                        IComparable currentMode = FoliageEditorPatches.GetEditMode(activeTool);
+                        if (currentMode != null && currentMode.CompareTo(FoliageEditorPatches.FoliageModeExact) == 0)
+                            isEditing = false;
+                    }
                 }
                 break;
         }

@@ -11,6 +11,8 @@ public static class UIExtensions
     /// </summary>
     public static void CopyTransformFrom(this ISleekElement element, ISleekElement other)
     {
+        ThreadUtil.assertIsGameThread();
+
         element.PositionOffset_X = other.PositionOffset_X;
         element.PositionOffset_Y = other.PositionOffset_Y;
         element.PositionScale_X = other.PositionScale_X;
@@ -27,6 +29,8 @@ public static class UIExtensions
     /// <returns><see langword="false"/> if either <paramref name="child"/> or <paramref name="parent"/> is <see langword="null"/> or <paramref name="child"/> is not a child of <paramref name="parent"/> or <paramref name="parent"/> has been destroyed, otherwise <see langword="true"/>.</returns>
     public static bool TryRemoveChild(this ISleekElement? parent, ISleekElement? child)
     {
+        ThreadUtil.assertIsGameThread();
+
         if (parent == null || child == null)
             return false;
 

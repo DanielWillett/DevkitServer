@@ -479,7 +479,7 @@ public class UserInput : MonoBehaviour
             Logger.LogError("Failed to read incoming movement packet length.");
             return;
         }
-        NetFactory.IncrementByteCount(false, DevkitServerMessage.MovementRelay, len + sizeof(ushort));
+        NetFactory.IncrementByteCount(DevkitServerMessage.MovementRelay, false, len + sizeof(ushort));
 
 #if SERVER
         EditorUser? user = UserManager.FromConnection(transportConnection);
@@ -494,8 +494,7 @@ public class UserInput : MonoBehaviour
             Logger.LogError("Failed to read movement packet.");
             return;
         }
-        Reader.LoadNew(buffer);
-        Reader.Skip(offset);
+        Reader.LoadNew(new ArraySegment<byte>(buffer, offset, len));
 #if CLIENT
         ulong s64 = Reader.ReadUInt64();
         EditorUser? user = UserManager.FromId(s64);

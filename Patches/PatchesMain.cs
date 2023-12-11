@@ -10,8 +10,10 @@ using System.Reflection.Emit;
 using Cysharp.Threading.Tasks;
 using Version = System.Version;
 using DevkitServer.API;
+using DevkitServer.Util.Encoding;
 
 #if CLIENT
+using DevkitServer.API.UI;
 using DevkitServer.Multiplayer.Levels;
 #endif
 #if SERVER
@@ -105,7 +107,7 @@ internal static class PatchesMain
             MethodInfo? method = typeof(Level).GetMethod(nameof(Level.includeHash), BindingFlags.Public | BindingFlags.Static);
             if (method != null)
             {
-                Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(PatchLevelIncludeHatch)));
+                Patcher.Patch(method, prefix: Accessor.GetHarmonyMethod(PatchLevelIncludeHatch));
             }
         }
         catch (Exception ex)
@@ -121,7 +123,7 @@ internal static class PatchesMain
             {
                 MethodInfo? method = typeof(MenuWorkshopEditorUI).GetMethod("onClickedAddButton", BindingFlags.NonPublic | BindingFlags.Static);
                 if (method != null)
-                    Patcher.Patch(method, transpiler: new HarmonyMethod(Accessor.GetMethod(MapCreation.TranspileOnClickedAddLevelButton)));
+                    Patcher.Patch(method, transpiler: Accessor.GetHarmonyMethod(MapCreation.TranspileOnClickedAddLevelButton));
                 else
                     Logger.LogWarning($"Method not found to patch map creation: {FormattingUtil.FormatMethod(typeof(void), typeof(MenuWorkshopEditorUI), "onClickedAddButton",
                             new (Type, string?)[] { (typeof(ISleekElement), "button") }, isStatic: true)}.", method: Source);
@@ -140,7 +142,7 @@ internal static class PatchesMain
         {
             MethodInfo? method = Accessor.GetMethod(Level.save);
             if (method != null)
-                Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(OnLevelSaving)));
+                Patcher.Patch(method, prefix: Accessor.GetHarmonyMethod(OnLevelSaving));
             else
                 Logger.LogWarning($"Method not found to patch map saving: {FormattingUtil.FormatMethod(typeof(void), typeof(Level), nameof(Level.save),
                     arguments: Type.EmptyTypes, isStatic: true)}.", method: Source);
@@ -162,7 +164,7 @@ internal static class PatchesMain
             }
             else
             {
-                Patcher.Patch(method, postfix: new HarmonyMethod(Accessor.GetMethod(PostfixLevelInit)));
+                Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostfixLevelInit));
                 Logger.LogDebug($"Postfixed {method.Format()} to add a on begin level load call.");
             }
         }
@@ -177,7 +179,7 @@ internal static class PatchesMain
         {
             MethodInfo? method = Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract")?.GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
             if (method != null)
-                Patcher.Patch(method, prefix: new HarmonyMethod(Accessor.GetMethod(EditorInteractUpdatePrefix)));
+                Patcher.Patch(method, prefix: Accessor.GetHarmonyMethod(EditorInteractUpdatePrefix));
             else
                 Logger.LogWarning($"Method not found to patch editor looking while not in Editor controller: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.", method: Source);
         }
@@ -185,6 +187,21 @@ internal static class PatchesMain
         {
             Logger.LogWarning($"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.", method: Source);
             Logger.LogError(ex, method: Source);
+        }
+
+        // LoadingUI.onClickedCancelButton
+        try
+        {
+            MethodInfo? method = typeof(LoadingUI).GetMethod("onClickedCancelButton", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
+            if (method != null)
+            {
+                Patcher.Patch(method, prefix: Accessor.GetHarmonyMethod(OnClickedCancelLoadingPrefix));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("Patcher unpatching error: LoadingUI.onClickedCancelButton.");
+            Logger.LogError(ex);
         }
 #endif
     }
@@ -235,6 +252,21 @@ internal static class PatchesMain
             Logger.LogWarning($"Failed to unpatch method: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.", method: Source);
             Logger.LogError(ex, method: Source);
         }
+
+        // LoadingUI.onClickedCancelButton
+        try
+        {
+            MethodInfo? method = typeof(LoadingUI).GetMethod("onClickedCancelButton", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
+            if (method != null)
+            {
+                Patcher.Unpatch(method, Accessor.GetMethod(OnClickedCancelLoadingPrefix));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("Patcher unpatching error: LoadingUI.onClickedCancelButton.");
+            Logger.LogError(ex);
+        }
 #endif
     }
     private static bool OnLevelSaving()
@@ -251,6 +283,37 @@ internal static class PatchesMain
         LandscapeUtil.DeleteUnusedTileData();
         return true;
     }
+#if CLIENT
+    private static bool OnClickedCancelLoadingPrefix(ISleekButton button)
+    {
+        LargeMessageTransmission? levelDownload = LargeMessageTransmission.GetReceivingMessages().FirstOrDefault(x => x.HandlerType == typeof(LevelTransmissionHandler) && !x.WasCancelled);
+        if (levelDownload == null)
+            return true;
+
+        UIAccessTools.SetLoadingCancelVisibility(false);
+
+        UniTask.Create(async () =>
+        {
+            bool cancelled;
+            try
+            {
+                cancelled = await levelDownload.Cancel(CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Failed to cancel level download.", method: levelDownload.LogSource);
+                Logger.LogError(ex, method: levelDownload.LogSource);
+                return;
+            }
+
+            Logger.LogInfo(!cancelled
+                ? $"[{levelDownload.LogSource}] Level download already cancelled."
+                : $"[{levelDownload.LogSource}] Level download cancelled by user request.");
+        });
+
+        return false;
+    }
+#endif
     private static bool PatchLevelIncludeHatch(string id, byte[] pendingHash)
     {
         return !Level.isLoaded;

@@ -17,6 +17,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using DevkitServer.API.Multiplayer;
 
 #if CLIENT
 using DevkitServer.Multiplayer.Sync;
@@ -76,9 +77,14 @@ public static class NetFactory
     public static int WriteBlockOffset { get; private set; }
 
     /// <summary>
-    /// Size of the net message block taken up by DevkitServer.
+    /// Size of the net message block taken up by DevkitServer and <see cref="ICustomNetMessageListener"/>s.
     /// </summary>
     public static int BlockSize { get; private set; }
+
+    /// <summary>
+    /// Size of the net message block taken up by vanilla DevkitServer.
+    /// </summary>
+    public static int DevkitServerBlockSize { get; private set; }
 
     /// <summary>
     /// New max bits count of the message enum for receiving data. On the server this would be <see cref="EServerMessage"/>, and on the client it would be <see cref="EClientMessage"/>.
@@ -100,7 +106,7 @@ public static class NetFactory
     internal static StaticGetter<IClientTransport> GetPlayerTransportConnection =
         Accessor.GenerateStaticGetter<Provider, IClientTransport>("clientTransport", throwOnError: true)!;
 #endif
-    private static bool ClaimMessageBlock()
+    internal static bool ReclaimMessageBlock()
     {
         Type devkitType = typeof(DevkitServerMessage);
 #if SERVER
@@ -110,24 +116,36 @@ public static class NetFactory
         Type vanilla = typeof(EClientMessage);
         Type vanillaSend = typeof(EServerMessage);
 #endif
+        List<(ICustomNetMessageListener, PluginAssembly)> pluginListeners = new List<(ICustomNetMessageListener, PluginAssembly)>();
+        foreach (PluginAssembly assembly in PluginLoader.Assemblies)
+        {
+            if (assembly.CustomNetMessageListeners.Count > 0)
+                pluginListeners.AddRange(assembly.CustomNetMessageListeners.Select(x => (x, assembly)));
+        }
 
         // calculates the minimum amount of bits needed to represent the number.
         int GetMinBitCount(int n) => (int)Math.Floor(Math.Log(n, 2)) + 1;
 
         ReceiveBlockOffset = vanilla.GetFields(BindingFlags.Static | BindingFlags.Public).Length;
         WriteBlockOffset = vanillaSend.GetFields(BindingFlags.Static | BindingFlags.Public).Length;
-        BlockSize = devkitType.GetFields(BindingFlags.Static | BindingFlags.Public).Length;
+        DevkitServerBlockSize = devkitType.GetFields(BindingFlags.Static | BindingFlags.Public).Length;
+        BlockSize = DevkitServerBlockSize + pluginListeners.Count;
         int origReceiveBitCount = GetMinBitCount(ReceiveBlockOffset);
         int origWriteBitCount = GetMinBitCount(WriteBlockOffset);
 
         NewReceiveBitCount = GetMinBitCount(ReceiveBlockOffset + BlockSize);
         NewWriteBitCount = GetMinBitCount(WriteBlockOffset + BlockSize);
 
-        Logger.LogDebug($"[NET FACTORY] Collected enum values: Offsets: (rec {ReceiveBlockOffset}, wrt {WriteBlockOffset}) | Size: {BlockSize} | Orig bit ct: (rec {origReceiveBitCount}, wrt {origWriteBitCount}). Bit cts: (rec {NewReceiveBitCount}, wrt {NewWriteBitCount}).");
+        Logger.LogDebug($"[NET FACTORY] Collected message block data: " +
+                        $"Offsets: (Receive = {ReceiveBlockOffset.Format()}, Write = {WriteBlockOffset.Format()}) | " +
+                        $"Size = {BlockSize.Format()} | " +
+                        $"Original Bit Count = (Receive: {origReceiveBitCount.Format()}b, Write: {origWriteBitCount.Format()}b) | " +
+                        $"Final Bit Count = (Receive: {NewReceiveBitCount.Format()}b, Write: {NewWriteBitCount.Format()}b).");
 
         // initialize DevkitMessage callbacks
         MethodInfo[] methods = new MethodInfo[BlockSize];
 
+        // vanilla callbacks
         methods[(int)DevkitServerMessage.InvokeMethod] = typeof(NetFactory).GetMethod(nameof(ReceiveMessage), BindingFlags.NonPublic | BindingFlags.Static)!;
         methods[(int)DevkitServerMessage.MovementRelay] = typeof(UserInput).GetMethod(nameof(UserInput.ReceiveMovementRelay), BindingFlags.NonPublic | BindingFlags.Static)!;
 #if CLIENT
@@ -135,6 +153,32 @@ public static class NetFactory
         methods[(int)DevkitServerMessage.SendNavigationData] = typeof(NavigationSync).GetMethod(nameof(NavigationSync.ReceiveNavigationData), BindingFlags.NonPublic | BindingFlags.Static)!;
 #endif
         methods[(int)DevkitServerMessage.ActionRelay] = typeof(EditorActions).GetMethod(nameof(EditorActions.ReceiveActionRelay), BindingFlags.NonPublic | BindingFlags.Static)!;
+        
+        // plugin callbacks
+        MethodInfo? interfaceMethod = typeof(ICustomNetMessageListener).GetMethod("OnInvoked", BindingFlags.Public | BindingFlags.Instance);
+        if (interfaceMethod != null)
+        {
+            for (int i = DevkitServerBlockSize; i < BlockSize; ++i)
+            {
+                (ICustomNetMessageListener listener, PluginAssembly assembly) = pluginListeners[i - DevkitServerBlockSize];
+                Type listenerType = listener.GetType();
+                MethodInfo? implMethod = Accessor.GetImplementedMethod(listenerType, interfaceMethod);
+                if (implMethod == null)
+                {
+                    assembly.LogWarning($"Unable to find {typeof(ICustomNetMessageListener).Format()}.{"OnInvoked".Colorize(FormattingColorType.Method)} " +
+                                      $"implementation in {listenerType.Format()}.", method: Source);
+                    continue;
+                }
+
+                methods[i] = implMethod;
+
+                assembly.LogInfo($"[{Source}] Registered {typeof(ICustomNetMessageListener).Format()} of type {listenerType.Format()} (receivable on: {listener.ReceivingSide.Format()}).");
+            }
+        }
+        else
+        {
+            Logger.LogWarning($"Unable to find {typeof(ICustomNetMessageListener).Format()}.{nameof(ICustomNetMessageListener.OnInvoked).Colorize(FormattingColorType.Method)}.", method: Source);
+        }
 
         Delegate[] listeners = new Delegate[methods.Length];
         Listeners = new ReadOnlyCollection<Delegate>(listeners);
@@ -235,20 +279,53 @@ public static class NetFactory
         Array nArr = Array.CreateInstance(callbackType, readCallbacks.Length + Listeners.Count);
         Array.Copy(readCallbacks, nArr, readCallbacks.Length);
 
+#if SERVER
+        const ConnectionSide receivingSide = ConnectionSide.Server;
+#else
+        const ConnectionSide receivingSide = ConnectionSide.Client;
+#endif
+
         for (int i = 0; i < methods.Length; ++i)
         {
             MethodInfo? m = methods[i];
-            if (m == null)
-                continue;
-            try
+
+            int index = readCallbacks.Length + i;
+
+            if (i >= DevkitServerBlockSize)
             {
-                nArr.SetValue(listeners[i] = m.CreateDelegate(callbackType), readCallbacks.Length + i);
+                (ICustomNetMessageListener listener, PluginAssembly assembly) = pluginListeners[i - DevkitServerBlockSize];
+                if ((listener.ReceivingSide & receivingSide) == 0)
+                {
+                    assembly.LogInfo($"Skipping implementing {listener.GetType().Format()} as it's not received on this connection side ({receivingSide.Format()}).");
+                    continue;
+                }
+
+                try
+                {
+                    nArr.SetValue(listeners[i] = m.CreateDelegate(callbackType, listener), index);
+                }
+                catch (Exception ex)
+                {
+                    assembly.LogError($"Implemented {nameof(ICustomNetMessageListener.OnInvoked).Colorize(FormattingColorType.Method)} method for " +
+                                      $"{listener.GetType().Format()} can not be converted to {callbackType.Format()}. Ensure your side settings are correct.", method: Source);
+                    assembly.LogError(ex, method: Source);
+                }
             }
-            catch (Exception ex)
+            else
             {
-                Logger.LogError("Implemented method for " + (DevkitServerMessage)i + " can not be converted to " + callbackType.Name + ".", method: Source);
-                Logger.LogError(ex, method: Source);
-                goto reset;
+                if (m == null)
+                    continue;
+
+                try
+                {
+                    nArr.SetValue(listeners[i] = m.CreateDelegate(callbackType), index);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Implemented method for {((DevkitServerMessage)i).Format()} can not be converted to {callbackType.Format()}.", method: Source);
+                    Logger.LogError(ex, method: Source);
+                    goto reset;
+                }
             }
         }
 
@@ -315,6 +392,11 @@ public static class NetFactory
     public static float GetBytesPerSecondAvg(DevkitServerMessage message, bool send) => GetBytesTotal(message, send, out float timespan) / timespan;
 
     /// <summary>
+    /// Gets the average data speed (either in or out, depending on the value of <paramref name="send"/>) in B/s per message type.
+    /// </summary>
+    public static float GetBytesPerSecondAvg(ICustomNetMessageListener listener, bool send) => GetBytesTotal((DevkitServerMessage)listener.MessageIndex, send, out float timespan) / timespan;
+
+    /// <summary>
     /// Gets the average data speed (either in or out, depending on the value of <paramref name="send"/>) in B/s total.
     /// </summary>
     public static float GetBytesPerSecondAvg(bool send) => GetBytesTotal(send, out float timespan) / timespan;
@@ -333,6 +415,12 @@ public static class NetFactory
     }
 
     /// <summary>
+    /// Gets the total amount of data (either in or out, depending on the value of <paramref name="send"/>) in B per message type.
+    /// </summary>
+    /// <param name="timespan">The amount of time in seconds this data was tracked over.</param>
+    public static long GetBytesTotal(ICustomNetMessageListener listener, bool send, out float timespan) => GetBytesTotal((DevkitServerMessage)listener.MessageIndex, send, out timespan);
+
+    /// <summary>
     /// Gets the total amount of data (either in or out, depending on the value of <paramref name="send"/>) in B.
     /// </summary>
     /// <param name="timespan">The amount of time in seconds this data was tracked over.</param>
@@ -345,16 +433,23 @@ public static class NetFactory
 
         return ttl;
     }
-    internal static void IncrementByteCount(bool send, DevkitServerMessage msg, long length)
+
+    /// <summary>
+    /// Increment the amount of bytes (either in or out, depending on the value of <paramref name="send"/>) by a listener.
+    /// </summary>
+    public static void IncrementByteCount(ICustomNetMessageListener listener, bool send, long length)
+        => IncrementByteCount((DevkitServerMessage)listener.MessageIndex, send, length);
+    internal static void IncrementByteCount(DevkitServerMessage msg, bool send, long length)
     {
-        if ((int)msg < BlockSize)
-        {
-            if (send)
-                length += Mathf.CeilToInt(NewWriteBitCount / 8f) + sizeof(ushort);
-            else
-                length += Mathf.CeilToInt(NewReceiveBitCount / 8f) + sizeof(ushort);
-            (send ? _outByteCt : _inByteCt)[(int)msg] += length;
-        }
+        if ((int)msg >= BlockSize)
+            return;
+
+        if (send)
+            length += Mathf.CeilToInt(NewWriteBitCount / 8f) + sizeof(ushort);
+        else
+            length += Mathf.CeilToInt(NewReceiveBitCount / 8f) + sizeof(ushort);
+
+        (send ? _outByteCt : _inByteCt)[(int)msg] += length;
     }
     internal static bool Init()
     {
@@ -366,9 +461,6 @@ public static class NetFactory
             NetCallSource.FromServer
 #endif
         );
-
-        if (!ClaimMessageBlock())
-            return false;
 
         PullFromTransportConnectionListPool = null;
         try
@@ -467,8 +559,10 @@ public static class NetFactory
                 , method: Source);
             return;
         }
-        byte[] bytes = new byte[len];
-        if (!reader.ReadBytes(bytes, len))
+
+        IncrementByteCount(DevkitServerMessage.InvokeMethod, false, len + sizeof(ushort));
+
+        if (!reader.ReadBytesPtr(len, out byte[] bytes, out int offset))
         {
             Logger.LogWarning($"Received invalid message, can't read bytes of length {len.Format()} B"
 #if SERVER
@@ -479,13 +573,13 @@ public static class NetFactory
             return;
         }
 
-        IncrementByteCount(false, DevkitServerMessage.InvokeMethod, len + sizeof(ushort));
+        ArraySegment<byte> data = new ArraySegment<byte>(bytes, offset, len);
 
-        MessageOverhead ovh = new MessageOverhead(bytes);
+        MessageOverhead ovh = new MessageOverhead(data);
 #if SERVER
-        OnReceived(bytes, transportConnection, ovh, false);
+        OnReceived(data, transportConnection, ovh, false);
 #else
-        OnReceived(bytes, GetPlayerTransportConnection(), ovh, false);
+        OnReceived(data, GetPlayerTransportConnection(), ovh, false);
 #endif
     }
     [UsedImplicitly]
@@ -582,20 +676,23 @@ public static class NetFactory
 #else
         IClientTransport
 #endif
-        connection, BaseNetCall call, byte[] message, int index, bool hs, ref object[]? parameters)
+        connection, BaseNetCall call, ArraySegment<byte> message, bool hs, ref object[]? parameters)
     {
         if (parameters != null)
             return true;
-        if (!call.Read(message, index, out parameters))
+        if (!call.Read(message, out parameters))
         {
             Logger.LogWarning($"Unable to read incoming message for message {overhead.Format()}\n.", method: Source);
             return false;
         }
 
-        object[] old = parameters;
-        parameters = new object[old.Length + 1];
-        parameters[0] = ctx = new MessageContext(connection, overhead, hs);
-        Array.Copy(old, 0, parameters, 1, old.Length);
+        ctx = new MessageContext(connection, overhead, hs);
+
+        if (parameters is not { Length: > 0 })
+            parameters = [ ctx ];
+        else
+            parameters[0] = ctx;
+
 #if METHOD_LOGGING
         Logger.LogDebug($"  Read net method: {overhead.Format()}: {string.Join(", ", parameters.Select(x => x.Format()))}.", ConsoleColor.DarkYellow);
 #endif
@@ -607,9 +704,9 @@ public static class NetFactory
 #else
         IClientTransport
 #endif
-            connection, NetMethodInfo methodInfo, BaseNetCall call, byte[] message, int index, bool hs, object[]? parameters)
+            connection, NetMethodInfo methodInfo, BaseNetCall call, ArraySegment<byte> message, bool hs, object[]? parameters)
     {
-        if (!FillParameters(in overhead, ref ctx, connection, call, message, index, hs, ref parameters))
+        if (!FillParameters(in overhead, ref ctx, connection, call, message, hs, ref parameters))
             return false;
 
         object? res;
@@ -745,7 +842,7 @@ public static class NetFactory
 #else
         IClientTransport
 #endif
-            connection, BaseNetCall call, byte[] message, int index, int size, bool hs)
+            connection, BaseNetCall call, ArraySegment<byte> message, int size, bool hs)
     {
         bool verified = !hs || connection is not HighSpeedConnection hsc || hsc.Verified;
         object[]? parameters = null;
@@ -761,7 +858,7 @@ public static class NetFactory
                 {
                     if (listener.Task is { IsCompleted: false })
                     {
-                        if (!FillParameters(in overhead, ref ctx, connection, call, message, index, hs, ref parameters))
+                        if (!FillParameters(in overhead, ref ctx, connection, call, message, hs, ref parameters))
                         {
 #if METHOD_LOGGING
                             Logger.LogDebug($"  Failed to read method: {overhead.Format()}.", ConsoleColor.DarkYellow);
@@ -790,7 +887,7 @@ public static class NetFactory
                         if (overhead.Size == sizeof(int))
                         {
                             if (size >= sizeof(int))
-                                errorCode = BitConverter.ToInt32(message, index);
+                                errorCode = BitConverter.ToInt32(message.Array!, message.Offset);
                         }
 
 #if METHOD_LOGGING
@@ -826,7 +923,7 @@ public static class NetFactory
                     continue;
 
                 invokedAny = true;
-                if (!InvokeMethod(in overhead, ref ctx, connection, netMethodInfo, call, message, index, hs, parameters))
+                if (!InvokeMethod(in overhead, ref ctx, connection, netMethodInfo, call, message, hs, parameters))
                 {
 #if METHOD_LOGGING
                     Logger.LogDebug($"  Failed to read method: {overhead.Format()}.", ConsoleColor.DarkYellow);
@@ -841,7 +938,7 @@ public static class NetFactory
             Logger.LogWarning($"Could not find invoker for message from {connection.Format()}: {overhead.Format()}.");
         }
     }
-    internal static void OnReceived(byte[] message,
+    internal static void OnReceived(ArraySegment<byte> message,
 #if SERVER
         ITransportConnection
 #else
@@ -849,14 +946,14 @@ public static class NetFactory
 #endif
             connection, in MessageOverhead overhead, bool hs)
     {
-        if (message.Length < MessageOverhead.MinimumSize)
+        if (message.Count < MessageOverhead.MinimumSize)
         {
             Logger.LogError("Received too short of a message.", method: Source);
             goto rtn;
         }
 
         int size = overhead.Size;
-        if (size > message.Length)
+        if (size > message.Count)
         {
             Logger.LogError("Message overhead read a size larger than the message payload: " + size + " bytes.", method: Source);
             goto rtn;
@@ -874,7 +971,7 @@ public static class NetFactory
 
         if ((hs ? HighSpeedInvokers : Invokers).TryGetValue(overhead.MessageId, out BaseNetCall call))
         {
-            ParseMessage(in overhead, connection, call, message, index, size, hs);
+            ParseMessage(in overhead, connection, call, new ArraySegment<byte>(message.Array!, message.Offset + index, message.Count - index), size, hs);
         }
         else
         {
@@ -1212,7 +1309,7 @@ public static class NetFactory
         Writer.WriteUInt16((ushort)length);
         Writer.WriteBytes(bytes, offset, length);
         Writer.Flush();
-        IncrementByteCount(true, message, length);
+        IncrementByteCount(message, true, length);
 #if CLIENT
         GetPlayerTransportConnection().Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
 #else
@@ -1226,7 +1323,7 @@ public static class NetFactory
     /// </summary>
     /// <param name="connections">Leave <see langword="null"/> to select all online users.</param>
     /// <exception cref="ArgumentException">Length is too long (must be at most <see cref="ushort.MaxValue"/>).</exception>
-    public static void SendGeneric(DevkitServerMessage message, byte[] bytes, IList<ITransportConnection>? connections = null, int offset = 0, int length = -1, bool reliable = true)
+    public static void SendGeneric(DevkitServerMessage message, byte[] bytes, IReadOnlyList<ITransportConnection>? connections = null, int offset = 0, int length = -1, bool reliable = true)
     {
         if (length == -1)
             length = bytes.Length - offset;
@@ -1318,7 +1415,7 @@ public static class NetFactory
 
         Writer.WriteUInt16((ushort)len);
         Writer.WriteBytes(bytes, offset, len);
-        IncrementByteCount(true, DevkitServerMessage.InvokeMethod, len);
+        IncrementByteCount(DevkitServerMessage.InvokeMethod, true, len);
         Writer.Flush();
 #if METHOD_LOGGING
         Logger.LogDebug("[NET FACTORY] Sending " + len.Format() + " B to " +
@@ -1332,7 +1429,7 @@ public static class NetFactory
         connection.Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
     }
 #if SERVER
-    internal static void Send(this IList<ITransportConnection> connections, byte[] bytes, bool reliable = true)
+    internal static void Send(this IReadOnlyList<ITransportConnection> connections, byte[] bytes, bool reliable = true)
     {
         Writer.Reset();
         Writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)DevkitServerMessage.InvokeMethod));
@@ -1435,7 +1532,11 @@ public enum NetCallSource : byte
     /// </summary>
     None = 3
 }
-public enum DevkitServerMessage
+
+/// <summary>
+/// Represents reserved messages by DevkitServer and also used to wrap <see cref="ICustomMessageListener"/>
+/// </summary>
+public enum DevkitServerMessage : uint
 {
     InvokeMethod = 0,
     InvokeGuidMethod = 1,

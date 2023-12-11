@@ -306,7 +306,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             Logger.LogError("[TILE SYNC] Failed to read incoming tile data packet length.");
             return;
         }
-        NetFactory.IncrementByteCount(false, DevkitServerMessage.SendTileData, len + sizeof(ushort));
+        NetFactory.IncrementByteCount(DevkitServerMessage.SendTileData, false, len + sizeof(ushort));
 
         if (!reader.ReadBytesPtr(len, out byte[] buffer, out int offset))
         {

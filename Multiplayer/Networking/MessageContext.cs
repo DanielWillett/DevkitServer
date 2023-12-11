@@ -1,5 +1,7 @@
-﻿using DevkitServer.Players;
-using DevkitServer.Util.Encoding;
+﻿using DevkitServer.Util.Encoding;
+#if SERVER
+using DevkitServer.Players;
+#endif
 
 namespace DevkitServer.Multiplayer.Networking;
 
@@ -68,20 +70,26 @@ public readonly struct MessageContext
         if (Connection is null)
             return false;
 
-        if ((Overhead.Flags & MessageFlags.AcknowledgeRequest) == MessageFlags.AcknowledgeRequest)
+        if ((Overhead.Flags & MessageFlags.AcknowledgeRequest) != MessageFlags.AcknowledgeRequest)
+            return false;
+
+        MessageFlags flags = Overhead.Flags & ~MessageFlags.AcknowledgeRequest;
+        long k = Overhead.ResponseKey != 0 ? Overhead.ResponseKey : Overhead.RequestKey;
+        if (k == 0)
+            return false;
+
+        flags |= MessageFlags.AcknowledgeResponse;
+        MessageOverhead overhead = new MessageOverhead(flags, Overhead.MessageId, 0, k);
+        byte[] bytes = overhead.GetBytes();
+        if (DevkitServerModule.IsMainThread)
+            Connection.Send(bytes);
+        else
         {
-            MessageFlags flags = Overhead.Flags & ~MessageFlags.AcknowledgeRequest;
-            long k = Overhead.ResponseKey != 0 ? Overhead.ResponseKey : Overhead.RequestKey;
-            if (k != 0)
-            {
-                flags |= MessageFlags.AcknowledgeResponse;
-                MessageOverhead overhead = new MessageOverhead(flags, Overhead.MessageId, 0, k);
-                byte[] bytes = overhead.GetBytes();
-                Connection.Send(bytes);
-                return true;
-            }
+            // ReSharper disable once SuggestVarOrType_SimpleTypes
+            var conn = Connection;
+            DevkitServerUtility.QueueOnMainThread(() => conn.Send(bytes));
         }
-        return false;
+        return true;
     }
 
     public bool Acknowledge(StandardErrorCode errorCode) => Acknowledge((int)errorCode);
@@ -90,27 +98,34 @@ public readonly struct MessageContext
         if (Connection is null)
             return false;
 
-        if ((Overhead.Flags & MessageFlags.AcknowledgeRequest) == MessageFlags.AcknowledgeRequest)
+        if ((Overhead.Flags & MessageFlags.AcknowledgeRequest) != MessageFlags.AcknowledgeRequest)
+            return false;
+
+        MessageFlags flags = Overhead.Flags & ~MessageFlags.AcknowledgeRequest;
+        if (Overhead.RequestKey != 0)
+            flags |= MessageFlags.AcknowledgeResponse;
+
+        if (Overhead.RequestKey == 0)
+            return false;
+
+        MessageOverhead overhead = new MessageOverhead(flags, Overhead.MessageId, sizeof(int), Overhead.RequestKey);
+        byte[] ttl = new byte[overhead.Length + sizeof(int)];
+
+        fixed (byte* ttlPtr = ttl)
         {
-            MessageFlags flags = Overhead.Flags & ~MessageFlags.AcknowledgeRequest;
-            if (Overhead.RequestKey != 0)
-                flags |= MessageFlags.AcknowledgeResponse;
-            if (Overhead.RequestKey != 0)
-            {
-                MessageOverhead overhead = new MessageOverhead(flags, Overhead.MessageId, sizeof(int), Overhead.RequestKey);
-                byte[] ttl = new byte[overhead.Length + sizeof(int)];
-
-                fixed (byte* ttlPtr = ttl)
-                {
-                    overhead.GetBytes(ttlPtr, out _);
-                    UnsafeBitConverter.GetBytes(ttlPtr, errorCode, overhead.Length);
-                }
-
-                Connection.Send(ttl);
-                return true;
-            }
+            overhead.GetBytes(ttlPtr, out _);
+            UnsafeBitConverter.GetBytes(ttlPtr, errorCode, overhead.Length);
         }
-        return false;
+
+        if (DevkitServerModule.IsMainThread)
+            Connection.Send(ttl);
+        else
+        {
+            // ReSharper disable once SuggestVarOrType_SimpleTypes
+            var conn = Connection;
+            DevkitServerUtility.QueueOnMainThread(() => conn.Send(ttl));
+        }
+        return true;
     }
     private static NotSupportedException NilError() => new NotSupportedException("This message context instance is not linked to a connection. Perhaps it is Nil or was not initialized properly.");
     public void Reply(NetCall call)

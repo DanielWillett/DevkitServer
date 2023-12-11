@@ -1,7 +1,7 @@
 ﻿using Cysharp.Threading.Tasks;
+using DevkitServer.API.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
 using System.IO.Compression;
-using DevkitServer.API.Multiplayer;
 using CompressionLevel = System.IO.Compression.CompressionLevel;
 using DeflateStream = System.IO.Compression.DeflateStream;
 
@@ -107,9 +107,24 @@ public class LargeMessageTransmission : IDisposable
     }
 
     /// <summary>
+    /// If this message is being sent instead of received.
+    /// </summary>
+    public bool IsServer => Comms.IsServer;
+
+    /// <summary>
+    /// If the message is at a point where it can be cancelled.
+    /// </summary>
+    public bool CanCancel => (!Comms.IsServer || _hasSent) && !_hasFullSent;
+
+    /// <summary>
     /// Client handler to add custom receive event handling.
     /// </summary>
     public BaseLargeMessageTransmissionClientHandler? Handler { get; set; }
+
+    /// <summary>
+    /// Cancellation token triggered when the transmission is cancelled or disposed.
+    /// </summary>
+    public CancellationToken CancellationToken => _tknSource.Token;
 
     internal byte Flags
     {
@@ -126,6 +141,7 @@ public class LargeMessageTransmission : IDisposable
             IsHighSpeed = (value & 8) != 0;
         }
     }
+
     internal int LowSpeedPacketCount => (int)Math.Ceiling(FinalSize / (double)Bandwidth);
 
     /// <summary>
@@ -204,6 +220,18 @@ public class LargeMessageTransmission : IDisposable
         _tknSource = new CancellationTokenSource();
         Comms = new LargeMessageTransmissionCommunications(this, false);
 
+        if (Handler != null)
+        {
+            try
+            {
+                Handler.IsDirty = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.", method: LogSource);
+                Logger.LogError(ex, method: LogSource);
+            }
+        }
     }
     internal void WriteStart(ByteWriter writer)
     {
@@ -278,6 +306,19 @@ public class LargeMessageTransmission : IDisposable
 
         _hasSent = true;
 
+        if (Handler != null)
+        {
+            try
+            {
+                Handler.IsDirty = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.", method: LogSource);
+                Logger.LogError(ex, method: LogSource);
+            }
+        }
+
         try
         {
             await Comms.Send(token, Finalize(token));
@@ -290,6 +331,19 @@ public class LargeMessageTransmission : IDisposable
 
         _hasSentData = true;
         _hasFullSent = true;
+
+        if (Handler == null)
+            return;
+
+        try
+        {
+            Handler.IsDirty = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.", method: LogSource);
+            Logger.LogError(ex, method: LogSource);
+        }
     }
     private async UniTask Compress(CancellationToken token = default)
     {
@@ -398,6 +452,7 @@ public class LargeMessageTransmission : IDisposable
             }
         }
 
+        _tknSource.Cancel();
         _tknSource.Dispose();
 
         if (Handler is IDisposable handler)
@@ -457,4 +512,16 @@ public class LargeMessageTransmission : IDisposable
             }
         });
     }
+
+    /// <summary>
+    /// Returns a copied collection of all messages currently registered where the data is being received from another connection.
+    /// </summary>
+    /// <remarks>Also see <seealso cref="GetSendingMessages"/>.</remarks>
+    public static IReadOnlyList<LargeMessageTransmission> GetReceivingMessages() => LargeMessageTransmissionCommunications.GetReceivingMessages();
+
+    /// <summary>
+    /// Returns a copied collection of all messages currently registered where the data is being sent to another connection.
+    /// </summary>
+    /// <remarks>Also see <seealso cref="GetReceivingMessages"/>.</remarks>
+    public static IReadOnlyList<LargeMessageTransmission> GetSendingMessages() => LargeMessageTransmissionCommunications.GetSendingMessages();
 }

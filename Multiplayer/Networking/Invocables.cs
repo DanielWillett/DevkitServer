@@ -46,7 +46,7 @@ public abstract class BaseNetCall
         if (Guid != Guid.Empty)
             DefaultFlags = MessageFlags.Guid;
     }
-    public abstract bool Read(byte[] message, int index, out object[] parameters);
+    public abstract bool Read(ArraySegment<byte> message, out object[] parameters);
     public NetTask Listen(int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
     {
         NetTask task = new NetTask(false, timeoutMs);
@@ -60,7 +60,7 @@ public abstract class BaseNetCall
         return task;
     }
     internal virtual void SetThrowOnError(bool value) { }
-    public override bool Equals(object obj) => obj is BaseNetCall c2 && Equals(c2);
+    public override bool Equals(object? obj) => obj is BaseNetCall c2 && Equals(c2);
     public bool Equals(BaseNetCall other) => (Id != default && Id == other.Id || Guid != Guid.Empty && Guid == other.Guid) && HighSpeed == other.HighSpeed;
     public override int GetHashCode()
     {
@@ -83,29 +83,29 @@ public class NetCallCustom : BaseNetCall
     internal NetCallCustom(DevkitServerNetCall method, int capacity = 0, bool highSpeed = false) : this((ushort)method, capacity, highSpeed) { }
     internal NetCallCustom(ushort method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriter(true, capacity);
+        _writer = new ByteWriter(true, capacity + MessageOverhead.MaximumSize);
     }
     public NetCallCustom(Guid method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriter(true, capacity);
+        _writer = new ByteWriter(true, capacity + MessageOverhead.MaximumSize);
     }
     public NetCallCustom(Method method, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriter(true, capacity);
+        _writer = new ByteWriter(true, capacity + MessageOverhead.MaximumSize);
     }
     public NetCallCustom(MethodAsync method, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriter(true, capacity);
+        _writer = new ByteWriter(true, capacity + MessageOverhead.MaximumSize);
     }
     internal override void SetThrowOnError(bool value) => throwOnError = value;
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
         ByteReader reader = new ByteReader { ThrowOnError = throwOnError };
-        reader.LoadNew(message, index);
-        parameters = new object[] { reader };
+        reader.LoadNew(message);
+        parameters = [ null!, reader ];
         return true;
     }
-    public bool Read(byte[] message, int index, out ByteReader reader)
+    public bool Read(ArraySegment<byte> message, out ByteReader reader)
     {
         reader = new ByteReader { ThrowOnError = throwOnError };
         reader.LoadNew(message);
@@ -356,10 +356,10 @@ public sealed class NetCall : BaseNetCall
         connections.Send(_bytes);
     }
 #endif
-    public bool Read(byte[] message, int index) => true;
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public bool Read(ArraySegment<byte> message) => true;
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        parameters = Array.Empty<object>();
+        parameters = new object[1];
         return true;
     }
 #if CLIENT
@@ -441,25 +441,25 @@ public sealed class NetCallRaw<T> : NetCallRaw
     internal NetCallRaw(DevkitServerNetCall method, Reader<T>? reader, Writer<T>? writer, int capacity = 0) : this((ushort)method, reader, writer, capacity) { }
     internal NetCallRaw(ushort method, Reader<T>? reader, Writer<T>? writer, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriterRaw<T>(writer, capacity: capacity);
+        _writer = new ByteWriterRaw<T>(writer, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T>(reader);
     }
     /// <summary>Leave <paramref name="reader"/> or <paramref name="writer"/> null to auto-fill.</summary>
     public NetCallRaw(Guid method, Reader<T>? reader, Writer<T>? writer, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriterRaw<T>(writer, capacity: capacity);
+        _writer = new ByteWriterRaw<T>(writer, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T>(reader);
     }
     /// <summary>Leave <paramref name="reader"/> or <paramref name="writer"/> null to auto-fill.</summary>
     public NetCallRaw(Method method, Reader<T>? reader, Writer<T>? writer, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriterRaw<T>(writer, capacity: capacity);
+        _writer = new ByteWriterRaw<T>(writer, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T>(reader);
     }
     /// <summary>Leave <paramref name="reader"/> or <paramref name="writer"/> null to auto-fill.</summary>
     public NetCallRaw(MethodAsync method, Reader<T>? reader, Writer<T>? writer, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriterRaw<T>(writer, capacity: capacity);
+        _writer = new ByteWriterRaw<T>(writer, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T>(reader);
     }
     internal override void SetThrowOnError(bool value) => _reader.ThrowOnError = value;
@@ -529,11 +529,11 @@ public sealed class NetCallRaw<T> : NetCallRaw
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T arg)
+    public bool Read(ArraySegment<byte> message, out T arg)
     {
         try
         {
-            return _reader.Read(message, index, out arg);
+            return _reader.Read(message, out arg);
         }
         catch (Exception ex)
         {
@@ -543,10 +543,10 @@ public sealed class NetCallRaw<T> : NetCallRaw
             return false;
         }
     }
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T a1);
-        parameters = success ? new object[] { a1! } : Array.Empty<object>();
+        bool success = Read(message, out T a1);
+        parameters = success ? new object[] { null!, a1! } : Array.Empty<object>();
         return success;
     }
 #if CLIENT
@@ -646,25 +646,25 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     internal NetCallRaw(ushort method, Reader<T1>? reader1, Reader<T2>? reader2, Writer<T1>? writer1, Writer<T2>? writer2, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(Guid method, Reader<T1>? reader1, Reader<T2>? reader2, Writer<T1>? writer1, Writer<T2>? writer2, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Writer<T1>? writer1, Writer<T2>? writer2, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Writer<T1>? writer1, Writer<T2>? writer2, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2>(writer1, writer2, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2>(reader1, reader2);
     }
     internal override void SetThrowOnError(bool value) => _reader.ThrowOnError = value;
@@ -734,11 +734,11 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T1 arg1, out T2 arg2)
+    public bool Read(ArraySegment<byte> message, out T1 arg1, out T2 arg2)
     {
         try
         {
-            return _reader.Read(message, index, out arg1, out arg2);
+            return _reader.Read(message, out arg1, out arg2);
         }
         catch (Exception ex)
         {
@@ -749,10 +749,10 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
             return false;
         }
     }
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T1 a1, out T2 a2);
-        parameters = success ? new object[] { a1!, a2! } : Array.Empty<object>();
+        bool success = Read(message, out T1 a1, out T2 a2);
+        parameters = success ? new object[] { null!, a1!, a2! } : Array.Empty<object>();
         return success;
     }
 #if CLIENT
@@ -854,25 +854,25 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     internal NetCallRaw(ushort method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(Guid method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3>(writer1, writer2, writer3, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3>(reader1, reader2, reader3);
     }
     internal override void SetThrowOnError(bool value) => _reader.ThrowOnError = value;
@@ -942,11 +942,11 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T1 arg1, out T2 arg2, out T3 arg3)
+    public bool Read(ArraySegment<byte> message, out T1 arg1, out T2 arg2, out T3 arg3)
     {
         try
         {
-            return _reader.Read(message, index, out arg1, out arg2, out arg3);
+            return _reader.Read(message, out arg1, out arg2, out arg3);
         }
         catch (Exception ex)
         {
@@ -958,10 +958,10 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
             return false;
         }
     }
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T1 a1, out T2 a2, out T3 a3);
-        parameters = success ? new object[] { a1!, a2!, a3! } : Array.Empty<object>();
+        bool success = Read(message, out T1 a1, out T2 a2, out T3 a3);
+        parameters = success ? new object[] { null!, a1!, a2!, a3! } : Array.Empty<object>();
         return success;
     }
 #if CLIENT
@@ -1060,29 +1060,29 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
     public delegate void Method(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4);
     public delegate Task MethodAsync(MessageContext context, T1 arg1, T2 arg2, T3 arg3, T4 arg4);
     internal NetCallRaw(DevkitServerNetCall method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, int capacity = 0)
-        : this((ushort)method, reader1, reader2, reader3, reader4, writer1, writer2, writer3, writer4, capacity) { }
+        : this((ushort)method, reader1, reader2, reader3, reader4, writer1, writer2, writer3, writer4, capacity + MessageOverhead.MaximumSize) { }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     internal NetCallRaw(ushort method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(Guid method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3, T4>(writer1, writer2, writer3, writer4, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3, T4>(reader1, reader2, reader3, reader4);
     }
     internal override void SetThrowOnError(bool value) => _reader.ThrowOnError = value;
@@ -1152,11 +1152,11 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4)
+    public bool Read(ArraySegment<byte> message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4)
     {
         try
         {
-            return _reader.Read(message, index, out arg1, out arg2, out arg3, out arg4);
+            return _reader.Read(message, out arg1, out arg2, out arg3, out arg4);
         }
         catch (Exception ex)
         {
@@ -1169,10 +1169,10 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
             return false;
         }
     }
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T1 a1, out T2 a2, out T3 a3, out T4 a4);
-        parameters = success ? new object[] { a1!, a2!, a3!, a4! } : Array.Empty<object>();
+        bool success = Read(message, out T1 a1, out T2 a2, out T3 a3, out T4 a4);
+        parameters = success ? new object[] { null!, a1!, a2!, a3!, a4! } : Array.Empty<object>();
         return success;
     }
 #if CLIENT
@@ -1274,25 +1274,25 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     internal NetCallRaw(ushort method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5>(reader1, reader2, reader3, reader4, reader5);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(Guid method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5>(reader1, reader2, reader3, reader4, reader5);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5>(reader1, reader2, reader3, reader4, reader5);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5>(writer1, writer2, writer3, writer4, writer5, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5>(reader1, reader2, reader3, reader4, reader5);
     }
     internal override void SetThrowOnError(bool value) => _reader.ThrowOnError = value;
@@ -1362,11 +1362,11 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5)
+    public bool Read(ArraySegment<byte> message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5)
     {
         try
         {
-            return _reader.Read(message, index, out arg1, out arg2, out arg3, out arg4, out arg5);
+            return _reader.Read(message, out arg1, out arg2, out arg3, out arg4, out arg5);
         }
         catch (Exception ex)
         {
@@ -1380,10 +1380,10 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
             return false;
         }
     }
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T1 a1, out T2 a2, out T3 a3, out T4 a4, out T5 a5);
-        parameters = success ? new object[] { a1!, a2!, a3!, a4!, a5! } : Array.Empty<object>();
+        bool success = Read(message, out T1 a1, out T2 a2, out T3 a3, out T4 a4, out T5 a5);
+        parameters = success ? new object[] { null!, a1!, a2!, a3!, a4!, a5! } : Array.Empty<object>();
         return success;
     }
 #if CLIENT
@@ -1485,25 +1485,25 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5, T6> : NetCallRaw
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     internal NetCallRaw(ushort method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Reader<T6>? reader6, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, Writer<T6>? writer6, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5, T6>(reader1, reader2, reader3, reader4, reader5, reader6);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(Guid method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Reader<T6>? reader6, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, Writer<T6>? writer6, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5, T6>(reader1, reader2, reader3, reader4, reader5, reader6);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(Method method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Reader<T6>? reader6, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, Writer<T6>? writer6, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5, T6>(reader1, reader2, reader3, reader4, reader5, reader6);
     }
     /// <summary>Leave any of the readers or writers null to auto-fill.</summary>
     public NetCallRaw(MethodAsync method, Reader<T1>? reader1, Reader<T2>? reader2, Reader<T3>? reader3, Reader<T4>? reader4, Reader<T5>? reader5, Reader<T6>? reader6, Writer<T1>? writer1, Writer<T2>? writer2, Writer<T3>? writer3, Writer<T4>? writer4, Writer<T5>? writer5, Writer<T6>? writer6, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity);
+        _writer = new ByteWriterRaw<T1, T2, T3, T4, T5, T6>(writer1, writer2, writer3, writer4, writer5, writer6, capacity: capacity + MessageOverhead.MaximumSize);
         _reader = new ByteReaderRaw<T1, T2, T3, T4, T5, T6>(reader1, reader2, reader3, reader4, reader5, reader6);
     }
     internal override void SetThrowOnError(bool value) => _reader.ThrowOnError = value;
@@ -1573,11 +1573,11 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5, T6> : NetCallRaw
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6)
+    public bool Read(ArraySegment<byte> message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6)
     {
         try
         {
-            return _reader.Read(message, index, out arg1, out arg2, out arg3, out arg4, out arg5, out arg6);
+            return _reader.Read(message, out arg1, out arg2, out arg3, out arg4, out arg5, out arg6);
         }
         catch (Exception ex)
         {
@@ -1592,10 +1592,10 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5, T6> : NetCallRaw
             return false;
         }
     }
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T1 a1, out T2 a2, out T3 a3, out T4 a4, out T5 a5, out T6 a6);
-        parameters = success ? new object[] { a1!, a2!, a3!, a4!, a5!, a6! } : Array.Empty<object>();
+        bool success = Read(message, out T1 a1, out T2 a2, out T3 a3, out T4 a4, out T5 a5, out T6 a6);
+        parameters = success ? new object[] { null!, a1!, a2!, a3!, a4!, a5!, a6! } : Array.Empty<object>();
         return success;
     }
 #if CLIENT
@@ -1778,11 +1778,11 @@ public sealed class NetCall<T> : DynamicNetCall
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T arg)
+    public bool Read(ArraySegment<byte> message, out T arg)
     {
         try
         {
-            return _reader.Read(message, index, out arg);
+            return _reader.Read(message, out arg);
         }
         catch (Exception ex)
         {
@@ -1792,10 +1792,10 @@ public sealed class NetCall<T> : DynamicNetCall
             return false;
         }
     }
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T a1);
-        parameters = success ? new object[] { a1! } : Array.Empty<object>();
+        bool success = Read(message, out T a1);
+        parameters = success ? new object[] { null!, a1! } : Array.Empty<object>();
         return success;
     }
 #if CLIENT
@@ -1978,11 +1978,11 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T1 arg1, out T2 arg2)
+    public bool Read(ArraySegment<byte> message, out T1 arg1, out T2 arg2)
     {
         try
         {
-            return _reader.Read(message, index, out arg1, out arg2);
+            return _reader.Read(message, out arg1, out arg2);
         }
         catch (Exception ex)
         {
@@ -1993,10 +1993,10 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
             return false;
         }
     }
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T1 a1, out T2 a2);
-        parameters = success ? new object[] { a1!, a2! } : Array.Empty<object>();
+        bool success = Read(message, out T1 a1, out T2 a2);
+        parameters = success ? new object[] { null!, a1!, a2! } : Array.Empty<object>();
         return success;
     }
 #if CLIENT
@@ -2179,11 +2179,11 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T1 arg1, out T2 arg2, out T3 arg3)
+    public bool Read(ArraySegment<byte> message, out T1 arg1, out T2 arg2, out T3 arg3)
     {
         try
         {
-            return _reader.Read(message, index, out arg1, out arg2, out arg3);
+            return _reader.Read(message, out arg1, out arg2, out arg3);
         }
         catch (Exception ex)
         {
@@ -2195,10 +2195,10 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
             return false;
         }
     }
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T1 arg1, out T2 arg2, out T3 arg3);
-        parameters = success ? new object[] { arg1!, arg2!, arg3! } : Array.Empty<object>();
+        bool success = Read(message, out T1 arg1, out T2 arg2, out T3 arg3);
+        parameters = success ? new object[] { null!, arg1!, arg2!, arg3! } : Array.Empty<object>();
         return success;
     }
 #if CLIENT
@@ -2381,11 +2381,11 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4)
+    public bool Read(ArraySegment<byte> message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4)
     {
         try
         {
-            return _reader.Read(message, index, out arg1, out arg2, out arg3, out arg4);
+            return _reader.Read(message, out arg1, out arg2, out arg3, out arg4);
         }
         catch (Exception ex)
         {
@@ -2398,10 +2398,10 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
             return false;
         }
     }
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4);
-        parameters = success ? new object[] { arg1!, arg2!, arg3!, arg4! } : Array.Empty<object>();
+        bool success = Read(message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4);
+        parameters = success ? new object[] { null!, arg1!, arg2!, arg3!, arg4! } : Array.Empty<object>();
         return success;
     }
 #if CLIENT
@@ -2584,11 +2584,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5)
+    public bool Read(ArraySegment<byte> message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5)
     {
         try
         {
-            return _reader.Read(message, index, out arg1, out arg2, out arg3, out arg4, out arg5);
+            return _reader.Read(message, out arg1, out arg2, out arg3, out arg4, out arg5);
         }
         catch (Exception ex)
         {
@@ -2602,10 +2602,10 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
             return false;
         }
     }
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5);
-        parameters = success ? new object[] { arg1!, arg2!, arg3!, arg4!, arg5! } : Array.Empty<object>();
+        bool success = Read(message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5);
+        parameters = success ? new object[] { null!, arg1!, arg2!, arg3!, arg4!, arg5! } : Array.Empty<object>();
         return success;
     }
 #if CLIENT
@@ -2788,11 +2788,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6)
+    public bool Read(ArraySegment<byte> message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6)
     {
         try
         {
-            return _reader.Read(message, index, out arg1, out arg2, out arg3, out arg4, out arg5, out arg6);
+            return _reader.Read(message, out arg1, out arg2, out arg3, out arg4, out arg5, out arg6);
         }
         catch (Exception ex)
         {
@@ -2807,10 +2807,10 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
             return false;
         }
     }
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6);
-        parameters = success ? new object[] { arg1!, arg2!, arg3!, arg4!, arg5!, arg6! } : Array.Empty<object>();
+        bool success = Read(message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6);
+        parameters = success ? new object[] { null!, arg1!, arg2!, arg3!, arg4!, arg5!, arg6! } : Array.Empty<object>();
         return success;
     }
 #if CLIENT
@@ -3002,12 +3002,12 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6,
+    public bool Read(ArraySegment<byte> message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6,
         out T7 arg7)
     {
         try
         {
-            return _reader.Read(message, index, out arg1, out arg2, out arg3, out arg4, out arg5, out arg6, out arg7);
+            return _reader.Read(message, out arg1, out arg2, out arg3, out arg4, out arg5, out arg6, out arg7);
         }
         catch (Exception ex)
         {
@@ -3024,10 +3024,10 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         }
     }
 
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7);
-        parameters = success ? new object[] { arg1!, arg2!, arg3!, arg4!, arg5!, arg6!, arg7! } : Array.Empty<object>();
+        bool success = Read(message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7);
+        parameters = success ? new object[] { null!, arg1!, arg2!, arg3!, arg4!, arg5!, arg6!, arg7! } : Array.Empty<object>();
         return success;
     }
 
@@ -3214,11 +3214,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8)
+    public bool Read(ArraySegment<byte> message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8)
     {
         try
         {
-            return _reader.Read(message, index, out arg1, out arg2, out arg3, out arg4, out arg5, out arg6, out arg7, out arg8);
+            return _reader.Read(message, out arg1, out arg2, out arg3, out arg4, out arg5, out arg6, out arg7, out arg8);
         }
         catch (Exception ex)
         {
@@ -3235,10 +3235,10 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
             return false;
         }
     }
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8);
-        parameters = success ? new object[] { arg1!, arg2!, arg3!, arg4!, arg5!, arg6!, arg7!, arg8! } : Array.Empty<object>();
+        bool success = Read(message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8);
+        parameters = success ? new object[] { null!, arg1!, arg2!, arg3!, arg4!, arg5!, arg6!, arg7!, arg8! } : Array.Empty<object>();
         return success;
     }
 #if CLIENT
@@ -3420,11 +3420,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8, out T9 arg9)
+    public bool Read(ArraySegment<byte> message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8, out T9 arg9)
     {
         try
         {
-            return _reader.Read(message, index, out arg1, out arg2, out arg3, out arg4, out arg5, out arg6, out arg7, out arg8, out arg9);
+            return _reader.Read(message, out arg1, out arg2, out arg3, out arg4, out arg5, out arg6, out arg7, out arg8, out arg9);
         }
         catch (Exception ex)
         {
@@ -3442,10 +3442,10 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
             return false;
         }
     }
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8, out T9 arg9);
-        parameters = success ? new object[] { arg1!, arg2!, arg3!, arg4!, arg5!, arg6!, arg7!, arg8!, arg9! } : Array.Empty<object>();
+        bool success = Read(message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8, out T9 arg9);
+        parameters = success ? new object[] { null!, arg1!, arg2!, arg3!, arg4!, arg5!, arg6!, arg7!, arg8!, arg9! } : Array.Empty<object>();
         return success;
     }
 #if CLIENT
@@ -3627,11 +3627,11 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
         }
     }
 #endif
-    public bool Read(byte[] message, int index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8, out T9 arg9, out T10 arg10)
+    public bool Read(ArraySegment<byte> message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8, out T9 arg9, out T10 arg10)
     {
         try
         {
-            return _reader.Read(message, index, out arg1, out arg2, out arg3, out arg4, out arg5, out arg6, out arg7, out arg8, out arg9, out arg10);
+            return _reader.Read(message, out arg1, out arg2, out arg3, out arg4, out arg5, out arg6, out arg7, out arg8, out arg9, out arg10);
         }
         catch (Exception ex)
         {
@@ -3650,10 +3650,10 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
             return false;
         }
     }
-    public override bool Read(byte[] message, int index, out object[] parameters)
+    public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        bool success = Read(message, index, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8, out T9 arg9, out T10 arg10);
-        parameters = success ? new object[] { arg1!, arg2!, arg3!, arg4!, arg5!, arg6!, arg7!, arg8!, arg9!, arg10! } : Array.Empty<object>();
+        bool success = Read(message, out T1 arg1, out T2 arg2, out T3 arg3, out T4 arg4, out T5 arg5, out T6 arg6, out T7 arg7, out T8 arg8, out T9 arg9, out T10 arg10);
+        parameters = success ? new object[] { null!, arg1!, arg2!, arg3!, arg4!, arg5!, arg6!, arg7!, arg8!, arg9!, arg10! } : Array.Empty<object>();
         return success;
     }
 #if CLIENT

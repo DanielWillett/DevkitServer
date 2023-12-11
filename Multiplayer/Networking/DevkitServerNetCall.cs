@@ -1,4 +1,5 @@
 ﻿namespace DevkitServer.Multiplayer.Networking;
+
 public enum DevkitServerNetCall : ushort
 {
     RequestLevel = 1,

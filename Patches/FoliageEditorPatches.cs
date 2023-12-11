@@ -13,7 +13,23 @@ namespace DevkitServer.Patches;
 [HarmonyPatch]
 internal static class FoliageEditorPatches
 {
-    public static readonly Type FoliageEditor = Accessor.AssemblyCSharp.GetType("SDG.Unturned.FoliageEditor");
+    internal static readonly Type FoliageEditor = Accessor.AssemblyCSharp.GetType("SDG.Unturned.FoliageEditor");
+
+    internal static InstanceGetter<object, IComparable>? GetEditMode = Accessor.GenerateInstanceGetter<IComparable>(FoliageEditor!, "mode", throwOnError: false);
+
+    internal static IComparable? FoliageModeExact;
+    static FoliageEditorPatches()
+    {
+        Type? enumType = FoliageEditor?.GetNestedType("EFoliageMode", BindingFlags.NonPublic | BindingFlags.Public);
+        if (enumType != null)
+            FoliageModeExact = Enum.ToObject(enumType, 1) as IComparable;
+
+        if (FoliageModeExact != null && FoliageModeExact.ToString().Equals("EXACT", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        Logger.LogWarning("Unable to find foliage mode EXACT.", method: "CLIENT EVENTS");
+        FoliageModeExact = null;
+    }
 
     [UsedImplicitly]
     [HarmonyPatch("FoliageEditor", "update")]
@@ -66,16 +82,6 @@ internal static class FoliageEditorPatches
         LocalBuilder lvlObjectPos = generator.DeclareLocal(typeof(Vector3));
         Label stLbl = generator.DefineLabel();
 
-        // limits to 60 actions per second todo fix this cause bad
-
-        yield return new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter);
-        yield return new CodeInstruction(OpCodes.Brfalse_S, stLbl);
-        yield return new CodeInstruction(OpCodes.Call, Accessor.GetRealtimeSinceStartup);
-        yield return new CodeInstruction(OpCodes.Ldsfld, EditorActions.LocalLastActionField);
-        yield return new CodeInstruction(OpCodes.Sub);
-        yield return new CodeInstruction(OpCodes.Ldc_R4, 1f / 60f);
-        yield return new CodeInstruction(OpCodes.Bge_S, stLbl);
-        yield return new CodeInstruction(OpCodes.Ret);
         int ri = 0, rspd = 0, lod = 0;
         for (int i = 0; i < ins.Count; ++i)
         {
@@ -87,7 +93,7 @@ internal static class FoliageEditorPatches
                 ParameterInfo[] ps = removeInstances.GetParameters();
                 if (i > ps.Length)
                 {
-                    if (ps[ps.Length - 1].ParameterType is { IsByRef: true } p && p.GetElementType() == typeof(int))
+                    if (ps[^1].ParameterType is { IsByRef: true } p && p.GetElementType() == typeof(int))
                     {
                         LocalBuilder? bld = PatchUtil.GetLocal(ins[i - 1], out int index, false);
                         yield return PatchUtil.GetLocalCodeInstruction(bld!, index, false);

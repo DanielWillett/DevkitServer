@@ -47,9 +47,24 @@ public readonly struct MessageOverhead
     /// <exception cref="IndexOutOfRangeException">If the pointer doesn't point to enough valid memory for the read.</exception>
     public unsafe MessageOverhead(byte[] bytes)
     {
+        if (bytes == null)
+            throw new ArgumentNullException(nameof(bytes));
+
         fixed (byte* ptr = bytes)
         {
             Read(ptr, bytes.Length, out Flags, out MessageId, out Size, out RequestKey, out ResponseKey, out Length, out MessageGuid);
+        }
+    }
+
+    /// <exception cref="IndexOutOfRangeException">If the pointer doesn't point to enough valid memory for the read.</exception>
+    public unsafe MessageOverhead(ArraySegment<byte> bytes)
+    {
+        if (bytes.Array == null)
+            throw new ArgumentNullException(nameof(bytes));
+
+        fixed (byte* ptr = &bytes.Array[bytes.Offset])
+        {
+            Read(ptr, bytes.Count, out Flags, out MessageId, out Size, out RequestKey, out ResponseKey, out Length, out MessageGuid);
         }
     }
     /// <exception cref="AccessViolationException">If the pointer doesn't point to enough valid memory for the read.</exception>

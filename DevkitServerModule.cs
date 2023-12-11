@@ -441,6 +441,12 @@ public sealed class DevkitServerModule : IModuleNexus
             ReplicatedLevelDataRegistry.RegisterFromAssembly(Accessor.DevkitServer, null, null);
 
             PluginLoader.LoadPlugins();
+
+            if (!NetFactory.ReclaimMessageBlock())
+            {
+                Fault();
+                goto fault;
+            }
             CreateDirectoryAttribute.DisposeLoadList();
         }
         catch (Exception ex)

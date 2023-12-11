@@ -1,9 +1,9 @@
 ﻿using Cysharp.Threading.Tasks;
+using DevkitServer.API.Multiplayer;
 using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Networking;
 using System.Collections.Concurrent;
 using System.Text.Json;
-using DevkitServer.API.Multiplayer;
 
 namespace DevkitServer.Util.Encoding;
 internal class LargeMessageTransmissionCommunications : IDisposable
@@ -83,15 +83,6 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         Transmission.Handler.ReceivedBytes = 0;
         Transmission.Handler.TotalBytes = Transmission.FinalSize;
         Transmission.Handler.IsStarted = true;
-        try
-        {
-            Transmission.Handler.IsDirty = true;
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError($"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
-            Logger.LogError(ex, method: Transmission.LogSource);
-        }
     }
 
 #if CLIENT
@@ -324,9 +315,9 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                 for (int retry = 0; retry < 2; ++retry)
                 {
 #if SERVER
-                    checkupResponse = await SendSlowCheckup.RequestAck(Connection, Transmission.TransmissionId, lastCheckupPacketIndex, packetIndex - 1);
+                    checkupResponse = await SendSlowCheckup.RequestAck(Connection, Transmission.TransmissionId, lastCheckupPacketIndex, packetIndex - 1, timeoutMs: 15000);
 #else
-                    checkupResponse = await SendSlowCheckup.RequestAck(Transmission.TransmissionId, lastCheckupPacketIndex, packetIndex - 1);
+                    checkupResponse = await SendSlowCheckup.RequestAck(Transmission.TransmissionId, lastCheckupPacketIndex, packetIndex - 1, timeoutMs: 15000);
 #endif
                     await UniTask.SwitchToMainThread(token);
 
@@ -339,6 +330,14 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                         await Transmission.Cancel(token);
                         return false;
                     }
+#if SERVER
+                    if (!Connection.IsConnected())
+                    {
+                        Logger.LogInfo($"[{Transmission.LogSource}] User disconnected at packet {packetIndex.Format()} / {packetCount.Format()}.", ConsoleColor.DarkCyan);
+                        await Transmission.Cancel(token);
+                        return false;
+                    }
+#endif
 
                     await UniTask.Delay(TimeSpan.FromSeconds(0.5), true, cancellationToken: token);
                 }
@@ -574,11 +573,13 @@ internal class LargeMessageTransmissionCommunications : IDisposable
     {
         bool cancelled = reader.ReadBool();
 
+        Logger.LogDebug($"[{Transmission.LogSource}] Cancelled: {cancelled.Format()}.");
+
         if (IsServer)
         {
             if (!cancelled)
             {
-                Logger.LogWarning($"Received server transmission: {Transmission.TransmissionId.Format()}, but expected client.", method: Transmission.LogSource);
+                Logger.LogWarning($"Received server transmission: {Transmission.TransmissionId.Format()}, but expected client for a non-cancelling end message.", method: Transmission.LogSource);
                 return;
             }
 
@@ -948,5 +949,13 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             Logger.LogDebug(string.Empty);
             Logger.LogDebug(string.Empty);
         }
+    }
+    internal static IReadOnlyList<LargeMessageTransmission> GetReceivingMessages()
+    {
+        return ActiveMessages.Values.Where(x => !x.Comms.IsServer).ToArray();
+    }
+    internal static IReadOnlyList<LargeMessageTransmission> GetSendingMessages()
+    {
+        return ActiveMessages.Values.Where(x => x.Comms.IsServer).ToArray();
     }
 }

@@ -147,6 +147,12 @@ public static class UIAccessTools
     private static readonly InstanceGetter<MenuWorkshopUI, MenuWorkshopSubscriptionsUI?>? GetMenuWorkshopSubscriptionsUI
         = Accessor.GenerateInstanceGetter<MenuWorkshopUI, MenuWorkshopSubscriptionsUI?>("subscriptionsUI");
 
+    private static readonly StaticGetter<ISleekButton>? GetLoadingUICancelButton
+        = Accessor.GenerateStaticGetter<ISleekButton>(typeof(LoadingUI), "cancelButton", throwOnError: false);
+
+    private static readonly StaticGetter<ISleekBox>? GetLoadingBarBox
+        = Accessor.GenerateStaticGetter<ISleekBox>(typeof(LoadingUI), "loadingBarBox", throwOnError: false);
+
     private static readonly Dictionary<Type, Type> MenuTypes = new Dictionary<Type, Type>(32);
 
     private static readonly Func<object?>? GetEditorTerrainHeightUI;
@@ -575,7 +581,7 @@ public static class UIAccessTools
     /// <summary>
     /// Get information about a vanilla UI type, or <see langword="null"/> if there's no information registered.
     /// </summary>
-    public static UITypeInfo? GetTypeInfo(Type type) => _typeInfoIntl.TryGetValue(type, out UITypeInfo typeInfo) ? typeInfo : null;
+    public static UITypeInfo? GetTypeInfo(Type type) => _typeInfoIntl.GetValueOrDefault(type);
 
     /// <exception cref="ArgumentOutOfRangeException">Invalid enum.</exception>
     /// <exception cref="MemberAccessException">Type or field not found (or invalid).</exception>
@@ -982,6 +988,25 @@ public static class UIAccessTools
                 throw;
             return null;
         }
+    }
+
+    /// <summary>
+    /// Sets the visibility of LoadingUI.cancelButton.
+    /// </summary>
+    public static bool SetLoadingCancelVisibility(bool visibility)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        ISleekButton? button = GetLoadingUICancelButton?.Invoke();
+
+        if (button != null)
+            button.IsVisible = visibility;
+        else
+            visibility = false;
+        ISleekBox? box = GetLoadingBarBox?.Invoke();
+        if (box != null)
+            box.SizeOffset_X = visibility ? -130f : -20f;
+        return button != null;
     }
 
     static UIAccessTools()

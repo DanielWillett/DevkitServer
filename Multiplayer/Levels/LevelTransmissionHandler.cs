@@ -1,5 +1,6 @@
 ﻿using DevkitServer.API.Multiplayer;
 #if CLIENT
+using DevkitServer.API.UI;
 using DevkitServer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using SDG.Framework.Utilities;
@@ -11,8 +12,9 @@ internal class LevelTransmissionHandler : BaseLargeMessageTransmissionClientHand
 #if CLIENT
     private string _mapName = null!;
     private float _lastUpdate;
-    private bool _updating;
+    private volatile int _updating;
     private bool _isDirty;
+    private bool _lastIsCancellable;
 
     protected internal override void OnStart()
     {
@@ -21,9 +23,9 @@ internal class LevelTransmissionHandler : BaseLargeMessageTransmissionClientHand
 
         if (IsUsingPackets)
             return;
-        
-        TimeUtility.updated += OnUpdate;
-        _updating = true;
+
+        if (Interlocked.Exchange(ref _updating, 1) == 0)
+            TimeUtility.updated += OnUpdate;
     }
 
     protected internal override void OnFinished(LargeMessageTransmissionStatus status)
@@ -62,32 +64,53 @@ internal class LevelTransmissionHandler : BaseLargeMessageTransmissionClientHand
 
     public void Dispose()
     {
-        if (!_updating)
-            return;
-        
-        TimeUtility.updated -= OnUpdate;
-        _updating = false;
+        int old = Interlocked.Exchange(ref _updating, 0);
+        if (old != 0)
+            TimeUtility.updated -= OnUpdate;
     }
 
     private void OnDirtyUpdated()
     {
-        if (_updating && (IsUsingPackets || IsDownloaded))
+        bool canCancel = Transmission.CanCancel;
+        if (canCancel != _lastIsCancellable)
         {
-            TimeUtility.updated -= OnUpdate;
-            _updating = false;
-        }
-        else if (!_updating && !IsUsingPackets)
-        {
-            TimeUtility.updated += OnUpdate;
-            _updating = true;
+            _lastIsCancellable = canCancel;
+
+            if (DevkitServerModule.IsMainThread)
+                UIAccessTools.SetLoadingCancelVisibility(canCancel);
+            else
+                DevkitServerUtility.QueueOnMainThread(() => UIAccessTools.SetLoadingCancelVisibility(canCancel));
         }
 
-        if (_updating)
+        int upd;
+        if (IsUsingPackets || IsDownloaded)
+        {
+            int old = Interlocked.Exchange(ref _updating, 0);
+            if (old != 0)
+                TimeUtility.updated -= OnUpdate;
+            upd = 0;
+        }
+        else if (!IsUsingPackets)
+        {
+            int old = Interlocked.Exchange(ref _updating, 1);
+            if (old == 0)
+                TimeUtility.updated += OnUpdate;
+            upd = 1;
+        }
+        else upd = _updating;
+
+        if (upd > 0)
             return;
 
+        if (DevkitServerModule.IsMainThread)
+            UpdateUIOnDirty();
+        else
+            DevkitServerUtility.QueueOnMainThread(UpdateUIOnDirty);
+    }
+    private void UpdateUIOnDirty()
+    {
         if (TotalMissingPackets > 0)
         {
-            Logger.LogDebug($"[{Transmission.LogSource}] ui updating 1...");
             LoadingUI.SetDownloadFileName(DevkitServerModule.LevelLoadingLocalization.Translate("RecoveringMissingPackets", _mapName, TotalMissingPackets, InitialMissingPackets));
             LoadingUI.NotifyDownloadProgress(InitialMissingPackets != 0 && InitialMissingPackets != TotalMissingPackets
                 ? (float)(InitialMissingPackets - TotalMissingPackets) / InitialMissingPackets * 0.90f + 0.05f
@@ -95,7 +118,6 @@ internal class LevelTransmissionHandler : BaseLargeMessageTransmissionClientHand
         }
         else if (ReceivedBytes >= TotalBytes || InitialMissingPackets > 0)
         {
-            Logger.LogDebug($"[{Transmission.LogSource}] ui updating 2...");
             LoadingUI.SetDownloadFileName(DevkitServerModule.LevelLoadingLocalization.Translate("Installing", _mapName));
             LoadingUI.NotifyDownloadProgress(0.95f);
         }
@@ -116,7 +138,6 @@ internal class LevelTransmissionHandler : BaseLargeMessageTransmissionClientHand
     }
     private void UpdateReceivedBytes()
     {
-        Logger.LogDebug($"[{Transmission.LogSource}] ui updating 3...");
         double elapsed = (DateTime.UtcNow - StartTimestamp).TotalSeconds;
 
         if (ReceivedBytes > 0)
@@ -126,11 +147,12 @@ internal class LevelTransmissionHandler : BaseLargeMessageTransmissionClientHand
             long bytes = (long)Math.Round(ReceivedBytes / elapsed);
 
             LoadingUI.SetDownloadFileName(DevkitServerModule.LevelLoadingLocalization.Translate("Downloading",
-                _mapName, ReceivedPackets, TotalPackets, DevkitServerUtility.FormatBytes(bytes), timeString));
+                _mapName, DevkitServerUtility.FormatBytes(ReceivedBytes), DevkitServerUtility.FormatBytes(TotalBytes), DevkitServerUtility.FormatBytes(bytes), timeString));
         }
         else
         {
-            LoadingUI.SetDownloadFileName(DevkitServerModule.LevelLoadingLocalization.Translate("CalculatingSpeed", _mapName, ReceivedPackets, TotalPackets));
+            LoadingUI.SetDownloadFileName(DevkitServerModule.LevelLoadingLocalization.Translate("CalculatingSpeed", _mapName,
+                DevkitServerUtility.FormatBytes(ReceivedBytes), DevkitServerUtility.FormatBytes(TotalBytes)));
         }
 
         LoadingUI.NotifyDownloadProgress(ReceivedBytes != 0 && TotalBytes != 0 ? (float)ReceivedBytes / TotalBytes * 0.90f + 0.05f : 0.05f);
