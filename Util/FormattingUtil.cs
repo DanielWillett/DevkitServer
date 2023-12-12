@@ -1,11 +1,11 @@
 ﻿using DevkitServer.API;
+using DevkitServer.Multiplayer.Networking;
 using HarmonyLib;
 using StackCleaner;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
-using DevkitServer.Multiplayer.Networking;
 using Version = System.Version;
 
 namespace DevkitServer.Util;
@@ -192,27 +192,27 @@ public static class FormattingUtil
                 int lastCpy = -1;
                 for (int i = 0; i < l - 2; ++i)
                 {
-                    if (l > i + 3 && chars[i] == ConsoleEscapeCharacter && chars[i + 1] == '[' && char.IsDigit(chars[i + 2]))
+                    if (l <= i + 3 || chars[i] != ConsoleEscapeCharacter || chars[i + 1] != '[' || !char.IsDigit(chars[i + 2]))
+                        continue;
+
+                    int st = i;
+                    int c = i + 3;
+                    for (; c < l; ++c)
                     {
-                        int st = i;
-                        int c = i + 3;
-                        for (; c < l; ++c)
+                        if (chars[c] != ';' && !char.IsDigit(chars[c]))
                         {
-                            if (chars[c] != ';' && !char.IsDigit(chars[c]))
-                            {
-                                if (chars[c] == 'm')
-                                    i = c;
+                            if (chars[c] == 'm')
+                                i = c;
 
-                                break;
-                            }
-
-                            i = c;
+                            break;
                         }
 
-                        Buffer.MemoryCopy(chars + lastCpy + 1, outp + outpInd, (l - outpInd) * sizeof(char), (st - lastCpy - 1) * sizeof(char));
-                        outpInd += st - lastCpy - 1;
-                        lastCpy += st - lastCpy + (c - st);
+                        i = c;
                     }
+
+                    Buffer.MemoryCopy(chars + lastCpy + 1, outp + outpInd, (l - outpInd) * sizeof(char), (st - lastCpy - 1) * sizeof(char));
+                    outpInd += st - lastCpy - 1;
+                    lastCpy += st - lastCpy + (c - st);
                 }
                 Buffer.MemoryCopy(chars + lastCpy + 1, outp + outpInd, (l - outpInd) * sizeof(char), (l - lastCpy) * sizeof(char));
                 outpInd += l - lastCpy;
@@ -279,7 +279,8 @@ public static class FormattingUtil
             if (setter.IsAssembly)
                 type += " internal set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
             else if (setter.IsFamilyAndAssembly)
-                type += " protected internal set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
+                type += " protected internal set".ColorizeNoReset(FormatProvider.
+                    StackCleaner.Configuration.Colors!.KeywordColor);
             else if (setter.IsPrivate)
                 type += " private set".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor);
             else if (setter.IsFamily)

@@ -7,6 +7,8 @@ using DevkitServer.Multiplayer.Sync;
 using System.Collections.ObjectModel;
 using System.Reflection;
 using DevkitServer.Util.Encoding;
+using DevkitServer.API.Cartography;
+
 #if CLIENT
 using DevkitServer.AssetTools;
 using DevkitServer.Configuration;
@@ -255,11 +257,11 @@ internal static class CommandTests
             throw ctx.SendUnknownError();
         float t = CachedTime.RealtimeSinceStartup;
         if (!ctx.HasArg(0) || ctx.MatchParameter(0, "hm", "heightmap", "heights"))
-            tileSyncAuth.InvalidateBounds(CartographyUtil.CaptureBounds, TileSync.DataType.Heightmap, t);
+            tileSyncAuth.InvalidateBounds(CartographyTool.CaptureBounds, TileSync.DataType.Heightmap, t);
         if (!ctx.HasArg(0) || ctx.MatchParameter(0, "sm", "splatmap", "materials"))
-            tileSyncAuth.InvalidateBounds(CartographyUtil.CaptureBounds, TileSync.DataType.Splatmap, t);
+            tileSyncAuth.InvalidateBounds(CartographyTool.CaptureBounds, TileSync.DataType.Splatmap, t);
         if (!ctx.HasArg(0) || ctx.MatchParameter(0, "holes", "holemap"))
-            tileSyncAuth.InvalidateBounds(CartographyUtil.CaptureBounds, TileSync.DataType.Holes, t);
+            tileSyncAuth.InvalidateBounds(CartographyTool.CaptureBounds, TileSync.DataType.Holes, t);
 
         ObjectSync? objectSyncAuth = ObjectSync.GetAuthority();
 #if CLIENT

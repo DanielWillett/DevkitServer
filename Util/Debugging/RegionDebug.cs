@@ -1,4 +1,5 @@
 ﻿#if CLIENT
+using DevkitServer.API.Cartography;
 using DevkitServer.Players;
 using SDG.Framework.Landscapes;
 using SDG.Framework.Rendering;
@@ -207,8 +208,8 @@ internal sealed class RegionDebug : MonoBehaviour
             bool isInRegion = ctrlTransform != null;
             Vector3 position = !isInRegion ? Vector3.zero : ctrlTransform!.position;
             isInRegion = isInRegion && Regions.tryGetCoordinate(position, out cx, out cy);
-            float lvlSizeX = Mathf.Min(4096, Mathf.Max(Mathf.Abs(CartographyUtil.CaptureBounds.max.x), Mathf.Abs(CartographyUtil.CaptureBounds.min.x)));
-            float lvlSizeZ = Mathf.Min(4096, Mathf.Max(Mathf.Abs(CartographyUtil.CaptureBounds.max.z), Mathf.Abs(CartographyUtil.CaptureBounds.min.z)));
+            float lvlSizeX = Mathf.Min(4096, Mathf.Max(Mathf.Abs(CartographyTool.CaptureBounds.max.x), Mathf.Abs(CartographyTool.CaptureBounds.min.x)));
+            float lvlSizeZ = Mathf.Min(4096, Mathf.Max(Mathf.Abs(CartographyTool.CaptureBounds.max.z), Mathf.Abs(CartographyTool.CaptureBounds.min.z)));
             float regionSize = Regions.REGION_SIZE;
             bool outOfBoundsX = Mathf.Abs(position.x) > lvlSizeX;
             bool outOfBoundsZ = Mathf.Abs(position.z) > lvlSizeZ;

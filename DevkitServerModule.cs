@@ -22,6 +22,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security;
+using DevkitServer.API.Cartography;
 using DevkitServer.Framework;
 using UnityEngine.SceneManagement;
 using Module = SDG.Framework.Modules.Module;
@@ -948,7 +949,7 @@ public sealed class DevkitServerModule : IModuleNexus
             EditorActions.ServerActions.IsOwner = true;
 #endif
         }
-        CartographyUtil.Reset();
+        CartographyTool.Reset();
 #if CLIENT
         if (IsEditing)
         {
