@@ -12,7 +12,7 @@ internal sealed class ControlCommand : DevkitServerCommand, ICommandLocalization
     public static readonly PermissionLeaf ChangeControllerPlayer = new PermissionLeaf("control.player", devkitServer: true);
     public static readonly PermissionLeaf ChangeControllerEditor = new PermissionLeaf("control.editor", devkitServer: true);
 
-    public override CommandExecutionMode Mode => CommandExecutionMode.Always;
+    public override CommandExecutionMode Mode => CommandExecutionMode.IgnoreControlMode | CommandExecutionMode.RequireMultiEditing;
 
     Local ILocalizedCommand.Translations { get; set; } = null!;
     public ControlCommand() : base("control")

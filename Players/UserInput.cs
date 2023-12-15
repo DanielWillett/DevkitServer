@@ -49,7 +49,7 @@ public class UserInput : MonoBehaviour
             if (DevkitServerModule.IsEditing && EditorUser.User?.Input is not null)
                 return EditorUser.User.Input.Controller;
 
-            return Level.isEditor ? CameraController.Editor : (Level.isLoaded ? CameraController.Player : CameraController.None);
+            return Level.isEditor ? CameraController.Editor : (Level.isLoaded || Level.isLoading ? CameraController.Player : CameraController.None);
         }
     }
     public static Transform LocalAim

@@ -156,7 +156,7 @@ public class Utf8JsonPreProcessingStream : Stream
     /// Returns a span of bytes representing the processed JSON data.
     /// </summary>
     /// <param name="allowStaticBuffer">When this is <see langword="true"/>, uses a static buffer if on the main thread.</param>
-    public ReadOnlySpan<byte> ReadAllBytes(bool allowStaticBuffer = true)
+    public ArraySegment<byte> ReadAllBytes(bool allowStaticBuffer = true)
     {
         int len = (int)Math.Min(int.MaxValue, Length);
         byte[] buffer;
@@ -170,7 +170,7 @@ public class Utf8JsonPreProcessingStream : Stream
             buffer = new byte[len];
 
         int ct = Read(buffer, 0, len);
-        return buffer.AsSpan(0, ct);
+        return new ArraySegment<byte>(buffer, 0, ct);
     }
 
     /// <inheritdoc />

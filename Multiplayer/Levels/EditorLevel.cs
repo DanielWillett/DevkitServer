@@ -24,7 +24,7 @@ public static class EditorLevel
     private static readonly NetCall<byte[]> SendPending = new NetCall<byte[]>(DevkitServerNetCall.SendPending);
     internal static List<ITransportConnection> PendingToReceiveActions = new List<ITransportConnection>(4);
 #if CLIENT
-    public static string TempLevelPath => Path.Combine(DevkitServerConfig.ServerFolder, "Levels", Provider.currentServerInfo?.map ?? throw new NotSupportedException("Level not pending."), "Level Install");
+    public static string TempLevelPath => Path.Combine(DevkitServerConfig.ServerFolder, "Levels", Provider.CurrentServerAdvertisement?.map ?? Guid.NewGuid().ToString("N"), "Level Install");
 #endif
 #if SERVER
     [NetCall(NetCallSource.FromClient, (ushort)DevkitServerNetCall.RequestLevel)]

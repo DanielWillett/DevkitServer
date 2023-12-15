@@ -66,7 +66,7 @@ public class HighSpeedServer : IDisposable
             client.ReceiveBufferSize = HighSpeedNetFactory.BufferSize;
 
             Logger.LogInfo("[HIGH SPEED SERVER] Client connecting to high-speed server: " +
-                           string.Join(" or ", results.Select(x => x.GetAddress().Format() + ":" + (x.TryGetPort(out ushort port) ? port.Format() : "XXXXX"))));
+                           string.Join(" or ", results.Select(x => x.Format())));
             HighSpeedConnection hsConn = new HighSpeedConnection(client, results, this);
             hsConn.Listen();
             _pending.Add(hsConn);
@@ -110,7 +110,9 @@ public class HighSpeedServer : IDisposable
     {
         if (_instance != null)
         {
-            foreach (HighSpeedConnection connection in _instance._connections.Concat(_instance._pending).Where(x => x.Steam64 == player.m_SteamID || x.Verified && (x.SteamConnection == null || !x.SteamConnection.TryGetPort(out _))))
+            foreach (HighSpeedConnection connection in _instance._connections
+                         .Concat(_instance._pending)
+                         .Where(x => x.Steam64 == player.m_SteamID || x.Verified && (x.SteamConnection == null || x.SteamConnection.GetAddress() == null)))
             {
                 connection.CloseConnection();
             }

@@ -742,16 +742,15 @@ public sealed class DevkitServerModule : IModuleNexus
         tree = (rawFile ? RawRepositoryUrl : RepositoryUrl) + (directory ? "/tree/" : (rawFile ? "/" : "/blob/")) + tree;
         if (string.IsNullOrWhiteSpace(tree))
             return tree;
-        
-        if (!string.IsNullOrEmpty(relativePath))
-        {
-            if (relativePath![0] == '/')
-                return tree + relativePath;
 
-            return tree + "/" + relativePath;
-        }
+        if (string.IsNullOrEmpty(relativePath))
+            return tree;
 
-        return tree;
+        if (relativePath[0] == '/')
+            return tree + relativePath;
+
+        return tree + "/" + relativePath;
+
     }
     public static string? FindModuleFile(string name)
     {

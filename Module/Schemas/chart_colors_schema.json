@@ -1,0 +1,116 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/DanielWillett/DevkitServer/tree/master/Module/Schemas/chart_colors_schema.json",
+  "title": "Chart Color Config",
+  "description": "Defines the colors used to make in-game charts in JSON format.",
+  "type": "object",
+  "properties": {
+    "water_color": {
+      "description": "The color of any point below sea level.",
+      "$ref": "#/$defs/color32"
+    },
+    "highway_color": {
+      "description": "The color of any concrete spline roads >= 8m in width.",
+      "$ref": "#/$defs/color32"
+    },
+    "road_color": {
+      "description": "The color of any concrete spline roads < 8m in width.",
+      "$ref": "#/$defs/color32"
+    },
+    "object_road_color": {
+      "description": "The color of any level objects defined as roads.",
+      "$ref": "#/$defs/color32"
+    },
+    "path_color": {
+      "description": "The color of any non-concrete spline roads.",
+      "$ref": "#/$defs/color32"
+    },
+    "cliff_color": {
+      "description": "Level objects defined as cliffs (usually cliff rocks).",
+      "$ref": "#/$defs/color32"
+    },
+    "resource_color": {
+      "description": "Resources like trees, etc.",
+      "$ref": "#/$defs/color32"
+    },
+    "object_large_color": {
+      "description": "Default for 'LARGE' level objects.",
+      "$ref": "#/$defs/color32"
+    },
+    "object_medium_color": {
+      "description": "Default for 'MEDIUM' level objects.",
+      "$ref": "#/$defs/color32"
+    },
+    "fallback_color": {
+      "description": "Default color for invalid layers, etc. This usually won't be used.",
+      "$ref": "#/$defs/color32"
+    },
+    "height_color_graph": {
+      "description": "Defines keyframes on an RGB graph.",
+      "type": [ "null", "array" ],
+      "items": {
+        "properties": {
+          "height": {
+            "description": "Absolute or relative height depending on 'height_unit'.",
+            "type": "number"
+          },
+          "color": {
+            "description": "Color to use as the base of the keyframe.",
+            "$ref": "#/$defs/color32"
+          },
+          "interpolation_mode": {
+            "description": "Defines how colors are estimated between keyframes.",
+            "type": "string",
+            "enum": [ "Constant", "Linear", "Smooth" ]
+          },
+          "height_unit": {
+            "description": "Defines how height is interpreted.",
+            "type": "string",
+            "enum": [ "Relative", "Absolute" ]
+          }
+        }
+      }
+    }
+  },
+
+  "$defs": {
+    "color32": {
+      "type": [ "string", "object", "array", "null" ],
+      "properties": {
+        "r": {
+          "description": "Red Channel",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "g": {
+          "description": "Green Channel",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "b": {
+          "description": "Blue Channel",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "a": {
+          "description": "Transparency Channel",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        }
+      },
+      "required": [ "r", "g", "b" ],
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "minItems": 3,
+      "maxItems": 4,
+      "pattern": "^(?:(?<!#)(?:[rR][eE][dD]|[gG][rR][eE][eE][nN]|[bB][lL][uU][eE]|[wW][hH][iI][tT][eE]|[bB][lL][aA][cC][kK]|[yY][eE][lL][lL][oO][wW]|[cC][yY][aA][nN]|[mM][aA][gG][eE][nN][tT][aA]|[gG][rR][aAeE][yY]|[cC][lL][eE][aA][rR]))$|^(?:#{0,1}(?:[\\daAbBcCdDeEfF]{8}|[\\daAbBcCdDeEfF]{6}|[\\daAbBcCdDeEfF]{1,4}))$"
+    }
+  }
+}

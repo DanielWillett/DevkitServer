@@ -674,12 +674,23 @@ public static class FormattingUtil
 
             if (connection.TryGetIPv4Address(out uint addr))
             {
-                str = GetColorPrefix(ToArgb(new Color32(204, 255, 102, 255)))
-                      + Parser.getIPFromUInt32(addr);
-                if (connection.TryGetPort(out ushort port))
-                    str += GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor) + ":" +
-                           GetColorPrefix(ToArgb(new Color32(170, 255, 0, 255))) +
-                           port.ToString(CultureInfo.InvariantCulture);
+                if (addr == 0 && connection.GetAddress() is { } ipAddress)
+                {
+                    str = GetColorPrefix(ToArgb(new Color32(204, 255, 102, 255)))
+                          + ipAddress;
+                }
+                else
+                {
+                    str = GetColorPrefix(ToArgb(new Color32(204, 255, 102, 255)))
+                          + Parser.getIPFromUInt32(addr);
+
+                    if (connection.TryGetPort(out ushort port))
+                    {
+                        str += GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor) + ":" +
+                               GetColorPrefix(ToArgb(new Color32(170, 255, 0, 255))) +
+                               port.ToString(CultureInfo.InvariantCulture);
+                    }
+                }
 
                 return str + ANSIForegroundReset;
             }

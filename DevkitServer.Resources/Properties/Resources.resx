@@ -332,5 +332,11 @@
   <data name="server_config_schema" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Schemas\server_config_schema.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="chart_colors_schema" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Schemas\chart_colors_schema.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="chart_colors" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Defaults\chart_colors.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <!-- ReSharper restore ResxNotResolved -->
 </root>

@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using Unturned.SystemEx;
 
 namespace DevkitServer.Multiplayer.Networking;
 public class HighSpeedConnection : ITransportConnection
@@ -277,5 +278,28 @@ public class HighSpeedConnection : ITransportConnection
     void IClientTransport.Initialize(ClientTransportReady callback, ClientTransportFailure failureCallback) => throw new NotImplementedException();
     bool IClientTransport.Receive(byte[] buffer, out long size) => throw new NotImplementedException();
     void IClientTransport.TearDown() => CloseConnection();
+    public bool TryGetIPv4Address(out IPv4Address address)
+    {
+        if (Client.Client.RemoteEndPoint is IPEndPoint endPoint)
+        {
+            address = DevkitServerUtility.PackToIPv4(endPoint.Address);
+            return true;
+        }
+
+        address = default;
+        return false;
+    }
+    public bool TryGetConnectionPort(out ushort connectionPort)
+    {
+        if (Client.Client.RemoteEndPoint is IPEndPoint endPoint)
+        {
+            connectionPort = (ushort)endPoint.Port;
+            return true;
+        }
+
+        connectionPort = default;
+        return false;
+    }
+    public bool TryGetQueryPort(out ushort queryPort) => TryGetConnectionPort(out queryPort);
 #endif
 }

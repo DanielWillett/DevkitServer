@@ -144,6 +144,15 @@ public static class HighSpeedNetFactory
         failedConfigCheck = true;
         if (DevkitServerConfig.Config.TcpSettings is not { EnableHighSpeedSupport: true })
             return NetTask.Completed;
+        
+        if (Provider.configData.Server.Use_FakeIP)
+        {
+            Logger.LogWarning($"Can not use a high-speed server with \"{"Use_FakeIP".Colorize(DevkitServerModule.UnturnedColor)}\" enabled in Config.json.", method: "HighSpeedNetFactory");
+            Logger.LogWarning($"Either disable {"FakeIP".Colorize(DevkitServerModule.UnturnedColor)} or disable high speed support in " +
+                              $"Servers/{Provider.serverID}/DevkitServer/server_config.json".Colorize(ConsoleColor.White) + " to hide this warning.", method: "HighSpeedNetFactory");
+            return NetTask.Completed;
+        }
+
         failedConfigCheck = false;
 
         return OpenHighSpeedClient.RequestAck(connection, DevkitServerConfig.Config.TcpSettings.HighSpeedPort);
@@ -249,7 +258,7 @@ public static class HighSpeedNetFactory
 
     private static void BeginGetConnectionToServer(ushort port)
     {
-        IPAddress ip = new IPAddress(DevkitServerUtility.ReverseUInt32(Provider.currentServerInfo.ip));
+        IPAddress ip = new IPAddress(DevkitServerUtility.ReverseUInt32(Provider.CurrentServerAdvertisement.ip));
         Logger.LogInfo("Connecting to server at " + ip.Format() + ":" + port.Format() + ".");
         TcpClient client = new TcpClient
         {

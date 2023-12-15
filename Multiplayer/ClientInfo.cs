@@ -143,7 +143,7 @@ public sealed class ClientInfo
         info.ServerRemovesCosmeticImprovements = systemConfig.RemoveCosmeticImprovements;
         info.ServerTreatsAdminsAsSuperuser = systemConfig.AdminsAreSuperusers;
         info.ServerMaxClientEditFPS = systemConfig.MaxClientEditFPS;
-        info.ServerHasHighSpeedSupport = systemConfig.TcpSettings.EnableHighSpeedSupport;
+        info.ServerHasHighSpeedSupport = systemConfig.TcpSettings.EnableHighSpeedSupport && !Provider.configData.Server.Use_FakeIP;
     }
 #endif
 }

@@ -461,7 +461,14 @@ internal static class PatchesMain
     {
         if (_shouldContinueToLaunch)
             return true;
-        Provider.provider.matchmakingService.refreshRules(Provider.currentServerInfo.ip, Provider.currentServerInfo.queryPort);
+
+        if (Provider.CurrentServerAdvertisement == null)
+        {
+            Logger.LogWarning("Unable to find Provider.CurrentServerAdvertisement. This could be caused by using a P2P or fake IP connection, if so please create an issue on GitHub.");
+            return true;
+        }
+
+        Provider.provider.matchmakingService.refreshRules(Provider.CurrentServerAdvertisement.ip, Provider.CurrentServerAdvertisement.queryPort);
         Provider.provider.matchmakingService.onRulesQueryRefreshed += RulesReady;
         return false;
     }
@@ -684,7 +691,7 @@ internal static class PatchesMain
     {
         for (int i = PendingConnections.Count - 1; i >= 0; --i)
         {
-            if (!PendingConnections[i].TryGetPort(out _))
+            if (PendingConnections[i].GetAddress() == null)
                 PendingConnections.RemoveAt(i);
         }
     }

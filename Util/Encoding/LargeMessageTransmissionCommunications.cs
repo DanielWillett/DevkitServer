@@ -244,7 +244,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 #if SERVER
         string? ip = Connection.GetAddressString(false);
 #else
-        string? ip = Provider.isConnected ? Parser.getIPFromUInt32(Provider.currentServerInfo.ip) : "127.0.0.1";
+        string? ip = Provider.isConnected ? Provider.CurrentServerConnectParameters.address.ToString() : "127.0.0.1";
 #endif
 
         if (ip != null && ip.Equals("127.0.0.1", StringComparison.Ordinal))

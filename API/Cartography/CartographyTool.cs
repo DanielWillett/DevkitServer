@@ -1,4 +1,6 @@
-﻿namespace DevkitServer.API.Cartography;
+﻿using SDG.Framework.Water;
+
+namespace DevkitServer.API.Cartography;
 
 /// <summary>
 /// Tools for converting between map image coordinates and world coordinates.
@@ -139,6 +141,7 @@ public static class CartographyTool
                 Vector3 size = vol.CalculateLocalBounds().size;
                 IntlMapImageWidth = Mathf.CeilToInt(size.x);
                 IntlMapImageHeight = Mathf.CeilToInt(size.z);
+                size = IntlCaptureBounds.size;
                 IntlCaptureSize = new Vector2(size.x, size.z);
                 IntlDistanceScale = new Vector2(IntlCaptureSize.x / IntlMapImageWidth, IntlCaptureSize.y / IntlMapImageHeight);
             }
@@ -153,7 +156,9 @@ public static class CartographyTool
                 IntlMapImageHeight = s;
                 IntlCaptureSize = new Vector2(w, w);
                 IntlDistanceScale = new Vector2(w / s, w / s);
-                IntlCaptureBounds = new Bounds(Vector3.zero, new Vector3(w, Level.HEIGHT, w));
+                float minHeight = WaterVolumeManager.worldSeaLevel;
+                float maxHeight = Level.TERRAIN;
+                IntlCaptureBounds = new Bounds(new Vector3(0, minHeight + (maxHeight - minHeight) / 2f, 0), new Vector3(w, maxHeight - minHeight, w));
             }
         }
     }

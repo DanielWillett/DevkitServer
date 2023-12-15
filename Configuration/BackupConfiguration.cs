@@ -68,18 +68,18 @@ public sealed class BackupConfiguration : SchemaConfiguration
     static BackupConfiguration() { IntlConfig.ReloadConfig(); }
 
     [JsonPropertyName("backup_behavior")]
-    [System.Text.Json.Serialization.JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public BackupBehavior Behavior { get; set; }
 
     [JsonPropertyName("backup_interval")]
     public TimeSpan? BackupInterval { get; set; }
 
     [JsonPropertyName("backup_schedule")]
-    [System.Text.Json.Serialization.JsonConverter(typeof(ScheduleConverter))]
+    [JsonConverter(typeof(ScheduleConverter))]
     public DateTime[]? BackupSchedule { get; set; }
 
     [JsonPropertyName("backup_schedule_interval")]
-    [System.Text.Json.Serialization.JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public ScheduleInterval BackupScheduleInterval { get; set; }
 
     [JsonPropertyName("backup_schedule_is_utc")]

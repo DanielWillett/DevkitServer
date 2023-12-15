@@ -30,6 +30,7 @@ public static class Logger
     public static event TerminalPreWriteDelegate? OnOutputting;
     public static event TerminalPostWriteDelegate? OnOutputed;
     internal static bool HasLoadingErrors => _loadingErrors is { Count: > 0 };
+    public static bool UseStackCleanerForExceptions { get; set; } //= true;
     public static ITerminal Terminal
     {
         get => _term;
@@ -607,8 +608,6 @@ public static class Logger
     public static void LogError(Exception ex, bool cleanStack = true, [CallerMemberName] string method = "") => WriteExceptionIntl(ex, cleanStack, 0, DateTime.UtcNow, method);
     private static void WriteExceptionIntl(Exception ex, bool cleanStack, int indent, DateTime timestamp, string? method = null)
     {
-        if (method != null)
-            method = FormattingUtil.SpaceProperCaseString(method);
         string ind = indent == 0 ? string.Empty : new string(' ', indent);
         bool inner = indent > 0;
         while (ex != null)
@@ -654,7 +653,7 @@ public static class Logger
             }
             if (ex.StackTrace != null)
             {
-                if (cleanStack)
+                if (cleanStack && UseStackCleanerForExceptions)
                 {
                     string str;
                     try
@@ -669,10 +668,10 @@ public static class Logger
 
                     Terminal.Write(str, ConsoleColor.DarkGray, true, Severity.Error);
                 }
-                /*
-                Terminal.Write(indent != 0
-                    ? string.Join(Environment.NewLine, ex.StackTrace.Split(SplitChars).Select(x => ind + x.Trim(TrimChars)))
-                    : ex.StackTrace, ConsoleColor.DarkGray);*/
+                else
+                {
+                    Terminal.Write(ex.StackTrace, ConsoleColor.DarkGray, true, Severity.Error);
+                }
             }
             if (ex is AggregateException or TargetInvocationException) break;
             ex = ex.InnerException!;

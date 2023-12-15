@@ -3,8 +3,18 @@
 /// <summary>
 /// Stores data for capturing a chart.
 /// </summary>
-public readonly struct ChartCaptureData
+public readonly ref struct CartographyCaptureData
 {
+    /// <summary>
+    /// Level being charted.
+    /// </summary>
+    public readonly LevelInfo Level;
+
+    /// <summary>
+    /// Full path to the output file after rendering.
+    /// </summary>
+    public readonly string OutputPath;
+
     /// <summary>
     /// Map coordinates.
     /// </summary>
@@ -21,11 +31,6 @@ public readonly struct ChartCaptureData
     public readonly Vector3 CaptureCenter;
 
     /// <summary>
-    /// 'Camera' that captures the chart.
-    /// </summary>
-    public readonly Transform CaptureOrigin;
-
-    /// <summary>
     /// Max y value to capture.
     /// </summary>
     public readonly float MaxHeight;
@@ -35,13 +40,20 @@ public readonly struct ChartCaptureData
     /// </summary>
     public readonly float MinHeight;
 
-    internal ChartCaptureData(Vector2Int imageSize, Vector3 captureSize, Vector3 captureCenter, Transform captureOrigin)
+    /// <summary>
+    /// Is this a chart or a satellite render?
+    /// </summary>
+    public readonly bool IsChart;
+
+    internal CartographyCaptureData(LevelInfo level, string outputPath, Vector2Int imageSize, Vector3 captureSize, Vector3 captureCenter, bool isChart)
     {
+        Level = level;
+        OutputPath = outputPath;
         ImageSize = imageSize;
         CaptureSize = captureSize;
         CaptureCenter = captureCenter;
-        CaptureOrigin = captureOrigin;
         MaxHeight = captureCenter.y + captureSize.y / 2f;
         MinHeight = captureCenter.y - captureSize.y / 2f;
+        IsChart = isChart;
     }
 }

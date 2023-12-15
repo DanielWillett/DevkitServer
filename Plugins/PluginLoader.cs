@@ -1,5 +1,7 @@
 ﻿using DevkitServer.API;
 using DevkitServer.API.Abstractions;
+using DevkitServer.API.Cartography.ChartColorProviders;
+using DevkitServer.API.Multiplayer;
 using DevkitServer.API.Permissions;
 using DevkitServer.Compat;
 using DevkitServer.Configuration;
@@ -12,13 +14,12 @@ using HarmonyLib;
 using SDG.Framework.Modules;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using DevkitServer.API.Multiplayer;
 using Unturned.SystemEx;
 using Module = SDG.Framework.Modules.Module;
 using Type = System.Type;
 
-
 #if CLIENT
+using DevkitServer.API.Cartography.Compositors;
 using DevkitServer.API.UI.Extensions;
 #endif
 
@@ -966,7 +967,11 @@ public class PluginAssembly
     private readonly List<NetMethodInfo> _netMethods;
     private readonly List<HierarchyItemTypeIdentifierFactoryInfo> _hierarchyItemFactories;
     private readonly List<ReplicatedLevelDataSourceInfo> _replicatedLevelDataSources;
+    private readonly List<ChartColorProviderInfo> _chartColorProviders;
     private readonly List<ICustomNetMessageListener> _customNetMessageListeners;
+#if CLIENT
+    private readonly List<CartographyCompositorInfo> _cartographyCompositors;
+#endif
     public IReadOnlyList<IDevkitServerPlugin> Plugins { get; }
     public Assembly Assembly { get; }
     public string? File { get; }
@@ -978,7 +983,11 @@ public class PluginAssembly
     public IReadOnlyList<NetMethodInfo> NetMethods { get; }
     public IReadOnlyList<HierarchyItemTypeIdentifierFactoryInfo> HierarchyItemFactories { get; }
     public IReadOnlyList<ReplicatedLevelDataSourceInfo> ReplicatedLevelDataSources { get; }
+    public IReadOnlyList<ChartColorProviderInfo> ChartColorProviders { get; }
     public IReadOnlyList<ICustomNetMessageListener> CustomNetMessageListeners { get; }
+#if CLIENT
+    public IReadOnlyList<CartographyCompositorInfo> CartographyCompositors { get; }
+#endif
     public PluginAssembly(Assembly assembly, string file, bool autoPatch = true)
     {
         _plugins = new List<IDevkitServerPlugin>(0);
@@ -986,14 +995,23 @@ public class PluginAssembly
         _netMethods = new List<NetMethodInfo>(0);
         _hierarchyItemFactories = new List<HierarchyItemTypeIdentifierFactoryInfo>(0);
         _replicatedLevelDataSources = new List<ReplicatedLevelDataSourceInfo>(0);
+        _chartColorProviders = new List<ChartColorProviderInfo>(0);
         _customNetMessageListeners = new List<ICustomNetMessageListener>(0);
-        Assembly = assembly;
+
         Plugins = _plugins.AsReadOnly();
         NetCalls = _netCalls.AsReadOnly();
         NetMethods = _netMethods.AsReadOnly();
         HierarchyItemFactories = _hierarchyItemFactories.AsReadOnly();
         ReplicatedLevelDataSources = _replicatedLevelDataSources.AsReadOnly();
+        ChartColorProviders = _chartColorProviders.AsReadOnly();
         CustomNetMessageListeners = _customNetMessageListeners.AsReadOnly();
+
+#if CLIENT
+        _cartographyCompositors = new List<CartographyCompositorInfo>(0);
+        CartographyCompositors = _cartographyCompositors.AsReadOnly();
+#endif
+
+        Assembly = assembly;
         Patcher = autoPatch ? new Harmony(PatchesMain.HarmonyId + ".assembly." + assembly.GetName().Name.ToLowerInvariant().Replace('_', '.').Replace(' ', '.')) : null;
         File = string.IsNullOrEmpty(file) ? null : file;
     }
@@ -1004,6 +1022,7 @@ public class PluginAssembly
         _netMethods = new List<NetMethodInfo>(0);
         _hierarchyItemFactories = new List<HierarchyItemTypeIdentifierFactoryInfo>(0);
         _replicatedLevelDataSources = new List<ReplicatedLevelDataSourceInfo>(0);
+        _chartColorProviders = new List<ChartColorProviderInfo>(0);
         _customNetMessageListeners = new List<ICustomNetMessageListener>(0);
 
         Plugins = _plugins.AsReadOnly();
@@ -1011,8 +1030,13 @@ public class PluginAssembly
         NetMethods = _netMethods.AsReadOnly();
         HierarchyItemFactories = _hierarchyItemFactories.AsReadOnly();
         ReplicatedLevelDataSources = _replicatedLevelDataSources.AsReadOnly();
+        ChartColorProviders = _chartColorProviders.AsReadOnly();
         CustomNetMessageListeners = _customNetMessageListeners.AsReadOnly();
 
+#if CLIENT
+        _cartographyCompositors = new List<CartographyCompositorInfo>(0);
+        CartographyCompositors = _cartographyCompositors.AsReadOnly();
+#endif
         File = null!;
         Assembly = null!;
         Patcher = null!;
@@ -1084,8 +1108,7 @@ public class PluginAssembly
                 }
             }
 
-            foreach (Type type in types
-                         .Where(typeof(ICustomNetMessageListener).TryIsAssignableFrom))
+            foreach (Type type in types.Where(typeof(ICustomNetMessageListener).TryIsAssignableFrom))
             {
                 if (type.IsAbstract || type.IsInterface)
                     continue;
@@ -1102,6 +1125,68 @@ public class PluginAssembly
                     Logger.LogError(ex, method: src);
                 }
             }
+
+            foreach (Type type in types.Where(typeof(IChartColorProvider).TryIsAssignableFrom))
+            {
+                if (type.IsAbstract || type.IsInterface)
+                    continue;
+
+                IDevkitServerPlugin? plugin = PluginLoader.FindPluginForMember(type);
+                if (plugin == null)
+                {
+                    LogError($"Unable to link {type.Format()} to a plugin. Use the {typeof(PluginIdentifierAttribute).Format()} to link a " +
+                             $"chart color provider to a plugin when multiple plugins are loaded from an assembly.");
+                    continue;
+                }
+
+                ConstructorInfo? ctor = type.GetConstructor(Array.Empty<Type>());
+                if (ctor == null)
+                {
+                    LogError($"Chart color provider {type.Format()} must have a parameterless constructor.");
+                    continue;
+                }
+                
+                _chartColorProviders.Add(new ChartColorProviderInfo(type, plugin, type.GetPriority()));
+            }
+#if CLIENT
+            foreach (Type type in types.Where(typeof(ICartographyCompositor).TryIsAssignableFrom))
+            {
+                if (type.IsAbstract || type.IsInterface)
+                    continue;
+
+                IDevkitServerPlugin? plugin = PluginLoader.FindPluginForMember(type);
+                if (plugin == null)
+                {
+                    LogError($"Unable to link {type.Format()} to a plugin. Use the {typeof(PluginIdentifierAttribute).Format()} to link a " +
+                             $"cartography compositor to a plugin when multiple plugins are loaded from an assembly.");
+                    continue;
+                }
+
+                ConstructorInfo? ctor = type.GetConstructor(Array.Empty<Type>());
+                if (ctor == null)
+                {
+                    LogError($"Cartography compositor {type.Format()} must have a parameterless constructor.");
+                    continue;
+                }
+
+                bool supportsSatellite = true, supportsChart = true;
+
+                try
+                {
+                    ICartographyCompositor compositor = (ICartographyCompositor)Activator.CreateInstance(type, true);
+                    supportsSatellite = compositor.SupportsSatellite;
+                    supportsChart = compositor.SupportsChart;
+                }
+                catch (Exception ex)
+                {
+                    LogError($"Error checking for 'SupportsSatellite' and 'SupportsChart' on cartography compositor {type.Format()}.");
+                    LogError(ex);
+                }
+                
+                _cartographyCompositors.Add(new CartographyCompositorInfo(type, plugin, type.GetPriority(), supportsSatellite, supportsChart));
+            }
+
+#endif
 
             CreateDirectoryAttribute.CreateInAssembly(Assembly);
         }

@@ -86,6 +86,18 @@ public static class VanillaCommandInfo
             dedicatedServerOnly = true;
             startupOnly = true;
         }
+        else if (command.Name.Equals("CommandCopyServerCode", StringComparison.Ordinal))
+        {
+            mode = CommandExecutionMode.RequireMultiplayer;
+            serverOnly = true;
+            terminalOnly = true;
+        }
+        else if (command.Name.Equals("CommandCopyFakeIP", StringComparison.Ordinal))
+        {
+            mode = CommandExecutionMode.RequireMultiplayer;
+            serverOnly = true;
+            terminalOnly = true;
+        }
         else if (command.Name.Equals("CommandCycle", StringComparison.Ordinal))
         {
             mode = CommandExecutionMode.Always;
@@ -177,6 +189,12 @@ public static class VanillaCommandInfo
         {
             mode = CommandExecutionMode.RequireMultiplayer;
             dedicatedServerOnly = true;
+        }
+        else if (command.Name.Equals("CommandLogTransportConnections", StringComparison.Ordinal))
+        {
+            mode = CommandExecutionMode.RequireMultiplayer;
+            serverOnly = true;
+            terminalOnly = true;
         }
         else if (command.Name.Equals("CommandLogMemoryUsage", StringComparison.Ordinal))
         {

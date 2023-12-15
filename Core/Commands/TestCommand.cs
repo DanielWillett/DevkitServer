@@ -1,21 +1,23 @@
 ﻿using Cysharp.Threading.Tasks;
 using DevkitServer.API;
+using DevkitServer.API.Cartography;
 using DevkitServer.API.Commands;
 using DevkitServer.API.Permissions;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Sync;
-using System.Collections.ObjectModel;
-using System.Reflection;
 using DevkitServer.Util.Encoding;
-using DevkitServer.API.Cartography;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Reflection;
+using System.Text.Json;
+using DevkitServer.Core.Cartography.ChartColorProviders;
 
 #if CLIENT
+using DevkitServer.API.UI.Icons;
 using DevkitServer.AssetTools;
 using DevkitServer.Configuration;
-using DevkitServer.Util.Debugging;
-using System.Diagnostics;
-using DevkitServer.API.UI.Icons;
 using DevkitServer.Players;
+using DevkitServer.Util.Debugging;
 using SDG.Framework.Devkit;
 using Unturned.SystemEx;
 #endif
@@ -24,9 +26,7 @@ namespace DevkitServer.Core.Commands;
 internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFile
 {
     public static readonly PermissionLeaf Test = new PermissionLeaf("test", devkitServer: true);
-
     public override CommandExecutionMode Mode => CommandExecutionMode.Always;
-
     public IReadOnlyList<PermissionLeaf> SyncSubcommandPermissions { get; }
     public IReadOnlyList<PermissionLeaf> AsyncSubcommandPermissions { get; }
     Local ILocalizedCommand.Translations { get; set; } = null!;
@@ -149,22 +149,26 @@ internal static class CommandTests
 #endif
         LargeMessageTransmissionCommunications.DumpDebug();
     }
-#if CLIENT
-    private static void missingobjects(CommandContext ctx)
+
+    private static async UniTask chartify(CommandContext ctx, CancellationToken token)
     {
-        List<ObjectAsset> assets = new List<ObjectAsset>(1024);
+        Stopwatch sw = Stopwatch.StartNew();
+        ChartCartography.CaptureChart(outputFile: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Chart.png"));
+        sw.Stop();
+        ctx.ReplyString($"DevkitServer time: {sw.GetElapsedMilliseconds():F2}.");
 
-        Assets.find(assets);
+        if (!ctx.HasArg(0))
+            return;
+        
+        await UniTask.NextFrame(cancellationToken: token);
 
-        assets.RemoveAll(x => x.type == EObjectType.DECAL || ObjectIconPresets.ActivePresets.ContainsKey(x.GUID));
-
-
-        for (int i = 0; i < assets.Count; i++)
-        {
-            ObjectAsset asset = assets[i];
-            Logger.LogInfo($"{i.Format()} {asset.Format()} ({asset.getFilePath().Format()})");
-        }
+        sw.Restart();
+        Level.CaptureChartImage();
+        sw.Stop();
+        ctx.ReplyString($"Vanilla time: {sw.GetElapsedMilliseconds():F2}.");
     }
+
+#if CLIENT
     private static void grab(CommandContext ctx)
     {
         if (ctx.HasArgsExact(0))

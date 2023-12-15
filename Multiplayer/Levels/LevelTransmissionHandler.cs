@@ -18,7 +18,7 @@ internal class LevelTransmissionHandler : BaseLargeMessageTransmissionClientHand
 
     protected internal override void OnStart()
     {
-        _mapName = Provider.currentServerInfo?.map ?? "<unknown_map>";
+        _mapName = Provider.CurrentServerAdvertisement?.map ?? "<unknown_map>";
         LoadingUI.SetIsDownloading(true);
 
         if (IsUsingPackets)

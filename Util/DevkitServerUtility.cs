@@ -3,9 +3,11 @@ using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using System.Diagnostics;
 using System.Globalization;
+using System.Net;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using SDG.Framework.Modules;
+using Unturned.SystemEx;
 #if SERVER
 using DevkitServer.Configuration;
 using DevkitServer.Patches;
@@ -1416,7 +1418,52 @@ public static class DevkitServerUtility
         if (connection is HighSpeedConnection conn)
             return conn.Client.Connected;
 
-        return connection.TryGetPort(out _);
+        return connection.GetAddress() != null;
+    }
+
+    /// <summary>
+    /// Converts a <see cref="IPv4Address"/> to an <see cref="IPAddress"/>.
+    /// </summary>
+    public static IPAddress Unpack(IPv4Address address) => Unpack(address.value);
+
+    /// <summary>
+    /// Converts a <see cref="uint"/> IPv4 to an <see cref="IPAddress"/>.
+    /// </summary>
+    public static IPAddress Unpack(uint address)
+    {
+        uint newAddr = address << 24 | ((address >> 8) & 0xFF) << 16 | ((address >> 16) & 0xFF) << 8 | (address >> 24);
+        return new IPAddress(newAddr);
+    }
+
+    /// <summary>
+    /// Converts a <see cref="IPAddress"/> to an <see cref="IPv4Address"/>.
+    /// </summary>
+    public static IPv4Address PackToIPv4(IPAddress address) => new IPv4Address(Pack(address));
+
+    /// <summary>
+    /// Converts a <see cref="IPAddress"/> to an <see cref="uint"/> IPv4.
+    /// </summary>
+    public static uint Pack(IPAddress address)
+    {
+        byte[] ipv4 = address.MapToIPv4().GetAddressBytes();
+        return ((uint)ipv4[0] << 24) | ((uint)ipv4[1] << 16) | ((uint)ipv4[2] << 8) | ipv4[3];
+    }
+
+    public static string GetServerUniqueFileName(bool includeMap = false, bool clientIncludesCharacter = false)
+    {
+#if CLIENT
+        if (NetFactory.GetPlayerTransportConnection() != null)
+        {
+            string mapCharPart = (includeMap ? "_" + Provider.map : string.Empty) + (clientIncludesCharacter ? "_" + Characters.selected.ToString(CultureInfo.InvariantCulture) : string.Empty);
+
+            if (Provider.CurrentServerConnectParameters.steamId.IsValid())
+                return Provider.CurrentServerConnectParameters.steamId.m_SteamID.ToString("D17", CultureInfo.InvariantCulture) + mapCharPart;
+
+            return Provider.CurrentServerConnectParameters.address + "_" + Provider.CurrentServerConnectParameters.connectionPort.ToString(CultureInfo.InvariantCulture) + mapCharPart;
+        }
+#endif
+
+        return Provider.serverID + (includeMap ? "_" + Provider.map : string.Empty);
     }
 }
 

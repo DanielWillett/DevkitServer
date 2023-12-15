@@ -26,11 +26,21 @@ public static class LandscapeUtil
 
     /// <returns>A readonly value collection used to loop through all the existing tiles.</returns>
     public static IReadOnlyCollection<LandscapeTile> Tiles => GetTiles().Values;
+
+    internal static Dictionary<LandscapeCoord, LandscapeTile> GetTileDictionary() => GetTiles();
+
     /// <summary>
     /// If possible, use <see cref="Tiles"/> instead.
     /// </summary>
     /// <returns>A copy of all existing tiles.</returns>
-    public static List<LandscapeTile> GetAllTiles() => new List<LandscapeTile>(Tiles);
+    public static LandscapeTile[] GetAllTiles()
+    {
+        ICollection<LandscapeTile> tiles = GetTiles().Values;
+        LandscapeTile[] newTiles = new LandscapeTile[Tiles.Count];
+        tiles.CopyTo(newTiles, 0);
+        return newTiles;
+    }
+
     public static bool Encapsulates(this in LandscapeBounds outer, in LandscapeBounds inner) =>
         outer.min.x < inner.min.x && outer.min.y < inner.min.y && outer.max.x > inner.max.x && outer.max.y > inner.max.y;
     public static bool Encapsulates(this in HeightmapBounds outer, in HeightmapBounds inner) =>
