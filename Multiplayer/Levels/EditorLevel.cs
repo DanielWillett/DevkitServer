@@ -43,19 +43,24 @@ public static class EditorLevel
     }
     public static void SendLevel(ITransportConnection connection)
     {
-        ThreadUtil.assertIsGameThread();
-
-        LevelData data = LevelData.GatherLevelData(false);
         PendingToReceiveActions.Add(connection);
-        data.WriteToData(true);
-
-        LargeMessageTransmission transmission = new LargeMessageTransmission(connection, data.Data)
-        {
-            LogSource = "SEND LEVEL",
-            HandlerType = typeof(LevelTransmissionHandler)
-        };
         UniTask.Create(async () =>
         {
+            LevelData data = await LevelData.GatherLevelData(false, true);
+
+            await UniTask.SwitchToMainThread();
+
+            if (!connection.IsConnected())
+                return;
+
+            data.WriteToData(true);
+
+            LargeMessageTransmission transmission = new LargeMessageTransmission(connection, data.Data)
+            {
+                LogSource = "SEND LEVEL",
+                HandlerType = typeof(LevelTransmissionHandler)
+            };
+
             try
             {
                 if (await transmission.Send(DevkitServerModule.UnloadToken))
@@ -70,7 +75,7 @@ public static class EditorLevel
             {
                 if (connection.IsConnected())
                     DevkitServerUtility.CustomDisconnect(connection, DevkitServerModule.LevelLoadingLocalization.Translate("DownloadCancelled"));
-                
+
                 return;
             }
             catch (Exception ex)

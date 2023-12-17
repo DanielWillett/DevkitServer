@@ -1,10 +1,8 @@
-﻿using DevkitServer.API;
-using DevkitServer.Configuration;
+﻿using DevkitServer.Configuration;
 using System.Text.Json.Serialization;
 
 namespace DevkitServer.Core.Cartography.ChartColorProviders;
 
-[LoadPriority(-1)]
 public class JsonChartColorData : SchemaConfiguration
 {
     private static JsonChartColorData? _defaultData;

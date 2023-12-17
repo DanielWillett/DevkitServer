@@ -338,5 +338,11 @@
   <data name="chart_colors" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Defaults\chart_colors.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="cartography_config_schema" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Schemas\cartography_config_schema.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="cartography_config" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Defaults\cartography_config.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <!-- ReSharper restore ResxNotResolved -->
 </root>

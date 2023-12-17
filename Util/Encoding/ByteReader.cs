@@ -400,6 +400,50 @@ public class ByteReader
         return false;
     }
 
+    public bool ReadBlockTo(Span<byte> buffer)
+    {
+        if (_streamMode)
+        {
+            int length;
+            if (_buffer is { Length: > 0 })
+            {
+                if (_buffer.Length - _index >= buffer.Length)
+                {
+                    _buffer.AsSpan(_index).CopyTo(buffer);
+                    _index += buffer.Length;
+                    return true;
+                }
+
+                int offset = _length - _index;
+                _index = _buffer.Length;
+                _buffer.AsSpan(_index).CopyTo(buffer[..offset]);
+                length = Stream!.Read(buffer.Slice(offset, buffer.Length - offset));
+                _position += length;
+                if (length + offset >= buffer.Length)
+                    return true;
+
+                Overflow("Failed to read " + length.ToString(CultureInfo.InvariantCulture) +
+                         " B at offset " + _index.ToString(CultureInfo.InvariantCulture) + " / " + _length.ToString(CultureInfo.InvariantCulture) + ".");
+                return false;
+            }
+
+            length = Stream!.Read(buffer);
+            _position += length;
+            if (length >= buffer.Length)
+                return true;
+
+            Overflow("Failed to read " + length.ToString(CultureInfo.InvariantCulture) +
+                     " B at offset " + _index.ToString(CultureInfo.InvariantCulture) + " / " + _length.ToString(CultureInfo.InvariantCulture) + ".");
+            return false;
+        }
+
+        if (!EnsureMoreLength(buffer.Length))
+            return false;
+        _buffer.AsSpan(_index).CopyTo(buffer);
+        _index += buffer.Length;
+        return true;
+    }
+
     /// <summary>
     /// Reads a byte array of length <paramref name="length"/>, without reading a length.
     /// </summary>

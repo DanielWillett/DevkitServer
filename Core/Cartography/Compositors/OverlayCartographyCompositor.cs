@@ -1,50 +1,56 @@
 ﻿#if CLIENT
+using DevkitServer.API;
 using DevkitServer.API.Cartography;
 using DevkitServer.API.Cartography.Compositors;
+using UnityEngine.Experimental.Rendering;
 
 namespace DevkitServer.Core.Cartography.Compositors;
+
+[LoadPriority(0)]
 internal class OverlayCartographyCompositor : ICartographyCompositor
 {
     public bool SupportsSatellite => true;
     public bool SupportsChart => true;
-    public bool Composite(in CartographyCaptureData data, Lazy<RenderTexture> texture)
+    public bool Composite(in CartographyCaptureData data, Lazy<RenderTexture> texture, bool isExplicitlyDefined)
     {
         List<Texture2D> foundImages = new List<Texture2D>();
 
         string levelPath = data.Level.path;
 
-        bool didAnything = false;
+        if (ApplyOverlays(in data, foundImages, isExplicitlyDefined, texture, Path.Combine(levelPath, "Editor", "Overlays"), true))
+            return true;
+        if (ApplyOverlays(in data, foundImages, isExplicitlyDefined, texture, Path.Combine(levelPath, "Editor", "Overlay"), true))
+            return true;
+        if (ApplyOverlays(in data, foundImages, isExplicitlyDefined, texture, Path.Combine(levelPath, "Overlays"), true))
+            return true;
+        if (ApplyOverlays(in data, foundImages, isExplicitlyDefined, texture, Path.Combine(levelPath, "Overlay"), true))
+            return true;
+        if (ApplyOverlays(in data, foundImages, isExplicitlyDefined, texture, Path.Combine(levelPath, "Editor"), false))
+            return true;
+        if (ApplyOverlays(in data, foundImages, isExplicitlyDefined, texture, Path.Combine(levelPath, "Chart"), false))
+            return true;
+        if (ApplyOverlays(in data, foundImages, isExplicitlyDefined, texture, Path.Combine(levelPath, "Terrain"), false))
+            return true;
+        if (ApplyOverlays(in data, foundImages, isExplicitlyDefined, texture, levelPath, false))
+            return true;
 
-        didAnything |= ApplyOverlays(in data, foundImages, texture, Path.Combine(levelPath, "Editor", "Overlays"), true);
-        if (!didAnything)
-            didAnything |= ApplyOverlays(in data, foundImages, texture, Path.Combine(levelPath, "Editor", "Overlay"), true);
-        if (!didAnything)
-            didAnything |= ApplyOverlays(in data, foundImages, texture, Path.Combine(levelPath, "Overlays"), true);
-        if (!didAnything)
-            didAnything |= ApplyOverlays(in data, foundImages, texture, Path.Combine(levelPath, "Overlay"), true);
-        if (!didAnything)
-            didAnything |= ApplyOverlays(in data, foundImages, texture, Path.Combine(levelPath, "Editor"), false);
-        if (!didAnything)
-            didAnything |= ApplyOverlays(in data, foundImages, texture, Path.Combine(levelPath, "Chart"), false);
-        if (!didAnything)
-            didAnything |= ApplyOverlays(in data, foundImages, texture, Path.Combine(levelPath, "Terrain"), false);
-        if (!didAnything)
-            didAnything |= ApplyOverlays(in data, foundImages, texture, Path.Combine(levelPath), false);
+        return false;
 
-        return didAnything;
-
-        static bool ApplyOverlays(in CartographyCaptureData data, List<Texture2D> foundImages, Lazy<RenderTexture> texture, string dir, bool anyFn)
+        static bool ApplyOverlays(in CartographyCaptureData data, List<Texture2D> foundImages, bool isExplicitlyDefined, Lazy<RenderTexture> texture, string dir, bool anyFn)
         {
             if (!Directory.Exists(dir))
                 return false;
 
             bool didAnything = false;
-            Logger.LogDebug($"Looking for overlays in {dir.Format()}.");
+            if (isExplicitlyDefined)
+                Logger.LogInfo($"[{nameof(OverlayCartographyCompositor)}] Looking for overlays in {dir.Format()}.");
+            else
+                Logger.LogDebug($"[{nameof(OverlayCartographyCompositor)}] Looking for overlays in {dir.Format()}.");
             foreach (string file in Directory.EnumerateFiles(dir, "*", SearchOption.TopDirectoryOnly).OrderByDescending(Path.GetFileName))
             {
                 string fn = Path.GetFileNameWithoutExtension(file);
 
-                if (anyFn || fn.IndexOf("overlay", StringComparison.InvariantCultureIgnoreCase) == -1)
+                if (!anyFn && fn.IndexOf("overlay", StringComparison.InvariantCultureIgnoreCase) == -1)
                     continue;
 
                 string ext = Path.GetExtension(file);
@@ -60,7 +66,7 @@ internal class OverlayCartographyCompositor : ICartographyCompositor
                 if (chart != satellite && chart != data.IsChart)
                     continue;
 
-                Texture2D compositedTexture = new Texture2D(2, 2)
+                Texture2D compositedTexture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
                 {
                     name = fn,
                     hideFlags = HideFlags.HideAndDontSave,
@@ -70,17 +76,25 @@ internal class OverlayCartographyCompositor : ICartographyCompositor
                 foundImages.Add(compositedTexture);
                 try
                 {
-                    compositedTexture.LoadImage(File.ReadAllBytes(file), false);
+                    Logger.LogInfo($"[{nameof(OverlayCartographyCompositor)}] Applying overlay: {file.Format()}.");
 
-                    Graphics.Blit(compositedTexture, texture.Value);
+                    compositedTexture.LoadImage(File.ReadAllBytes(file), false);
+                    _ = texture.Value; // ensure the render texture has been initialized.
+                    GL.PushMatrix();
+                    GL.LoadPixelMatrix(0, data.ImageSize.x, data.ImageSize.y, 0);
+                    Graphics.DrawTexture(new Rect(0f, 0f, data.ImageSize.x, data.ImageSize.y), compositedTexture);
+                    GL.PopMatrix();
                     didAnything = true;
                 }
                 catch (Exception ex)
                 {
                     foundImages.RemoveAt(foundImages.Count - 1);
+                    Logger.LogError($"Failed to read composited overlay at {file.Format()}.", method: nameof(OverlayCartographyCompositor));
+                    Logger.LogError(ex, method: nameof(OverlayCartographyCompositor));
+                }
+                finally
+                {
                     Object.Destroy(compositedTexture);
-                    Logger.LogError($"Failed to read composited overlay at {file.Format()}.");
-                    Logger.LogError(ex);
                 }
             }
 

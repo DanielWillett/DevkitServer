@@ -1,8 +1,10 @@
-﻿using DevkitServer.Configuration;
-using DevkitServer.Multiplayer.Networking;
+﻿using DevkitServer.API.Storage;
+using DevkitServer.Configuration;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO.Compression;
+using Backup = (string Path, System.DateTime UtcTimestamp);
+using CompressionLevel = System.IO.Compression.CompressionLevel;
 using Level = SDG.Unturned.Level;
 
 namespace DevkitServer.Levels;
@@ -24,7 +26,7 @@ public sealed class BackupManager : MonoBehaviour
     private int _lastSize = 52428800;
     private BackupLogs _logs = new BackupLogs();
     internal static bool PlayerHasJoinedSinceLastBackup;
-    private static volatile bool _working;
+    private static readonly SemaphoreSlim BackupLock = new SemaphoreSlim(1, 1);
 
     /// <summary>
     /// Time the last backup was made (relative to <see cref="Time.realtimeSinceStartup"/>).
@@ -231,38 +233,49 @@ public sealed class BackupManager : MonoBehaviour
         ThreadUtil.assertIsGameThread();
 
         Stopwatch timer = Stopwatch.StartNew();
-        if (_working)
-            SpinWait.SpinUntil(() => !_working);
-        _lastSave = CachedTime.RealtimeSinceStartup;
-        Logger.LogInfo($"[{Source}] Backing up {Level.info.name.Format(false)}...");
-        DateTimeOffset timestamp = DateTimeOffset.UtcNow;
-        LevelData save = LevelData.GatherLevelData(true
-#if SERVER
-            , gatherLevelData: false
-#endif
-            );
-        BackupLogs oldLogs = Interlocked.Exchange(ref _logs, new BackupLogs());
-        _working = true;
-        if (Provider.clients.Count == 0)
-            PlayerHasJoinedSinceLastBackup = false;
+        BackupLogs oldLogs;
+        DateTimeOffset timestamp;
+        Task<LevelData> saveTask;
+        BackupLock.Wait();
+        try
+        {
+            _lastSave = CachedTime.RealtimeSinceStartup;
+            Logger.LogInfo($"[{Source}] Backing up {Level.info.name.Format(false)}...");
+            timestamp = DateTimeOffset.UtcNow;
+
+            saveTask = LevelData.GatherLevelData(true, token: DevkitServerModule.UnloadToken);
+
+            oldLogs = Interlocked.Exchange(ref _logs, new BackupLogs());
+            if (Provider.clients.Count == 0)
+                PlayerHasJoinedSinceLastBackup = false;
+        }
+        catch
+        {
+            BackupLock.Release();
+            throw;
+        }
         Task.Run(async () =>
         {
             string path;
             try
             {
                 path = GetBackupPath(timestamp);
-                await ZipAndClear(path, save, maxBackups, maxBackupSizeMegabytes);
+                await ZipAndClear(path, await saveTask.ConfigureAwait(false), maxBackups, maxBackupSizeMegabytes);
+            }
+            catch (OperationCanceledException)
+            {
+                path = null!;
+                Logger.LogError($"Cancelled backing up level {Level.info.name.Colorize(DevkitServerModule.UnturnedColor)}.", method: Source);
             }
             catch (Exception ex)
             {
                 path = null!;
-                Console.WriteLine(ex);
                 Logger.LogError($"Error backing up level {Level.info.name.Colorize(DevkitServerModule.UnturnedColor)}.", method: Source);
                 Logger.LogError(ex, method: Source);
             }
             finally
             {
-                _working = false;
+                BackupLock.Release();
             }
             if (saveLogs)
             {
@@ -280,40 +293,33 @@ public sealed class BackupManager : MonoBehaviour
         using MemoryStream stream = new MemoryStream(_lastSize);
         using (ZipArchive archive = new ZipArchive(stream, ZipArchiveMode.Create, true))
         {
-            Folder folder = save.LevelFolderContent;
-            for (int i = 0; i < folder.Folders.Length; ++i)
+            VirtualDirectoryRoot folder = save.LevelFolderContent;
+            foreach (string dir in folder.Directories)
             {
-                string dir = folder.Folders[i];
                 if (string.IsNullOrEmpty(dir))
                     continue;
-                if (dir[dir.Length - 1] != Path.DirectorySeparatorChar)
-                    dir += Path.DirectorySeparatorChar;
-                archive.CreateEntry(dir, System.IO.Compression.CompressionLevel.Optimal);
+                archive.CreateEntry(dir[^1] != Path.DirectorySeparatorChar ? dir + Path.DirectorySeparatorChar : dir, CompressionLevel.Optimal);
             }
 
-            for (int i = 0; i < folder.Files.Length; ++i)
+            foreach (VirtualFile file in folder.Files)
             {
-                Folder.File file = folder.Files[i];
-                ZipArchiveEntry entry = archive.CreateEntry(file.Path, System.IO.Compression.CompressionLevel.Optimal);
-                using Stream entryStream = entry.Open();
-                await entryStream.WriteAsync(file.Content, 0, file.Content.Length).ConfigureAwait(false);
-                await entryStream.FlushAsync().ConfigureAwait(false);
+                ZipArchiveEntry entry = archive.CreateEntry(file.Path, CompressionLevel.Optimal);
+                await using Stream zipFileEntryStream = entry.Open();
+                await zipFileEntryStream.WriteAsync(file.Content).ConfigureAwait(false);
+                await zipFileEntryStream.FlushAsync().ConfigureAwait(false);
             }
         }
 
         long streamLength = stream.Length;
-        _lastSize = streamLength > int.MaxValue ? int.MaxValue : (int)streamLength;
+        _lastSize = (int)Math.Min(1073741824L, streamLength);
 
         Logger.LogDebug($"[{Source}] Zipped {DevkitServerUtility.FormatBytes(streamLength).Format(false)}.");
         ClearBackups(streamLength, maxBackups < 0 ? null : maxBackups,
             maxBackupSizeMegabytes >= 0 ? DevkitServerUtility.ConvertMBToB(maxBackupSizeMegabytes) : null);
 
-        using (FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
-        {
-            stream.Seek(0, SeekOrigin.Begin);
-            await stream.CopyToAsync(fs).ConfigureAwait(false);
-            await fs.FlushAsync().ConfigureAwait(false);
-        }
+        await using FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+        stream.Seek(0, SeekOrigin.Begin);
+        await stream.CopyToAsync(fs).ConfigureAwait(false);
     }
     private static void ClearBackups(long extraSize, int? maxBackups, long? maxBackupSize)
     {
@@ -353,7 +359,7 @@ public sealed class BackupManager : MonoBehaviour
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error trying to calculate backup folder size.", method: Source);
+                Logger.LogError("Error trying to calculate backup count.", method: Source);
                 Logger.LogError(ex, method: Source);
             }
         }
@@ -365,14 +371,15 @@ public sealed class BackupManager : MonoBehaviour
         for (int i = 0; i < files.Length; i++)
         {
             string file = files[i];
-            if (TryParseBackupName(Path.GetFileName(file), out _, out string lvl) && lvl.Equals(levelName, StringComparison.Ordinal))
-            {
-                FileInfo fileInfo = new FileInfo(file);
-                if (fileInfo.Exists)
-                    ttl += fileInfo.Length;
-                else
-                    ttl += DevkitServerUtility.GetDirectorySize(file);
-            }
+
+            if (!TryParseBackupName(Path.GetFileName(file), out _, out string lvl) || !lvl.Equals(levelName, StringComparison.Ordinal))
+                continue;
+
+            FileInfo fileInfo = new FileInfo(file);
+            if (fileInfo.Exists)
+                ttl += fileInfo.Length;
+            else
+                ttl += DevkitServerUtility.GetDirectorySize(file);
         }
 
         return ttl;
@@ -394,32 +401,33 @@ public sealed class BackupManager : MonoBehaviour
     /// <summary>
     /// Get an array of all backups sorted by date (newest to oldest).
     /// </summary>
-    public static (string Path, DateTime UtcTimestamp)[] GetOrderedBackups(string levelName)
+    public static Backup[] GetOrderedBackups(string levelName)
     {
         string[] entries = Directory.GetFiles(BackupConfiguration.BackupPath, "*.zip", SearchOption.TopDirectoryOnly);
-        (string Path, DateTime UtcTimestamp)[] backups = new (string, DateTime)[entries.Length];
+        Backup[] backups = new Backup[entries.Length];
         int index = -1;
         for (int i = 0; i < entries.Length; ++i)
         {
             string entry = entries[i];
-            if (TryParseBackupName(Path.GetFileName(entry), out DateTime utcTimestamp, out string lvl) && lvl.Equals(levelName, StringComparison.Ordinal))
-            {
-                bool added = false;
-                for (int j = 0; j <= index; ++j)
-                {
-                    if (backups[j].UtcTimestamp >= utcTimestamp)
-                        continue;
-                    ++index;
-                    for (int k = index; k > j; --k)
-                        backups[k] = backups[k - 1];
-                    backups[j] = (entry, utcTimestamp);
-                    added = true;
-                    break;
-                }
 
-                if (!added)
-                    backups[++index] = (entry, utcTimestamp);
+            if (!TryParseBackupName(Path.GetFileName(entry), out DateTime utcTimestamp, out string lvl) || !lvl.Equals(levelName, StringComparison.Ordinal))
+                continue;
+
+            bool added = false;
+            for (int j = 0; j <= index; ++j)
+            {
+                if (backups[j].UtcTimestamp >= utcTimestamp)
+                    continue;
+                ++index;
+                for (int k = index; k > j; --k)
+                    backups[k] = backups[k - 1];
+                backups[j] = (entry, utcTimestamp);
+                added = true;
+                break;
             }
+
+            if (!added)
+                backups[++index] = (entry, utcTimestamp);
         }
         if (backups.Length - 1 != index)
             Array.Resize(ref backups, index + 1);
@@ -434,24 +442,21 @@ public sealed class BackupManager : MonoBehaviour
         for (int i = 0; i < entries.Length; ++i)
         {
             string entry = entries[i];
-            if (TryParseBackupName(Path.GetFileName(entry), out DateTime dt, out string lvl) && lvl.Equals(levelName, StringComparison.Ordinal))
+            if (!TryParseBackupName(Path.GetFileName(entry), out DateTime dt, out string lvl) ||
+                !lvl.Equals(levelName, StringComparison.Ordinal)) continue;
+            if (latest)
             {
-                if (latest)
-                {
-                    if (utcTimestamp < dt)
-                    {
-                        utcTimestamp = dt;
-                        path = entry;
-                    }
-                }
-                else
-                {
-                    if (utcTimestamp > dt)
-                    {
-                        utcTimestamp = dt;
-                        path = entry;
-                    }
-                }
+                if (utcTimestamp >= dt)
+                    continue;
+                utcTimestamp = dt;
+                path = entry;
+            }
+            else
+            {
+                if (utcTimestamp <= dt)
+                    continue;
+                utcTimestamp = dt;
+                path = entry;
             }
         }
         return path != null;
@@ -477,7 +482,7 @@ public sealed class BackupManager : MonoBehaviour
     {
         if (ct <= 0)
             return 0;
-        (string Path, DateTime UtcTimestamp)[] backups = GetOrderedBackups(levelName);
+        Backup[] backups = GetOrderedBackups(levelName);
         
         int ctDeleted = 0;
         for (int i = 0; i < ct; ++i)

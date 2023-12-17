@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
+using DevkitServer.Levels;
 using Version = System.Version;
 
 #if CLIENT
@@ -143,12 +144,8 @@ internal static class PatchesMain
         // Level.save
         try
         {
-            MethodInfo? method = Accessor.GetMethod(Level.save);
-            if (method != null)
-                Patcher.Patch(method, prefix: Accessor.GetHarmonyMethod(OnLevelSaving));
-            else
-                Logger.LogWarning($"Method not found to patch map saving: {FormattingUtil.FormatMethod(typeof(void), typeof(Level), nameof(Level.save),
-                    arguments: Type.EmptyTypes, isStatic: true)}.", method: Source);
+            MethodInfo method = Accessor.GetMethod(Level.save)!;
+            Patcher.Patch(method, prefix: Accessor.GetHarmonyMethod(OnLevelSaving), finalizer: Accessor.GetHarmonyMethod(OnLevelSavedFinalizer));
         }
         catch (Exception ex)
         {
@@ -282,9 +279,20 @@ internal static class PatchesMain
             return false;
         }
 #endif
+
+        ThreadUtil.assertIsGameThread();
+
+        if (LevelData.ShouldActivateSaveLockOnLevelSave)
+            LevelData.SaveLock.Wait();
+
         Logger.LogInfo("Saving editor data.");
         LandscapeUtil.DeleteUnusedTileData();
         return true;
+    }
+    private static void OnLevelSavedFinalizer()
+    {
+        if (LevelData.ShouldActivateSaveLockOnLevelSave)
+            LevelData.SaveLock.Release();
     }
 #if CLIENT
     private static bool OnClickedCancelLoadingPrefix(ISleekButton button)

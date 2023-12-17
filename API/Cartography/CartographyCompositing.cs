@@ -3,26 +3,64 @@ using DevkitServer.API.Cartography.Compositors;
 using DevkitServer.Core.Cartography.Compositors;
 using DevkitServer.Plugins;
 using System.Diagnostics;
+using Cysharp.Threading.Tasks;
+using DevkitServer.Core.Cartography;
+using UnityEngine.Rendering;
 
 namespace DevkitServer.API.Cartography;
 internal static class CartographyCompositing
 {
-    private static readonly CartographyCompositorInfo[] DefaultChartColorProviders =
+    private static readonly CartographyCompositorInfo[] DefaultCompositors =
     [
         new CartographyCompositorInfo(typeof(OverlayCartographyCompositor), null!, 0, true, true)
     ];
 
-    internal static bool CompositeForeground(Texture2D texture, in CartographyCaptureData data)
+    internal static bool CompositeForeground(Texture2D texture, LevelCartographyConfigData? config, in CartographyCaptureData data)
     {
         List<CartographyCompositorInfo> types = new List<CartographyCompositorInfo>(4);
 
-        // plugin compositors
-        types.AddRange(PluginLoader.Assemblies.SelectMany(x => x.CartographyCompositors));
+        bool isExplicit;
 
-        // 'vanilla' compositors
-        types.AddRange(DefaultChartColorProviders);
+        if (config?.ActiveCompositors == null)
+        {
+            isExplicit = false;
+            // plugin compositors
+            types.AddRange(PluginLoader.Assemblies.SelectMany(x => x.CartographyCompositors));
 
-        types.Sort((a, b) => b.Priority.CompareTo(a.Priority));
+            // 'vanilla' compositors
+            types.AddRange(DefaultCompositors);
+
+            types.Sort((a, b) => a.Priority.CompareTo(b.Priority));
+        }
+        else
+        {
+            isExplicit = true;
+            for (int i = 0; i < config.ActiveCompositors.Length; i++)
+            {
+                string compositorName = config.ActiveCompositors[i];
+
+                // vanilla
+                CartographyCompositorInfo info = DefaultCompositors
+                    .FirstOrDefault(x => x.Type.Name.Equals(compositorName, StringComparison.InvariantCultureIgnoreCase));
+
+                // all plugins
+                if (info.Type == null)
+                {
+                    info = PluginLoader.Assemblies
+                        .SelectMany(x => x.CartographyCompositors)
+                        .OrderByDescending(x => x.Priority)
+                        .FirstOrDefault(x => x.Type.Name.Equals(compositorName, StringComparison.InvariantCultureIgnoreCase));
+                }
+
+                if (info.Type == null || !typeof(ICartographyCompositor).IsAssignableFrom(info.Type) || info.Type.IsAbstract || info.Type.IsInterface)
+                {
+                    Logger.LogWarning($"Unknown chart provider: {compositorName.Format()}, skipping this compositor. Make sure your compositor implements {typeof(ICartographyCompositor).Format()}.");
+                    continue;
+                }
+
+                types.Add(info);
+            }
+        }
 
         RenderTexture? active = null;
 
@@ -30,7 +68,12 @@ internal static class CartographyCompositing
         {
             texture.Apply(false);
 
-            RenderTexture rt = RenderTexture.GetTemporary(texture.width, texture.height, 0, texture.graphicsFormat, 1);
+            RenderTexture rt = RenderTexture.GetTemporary(new RenderTextureDescriptor(texture.width, texture.height, RenderTextureFormat.ARGB32, 0, 1)
+            {
+                useMipMap = false,
+                autoGenerateMips = false,
+                dimension = TextureDimension.Tex2D
+            });
 
             active = RenderTexture.active;
             RenderTexture.active = rt;
@@ -76,7 +119,7 @@ internal static class CartographyCompositing
 
                 sw.Restart();
 
-                bool compositorDidAnything = compositor.Composite(in data, renderTexture);
+                bool compositorDidAnything = compositor.Composite(in data, renderTexture, isExplicit);
 
                 sw.Stop();
 
@@ -113,8 +156,8 @@ internal static class CartographyCompositing
 
         if (renderTexture.IsValueCreated)
         {
-            RenderTexture.active = active;
             texture.ReadPixels(new Rect(0, 0, data.ImageSize.x, data.ImageSize.y), 0, 0, false);
+            RenderTexture.active = active;
             RenderTexture.ReleaseTemporary(renderTexture.Value);
             Logger.LogDebug("Released compositing render texture.");
         }

@@ -1,13 +1,15 @@
-﻿using DevkitServer.Configuration;
-using DevkitServer.Util.Encoding;
-using System.Text.Json;
-using SDG.Framework.Water;
-using DevkitServer.API.Cartography.ChartColorProviders;
+﻿using DevkitServer.API;
 using DevkitServer.API.Cartography;
+using DevkitServer.API.Cartography.ChartColorProviders;
+using DevkitServer.Configuration;
+using DevkitServer.Util.Encoding;
 using SDG.Framework.Landscapes;
+using System.Text.Json;
 
 namespace DevkitServer.Core.Cartography.ChartColorProviders;
-public class JsonChartColorProvider : SimpleChartColorProvider
+
+[LoadPriority(-1)]
+public class JsonChartColorProvider : RaycastChartColorProvider
 {
     public JsonChartColorData Data { get; protected set; } = null!;
 
@@ -22,7 +24,7 @@ public class JsonChartColorProvider : SimpleChartColorProvider
     protected Color32 WaterColor;
     protected Color32 FallbackColor;
 
-    public override bool TryInitialize(in CartographyCaptureData data)
+    public override bool TryInitialize(in CartographyCaptureData data, bool isExplicitlyDefined)
     {
         string path = Path.Combine(data.Level.path, "Editor", "chart_colors.json");
         if (!File.Exists(path))
@@ -36,7 +38,10 @@ public class JsonChartColorProvider : SimpleChartColorProvider
                     path = Path.Combine(data.Level.path, "Charts.json");
                     if (!File.Exists(path))
                     {
-                        Logger.LogDebug($"[{nameof(JsonChartColorProvider)}] Skipping because there is no chart data at {path.Format()}.");
+                        if (isExplicitlyDefined)
+                            Logger.LogInfo($"[{nameof(JsonChartColorProvider)}] Skipping because there is no chart data at {path.Format()}.");
+                        else
+                            Logger.LogDebug($"[{nameof(JsonChartColorProvider)}] Skipping because there is no chart data at {path.Format()}.");
                         return false;
                     }
                 }
@@ -122,7 +127,7 @@ public class JsonChartColorProvider : SimpleChartColorProvider
         MediumColor = Data.MediumColor.GetValueOrDefault(JsonChartColorData.Defaults.MediumColor!.Value) with { a = 255 };
         FallbackColor = Data.FallbackColor.GetValueOrDefault(JsonChartColorData.Defaults.FallbackColor!.Value) with { a = 255 };
 
-        return base.TryInitialize(in data);
+        return base.TryInitialize(in data, isExplicitlyDefined);
 
     }
     public override Color32 GetColor(in CartographyCaptureData data, EObjectChart chartType, Transform? transform, int layer, ref RaycastHit hit)
@@ -133,7 +138,7 @@ public class JsonChartColorProvider : SimpleChartColorProvider
         if (chartType == EObjectChart.GROUND)
         {
             Vector3 terrainPoint = hit.point;
-            if (layer == LayerMasks.GROUND) // otherwise it hit a Chart GROUND object.
+            if (layer == LayerMasks.GROUND) // otherwise it hit a 'Chart GROUND' object or resource.
                 Landscape.getWorldHeight(terrainPoint, out terrainPoint.y);
 
             if (IsPointUnderwaterFast(terrainPoint))

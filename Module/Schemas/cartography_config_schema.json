@@ -1,0 +1,20 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/DanielWillett/DevkitServer/tree/master/Module/Schemas/chart_colors_schema.json",
+  "title": "Cartography Config",
+  "description": "Defines overrides for color providers and compositors to use with cartography rendering.",
+  "type": "object",
+  "properties": {
+    "override_chart_color_provider": {
+      "description": "Override the chart color provider to use. Value should be a C# type name like 'BundledStripChartColorProvider' or 'JsonChartColorProvider'.",
+      "type": [ "string", "null" ]
+    },
+    "override_active_compositors": {
+      "description": "Provides an ordered list of compositors to apply. The fist elements will be applied on top of lower ones (they are applied in reverse). Values should be a C# type name like 'OverlayCartographyCompositor'.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

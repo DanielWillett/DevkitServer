@@ -1,5 +1,7 @@
 ﻿using DevkitServer.API.Multiplayer;
 #if CLIENT
+using Cysharp.Threading.Tasks;
+using DevkitServer.API.Storage;
 using DevkitServer.API.UI;
 using DevkitServer.Levels;
 using DevkitServer.Multiplayer.Networking;
@@ -45,12 +47,20 @@ internal class LevelTransmissionHandler : BaseLargeMessageTransmissionClientHand
         Logger.LogDebug("[RECEIVE LEVEL] Reading level folder.");
         LevelData serverPendingLevelData = LevelData.Read(Transmission.Content);
         EditorLevel.ServerPendingLevelData = serverPendingLevelData;
-        Folder folder = serverPendingLevelData.LevelFolderContent;
+        VirtualDirectoryRoot folder = serverPendingLevelData.LevelFolderContent;
         Logger.LogDebug("[RECEIVE LEVEL] Writing level folder.");
-        folder.WriteContentsToDisk(dir, true);
-        LoadingUI.NotifyDownloadProgress(1f);
-        Logger.LogInfo($"[RECEIVE LEVEL] Finished receiving level data ({DevkitServerUtility.FormatBytes(TotalBytes)}) for level {_mapName}.", ConsoleColor.DarkCyan);
-        EditorLevel.OnLevelReady(Path.Combine(dir, _mapName));
+        LoadingUI.NotifyDownloadProgress(0.95f);
+        UniTask.Create(async () =>
+        {
+            await folder.SaveAsync(dir, true);
+
+            await UniTask.SwitchToMainThread();
+
+            LoadingUI.NotifyDownloadProgress(1f);
+            Logger.LogInfo($"[RECEIVE LEVEL] Finished receiving level data ({DevkitServerUtility.FormatBytes(TotalBytes)}) for level {_mapName}.", ConsoleColor.DarkCyan);
+            
+            EditorLevel.OnLevelReady(Path.Combine(dir, _mapName));
+        });
     }
 
     public override bool IsDirty

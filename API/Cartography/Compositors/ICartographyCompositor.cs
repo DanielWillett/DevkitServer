@@ -20,7 +20,8 @@ public interface ICartographyCompositor
     /// <summary>
     /// Apply any compositing to a <see cref="RenderTexture"/>. The render texture is not created until it's first used.
     /// </summary>
+    /// <param name="isExplicitlyDefined">If this compositor was explicitly requested by config.</param>
     /// <returns><see langword="true"/> if any changes were made, otherwise <see langword="false"/>.</returns>
-    bool Composite(in CartographyCaptureData data, Lazy<RenderTexture> texture);
+    bool Composite(in CartographyCaptureData data, Lazy<RenderTexture> texture, bool isExplicitlyDefined);
 }
 #endif

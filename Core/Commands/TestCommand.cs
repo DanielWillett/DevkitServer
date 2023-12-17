@@ -9,11 +9,7 @@ using DevkitServer.Util.Encoding;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Reflection;
-using System.Text.Json;
-using DevkitServer.Core.Cartography.ChartColorProviders;
-
 #if CLIENT
-using DevkitServer.API.UI.Icons;
 using DevkitServer.AssetTools;
 using DevkitServer.Configuration;
 using DevkitServer.Players;
@@ -153,13 +149,14 @@ internal static class CommandTests
     private static async UniTask chartify(CommandContext ctx, CancellationToken token)
     {
         Stopwatch sw = Stopwatch.StartNew();
-        ChartCartography.CaptureChart(outputFile: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Chart.png"));
+        await ChartCartography.CaptureChart(outputFile: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Chart.png"), token: token);
         sw.Stop();
         ctx.ReplyString($"DevkitServer time: {sw.GetElapsedMilliseconds():F2}.");
 
         if (!ctx.HasArg(0))
             return;
         
+        await UniTask.NextFrame(cancellationToken: token);
         await UniTask.NextFrame(cancellationToken: token);
 
         sw.Restart();
@@ -207,31 +204,30 @@ internal static class CommandTests
         if (ctx.HasArgsExact(1) && ctx.TryGet(0, out string resourcePath))
         {
             string actualPath = Path.Combine(DevkitServerConfig.Directory, "AssetExports", "Unity Resources", resourcePath);
-            if (Grabber.DownloadResource<Object>(resourcePath, actualPath))
-            {
-                ctx.ReplyString("Saved to <#fff>" + actualPath + "</color>.");
-                if (!Directory.Exists(actualPath))
-                    actualPath = Path.GetDirectoryName(actualPath)!;
-                Process.Start(actualPath);
-            }
-            else ctx.ReplyString("<#ffae3d>Couldn't save.");
+            if (!Grabber.DownloadResource<Object>(resourcePath, actualPath))
+                throw ctx.ReplyString("<#ffae3d>Couldn't save.");
+            
+            ctx.ReplyString("Saved to <#fff>" + actualPath + "</color>.");
+            if (!Directory.Exists(actualPath))
+                actualPath = Path.GetDirectoryName(actualPath)!;
+            Process.Start(actualPath);
         }
         else if (ctx.HasArgsExact(2) && ctx.TryGet(0, out string bundlePath) && ctx.TryGet(1, out resourcePath))
         {
-            if (bundlePath.EndsWith(".unity3d", StringComparison.OrdinalIgnoreCase))
+            if (!bundlePath.EndsWith(".unity3d", StringComparison.OrdinalIgnoreCase))
+                throw ctx.ReplyString("<#ffae3d>Expected a .unity3d bundle.");
+
+            Bundle bundle = new Bundle(bundlePath, false, Path.GetFileNameWithoutExtension(bundlePath) + " (Temporary)");
+
+            string actualPath = Path.Combine(DevkitServerConfig.Directory, "AssetExports", Path.GetFileName(bundlePath), resourcePath);
+            if (Grabber.DownloadFromBundle<Object>(bundle, resourcePath, actualPath))
             {
-                Bundle bundle = new Bundle(bundlePath, true, "Temp bundle");
-
-                string actualPath = Path.Combine(DevkitServerConfig.Directory, "AssetExports", Path.GetFileName(bundlePath), resourcePath);
-                if (Grabber.DownloadFromBundle<Object>(bundle, resourcePath, actualPath))
-                {
-                    Process.Start(Path.GetDirectoryName(actualPath)!);
-                    ctx.ReplyString("Saved to <#fff>" + actualPath + "</color>.");
-                }
-                else ctx.ReplyString("<#ffae3d>Couldn't save.");
-
-                bundle.unload();
+                Process.Start(Path.GetDirectoryName(actualPath)!);
+                ctx.ReplyString("Saved to <#fff>" + actualPath + "</color>.");
             }
+            else ctx.ReplyString("<#ffae3d>Couldn't save.");
+
+            bundle.unload();
         }
         else ctx.SendCorrectUsage("/test grab <resource>");
     }

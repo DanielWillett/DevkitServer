@@ -1,29 +1,23 @@
 ﻿using DevkitServer.Core.Cartography.ChartColorProviders;
-using SDG.Framework.Landscapes;
 using SDG.Framework.Water;
 
 namespace DevkitServer.API.Cartography.ChartColorProviders;
 
 /// <summary>
-/// Chart color provider that uses raycasting like the base game for color picking.
+/// Chart color provider that uses multi-threaded effecient raycasting with Unity's Job System, similar to how vanilla does it but much faster.
 /// </summary>
 /// <remarks>Abstract. Default implementations: <see cref="BundledStripChartColorProvider"/>, <see cref="JsonChartColorProvider"/>.</remarks>
-public abstract class SimpleChartColorProvider : IChartColorProvider
+public abstract class RaycastChartColorProvider : ISamplingChartColorProvider
 {
-    private static readonly Vector3 RayDirection = Vector3.down;
-    private Dictionary<LandscapeCoord, LandscapeTile> _allTiles = null!;
     private WaterVolume[] _allWaterVolumes = null!;
     private Vector3[] _waterVolumeCenters = null!;
     private Vector3[] _waterVolumeExtents = null!;
-    private PhysicsScene _defaultPhysicsScene;
 
-    public virtual bool TryInitialize(in CartographyCaptureData data)
+    public virtual bool TryInitialize(in CartographyCaptureData data, bool isExplicitlyDefined)
     {
-        _allTiles = LandscapeUtil.GetTileDictionary();
         _allWaterVolumes = WaterVolumeManager.Get().GetAllVolumes().ToArray();
         _waterVolumeCenters = new Vector3[_allWaterVolumes.Length];
         _waterVolumeExtents = new Vector3[_allWaterVolumes.Length];
-        _defaultPhysicsScene = Physics.defaultPhysicsScene;
 
         for (int i = 0; i < _allWaterVolumes.Length; ++i)
         {
@@ -32,53 +26,23 @@ public abstract class SimpleChartColorProvider : IChartColorProvider
             Bounds bounds = volume.CalculateWorldBounds();
             _waterVolumeCenters[i] = bounds.center;
             _waterVolumeExtents[i] = bounds.extents;
-            Logger.LogDebug($"Water volume {i.Format()} : {bounds.Format("F2")}.");
         }
 
         return true;
     }
+
+    /// <summary>
+    /// Converts chart type and layer data to a raw <see cref="Color32"/>.
+    /// </summary>
     public abstract Color32 GetColor(in CartographyCaptureData data, EObjectChart chartType, Transform? transform, int layer, ref RaycastHit hit);
-    public Color32 SampleChartPosition(in CartographyCaptureData data, Vector2 worldCoordinates)
-    {
-        float x = worldCoordinates.x, y = worldCoordinates.y;
-        Color32 tr = Sample(in data, x + 0.75f, y + 0.75f),
-                br = Sample(in data, x + 0.25f, y + 0.75f),
-                tl = Sample(in data, x + 0.75f, y + 0.25f),
-                bl = Sample(in data, x + 0.25f, y + 0.25f);
+    
+    /// <exception cref="NotImplementedException"/>
+    public Color32 SampleChartPosition(in CartographyCaptureData data, Vector2 worldCoordinates) => throw new NotImplementedException();
 
-        return new Color32(
-            (byte)(tr.r / 4 + br.r / 4 + tl.r / 4 + bl.r / 4),
-            (byte)(tr.g / 4 + br.g / 4 + tl.g / 4 + bl.g / 4),
-            (byte)(tr.b / 4 + br.b / 4 + tl.b / 4 + bl.b / 4),
-            255
-        );
-    }
-    private Color32 Sample(in CartographyCaptureData data, float x, float y)
-    {
-        Vector3 rayOrigin = new Vector3(x, data.CaptureCenter.y + data.CaptureSize.y / 2f, y);
-
-        while (true)
-        {
-            _defaultPhysicsScene.Raycast(rayOrigin, RayDirection, out RaycastHit hit, data.CaptureSize.y, RayMasks.CHART, QueryTriggerInteraction.Ignore);
-
-            Transform? transform = hit.transform;
-
-            if (transform == null)
-                transform = null!;
-
-            int layer = transform is null ? LayerMasks.DEFAULT : transform.gameObject.layer;
-
-            if (layer == LayerMasks.ENVIRONMENT)
-                layer = GetRoadLayer(transform!);
-
-            EObjectChart chartType = GetChartType(ref hit, transform, layer);
-            if (chartType != EObjectChart.IGNORE)
-                return GetColor(in data, chartType, transform, layer, ref hit);
-
-            rayOrigin = new Vector3(x, hit.point.y - 0.01f, y);
-        }
-    }
-
+    /// <summary>
+    /// Gets the chart type based on transform and layer.
+    /// For maximum performance do not use <see cref="RaycastHit.transform"/> or most other properties in <see cref="RaycastHit"/> or <see cref="Transform"/>.
+    /// </summary>
     public virtual EObjectChart GetChartType(ref RaycastHit hit, Transform? transform, int layer)
     {
         if (transform is null || layer == LayerMasks.GROUND)
@@ -86,30 +50,58 @@ public abstract class SimpleChartColorProvider : IChartColorProvider
 
         if (layer == LayerMasks.WATER)
             return EObjectChart.WATER;
-        
+
+        byte x, y;
+        int ct;
         if (layer is LayerMasks.SMALL or LayerMasks.MEDIUM or LayerMasks.LARGE)
         {
-            LevelObject? obj = LevelObjectUtil.FindObject(hit.transform, false);
-            if (obj != null)
-                return obj.asset.chart;
+            if (!Regions.tryGetCoordinate(transform.position, out x, out y))
+                return EObjectChart.NONE;
+
+            List<LevelObject> objects = LevelObjects.objects[x, y];
+            ct = objects.Count;
+            for (int i = 0; i < ct; ++i)
+            {
+                if (ReferenceEquals(objects[i].transform, transform))
+                    return objects[i].asset.chart;
+            }
+
+            transform = transform.root;
+            for (int i = 0; i < ct; ++i)
+            {
+                if (ReferenceEquals(objects[i].transform, transform))
+                    return objects[i].asset.chart;
+            }
+
+            return EObjectChart.NONE;
         }
 
-        if (layer != LayerMasks.RESOURCE || !Regions.tryGetCoordinate(hit.point, out byte x, out byte y))
+        if (layer != LayerMasks.RESOURCE || !Regions.tryGetCoordinate(transform.position, out x, out y))
             return EObjectChart.NONE;
 
         List<ResourceSpawnpoint> spawnpoints = LevelGround.trees[x, y];
-        Transform t = transform.root;
 
-        for (int i = 0; i < spawnpoints.Count; ++i)
+        ct = spawnpoints.Count;
+        for (int i = 0; i < ct; ++i)
         {
-            if (ReferenceEquals(spawnpoints[i].model, t))
+            if (ReferenceEquals(spawnpoints[i].model, transform))
+                return spawnpoints[i].asset.chart;
+        }
+
+        transform = transform.root;
+        for (int i = 0; i < ct; ++i)
+        {
+            if (ReferenceEquals(spawnpoints[i].model, transform))
                 return spawnpoints[i].asset.chart;
         }
 
         return EObjectChart.NONE;
     }
 
-    internal static int GetRoadLayer(Transform transform)
+    /// <summary>
+    /// Gets the new layer of the road at <paramref name="transform"/>.
+    /// </summary>
+    protected internal static int GetRoadLayer(Transform transform)
     {
         RoadMaterial? material = null;
 
@@ -132,6 +124,10 @@ public abstract class SimpleChartColorProvider : IChartColorProvider
 
         return material.isConcrete ? material.width <= 8d ? 1 : 0 : 3;
     }
+
+    /// <summary>
+    /// Faster implementation of <see cref="WaterUtility.isPointUnderwater"/>.
+    /// </summary>
     protected bool IsPointUnderwaterFast(Vector3 point)
     {
         // return WaterUtility.isPointUnderwater(point);

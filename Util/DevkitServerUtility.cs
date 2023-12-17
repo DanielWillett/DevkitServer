@@ -1304,7 +1304,7 @@ public static class DevkitServerUtility
     /// Recursively copy a directory from <paramref name="source"/> to <paramref name="destination"/>.
     /// </summary>
     /// <exception cref="AggregateException">Errors reading or writing files.</exception>
-    public static void CopyDirectory(string source, string destination, bool overwrite = true, Predicate<FileInfo>? shouldInclude = null)
+    public static void CopyDirectory(string source, string destination, bool overwrite = true, bool skipExisting = false, Predicate<FileInfo>? shouldInclude = null)
     {
         DirectoryInfo sourceInfo = new DirectoryInfo(source);
         if (!sourceInfo.Exists)
@@ -1325,6 +1325,8 @@ public static class DevkitServerUtility
                         if (shouldInclude != null && !shouldInclude(file))
                             continue;
                         string path = Path.Combine(dstInfo.FullName, GetRelativePath(sourceInfo.FullName, file.FullName));
+                        if (!overwrite && skipExisting && File.Exists(path))
+                            continue;
                         string? dir = Path.GetDirectoryName(path);
                         if (dir != null)
                             Directory.CreateDirectory(dir);

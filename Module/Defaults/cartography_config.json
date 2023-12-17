@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/DanielWillett/DevkitServer/master/Module/Schemas/cartography_config_schema.json",
+
+  /*
+   *  Overrides the chart color provider to use when rendering charts.
+   *  These types can be added by plugin types that implement the IChartColorProvider interface.
+   *
+   *  In vanilla you can either use 'BundledStripChartColorProvider' or 'JsonChartColorProvider'.
+   *  By default the first successfully initialized provider is applied in the order of their LoadPriority attributes.
+   */
+  "override_chart_color_provider": "BundledStripChartColorProvider",
+
+  /*
+   *  Provides an override ordered list of compositors to apply after rendering charts.
+   *  These types can be added by plugin types that implement the ICartographyCompositor interface.
+   *
+   *  In vanilla you can only use 'OverlayCartographyCompositor'.
+   *  By default all compositors are applied sorted by their LoadPriority attributes.
+   */
+  "override_active_compositors": [
+    "OverlayCartographyCompositor"
+  ]
+}

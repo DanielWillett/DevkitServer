@@ -243,6 +243,12 @@ public class ByteWriter
             throw new NotSupportedException("Resizing the buffer is not supported in stream mode.");
         ExtendBufferIntl(newsize);
     }
+    public void ExtendBufferFor(int byteCount)
+    {
+        if (_streamMode)
+            throw new NotSupportedException("Resizing the buffer is not supported in stream mode.");
+        ExtendBufferIntl(byteCount + _size);
+    }
     private void ExtendBufferIntl(int newsize)
     {
         if (newsize <= _buffer.Length)
@@ -1240,11 +1246,6 @@ public class ByteWriter
     /// <summary>
     /// Does not write length.
     /// </summary>
-    public void WriteBlock(ArraySegment<byte> n) => WriteBlock(n.Array!, n.Offset, n.Count);
-
-    /// <summary>
-    /// Does not write length.
-    /// </summary>
     public void WriteBlock(byte[] n, int index, int count = -1)
     {
         if (count == -1)
@@ -1263,6 +1264,25 @@ public class ByteWriter
         if (newsize > _buffer.Length)
             ExtendBufferIntl(newsize);
         System.Buffer.BlockCopy(n, index, _buffer, _size, count);
+        _size = newsize;
+    }
+
+    /// <summary>
+    /// Does not write length.
+    /// </summary>
+    public void WriteBlock(ReadOnlySpan<byte> n)
+    {
+        if (_streamMode)
+        {
+            _stream!.Write(n);
+            _size += n.Length;
+            return;
+        }
+        int newsize = _size + n.Length;
+        if (newsize > _buffer.Length)
+            ExtendBufferIntl(newsize);
+
+        n.TryCopyTo(_buffer.AsSpan(_size));
         _size = newsize;
     }
     public unsafe void WriteLong(byte[] n)
