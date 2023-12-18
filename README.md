@@ -122,7 +122,7 @@ Then set `enable_high_speed_support` to `true` in the `server_config.json` file 
 # Compiling
 
 ## Target
-Ensure you have .NET Framework 4.8.1 installed.
+DevkitServer targets .NET Standard 2.1 with a custom redistribution of Lib.Harmony (because the original is not compatible with compiling in .NET Standard 2.1).
 
 ## Strong Naming
 
