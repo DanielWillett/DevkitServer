@@ -47,7 +47,7 @@ public sealed class BackupLogs
     }
     internal void Write(string folderPath)
     {
-        if (!DevkitServerUtility.CheckDirectory(false, folderPath))
+        if (!FileUtil.CheckDirectory(false, folderPath))
         {
             Logger.LogError($"Failed to create logs directory: {folderPath.Format()}.", method: Source);
             return;

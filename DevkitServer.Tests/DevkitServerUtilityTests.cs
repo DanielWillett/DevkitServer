@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.IO;
 
 namespace DevkitServer.Tests;
 /// <summary>Unit tests for <see cref="DevkitServerUtility"/>.</summary>
@@ -161,26 +162,18 @@ public class DevkitServerUtilityTests
     [DataRow(@"C:\AFolder\BFolder\DFolder", @"C:\AFolder\BFolder\CFolder2\..\..\d.exe", false)]
     public void TestCheckParent(string relativeTo, string folder, bool expectedMatch)
     {
-        bool isParent = DevkitServerUtility.IsChildOf(relativeTo, folder);
+        bool isParent = FileUtil.IsChildOf(relativeTo, folder);
 
         Assert.AreEqual(expectedMatch, isParent);
     }
     [TestMethod]
-    [DataRow(@"C:\AFolder\BFolder\CFolder", @"C:\AFolder\BFolder\CFolder\d.exe", @".\d.exe")]
+    [DataRow(@"C:\AFolder\BFolder\CFolder", @"C:\AFolder\BFolder\CFolder\d.exe", "d.exe")]
     [DataRow(@"C:\AFolder\BFolder\CFolder", @"C:\AFolder\BFolder\CFolder\DFolder\d.exe", @"DFolder\d.exe")]
-    [DataRow(@"C:\AFolder\BFolder\CFolder", @"C:\AFolder\BFolder\CFolder\DFolder\..\d.exe", @".\d.exe")]
-    [DataRow(@"", @"C:\AFolder\BFolder\CFolder2\d.exe", @"C:\AFolder\BFolder\CFolder2\d.exe")]
+    [DataRow(@"C:\AFolder\BFolder\CFolder", @"C:\AFolder\BFolder\CFolder\DFolder\..\d.exe", "d.exe")]
     public void TestGetRelativePath(string relativeTo, string folder, string expected)
     {
-        string path = DevkitServerUtility.GetRelativePath(relativeTo, folder);
+        string path = Path.GetRelativePath(relativeTo, folder);
 
         Assert.AreEqual(expected, path);
-    }
-
-    [TestMethod]
-    [DataRow(@"C:\AFolder\BFolder\CFolder", @"C:\AFolder\BFolder\CFolder\DFolder\..\..\d.exe")]
-    public void TestGetRelativePathThrowsException(string relativeTo, string folder)
-    {
-        Assert.ThrowsException<ArgumentException>(() => DevkitServerUtility.GetRelativePath(relativeTo, folder));
     }
 }

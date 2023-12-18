@@ -411,8 +411,8 @@ public class LargeMessageTransmission : IDisposable
             IsCompressed = true;
             FinalContent = new ArraySegment<byte>(compressedContent, 0, length);
             FinalSize = length;
-            Logger.LogInfo($"[{LogSource}] Compresssed data from {DevkitServerUtility.FormatBytes(source.Count).Colorize(FormattingUtil.NumberColor)} " +
-                           $"to {DevkitServerUtility.FormatBytes(FinalContent.Count).Colorize(FormattingUtil.NumberColor)}.");
+            Logger.LogInfo($"[{LogSource}] Compresssed data from {FormattingUtil.FormatCapacity(source.Count, colorize: true)} " +
+                           $"to {FormattingUtil.FormatCapacity(FinalContent.Count, colorize: true)}.");
         }
         else
         {
@@ -446,13 +446,13 @@ public class LargeMessageTransmission : IDisposable
         await UniTask.SwitchToMainThread(PlayerLoopTiming.EarlyUpdate, token);
         if (OriginalSize != count)
         {
-            Logger.LogWarning($"Expected data of length {DevkitServerUtility.FormatBytes(OriginalSize).Colorize(FormattingUtil.NumberColor)} " +
-                              $"but instead got data of length {DevkitServerUtility.FormatBytes(count).Colorize(FormattingUtil.NumberColor)}.", method: LogSource);
+            Logger.LogWarning($"Expected data of length {FormattingUtil.FormatCapacity(OriginalSize, colorize: true)} " +
+                              $"but instead got data of length {FormattingUtil.FormatCapacity(count, colorize: true)}.", method: LogSource);
         }
 
         Content = new ArraySegment<byte>(buffer, 0, count);
 
-        Logger.LogDebug($"[{LogSource}] Decompressed content from {DevkitServerUtility.FormatBytes(source.Count)} to {DevkitServerUtility.FormatBytes(count)}.");
+        Logger.LogDebug($"[{LogSource}] Decompressed content from {FormattingUtil.FormatCapacity(source.Count, colorize: true)} to {FormattingUtil.FormatCapacity(count, colorize: true)}.");
 
         await UniTask.SwitchToMainThread(token);
     }

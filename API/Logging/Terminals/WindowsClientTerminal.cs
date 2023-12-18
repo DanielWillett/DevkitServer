@@ -1,11 +1,10 @@
 ﻿#if CLIENT
+using DevkitServer.Core.Commands.Subsystem;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
-using SDG.Framework.Utilities;
 using System.Text;
 using ThreadPriority = System.Threading.ThreadPriority;
 using ThreadState = System.Threading.ThreadState;
-using DevkitServer.Core.Commands.Subsystem;
 
 namespace DevkitServer.API.Logging.Terminals;
 internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
@@ -134,7 +133,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                             CommandHandler.IsLoggingFromDevkitServer = true;
                             try
                             {
-                                Logs.printLine(FormattingUtil.RemoveANSIFormatting(message));
+                                Logs.printLine(FormattingUtil.RemoveVirtualTerminalSequences(message));
                             }
                             finally
                             {
@@ -167,7 +166,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                             CommandHandler.IsLoggingFromDevkitServer = true;
                             try
                             {
-                                Logs.printLine(FormattingUtil.RemoveANSIFormatting(message));
+                                Logs.printLine(FormattingUtil.RemoveVirtualTerminalSequences(message));
                             }
                             finally
                             {
@@ -253,7 +252,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                         CommandHandler.IsLoggingFromDevkitServer = true;
                         try
                         {
-                            Logs.printLine(FormattingUtil.RemoveANSIFormatting(message));
+                            Logs.printLine(FormattingUtil.RemoveVirtualTerminalSequences(message));
                         }
                         finally
                         {
@@ -352,7 +351,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
     }
     internal readonly struct LogMessage(string message, ConsoleColor color, bool save)
     {
-        public readonly string Message = FormattingUtil.GetANSIString(color, false) + message + FormattingUtil.ANSIForegroundReset;
+        public readonly string Message = FormattingUtil.GetForegroundSequenceString(color, false) + message + FormattingUtil.ForegroundResetSequence;
         public readonly bool Save = save;
 
         public void Write()

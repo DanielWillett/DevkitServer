@@ -29,6 +29,7 @@ public static class Logger
     public static event TerminalPostReadDelegate? OnInputted;
     public static event TerminalPreWriteDelegate? OnOutputting;
     public static event TerminalPostWriteDelegate? OnOutputed;
+    internal const string TimeFormat = "yyyy-MM-dd hh:mm:ss";
     internal static bool HasLoadingErrors => _loadingErrors is { Count: > 0 };
     public static bool UseStackCleanerForExceptions { get; set; } //= true;
     public static ITerminal Terminal
@@ -87,15 +88,13 @@ public static class Logger
             }
         }
     }
-    internal const string TimeFormat = "yyyy-MM-dd hh:mm:ss";
-
     private static ColorConfig GetUnityConfig() => UnityColor32Config.Default;
     private static ColorConfig GetSystemConfig() => Color32Config.Default;
     static Logger()
     {
+        IsExternalFeatureset = DevkitServerModule.Module == null;
         try
         {
-            IsExternalFeatureset = DevkitServerModule.Module == null;
             StackCleanerConfiguration config = new StackCleanerConfiguration
             {
                 ColorFormatting = StackColorFormatType.ExtendedANSIColor,
@@ -120,10 +119,7 @@ public static class Logger
             }
             else
             {
-                List<Type> hiddenTypes = new List<Type>(config.GetHiddenTypes())
-                {
-                    typeof(UniTask)
-                };
+                List<Type> hiddenTypes = [..config.GetHiddenTypes(), typeof(UniTask)];
                 Assembly uniTask = typeof(UniTask).Assembly;
                 Type? type = uniTask.GetType("Cysharp.Threading.Tasks.EnumeratorAsyncExtensions+EnumeratorPromise", false, false);
 
@@ -405,7 +401,7 @@ public static class Logger
     {
         if (Terminal is not { IsComittingToUnturnedLog: false })
             return;
-        line = FormattingUtil.RemoveANSIFormatting(line);
+        line = FormattingUtil.RemoveVirtualTerminalSequences(line);
         string msg2 = line;
         TryRemoveDateFromLine(ref msg2);
         if (msg2.IndexOf("[DEVKITSERVER.LAUNCHER]", StringComparison.Ordinal) != -1)
@@ -495,17 +491,17 @@ public static class Logger
         Terminal.Write("[" + DateTime.UtcNow.ToString(TimeFormat) + "] " +
                        "[" + core.ToUpperInvariant() + "]"
                        + new string(' ', Math.Max(1, 14 - core.Length))
-                       + "[" + type!.ToUpperInvariant() + "]" + new string(' ', Math.Max(1, 6 - type.Length)) + message,
+                       + "[" + type + "]" + new string(' ', Math.Max(1, 6 - type.Length)) + message,
             color.Value, true, severity);
     }
     /// <summary>
-    /// Replaces any ANSI reset strings with the ANSI string for the provided console color.
+    /// Replaces any virtual terminal reset sequences with the ANSI string for the provided console color.
     /// </summary>
     public static void ReplaceResetsWithConsoleColor(ref string message, ConsoleColor color)
     {
         if (color != ConsoleColor.Gray && message.IndexOf(FormattingUtil.ConsoleEscapeCharacter) != -1)
         {
-            message = message.Replace(FormattingUtil.ANSIForegroundReset, FormattingUtil.GetANSIString(color, false)) + FormattingUtil.ANSIForegroundReset;
+            message = message.Replace(FormattingUtil.ForegroundResetSequence, FormattingUtil.GetForegroundSequenceString(color, false)) + FormattingUtil.ForegroundResetSequence;
         }
     }
     [Conditional("DEBUG")]
@@ -591,7 +587,7 @@ public static class Logger
         foreach (Component comp in comps)
         {
             Terminal.Write($" Parent: {comp.transform.gameObject.name}", color, true, Severity.Debug);
-            Terminal.Write($" Type: {comp.GetType().Format()}{FormattingUtil.GetANSIString(color, false)}", color, true, Severity.Debug);
+            Terminal.Write($" Type: {comp.GetType().Format()}{FormattingUtil.GetForegroundSequenceString(color, false)}", color, true, Severity.Debug);
             Terminal.Write(" ========================================", color, true, Severity.Debug);
         }
         int childCt = go.transform.childCount;
@@ -621,8 +617,8 @@ public static class Logger
             Terminal.Write(ind + (
                 inner
                     ? "Inner Exception: "
-                    : "[" + timestamp.ToString(TimeFormat) + "]" + (string.IsNullOrEmpty(method) ? string.Empty : " [" + method!.ToUpperInvariant() + "] ") + "Exception: ")
-                               + ex.GetType().Format() + FormattingUtil.GetANSIString(ConsoleColor.Red, false) + ".", ConsoleColor.Red, true, Severity.Error);
+                    : "[" + timestamp.ToString(TimeFormat) + "]" + (string.IsNullOrEmpty(method) ? string.Empty : " [" + method.ToUpperInvariant() + "] ") + "Exception: ")
+                               + ex.GetType().Format() + FormattingUtil.GetForegroundSequenceString(ConsoleColor.Red, false) + ".", ConsoleColor.Red, true, Severity.Error);
             Terminal.Write(ind + message, ConsoleColor.DarkRed, true, Severity.Error);
             if (!Level.isLoaded)
                 _loadingErrors?.Add((DateTime.UtcNow, Severity.Error, message, ConsoleColor.DarkRed, method ?? string.Empty));
@@ -703,9 +699,9 @@ public static class Logger
         {
             try
             {
-                if (!outputMessage.EndsWith(FormattingUtil.ANSIForegroundReset, StringComparison.Ordinal))
-                    outputMessage += FormattingUtil.ANSIForegroundReset;
-                _ansiLogWriter.WriteLine(FormattingUtil.GetANSIString(color, false) + outputMessage);
+                if (!outputMessage.EndsWith(FormattingUtil.ForegroundResetSequence, StringComparison.Ordinal))
+                    outputMessage += FormattingUtil.ForegroundResetSequence;
+                _ansiLogWriter.WriteLine(FormattingUtil.GetForegroundSequenceString(color, false) + outputMessage);
             }
             catch (Exception ex)
             {
@@ -760,7 +756,7 @@ public static class Logger
             {
                 for (int i = Logs.Count - 1; i >= 0; --i)
                 {
-                    fileWriter.WriteLine(FormattingUtil.RemoveANSIFormatting(Logs[i]));
+                    fileWriter.WriteLine(FormattingUtil.RemoveVirtualTerminalSequences(Logs[i]));
                 }
             }
         }

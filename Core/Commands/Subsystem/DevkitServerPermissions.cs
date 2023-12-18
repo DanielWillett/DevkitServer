@@ -635,7 +635,7 @@ public class DevkitServerPermissions : IUserPermissionHandler, IPermissionHandle
         {
             if (!forceReload && UserManager.FromId(user) is { Permissions: { } perms })
                 return perms;
-            string path = DevkitServerUtility.GetUserSavedataLocation(user, Path.Combine("DevkitServer", "Permissions.dat"));
+            string path = FileUtil.GetUserSavedataLocation(user, Path.Combine("DevkitServer", "Permissions.dat"));
             if (File.Exists(path))
             {
                 using FileStream str = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -680,7 +680,7 @@ public class DevkitServerPermissions : IUserPermissionHandler, IPermissionHandle
         {
             if (!forceReload && UserManager.FromId(user) is { PermissionGroups: { } perms })
                 return perms;
-            string path = DevkitServerUtility.GetUserSavedataLocation(user, Path.Combine("DevkitServer", "PermissionGroups.dat"));
+            string path = FileUtil.GetUserSavedataLocation(user, Path.Combine("DevkitServer", "PermissionGroups.dat"));
             if (File.Exists(path))
             {
                 using FileStream str = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -727,9 +727,9 @@ public class DevkitServerPermissions : IUserPermissionHandler, IPermissionHandle
     {
         lock (_writer)
         {
-            string path = DevkitServerUtility.GetUserSavedataLocation(user, Path.Combine("DevkitServer", "Permissions.dat"));
+            string path = FileUtil.GetUserSavedataLocation(user, Path.Combine("DevkitServer", "Permissions.dat"));
             string? dir = Path.GetDirectoryName(path);
-            if (dir != null && !DevkitServerUtility.CheckDirectory(false, dir))
+            if (dir != null && !FileUtil.CheckDirectory(false, dir))
             {
                 CommonErrors.LogPlayerSavedataAccessError(dir);
                 return;
@@ -749,7 +749,7 @@ public class DevkitServerPermissions : IUserPermissionHandler, IPermissionHandle
     {
         lock (_writer)
         {
-            string path = DevkitServerUtility.GetUserSavedataLocation(user, Path.Combine("DevkitServer", "PermissionGroups.dat"));
+            string path = FileUtil.GetUserSavedataLocation(user, Path.Combine("DevkitServer", "PermissionGroups.dat"));
             string? dir = Path.GetDirectoryName(path);
             if (dir != null)
                 Directory.CreateDirectory(dir);

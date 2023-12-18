@@ -352,7 +352,7 @@ public class DevkitServerSteamNetworkingSocketsTransport
                 m_int32 = TransportPatcher.SendBufferSize
             }
         });
-        Logger.LogInfo($"[{TransportPatcher.Source}] Set transport buffer size to {DevkitServerUtility.FormatBytes(TransportPatcher.SendBufferSize).Colorize(DevkitServerModule.UnturnedColor)}.");
+        Logger.LogInfo($"[{TransportPatcher.Source}] Set transport buffer size to {FormattingUtil.FormatCapacity(TransportPatcher.SendBufferSize, colorize: true)}.");
         return @base;
     }
 }

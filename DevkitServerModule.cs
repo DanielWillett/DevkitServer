@@ -4,8 +4,10 @@
 #define TILE_SYNC
 using Cysharp.Threading.Tasks;
 using DevkitServer.API;
+using DevkitServer.API.Cartography;
 using DevkitServer.Configuration;
 using DevkitServer.Core;
+using DevkitServer.Framework;
 using DevkitServer.Levels;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Actions;
@@ -22,16 +24,14 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security;
-using DevkitServer.API.Cartography;
-using DevkitServer.Framework;
 using UnityEngine.SceneManagement;
 using Module = SDG.Framework.Modules.Module;
 using Version = System.Version;
 #if CLIENT
+using DevkitServer.API.Logging;
 using DevkitServer.API.UI;
 using DevkitServer.API.UI.Icons;
 using DevkitServer.API.UI.Extensions;
-using DevkitServer.API.Logging;
 using DevkitServer.Core.Tools;
 using DevkitServer.Players;
 using SDG.Framework.Utilities;
@@ -82,7 +82,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static MasterBundleConfig? BundleConfig { get; private set; }
     public static Module Module { get; private set; } = null!;
     public static bool IsMainThread => Thread.CurrentThread.IsGameThread();
-    public static CancellationToken UnloadToken => _tknSrc == null ? CancellationToken.None : _tknSrc.Token;
+    public static CancellationToken UnloadToken => _tknSrc?.Token ?? CancellationToken.None;
     public static Local MainLocalization { get; private set; } = null!;
     public static BackupManager? BackupManager { get; private set; }
     public static bool MonoLoaded { get; }
@@ -573,13 +573,13 @@ public sealed class DevkitServerModule : IModuleNexus
 #if CLIENT
     private static void OnChatMessageReceived()
     {
-        if (ChatManager.receivedChatHistory.Count > 0)
-        {
-            ReceivedChatMessage msg = ChatManager.receivedChatHistory[0];
-            Logger.CoreLog("[" + (msg.speaker?.playerID?.characterName ?? "SERVER") + " | " + msg.mode.ToString().ToUpperInvariant() + "] "
-                           + (msg.useRichTextFormatting ? FormattingUtil.ConvertRichTextToANSI(msg.contents) : msg.contents),
-                "UNTURNED", "CHAT", color: ConsoleColor.White, Severity.Info);
-        }
+        if (ChatManager.receivedChatHistory.Count <= 0)
+            return;
+
+        ReceivedChatMessage msg = ChatManager.receivedChatHistory[0];
+        Logger.CoreLog("[" + (msg.speaker?.playerID?.characterName ?? "SERVER") + " | " + msg.mode.ToString().ToUpperInvariant() + "] "
+                       + (msg.useRichTextFormatting ? FormattingUtil.ConvertRichTextToVirtualTerminalSequences(msg.contents) : msg.contents),
+            "UNTURNED", "CHAT", color: ConsoleColor.White, Severity.Info);
     }
     private static void OnLevelExited()
     {
@@ -673,7 +673,7 @@ public sealed class DevkitServerModule : IModuleNexus
         yield return new WaitForSeconds(2);
         if (Logger.HasLoadingErrors)
             Logger.ClearLoadingErrors();
-        Logger.LogDebug($"DevkitServer managed memory usage: {DevkitServerUtility.FormatBytes(GC.GetTotalMemory(true)).Format(false)}");
+        Logger.LogDebug($"DevkitServer managed memory usage: {FormattingUtil.FormatCapacity(GC.GetTotalMemory(true), colorize: true)}");
 
         if (!BitConverter.IsLittleEndian)
         {
@@ -687,15 +687,15 @@ public sealed class DevkitServerModule : IModuleNexus
     private static void LoadSearchLocations()
     {
         string asmDir = Path.GetDirectoryName(AssemblyPath)!;
-        List<string> locs = new List<string>
-        {
-            Path.GetFullPath(asmDir)
-        };
+        List<string> locs = [ Path.GetFullPath(asmDir) ];
+
         string dir = Path.GetFullPath(Path.Combine(asmDir, ".."));
+
         if (!Path.GetFileName(dir).Equals("Modules", StringComparison.OrdinalIgnoreCase))
         {
             locs.Add(dir);
             string dir2 = Path.GetFullPath(Path.Combine(asmDir, "..", ".."));
+
             if (!Path.GetFileName(dir2).Equals("Modules", StringComparison.OrdinalIgnoreCase))
             {
                 locs.Add(dir2);
@@ -929,7 +929,7 @@ public sealed class DevkitServerModule : IModuleNexus
         }
 
 #if SERVER
-        DevkitServerUtility.CheckDirectory(false, false, DevkitServerConfig.LevelDirectory, typeof(DevkitServerConfig).GetProperty(nameof(DevkitServerConfig.LevelDirectory), BindingFlags.Public | BindingFlags.Static));
+        FileUtil.CheckDirectory(false, false, DevkitServerConfig.LevelDirectory, typeof(DevkitServerConfig).GetProperty(nameof(DevkitServerConfig.LevelDirectory), BindingFlags.Public | BindingFlags.Static));
 
         RoadNetIdDatabase.AssignExisting();
         LevelObjectNetIdDatabase.AssignExisting();

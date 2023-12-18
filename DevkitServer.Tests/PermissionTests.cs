@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using DevkitServer.API;
 using DevkitServer.API.Permissions;
@@ -15,16 +16,27 @@ public class PermissionTests
     [ClassInitialize]
     public static void Setup(TestContext context)
     {
-        TestHelpers.SetupMainThread();
-        TestHelpers.SetupFormatProvider();
+        try
+        {
+            TestHelpers.SetupMainThread();
+            TestHelpers.SetupFormatProvider();
 
-        PluginLoader.RegisterPlugin(new TestPlugin("a", "A"));
-        PluginLoader.RegisterPlugin(new TestPlugin("plugin1", "Plugin1"));
-        PluginLoader.RegisterPlugin(new TestPlugin("plugin2", "Plugin2"));
-        PluginLoader.RegisterPlugin(new TestPlugin("plugin3", "Plugin3"));
-        PluginLoader.RegisterPlugin(new TestPlugin("plugin4", "Plugin4"));
-        PluginLoader.RegisterPlugin(new TestPlugin("plugin:5", "Plugin5"));
-        PluginLoader.RegisterPlugin(new TestPlugin(LongPluginId, "Test Long Plugin"));
+            PluginLoader.RegisterPlugin(new TestPlugin("a", "A"));
+            PluginLoader.RegisterPlugin(new TestPlugin("plugin1", "Plugin1"));
+            PluginLoader.RegisterPlugin(new TestPlugin("plugin2", "Plugin2"));
+            PluginLoader.RegisterPlugin(new TestPlugin("plugin3", "Plugin3"));
+            PluginLoader.RegisterPlugin(new TestPlugin("plugin4", "Plugin4"));
+            PluginLoader.RegisterPlugin(new TestPlugin("plugin:5", "Plugin5"));
+            PluginLoader.RegisterPlugin(new TestPlugin(LongPluginId, "Test Long Plugin"));
+        }
+        catch (Exception ex)
+        {
+            string path = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            path = Path.Combine(path, "log.txt");
+            File.WriteAllText(path, ex.ToString());
+            context.WriteLine(ex.ToString());
+            throw;
+        }
     }
 
     [ClassCleanup]

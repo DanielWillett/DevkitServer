@@ -6,28 +6,78 @@ using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
+using System.Text.RegularExpressions;
 using Version = System.Version;
 
 namespace DevkitServer.Util;
+
+/// <summary>
+/// Methods for formatting strings and termi
+/// </summary>
 public static class FormattingUtil
 {
-    // For unit tests
-    public static ITerminalFormatProvider FormatProvider { get; set; } = new LoggerFormatProvider();
     private static char[][]? _tags;
     private static RemoveRichTextOptions[]? _tagFlags;
-    public static Func<object, string> FormatSelector = x => x.Format();
+    private static string[]? _sizeCodes;
+    private static double[]? _sizeIncrements;
+    internal static Func<object, string> FormatSelector = x => x.Format();
+
+    /// <summary>
+    /// Provide a custom <see cref="StackTraceCleaner"/> configuration for formatting methods.
+    /// </summary>
+    public static ITerminalFormatProvider FormatProvider { get; set; } = new LoggerFormatProvider();
+
+    /// <summary>
+    /// Regular expression to remove all rich text.
+    /// </summary>
+    /// <remarks>Does not include &lt;#ffffff&gt; colors.</remarks>
+    public static Regex RemoveRichTextRegex { get; } =
+        new Regex(@"(?<!(?:\<noparse\>(?!\<\/noparse\>)).*)\<\/{0,1}(?:(?:color=\""{0,1}[#a-z]{0,9}\""{0,1})|(?:color)|(?:size=\""{0,1}\d+\""{0,1})|(?:size)|(?:alpha)|(?:alpha=#[0-f]{1,2})|(?:#.{3,8})|(?:[isub])|(?:su[pb])|(?:lowercase)|(?:uppercase)|(?:smallcaps))\>", RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Regular expression to remove Text Mesh Pro tags.
+    /// </summary>
+    public static Regex RemoveTMProRichTextRegex { get; } =
+        new Regex(@"(?<!(?:\<noparse\>(?!\<\/noparse\>)).*)\<\/{0,1}(?:(?:noparse)|(?:alpha)|(?:alpha=#[0-f]{1,2})|(?:[su])|(?:su[pb])|(?:lowercase)|(?:uppercase)|(?:smallcaps))\>", RegexOptions.IgnoreCase);
+    
+    /// <summary>
+    /// ANSI escape character for virtual terminal sequences.
+    /// </summary>>
+    /// <remarks>See <see href="https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences#text-formatting"/>.</remarks>
     public const char ConsoleEscapeCharacter = '\u001b';
-    public const string ANSIForegroundReset = "\u001b[39m";
-    public const string ANSIBackgroundReset = "\u001b[49m";
+
+    /// <summary>
+    /// Visual ANSI virtual termianl sequence for reseting the foreground color.
+    /// </summary>
+    public const string ForegroundResetSequence = "\u001b[39m";
+
+    /// <summary>
+    /// Visual ANSI virtual termianl sequence for reseting the background color.
+    /// </summary>
+    public const string BackgroundResetSequence = "\u001b[49m";
     private const int DefaultForeground = -9013642;  // gray
     private const int DefaultBackground = -15987700; // black
-    public static unsafe string GetANSIString(ConsoleColor color, bool background)
+
+    /// <summary>
+    /// Remove any rich text tags from Text Mesh Pro.
+    /// </summary>
+    /// <remarks>Does not include &lt;#ffffff&gt; colors.</remarks>
+    [Pure]
+    public static string RemoveTMProRichText(string text)
+    {
+        return RemoveTMProRichTextRegex.Replace(text, string.Empty);
+    }
+    /// <summary>
+    /// Converts a <see cref="ConsoleColor"/> value to a 8-bit foreground color virtual terminal sequence.
+    /// </summary>
+    /// <remarks>See <see href="https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences#text-formatting"/>.</remarks>
+    public static unsafe string GetForegroundSequenceString(ConsoleColor color, bool background)
     {
         char* chrs = stackalloc char[5];
-        SetANSICode(chrs, 0, color, background);
+        SetForegroundSequenceCode(chrs, 0, color, background);
         return new string(chrs, 0, 5);
     }
-    private static unsafe void SetANSICode(char* data, int index, ConsoleColor color, bool background)
+    private static unsafe void SetForegroundSequenceCode(char* data, int index, ConsoleColor color, bool background)
     {
         int num = color switch
         {
@@ -57,19 +107,24 @@ public static class FormattingUtil
         data[index + 3] = (char)(num % 10 + 48);
         data[index + 4] = 'm';
     }
-    public static unsafe string GetExtendedANSIString(int argb, bool background)
+
+    /// <summary>
+    /// Converts an ARGB value to an extended foreground color virtual terminal sequence.
+    /// </summary>
+    /// <remarks>See <see href="https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences#extended-colors"/>.</remarks>
+    public static unsafe string GetForegroundSequenceString(int argb, bool background)
     {
         byte r = unchecked((byte)(argb >> 16));
         byte g = unchecked((byte)(argb >> 8));
         byte b = unchecked((byte)argb);
         int l = 10 + (r > 9 ? r > 99 ? 3 : 2 : 1) + (g > 9 ? g > 99 ? 3 : 2 : 1) + (b > 9 ? b > 99 ? 3 : 2 : 1);
         char* chrs = stackalloc char[l];
-        SetExtendedANSICode(chrs, 0, r, g, b, background);
+        SetForegroundSequenceString(chrs, 0, r, g, b, background);
         return new string(chrs, 0, l);
     }
-    private static unsafe void SetExtendedANSICode(char* data, int index, byte r, byte g, byte b, bool background)
+    private static unsafe void SetForegroundSequenceString(char* data, int index, byte r, byte g, byte b, bool background)
     {
-        // https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences?redirectedfrom=MSDN#text-formatting
+        // https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences#extended-colors
         data[index] = ConsoleEscapeCharacter;
         data[index + 1] = '[';
         data[index + 2] = background ? '4' : '3';
@@ -97,7 +152,45 @@ public static class FormattingUtil
         data[++index] = (char)(b % 10 + 48);
         data[index + 1] = 'm';
     }
-    
+
+    /// <summary>
+    /// Faster version of <see cref="string.Format"/> that only formats {0}.
+    /// </summary>
+    /// <param name="input">The string to search for matches in.</param>
+    /// <param name="val">The string to replace matches with.</param>
+    /// <param name="repeat">Keep looking for {0} after the first one is found?</param>
+    public static string QuickFormat(string input, string? val, bool repeat = false) => QuickFormat(input, val, 0, repeat);
+
+    /// <summary>
+    /// Faster version of <see cref="string.Format"/> that only formats {<paramref name="index"/>}.
+    /// </summary>
+    /// <param name="input">The string to search for matches in.</param>
+    /// <param name="val">The string to replace matches with.</param>
+    /// <param name="index">The index of formatting placeholder to match.</param>
+    /// <param name="repeat">Keep looking for {<paramref name="index"/>} after the first one is found?</param>
+    public static string QuickFormat(string input, string? val, int index, bool repeat = false)
+    {
+        string srch = "{" + index.ToString(CultureInfo.InvariantCulture) + "}";
+        int len = srch.Length;
+        int ind = -3;
+        do
+        {
+            ind = input.IndexOf(srch, ind + len, StringComparison.Ordinal);
+            if (ind < 0 || ind > input.Length - len)
+                break;
+
+            if (string.IsNullOrEmpty(val))
+                input = input[..ind] + input.Substring(ind + len, input.Length - ind - len);
+            else
+                input = input[..ind] + val + input.Substring(ind + len, input.Length - ind - len);
+
+            if (!repeat || ind + len >= input.Length)
+                return input;
+        }
+        while (true);
+        return input;
+    }
+
     /// <summary>
     /// Convert to <see cref="Color"/> to ARGB data.
     /// </summary>
@@ -164,7 +257,11 @@ public static class FormattingUtil
 
         return text;
     }
-    public static unsafe string RemoveANSIFormatting(string orig)
+
+    /// <summary>
+    /// Effeciently removes any virtual terminal sequences from a string and returns the result as a copy.
+    /// </summary>
+    public static unsafe string RemoveVirtualTerminalSequences(string orig)
     {
         if (orig.Length < 5)
             return orig;
@@ -181,50 +278,95 @@ public static class FormattingUtil
         if (!found)
             return orig;
 
-        try
+        // regex: \u001B\[[\d;]*m
+
+        int outpInd = 0;
+        char* outp = stackalloc char[l - 3];
+        fixed (char* chars = orig)
         {
-            // regex: \u001B\[[\d;]*m
-
-            int outpInd = 0;
-            char* outp = stackalloc char[l - 3];
-            fixed (char* chars = orig)
+            int lastCpy = -1;
+            for (int i = 0; i < l - 2; ++i)
             {
-                int lastCpy = -1;
-                for (int i = 0; i < l - 2; ++i)
+                if (l <= i + 3 || chars[i] != ConsoleEscapeCharacter || chars[i + 1] != '[' || !char.IsDigit(chars[i + 2]))
+                    continue;
+
+                int st = i;
+                int c = i + 3;
+                for (; c < l; ++c)
                 {
-                    if (l <= i + 3 || chars[i] != ConsoleEscapeCharacter || chars[i + 1] != '[' || !char.IsDigit(chars[i + 2]))
-                        continue;
-
-                    int st = i;
-                    int c = i + 3;
-                    for (; c < l; ++c)
+                    if (chars[c] != ';' && !char.IsDigit(chars[c]))
                     {
-                        if (chars[c] != ';' && !char.IsDigit(chars[c]))
-                        {
-                            if (chars[c] == 'm')
-                                i = c;
+                        if (chars[c] == 'm')
+                            i = c;
 
-                            break;
-                        }
-
-                        i = c;
+                        break;
                     }
 
-                    Buffer.MemoryCopy(chars + lastCpy + 1, outp + outpInd, (l - outpInd) * sizeof(char), (st - lastCpy - 1) * sizeof(char));
-                    outpInd += st - lastCpy - 1;
-                    lastCpy += st - lastCpy + (c - st);
+                    i = c;
                 }
-                Buffer.MemoryCopy(chars + lastCpy + 1, outp + outpInd, (l - outpInd) * sizeof(char), (l - lastCpy) * sizeof(char));
-                outpInd += l - lastCpy;
-            }
 
-            return new string(outp, 0, outpInd - 1);
+                Buffer.MemoryCopy(chars + lastCpy + 1, outp + outpInd, (l - outpInd) * sizeof(char), (st - lastCpy - 1) * sizeof(char));
+                outpInd += st - lastCpy - 1;
+                lastCpy += st - lastCpy + (c - st);
+            }
+            Buffer.MemoryCopy(chars + lastCpy + 1, outp + outpInd, (l - outpInd) * sizeof(char), (l - lastCpy) * sizeof(char));
+            outpInd += l - lastCpy;
         }
-        catch
-        {
-            return orig;
-        }
+
+        return new string(outp, 0, outpInd - 1);
     }
+
+    [Pure]
+    public static string FormatCapacity(long length, int decimals = 1, bool colorize = false)
+    {
+        _sizeCodes ??=
+        [
+            "B",
+            "KiB",
+            "MiB",
+            "GiB",
+            "TiB",
+            "PiB",
+            "EiB"
+        ];
+
+        if (_sizeIncrements == null)
+        {
+            _sizeIncrements = new double[_sizeCodes.Length];
+            for (int i = 0; i < _sizeCodes.Length; ++i)
+                _sizeIncrements[i] = Math.Pow(1024, i);
+        }
+
+        string numStr;
+        if (length == 0)
+        {
+            numStr = 0.ToString("N" + Math.Max(0, decimals).ToString(CultureInfo.CurrentCulture));
+            return colorize ? numStr.Colorize(FormattingColorType.Number) : numStr;
+        }
+
+        bool neg = length < 0;
+        length = Math.Abs(length);
+
+        double incr = Math.Log(length, 1024);
+        int inc;
+        if (incr % 1 > 0.8)
+            inc = (int)Math.Ceiling(incr);
+        else
+            inc = (int)Math.Floor(incr);
+
+        if (inc >= _sizeIncrements.Length)
+            inc = _sizeIncrements.Length - 1;
+
+        double len = length / _sizeIncrements[inc];
+        if (neg) len = -len;
+
+        numStr = len.ToString("N" + Math.Max(0, decimals).ToString(CultureInfo.CurrentCulture));
+        return (colorize ? numStr.ColorizeNoReset(FormattingColorType.Number) : numStr) + " " + (colorize ? _sizeCodes[inc].Colorize(FormattingColorType.Struct) : _sizeCodes[inc]);
+    }
+
+    /// <summary>
+    /// Formats a field for easier viewing in a console.
+    /// </summary>
     public static string Format(this FieldInfo? field)
     {
         if (field == null)
@@ -237,10 +379,14 @@ public static class FormattingUtil
             type += FormatProvider.StackCleaner.GetString(field.DeclaringType) + ".";
         else
             type += "global".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) +
-                   "::".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
+                    "::".Colorize(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
 
         return type + field.Name.Colorize(FormatProvider.StackCleaner.Configuration.Colors!.PropertyColor);
     }
+
+    /// <summary>
+    /// Formats a property for easier viewing in a console.
+    /// </summary>
     public static string Format(this PropertyInfo? property)
     {
         if (property == null)
@@ -255,7 +401,7 @@ public static class FormattingUtil
             type += FormatProvider.StackCleaner.GetString(property.DeclaringType) + ".";
         else
             type += "global".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) +
-                   "::".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
+                    "::".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
 
         type += property.Name.ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PropertyColor) + " {".ColorizeNoReset(FormatProvider.StackCleaner.Configuration.Colors!.PunctuationColor);
         
@@ -294,7 +440,15 @@ public static class FormattingUtil
 
         return type + GetResetSuffix();
     }
+
+    /// <summary>
+    /// Formats a method for easier viewing in a console.
+    /// </summary>
     public static string Format(this MethodBase? method) => method == null ? ((object)null!).Format() : FormatProvider.StackCleaner.GetString(method);
+
+    /// <summary>
+    /// Formats a described method (with a passed delegate type) for easier viewing in a console.
+    /// </summary>
     public static string FormatMethod(Type delegateType, string name, bool removeInstance = false, bool isStatic = false, bool isAsync = false, bool isGetter = false, bool isSetter = false, bool isIndexer = false, Type? declTypeOverride = null)
     {
         Accessor.GetDelegateSignature(delegateType, out Type returnType, out ParameterInfo[] parameters);
@@ -304,6 +458,10 @@ public static class FormattingUtil
         
         return FormatMethod(returnType, declTypeOverride ?? (removeInstance && parameters.Length > 0 ? parameters[0].ParameterType : null), name, typeParameters, null, null, isStatic, isAsync, isGetter, isSetter, isIndexer);
     }
+
+    /// <summary>
+    /// Formats a described method (with a passed delegate type) for easier viewing in a console.
+    /// </summary>
     public static string FormatMethod<TDelegate>(string name, bool removeInstance = false, bool isStatic = false, bool isAsync = false, bool isGetter = false, bool isSetter = false, bool isIndexer = false, Type? declTypeOverride = null) where TDelegate : Delegate
     {
         ParameterInfo[] parameters = Accessor.GetParameters<TDelegate>();
@@ -314,6 +472,10 @@ public static class FormattingUtil
         
         return FormatMethod(returnType, declTypeOverride ?? (removeInstance && parameters.Length > 0 ? parameters[0].ParameterType : null), name, typeParameters, null, null, isStatic, isAsync, isGetter, isSetter, isIndexer);
     }
+
+    /// <summary>
+    /// Formats a described method for easier viewing in a console.
+    /// </summary>
     public static string FormatMethod(Type? rtnType, Type? declType, string name, (Type type, string? name)[]? namedArguments = null, Type[]? arguments = null, Type[]? genericArgs = null, bool isStatic = false, bool isAsync = false, bool isGetter = false, bool isSetter = false, bool isIndexer = false)
     {
         StringBuilder sb = new StringBuilder(32);
@@ -378,7 +540,15 @@ public static class FormattingUtil
         }
         return sb.ToString();
     }
+
+    /// <summary>
+    /// Formats a type for easier viewing in a console.
+    /// </summary>
     public static string Format(this Type? typedef) => typedef == null ? ((object)null!).Format() : FormatProvider.StackCleaner.GetString(typedef);
+
+    /// <summary>
+    /// Formats a Harmony exception block for easier viewing in a console.
+    /// </summary>
     public static string Format(this ExceptionBlock? block)
     {
         if (block == null)
@@ -404,12 +574,20 @@ public static class FormattingUtil
 
         return "} " + GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.FlowKeywordColor) + block.blockType + GetResetSuffix() + " {";
     }
+
+    /// <summary>
+    /// Formats a label for easier viewing in a console.
+    /// </summary>
     public static string Format(this Label label) => (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
-        ? string.Empty
-        : (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-            ? GetExtendedANSIString(FormatProvider.StackCleaner.Configuration.Colors!.StructColor, false)
-            : GetANSIString(ToConsoleColor(FormatProvider.StackCleaner.Configuration.Colors!.StructColor), false))) + "Label #" + label.GetLabelId() +
+                                                         ? string.Empty
+                                                         : (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
+                                                             ? GetForegroundSequenceString(FormatProvider.StackCleaner.Configuration.Colors!.StructColor, false)
+                                                             : GetForegroundSequenceString(ToConsoleColor(FormatProvider.StackCleaner.Configuration.Colors!.StructColor), false))) + "Label #" + label.GetLabelId() +
                                                      GetResetSuffix();
+
+    /// <summary>
+    /// Formats a Harmony code instruction for easier viewing in a console.
+    /// </summary>
     public static string Format(this CodeInstruction? instruction)
     {
         if (instruction == null)
@@ -525,6 +703,10 @@ public static class FormattingUtil
 
         return op;
     }
+
+    /// <summary>
+    /// Formats an IL opcode for easier viewing in a console.
+    /// </summary>
     public static string Format(this OpCode instruction)
     {
         string? clr = null;
@@ -539,42 +721,58 @@ public static class FormattingUtil
                 _ => new Color32(86, 156, 214, 255)
             });
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor)
-                clr = GetExtendedANSIString(argb, false);
+                clr = GetForegroundSequenceString(argb, false);
             else
-                clr = GetANSIString(ToConsoleColor(argb), false);
+                clr = GetForegroundSequenceString(ToConsoleColor(argb), false);
         }
 
         if (clr != null)
-            return clr + instruction.Name + ANSIForegroundReset;
+            return clr + instruction.Name + ForegroundResetSequence;
 
         return instruction.Name;
     }
 
-    public static readonly Color32 StringColor = new Color32(214, 157, 133, 255);
-    public static readonly Color32 NumberColor = new Color32(181, 206, 168, 255);
+    /// <summary>
+    /// Default string color during formatting.
+    /// </summary>
+    public static Color32 StringColor = new Color32(214, 157, 133, 255);
+
+    /// <summary>
+    /// Default number color during formatting.
+    /// </summary>
+    public static Color32 NumberColor = new Color32(181, 206, 168, 255);
+
+    /// <summary>
+    /// Colors a string and optionally adds quotes.
+    /// </summary>
     public static string Format(this string? str, bool quotes)
     {
         if (str == null) return ((object?)null).Format();
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string clr = FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetExtendedANSIString(ToArgb(StringColor), false)
-                : GetANSIString(ToConsoleColor(ToArgb(StringColor)), false);
+                ? GetForegroundSequenceString(ToArgb(StringColor), false)
+                : GetForegroundSequenceString(ToConsoleColor(ToArgb(StringColor)), false);
 
             if (quotes)
-                return clr + "\"" + str + "\"" + ANSIForegroundReset;
+                return clr + "\"" + str + "\"" + ForegroundResetSequence;
             
-            return clr + str + ANSIForegroundReset;
+            return clr + str + ForegroundResetSequence;
         }
 
         return str;
     }
+
+    /// <summary>
+    /// Formats any object for easier viewing in the console. Most common types have custom formatting.
+    /// </summary>
+    /// <remarks>Any objects implementing <see cref="ITerminalFormattable"/> will use their custom format implementation.</remarks>
     public static string Format(this object? obj, string? format = null)
     {
         if (obj == null || obj.Equals(null))
         {
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
-                return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) + "null" + ANSIForegroundReset;
+                return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) + "null" + ForegroundResetSequence;
             return "null";
         }
 
@@ -598,7 +796,7 @@ public static class FormattingUtil
         if (obj is IDevkitServerPlugin plugin)
         {
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
-                return GetColorPrefix(ToArgb(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor)) + plugin.Name + ANSIForegroundReset;
+                return GetColorPrefix(ToArgb(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor)) + plugin.Name + ForegroundResetSequence;
             return "null";
         }
 
@@ -658,14 +856,14 @@ public static class FormattingUtil
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
                 return s64.ToString("D17");
 
-            return GetColorPrefix(ToArgb(new Color32(102, 192, 244, 255))) + s64.ToString("D17") + ANSIForegroundReset;
+            return GetColorPrefix(ToArgb(new Color32(102, 192, 244, 255))) + s64.ToString("D17") + ForegroundResetSequence;
         }
         if (obj is CSteamID cs64 && cs64.UserSteam64())
         {
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
                 return cs64.m_SteamID.ToString("D17");
 
-            return GetColorPrefix(ToArgb(new Color32(102, 192, 244, 255))) + cs64.m_SteamID.ToString("D17") + ANSIForegroundReset;
+            return GetColorPrefix(ToArgb(new Color32(102, 192, 244, 255))) + cs64.m_SteamID.ToString("D17") + ForegroundResetSequence;
         }
         if (obj is ITransportConnection connection)
         {
@@ -692,10 +890,10 @@ public static class FormattingUtil
                     }
                 }
 
-                return str + ANSIForegroundReset;
+                return str + ForegroundResetSequence;
             }
 
-            return GetColorPrefix(ToArgb(new Color32(204, 255, 102, 255))) + (connection.GetAddressString(true) ?? "<unknown address>") + ANSIForegroundReset;
+            return GetColorPrefix(ToArgb(new Color32(204, 255, 102, 255))) + (connection.GetAddressString(true) ?? "<unknown address>") + ForegroundResetSequence;
         }
 
         if (obj is IClientTransport)
@@ -718,54 +916,54 @@ public static class FormattingUtil
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             if (obj is string or char)
-                return GetColorPrefix(ToArgb(new Color32(214, 157, 133, 255))) + "\"" + str + "\"" + ANSIForegroundReset;
+                return GetColorPrefix(ToArgb(new Color32(214, 157, 133, 255))) + "\"" + str + "\"" + ForegroundResetSequence;
 
             if (type.IsEnum)
-                return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.EnumColor) + str + ANSIForegroundReset;
+                return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.EnumColor) + str + ForegroundResetSequence;
 
             if (type.IsPrimitive)
             {
                 if (obj is bool)
-                    return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) + str + ANSIForegroundReset;
+                    return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.KeywordColor) + str + ForegroundResetSequence;
                 
                 if (format != null)
                 {
                     switch (obj)
                     {
                         case float n:
-                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ForegroundResetSequence;
                         case double n:
-                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ForegroundResetSequence;
                         case decimal n:
-                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ForegroundResetSequence;
                         case int n:
-                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ForegroundResetSequence;
                         case uint n:
-                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ForegroundResetSequence;
                         case short n:
-                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ForegroundResetSequence;
                         case ushort n:
-                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ForegroundResetSequence;
                         case sbyte n:
-                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ForegroundResetSequence;
                         case byte n:
-                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ForegroundResetSequence;
                         case long n:
-                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ForegroundResetSequence;
                         case ulong n:
-                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ANSIForegroundReset;
+                            return GetColorPrefix(ToArgb(NumberColor)) + n.ToString(format) + ForegroundResetSequence;
                     }
                 }
 
 
-                return GetColorPrefix(ToArgb(NumberColor)) + str + ANSIForegroundReset;
+                return GetColorPrefix(ToArgb(NumberColor)) + str + ForegroundResetSequence;
             }
 
             if (type.IsInterface)
-                return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.InterfaceColor) + str + ANSIForegroundReset;
+                return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.InterfaceColor) + str + ForegroundResetSequence;
 
             if (type.IsValueType)
-                return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.StructColor) + str + ANSIForegroundReset;
+                return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.StructColor) + str + ForegroundResetSequence;
 
             if (type.IsArray)
             {
@@ -774,61 +972,81 @@ public static class FormattingUtil
                         "]".Colorize(FormattingColorType.Punctuation));
             }
 
-            return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.ClassColor) + str + ANSIForegroundReset;
+            return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.ClassColor) + str + ForegroundResetSequence;
         }
 
         return str;
     }
+
+    /// <summary>
+    /// Colorize a string with an 8-bit color. Appends a reset sequence afterwards.
+    /// </summary>
     public static string Colorize(this string str, ConsoleColor color)
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            string ansiString = GetANSIString(color, false);
-            return ansiString + str.Replace(ANSIForegroundReset, ansiString) + ANSIForegroundReset;
+            string ansiString = GetForegroundSequenceString(color, false);
+            return ansiString + str.Replace(ForegroundResetSequence, ansiString) + ForegroundResetSequence;
         }
 
         return str;
     }
+
+    /// <summary>
+    /// Colorize a string with a 24-bit RGB color. Appends a reset sequence afterwards.
+    /// </summary>
     public static string Colorize(this string str, Color color)
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string ansiString = (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetExtendedANSIString(ToArgb(color), false)
-                : GetANSIString(ToConsoleColor(ToArgb(color)), false));
-            return ansiString + str.Replace(ANSIForegroundReset, ansiString) + ANSIForegroundReset;
+                ? GetForegroundSequenceString(ToArgb(color), false)
+                : GetForegroundSequenceString(ToConsoleColor(ToArgb(color)), false));
+            return ansiString + str.Replace(ForegroundResetSequence, ansiString) + ForegroundResetSequence;
         }
 
         return str;
     }
+
+    /// <summary>
+    /// Colorize a string with a 24-bit RGB color. Appends a reset sequence afterwards.
+    /// </summary>
     public static string Colorize(this string str, Color32 color)
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string ansiString = (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetExtendedANSIString(ToArgb(color), false)
-                : GetANSIString(ToConsoleColor(ToArgb(color)), false));
-            return ansiString + str.Replace(ANSIForegroundReset, ansiString) + ANSIForegroundReset;
+                ? GetForegroundSequenceString(ToArgb(color), false)
+                : GetForegroundSequenceString(ToConsoleColor(ToArgb(color)), false));
+            return ansiString + str.Replace(ForegroundResetSequence, ansiString) + ForegroundResetSequence;
         }
 
         return str;
     }
+
+    /// <summary>
+    /// Colorize a string with a 24-bit RGB color in ARGB format. Appends a reset sequence afterwards.
+    /// </summary>
     public static string Colorize(this string str, int argb)
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string ansiString = (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetExtendedANSIString(argb, false)
-                : GetANSIString(ToConsoleColor(argb), false));
-            return ansiString + str.Replace(ANSIForegroundReset, ansiString) + ANSIForegroundReset;
+                ? GetForegroundSequenceString(argb, false)
+                : GetForegroundSequenceString(ToConsoleColor(argb), false));
+            return ansiString + str.Replace(ForegroundResetSequence, ansiString) + ForegroundResetSequence;
         }
 
         return str;
     }
+
+    /// <summary>
+    /// Colorize a string based on a defined token type. Appends a reset sequence afterwards.
+    /// </summary>
     public static string Colorize(this string str, FormattingColorType tokenType)
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
-            return ColorizeNoReset(str, tokenType) + ANSIForegroundReset;
+            return ColorizeNoReset(str, tokenType) + ForegroundResetSequence;
         return str;
     }
     private static int ToArgb(FormattingColorType tokenType)
@@ -849,11 +1067,15 @@ public static class FormattingUtil
             FormattingColorType.Namespace => colors.NamespaceColor,
             FormattingColorType.Punctuation => colors.PunctuationColor,
             FormattingColorType.ExtraData => colors.ExtraDataColor,
-            FormattingColorType.LinesHiddenWarning => colors.LinesHiddenWarningColor,
-            FormattingColorType.HtmlBackground => colors.HtmlBackgroundColor,
+            FormattingColorType.Number => ToArgb(NumberColor),
+            FormattingColorType.String => ToArgb(StringColor),
             _ => unchecked((int)0xFFFFFFFF)
         };
     }
+
+    /// <summary>
+    /// Colorize a string based on a defined token type. Does not append a reset sequence afterwards.
+    /// </summary>
     public static string ColorizeNoReset(this string str, FormattingColorType tokenType)
     {
         StackCleanerConfiguration config = FormatProvider.StackCleaner.Configuration;
@@ -862,134 +1084,198 @@ public static class FormattingUtil
             int argb = ToArgb(tokenType);
 
             string ansiString = (config.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetExtendedANSIString(argb, false)
-                : GetANSIString(ToConsoleColor(argb), false));
-            return ansiString + str.Replace(ANSIForegroundReset, ansiString) + ANSIForegroundReset;
+                ? GetForegroundSequenceString(argb, false)
+                : GetForegroundSequenceString(ToConsoleColor(argb), false));
+            return ansiString + str.Replace(ForegroundResetSequence, ansiString) + ForegroundResetSequence;
         }
 
         return str;
     }
+
+    /// <summary>
+    /// Colorize a string with an 8-bit color. Does not append a reset sequence afterwards.
+    /// </summary>
     public static string ColorizeNoReset(this string str, ConsoleColor color)
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            string ansiString = GetANSIString(color, false);
-            return ansiString + str.Replace(ANSIForegroundReset, ansiString);
+            string ansiString = GetForegroundSequenceString(color, false);
+            return ansiString + str.Replace(ForegroundResetSequence, ansiString);
         }
 
         return str;
     }
+
+    /// <summary>
+    /// Colorize a string with an 24-bit RGB color. Does not append a reset sequence afterwards.
+    /// </summary>
     public static string ColorizeNoReset(this string str, Color color)
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string ansiString = FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetExtendedANSIString(ToArgb(color), false)
-                : GetANSIString(ToConsoleColor(ToArgb(color)), false);
-            return ansiString + str.Replace(ANSIForegroundReset, ansiString);
+                ? GetForegroundSequenceString(ToArgb(color), false)
+                : GetForegroundSequenceString(ToConsoleColor(ToArgb(color)), false);
+            return ansiString + str.Replace(ForegroundResetSequence, ansiString);
         }
 
         return str;
     }
+
+    /// <summary>
+    /// Colorize a string with an 24-bit RGB color. Does not append a reset sequence afterwards.
+    /// </summary>
     public static string ColorizeNoReset(this string str, Color32 color)
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string ansiString = FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetExtendedANSIString(ToArgb(color), false)
-                : GetANSIString(ToConsoleColor(ToArgb(color)), false);
-            return ansiString + str.Replace(ANSIForegroundReset, ansiString);
+                ? GetForegroundSequenceString(ToArgb(color), false)
+                : GetForegroundSequenceString(ToConsoleColor(ToArgb(color)), false);
+            return ansiString + str.Replace(ForegroundResetSequence, ansiString);
         }
 
         return str;
     }
+
+    /// <summary>
+    /// Colorize a string with an 24-bit RGB color in ARGB format. Does not append a reset sequence afterwards.
+    /// </summary>
     public static string ColorizeNoReset(this string str, int argb)
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string ansiString = FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetExtendedANSIString(argb, false)
-                : GetANSIString(ToConsoleColor(argb), false);
-            return ansiString + str.Replace(ANSIForegroundReset, ansiString) + ANSIForegroundReset;
+                ? GetForegroundSequenceString(argb, false)
+                : GetForegroundSequenceString(ToConsoleColor(argb), false);
+            return ansiString + str.Replace(ForegroundResetSequence, ansiString) + ForegroundResetSequence;
         }
 
         return str;
     }
+
+    /// <summary>
+    /// Construct a color prefix based on the current settings and an ARGB color.
+    /// </summary>
     public static string GetColorPrefix(int argb)
     {
         return FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
             ? string.Empty
             : (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetExtendedANSIString(argb, false)
-                : GetANSIString(ToConsoleColor(argb), false));
+                ? GetForegroundSequenceString(argb, false)
+                : GetForegroundSequenceString(ToConsoleColor(argb), false));
     }
 
+    /// <summary>
+    /// Construct a color prefix based on the current settings and an 8-bit color.
+    /// </summary>
     public static string GetColorPrefix(ConsoleColor color)
     {
         return FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
             ? string.Empty
-            : GetANSIString(color, false);
+            : GetForegroundSequenceString(color, false);
     }
 
+    /// <summary>
+    /// Construct a color prefix based on the current settings and a 24-bit RGB color.
+    /// </summary>
     public static string GetColorPrefix(Color color) => GetColorPrefix(ToArgb(color));
-    public static string GetColorPrefix(Color32 color) => GetColorPrefix(ToArgb(color));
-    public static string GetColorPrefix(FormattingColorType color) => GetColorPrefix(ToArgb(color));
-    public static string GetResetSuffix() => FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ANSIForegroundReset;
 
+    /// <summary>
+    /// Construct a color prefix based on the current settings and a 24-bit RGB color.
+    /// </summary>
+    public static string GetColorPrefix(Color32 color) => GetColorPrefix(ToArgb(color));
+
+    /// <summary>
+    /// Construct a color prefix based on the current settings and a defined token type.
+    /// </summary>
+    public static string GetColorPrefix(FormattingColorType color) => GetColorPrefix(ToArgb(color));
+
+    /// <summary>
+    /// Construct a reset suffix based on the current settings.
+    /// </summary>
+    public static string GetResetSuffix() => FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ForegroundResetSequence;
+
+    /// <summary>
+    /// Print the given bytes to the INFO log in hexadecimal (base 16) columns.
+    /// </summary>
+    /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     public static void PrintBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1, bool formatMessageOverhead = false)
     {
         Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, columnCount, offset, len, formatMessageOverhead));
     }
+
+    /// <summary>
+    /// Print the given bytes to the INFO log in decimal (base 10) columns.
+    /// </summary>
+    /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     public static void PrintBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1, bool formatMessageOverhead = false)
     {
         Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, columnCount, offset, len, formatMessageOverhead));
     }
+
+    /// <summary>
+    /// Format the given bytes in hexadecimal (base 16) columns.
+    /// </summary>
+    /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static string GetBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1, bool formatMessageOverhead = false)
     {
         return BytesToString(bytes, columnCount, offset, len, "X2", formatMessageOverhead);
     }
+
+    /// <summary>
+    /// Format the given bytes in decimal (base 10) columns.
+    /// </summary>
+    /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static string GetBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1, bool formatMessageOverhead = false)
     {
         return BytesToString(bytes, columnCount, offset, len, "000", formatMessageOverhead);
     }
+
+    /// <summary>
+    /// Print the given bytes to the INFO log in hexadecimal (base 16) columns.
+    /// </summary>
+    /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     public static unsafe void PrintBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0, bool formatMessageOverhead = false)
     {
         Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, len, columnCount, offset, formatMessageOverhead));
     }
+
+    /// <summary>
+    /// Print the given bytes to the INFO log in decimal (base 10) columns.
+    /// </summary>
+    /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     public static unsafe void PrintBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0, bool formatMessageOverhead = false)
     {
         Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, len, columnCount, offset, formatMessageOverhead));
     }
+
+    /// <summary>
+    /// Format the given bytes in hexadecimal (base 16) columns.
+    /// </summary>
+    /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static unsafe string GetBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0, bool formatMessageOverhead = false)
     {
         return BytesToString(bytes, columnCount, offset, len, "X2", formatMessageOverhead);
     }
+
+    /// <summary>
+    /// Format the given bytes in decimal (base 10) columns.
+    /// </summary>
+    /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static unsafe string GetBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0, bool formatMessageOverhead = false)
     {
         return BytesToString(bytes, columnCount, offset, len, "000", formatMessageOverhead);
     }
-    public static unsafe void PrintBytesHex<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
-    {
-        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, len, columnCount, offset));
-    }
-    public static unsafe void PrintBytesDec<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
-    {
-        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, len, columnCount, offset));
-    }
-    [Pure]
-    public static unsafe string GetBytesHex<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
-    {
-        return BytesToString(bytes, columnCount, offset, len);
-    }
-    [Pure]
-    public static unsafe string GetBytesDec<T>(T* bytes, int len, int columnCount = 64, int offset = 0) where T : unmanaged
-    {
-        return BytesToString(bytes, columnCount, offset, len);
-    }
+
+    /// <summary>
+    /// Format the given bytes in the given <paramref name="fmt"/> into columns. The format should return a fixed length string.
+    /// </summary>
+    /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static unsafe string BytesToString(byte[] bytes, int columnCount, int offset, int len, string fmt, bool formatMessageOverhead = false)
     {
@@ -1000,12 +1286,36 @@ public static class FormattingUtil
         fixed (byte* ptr = &bytes[offset])
             return BytesToString(ptr, columnCount, offset, len, fmt, formatMessageOverhead);
     }
+    
+    /// <summary>
+    /// The color of <see cref="MessageOverhead.Flags"/> in the byte formatting methods.
+    /// </summary>
+    public static Color32 MessageOverheadFlag    = new Color32(0,   255, 255, 255);
 
-    private static readonly Color32 MessageOverheadFlag    = new Color32(0,   255, 255, 255);
-    private static readonly Color32 MessageOverheadId      = new Color32(186, 222, 192, 255);
-    private static readonly Color32 MessageOverheadSize    = new Color32(102, 255, 153, 255);
-    private static readonly Color32 MessageOverheadReqKey  = new Color32(75,  155, 88,  255);
-    private static readonly Color32 MessageOverheadRespKey = new Color32(51,  255, 119, 255);
+    /// <summary>
+    /// The color of <see cref="MessageOverhead.MessageId"/> in the byte formatting methods.
+    /// </summary>
+    public static Color32 MessageOverheadId      = new Color32(186, 222, 192, 255);
+
+    /// <summary>
+    /// The color of <see cref="MessageOverhead.Size"/> in the byte formatting methods.
+    /// </summary>
+    public static Color32 MessageOverheadSize    = new Color32(102, 255, 153, 255);
+
+    /// <summary>
+    /// The color of <see cref="MessageOverhead.RequestKey"/> in the byte formatting methods.
+    /// </summary>
+    public static Color32 MessageOverheadReqKey  = new Color32(75,  155, 88,  255);
+
+    /// <summary>
+    /// The color of <see cref="MessageOverhead.ResponseKey"/> in the byte formatting methods.
+    /// </summary>
+    public static Color32 MessageOverheadRespKey = new Color32(51,  255, 119, 255);
+
+    /// <summary>
+    /// Format the given bytes in the given <paramref name="fmt"/> into columns. The format should return a fixed length string.
+    /// </summary>
+    /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static unsafe string BytesToString(byte* bytes, int columnCount, int offset, int len, string fmt, bool formatMessageOverhead = false)
     {
@@ -1088,32 +1398,16 @@ public static class FormattingUtil
             sb.Append(GetResetSuffix());
         return sb.ToString();
     }
-    [Pure]
-    public static unsafe string BytesToString<T>(T* bytes, int columnCount, int offset, int len) where T : unmanaged
-    {
-        if (offset >= len)
-            offset = len - 1;
-        StringBuilder sb = new StringBuilder(len * 4);
-        for (int i = 0; i < len; ++i)
-        {
-            if (i != 0 && i % columnCount == 0)
-                sb.Append(Environment.NewLine);
-            else if (i != 0)
-                sb.Append(' ');
-            sb.Append(bytes[i + offset].ToString());
-        }
-        return sb.ToString();
-    }
 
     /// <summary>
-    /// Remove rich text tags from text, and replace &lt;color&gt; and &lt;mark&gt; tags with the ANSI or extended ANSI equivalent.
+    /// Remove rich text tags from text, and replace &lt;color&gt; and &lt;mark&gt; tags with virtual terminal sequences (depending on the current configuration).
     /// </summary>
     /// <param name="options">Tags to check for and remove.</param>
     /// <param name="argbForeground">Color to reset the foreground to.</param>
     /// <param name="argbBackground">Color to reset the background to.</param>
     /// <exception cref="ArgumentOutOfRangeException"/>
     [Pure]
-    public static unsafe string ConvertRichTextToANSI(string str, int index = 0, int length = -1, RemoveRichTextOptions options = RemoveRichTextOptions.All, int argbForeground = DefaultForeground, int argbBackground = DefaultBackground)
+    public static unsafe string ConvertRichTextToVirtualTerminalSequences(string str, int index = 0, int length = -1, RemoveRichTextOptions options = RemoveRichTextOptions.All, int argbForeground = DefaultForeground, int argbBackground = DefaultBackground)
     {
         CheckTags();
         if (index >= str.Length || index < 0)
@@ -1141,7 +1435,7 @@ public static class FormattingUtil
 
         int nonDefaults = 1 | 2;
         if (useColor)
-            AppendDefaults();
+            AppendDefaults(nonDefaults, ref writeIndex, ref rtn, argbBackground, argbForeground, format);
 
         fixed (char* mainPtr = str)
         {
@@ -1281,7 +1575,7 @@ public static class FormattingUtil
                         }
                         else
                         {
-                            AppendDefaults();
+                            AppendDefaults(nonDefaults, ref writeIndex, ref rtn, argbBackground, argbForeground, format);
                         }
                     }
                 }
@@ -1289,17 +1583,20 @@ public static class FormattingUtil
             Append(ref rtn, ptr + nextCopyStartIndex, writeIndex, str.Length - nextCopyStartIndex);
             writeIndex += str.Length - nextCopyStartIndex;
             if (useColor)
-                AppendDefaults();
+                AppendDefaults(nonDefaults, ref writeIndex, ref rtn, argbBackground, argbForeground, format);
         }
-        void AppendDefaults()
+
+        return new string(rtn, 0, writeIndex);
+
+        static void AppendDefaults(int nonDefaults, ref int writeIndex, ref char[] rtn, int argbBackground, int argbForeground, StackColorFormatType format)
         {
             if ((nonDefaults & 2) != 0)
             {
                 if (argbBackground == DefaultBackground)
                 {
-                    fixed (char* ptr2 = ANSIBackgroundReset)
-                        Append(ref rtn, ptr2, writeIndex, ANSIBackgroundReset.Length);
-                    writeIndex += ANSIBackgroundReset.Length;
+                    fixed (char* ptr2 = BackgroundResetSequence)
+                        Append(ref rtn, ptr2, writeIndex, BackgroundResetSequence.Length);
+                    writeIndex += BackgroundResetSequence.Length;
                 }
                 else if (format == StackColorFormatType.ExtendedANSIColor)
                     writeIndex += AppendExtANSIForegroundCode(ref rtn, writeIndex, (byte)(argbBackground >> 16), (byte)(argbBackground >> 8), (byte)argbBackground, true);
@@ -1308,9 +1605,9 @@ public static class FormattingUtil
                     ConsoleColor consoleColor = ToConsoleColor(argbBackground);
                     if (consoleColor == ConsoleColor.Black)
                     {
-                        fixed (char* ptr2 = ANSIBackgroundReset)
-                            Append(ref rtn, ptr2, writeIndex, ANSIBackgroundReset.Length);
-                        writeIndex += ANSIBackgroundReset.Length;
+                        fixed (char* ptr2 = BackgroundResetSequence)
+                            Append(ref rtn, ptr2, writeIndex, BackgroundResetSequence.Length);
+                        writeIndex += BackgroundResetSequence.Length;
                     }
                     else
                         writeIndex += AppendANSIForegroundCode(ref rtn, writeIndex, consoleColor, true);
@@ -1321,9 +1618,9 @@ public static class FormattingUtil
             {
                 if (argbForeground == DefaultForeground)
                 {
-                    fixed (char* ptr2 = ANSIForegroundReset)
-                        Append(ref rtn, ptr2, writeIndex, ANSIForegroundReset.Length);
-                    writeIndex += ANSIForegroundReset.Length;
+                    fixed (char* ptr2 = ForegroundResetSequence)
+                        Append(ref rtn, ptr2, writeIndex, ForegroundResetSequence.Length);
+                    writeIndex += ForegroundResetSequence.Length;
                 }
                 else if (format == StackColorFormatType.ExtendedANSIColor)
                     writeIndex += AppendExtANSIForegroundCode(ref rtn, writeIndex, (byte)(argbForeground >> 16), (byte)(argbForeground >> 8), (byte)argbForeground, false);
@@ -1332,9 +1629,9 @@ public static class FormattingUtil
                     ConsoleColor consoleColor = ToConsoleColor(argbForeground);
                     if (consoleColor == ConsoleColor.Gray)
                     {
-                        fixed (char* ptr2 = ANSIForegroundReset)
-                            Append(ref rtn, ptr2, writeIndex, ANSIForegroundReset.Length);
-                        writeIndex += ANSIForegroundReset.Length;
+                        fixed (char* ptr2 = ForegroundResetSequence)
+                            Append(ref rtn, ptr2, writeIndex, ForegroundResetSequence.Length);
+                        writeIndex += ForegroundResetSequence.Length;
                     }
                     else
                         writeIndex += AppendANSIForegroundCode(ref rtn, writeIndex, consoleColor, false);
@@ -1343,8 +1640,6 @@ public static class FormattingUtil
 
             nonDefaults = 0;
         }
-
-        return new string(rtn, 0, writeIndex);
     }
     /// <summary>
     /// Remove rich text, including TextMeshPro and normal Unity tags.
@@ -1450,8 +1745,8 @@ public static class FormattingUtil
     }
     private static void CheckTags()
     {
-        _tags ??= new char[][]
-        {
+        _tags ??=
+        [
             "align".ToCharArray(),
             "allcaps".ToCharArray(),
             "alpha".ToCharArray(),
@@ -1492,9 +1787,9 @@ public static class FormattingUtil
             "uppercase".ToCharArray(),
             "voffset".ToCharArray(),
             "width".ToCharArray()
-        };
-        _tagFlags ??= new RemoveRichTextOptions[]
-        {
+        ];
+        _tagFlags ??=
+        [
             RemoveRichTextOptions.Align,
             RemoveRichTextOptions.Uppercase,
             RemoveRichTextOptions.Alpha,
@@ -1535,7 +1830,7 @@ public static class FormattingUtil
             RemoveRichTextOptions.Uppercase,
             RemoveRichTextOptions.VerticalOffset,
             RemoveRichTextOptions.TextWidth
-        };
+        ];
     }
     private static unsafe void Append(ref char[] arr, char* data, int index, int length)
     {
@@ -1553,7 +1848,7 @@ public static class FormattingUtil
     private static unsafe int AppendANSIForegroundCode(ref char[] data, int index, ConsoleColor color, bool background)
     {
         char* ptr = stackalloc char[5];
-        SetANSICode(ptr, 0, color, background);
+        SetForegroundSequenceCode(ptr, 0, color, background);
         Append(ref data, ptr, index, 5);
         return 5;
     }
@@ -1561,7 +1856,7 @@ public static class FormattingUtil
     {
         int l = 10 + (r > 9 ? r > 99 ? 3 : 2 : 1) + (g > 9 ? g > 99 ? 3 : 2 : 1) + (b > 9 ? b > 99 ? 3 : 2 : 1);
         char* ptr = stackalloc char[l];
-        SetExtendedANSICode(ptr, 0, r, g, b, background);
+        SetForegroundSequenceString(ptr, 0, r, g, b, background);
         Append(ref data, ptr, index, l);
         return l;
     }
@@ -1737,6 +2032,9 @@ public enum RemoveRichTextOptions : ulong
           Style | Subscript | Superscript | Underline | Uppercase | VerticalOffset | TextWidth
 }
 
+/// <summary>
+/// Represents a token type for colorizing based on object type instead of color with <see cref="FormattingUtil"/>.
+/// </summary>
 public enum FormattingColorType
 {
     Keyword,
@@ -1752,8 +2050,8 @@ public enum FormattingColorType
     Namespace,
     Punctuation,
     ExtraData,
-    LinesHiddenWarning,
-    HtmlBackground
+    Number,
+    String
 }
 
 internal class LoggerFormatProvider : ITerminalFormatProvider
@@ -1761,11 +2059,10 @@ internal class LoggerFormatProvider : ITerminalFormatProvider
     public StackTraceCleaner StackCleaner => Logger.StackCleaner;
 }
 
-internal class CustomTerminalFormatProvider : ITerminalFormatProvider
+/// <summary>
+/// Create a custom <see cref="StackTraceCleaner"/> provider for <see cref="FormattingUtil"/>.
+/// </summary>
+public class CustomTerminalFormatProvider(StackTraceCleaner stackCleaner) : ITerminalFormatProvider
 {
-    public StackTraceCleaner StackCleaner { get; }
-    public CustomTerminalFormatProvider(StackTraceCleaner stackCleaner)
-    {
-        StackCleaner = stackCleaner;
-    }
+    public StackTraceCleaner StackCleaner { get; } = stackCleaner;
 }

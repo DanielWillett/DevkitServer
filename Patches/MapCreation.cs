@@ -127,7 +127,7 @@ public static class MapCreation
             // Copy over the default level asset but replace the GUID with a new one
             string defaultLevelAsset = File.ReadAllText(levelAssetFilePath);
             string dir = Path.Combine(lvlPath, "Bundles", "Assets");
-            DevkitServerUtility.CheckDirectory(false, dir);
+            FileUtil.CheckDirectory(false, dir);
 
             assetGuid = Guid.NewGuid();
             string path = Path.Combine(dir, mapName + ".asset");
@@ -141,7 +141,7 @@ public static class MapCreation
             AssetUtil.LoadFileSync(path, origin);
         }
 
-        DevkitServerUtility.CheckDirectory(false, lvlPath);
+        FileUtil.CheckDirectory(false, lvlPath);
         WriteLevelInfoConfigData(new LevelInfoConfigData
         {
             Use_Legacy_Clip_Borders = false,

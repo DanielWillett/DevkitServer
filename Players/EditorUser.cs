@@ -268,7 +268,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     internal static void OnClientConnected()
     {
         DevkitServerConfig.SeverFolderIntl = null;
-        DevkitServerUtility.CheckDirectory(false, DevkitServerConfig.ServerFolder);
+        FileUtil.CheckDirectory(false, DevkitServerConfig.ServerFolder);
         if (!DevkitServerModule.IsEditing)
             return;
         Commander.init();

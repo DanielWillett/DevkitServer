@@ -230,7 +230,7 @@ public sealed class BuildableResponsibilities : IReplicatedLevelDataSource<Build
             {
                 if (File.Exists(SavePath))
                 {
-                    string backup = DevkitServerUtility.BackupFile(SavePath, true);
+                    string backup = FileUtil.BackupFile(SavePath, true);
                     Logger.LogInfo($"[{Source}] Backed up {SavePath.Format()} to {backup.Format()}.");
                 }
             }
@@ -256,8 +256,8 @@ public sealed class BuildableResponsibilities : IReplicatedLevelDataSource<Build
         if (SavePath == null)
             return;
         ThreadUtil.assertIsGameThread();
-        
-        DevkitServerUtility.CheckDirectory(false, Path.GetDirectoryName(SavePath)!);
+
+        FileUtil.CheckDirectory(false, Path.GetDirectoryName(SavePath)!);
         Thread.BeginCriticalRegion();
         try
         {

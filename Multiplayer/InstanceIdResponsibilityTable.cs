@@ -158,7 +158,7 @@ internal sealed class InstanceIdResponsibilityTable
         _dirty = false;
         if (Responsibilities.Count > 0)
         {
-            DevkitServerUtility.CheckDirectory(false, Path.GetDirectoryName(SavePath)!);
+            FileUtil.CheckDirectory(false, Path.GetDirectoryName(SavePath)!);
             Thread.BeginCriticalRegion();
             try
             {

@@ -32,7 +32,7 @@ public class NetworkBuffer : IDisposable
                     {
                         if (amtReceived < MessageOverhead.MinimumSize)
                         {
-                            Logger.LogWarning("Received message less than " + DevkitServerUtility.FormatBytes(MessageOverhead.MinimumSize) + " long!");
+                            Logger.LogWarning("Received message less than " + FormattingUtil.FormatCapacity(MessageOverhead.MinimumSize, colorize: true) + " long!");
                             BufferProgressUpdated?.Invoke(0, 0);
                             return;
                         }
@@ -123,7 +123,7 @@ public class NetworkBuffer : IDisposable
         }
         catch (OverflowException)
         {
-            Logger.LogError("Overflow exception hit trying to allocate " + DevkitServerUtility.FormatBytes(PendingOverhead.Size) + " for message " + PendingOverhead.Format() + ".");
+            Logger.LogError("Overflow exception hit trying to allocate " + FormattingUtil.FormatCapacity(PendingOverhead.Size, colorize: true) + " for message " + PendingOverhead.Format() + ".");
             _pendingData = null;
             PendingOverhead = default;
             Buffer = null!;
@@ -131,7 +131,7 @@ public class NetworkBuffer : IDisposable
         }
         catch (OutOfMemoryException)
         {
-            Logger.LogError("Out of Memory exception hit trying to allocate " + DevkitServerUtility.FormatBytes(PendingOverhead.Size) + " for message " + PendingOverhead.Format() + ".");
+            Logger.LogError("Out of Memory exception hit trying to allocate " + FormattingUtil.FormatCapacity(PendingOverhead.Size, colorize: true) + " for message " + PendingOverhead.Format() + ".");
         }
     }
 

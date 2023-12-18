@@ -86,7 +86,7 @@ public sealed class LevelData
                     try
                     {
                         Logger.LogDebug("  Copying...");
-                        DevkitServerUtility.CopyDirectory(oldPath, newPath, overwrite: false, skipExisting: true);
+                        FileUtil.CopyDirectory(oldPath, newPath, overwrite: false, skipExisting: true);
                         Logger.LogDebug("  Done copying.");
                     }
                     catch (Exception ex)

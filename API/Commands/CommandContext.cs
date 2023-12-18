@@ -159,7 +159,7 @@ public class CommandContext : Exception
     /// </summary>
     /// <remarks>If <see cref="IsConsole"/> is true, rich text is removed from the result.</remarks>
     /// <param name="format">Formatting key.</param>
-    public string Translate(string format) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(Translations.Translate(format)) : Translations.Translate(format);
+    public string Translate(string format) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToVirtualTerminalSequences(Translations.Translate(format)) : Translations.Translate(format);
 
     /// <summary>
     /// Translate a formatting key using the default translation file (<see cref="Translations"/>).
@@ -167,7 +167,7 @@ public class CommandContext : Exception
     /// <remarks>If <see cref="IsConsole"/> is true, rich text is removed from the result.</remarks>
     /// <param name="format">Formatting key.</param>
     /// <param name="arg0">Replaces '{0}' in the value of the localization.</param>
-    public string Translate(string format, object? arg0) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(Translations.Translate(format, arg0)) : Translations.Translate(format, arg0);
+    public string Translate(string format, object? arg0) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToVirtualTerminalSequences(Translations.Translate(format, arg0)) : Translations.Translate(format, arg0);
 
     /// <summary>
     /// Translate a formatting key using the default translation file (<see cref="Translations"/>).
@@ -176,7 +176,7 @@ public class CommandContext : Exception
     /// <param name="format">Formatting key.</param>
     /// <param name="arg0">Replaces '{0}' in the value of the localization.</param>
     /// <param name="arg1">Replaces '{1}' in the value of the localization.</param>
-    public string Translate(string format, object? arg0, object? arg1) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(Translations.Translate(format, arg0, arg1)) : Translations.Translate(format, arg0, arg1);
+    public string Translate(string format, object? arg0, object? arg1) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToVirtualTerminalSequences(Translations.Translate(format, arg0, arg1)) : Translations.Translate(format, arg0, arg1);
 
     /// <summary>
     /// Translate a formatting key using the default translation file (<see cref="Translations"/>).
@@ -186,7 +186,7 @@ public class CommandContext : Exception
     /// <param name="arg0">Replaces '{0}' in the value of the localization.</param>
     /// <param name="arg1">Replaces '{1}' in the value of the localization.</param>
     /// <param name="arg2">Replaces '{2}' in the value of the localization.</param>
-    public string Translate(string format, object? arg0, object? arg1, object? arg2) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(Translations.Translate(format, arg0, arg1, arg2)) : Translations.Translate(format, arg0, arg1, arg2);
+    public string Translate(string format, object? arg0, object? arg1, object? arg2) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToVirtualTerminalSequences(Translations.Translate(format, arg0, arg1, arg2)) : Translations.Translate(format, arg0, arg1, arg2);
 
     /// <summary>
     /// Translate a formatting key using the default translation file (<see cref="Translations"/>).
@@ -194,7 +194,7 @@ public class CommandContext : Exception
     /// <remarks>If <see cref="IsConsole"/> is true, rich text is removed from the result.</remarks>
     /// <param name="format">Formatting key.</param>
     /// <param name="args">Replaces '{n}' in the value of the localization.</param>
-    public string Translate(string format, params object?[] args) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(Translations.Translate(format, args)) : Translations.Translate(format, args);
+    public string Translate(string format, params object?[] args) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToVirtualTerminalSequences(Translations.Translate(format, args)) : Translations.Translate(format, args);
 
     /// <summary>
     /// Translate a formatting key using <paramref name="lcl"/>.
@@ -202,7 +202,7 @@ public class CommandContext : Exception
     /// <remarks>If <see cref="IsConsole"/> is true, rich text is removed from the result.</remarks>
     /// <param name="format">Formatting key.</param>
     /// <param name="lcl">Localization table to use for the translation.</param>
-    public string Translate(Local lcl, string format) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(lcl.Translate(format)) : lcl.Translate(format);
+    public string Translate(Local lcl, string format) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToVirtualTerminalSequences(lcl.Translate(format)) : lcl.Translate(format);
 
     /// <summary>
     /// Translate a formatting key using <paramref name="lcl"/>.
@@ -211,7 +211,7 @@ public class CommandContext : Exception
     /// <param name="format">Formatting key.</param>
     /// <param name="arg0">Replaces '{0}' in the value of the localization.</param>
     /// <param name="lcl">Localization table to use for the translation.</param>
-    public string Translate(Local lcl, string format, object? arg0) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(lcl.Translate(format, arg0)) : lcl.Translate(format, arg0);
+    public string Translate(Local lcl, string format, object? arg0) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToVirtualTerminalSequences(lcl.Translate(format, arg0)) : lcl.Translate(format, arg0);
 
     /// <summary>
     /// Translate a formatting key using <paramref name="lcl"/>.
@@ -221,7 +221,7 @@ public class CommandContext : Exception
     /// <param name="arg0">Replaces '{0}' in the value of the localization.</param>
     /// <param name="arg1">Replaces '{1}' in the value of the localization.</param>
     /// <param name="lcl">Localization table to use for the translation.</param>
-    public string Translate(Local lcl, string format, object? arg0, object? arg1) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(lcl.Translate(format, arg0, arg1)) : lcl.Translate(format, arg0, arg1);
+    public string Translate(Local lcl, string format, object? arg0, object? arg1) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToVirtualTerminalSequences(lcl.Translate(format, arg0, arg1)) : lcl.Translate(format, arg0, arg1);
 
     /// <summary>
     /// Translate a formatting key using <paramref name="lcl"/>.
@@ -232,7 +232,7 @@ public class CommandContext : Exception
     /// <param name="arg1">Replaces '{1}' in the value of the localization.</param>
     /// <param name="arg2">Replaces '{2}' in the value of the localization.</param>
     /// <param name="lcl">Localization table to use for the translation.</param>
-    public string Translate(Local lcl, string format, object? arg0, object? arg1, object? arg2) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(lcl.Translate(format, arg0, arg1, arg2)) : lcl.Translate(format, arg0, arg1, arg2);
+    public string Translate(Local lcl, string format, object? arg0, object? arg1, object? arg2) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToVirtualTerminalSequences(lcl.Translate(format, arg0, arg1, arg2)) : lcl.Translate(format, arg0, arg1, arg2);
 
     /// <summary>
     /// Translate a formatting key using <paramref name="lcl"/>.
@@ -241,7 +241,7 @@ public class CommandContext : Exception
     /// <param name="format">Formatting key.</param>
     /// <param name="args">Replaces '{n}' in the value of the localization.</param>
     /// <param name="lcl">Localization table to use for the translation.</param>
-    public string Translate(Local lcl, string format, params object?[] args) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(lcl.Translate(format, args)) : lcl.Translate(format, args);
+    public string Translate(Local lcl, string format, params object?[] args) => ReplyingToConsole ? FormattingUtil.ConvertRichTextToVirtualTerminalSequences(lcl.Translate(format, args)) : lcl.Translate(format, args);
 
     /// <summary>
     /// Send a message to the caller or console using the default translation file (<see cref="Translations"/>).
@@ -343,12 +343,12 @@ public class CommandContext : Exception
     /// <remarks>Thread safe. Rich text is always enabled.</remarks>
     /// <param name="rawText">Formatting key.</param>
     /// <returns>A throwable execption to break out of the command.</returns>
-    public Exception ReplyString(string rawText) => ReplyStringIntl(ReplyingToConsole ? FormattingUtil.ConvertRichTextToANSI(rawText) : rawText);
+    public Exception ReplyString(string rawText) => ReplyStringIntl(ReplyingToConsole ? FormattingUtil.ConvertRichTextToVirtualTerminalSequences(rawText) : rawText);
     private Exception ReplyStringIntl(string rawText)
     {
         if (ReplyingToConsole)
         {
-            Command.LogInfo(FormattingUtil.ConvertRichTextToANSI(rawText));
+            Command.LogInfo(FormattingUtil.ConvertRichTextToVirtualTerminalSequences(rawText));
         }
         else
         {

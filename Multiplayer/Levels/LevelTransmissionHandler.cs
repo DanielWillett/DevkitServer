@@ -57,7 +57,7 @@ internal class LevelTransmissionHandler : BaseLargeMessageTransmissionClientHand
             await UniTask.SwitchToMainThread();
 
             LoadingUI.NotifyDownloadProgress(1f);
-            Logger.LogInfo($"[RECEIVE LEVEL] Finished receiving level data ({DevkitServerUtility.FormatBytes(TotalBytes)}) for level {_mapName}.", ConsoleColor.DarkCyan);
+            Logger.LogInfo($"[RECEIVE LEVEL] Finished receiving level data ({FormattingUtil.FormatCapacity(TotalBytes, colorize: true)}) for level {_mapName}.", ConsoleColor.DarkCyan);
             
             EditorLevel.OnLevelReady(Path.Combine(dir, _mapName));
         });
@@ -158,12 +158,12 @@ internal class LevelTransmissionHandler : BaseLargeMessageTransmissionClientHand
             long bytes = (long)Math.Round(ReceivedBytes / elapsed);
 
             LoadingUI.SetDownloadFileName(DevkitServerModule.LevelLoadingLocalization.Translate("Downloading",
-                _mapName, DevkitServerUtility.FormatBytes(ReceivedBytes), DevkitServerUtility.FormatBytes(TotalBytes), DevkitServerUtility.FormatBytes(bytes), timeString));
+                _mapName, FormattingUtil.FormatCapacity(ReceivedBytes), FormattingUtil.FormatCapacity(TotalBytes), FormattingUtil.FormatCapacity(bytes), timeString));
         }
         else
         {
             LoadingUI.SetDownloadFileName(DevkitServerModule.LevelLoadingLocalization.Translate("CalculatingSpeed", _mapName,
-                DevkitServerUtility.FormatBytes(ReceivedBytes), DevkitServerUtility.FormatBytes(TotalBytes)));
+                FormattingUtil.FormatCapacity(ReceivedBytes), FormattingUtil.FormatCapacity(TotalBytes)));
         }
 
         LoadingUI.NotifyDownloadProgress(ReceivedBytes != 0 && TotalBytes != 0 ? (float)ReceivedBytes / TotalBytes * 0.90f + 0.05f : 0.05f);

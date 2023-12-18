@@ -88,7 +88,7 @@ public static class Grabber
                 outPath = Path.Combine(Path.GetDirectoryName(outPath) ?? string.Empty, Path.GetFileNameWithoutExtension(outPath)) + ".obj";
                 string? dir = Path.GetDirectoryName(outPath);
                 if (dir != null)
-                    DevkitServerUtility.CheckDirectory(false, dir);
+                    FileUtil.CheckDirectory(false, dir);
 
                 using FileStream fs = new FileStream(outPath, FileMode.Create, FileAccess.Write, FileShare.Read);
                 ExportMesh(mesh, fs, null, null);
@@ -110,7 +110,7 @@ public static class Grabber
                 outPath = Path.Combine(Path.GetDirectoryName(outPath) ?? string.Empty, Path.GetFileNameWithoutExtension(outPath)) + ".json";
                 string? dir = Path.GetDirectoryName(outPath);
                 if (dir != null)
-                    DevkitServerUtility.CheckDirectory(false, dir);
+                    FileUtil.CheckDirectory(false, dir);
 
                 using FileStream fs = new FileStream(outPath, FileMode.Create, FileAccess.Write, FileShare.Read);
                 using Utf8JsonWriter writer = new Utf8JsonWriter(fs, DevkitServerConfig.WriterOptions);
@@ -129,7 +129,7 @@ public static class Grabber
                 // meshes, materials, textures
                 if (gameObject.TryGetComponent(out Renderer renderer))
                 {
-                    DevkitServerUtility.CheckDirectory(false, outPath);
+                    FileUtil.CheckDirectory(false, outPath);
                     Material[] materials = renderer.materials;
                     if (gameObject.TryGetComponent(out MeshFilter filter))
                     {
@@ -144,7 +144,7 @@ public static class Grabber
                     for (int i = 0; i < materials.Length; ++i)
                     {
                         string dir = Path.Combine(outPath, "Materials", i.ToString(CultureInfo.InvariantCulture) + "_" + materials[i].name);
-                        DevkitServerUtility.CheckDirectory(false, dir);
+                        FileUtil.CheckDirectory(false, dir);
                         using FileStream stream2 = new FileStream(Path.Combine(dir, "material.json"), FileMode.Create, FileAccess.Write, FileShare.Read);
                         ExportMaterialJson(materials[i], stream2, dir);
                     }

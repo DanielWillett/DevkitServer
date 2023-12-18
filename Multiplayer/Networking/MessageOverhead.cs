@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using DevkitServer.API;
 
 namespace DevkitServer.Multiplayer.Networking;
 
@@ -9,7 +10,7 @@ namespace DevkitServer.Multiplayer.Networking;
 /// Represents the header for <see cref="DevkitServerMessage.InvokeMethod"/> messges.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Size = MaximumSize)]
-public readonly struct MessageOverhead
+public readonly struct MessageOverhead : ITerminalFormattable
 {
     [ThreadStatic]
     private static byte[]? t_GuidBuffer;
@@ -251,7 +252,7 @@ public readonly struct MessageOverhead
             else
                 msg = "Msg: " + NetFactory.GetInvokerName(MessageGuid, (Flags & MessageFlags.HighSpeed) != 0) + ";";
         }
-        msg += " " + DevkitServerUtility.FormatBytes(Size) + ";";
+        msg += " " + FormattingUtil.FormatCapacity(Size) + ";";
         if (ResponseKey != 0)
             msg += " Snowflake: " + RequestKey.ToString(CultureInfo.InvariantCulture) + ";";
         if (RequestKey != 0)
@@ -259,5 +260,31 @@ public readonly struct MessageOverhead
         if (Flags is not MessageFlags.None)
             msg += " Flags: " + Flags.ToString("F");
         return msg;
+    }
+    public string Format(ITerminalFormatProvider provider)
+    {
+        string msg;
+        if ((Flags & MessageFlags.Guid) == 0)
+        {
+            if (MessageId == 0)
+                msg = "Unknown Message Type".ColorizeNoReset(FormattingColorType.Keyword) + " (".ColorizeNoReset(FormattingColorType.Punctuation) + MessageId.Format() + ");".ColorizeNoReset(FormattingColorType.Punctuation);
+            else
+                msg = "Msg".ColorizeNoReset(FormattingColorType.Keyword) + ": ".ColorizeNoReset(FormattingColorType.Punctuation) + NetFactory.GetInvokerName(MessageId, (Flags & MessageFlags.HighSpeed) != 0).ColorizeNoReset(FormattingColorType.Struct) + ";".ColorizeNoReset(FormattingColorType.Punctuation);
+        }
+        else
+        {
+            if (MessageGuid == Guid.Empty)
+                msg = "Unknown Message Type".ColorizeNoReset(FormattingColorType.Keyword) + " (".ColorizeNoReset(FormattingColorType.Punctuation) + MessageGuid.Format("N") + ");".ColorizeNoReset(FormattingColorType.Punctuation);
+            else
+                msg = "Msg".ColorizeNoReset(FormattingColorType.Keyword) + ": ".ColorizeNoReset(FormattingColorType.Punctuation) + NetFactory.GetInvokerName(MessageGuid, (Flags & MessageFlags.HighSpeed) != 0).ColorizeNoReset(FormattingColorType.Struct) + ";".ColorizeNoReset(FormattingColorType.Punctuation);
+        }
+        msg += " " + FormattingUtil.FormatCapacity(Size, colorize: true) + ";".ColorizeNoReset(FormattingColorType.Punctuation);
+        if (ResponseKey != 0)
+            msg += " Snowflake".ColorizeNoReset(FormattingColorType.Keyword) + ": ".ColorizeNoReset(FormattingColorType.Punctuation) + RequestKey.Format() + ";".ColorizeNoReset(FormattingColorType.Punctuation);
+        if (RequestKey != 0)
+            msg += (ResponseKey == 0 ? " Snowflake".ColorizeNoReset(FormattingColorType.Keyword) : " Request Key".ColorizeNoReset(FormattingColorType.Keyword)) + ": ".ColorizeNoReset(FormattingColorType.Punctuation) + RequestKey.Format() + ";".ColorizeNoReset(FormattingColorType.Punctuation);
+        if (Flags is not MessageFlags.None)
+            msg += " Flags".ColorizeNoReset(FormattingColorType.Keyword) + ": ".ColorizeNoReset(FormattingColorType.Punctuation) + Flags.ToString("F").ColorizeNoReset(FormattingColorType.Struct);
+        return msg + FormattingUtil.GetResetSuffix();
     }
 }

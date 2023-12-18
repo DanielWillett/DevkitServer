@@ -228,7 +228,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             return true;
 
 
-        Logger.LogWarning($"Failed to send {DevkitServerUtility.FormatBytes(Transmission.FinalContent.Count)} of data over a high-speed connection, trying low speed.",
+        Logger.LogWarning($"Failed to send {FormattingUtil.FormatCapacity(Transmission.FinalContent.Count, colorize: true)} of data over a high-speed connection, trying low speed.",
             ConsoleColor.DarkCyan, method: Transmission.LogSource);
 
         if (!ReferenceEquals(Connection, highSpeedConnection))
@@ -557,11 +557,11 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         {
             if (_missingSlowPackets > 0)
                 --_missingSlowPackets;
-            Logger.LogDebug($"[{Transmission.LogSource}] Recovered ({DevkitServerUtility.FormatBytes(packetLength)}) (packet #{(packetIndex + 1).Format()}).", ConsoleColor.DarkCyan);
+            Logger.LogDebug($"[{Transmission.LogSource}] Recovered ({FormattingUtil.FormatCapacity(packetLength, colorize: true)}) (packet #{(packetIndex + 1).Format()}).", ConsoleColor.DarkCyan);
         }
         else
         {
-            Logger.LogDebug($"[{Transmission.LogSource}] Received ({DevkitServerUtility.FormatBytes(packetLength)}) (packet #{(packetIndex + 1).Format()}).", ConsoleColor.DarkCyan);
+            Logger.LogDebug($"[{Transmission.LogSource}] Received ({FormattingUtil.FormatCapacity(packetLength, colorize: true)}) (packet #{(packetIndex + 1).Format()}).", ConsoleColor.DarkCyan);
         }
 
         ++_receivedSlowPackets;

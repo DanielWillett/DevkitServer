@@ -270,7 +270,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
         else _packetMask![packetId] = true;
         Logger.LogDebug($"[TILE SYNC] Offset: {offset.Format()}, copying {len} B to {_index}.");
         Buffer.BlockCopy(data, offset, _buffer, _index, len);
-        Logger.LogDebug($"[TILE SYNC] Receiving packet #{packetId} for tile {_receiving.Tile.Format()} ({DevkitServerUtility.FormatBytes(len)} @ {DevkitServerUtility.FormatBytes(_index)})");
+        Logger.LogDebug($"[TILE SYNC] Receiving packet #{packetId.Format()} for tile {_receiving.Tile.Format()} ({FormattingUtil.FormatCapacity(len, colorize: true)} @ {FormattingUtil.FormatCapacity(_index, colorize: true)})");
 
         _index += len;
         int missingCt = 0;
@@ -481,7 +481,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             UnsafeBitConverter.GetBytes(ptr, tile.coord.y, offset);
         }
 
-        Logger.LogDebug("[TILE SYNC]  Buffered " + DevkitServerUtility.FormatBytes(_bufferLen - HeaderSize) + " (" + _dataType.ToString().ToUpperInvariant() + ").");
+        Logger.LogDebug("[TILE SYNC]  Buffered " + FormattingUtil.FormatCapacity(_bufferLen - HeaderSize, colorize: true) + " (" + _dataType.ToString().ToUpperInvariant().Colorize(FormattingColorType.Struct) + ").");
     }
     private unsafe void ApplyBuffer()
     {

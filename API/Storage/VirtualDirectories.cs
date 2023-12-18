@@ -226,11 +226,11 @@ public static class VirtualDirectories
         writer.Write(totalFileSize);
 
         foreach (string dir in root.Directories)
-            writer.Write(FormatPath(dir));
+            writer.Write(FileUtil.FormatUniversalPath(dir));
 
         foreach (VirtualFile dir in root.Files)
         {
-            writer.Write(FormatPath(dir.Path));
+            writer.Write(FileUtil.FormatUniversalPath(dir.Path));
             writer.Write(dir.Content.Count);
             writer.WriteBlock(dir.Content);
         }
@@ -251,14 +251,14 @@ public static class VirtualDirectories
         VirtualFile[] files = new VirtualFile[fileCount];
 
         for (int i = 0; i < dirCount; ++i)
-            directories[i] = UnformatPath(reader.ReadString());
+            directories[i] = FileUtil.UnformatUniversalPath(reader.ReadString());
 
         int index = 0;
         byte[] buffer = new byte[Math.Min(1073741824L, totalFileSize)];
 
         for (int i = 0; i < fileCount; ++i)
         {
-            string path = UnformatPath(reader.ReadString());
+            string path = FileUtil.UnformatUniversalPath(reader.ReadString());
             int fileSize = reader.ReadInt32();
             reader.ReadBlockTo(buffer.AsSpan(index, fileSize));
             files[i] = new VirtualFile(path, new ArraySegment<byte>(buffer, index, fileSize));
@@ -266,14 +266,6 @@ public static class VirtualDirectories
         }
 
         return new VirtualDirectoryRoot(directories, files);
-    }
-    private static string FormatPath(string path)
-    {
-        return Path.DirectorySeparatorChar == '\\' ? path : path.Replace(Path.DirectorySeparatorChar, '\\');
-    }
-    private static string UnformatPath(string path)
-    {
-        return Path.DirectorySeparatorChar == '\\' ? path : path.Replace('\\', Path.DirectorySeparatorChar);
     }
     private static HashSet<string> RestrictedFileTypesIntl => _restrictedFileTypes ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {

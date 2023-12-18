@@ -99,14 +99,14 @@ public sealed class BackupManager : MonoBehaviour
             if (config.MaxBackupSizeMegabytes > 0)
             {
                 Logger.LogInfo($"[{Source}] Limits: {config.MaxBackups.Format()} backup{config.MaxBackups.S()}, " +
-                               $"Size: {DevkitServerUtility.FormatBytes(DevkitServerUtility.ConvertMBToB(config.MaxBackupSizeMegabytes)).Format(false)}.");
+                               $"Size: {FormattingUtil.FormatCapacity(DevkitServerUtility.ConvertMBToB(config.MaxBackupSizeMegabytes), colorize: true)}.");
             }
             else
                 Logger.LogInfo($"[{Source}] Limit: {config.MaxBackups.Format()} backup{config.MaxBackups.S()}.");
         }
         else if (config.MaxBackupSizeMegabytes > 0)
         {
-            Logger.LogInfo($"[{Source}] Size Limit: {DevkitServerUtility.FormatBytes(DevkitServerUtility.ConvertMBToB(config.MaxBackupSizeMegabytes)).Format(false)}.");
+            Logger.LogInfo($"[{Source}] Size Limit: {FormattingUtil.FormatCapacity(DevkitServerUtility.ConvertMBToB(config.MaxBackupSizeMegabytes), colorize: true)}.");
         }
         else
         {
@@ -313,7 +313,7 @@ public sealed class BackupManager : MonoBehaviour
         long streamLength = stream.Length;
         _lastSize = (int)Math.Min(1073741824L, streamLength);
 
-        Logger.LogDebug($"[{Source}] Zipped {DevkitServerUtility.FormatBytes(streamLength).Format(false)}.");
+        Logger.LogDebug($"[{Source}] Zipped {FormattingUtil.FormatCapacity(streamLength, colorize: true)}.");
         ClearBackups(streamLength, maxBackups < 0 ? null : maxBackups,
             maxBackupSizeMegabytes >= 0 ? DevkitServerUtility.ConvertMBToB(maxBackupSizeMegabytes) : null);
 
@@ -379,7 +379,7 @@ public sealed class BackupManager : MonoBehaviour
             if (fileInfo.Exists)
                 ttl += fileInfo.Length;
             else
-                ttl += DevkitServerUtility.GetDirectorySize(file);
+                ttl += FileUtil.GetDirectorySize(file);
         }
 
         return ttl;

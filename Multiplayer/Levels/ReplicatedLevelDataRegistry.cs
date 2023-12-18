@@ -369,9 +369,9 @@ public static class ReplicatedLevelDataRegistry
         }
 #if DEBUG
         if (srcInfo.Assembly != null)
-            srcInfo.Assembly.LogDebug($"[{Source}] Wrote data from {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}): {DevkitServerUtility.FormatBytes(size)}.");
+            srcInfo.Assembly.LogDebug($"[{Source}] Wrote data from {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}): {FormattingUtil.FormatCapacity(size, colorize: true)}.");
         else
-            Logger.LogDebug($"[{Source}] Wrote data from {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}): {DevkitServerUtility.FormatBytes(size)}.");
+            Logger.LogDebug($"[{Source}] Wrote data from {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}): {FormattingUtil.FormatCapacity(size, colorize: true)}.");
 #endif
     }
 

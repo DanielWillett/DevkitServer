@@ -27,10 +27,6 @@
         </PackageReference>
     </ItemGroup>
 
-
-    <ItemGroup>
-    </ItemGroup>
-
   
     <!-- Global Usings -->
     <ItemGroup>

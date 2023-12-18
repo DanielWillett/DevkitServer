@@ -593,16 +593,16 @@ internal class EditorLevelObjectsUIExtension : UIExtension
             }
 
             if (modId == 0ul)
-                path = DevkitServerUtility.GetRelativePath(UnturnedPaths.RootDirectory.FullName, path);
+                path = Path.GetRelativePath(UnturnedPaths.RootDirectory.FullName, path);
             else if (modId == 1ul)
-                path = DevkitServerUtility.GetRelativePath(sboxPath, path);
+                path = Path.GetRelativePath(sboxPath, path);
             else if (modId == 2ul)
-                path = DevkitServerUtility.GetRelativePath(mapPath, path);
+                path = Path.GetRelativePath(mapPath, path);
             else
             {
                 SteamContent? ugc = Provider.provider?.workshopService?.ugc?.Find(x => x.publishedFileID.m_PublishedFileId == modId);
                 if (ugc != null)
-                    path = DevkitServerUtility.GetRelativePath(ugc.path, path);
+                    path = Path.GetRelativePath(ugc.path, path);
             }
 
             Logger.LogInfo($"[{ObjectIconGenerator.Source}] Missing Object: {$"{obj.FriendlyName,-33}".Colorize(new Color32(255, 204, 102, 255))} @ {path.Colorize(ConsoleColor.DarkGray)}");

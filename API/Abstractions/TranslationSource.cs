@@ -498,7 +498,7 @@ public sealed class FileTranslationSource : ITranslationSource
 #nullable restore
     public string Translate(string key, object[]? parameters)
     {
-        DirectoryInfo directory = new DirectoryInfo(Path.Combine(UnturnedPaths.RootDirectory.FullName, DevkitServerUtility.UnformatUniversalPath(RelativeDirectory)));
+        DirectoryInfo directory = new DirectoryInfo(Path.Combine(UnturnedPaths.RootDirectory.FullName, FileUtil.UnformatUniversalPath(RelativeDirectory)));
 
         try
         {
@@ -515,8 +515,14 @@ public sealed class FileTranslationSource : ITranslationSource
 
     public FileTranslationSource(string relativeDirectory)
     {
+        if (!Path.IsPathRooted(relativeDirectory))
+            relativeDirectory = Path.Combine(UnturnedPaths.RootDirectory.FullName, relativeDirectory);
+
+        if (!FileUtil.IsChildOf(UnturnedPaths.RootDirectory.FullName, relativeDirectory))
+            throw new ArgumentException("Not a subfile of the root Unturned directory.", nameof(relativeDirectory));
+
         DirectoryInfo directory = new DirectoryInfo(relativeDirectory);
-        RelativeDirectory = DevkitServerUtility.FormatUniversalPath(DevkitServerUtility.GetRelativePath(UnturnedPaths.RootDirectory.FullName, directory.FullName));
+        RelativeDirectory = FileUtil.FormatUniversalPath(Path.GetRelativePath(UnturnedPaths.RootDirectory.FullName, directory.FullName));
     }
     // ReSharper disable once UnusedParameter.Local
     internal FileTranslationSource(string relativeDirectory, bool dummy)

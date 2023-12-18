@@ -72,7 +72,7 @@ public class DevkitServerConfig
     [CreateDirectory]
     public static readonly string Directory = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer");
     public static readonly string ConfigFilePath = Path.Combine(Directory, "client_config.json");
-    public static string ServerFolder => SeverFolderIntl ??= Path.Combine(Directory, "Temp_" + DevkitServerUtility.GetServerUniqueFileName());
+    public static string ServerFolder => SeverFolderIntl ??= Path.Combine(Directory, "Temp_" + FileUtil.GetServerUniqueFileName());
 #else
     [CreateDirectory]
     public static readonly string Directory = Path.Combine(UnturnedPaths.RootDirectory.FullName, "Servers", Provider.serverID, "DevkitServer");

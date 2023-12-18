@@ -24,7 +24,7 @@ internal class ServerTerminal : MonoBehaviour, ITerminal
     {
         CheckInit();
         OnOutput?.Invoke(ref input, ref color);
-        string str = FormattingUtil.GetANSIString(color, false) + input + FormattingUtil.ANSIForegroundReset;
+        string str = FormattingUtil.GetForegroundSequenceString(color, false) + input + FormattingUtil.ForegroundResetSequence;
         _writing = true;
         switch (severity)
         {
@@ -64,7 +64,7 @@ internal class ServerTerminal : MonoBehaviour, ITerminal
         if (save)
         {
             Logger.TryRemoveDateFromLine(ref str);
-            str = FormattingUtil.RemoveANSIFormatting(str);
+            str = FormattingUtil.RemoveVirtualTerminalSequences(str);
             DevkitServerUtility.QueueOnMainThread(() =>
             {
                 CommandHandler.IsLoggingFromDevkitServer = true;

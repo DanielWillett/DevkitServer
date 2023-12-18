@@ -5,80 +5,15 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Reflection;
-using System.Text.RegularExpressions;
-using SDG.Framework.Modules;
 using Unturned.SystemEx;
 #if SERVER
-using DevkitServer.Configuration;
 using DevkitServer.Patches;
 using DevkitServer.Players;
-using System.Net;
 #endif
 
 namespace DevkitServer.Util;
 public static class DevkitServerUtility
 {
-    public static T IdentitySelector<T>(T value) => value;
-    public static string QuickFormat(string input, string? val)
-    {
-        int ind = input.IndexOf("{0}", StringComparison.Ordinal);
-        if (ind != -1)
-        {
-            if (string.IsNullOrEmpty(val))
-                return input.Substring(0, ind) + input.Substring(ind + 3, input.Length - ind - 3);
-            return input.Substring(0, ind) + val + input.Substring(ind + 3, input.Length - ind - 3);
-        }
-        return input;
-    }
-
-    private static string[]? _sizeCodes;
-    private static double[]? _sizeIncrements;
-    public static Regex RemoveRichTextRegex { get; } =
-        new Regex(@"(?<!(?:\<noparse\>(?!\<\/noparse\>)).*)\<\/{0,1}(?:(?:color=\""{0,1}[#a-z]{0,9}\""{0,1})|(?:color)|(?:size=\""{0,1}\d+\""{0,1})|(?:size)|(?:alpha)|(?:alpha=#[0-f]{1,2})|(?:#.{3,8})|(?:[isub])|(?:su[pb])|(?:lowercase)|(?:uppercase)|(?:smallcaps))\>", RegexOptions.IgnoreCase);
-    public static Regex RemoveTMProRichTextRegex { get; } =
-        new Regex(@"(?<!(?:\<noparse\>(?!\<\/noparse\>)).*)\<\/{0,1}(?:(?:noparse)|(?:alpha)|(?:alpha=#[0-f]{1,2})|(?:[su])|(?:su[pb])|(?:lowercase)|(?:uppercase)|(?:smallcaps))\>", RegexOptions.IgnoreCase);
-    [Pure]
-    public static string FormatBytes(long length, int decimals = 1)
-    {
-        _sizeCodes ??= new string[]
-        {
-            "B",
-            "KiB",
-            "MiB",
-            "GiB",
-            "TiB",
-            "PiB",
-            "EiB"
-        };
-        
-        if (_sizeIncrements == null)
-        {
-            _sizeIncrements = new double[_sizeCodes.Length];
-            for (int i = 0; i < _sizeCodes.Length; ++i)
-                _sizeIncrements[i] = Math.Pow(1024, i);
-        }
-
-        if (length == 0)
-            return 0.ToString("N" + Math.Max(0, decimals).ToString(CultureInfo.InvariantCulture));
-
-        bool neg = length < 0;
-        length = Math.Abs(length);
-
-        double incr = Math.Log(length, 1024);
-        int inc;
-        if ((incr % 1) > 0.8)
-            inc = (int)Math.Ceiling(incr);
-        else
-            inc = (int)Math.Floor(incr);
-
-        if (inc >= _sizeIncrements.Length)
-            inc = _sizeIncrements.Length - 1;
-
-        double len = length / _sizeIncrements[inc];
-        if (neg) len = -len;
-
-        return len.ToString("N" + Math.Max(0, decimals).ToString(CultureInfo.InvariantCulture)) + " " + _sizeCodes[inc];
-    }
     [Pure]
     public static Bounds InflateBounds(in Bounds bounds)
     {
@@ -577,27 +512,6 @@ public static class DevkitServerUtility
     public static unsafe bool UserSteam64(this ulong s64) => ((CSteamID*)&s64)->GetEAccountType() == EAccountType.k_EAccountTypeIndividual;
     [Pure]
     public static bool UserSteam64(this CSteamID s64) => s64.GetEAccountType() == EAccountType.k_EAccountTypeIndividual;
-#if SERVER
-    [Pure]
-    public static string GetUserSavedataLocation(ulong s64, string path, int characterId = 0)
-    {
-        string basePath;
-        if (!string.IsNullOrEmpty(DevkitServerConfig.Config.UserSavedataLocationOverride))
-        {   
-            basePath = DevkitServerConfig.Config.UserSavedataLocationOverride!;
-            if (!Path.IsPathRooted(basePath))
-                basePath = Path.Combine(ReadWrite.PATH, basePath);
-        }
-        else if (PlayerSavedata.hasSync)
-            basePath = Path.Combine(ReadWrite.PATH, "Sync");
-        else
-            basePath = Path.Combine(ReadWrite.PATH, ServerSavedata.directoryName, Provider.serverID, "Players");
-
-        // intentionally using cultured toString here since the base game also does
-        return Path.Combine(basePath, s64 + "_" + characterId, Level.info.name, path);
-    }
-#endif
-
     public static void UpdateLocalizationFile(ref Local read, LocalDatDictionary @default, string directory)
     {
         DatDictionary @new = new DatDictionary();
@@ -636,12 +550,6 @@ public static class DevkitServerUtility
             args[i] ??= NullValue;
         
         return local.format(format, args);
-    }
-    /// <remarks>Does not include &lt;#ffffff&gt; colors.</remarks>
-    [Pure]
-    public static string RemoveTMProRichText(string text)
-    {
-        return RemoveTMProRichTextRegex.Replace(text, string.Empty);
     }
 
     /// <summary>
@@ -745,50 +653,6 @@ public static class DevkitServerUtility
         }
     }
 #endif
-    /// <summary>
-    /// Tries to create a directory.
-    /// </summary>
-    /// <remarks>Will not throw an exception. Use <see cref="Directory.CreateDirectory(string)"/> if you want an exception.</remarks>
-    /// <param name="relative">If the path is relative to <see cref="ReadWrite.PATH"/>.</param>
-    /// <param name="path">Relative or absolute path to a directory.</param>
-    /// <returns><see langword="true"/> if the directory is created or already existed, otherwise false.</returns>
-    public static bool CheckDirectory(bool relative, string path) => CheckDirectory(relative, false, path, null);
-    internal static bool CheckDirectory(bool relative, bool fault, string path, MemberInfo? member)
-    {
-        if (path == null)
-            return false;
-        try
-        {
-            if (relative)
-                path = Path.Combine(ReadWrite.PATH, path);
-            if (Directory.Exists(path))
-            {
-                if (member == null)
-                    Logger.LogDebug($"[CHECK DIR] Directory checked: {path.Format(false)}.");
-                else
-                    Logger.LogDebug($"[CHECK DIR] Directory checked: {path.Format(false)} from {member.Format()}.");
-                return true;
-            }
-
-            Directory.CreateDirectory(path);
-            if (member == null)
-                Logger.LogInfo($"[CHECK DIR] Directory created: {path.Format(false)}.");
-            else
-                Logger.LogInfo($"[CHECK DIR] Directory created: {path.Format(false)} from {member.Format()}.");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            if (member == null)
-                Logger.LogError($"[CHECK DIR] Unable to create directory: {path.Format(false)}.");
-            else
-                Logger.LogError($"[CHECK DIR] Unable to create directory: {path.Format(false)} from {member.Format()}.");
-            Logger.LogError(ex);
-            if (fault)
-                DevkitServerModule.Fault();
-            return false;
-        }
-    }
     /// <summary>
     /// Compares a <see cref="Quaternion"/> to <see cref="Quaternion.identity"/> within <paramref name="tolerance"/>.
     /// </summary>
@@ -985,42 +849,6 @@ public static class DevkitServerUtility
 
 
     /// <summary>
-    /// Gets the size in bytes of a directory and all it's subfiles recursively.
-    /// </summary>
-    [Pure]
-    public static long GetDirectorySize(string directory)
-    {
-        DirectoryInfo dir = new DirectoryInfo(directory);
-        return GetDirectorySize(dir);
-    }
-
-    /// <summary>
-    /// Gets the size in bytes of a directory and all it's subfiles recursively.
-    /// </summary>
-    [Pure]
-    public static long GetDirectorySize(DirectoryInfo directory)
-    {
-        if (!directory.Exists)
-            return 0L;
-        FileSystemInfo[] files = directory.GetFileSystemInfos("*", SearchOption.TopDirectoryOnly);
-        long ttl = 0;
-        for (int i = 0; i < files.Length; ++i)
-        {
-            switch (files[i])
-            {
-                case FileInfo f:
-                    ttl += f.Length;
-                    break;
-                case DirectoryInfo d:
-                    ttl += GetDirectorySize(d);
-                    break;
-            }
-        }
-
-        return ttl;
-    }
-
-    /// <summary>
     /// Removes all matches in a list.
     /// </summary>
     /// <remarks>Runs backwards.</remarks>
@@ -1169,209 +997,6 @@ public static class DevkitServerUtility
 
         return rtn;
     }
-
-    /// <summary>
-    /// Creates a copy or moves a file, for example, 'OriginalName' to 'OriginalName Backup', and optionally assigns a number if there are duplicate files.
-    /// </summary>
-    /// <param name="originalFile">Path to the file to copy or move.</param>
-    /// <param name="overwrite">Allows the copy or move operation to just overwrite existing files instead of incrementing a number.</param>
-    /// <returns>The path to the newly created or moved file.</returns>
-    public static string BackupFile(string originalFile, bool moveInsteadOfCopy, bool overwrite = true)
-    {
-        string ext = Path.GetExtension(originalFile);
-        string? dir = Path.GetDirectoryName(originalFile);
-        string fn = Path.GetFileNameWithoutExtension(originalFile) + " Backup";
-        if (dir != null)
-            fn = Path.Combine(dir, fn);
-        if (File.Exists(fn + ext) && !overwrite)
-        {
-            int num = 0;
-            fn += " ";
-            while (File.Exists(fn + num.ToString(CultureInfo.InvariantCulture) + ext))
-                ++num;
-            fn += num.ToString(CultureInfo.InvariantCulture);
-        }
-
-        DateTime? lastModified = null;
-        try
-        {
-            lastModified = File.GetLastWriteTimeUtc(originalFile);
-        }
-        catch
-        {
-            // ignored
-        }
-
-        fn += ext;
-        if (moveInsteadOfCopy)
-        {
-            if (overwrite && File.Exists(fn))
-                File.Delete(fn);
-
-            File.Move(originalFile, fn);
-        }
-        else
-        {
-            File.Copy(originalFile, fn, overwrite);
-        }
-
-        try
-        {
-            File.SetCreationTimeUtc(fn, DateTime.UtcNow);
-
-            if (lastModified.HasValue)
-                File.SetLastWriteTimeUtc(fn, lastModified.Value);
-        }
-        catch
-        {
-            // ignored
-        }
-
-        return fn;
-    }
-
-    /// <summary>
-    /// Checks to see if <paramref name="longerPath"/> is a child folder or file of the directory <paramref name="shorterPath"/>.
-    /// </summary>
-    [Pure]
-    public static bool IsChildOf(string? shorterPath, string longerPath, bool includeSubDirectories = true)
-    {
-        if (string.IsNullOrEmpty(shorterPath))
-            return true;
-        if (string.IsNullOrEmpty(longerPath))
-            return false;
-        DirectoryInfo parent = new DirectoryInfo(shorterPath);
-        DirectoryInfo child = new DirectoryInfo(longerPath);
-        return IsChildOf(parent, child, includeSubDirectories);
-    }
-
-    /// <summary>
-    /// Checks to see if <paramref name="longerPath"/> is a child folder or file of the directory <paramref name="shorterPath"/>.
-    /// </summary>
-    [Pure]
-    public static bool IsChildOf(DirectoryInfo shorterPath, DirectoryInfo longerPath, bool includeSubDirectories = true)
-    {
-        string shortFullname = shorterPath.FullName;
-        if (!includeSubDirectories)
-            return longerPath.Parent != null && longerPath.Parent.FullName.Equals(shortFullname, StringComparison.Ordinal);
-        while (longerPath.Parent != null)
-        {
-            if (longerPath.Parent.FullName.Equals(shortFullname, StringComparison.Ordinal))
-                return true;
-            longerPath = longerPath.Parent;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Gets the path to a file or directory relative to <paramref name="relativeTo"/> of <paramref name="path"/>.
-    /// </summary>
-    // https://stackoverflow.com/questions/51179331/is-it-possible-to-use-path-getrelativepath-net-core2-in-winforms-proj-targeti
-    [Pure]
-    public static string GetRelativePath(string relativeTo, string path)
-    {
-        if (!IsChildOf(relativeTo, path))
-            throw new ArgumentException("Path is not relative to parent", nameof(path));
-        if (string.IsNullOrEmpty(relativeTo))
-        {
-            path = path.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
-            if (path.IndexOf(Path.DirectorySeparatorChar) == -1)
-                path = "." + Path.DirectorySeparatorChar + path;
-            return path;
-        }
-        path = Path.GetFullPath(path);
-        relativeTo = Path.GetFullPath(relativeTo);
-        Uri uri = new Uri(relativeTo);
-        string rel = Uri.UnescapeDataString(uri.MakeRelativeUri(new Uri(path)).ToString()).Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
-        int index = rel.IndexOf(Path.DirectorySeparatorChar);
-        if (index == -1)
-            rel = "." + Path.DirectorySeparatorChar + rel;
-        else
-        {
-            if (index != rel.Length - 1)
-            {
-                rel = rel.Substring(index + 1);
-                if (rel.IndexOf(Path.DirectorySeparatorChar) == -1)
-                    rel = "." + Path.DirectorySeparatorChar + rel;
-            }
-        }
-
-        return rel;
-    }
-
-    /// <summary>
-    /// Recursively copy a directory from <paramref name="source"/> to <paramref name="destination"/>.
-    /// </summary>
-    /// <exception cref="AggregateException">Errors reading or writing files.</exception>
-    public static void CopyDirectory(string source, string destination, bool overwrite = true, bool skipExisting = false, Predicate<FileInfo>? shouldInclude = null)
-    {
-        DirectoryInfo sourceInfo = new DirectoryInfo(source);
-        if (!sourceInfo.Exists)
-            return;
-        DirectoryInfo dstInfo = new DirectoryInfo(destination);
-        if (!dstInfo.Exists)
-            dstInfo.Create();
-
-        List<Exception>? exceptions = null;
-        try
-        {
-            foreach (FileSystemInfo info in sourceInfo.GetFileSystemInfos("*", SearchOption.AllDirectories))
-            {
-                if (info is FileInfo file)
-                {
-                    try
-                    {
-                        if (shouldInclude != null && !shouldInclude(file))
-                            continue;
-                        string path = Path.Combine(dstInfo.FullName, GetRelativePath(sourceInfo.FullName, file.FullName));
-                        if (!overwrite && skipExisting && File.Exists(path))
-                            continue;
-                        string? dir = Path.GetDirectoryName(path);
-                        if (dir != null)
-                            Directory.CreateDirectory(dir);
-                        file.CopyTo(path, overwrite);
-                    }
-                    catch (Exception ex)
-                    {
-                        (exceptions ??= new List<Exception>(1)).Add(ex);
-                    }
-                }
-                else if (info is DirectoryInfo { Exists: false } dir)
-                {
-                    try
-                    {
-                        string path = Path.Combine(dstInfo.FullName, GetRelativePath(sourceInfo.FullName, dir.FullName));
-                        Directory.CreateDirectory(path);
-                    }
-                    catch (Exception ex)
-                    {
-                        (exceptions ??= new List<Exception>(1)).Add(ex);
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            throw new AggregateException(ex);
-        }
-
-        if (exceptions is { Count: > 0 })
-        {
-            throw new AggregateException(exceptions);
-        }
-    }
-
-    /// <summary>
-    /// Changes directory separators to back slashes if they aren't already.
-    /// </summary>
-    public static string FormatUniversalPath(string path) => Path.DirectorySeparatorChar == '\\' ? path : path.Replace(Path.DirectorySeparatorChar, '\\');
-
-    /// <summary>
-    /// Changes directory separators to forward slashes if they aren't supposed to be back slashes.
-    /// </summary>
-    public static string UnformatUniversalPath(string path) => Path.DirectorySeparatorChar == '\\' ? path : path.Replace('\\', Path.DirectorySeparatorChar);
-
     /// <summary>
     /// Ceils positive numbers, floors negative numbers.
     /// </summary>
@@ -1401,15 +1026,6 @@ public static class DevkitServerUtility
             v3.z -= by;
         else if (v3.z > 0)
             v3.z += by;
-    }
-
-    /// <summary>
-    /// Get the full path to a <see cref="ModuleAssembly"/> from a module.
-    /// </summary>
-    public static string GetModuleAssemblyPath(ModuleConfig config, ModuleAssembly assembly)
-    {
-        string path = Path.GetFullPath(config.DirectoryPath);
-        return string.IsNullOrEmpty(assembly.Path) ? path : Path.Combine(path, assembly.Path[0] == '/' ? assembly.Path.Substring(1) : assembly.Path);
     }
 
     /// <summary>
@@ -1450,23 +1066,6 @@ public static class DevkitServerUtility
         byte[] ipv4 = address.MapToIPv4().GetAddressBytes();
         return ((uint)ipv4[0] << 24) | ((uint)ipv4[1] << 16) | ((uint)ipv4[2] << 8) | ipv4[3];
     }
-
-    public static string GetServerUniqueFileName(bool includeMap = false, bool clientIncludesCharacter = false)
-    {
-#if CLIENT
-        if (NetFactory.GetPlayerTransportConnection() != null)
-        {
-            string mapCharPart = (includeMap ? "_" + Provider.map : string.Empty) + (clientIncludesCharacter ? "_" + Characters.selected.ToString(CultureInfo.InvariantCulture) : string.Empty);
-
-            if (Provider.CurrentServerConnectParameters.steamId.IsValid())
-                return Provider.CurrentServerConnectParameters.steamId.m_SteamID.ToString("D17", CultureInfo.InvariantCulture) + mapCharPart;
-
-            return Provider.CurrentServerConnectParameters.address + "_" + Provider.CurrentServerConnectParameters.connectionPort.ToString(CultureInfo.InvariantCulture) + mapCharPart;
-        }
-#endif
-
-        return Provider.serverID + (includeMap ? "_" + Provider.map : string.Empty);
-    }
 }
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
@@ -1504,7 +1103,7 @@ public sealed class CreateDirectoryAttribute : Attribute
                     string? path = (string?)field.GetValue(null);
                     if (path == null)
                         Logger.LogWarning($"Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.", method: "CHECK DIR");
-                    else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, field);
+                    else FileUtil.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, field);
                 }
                 catch (Exception ex)
                 {
@@ -1524,7 +1123,7 @@ public sealed class CreateDirectoryAttribute : Attribute
                         if (fileInfo == null)
                             Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
                     }
-                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, field);
+                    else FileUtil.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, field);
                 }
                 catch (Exception ex)
                 {
@@ -1540,7 +1139,7 @@ public sealed class CreateDirectoryAttribute : Attribute
                     cdir.RelativeToGameDir = false;
                     if (dir == null)
                         Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
-                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, field);
+                    else FileUtil.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, field);
                 }
                 catch (Exception ex)
                 {
@@ -1568,7 +1167,7 @@ public sealed class CreateDirectoryAttribute : Attribute
                     string? path = (string?)property.GetMethod?.Invoke(null, Array.Empty<object>());
                     if (path == null)
                         Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
-                    else DevkitServerUtility.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, property);
+                    else FileUtil.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, property);
                 }
                 catch (Exception ex)
                 {
@@ -1587,7 +1186,7 @@ public sealed class CreateDirectoryAttribute : Attribute
                         if (fileInfo == null)
                             Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
                     }
-                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, property);
+                    else FileUtil.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, property);
                 }
                 catch (Exception ex)
                 {
@@ -1602,7 +1201,7 @@ public sealed class CreateDirectoryAttribute : Attribute
                     string? dir = ((DirectoryInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>()))?.FullName;
                     if (dir == null)
                         Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
-                    else DevkitServerUtility.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, property);
+                    else FileUtil.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, property);
                 }
                 catch (Exception ex)
                 {

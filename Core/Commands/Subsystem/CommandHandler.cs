@@ -464,7 +464,7 @@ public class CommandHandler : ICommandHandler, IDisposable
                 DevkitServerUtility.QueueOnMainThread(() => ChatManager.say(user.playerID.steamID, tr, Palette.AMBIENT, EChatMode.SAY, true));
         }
         else
-            Log(FormattingUtil.ConvertRichTextToANSI(tr));
+            Log(FormattingUtil.ConvertRichTextToVirtualTerminalSequences(tr));
 #else
         if (!console)
         {
@@ -473,7 +473,7 @@ public class CommandHandler : ICommandHandler, IDisposable
             else
                 DevkitServerUtility.QueueOnMainThread(() => ChatManager.receiveChatMessage(CSteamID.Nil, string.Empty, EChatMode.SAY, Palette.AMBIENT, true, tr));
         }
-        Log(FormattingUtil.ConvertRichTextToANSI(tr));
+        Log(FormattingUtil.ConvertRichTextToVirtualTerminalSequences(tr));
 #endif
         void Log(string msg)
         {

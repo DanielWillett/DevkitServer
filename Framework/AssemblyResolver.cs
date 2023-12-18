@@ -2,7 +2,6 @@
 using DevkitServer.Plugins;
 using SDG.Framework.Modules;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using Module = SDG.Framework.Modules.Module;
 
 namespace DevkitServer.Framework;
@@ -93,7 +92,7 @@ internal class AssemblyResolver : IDisposable
 
                 foreach (ModuleAssembly asmInfo in module.config.Assemblies)
                 {
-                    string filePath = DevkitServerUtility.GetModuleAssemblyPath(module.config, asmInfo);
+                    string filePath = FileUtil.GetModuleAssemblyPath(module.config, asmInfo);
                     if (!File.Exists(filePath))
                         continue;
 

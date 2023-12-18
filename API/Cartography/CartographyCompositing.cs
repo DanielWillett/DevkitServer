@@ -1,11 +1,9 @@
 ﻿#if CLIENT
 using DevkitServer.API.Cartography.Compositors;
+using DevkitServer.Core.Cartography;
 using DevkitServer.Core.Cartography.Compositors;
 using DevkitServer.Plugins;
 using System.Diagnostics;
-using Cysharp.Threading.Tasks;
-using DevkitServer.Core.Cartography;
-using UnityEngine.Rendering;
 
 namespace DevkitServer.API.Cartography;
 internal static class CartographyCompositing
@@ -68,12 +66,7 @@ internal static class CartographyCompositing
         {
             texture.Apply(false);
 
-            RenderTexture rt = RenderTexture.GetTemporary(new RenderTextureDescriptor(texture.width, texture.height, RenderTextureFormat.ARGB32, 0, 1)
-            {
-                useMipMap = false,
-                autoGenerateMips = false,
-                dimension = TextureDimension.Tex2D
-            });
+            RenderTexture rt = RenderTexture.GetTemporary(texture.width, texture.height);
 
             active = RenderTexture.active;
             RenderTexture.active = rt;
@@ -153,7 +146,7 @@ internal static class CartographyCompositing
                 }
             }
         }
-
+        
         if (renderTexture.IsValueCreated)
         {
             texture.ReadPixels(new Rect(0, 0, data.ImageSize.x, data.ImageSize.y), 0, 0, false);

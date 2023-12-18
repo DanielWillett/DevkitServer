@@ -191,7 +191,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
     {
         Interlocked.Exchange(ref _queued, 0);
 
-        Logger.LogDebug($"[{Source}] Received packet #{_packetId.Format()} for {_navMeshDisplay} @ {DevkitServerUtility.FormatBytes(_index)}.");
+        Logger.LogDebug($"[{Source}] Received packet #{_packetId.Format()} for {_navMeshDisplay} @ {FormattingUtil.FormatCapacity(_index, colorize: true)}.");
 
         int missingCt = 0;
         _packetMask![_packetId] = true;
@@ -204,7 +204,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             if (uiExt != null)
             {
                 uiExt.UpdateLoadingBarProgress((float)(_packetId + 1) / _ttlPackets);
-                uiExt.UpdateLoadingBarDescription($"Downloading {_navMeshDisplay} | " + DevkitServerUtility.FormatBytes(_index) + " / " + DevkitServerUtility.FormatBytes(_bufferLen));
+                uiExt.UpdateLoadingBarDescription($"Downloading {_navMeshDisplay} | " + FormattingUtil.FormatCapacity(_index) + " / " + FormattingUtil.FormatCapacity(_bufferLen));
             }
 
             _pendingUINetIdStartTime = CachedTime.RealtimeSinceStartup;
@@ -404,7 +404,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
 
 
         NavigationUtil.WriteRecastGraphData(writer, flag.graph);
-        Logger.LogDebug($"[{Source}]  Buffered {DevkitServerUtility.FormatBytes(_bufferLen - HeaderSize)}. Total packets: {_ttlPackets.Format()}.");
+        Logger.LogDebug($"[{Source}]  Buffered {FormattingUtil.FormatCapacity(_bufferLen - HeaderSize, colorize: true)}. Total packets: {_ttlPackets.Format()}.");
 
         _fs!.Flush();
         _fs.Seek(0L, SeekOrigin.Begin);
@@ -578,7 +578,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
 #endif
                 length: index + len, reliable: true);
 
-            Logger.LogDebug($"[{Source}] Sent nav data packet #{_packetId.Format()} {DevkitServerUtility.FormatBytes(len)} ({DevkitServerUtility.FormatBytes(_index)} / {DevkitServerUtility.FormatBytes(_bufferLen)}).");
+            Logger.LogDebug($"[{Source}] Sent nav data packet #{_packetId.Format()} {FormattingUtil.FormatCapacity(len, colorize: true)} ({FormattingUtil.FormatCapacity(_index, colorize: true)} / {FormattingUtil.FormatCapacity(_bufferLen, colorize: true)}).");
 
             _index += len;
             ++_packetId;

@@ -65,11 +65,11 @@ public static class EditorLevel
             {
                 if (await transmission.Send(DevkitServerModule.UnloadToken))
                 {
-                    Logger.LogInfo($"[{transmission.LogSource}] Sent level {Provider.map.Format(false)} (size: {DevkitServerUtility.FormatBytes(transmission.OriginalSize)}) to {connection.Format()}.");
+                    Logger.LogInfo($"[{transmission.LogSource}] Sent level {Provider.map.Format(false)} (size: {FormattingUtil.FormatCapacity(transmission.OriginalSize, colorize: true)}) to {connection.Format()}.");
                     return;
                 }
 
-                Logger.LogWarning($"Failed to send level {Provider.map.Format(false)} (size: {DevkitServerUtility.FormatBytes(transmission.OriginalSize)}) to {connection.Format()}.", method: transmission.LogSource);
+                Logger.LogWarning($"Failed to send level {Provider.map.Format(false)} (size: {FormattingUtil.FormatCapacity(transmission.OriginalSize, colorize: true)}) to {connection.Format()}.", method: transmission.LogSource);
             }
             catch (OperationCanceledException)
             {
