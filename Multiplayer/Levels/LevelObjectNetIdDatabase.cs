@@ -67,9 +67,8 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
         for (int i = id.Index + 1; i <= ushort.MaxValue; ++i)
         {
             RegionIdentifier laterIndex = new RegionIdentifier(id.X, id.Y, (ushort)i);
-            if (!BuildableAssignments.TryGetValue(laterIndex, out NetId netId))
+            if (!BuildableAssignments.Remove(laterIndex, out NetId netId))
                 break;
-            BuildableAssignments.Remove(laterIndex);
             BuildableAssignments[new RegionIdentifier(id.X, id.Y, (ushort)(i - 1))] = netId;
         }
 
@@ -85,19 +84,19 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
             NetIdRegistry.ReleaseTransform(netId, obj.transform);
             LevelObjectAssignments.Remove(obj.instanceID);
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Released object NetId: {netId.Format()} ({obj.instanceID}, {(obj.asset?.FriendlyName).Format()}, {obj.GUID.Format()})");
+                Logger.DevkitServer.LogDebug(Source, $"Released object NetId: {netId.Format()} ({obj.instanceID}, {(obj.asset?.FriendlyName).Format()}, {obj.GUID.Format()})");
         }
         else
-            Logger.LogWarning($"Unable to release NetId to object {obj.instanceID.Format()}, {(obj.asset?.FriendlyName).Format()}, {obj.GUID.Format()}, NetId not registered.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to release NetId to object {obj.instanceID.Format()}, {(obj.asset?.FriendlyName).Format()}, {obj.GUID.Format()}, NetId not registered.");
     }
     public static NetId AddObject(LevelObject obj)
     {
         if (obj.transform == null)
         {
             if (obj.asset == null)
-                Logger.LogWarning($"Unable to assign NetId to object {obj.instanceID.Format()} ({(obj.GUID == Guid.Empty ? obj.id.Format() : obj.GUID.Format())}), asset not found.");
+                Logger.DevkitServer.LogWarning(Source, $"Unable to assign NetId to object {obj.instanceID.Format()} ({(obj.GUID == Guid.Empty ? obj.id.Format() : obj.GUID.Format())}), asset not found.");
             else
-                Logger.LogWarning($"Unable to assign NetId to object {obj.instanceID.Format()} ({(obj.asset?.FriendlyName).Format()} / {obj.GUID.Format()}), transform was null.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Unable to assign NetId to object {obj.instanceID.Format()} ({(obj.asset?.FriendlyName).Format()} / {obj.GUID.Format()}), transform was null.");
             return NetId.INVALID;
         }
         NetId netId = NetIdRegistry.Claim();
@@ -114,10 +113,10 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
             NetIdRegistry.ReleaseTransform(netId, buildable.transform);
             BuildableAssignments.Remove(id);
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Released buildable NetId: {netId.Format()} ({id.Format()}, {(buildable.asset?.FriendlyName).Format()}, {(buildable.asset == null ? null : (object)buildable.asset.GUID).Format()})");
+                Logger.DevkitServer.LogDebug(Source, $"Released buildable NetId: {netId.Format()} ({id.Format()}, {(buildable.asset?.FriendlyName).Format()}, {(buildable.asset == null ? null : (object)buildable.asset.GUID).Format()})");
         }
         else
-            Logger.LogWarning($"Unable to release NetId to buildable {id.Format()}, {(buildable.asset?.FriendlyName).Format()}, {(buildable.asset == null ? null : (object)buildable.asset.GUID).Format()}, NetId not registered.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to release NetId to buildable {id.Format()}, {(buildable.asset?.FriendlyName).Format()}, {(buildable.asset == null ? null : (object)buildable.asset.GUID).Format()}, NetId not registered.");
     }
     public static NetId AddBuildable(RegionIdentifier id) => AddBuildable(LevelObjectUtil.GetBuildable(id)!, id);
     internal static NetId AddBuildable(LevelBuildableObject buildable, RegionIdentifier id)
@@ -125,9 +124,9 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
         if (buildable == null || buildable.transform == null)
         {
             if (buildable != null && buildable.asset == null)
-                Logger.LogWarning($"Unable to assign NetId to buildable at {buildable.point.Format("F1")}, asset not found.");
+                Logger.DevkitServer.LogWarning(Source, $"Unable to assign NetId to buildable at {buildable.point.Format("F1")}, asset not found.");
             else
-                Logger.LogWarning($"Unable to assign NetId to buildable {(buildable?.asset?.FriendlyName).Format()} / {(buildable?.asset == null ? null : (object)buildable.asset.GUID).Format()}, transform was null.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Unable to assign NetId to buildable {(buildable?.asset?.FriendlyName).Format()} / {(buildable?.asset == null ? null : (object)buildable.asset.GUID).Format()}, transform was null.");
             return NetId.INVALID;
         }
         NetId netId = NetIdRegistry.Claim();
@@ -211,7 +210,7 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
                 }
             }
         }
-        Logger.LogInfo($"[{Source}] Assigned NetIds for {buildables.Format()} buildable{buildables.S()}.");
+        Logger.DevkitServer.LogInfo(Source, $"Assigned NetIds for {buildables.Format()} buildable{buildables.S()}.");
         for (int x = 0; x < Regions.WORLD_SIZE; ++x)
         {
             for (int y = 0; y < Regions.WORLD_SIZE; ++y)
@@ -224,7 +223,7 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
                 }
             }
         }
-        Logger.LogInfo($"[{Source}] Assigned NetIds for {objects.Format()} object{objects.S()}.");
+        Logger.DevkitServer.LogInfo(Source, $"Assigned NetIds for {objects.Format()} object{objects.S()}.");
     }
 #endif
 
@@ -239,17 +238,17 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
                 {
                     registry[value] = netId;
                     if (Level.isLoaded)
-                        Logger.LogDebug($"[{Source}] NetId was already registered: {old.Format()} @ {t.name.Format()}.");
+                        Logger.DevkitServer.LogDebug(Source, $"NetId was already registered: {old.Format()} @ {t.name.Format()}.");
                     return;
                 }
                 if (Level.isLoaded)
-                    Logger.LogDebug($"[{Source}] NetId already set: {old.Format()} @ {(t == null ? null : t.name).Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"NetId already set: {old.Format()} @ {(t == null ? null : t.name).Format()}.");
                 NetIdRegistry.ReleaseTransform(old, t);
             }
             else if (NetIdRegistry.Release(old))
             {
                 if (Level.isLoaded)
-                    Logger.LogDebug($"[{Source}] Released old NetId pairing: {old.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {old.Format()}.");
             }
         }
 
@@ -259,16 +258,16 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
             if (old == netId)
             {
                 if (Level.isLoaded)
-                    Logger.LogDebug($"[{Source}] NetId was already claimed: {old.Format()} @ {path.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"NetId was already claimed: {old.Format()} @ {path.Format()}.");
                 return;
             }
             NetIdRegistry.ReleaseTransform(old, transform);
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Released old transform pairing NetId: {old.Format()} @ {path.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Released old transform pairing NetId: {old.Format()} @ {path.Format()}.");
         }
         NetIdRegistry.AssignTransform(netId, transform);
         if (Level.isLoaded)
-            Logger.LogDebug($"[{Source}] Claimed new NetId: {netId.Format()} @ {transform.name.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Claimed new NetId: {netId.Format()} @ {transform.name.Format()}.");
     }
 
 #if CLIENT
@@ -283,7 +282,7 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
             LevelBuildableObject? buildable = LevelObjectUtil.GetBuildable(id);
             if (buildable == null)
             {
-                Logger.LogWarning($"Unable to find buildable in level data info: {id.Format()}.");
+                Logger.DevkitServer.LogWarning(Source, $"Unable to find buildable in level data info: {id.Format()}.");
                 continue;
             }
 
@@ -300,7 +299,7 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
                     ? LevelObjectUtil.TryFindObject(last, instanceId, out RegionIdentifier id)
                     : LevelObjectUtil.TryFindObject(instanceId, out id)))
             {
-                Logger.LogWarning($"Unable to find object in level data info: {instanceId.Format()}.");
+                Logger.DevkitServer.LogWarning(Source, $"Unable to find object in level data info: {instanceId.Format()}.");
                 continue;
             }
 

@@ -67,6 +67,8 @@ internal sealed class VanillaCommand : ICachedTranslationSourceCommand, IEquatab
     public override int GetHashCode() => CommandName.GetHashCode();
     public static bool operator ==(VanillaCommand? left, VanillaCommand? right) => Equals(left, right);
     public static bool operator !=(VanillaCommand? left, VanillaCommand? right) => !Equals(left, right);
-
     public string Format(ITerminalFormatProvider provider) => Command.GetType().Format();
+    void IDevkitServerLogger.AddLog(ITerminal terminal, object? source, Severity severity, ReadOnlySpan<char> message, Exception? exception, int baseColorArgb)
+        => Logger.Unturned.AddLog(terminal, source, severity, message, exception, baseColorArgb);
+    string ILogSource.Source => Command.command.ToUpperInvariant() + " CMD";
 }

@@ -7,7 +7,6 @@ using DevkitServer.Util.Encoding;
 namespace DevkitServer.Multiplayer.Sync;
 public class ObjectSync : AuthoritativeSync<ObjectSync>
 {
-    private const string Source = "OBJECT SYNC";
     private const float Delay = 0.5f;
     private const float SendDelay = 3f;
     private static readonly NetCallRaw<ulong, ObjectInfo> SendObjectSyncData = new NetCallRaw<ulong, ObjectInfo>(DevkitServerNetCall.SendObjectSyncData, null, reader => new ObjectInfo(reader), null, (writer, obj) => obj.Write(writer));
@@ -35,7 +34,7 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
         if (time - _lastSent < Delay)
             return;
         _lastSent = time;
-        NetId netId = _syncQueue[_syncQueue.Count - 1];
+        NetId netId = _syncQueue[^1];
         _syncQueue.RemoveAt(_syncQueue.Count - 1);
         ObjectInfo obj;
         if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out LevelBuildableObject? buildable, out _))
@@ -56,7 +55,7 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
                 return;
             obj = new ObjectInfo(netId, true, transform.position, transform.rotation, transform.localScale, default, -1);
         }
-        Logger.LogDebug($"[{Source}] Syncing {netId.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Syncing {netId.Format()}.");
 #if SERVER
         SendObjectSyncData.Invoke(Provider.GatherClientConnections(), 0ul, obj);
 #elif CLIENT
@@ -78,12 +77,12 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
 
         if (sync == null)
         {
-            Logger.LogError($"Unable to find object sync source for relay ID: {relaySource.Format()}.", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Unable to find object sync source for relay ID: {relaySource.Format()}.");
             return;
         }
         if (!sync.HasAuthority)
         {
-            Logger.LogError($"Found object sync relay source, but it didn't have authority: {relaySource.Format()}, {sync.Format()}.", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Found object sync relay source, but it didn't have authority: {relaySource.Format()}, {sync.Format()}.");
             return;
         }
 
@@ -95,7 +94,7 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
     {
         if (!HasAuthority || _syncQueue.Count == 0)
             return;
-        if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(_syncQueue[_syncQueue.Count - 1], out LevelObject? levelObject, out LevelBuildableObject? buildable, out _))
+        if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(_syncQueue[^1], out LevelObject? levelObject, out LevelBuildableObject? buildable, out _))
             return;
         Transform? transform = levelObject == null ? buildable!.transform : levelObject.GetTransform();
         if (transform == null)
@@ -108,13 +107,13 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
 #endif
     private static void ReceiveObject(in ObjectInfo obj)
     {
-        Logger.LogDebug($"[{Source}] Received object sync data for NetID: {obj.NetId.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Received object sync data for NetID: {obj.NetId.Format()}.");
 
         if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(obj.NetId, out LevelObject? levelObject, out LevelBuildableObject? buildable, out _))
         {
             if (!obj.IsAlive)
                 return;
-            Logger.LogWarning($"Expected object ({obj.NetId.Format()}) not found.");
+            Logger.DevkitServer.LogWarning(Source, $"Expected object ({obj.NetId.Format()}) not found.");
         }
         else if (levelObject != null)
         {
@@ -123,7 +122,7 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
                 return;
             if (!obj.IsAlive)
             {
-                Logger.LogDebug($"[{Source}] Deleting invalid object: {levelObject.asset.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Deleting invalid object: {levelObject.asset.Format()}.");
                 LevelObjects.registerRemoveObject(transform);
                 return;
             }
@@ -132,7 +131,7 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
                 !transform.rotation.IsNearlyEqual(obj.Rotation) ||
                 !transform.localScale.IsNearlyEqual(obj.Scale))
             {
-                Logger.LogDebug($"[{Source}] Transforming invalid object: {levelObject.asset.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Transforming invalid object: {levelObject.asset.Format()}.");
                 LevelObjects.registerTransformObject(transform, obj.Position, obj.Rotation, obj.Scale, transform.position, transform.rotation, transform.localScale);
             }
 
@@ -173,7 +172,7 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
 
             if (!obj.IsAlive)
             {
-                Logger.LogDebug($"[{Source}] Deleting invalid buildable: {buildable.asset.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Deleting invalid buildable: {buildable.asset.Format()}.");
                 LevelObjects.registerRemoveObject(transform);
                 return;
             }
@@ -182,7 +181,7 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
                 !transform.rotation.IsNearlyEqual(obj.Rotation) ||
                 !transform.localScale.IsNearlyEqual(obj.Scale))
             {
-                Logger.LogDebug($"[{Source}] Transforming invalid buildable: {buildable.asset.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Transforming invalid buildable: {buildable.asset.Format()}.");
                 LevelObjects.registerTransformObject(transform, obj.Position, obj.Rotation, obj.Scale, transform.position, transform.rotation, transform.localScale);
             }
         }
@@ -217,7 +216,7 @@ public class ObjectSync : AuthoritativeSync<ObjectSync>
         }
         _syncQueue.Insert(0, netId);
         _lastSent = CachedTime.RealtimeSinceStartup + Math.Max(-Delay, SendDelay - _syncQueue.Count * Delay);
-        Logger.LogDebug($"[{Source}] Requested sync for: {netId.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Requested sync for: {netId.Format()}.");
     }
 
     private readonly struct ObjectInfo

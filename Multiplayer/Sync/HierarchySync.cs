@@ -8,7 +8,6 @@ using SDG.Framework.Devkit;
 namespace DevkitServer.Multiplayer.Sync;
 public class HierarchySync : AuthoritativeSync<HierarchySync>
 {
-    private const string Source = "HIERARCHY SYNC";
     private const float Delay = 0.5f;
     private const float SendDelay = 3f;
     private static readonly NetCallRaw<ulong, HierarchyItemInfo> SendHierarchySyncData = new NetCallRaw<ulong, HierarchyItemInfo>(DevkitServerNetCall.SendHierarchySyncData, null, reader => new HierarchyItemInfo(reader), null, (writer, obj) => obj.Write(writer));
@@ -36,7 +35,7 @@ public class HierarchySync : AuthoritativeSync<HierarchySync>
         if (time - _lastSent < Delay)
             return;
         _lastSent = time;
-        NetId netId = _syncQueue[_syncQueue.Count - 1];
+        NetId netId = _syncQueue[^1];
         _syncQueue.RemoveAt(_syncQueue.Count - 1);
         HierarchyItemInfo obj;
         if (!HierarchyItemNetIdDatabase.TryGetHierarchyItem(netId, out IDevkitHierarchyItem item))
@@ -57,7 +56,7 @@ public class HierarchySync : AuthoritativeSync<HierarchySync>
                 obj = new HierarchyItemInfo(netId, true, Vector3.zero, Quaternion.identity, Vector3.one);
             }
         }
-        Logger.LogDebug($"[{Source}] Syncing {netId.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Syncing {netId.Format()}.");
 #if SERVER
         SendHierarchySyncData.Invoke(Provider.GatherClientConnections(), 0ul, obj);
 #elif CLIENT
@@ -79,12 +78,12 @@ public class HierarchySync : AuthoritativeSync<HierarchySync>
 
         if (sync == null)
         {
-            Logger.LogError($"Unable to find hierarchy item sync source for relay ID: {relaySource.Format()}.", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Unable to find hierarchy item sync source for relay ID: {relaySource.Format()}.");
             return;
         }
         if (!sync.HasAuthority)
         {
-            Logger.LogError($"Found hierarchy item sync relay source, but it didn't have authority: {relaySource.Format()}, {sync.Format()}.", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Found hierarchy item sync relay source, but it didn't have authority: {relaySource.Format()}, {sync.Format()}.");
             return;
         }
 
@@ -96,7 +95,7 @@ public class HierarchySync : AuthoritativeSync<HierarchySync>
     {
         if (!HasAuthority || _syncQueue.Count == 0)
             return;
-        if (!HierarchyItemNetIdDatabase.TryGetHierarchyItem(_syncQueue[_syncQueue.Count - 1], out IDevkitHierarchyItem item) || item is not Component comp)
+        if (!HierarchyItemNetIdDatabase.TryGetHierarchyItem(_syncQueue[^1], out IDevkitHierarchyItem item) || item is not Component comp)
             return;
         Transform? transform = comp.transform;
         if (transform == null)
@@ -109,17 +108,17 @@ public class HierarchySync : AuthoritativeSync<HierarchySync>
 #endif
     private static void ReceiveHierarchyItem(in HierarchyItemInfo obj)
     {
-        Logger.LogDebug($"[{Source}] Received hierarchy item sync data for NetID: {obj.NetId.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Received hierarchy item sync data for NetID: {obj.NetId.Format()}.");
 
         if (!HierarchyItemNetIdDatabase.TryGetHierarchyItem(obj.NetId, out IDevkitHierarchyItem item))
         {
             if (!obj.IsAlive)
                 return;
-            Logger.LogWarning($"Expected hierarchy item ({obj.NetId.Format()}) not found.");
+            Logger.DevkitServer.LogWarning(Source, $"Expected hierarchy item ({obj.NetId.Format()}) not found.");
         }
         else if (!obj.IsAlive)
         {
-            Logger.LogDebug($"[{Source}] Deleting invalid hierarchy item: {item.Format()} ({item.instanceID.Format()}).");
+            Logger.DevkitServer.LogDebug(Source, $"Deleting invalid hierarchy item: {item.Format()} ({item.instanceID.Format()}).");
             HierarchyUtil.LocalRemoveItem(item);
         }
         else if (item is Component comp)
@@ -130,7 +129,7 @@ public class HierarchySync : AuthoritativeSync<HierarchySync>
                                       !transform.rotation.IsNearlyEqual(obj.Rotation) ||
                                       !transform.localScale.IsNearlyEqual(obj.Scale)))
             {
-                Logger.LogDebug($"[{Source}] Transforming invalid hierarchy item: {item.Format()} ({item.instanceID.Format()}).");
+                Logger.DevkitServer.LogDebug(Source, $"Transforming invalid hierarchy item: {item.Format()} ({item.instanceID.Format()}).");
                 HierarchyUtil.LocalTranslate(item, new FinalTransformation(obj.NetId,
                     new TransformationDelta(TransformationDelta.TransformFlags.All, obj.Position, obj.Rotation, transform.position, transform.rotation),
                     obj.Scale, transform.localScale), true);
@@ -162,7 +161,7 @@ public class HierarchySync : AuthoritativeSync<HierarchySync>
         }
         _syncQueue.Insert(0, netId);
         _lastSent = CachedTime.RealtimeSinceStartup + Math.Max(-Delay, SendDelay - _syncQueue.Count * Delay);
-        Logger.LogDebug($"[{Source}] Requested sync for: {netId.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Requested sync for: {netId.Format()}.");
     }
 
     private readonly struct HierarchyItemInfo

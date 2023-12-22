@@ -166,13 +166,12 @@ public class UITypeInfo
                 }
 
                 if (OpenMethods.Length == 0)
-                    Logger.LogWarning($"Failed to find any open methods for UI: {type.Format()}.", method: UIAccessTools.Source);
+                    Logger.DevkitServer.LogWarning(UIAccessTools.Source, $"Failed to find any open methods for UI: {type.Format()}.");
 
             }
             catch (Exception ex)
             {
-                Logger.LogWarning($"Error finding any open methods for UI: {type.Format()}.", method: UIAccessTools.Source);
-                Logger.LogError(ex, method: UIAccessTools.Source);
+                Logger.DevkitServer.LogWarning(UIAccessTools.Source, ex, $"Error finding any open methods for UI: {type.Format()}.");
                 OpenMethods = Array.Empty<UIVisibilityMethodInfo>();
             }
         }
@@ -199,12 +198,11 @@ public class UITypeInfo
                 }
 
                 if (CloseMethods.Length == 0)
-                    Logger.LogWarning($"Failed to find any close methods for UI: {type.Format()}.", method: UIAccessTools.Source);
+                    Logger.DevkitServer.LogWarning(UIAccessTools.Source, $"Failed to find any close methods for UI: {type.Format()}.");
             }
             catch (Exception ex)
             {
-                Logger.LogWarning($"Error finding any close methods for UI: {type.Format()}.", method: UIAccessTools.Source);
-                Logger.LogError(ex, method: UIAccessTools.Source);
+                Logger.DevkitServer.LogWarning(UIAccessTools.Source, ex, $"Error finding any close methods for UI: {type.Format()}.");
                 CloseMethods = Array.Empty<UIVisibilityMethodInfo>();
             }
         }
@@ -232,12 +230,11 @@ public class UITypeInfo
                 }
 
                 if (InitializeMethods.Length == 0)
-                    Logger.LogWarning($"Failed to find any initialize constructors for UI: {type.Format()}.", method: UIAccessTools.Source);
+                    Logger.DevkitServer.LogWarning(UIAccessTools.Source, $"Failed to find any initialize constructors for UI: {type.Format()}.");
             }
             catch (Exception ex)
             {
-                Logger.LogWarning($"Error finding any initialize constructors for UI: {type.Format()}.", method: UIAccessTools.Source);
-                Logger.LogError(ex, method: UIAccessTools.Source);
+                Logger.DevkitServer.LogWarning(UIAccessTools.Source, ex, $"Error finding any initialize constructors for UI: {type.Format()}.");
                 InitializeMethods = Array.Empty<UIVisibilityMethodInfo>();
             }
         }
@@ -264,12 +261,11 @@ public class UITypeInfo
                 }
 
                 if (DestroyMethods.Length == 0)
-                    Logger.LogDebug($"[{UIAccessTools.Source}] Failed to find any destroy methods for UI: {type.Format()}.");
+                    Logger.DevkitServer.LogDebug(UIAccessTools.Source, $"Failed to find any destroy methods for UI: {type.Format()}.");
             }
             catch (Exception ex)
             {
-                Logger.LogWarning($"Error finding any destroy methods for UI: {type.Format()}.", method: UIAccessTools.Source);
-                Logger.LogError(ex, method: UIAccessTools.Source);
+                Logger.DevkitServer.LogWarning(UIAccessTools.Source, ex, $"Error finding any destroy methods for UI: {type.Format()}.");
                 DestroyMethods = Array.Empty<UIVisibilityMethodInfo>();
             }
         }
@@ -299,12 +295,11 @@ public class UITypeInfo
                         x.Name.Equals("active", StringComparison.InvariantCultureIgnoreCase) || x.Name.Equals("isActive", StringComparison.InvariantCultureIgnoreCase))?
                     .GetGetMethod(true);
                 if (IsActiveMember == null)
-                    Logger.LogWarning($"Failed to find any 'active' or 'isActive' member for {type.Format()}.", method: UIAccessTools.Source);
+                    Logger.DevkitServer.LogWarning(UIAccessTools.Source, $"Failed to find any 'active' or 'isActive' member for {type.Format()}.");
             }
             catch (Exception ex)
             {
-                Logger.LogWarning($"Error finding any destroy methods for UI: {type.Format()}.", method: UIAccessTools.Source);
-                Logger.LogError(ex, method: UIAccessTools.Source);
+                Logger.DevkitServer.LogWarning(UIAccessTools.Source, ex, $"Error finding any destroy methods for UI: {type.Format()}.");
                 IsActiveMember = null;
             }
         }

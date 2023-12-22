@@ -58,14 +58,13 @@ public static class TransportPatcher
             if (method != null)
             {
                 PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionEstablished));
-                Logger.LogDebug($"[{Source}] Postfixed {method.Format()} to add an event for when transport connections are established.");
+                Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when transport connections are established.");
             }
-            else Logger.LogWarning("Method not found: ServerTransport_SteamNetworkingSockets.HandleState_Connected.", method: Source);
+            else Logger.DevkitServer.LogWarning(Source, "Method not found: ServerTransport_SteamNetworkingSockets.HandleState_Connected.");
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Patcher unpatching error: ServerTransport_SteamNetworkingSockets.HandleState_Connected.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, "Patcher unpatching error: ServerTransport_SteamNetworkingSockets.HandleState_Connected.");
         }
 
         // ServerTransport_SteamNetworkingSockets.CloseConnection
@@ -75,14 +74,13 @@ public static class TransportPatcher
             if (method != null)
             {
                 PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionClosed));
-                Logger.LogDebug($"[{Source}] Postfixed {method.Format()} to add an event for when transport connections are disposed.");
+                Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when transport connections are disposed.");
             }
-            else Logger.LogWarning("Method not found: ServerTransport_SteamNetworkingSockets.CloseConnection.", method: Source);
+            else Logger.DevkitServer.LogWarning(Source, "Method not found: ServerTransport_SteamNetworkingSockets.CloseConnection.");
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Patcher unpatching error: ServerTransport_SteamNetworkingSockets.CloseConnection.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, "Patcher unpatching error: ServerTransport_SteamNetworkingSockets.CloseConnection.");
         }
 #elif CLIENT
         // ClientTransport_SteamNetworkingSockets.HandleState_Connected
@@ -92,14 +90,13 @@ public static class TransportPatcher
             if (method != null)
             {
                 PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionEstablished));
-                Logger.LogDebug($"[{Source}] Postfixed {method.Format()} to add an event for when the client transport connection is established.");
+                Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when the client transport connection is established.");
             }
-            else Logger.LogWarning("Method not found: ClientTransport_SteamNetworkingSockets.HandleState_Connected.", method: Source);
+            else Logger.DevkitServer.LogWarning(Source, "Method not found: ClientTransport_SteamNetworkingSockets.HandleState_Connected.");
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Patching error: ClientTransport_SteamNetworkingSockets.HandleState_Connected.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, "Patching error: ClientTransport_SteamNetworkingSockets.HandleState_Connected.");
         }
 
         // ClientTransport_SteamNetworkingSockets.TearDown
@@ -109,14 +106,13 @@ public static class TransportPatcher
             if (method != null)
             {
                 PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionClosed));
-                Logger.LogDebug($"[{Source}] Postfixed {method.Format()} to add an event for when the client transport connection is disposed.");
+                Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when the client transport connection is disposed.");
             }
-            else Logger.LogWarning("Method not found: ClientTransport_SteamNetworkingSockets.TearDown.", method: Source);
+            else Logger.DevkitServer.LogWarning(Source, "Method not found: ClientTransport_SteamNetworkingSockets.TearDown.");
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Patching error: ClientTransport_SteamNetworkingSockets.TearDown.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, "Patching error: ClientTransport_SteamNetworkingSockets.TearDown.");
         }
 #endif
     }
@@ -131,13 +127,12 @@ public static class TransportPatcher
             if (method != null)
             {
                 PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionEstablished));
-                Logger.LogDebug($"[{Source}] Postfixed {method.Format()} to add an event for when transport connections are established.");
+                Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when transport connections are established.");
             }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Patcher unpatching error: ServerTransport_SteamNetworkingSockets.HandleState_Connected.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, "Patcher unpatching error: ServerTransport_SteamNetworkingSockets.HandleState_Connected.");
         }
 
         // ServerTransport_SteamNetworkingSockets.CloseConnection
@@ -147,13 +142,12 @@ public static class TransportPatcher
             if (method != null)
             {
                 PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionClosed));
-                Logger.LogDebug($"[{Source}] Postfixed {method.Format()} to add an event for when transport connections are disposed.");
+                Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when transport connections are disposed.");
             }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Patcher unpatching error: ServerTransport_SteamNetworkingSockets.CloseConnection.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, "Patcher unpatching error: ServerTransport_SteamNetworkingSockets.CloseConnection.");
         }
 #elif CLIENT
         // ClientTransport_SteamNetworkingSockets.HandleState_Connected
@@ -163,13 +157,12 @@ public static class TransportPatcher
             if (method != null)
             {
                 PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionEstablished));
-                Logger.LogDebug($"[{Source}] Postfixed {method.Format()} to add an event for when the client transport connection is established.");
+                Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when the client transport connection is established.");
             }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Patcher unpatching error: ClientTransport_SteamNetworkingSockets.HandleState_Connected.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, "Patcher unpatching error: ClientTransport_SteamNetworkingSockets.HandleState_Connected.");
         }
 
         // ClientTransport_SteamNetworkingSockets.TearDown
@@ -179,13 +172,12 @@ public static class TransportPatcher
             if (method != null)
             {
                 PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionClosed));
-                Logger.LogDebug($"[{Source}] Postfixed {method.Format()} to add an event for when the client transport connection is disposed.");
+                Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when the client transport connection is disposed.");
             }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Patcher unpatching error: ClientTransport_SteamNetworkingSockets.TearDown.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, "Patcher unpatching error: ClientTransport_SteamNetworkingSockets.TearDown.");
         }
 #endif
     }
@@ -203,12 +195,16 @@ public static class TransportPatcher
     {
         if (GetNetTransportFlag?.Invoke() is { hasValue: true, value: { } flag } && !flag.Equals("SteamNetworkingSockets", StringComparison.OrdinalIgnoreCase) && !flag.Equals(DevkitServerModule.ModuleName, StringComparison.OrdinalIgnoreCase))
         {
-            Logger.LogWarning($"Unable to use specified transport type: \"{"-NetTransport".Colorize(ConsoleColor.White)} {flag.Colorize(ConsoleColor.Red)}\", only \"{"-NetTransport".Colorize(ConsoleColor.White)} {"SteamNetworkingSockets".Colorize(DevkitServerModule.UnturnedColor)}\" or \"{"-NetTransport".Colorize(ConsoleColor.White)} {DevkitServerModule.ModuleName.Colorize(DevkitServerModule.ModuleColor)}\" is supported.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to use specified transport type: \"{"-NetTransport".Colorize(ConsoleColor.White)} " +
+                                                   $"{flag.Colorize(ConsoleColor.Red)}\", only \"{"-NetTransport".Colorize(ConsoleColor.White)} " +
+                                                   $"{"SteamNetworkingSockets".Colorize(DevkitServerModule.UnturnedColor)}\" or " +
+                                                   $"\"{"-NetTransport".Colorize(ConsoleColor.White)} {DevkitServerModule.ModuleName.Colorize(DevkitServerModule.ModuleColor)}\" " +
+                                                   $"is supported.");
             TransportType = null;
         }
         else
         {
-            Logger.LogInfo($"[{Source}] Verified valid transport command line argument: \"{"-NetTransport".Colorize(ConsoleColor.White)} {(GetNetTransportFlag?.Invoke() is { hasValue: true, value: { } flag2 } ? flag2 : "default".Colorize(ConsoleColor.DarkGray))}\".");
+            Logger.DevkitServer.LogInfo(Source, $"[{Source}] Verified valid transport command line argument: \"{"-NetTransport".Colorize(ConsoleColor.White)} {(GetNetTransportFlag?.Invoke() is { hasValue: true, value: { } flag2 } ? flag2 : "default".Colorize(ConsoleColor.DarkGray))}\".");
         }
     }
 #endif
@@ -280,7 +276,7 @@ public static class TransportPatcher
         ref HSteamNetConnection handle = ref callback.m_hConn;
         ref SteamNetworkingIPAddr addr = ref callback.m_info.m_addrRemote;
 
-        Logger.LogDebug($"[{Source}] Transport connection created: {Parser.getIPFromUInt32(addr.GetIPv4()).ColorizeNoReset(new Color32(204, 255, 102, 255))}{":".ColorizeNoReset(FormattingColorType.Punctuation)}{addr.m_port.ToString(CultureInfo.InvariantCulture).Colorize(new Color32(170, 255, 0, 255))}.");
+        Logger.DevkitServer.LogDebug(Source, $"Transport connection created: {Parser.getIPFromUInt32(addr.GetIPv4()).ColorizeNoReset(new Color32(204, 255, 102, 255))}{":".ColorizeNoReset(FormattingColorType.Punctuation)}{addr.m_port.ToString(CultureInfo.InvariantCulture).Colorize(new Color32(170, 255, 0, 255))}.");
         if (__instance == null || GetTransportConnections == null)
             return;
 
@@ -297,7 +293,7 @@ public static class TransportPatcher
 
         if (connection == null)
         {
-            Logger.LogWarning($"Unknown transport connection with handle {handle.m_HSteamNetConnection.Format("X8")}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unknown transport connection with handle {handle.m_HSteamNetConnection.Format("X8")}.");
             return;
         }
 
@@ -308,7 +304,7 @@ public static class TransportPatcher
         CustomNetMessageListeners.RemoteMappings.Remove(transportConnection, out _);
 
         EventOnTransportConnectionDestroyed?.TryInvoke(transportConnection);
-        Logger.LogDebug($"[{Source}] Transport connection torn down: {transportConnection.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Transport connection torn down: {transportConnection.Format()}.");
     }
 #elif CLIENT
     private static void PostFixOnTransportConnectionEstablished(ClientTransport_SteamNetworkingSockets __instance, ref SteamNetConnectionStatusChangedCallback_t callback)
@@ -319,13 +315,13 @@ public static class TransportPatcher
             CustomNetMessageListeners.SendLocalMappings();
         }
         else
-            Logger.LogDebug($"[{Source}] Client transport connection either connected to not a DevkitServer server or is unable to tell as of yet.");
+            Logger.DevkitServer.LogDebug(Source, $"Client transport connection either connected to not a DevkitServer server or is unable to tell as of yet.");
 
         EventOnTransportConnectionCreated.TryInvoke(__instance);
     }
     private static void PostFixOnTransportConnectionClosed(ClientTransport_SteamNetworkingSockets __instance)
     {
-        Logger.LogDebug($"[{Source}] Client transport connection torn down.");
+        Logger.DevkitServer.LogDebug(Source, $"Client transport connection torn down.");
 
         EventOnTransportConnectionDestroyed?.TryInvoke(__instance);
     }
@@ -352,7 +348,7 @@ public class DevkitServerSteamNetworkingSocketsTransport
                 m_int32 = TransportPatcher.SendBufferSize
             }
         });
-        Logger.LogInfo($"[{TransportPatcher.Source}] Set transport buffer size to {FormattingUtil.FormatCapacity(TransportPatcher.SendBufferSize, colorize: true)}.");
+        Logger.DevkitServer.LogInfo(TransportPatcher.Source, $"Set transport buffer size to {FormattingUtil.FormatCapacity(TransportPatcher.SendBufferSize, colorize: true)}.");
         return @base;
     }
 }

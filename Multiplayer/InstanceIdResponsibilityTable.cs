@@ -1,10 +1,10 @@
 ﻿using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.Multiplayer;
-internal sealed class InstanceIdResponsibilityTable
+internal sealed class InstanceIdResponsibilityTable(string savePath, string source)
 {
     private const ushort DataVersion = 0;
-    private bool _dirty = false;
+    private bool _dirty;
 #if SERVER
     private readonly Dictionary<uint, ulong> Responsibilities = new Dictionary<uint, ulong>(256);
 #else
@@ -13,14 +13,8 @@ internal sealed class InstanceIdResponsibilityTable
     private static readonly ByteWriter Writer = new ByteWriter(false);
     private static readonly ByteReader Reader = new ByteReader { LogOnError = true };
     
-    public string SavePath { get; }
-    public string Source { get; }
-
-    public InstanceIdResponsibilityTable(string savePath, string source)
-    {
-        SavePath = savePath;
-        Source = source;
-    }
+    public string SavePath { get; } = savePath;
+    public string Source { get; } = source;
 
 #if SERVER
     public ulong GetPlacer(uint instanceId) => Responsibilities.TryGetValue(instanceId, out ulong placer) ? placer : 0ul;
@@ -44,7 +38,7 @@ internal sealed class InstanceIdResponsibilityTable
             bool client = Reader.ReadBool();
             if (client == Dedicator.IsDedicatedServer)
             {
-                Logger.LogWarning($"Invalid responsiblities file provided: {SavePath.Format(false)}. This file was created on the wrong platform (client vs. server).", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Invalid responsiblities file provided: {SavePath.Format(false)}. This file was created on the wrong platform (client vs. server).");
                 return;
             }
             while (Reader.BytesLeft > 0)
@@ -72,18 +66,17 @@ internal sealed class InstanceIdResponsibilityTable
                 }
                 else Responsibilities.Add(instanceId, steam64);
 #else
-                if (Responsibilities.Contains(instanceId))
+                if (!Responsibilities.Add(instanceId))
                     save = true;
-                else Responsibilities.Add(instanceId);
 #endif
             }
-            Logger.LogDebug($"[{Source}] Read {Responsibilities.Count.Format()} responsiblities in table stored at {SavePath.Format()}." + (save ? " Saving updates." : string.Empty));
+            Logger.DevkitServer.LogDebug(Source, $"Read {Responsibilities.Count.Format()} responsiblities in table stored at {SavePath.Format()}." + (save ? " Saving updates." : string.Empty));
             if (save && resaveIfNeeded)
                 Save();
         }
         else
         {
-            Logger.LogDebug($"[{Source}] Loaded new responsiblities table.");
+            Logger.DevkitServer.LogDebug(Source, "Loaded new responsiblities table.");
         }
 
         _dirty = false;
@@ -129,9 +122,8 @@ internal sealed class InstanceIdResponsibilityTable
 
         Responsibilities.Add(instanceId, existing);
 #else
-        if (Responsibilities.Contains(instanceId))
+        if (!Responsibilities.Add(instanceId))
             return;
-        Responsibilities.Add(instanceId);
 #endif
         if (!save) return;
         if (!File.Exists(SavePath))

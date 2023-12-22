@@ -62,7 +62,7 @@ internal static class PatchesMain
     }
     internal static void Init()
     {
-        Logger.LogInfo($"[{Source}] Patching game code...");
+        Logger.DevkitServer.LogInfo(Source, "Patching game code...");
 
         try
         {
@@ -80,11 +80,11 @@ internal static class PatchesMain
             TransportPatcher.ManualPatch();
             DoManualPatches();
             sw.Stop();
-            Logger.LogInfo($"[{Source}] Finished patching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)} ({(sw.GetElapsedMilliseconds() / 1000d).ToString("0.0000").Colorize(FormattingUtil.NumberColor)} seconds).");
+            Logger.DevkitServer.LogInfo(Source, $"Finished patching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)} ({(sw.GetElapsedMilliseconds() / 1000d).ToString("0.0000").Colorize(FormattingUtil.NumberColor)} seconds).");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, "Patch error");
             DevkitServerModule.Fault();
             Unpatch();
         }
@@ -96,11 +96,11 @@ internal static class PatchesMain
             TransportPatcher.ManualUnpatch();
             DoManualUnpatches();
             Patcher.UnpatchAll(HarmonyId);
-            Logger.LogInfo($"[{Source}] Finished unpatching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
+            Logger.DevkitServer.LogInfo(Source, $"Finished unpatching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(Source, ex, "Unpatch error.");
         }
     }
     private static void DoManualPatches()
@@ -116,8 +116,7 @@ internal static class PatchesMain
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Patcher error: Level.includeHash.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogWarning(Source, ex, "Patcher error: Level.includeHash.");
         }
 #if CLIENT
         if (DevkitServerConfig.Config.EnableBetterLevelCreation)
@@ -129,14 +128,13 @@ internal static class PatchesMain
                 if (method != null)
                     Patcher.Patch(method, transpiler: Accessor.GetHarmonyMethod(MapCreation.TranspileOnClickedAddLevelButton));
                 else
-                    Logger.LogWarning($"Method not found to patch map creation: {FormattingUtil.FormatMethod(typeof(void), typeof(MenuWorkshopEditorUI), "onClickedAddButton",
-                            new (Type, string?)[] { (typeof(ISleekElement), "button") }, isStatic: true)}.", method: Source);
+                    Logger.DevkitServer.LogWarning(Source, $"Method not found to patch map creation: {FormattingUtil.FormatMethod(typeof(void),
+                        typeof(MenuWorkshopEditorUI), "onClickedAddButton", [ (typeof(ISleekElement), "button") ], isStatic: true)}.");
             }
             catch (Exception ex)
             {
-                Logger.LogWarning($"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), typeof(MenuWorkshopEditorUI), "onClickedAddButton",
-                        new (Type, string?)[] { (typeof(ISleekElement), "button") }, isStatic: true)}.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), typeof(MenuWorkshopEditorUI), "onClickedAddButton",
+                        [ (typeof(ISleekElement), "button") ], isStatic: true)}.");
             }
         }
 #endif
@@ -149,8 +147,7 @@ internal static class PatchesMain
         }
         catch (Exception ex)
         {
-            Logger.LogWarning($"Failed to patch method: {Accessor.GetMethod(Level.save).Format()}.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch method: {Accessor.GetMethod(Level.save).Format()}.");
         }
 
 
@@ -160,18 +157,19 @@ internal static class PatchesMain
             MethodInfo? method = typeof(Level).GetMethod(nameof(Level.init), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int) }, null);
             if (method == null)
             {
-                Logger.LogWarning($"Method not found: {FormattingUtil.FormatMethod(typeof(IEnumerator), typeof(Level), nameof(Level.init), namedArguments: new (Type, string?)[] { (typeof(int), "id") })}.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Method not found: {FormattingUtil.FormatMethod(typeof(IEnumerator), typeof(Level),
+                                                        nameof(Level.init), [ (typeof(int), "id") ])}.");
             }
             else
             {
                 Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostfixLevelInit));
-                Logger.LogDebug($"Postfixed {method.Format()} to add a on begin level load call.");
+                Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add a on begin level load call.");
             }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning($"Failed to patch coroutine: {FormattingUtil.FormatMethod(typeof(IEnumerator), typeof(Level), nameof(Level.init), namedArguments: new (Type, string?)[] { (typeof(int), "id") })}.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch coroutine: {FormattingUtil.FormatMethod(typeof(IEnumerator), typeof(Level),
+                nameof(Level.init), [ (typeof(int), "id") ])}.");
         }
 #if CLIENT
         // EditorInteract.Update
@@ -181,12 +179,12 @@ internal static class PatchesMain
             if (method != null)
                 Patcher.Patch(method, prefix: Accessor.GetHarmonyMethod(EditorInteractUpdatePrefix));
             else
-                Logger.LogWarning($"Method not found to patch editor looking while not in Editor controller: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Method not found to patch editor looking while not in Editor controller: {FormattingUtil.FormatMethod(typeof(void),
+                                               Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.");
         }
         catch (Exception ex)
         {
-            Logger.LogWarning($"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.");
         }
 
         // LoadingUI.onClickedCancelButton
@@ -200,8 +198,7 @@ internal static class PatchesMain
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Patcher unpatching error: LoadingUI.onClickedCancelButton.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogWarning(Source, ex, "Patcher unpatching error: LoadingUI.onClickedCancelButton.");
         }
 #endif
     }
@@ -218,8 +215,7 @@ internal static class PatchesMain
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Patcher unpatching error: Level.includeHash.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogWarning(Source, ex, "Patcher unpatching error: Level.includeHash.");
         }
 
         // Level.init
@@ -233,8 +229,7 @@ internal static class PatchesMain
         }
         catch (Exception ex)
         {
-            Logger.LogWarning($"Failed to unpatch coroutine: {FormattingUtil.FormatMethod(typeof(IEnumerator), typeof(Level), nameof(Level.init), namedArguments: new (Type, string?)[] { (typeof(int), "id") })}.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to unpatch coroutine: {FormattingUtil.FormatMethod(typeof(IEnumerator), typeof(Level), nameof(Level.init), namedArguments: [ (typeof(int), "id") ])}.");
         }
 
 #if CLIENT
@@ -249,8 +244,7 @@ internal static class PatchesMain
         }
         catch (Exception ex)
         {
-            Logger.LogWarning($"Failed to unpatch method: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to unpatch method: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.");
         }
 
         // LoadingUI.onClickedCancelButton
@@ -264,8 +258,7 @@ internal static class PatchesMain
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Patcher unpatching error: LoadingUI.onClickedCancelButton.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogWarning(Source, ex, "Patcher unpatching error: LoadingUI.onClickedCancelButton.");
         }
 #endif
     }
@@ -274,7 +267,7 @@ internal static class PatchesMain
 #if CLIENT
         if (DevkitServerModule.IsEditing)
         {
-            Logger.LogInfo("Asking server to save.");
+            Logger.DevkitServer.LogInfo(nameof(OnLevelSaving), "Asking server to save.");
             DevkitServerModule.AskSave();
             return false;
         }
@@ -285,7 +278,7 @@ internal static class PatchesMain
         if (LevelData.ShouldActivateSaveLockOnLevelSave)
             LevelData.SaveLock.Wait();
 
-        Logger.LogInfo("Saving editor data.");
+        Logger.DevkitServer.LogInfo(nameof(OnLevelSaving), "Saving editor data.");
         LandscapeUtil.DeleteUnusedTileData();
         return true;
     }
@@ -312,12 +305,11 @@ internal static class PatchesMain
             }
             catch (Exception ex)
             {
-                Logger.LogWarning("Failed to cancel level download.", method: levelDownload.LogSource);
-                Logger.LogError(ex, method: levelDownload.LogSource);
+                Logger.DevkitServer.LogWarning(levelDownload.LogSource, ex, "Failed to cancel level download.");
                 return;
             }
 
-            Logger.LogInfo(!cancelled
+            Logger.DevkitServer.LogInfo(levelDownload.LogSource, !cancelled
                 ? $"[{levelDownload.LogSource}] Level download already cancelled."
                 : $"[{levelDownload.LogSource}] Level download cancelled by user request.");
         });
@@ -349,7 +341,7 @@ internal static class PatchesMain
     
     private static void PostfixLevelInit(ref IEnumerator __result)
     {
-        Logger.LogInfo($"Level initializing: {Level.info.getLocalizedName().Format(false)}.");
+        Logger.DevkitServer.LogInfo(Source, $"Level initializing: {Level.info.getLocalizedName().Format(false)}.");
 
         IEnumerator val = __result;
         __result = UniTask.ToCoroutine(async () =>
@@ -368,13 +360,13 @@ internal static class PatchesMain
         FieldInfo? areaField = typeof(Editor).GetField("_area", BindingFlags.NonPublic | BindingFlags.Instance);
         if (areaField == null)
         {
-            Logger.LogWarning("Unable to find field: Editor._area.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find field: Editor._area.");
             return;
         }
         FieldInfo? editorField = typeof(Editor).GetField("_editor", BindingFlags.NonPublic | BindingFlags.Static);
         if (editorField == null)
         {
-            Logger.LogWarning("Unable to find field: Editor._editor.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find field: Editor._editor.");
             return;
         }
         Transform parent = __instance.transform.parent;
@@ -382,11 +374,11 @@ internal static class PatchesMain
         {
             editorField.SetValue(null, editor);
             areaField.SetValue(editor, area);
-            Logger.LogDebug($"[{Source}] Patched issue with EditorUI not loading (set Editor._area and Editor._editor in OnEnable).");
+            Logger.DevkitServer.LogDebug(Source, $"Patched issue with EditorUI not loading (set Editor._area and Editor._editor in OnEnable).");
         }
         else
         {
-            Logger.LogWarning("Unable to fix order of Editor component instantiations.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to fix order of Editor component instantiations.");
         }
     }
 
@@ -398,19 +390,19 @@ internal static class PatchesMain
         FieldInfo? playerUIInstance = typeof(PlayerUI).GetField("instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
         if (playerUIInstance == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find field: PlayerUI.instance.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find field: PlayerUI.instance.");
             DevkitServerModule.Fault();
         }
         FieldInfo? editorUIInstance = typeof(EditorUI).GetField("instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
         if (playerUIInstance == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find field: EditorUI.instance.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find field: EditorUI.instance.");
             DevkitServerModule.Fault();
         }
 
         MethodInfo getController = UserInput.GetLocalControllerMethod;
 
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> ins = [..instructions];
         bool patchedOutPlayerUI = false;
         bool patchedOutEditorUI = false;
         for (int i = 1; i < ins.Count; ++i)
@@ -436,18 +428,17 @@ internal static class PatchesMain
 
         if (!patchedOutPlayerUI)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to edit call to {FormattingUtil.FormatMethod(typeof(void), typeof(PlayerUI), "Player_OnGUI", arguments: Type.EmptyTypes)}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to edit call to {FormattingUtil.FormatMethod(typeof(void), typeof(PlayerUI), "Player_OnGUI", arguments: Type.EmptyTypes)}.");
             DevkitServerModule.Fault();
         }
         if (!patchedOutEditorUI)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to edit call to {FormattingUtil.FormatMethod(typeof(void), typeof(EditorUI), "Editor_OnGUI", arguments: Type.EmptyTypes)}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to edit call to {FormattingUtil.FormatMethod(typeof(void), typeof(EditorUI), "Editor_OnGUI", arguments: Type.EmptyTypes)}.");
             DevkitServerModule.Fault();
         }
 
         return ins;
     }
-
     
     [HarmonyPatch("SDG.Unturned.Level, Assembly-CSharp", nameof(Level.isLoading), MethodType.Getter)]
     [HarmonyPrefix]
@@ -472,7 +463,7 @@ internal static class PatchesMain
 
         if (Provider.CurrentServerAdvertisement == null)
         {
-            Logger.LogWarning("Unable to find Provider.CurrentServerAdvertisement. This could be caused by using a P2P or fake IP connection, if so please create an issue on GitHub.");
+            Logger.DevkitServer.LogWarning(Source, "Unable to find Provider.CurrentServerAdvertisement. This could be caused by using a P2P or fake IP connection, if so please create an issue on GitHub.");
             return true;
         }
 
@@ -507,7 +498,7 @@ internal static class PatchesMain
         }
         else
         {
-            Logger.LogInfo($"Loading server level: {level.getLocalizedName().Format(false)}.");
+            Logger.DevkitServer.LogInfo(nameof(Launch), $"Loading server level: {level.getLocalizedName().Format(false)}.");
             Level.edit(level);
             Provider.gameMode = new DevkitServerGamemode();
         }
@@ -527,14 +518,14 @@ internal static class PatchesMain
             DevkitServerModule.IsEditing = true;
             CustomNetMessageListeners.SendLocalMappings();
 
-            Logger.LogInfo($"Connecting to a server running {DevkitServerModule.ModuleName.Colorize(DevkitServerModule.ModuleColor)} " +
+            Logger.DevkitServer.LogInfo(nameof(RulesReady), $"Connecting to a server running {DevkitServerModule.ModuleName.Colorize(DevkitServerModule.ModuleColor)} " +
                            $"v{version.Format()} (You are running {Accessor.DevkitServer.GetName().Version.Format()})...");
 
             EditorLevel.RequestLevel();
         }
         else
         {
-            Logger.LogDebug($"Did not find tag {DevkitServerModule.ServerRule.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(RulesReady), $"Did not find tag {DevkitServerModule.ServerRule.Format()}.");
             DevkitServerModule.IsEditing = false;
             ProceedWithLaunch();
         }
@@ -630,7 +621,7 @@ internal static class PatchesMain
         MethodInfo? isConnected = typeof(Provider).GetProperty(nameof(Provider.isConnected), BindingFlags.Static | BindingFlags.Public)?.GetMethod;
         if (isConnected == null)
         {
-            Logger.LogWarning("Unable to find getter: Provider.isConnected.");
+            Logger.DevkitServer.LogWarning(Source, "Unable to find getter: Provider.isConnected.");
             DevkitServerModule.Fault();
         }
         List<CodeInstruction> inst = new List<CodeInstruction>(instructions);
@@ -644,13 +635,13 @@ internal static class PatchesMain
                 yield return new CodeInstruction(OpCodes.Call, IsPlayerControlledOrNotEditingMethod);
                 yield return new CodeInstruction(OpCodes.And);
                 one = true;
-                Logger.LogDebug($"[{Source}] {method.Format()} - Patched connection state checker.");
+                Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Patched connection state checker.");
             }
         }
 
         if (!one)
         {
-            Logger.LogWarning($"Unable to patch connection state checker in {method.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to patch connection state checker in {method.Format()}.");
             DevkitServerModule.Fault();
         }
     }
@@ -691,7 +682,7 @@ internal static class PatchesMain
             Provider.host();
         else
         {
-            Logger.LogError($"Unable to host without {Path.Combine(DevkitServerConfig.BundlesFolder, "devkitserver.masterbundle").Format(false)}. Try redownloading from {DevkitServerModule.RepositoryUrl}.", method: "TryLoadBundle");
+            Logger.DevkitServer.LogError("TryLoadBundle", $"Unable to host without {Path.Combine(DevkitServerConfig.BundlesFolder, "devkitserver.masterbundle").Format(false)}. Try redownloading from {DevkitServerModule.RepositoryUrl}.");
             DevkitServerModule.Fault();
         }
     }
@@ -717,7 +708,7 @@ internal static class PatchesMain
     {
         if (!string.IsNullOrEmpty(Provider.serverPassword) && !Hash.verifyHash(passwordSHA1, Provider.serverPasswordHash))
         {
-            Logger.LogInfo($"{ctx.Connection.Format()} tried to connect with an invalid password.");
+            Logger.DevkitServer.LogInfo(nameof(OnConnectionPending), $"{ctx.Connection.Format()} tried to connect with an invalid password.");
             DevkitServerUtility.CustomDisconnect(ctx.Connection, ESteamRejection.WRONG_PASSWORD);
             ctx.Acknowledge(StandardErrorCode.AccessViolation);
             return;
@@ -737,10 +728,10 @@ internal static class PatchesMain
         {
             RemoveConnection(transportConnection);
             PendingConnections.Add(transportConnection);
-            Logger.LogDebug("Connection pending: " + transportConnection.Format() + ".");
+            Logger.DevkitServer.LogDebug(nameof(OnConnectionPending), "Connection pending: " + transportConnection.Format() + ".");
         }
         else
-            Logger.LogDebug("Connection already pending: " + transportConnection.Format() + ".");
+            Logger.DevkitServer.LogDebug(nameof(OnConnectionPending), "Connection already pending: " + transportConnection.Format() + ".");
     }
     [HarmonyPatch("ServerMessageHandler_ReadyToConnect", "ReadMessage", MethodType.Normal)]
     [HarmonyPrefix]
@@ -749,7 +740,7 @@ internal static class PatchesMain
     {
         RemoveExpiredConnections();
         RemoveConnection(transportConnection);
-        Logger.LogDebug("Connection ready: " + transportConnection.Format() + ".");
+        Logger.DevkitServer.LogDebug(nameof(OnReadyToConnect), "Connection ready: " + transportConnection.Format() + ".");
     }
     [UsedImplicitly]
     [HarmonyPatch(typeof(LevelLighting), nameof(LevelLighting.updateLocal), typeof(Vector3), typeof(float), typeof(IAmbianceNode))]
@@ -803,7 +794,7 @@ internal static class PatchesMain
     private static void AdvertiseConfig()
     {
         Version version = Accessor.DevkitServer.GetName().Version;
-        Logger.LogDebug($"Setting SteamGameServer KeyValue {DevkitServerModule.ServerRule.Format()} to {version.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(AdvertiseConfig), $"Setting SteamGameServer KeyValue {DevkitServerModule.ServerRule.Format()} to {version.Format()}.");
         SteamGameServer.SetKeyValue(DevkitServerModule.ServerRule, version.ToString(4));
     }
 
@@ -844,7 +835,7 @@ internal static class PatchesMain
             {
                 yield return new CodeInstruction(OpCodes.Pop);
                 yield return new CodeInstruction(lvlEdit.GetCallRuntime(), lvlEdit);
-                Logger.LogDebug("Inserted patch to " + method.Format() + " to load editor instead of player.");
+                Logger.DevkitServer.LogDebug(Source, "Inserted patch to " + method.Format() + " to load editor instead of player.");
                 one = true;
             }
             else
@@ -852,7 +843,7 @@ internal static class PatchesMain
         }
         if (!one)
         {
-            Logger.LogWarning("Failed to insert " + method.Format() + " patch to load editor instead of player.");
+            Logger.DevkitServer.LogWarning(Source, "Failed to insert " + method.Format() + " patch to load editor instead of player.");
             DevkitServerModule.Fault();
         }
     }
@@ -862,7 +853,7 @@ internal static class PatchesMain
     [UsedImplicitly]
     private static bool OnCheckingLevelHash(ITransportConnection connection)
     {
-        Logger.LogInfo(connection.Format() + " checking hash...");
+        Logger.DevkitServer.LogInfo(nameof(OnCheckingLevelHash), connection.Format() + " checking hash...");
         return DevkitServerModule.IsEditing;
     }
 
@@ -881,10 +872,10 @@ internal static class PatchesMain
         });
         if (reject == null)
         {
-            Logger.LogWarning("Unable to find method: Provider.reject(ITransportConnection, ESteamRejection).");
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: Provider.reject(ITransportConnection, ESteamRejection).");
             DevkitServerModule.Fault();
         }
-        List<CodeInstruction> list = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> list = [..instructions];
         int c = 0;
         for (int i = 0; i < list.Count; ++i)
         {
@@ -898,7 +889,7 @@ internal static class PatchesMain
                 yield return new CodeInstruction(OpCodes.Ldarg_0);
                 yield return new CodeInstruction(mtd.GetCallRuntime(), mtd);
                 yield return new CodeInstruction(OpCodes.Brtrue_S, label);
-                Logger.LogDebug("Inserted patch to " + method.Format() + " to skip level hash verification.");
+                Logger.DevkitServer.LogDebug(Source, "Inserted patch to " + method.Format() + " to skip level hash verification.");
                 yield return ins;
                 yield return list[i + 1];
                 yield return list[i + 2];
@@ -913,13 +904,13 @@ internal static class PatchesMain
         }
         if (c != 2)
         {
-            Logger.LogWarning("Failed to insert two " + method.Format() + " patches to skip level hash verification.");
+            Logger.DevkitServer.LogWarning(Source, "Failed to insert two " + method.Format() + " patches to skip level hash verification.");
             DevkitServerModule.Fault();
         }
     }
     private static void OnLoadEdit(LevelInfo info)
     {
-        Logger.LogInfo("Loading DevkitServerEditor for " + info.getLocalizedName() + ".");
+        Logger.DevkitServer.LogInfo(Source, "Loading DevkitServerEditor for " + info.getLocalizedName() + ".");
         DevkitServerModule.IsEditing = true;
         Level.edit(info);
     }
@@ -932,7 +923,7 @@ internal static class PatchesMain
         FieldInfo? field = typeof(LevelZombies).GetField("_zombies", BindingFlags.Static | BindingFlags.NonPublic);
         if (field == null || !field.FieldType.IsAssignableFrom(typeof(List<ZombieSpawnpoint>[])))
         {
-            Logger.LogError($"Unable to find field: {typeof(LevelZombies).Format()}._zombies.");
+            Logger.DevkitServer.LogError(Source, $"Unable to find field: {typeof(LevelZombies).Format()}._zombies.");
             DevkitServerModule.Fault();
             return;
         }
@@ -961,7 +952,7 @@ internal static class PatchesMain
                 }
             }
         }
-        Logger.LogInfo($"Copied over {c.Format()} zombie spawn{c.S()} from {typeof(LevelZombies).Format()}.");
+        Logger.DevkitServer.LogInfo(Source, $"Copied over {c.Format()} zombie spawn{c.S()} from {typeof(LevelZombies).Format()}.");
     }
 
 
@@ -1028,11 +1019,11 @@ internal static class PatchesMain
         FieldInfo? transactions = typeof(Landscape).GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Static);
         if (transactions == null)
         {
-            Logger.LogWarning("Unable to find field: Landscape." + fieldName.Format(false) + " in " + method.Format() + ".");
+            Logger.DevkitServer.LogWarning(Source, "Unable to find field: Landscape." + fieldName.Format(false) + " in " + method.Format() + ".");
             DevkitServerModule.Fault();
         }
 
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> ins = [..instructions];
         bool ld = false;
         for (int i = 0; i < ins.Count; ++i)
         {
@@ -1046,7 +1037,7 @@ internal static class PatchesMain
                     {
                         yield return new CodeInstruction(OpCodes.Ldsfld, LandscapeUtil.SaveTransactionsField);
                         yield return new CodeInstruction(OpCodes.Brfalse_S, lbl);
-                        Logger.LogDebug("Inserted save transactions check in " + method.Format() + ".");
+                        Logger.DevkitServer.LogDebug(Source, "Inserted save transactions check in " + method.Format() + ".");
                         break;
                     }
                 }
@@ -1056,7 +1047,7 @@ internal static class PatchesMain
         }
         if (!ld)
         {
-            Logger.LogWarning("Patching error for " + method.Format() + ". Invalid transpiler operation.");
+            Logger.DevkitServer.LogWarning(Source, "Patching error for " + method.Format() + ". Invalid transpiler operation.");
             DevkitServerModule.Fault();
         }
     }

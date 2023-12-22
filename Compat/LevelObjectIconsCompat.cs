@@ -9,7 +9,7 @@ internal static class LevelObjectIconsCompat
 {
     internal static void AddIconProviders(IList<IDefaultIconProvider> providers)
     {
-        Logger.LogInfo($"Loading compat layer for {"LevelObjectIcons".Colorize(new Color32(255, 255, 102, 255))}...");
+        Logger.DevkitServer.LogInfo(ObjectIconGenerator.Source, $"Loading compat layer for {"LevelObjectIcons".Colorize(new Color32(255, 255, 102, 255))}...");
         IEnumerable<Type> types = !DevkitServerConfig.Config.DisableDefaultLevelObjectIconProviderSearch
             ? Accessor.GetTypesSafe(ModuleHook.modules.Where(x => x.assemblies != null).SelectMany(x => x.assemblies), true)
             : Accessor.GetTypesSafe(true);
@@ -23,7 +23,7 @@ internal static class LevelObjectIconsCompat
             }
             catch (Exception ex)
             {
-                Logger.LogInfo($"Unable to check type {type.Format()} for {typeof(DanielWillett.LevelObjectIcons.API.IDefaultIconProvider).Format()} - {ex.GetType().Format()} {ex.Message.Format(true)}");
+                Logger.DevkitServer.LogInfo(ObjectIconGenerator.Source, $"Unable to check type {type.Format()} for {typeof(DanielWillett.LevelObjectIcons.API.IDefaultIconProvider).Format()} - {ex.GetType().Format()} {ex.Message.Format(true)}");
                 continue;
             }
 
@@ -34,8 +34,7 @@ internal static class LevelObjectIconsCompat
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Unable to apply icon provider: {type.Format()}.", method: ObjectIconGenerator.Source);
-                Logger.LogError(ex, method: ObjectIconGenerator.Source);
+                Logger.DevkitServer.LogError(ObjectIconGenerator.Source, ex, $"Unable to apply icon provider: {type.Format()}.");
             }
         }
     }

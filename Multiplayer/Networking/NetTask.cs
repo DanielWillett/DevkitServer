@@ -46,10 +46,10 @@ public sealed class NetTask : CustomYieldInstruction
         _requestId = reqId;
         if (timeoutMs / 1000d > NetFactory.MaxListenTimeout)
         {
-            Logger.LogWarning("Started a listener or ack listener with a timeout longer than the max timeout (" +
-                              NetFactory.MaxListenTimeout.ToString("0.##", CultureInfo.InvariantCulture) +
-                              " seconds). Using max as timeout.");
-            Logger.LogWarning(new StackTrace().ToString());
+            Logger.DevkitServer.LogWarning(nameof(NetTask), "Started a listener or ack listener with a timeout longer than the max timeout (" +
+                                           NetFactory.MaxListenTimeout.ToString("0.##", CultureInfo.InvariantCulture) +
+                                           " seconds). Using max as timeout.");
+            Logger.DevkitServer.LogWarning(nameof(NetTask), Logger.UseStackCleanerForExceptions ? Logger.StackCleaner.GetString(new StackTrace()) : new StackTrace().ToString());
             timeoutMs = (int)Math.Floor(NetFactory.MaxListenTimeout * 1000d);
         }
         _awaiter = new NetTaskAwaiter(this);

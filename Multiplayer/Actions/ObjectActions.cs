@@ -11,6 +11,7 @@ using DevkitServer.Players;
 namespace DevkitServer.Multiplayer.Actions;
 public sealed class ObjectActions
 {
+    internal const string Source = "OBJECT ACTIONS";
     public EditorActions EditorActions { get; }
     internal ObjectActions(EditorActions actions)
     {
@@ -104,7 +105,7 @@ public sealed class DeleteLevelObjectsAction : IAction
                 NetId netId = NetIds[i];
                 if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out LevelBuildableObject? buildable, out _))
                 {
-                    Logger.LogWarning($"Unknown object or buildable with NetId: {netId.Format()}.");
+                    Logger.DevkitServer.LogWarning(ObjectActions.Source, $"Unknown object or buildable with NetId: {netId.Format()}.");
                     continue;
                 }
                 objs[i] = levelObject == null ? buildable!.transform : levelObject.transform;
@@ -132,7 +133,7 @@ public sealed class DeleteLevelObjectsAction : IAction
             NetId netId = NetIds[i];
             if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out LevelBuildableObject? buildable, out RegionIdentifier buildableId))
             {
-                Logger.LogWarning($"Unknown object or buildable with NetId: {netId.Format()}.");
+                Logger.DevkitServer.LogWarning(ObjectActions.Source, $"Unknown object or buildable with NetId: {netId.Format()}.");
                 continue;
             }
 
@@ -200,7 +201,7 @@ public class MoveLevelObjectsFinalAction : IAction
                 NetId netId = Transformations[i].NetId;
                 if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out LevelBuildableObject? buildable, out _))
                 {
-                    Logger.LogWarning($"Unknown object or buildable with NetId: {netId.Format()}.");
+                    Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown object or buildable with NetId: {netId.Format()}.");
                     continue;
                 }
                 objs[i] = levelObject == null ? buildable!.transform : levelObject.transform;
@@ -229,7 +230,7 @@ public class MoveLevelObjectsFinalAction : IAction
             NetId netId = Transformations[i].NetId;
             if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out LevelBuildableObject? buildable, out RegionIdentifier buildableId))
             {
-                Logger.LogWarning($"Unknown object or buildable with NetId: {netId.Format()}.");
+                Logger.DevkitServer.LogWarning(ObjectActions.Source, $"Unknown object or buildable with NetId: {netId.Format()}.");
                 continue;
             }
 
@@ -370,7 +371,7 @@ public sealed class UpdateObjectsCustomMaterialPaletteOverrideAction : IReplacab
                 NetId netId = NetIds[i];
                 if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out _, out _) || levelObject == null)
                 {
-                    Logger.LogWarning($"Unknown object with NetId: {netId.Format()}.");
+                    Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown object with NetId: {netId.Format()}.");
                     continue;
                 }
                 objs[i] = levelObject;
@@ -399,7 +400,7 @@ public sealed class UpdateObjectsCustomMaterialPaletteOverrideAction : IReplacab
             NetId netId = NetIds[i];
             if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out _, out _) || levelObject == null)
             {
-                Logger.LogWarning($"Unknown object with NetId: {netId.Format()}.");
+                Logger.DevkitServer.LogWarning(ObjectActions.Source, $"Unknown object with NetId: {netId.Format()}.");
                 continue;
             }
             
@@ -475,7 +476,7 @@ public sealed class UpdateObjectsMaterialIndexOverrideAction : IReplacableAction
                 NetId netId = NetIds[i];
                 if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out _, out _) || levelObject == null)
                 {
-                    Logger.LogWarning($"Unknown object with NetId: {netId.Format()}.");
+                    Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown object with NetId: {netId.Format()}.");
                     continue;
                 }
                 objs[i] = levelObject;
@@ -504,7 +505,7 @@ public sealed class UpdateObjectsMaterialIndexOverrideAction : IReplacableAction
             NetId netId = NetIds[i];
             if (!LevelObjectNetIdDatabase.TryGetObjectOrBuildable(netId, out LevelObject? levelObject, out _, out _) || levelObject == null)
             {
-                Logger.LogWarning($"Unknown object with NetId: {netId.Format()}.");
+                Logger.DevkitServer.LogWarning(ObjectActions.Source, $"Unknown object with NetId: {netId.Format()}.");
                 continue;
             }
             

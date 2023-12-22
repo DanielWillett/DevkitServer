@@ -19,14 +19,14 @@ internal static class TransactionPatches
         MethodInfo? redoMethod = tm.GetMethod(nameof(DevkitTransactionManager.redo), BindingFlags.Public | BindingFlags.Static);
         if (redoMethod == null)
         {
-            Logger.LogWarning("Unable to find method: DevkitTransactionManager.redo.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(EditorInteractUpdateTranspiler), "Unable to find method: DevkitTransactionManager.redo.");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? undoMethod = tm.GetMethod(nameof(DevkitTransactionManager.undo), BindingFlags.Public | BindingFlags.Static);
         if (undoMethod == null)
         {
-            Logger.LogWarning("Unable to find method: DevkitTransactionManager.undo.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(EditorInteractUpdateTranspiler), "Unable to find method: DevkitTransactionManager.undo.");
             DevkitServerModule.Fault();
         }
         MethodInfo undoInvoker = tp.GetMethod(nameof(OnUndoRequested), BindingFlags.Static | BindingFlags.NonPublic)!;
@@ -65,7 +65,7 @@ internal static class TransactionPatches
         }
         if (!undo || !redo)
         {
-            Logger.LogWarning("Patching error for " + method.Format() + $" Redo: {redo.Format()}, Undo: {undo.Format()}.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(EditorInteractUpdateTranspiler), "Patching error for " + method.Format() + $" Redo: {redo.Format()}, Undo: {undo.Format()}.");
             DevkitServerModule.Fault();
         }
     }

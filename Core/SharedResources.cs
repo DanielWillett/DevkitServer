@@ -10,7 +10,7 @@ internal static class SharedResources
         Bundle? bundle = DevkitServerModule.Bundle;
         if (bundle == null)
         {
-            Logger.LogWarning("Tried to setup shared resources without a loaded bundle.");
+            Logger.DevkitServer.LogWarning(nameof(LoadFromBundle), "Tried to setup shared resources without a loaded bundle.");
             return;
         }
 #if CLIENT
@@ -22,7 +22,7 @@ internal static class SharedResources
         else
             LogicShader = Shader.Find("Unlit/Color");
 
-        Logger.LogDebug($"Found logic shader: {LogicShader?.name.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(LoadFromBundle), $"Found logic shader: {LogicShader?.name.Format()}.");
 #endif
     }
 }

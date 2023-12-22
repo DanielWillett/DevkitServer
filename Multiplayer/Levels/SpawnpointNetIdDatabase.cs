@@ -75,7 +75,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
 
         if (!blockingNetId.IsNull())
         {
-            Logger.LogDebug($"[{Source}] Released blocking net id to save animal spawnpoint: {point.point.Format()} ({netId.Format()}, # {toIndex.Format()}).");
+            Logger.DevkitServer.LogDebug(Source, $"Released blocking net id to save animal spawnpoint: {point.point.Format()} ({netId.Format()}, # {toIndex.Format()}).");
             NetIdRegistry.Release(blockingNetId);
         }
 
@@ -83,7 +83,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
         NetIdRegistry.Assign(netId, toIndex);
         AnimalSpawnAssignments.Remove(fromIndex);
         AnimalSpawnAssignments[toIndex] = netId;
-        Logger.LogDebug($"[{Source}] Moved animal spawnpoint NetId: {point.point.Format()} ({netId.Format()}, # {toIndex.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Moved animal spawnpoint NetId: {point.point.Format()} ({netId.Format()}, # {toIndex.Format()}).");
     }
     private static void OnPlayerSpawnIndexUpdated(PlayerSpawnpoint point, int fromIndex, int toIndex)
     {
@@ -97,7 +97,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
 
         if (!blockingNetId.IsNull())
         {
-            Logger.LogDebug($"[{Source}] Released blocking net id to save player spawnpoint: {point.point.Format()} ({netId.Format()}, # {toIndex.Format()}).");
+            Logger.DevkitServer.LogDebug(Source, $"Released blocking net id to save player spawnpoint: {point.point.Format()} ({netId.Format()}, # {toIndex.Format()}).");
             NetIdRegistry.Release(blockingNetId);
         }
 
@@ -105,7 +105,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
         NetIdRegistry.Assign(netId, toIndex);
         PlayerSpawnAssignments.Remove(fromIndex);
         PlayerSpawnAssignments[toIndex] = netId;
-        Logger.LogDebug($"[{Source}] Moved player spawnpoint NetId: {point.point.Format()} ({netId.Format()}, # {toIndex.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Moved player spawnpoint NetId: {point.point.Format()} ({netId.Format()}, # {toIndex.Format()}).");
     }
     private static void OnVehicleSpawnIndexUpdated(VehicleSpawnpoint point, int fromIndex, int toIndex)
     {
@@ -119,7 +119,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
 
         if (!blockingNetId.IsNull())
         {
-            Logger.LogDebug($"[{Source}] Released blocking net id to save vehicle spawnpoint: {point.point.Format()} ({netId.Format()}, # {toIndex.Format()}).");
+            Logger.DevkitServer.LogDebug(Source, $"Released blocking net id to save vehicle spawnpoint: {point.point.Format()} ({netId.Format()}, # {toIndex.Format()}).");
             NetIdRegistry.Release(blockingNetId);
         }
 
@@ -127,7 +127,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
         NetIdRegistry.Assign(netId, toIndex);
         VehicleSpawnAssignments.Remove(fromIndex);
         VehicleSpawnAssignments[toIndex] = netId;
-        Logger.LogDebug($"[{Source}] Moved vehicle spawnpoint NetId: {point.point.Format()} ({netId.Format()}, # {toIndex.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Moved vehicle spawnpoint NetId: {point.point.Format()} ({netId.Format()}, # {toIndex.Format()}).");
     }
     private static void OnItemSpawnRegionUpdated(ItemSpawnpoint point, RegionIdentifier fromRegion, RegionIdentifier toRegion)
     {
@@ -141,7 +141,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
 
         if (!blockingNetId.IsNull())
         {
-            Logger.LogDebug($"[{Source}] Released blocking net id to save item spawnpoint: {point.point.Format()} ({netId.Format()}, {toRegion.Format()}).");
+            Logger.DevkitServer.LogDebug(Source, $"Released blocking net id to save item spawnpoint: {point.point.Format()} ({netId.Format()}, {toRegion.Format()}).");
             NetIdRegistry.Release(blockingNetId);
         }
 
@@ -149,7 +149,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
         NetIdRegistry.Assign(netId, toRegion);
         ItemSpawnAssignments.Remove(fromRegion);
         ItemSpawnAssignments[toRegion] = netId;
-        Logger.LogDebug($"[{Source}] Moved item spawnpoint NetId: {point.point.Format()} ({netId.Format()}, {toRegion.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Moved item spawnpoint NetId: {point.point.Format()} ({netId.Format()}, {toRegion.Format()}).");
     }
     private static void OnZombieSpawnRegionUpdated(ZombieSpawnpoint point, RegionIdentifier fromRegion, RegionIdentifier toRegion)
     {
@@ -163,7 +163,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
 
         if (!blockingNetId.IsNull())
         {
-            Logger.LogDebug($"[{Source}] Released blocking net id to save zombie spawnpoint: {point.point.Format()} ({netId.Format()}, {toRegion.Format()}).");
+            Logger.DevkitServer.LogDebug(Source, $"Released blocking net id to save zombie spawnpoint: {point.point.Format()} ({netId.Format()}, {toRegion.Format()}).");
             NetIdRegistry.Release(blockingNetId);
         }
 
@@ -171,7 +171,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
         NetIdRegistry.Assign(netId, toRegion);
         ZombieSpawnAssignments.Remove(fromRegion);
         ZombieSpawnAssignments[toRegion] = netId;
-        Logger.LogDebug($"[{Source}] Moved zombie spawnpoint NetId: {point.point.Format()} ({netId.Format()}, {toRegion.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Moved zombie spawnpoint NetId: {point.point.Format()} ({netId.Format()}, {toRegion.Format()}).");
     }
 #if SERVER
     private static void OnAnimalSpawnRemoved(AnimalSpawnpoint point, int index)
@@ -185,7 +185,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
 
         NetIdRegistry.Release(netId);
         AnimalSpawnAssignments.Remove(index);
-        Logger.LogDebug($"[{Source}] Removed animal spawnpoint NetId: {point.point.Format()} ({netId.Format()}, # {index.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Removed animal spawnpoint NetId: {point.point.Format()} ({netId.Format()}, # {index.Format()}).");
     }
     private static void OnPlayerSpawnRemoved(PlayerSpawnpoint point, int index)
     {
@@ -198,7 +198,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
 
         NetIdRegistry.Release(netId);
         PlayerSpawnAssignments.Remove(index);
-        Logger.LogDebug($"[{Source}] Removed player spawnpoint NetId: {point.point.Format()} ({netId.Format()}, # {index.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Removed player spawnpoint NetId: {point.point.Format()} ({netId.Format()}, # {index.Format()}).");
     }
     private static void OnVehicleSpawnRemoved(VehicleSpawnpoint point, int index)
     {
@@ -211,7 +211,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
 
         NetIdRegistry.Release(netId);
         VehicleSpawnAssignments.Remove(index);
-        Logger.LogDebug($"[{Source}] Removed vehicle spawnpoint NetId: {point.point.Format()} ({netId.Format()}, # {index.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Removed vehicle spawnpoint NetId: {point.point.Format()} ({netId.Format()}, # {index.Format()}).");
     }
     private static void OnItemSpawnRemoved(ItemSpawnpoint point, RegionIdentifier region)
     {
@@ -224,7 +224,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
 
         NetIdRegistry.Release(netId);
         ItemSpawnAssignments.Remove(region);
-        Logger.LogDebug($"[{Source}] Removed item spawnpoint NetId: {point.point.Format()} ({netId.Format()}, {region.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Removed item spawnpoint NetId: {point.point.Format()} ({netId.Format()}, {region.Format()}).");
     }
     private static void OnZombieSpawnRemoved(ZombieSpawnpoint point, RegionIdentifier region)
     {
@@ -237,7 +237,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
 
         NetIdRegistry.Release(netId);
         ZombieSpawnAssignments.Remove(region);
-        Logger.LogDebug($"[{Source}] Removed zombie spawnpoint NetId: {point.point.Format()} ({netId.Format()}, {region.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Removed zombie spawnpoint NetId: {point.point.Format()} ({netId.Format()}, {region.Format()}).");
     }
 #endif
     
@@ -305,10 +305,10 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
             NetIdRegistry.Release(netId);
             assignments.Remove(index);
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Released {type.ToString().ToLower()} spawn NetId: {netId.Format()} ({type.Format()}, # {index.Format()}).");
+                Logger.DevkitServer.LogDebug(Source, $"Released {type.ToString().ToLower()} spawn NetId: {netId.Format()} ({type.Format()}, # {index.Format()}).");
         }
         else
-            Logger.LogWarning($"Unable to release NetId to {type.ToString().ToLower()} spawn {netId.Format()} ({type.Format()}, # {index.Format()}), NetId not registered.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to release NetId to {type.ToString().ToLower()} spawn {netId.Format()} ({type.Format()}, # {index.Format()}), NetId not registered.");
     }
     public static void RemoveRegionSpawnpoint(SpawnType type, RegionIdentifier id)
     {
@@ -322,10 +322,10 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
             NetIdRegistry.Release(netId);
             assignments.Remove(id);
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Released {type.ToString().ToLower()} spawn NetId: {netId.Format()} ({type.Format()}, {id.Format()}).");
+                Logger.DevkitServer.LogDebug(Source, $"Released {type.ToString().ToLower()} spawn NetId: {netId.Format()} ({type.Format()}, {id.Format()}).");
         }
         else
-            Logger.LogWarning($"Unable to release NetId to {type.ToString().ToLower()} spawn {netId.Format()} ({type.Format()}, {id.Format()}), NetId not registered.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to release NetId to {type.ToString().ToLower()} spawn {netId.Format()} ({type.Format()}, {id.Format()}), NetId not registered.");
     }
     public static NetId AddIndexSpawnpoint(SpawnType type, int index)
     {
@@ -552,7 +552,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
         for (; count < animals.Count; ++count)
             AddIndexSpawnpoint(SpawnType.Animal, count);
         
-        Logger.LogInfo($"[{Source}] Assigned NetIds for {count.Format()} animal spawnpoint{count.S()}.");
+        Logger.DevkitServer.LogInfo(Source, $"Assigned NetIds for {count.Format()} animal spawnpoint{count.S()}.");
 
         List<PlayerSpawnpoint> players = LevelPlayers.spawns;
 
@@ -561,7 +561,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
         for (; count < players.Count; ++count)
             AddIndexSpawnpoint(SpawnType.Player, count);
         
-        Logger.LogInfo($"[{Source}] Assigned NetIds for {count.Format()} player spawnpoint{count.S()}.");
+        Logger.DevkitServer.LogInfo(Source, $"Assigned NetIds for {count.Format()} player spawnpoint{count.S()}.");
 
         List<VehicleSpawnpoint> vehicles = LevelVehicles.spawns;
 
@@ -570,7 +570,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
         for (; count < vehicles.Count; ++count)
             AddIndexSpawnpoint(SpawnType.Vehicle, count);
         
-        Logger.LogInfo($"[{Source}] Assigned NetIds for {count.Format()} vehicle spawnpoint{count.S()}.");
+        Logger.DevkitServer.LogInfo(Source, $"Assigned NetIds for {count.Format()} vehicle spawnpoint{count.S()}.");
 
         count = 0;
 
@@ -582,7 +582,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
             count += items.Count;
         }
 
-        Logger.LogInfo($"[{Source}] Assigned NetIds for {count.Format()} item spawnpoint{count.S()}.");
+        Logger.DevkitServer.LogInfo(Source, $"Assigned NetIds for {count.Format()} item spawnpoint{count.S()}.");
 
         count = 0;
 
@@ -594,7 +594,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
             count += zombies.Count;
         }
 
-        Logger.LogInfo($"[{Source}] Assigned NetIds for {count.Format()} zombie spawnpoint{count.S()}.");
+        Logger.DevkitServer.LogInfo(Source, $"Assigned NetIds for {count.Format()} zombie spawnpoint{count.S()}.");
     }
 #endif
     private static void ClaimBasicNetId(int index, SpawnType typeChecked, NetId netId)
@@ -602,18 +602,17 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
         if (!netId.IsNull() && NetIdRegistry.Release(netId))
         {
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Released old NetId pairing: {netId.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {netId.Format()}.");
         }
 
         if (typeChecked == SpawnType.Animal)
         {
-            if (AnimalSpawnAssignments.TryGetValue(index, out NetId old))
-                AnimalSpawnAssignments.Remove(index);
+            AnimalSpawnAssignments.Remove(index, out NetId old);
 
             if (NetIdRegistry.Release(old))
             {
                 if (Level.isLoaded)
-                    Logger.LogDebug($"[{Source}] Released old animal NetId pairing: {old.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"Released old animal NetId pairing: {old.Format()}.");
             }
 
             if (!netId.IsNull())
@@ -621,13 +620,12 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
         }
         else if (typeChecked == SpawnType.Player)
         {
-            if (PlayerSpawnAssignments.TryGetValue(index, out NetId old))
-                PlayerSpawnAssignments.Remove(index);
+            PlayerSpawnAssignments.Remove(index, out NetId old);
 
             if (NetIdRegistry.Release(old))
             {
                 if (Level.isLoaded)
-                    Logger.LogDebug($"[{Source}] Released old player NetId pairing: {old.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"Released old player NetId pairing: {old.Format()}.");
             }
 
             if (!netId.IsNull())
@@ -635,13 +633,12 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
         }
         else
         {
-            if (VehicleSpawnAssignments.TryGetValue(index, out NetId old))
-                VehicleSpawnAssignments.Remove(index);
+            VehicleSpawnAssignments.Remove(index, out NetId old);
 
             if (NetIdRegistry.Release(old))
             {
                 if (Level.isLoaded)
-                    Logger.LogDebug($"[{Source}] Released old vehicle NetId pairing: {old.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"Released old vehicle NetId pairing: {old.Format()}.");
             }
 
             if (!netId.IsNull())
@@ -653,11 +650,11 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
             NetIdRegistry.Assign(netId, index);
 
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Claimed new NetId: {netId.Format()} @ {typeChecked.Format()} (# {index.Format()}).");
+                Logger.DevkitServer.LogDebug(Source, $"Claimed new NetId: {netId.Format()} @ {typeChecked.Format()} (# {index.Format()}).");
         }
         else
         {
-            Logger.LogDebug($"[{Source}] Released NetId: {netId.Format()} @ {typeChecked.Format()} (# {index.Format()}).");
+            Logger.DevkitServer.LogDebug(Source, $"Released NetId: {netId.Format()} @ {typeChecked.Format()} (# {index.Format()}).");
         }
     }
     private static void ClaimBasicNetId(RegionIdentifier id, SpawnType typeChecked, NetId netId)
@@ -665,18 +662,17 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
         if (!netId.IsNull() && NetIdRegistry.Release(netId))
         {
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Released old NetId pairing: {netId.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {netId.Format()}.");
         }
 
         if (typeChecked == SpawnType.Item)
         {
-            if (ItemSpawnAssignments.TryGetValue(id, out NetId old))
-                ItemSpawnAssignments.Remove(id);
+            ItemSpawnAssignments.Remove(id, out NetId old);
 
             if (NetIdRegistry.Release(old))
             {
                 if (Level.isLoaded)
-                    Logger.LogDebug($"[{Source}] Released old item NetId pairing: {old.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"Released old item NetId pairing: {old.Format()}.");
             }
 
             if (!netId.IsNull())
@@ -684,13 +680,12 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
         }
         else
         {
-            if (ZombieSpawnAssignments.TryGetValue(id, out NetId old))
-                ZombieSpawnAssignments.Remove(id);
+            ZombieSpawnAssignments.Remove(id, out NetId old);
 
             if (NetIdRegistry.Release(old))
             {
                 if (Level.isLoaded)
-                    Logger.LogDebug($"[{Source}] Released old zombie NetId pairing: {old.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"Released old zombie NetId pairing: {old.Format()}.");
             }
 
             if (!netId.IsNull())
@@ -702,11 +697,11 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
             NetIdRegistry.Assign(netId, id);
 
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Claimed new NetId: {netId.Format()} @ {typeChecked.Format()} ({id.Format()}).");
+                Logger.DevkitServer.LogDebug(Source, $"Claimed new NetId: {netId.Format()} @ {typeChecked.Format()} ({id.Format()}).");
         }
         else
         {
-            Logger.LogDebug($"[{Source}] Released NetId: {netId.Format()} @ {typeChecked.Format()} ({id.Format()}).");
+            Logger.DevkitServer.LogDebug(Source, $"Released NetId: {netId.Format()} @ {typeChecked.Format()} ({id.Format()}).");
         }
     }
 #if CLIENT
@@ -742,7 +737,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
             if (!id.IsInvalid)
                 ClaimBasicNetId(id, SpawnType.Item, netIds[index]);
             else
-                Logger.LogWarning($"Received item spawn with invalid region identifier: {id.Format()}.");
+                Logger.DevkitServer.LogWarning(Source, $"Received item spawn with invalid region identifier: {id.Format()}.");
         }
 
         maxIndex = data.Count;
@@ -752,7 +747,7 @@ public sealed class SpawnpointNetIdDatabase : IReplicatedLevelDataSource<Spawnpo
             if (!id.IsInvalid)
                 ClaimBasicNetId(id, SpawnType.Zombie, netIds[index]);
             else
-                Logger.LogWarning($"Received zombie spawn with invalid region identifier: {id.Format()}.");
+                Logger.DevkitServer.LogWarning(Source, $"Received zombie spawn with invalid region identifier: {id.Format()}.");
         }
     }
 #elif SERVER       

@@ -1,9 +1,10 @@
 ﻿using DevkitServer.API.Abstractions;
+using DevkitServer.API.Logging;
 using DevkitServer.Plugins;
 
 namespace DevkitServer.API;
-public interface IDevkitServerPlugin<out TConfig> : IReloadableDevkitServerPlugin, IConfigProvider<TConfig> where TConfig : class, new() { }
-public interface IDevkitServerPlugin
+public interface IDevkitServerPlugin<out TConfig> : IReloadableDevkitServerPlugin, IConfigProvider<TConfig> where TConfig : class, new();
+public interface IDevkitServerPlugin : IDevkitServerSourceLogger
 {
     /// <summary>
     /// Must be unique among all loaded plugins. Can not contain a period.
@@ -55,31 +56,6 @@ public interface IDevkitServerPlugin
     /// </summary>
     /// <remarks>Used to disable various readonly restrictions to plugin files (like object icons).</remarks>
     bool DeveloperMode { get; }
-
-    /// <summary>
-    /// Send a debug message to the log. Shoud be ignored when not building with the DEBUG flag.
-    /// </summary>
-    void LogDebug(string message, ConsoleColor color = ConsoleColor.DarkGray);
-
-    /// <summary>
-    /// Send information message to the log.
-    /// </summary>
-    void LogInfo(string message, ConsoleColor color = ConsoleColor.DarkCyan);
-
-    /// <summary>
-    /// Send a warning message to the log.
-    /// </summary>
-    void LogWarning(string message, ConsoleColor color = ConsoleColor.Yellow);
-
-    /// <summary>
-    /// Send an error message to the log.
-    /// </summary>
-    void LogError(string message, ConsoleColor color = ConsoleColor.Red);
-
-    /// <summary>
-    /// Send an <see cref="Exception"/> to the log.
-    /// </summary>
-    void LogError(Exception ex);
 
     /// <summary>
     /// Called to load the plugin.

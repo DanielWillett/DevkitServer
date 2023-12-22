@@ -69,7 +69,7 @@ public class HighSpeedConnection : ITransportConnection
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
 
-        Logger.LogDebug("[HIGH SPEED CONNECTION] Closing high-speed connection.");
+        Logger.DevkitServer.LogDebug("HIGH SPEED CONNECTION", "Closing high-speed connection.");
 #if SERVER
         if (Server != null)
             Server.Disconnect(this);
@@ -83,7 +83,7 @@ public class HighSpeedConnection : ITransportConnection
         Client.Dispose();
     }
 
-    public bool Equals(ITransportConnection other) => ReferenceEquals(other, this);
+    public bool Equals(ITransportConnection? other) => ReferenceEquals(other, this);
     public bool TryGetIPv4Address(out uint address)
     {
         if (Client.Client.RemoteEndPoint is IPEndPoint ip)
@@ -145,7 +145,7 @@ public class HighSpeedConnection : ITransportConnection
         {
 #if DEBUG
             MessageOverhead ovh = new MessageOverhead(buffer);
-            Logger.LogDebug("Sending message: " + ovh.Format() + ".");
+            Logger.DevkitServer.LogDebug("HIGH SPEED CONNECTION", "Sending message: " + ovh.Format() + ".");
 #endif
             str.BeginWrite(buffer, 0, (int)size, EndWrite, str);
         }
@@ -159,8 +159,7 @@ public class HighSpeedConnection : ITransportConnection
         }
         catch (Exception ex)
         {
-            Logger.LogError("[HIGH SPEED CONNECTION] Error reading in Send.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("HIGH SPEED CONNECTION", ex, "Error reading in Send.");
             CloseConnection();
         }
     }
@@ -182,8 +181,7 @@ public class HighSpeedConnection : ITransportConnection
         }
         catch (Exception ex)
         {
-            Logger.LogError("[HIGH SPEED CONNECTION] Error reading in EndWrite.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("HIGH SPEED CONNECTION", ex, "Error reading in EndWrite.");
             CloseConnection();
         }
     }
@@ -201,14 +199,12 @@ public class HighSpeedConnection : ITransportConnection
         }
         catch (ObjectDisposedException ex)
         {
-            Logger.LogError("[HIGH SPEED CONNECTION] ObjectDisposedException in Listen.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("HIGH SPEED CONNECTION", ex, "ObjectDisposedException in Listen.");
             CloseConnection();
         }
         catch (Exception ex)
         {
-            Logger.LogError("[HIGH SPEED CONNECTION] Error reading in Listen.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("HIGH SPEED CONNECTION", ex, "Error reading in Listen.");
             CloseConnection();
         }
     }
@@ -236,8 +232,7 @@ public class HighSpeedConnection : ITransportConnection
         }
         catch (Exception ex)
         {
-            Logger.LogError("[HIGH SPEED CONNECTION] Error reading in EndRead.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("HIGH SPEED CONNECTION", ex, "Error reading in EndRead.");
             CloseConnection();
         }
     }
@@ -248,11 +243,8 @@ public class HighSpeedConnection : ITransportConnection
             CloseConnection();
             return;
         }
-        if (ex is SocketException)
-            Logger.LogError("[HIGH SPEED CONNECTION] Socket error:");
-        else
-            Logger.LogError("[HIGH SPEED CONNECTION] IO error:");
-        Logger.LogError(ex);
+
+        Logger.DevkitServer.LogError("HIGH SPEED CONNECTION", ex, ex is SocketException ? "Socket error:" : "IO error:");
         CloseConnection();
     }
     private void MessageReady(ArraySegment<byte> payload)
@@ -260,7 +252,7 @@ public class HighSpeedConnection : ITransportConnection
         DevkitServerUtility.QueueOnMainThread(() =>
         {
             MessageOverhead overhead = new MessageOverhead(payload);
-            Logger.LogDebug("[HIGH SPEED CONNECTION] HS message received: " + overhead.Format() + ".");
+            Logger.DevkitServer.LogDebug("HIGH SPEED CONNECTION", "HS message received: " + overhead.Format() + ".");
             HighSpeedNetFactory.Receive(this, payload, in overhead);
         });
     }

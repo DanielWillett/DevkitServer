@@ -136,7 +136,7 @@ public class NetCallCustom : BaseNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -157,11 +157,10 @@ public class NetCallCustom : BaseNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
         }
     }
 #if SERVER
@@ -184,8 +183,7 @@ public class NetCallCustom : BaseNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -211,7 +209,7 @@ public class NetCallCustom : BaseNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -226,8 +224,7 @@ public class NetCallCustom : BaseNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server (HS).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server (HS).");
         }
     }
     public void Invoke(HighSpeedConnection connection, WriterTask task)
@@ -367,7 +364,7 @@ public sealed class NetCall : BaseNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         connection.Send(overhead.GetBytes());
@@ -472,7 +469,7 @@ public sealed class NetCallRaw<T> : NetCallRaw
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -487,12 +484,10 @@ public sealed class NetCallRaw<T> : NetCallRaw
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
-            Logger.LogError(ex);
         }
     }
     public void Invoke(
@@ -524,8 +519,7 @@ public sealed class NetCallRaw<T> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -537,8 +531,7 @@ public sealed class NetCallRaw<T> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg = default!;
             return false;
         }
@@ -554,7 +547,7 @@ public sealed class NetCallRaw<T> : NetCallRaw
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -563,9 +556,7 @@ public sealed class NetCallRaw<T> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T arg)
@@ -677,7 +668,7 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -692,12 +683,10 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
-            Logger.LogError(ex);
         }
     }
     public void Invoke(
@@ -729,8 +718,7 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -742,8 +730,7 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg1 = default!;
             arg2 = default!;
             return false;
@@ -760,7 +747,7 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -769,9 +756,7 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2)
@@ -885,7 +870,7 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -900,12 +885,10 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
-            Logger.LogError(ex);
         }
     }
     public void Invoke(
@@ -937,8 +920,7 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -950,8 +932,7 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg1 = default!;
             arg2 = default!;
             arg3 = default!;
@@ -969,7 +950,7 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -978,9 +959,7 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3)
@@ -1095,7 +1074,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -1110,12 +1089,10 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
-            Logger.LogError(ex);
         }
     }
     public void Invoke(
@@ -1147,8 +1124,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -1160,8 +1136,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg1 = default!;
             arg2 = default!;
             arg3 = default!;
@@ -1180,7 +1155,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -1189,9 +1164,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
@@ -1305,7 +1278,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -1320,12 +1293,10 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
-            Logger.LogError(ex);
         }
     }
     public void Invoke(
@@ -1357,8 +1328,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -1370,8 +1340,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg1 = default!;
             arg2 = default!;
             arg3 = default!;
@@ -1391,7 +1360,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -1400,9 +1369,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
@@ -1516,7 +1483,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5, T6> : NetCallRaw
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -1531,12 +1498,10 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5, T6> : NetCallRaw
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
-            Logger.LogError(ex);
         }
     }
     public void Invoke(
@@ -1568,8 +1533,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5, T6> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -1581,8 +1545,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5, T6> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg1 = default!;
             arg2 = default!;
             arg3 = default!;
@@ -1603,7 +1566,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5, T6> : NetCallRaw
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -1612,9 +1575,7 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5, T6> : NetCallRaw
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
@@ -1722,7 +1683,7 @@ public sealed class NetCall<T> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -1737,11 +1698,10 @@ public sealed class NetCall<T> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
         }
     }
     public void Invoke(
@@ -1773,8 +1733,7 @@ public sealed class NetCall<T> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -1786,8 +1745,7 @@ public sealed class NetCall<T> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg = default!;
             return false;
         }
@@ -1803,7 +1761,7 @@ public sealed class NetCall<T> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -1812,9 +1770,7 @@ public sealed class NetCall<T> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T arg)
@@ -1922,7 +1878,7 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -1937,11 +1893,10 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
         }
     }
     public void Invoke(
@@ -1973,8 +1928,7 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -1986,8 +1940,7 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg1 = default!;
             arg2 = default!;
             return false;
@@ -2004,7 +1957,7 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -2013,9 +1966,7 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2)
@@ -2123,7 +2074,7 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -2138,11 +2089,10 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
         }
     }
     public void Invoke(
@@ -2174,8 +2124,7 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -2187,8 +2136,7 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg1 = default!;
             arg2 = default!;
             arg3 = default!;
@@ -2206,7 +2154,7 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -2215,9 +2163,7 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3)
@@ -2325,7 +2271,7 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -2340,11 +2286,10 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
         }
     }
     public void Invoke(
@@ -2376,8 +2321,7 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -2389,8 +2333,7 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg1 = default!;
             arg2 = default!;
             arg3 = default!;
@@ -2409,7 +2352,7 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -2418,9 +2361,7 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
@@ -2528,7 +2469,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -2543,11 +2484,10 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
         }
     }
     public void Invoke(
@@ -2579,8 +2519,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -2592,8 +2531,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg1 = default!;
             arg2 = default!;
             arg3 = default!;
@@ -2613,7 +2551,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -2622,9 +2560,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
@@ -2732,7 +2668,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -2747,11 +2683,10 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
         }
     }
     public void Invoke(
@@ -2783,8 +2718,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -2796,8 +2730,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg1 = default!;
             arg2 = default!;
             arg3 = default!;
@@ -2818,7 +2751,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -2827,9 +2760,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
@@ -2944,7 +2875,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -2960,11 +2891,10 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
         }
     }
 
@@ -2997,8 +2927,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -3011,8 +2940,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg1 = default!;
             arg2 = default!;
             arg3 = default!;
@@ -3036,7 +2964,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -3045,9 +2973,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
@@ -3158,7 +3084,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -3173,11 +3099,10 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
         }
     }
     public void Invoke(
@@ -3209,8 +3134,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -3222,8 +3146,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg1 = default!;
             arg2 = default!;
             arg3 = default!;
@@ -3246,7 +3169,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -3255,9 +3178,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
@@ -3364,7 +3285,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -3379,11 +3300,10 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
         }
     }
     public void Invoke(
@@ -3415,8 +3335,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -3428,8 +3347,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg1 = default!;
             arg2 = default!;
             arg3 = default!;
@@ -3453,7 +3371,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -3462,9 +3380,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
@@ -3571,7 +3487,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
 #if SERVER
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
 #endif
@@ -3586,11 +3502,10 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
         catch (Exception ex)
         {
 #if SERVER
-            Logger.LogError($"Error sending method {Id.Format()} to connection {connection.Format()}.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to connection {connection.Format()}.");
 #else
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
 #endif
-            Logger.LogError(ex);
         }
     }
     public void Invoke(
@@ -3622,8 +3537,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to 1+ connection(s).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to 1+ connection(s).");
         }
     }
 #endif
@@ -3635,8 +3549,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error reading method {Id.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error reading method {Id.Format()}.");
             arg1 = default!;
             arg2 = default!;
             arg3 = default!;
@@ -3661,7 +3574,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
     {
         if (connection == null)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to null connection.");
+            Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection.");
             return;
         }
         try
@@ -3670,9 +3583,7 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error sending method {Id.Format()} to server.");
-            Logger.LogError(ex);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to server.");
         }
     }
     public void Invoke(HighSpeedConnection connection, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)

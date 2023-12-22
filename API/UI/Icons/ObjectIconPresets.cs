@@ -104,7 +104,7 @@ public static class ObjectIconPresets
             _customPresets.SaveConfig();
             PresetsIntl[guid] = existing;
 
-            Logger.LogInfo($"Updated asset icon preset: {preset.Asset.Format()}, saved to {_customPresets.File.Format()}.");
+            Logger.DevkitServer.LogInfo(ObjectIconGenerator.Source, $"Updated asset icon preset: {preset.Asset.Format()}, saved to {_customPresets.File.Format()}.");
         }
         else
         {
@@ -133,7 +133,7 @@ public static class ObjectIconPresets
             existing.IconRotation = preset.IconRotation;
             config.SaveConfig();
             PresetsIntl[guid] = existing;
-            Logger.LogInfo($"Updated asset icon preset: {preset.Asset.Format()}, saved to {config.File.Format()}.");
+            Logger.DevkitServer.LogInfo(ObjectIconGenerator.Source, $"Updated asset icon preset: {preset.Asset.Format()}, saved to {config.File.Format()}.");
         }
 
         ClearEditCache();
@@ -161,7 +161,7 @@ public static class ObjectIconPresets
         foreach (JsonConfigurationFile<List<AssetIconPreset>> config in _presetProviders)
             config.OnRead -= OnConfigReloaded;
         _presetProviders.Clear();
-        Logger.LogDebug($"[{ObjectIconGenerator.Source}] Searching for object icon preset provider JSON files.");
+        Logger.DevkitServer.LogDebug(ObjectIconGenerator.Source, "Searching for object icon preset provider JSON files.");
         string dir;
         if (Provider.isConnected)
         {
@@ -265,7 +265,7 @@ public static class ObjectIconPresets
         {
             string path = Path.GetFullPath(CustomPresetsPath);
             _presetProviders.Add(_customPresets = new JsonConfigurationFile<List<AssetIconPreset>>(path) { Defaultable = true });
-            Logger.LogDebug($"[{ObjectIconGenerator.Source}] + Registered working icon provider: {path.Format(false)}.");
+            Logger.DevkitServer.LogDebug(ObjectIconGenerator.Source, $"+ Registered working icon provider: {path.Format(false)}.");
         }
 
         PresetsIntl.Clear();
@@ -298,9 +298,9 @@ public static class ObjectIconPresets
                 if (preset.Asset.Find() == null)
                 {
                     if (i >= workshop)
-                        Logger.LogWarning($"Object not found for icon preset: {preset.Asset.GUID.Format()} in {configFile.File.Format()}.", method: ObjectIconGenerator.Source);
+                        Logger.DevkitServer.LogWarning(ObjectIconGenerator.Source, $"Object not found for icon preset: {preset.Asset.GUID.Format()} in {configFile.File.Format()}.");
                     else
-                        Logger.LogDebug($"[{ObjectIconGenerator.Source}] Object not found for workshop icon preset: {preset.Asset.GUID.Format()} in {configFile.File.Format()}.");
+                        Logger.DevkitServer.LogDebug(ObjectIconGenerator.Source, $"Object not found for workshop icon preset: {preset.Asset.GUID.Format()} in {configFile.File.Format()}.");
                     continue;
                 }
                 preset.File = configFile.File;
@@ -309,7 +309,7 @@ public static class ObjectIconPresets
             }
         }
 
-        Logger.LogInfo($"[{ObjectIconGenerator.Source}] Registered {PresetsIntl.Count.Format()} unique icon presets from {ct.Format()} presets.");
+        Logger.DevkitServer.LogInfo(ObjectIconGenerator.Source, $"Registered {PresetsIntl.Count.Format()} unique icon presets from {ct.Format()} presets.");
 
         GC.Collect();
     }
@@ -333,7 +333,7 @@ public static class ObjectIconPresets
                 || name.StartsWith("object_presets", StringComparison.InvariantCultureIgnoreCase)
                 ) && !_presetProviders.Exists(x => x.File.Equals(file, StringComparison.Ordinal)))
             {
-                Logger.LogDebug($"[{ObjectIconGenerator.Source}] + Registered icon provider {file.Format()}.");
+                Logger.DevkitServer.LogDebug(ObjectIconGenerator.Source, $"+ Registered icon provider {file.Format()}.");
                 _presetProviders.Add(new JsonConfigurationFile<List<AssetIconPreset>>(Path.GetFullPath(file)) { ReadOnlyReloading = isReadonly });
             }
         }
@@ -354,7 +354,7 @@ public static class ObjectIconPresets
             }
             catch (Exception ex)
             {
-                Logger.LogInfo($"Unable to check type for {typeof(IDefaultIconProvider).Format()} - {ex.GetType().Format()} {ex.Message.Format(true)}");
+                Logger.DevkitServer.LogInfo(ObjectIconGenerator.Source, $"Unable to check type for {typeof(IDefaultIconProvider).Format()} - {ex.GetType().Format()} {ex.Message.Format(true)}");
                 continue;
             }
 
@@ -365,8 +365,7 @@ public static class ObjectIconPresets
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Unable to apply icon provider: {type.FullName}.", method: ObjectIconGenerator.Source);
-                Logger.LogError(ex, method: ObjectIconGenerator.Source);
+                Logger.DevkitServer.LogError(ObjectIconGenerator.Source, ex, $"Unable to apply icon provider: {type.Format()}.");
             }
         }
 
@@ -380,7 +379,7 @@ public static class ObjectIconPresets
 #if DEBUG
         foreach (IDefaultIconProvider provider in providers)
         {
-            Logger.LogDebug($"[{ObjectIconGenerator.Source}] + Registered default icon provider: {provider.GetType().Name} (Priority: {provider.Priority}).");
+            Logger.DevkitServer.LogDebug(ObjectIconGenerator.Source, $"+ Registered default icon provider: {provider.GetType().Format()} (Priority: {provider.Priority.Format()}).");
         }
 #endif
 

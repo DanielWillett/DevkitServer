@@ -66,8 +66,7 @@ internal class CustomUseableHandler : ICustomOnDestroyUIHandler, ICustomOnInitia
             }
             catch (Exception ex)
             {
-                Logger.LogWarning($"Failed to patch {method.Format()}.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch {method.Format()}.");
             }
         }
         foreach (MethodInfo method in AllowedDequipTypes.Keys)
@@ -78,8 +77,7 @@ internal class CustomUseableHandler : ICustomOnDestroyUIHandler, ICustomOnInitia
             }
             catch (Exception ex)
             {
-                Logger.LogWarning($"Failed to patch {method.Format()}.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch {method.Format()}.");
             }
         }
     }

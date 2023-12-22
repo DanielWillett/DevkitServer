@@ -59,7 +59,7 @@ public class UIExistingMemberInfo
                 il.Emit(getter.GetCall(), getter);
                 break;
             default:
-                Logger.LogWarning($"Invalid accessor for existing member: {Existing.Format()}.", method: UIExtensionManager.Source);
+                Logger.DevkitServer.LogWarning(UIExtensionManager.Source, $"Invalid accessor for existing member: {Existing.Format()}.");
                 il.Emit(OpCodes.Ldnull);
                 break;
         }
@@ -80,7 +80,7 @@ public class UIExistingMemberInfo
                     il.Emit(method.GetCall(), method);
                     break;
                 default:
-                    Logger.LogWarning($"Invalid accessor for implementing member: {Existing.Format()}.", method: UIExtensionManager.Source);
+                    Logger.DevkitServer.LogWarning(UIExtensionManager.Source, $"Invalid accessor for implementing member: {Member.Format()}.");
                     break;
             }
         }

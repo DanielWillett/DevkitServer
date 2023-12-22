@@ -3,11 +3,9 @@ using DevkitServer.Multiplayer.Levels;
 using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
+#if CLIENT
 using DevkitServer.API;
 using DevkitServer.API.Permissions;
-
-
-#if CLIENT
 using DevkitServer.API.UI;
 using DevkitServer.Configuration;
 using DevkitServer.Core.Permissions;
@@ -43,7 +41,7 @@ internal static class LevelObjectPatches
                 CallingConventions.Any, new Type[] { typeof(ISleekField), typeof(string) }, null);
             if (onTypedMaterialPalletteOverride == null || !onTypedMaterialPalletteOverride.IsStatic)
             {
-                Logger.LogWarning("Method not found: static EditorLevelObjectsUI.OnTypedMaterialPaletteOverride. Custom material palettes will not replicate.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Method not found: static EditorLevelObjectsUI.OnTypedMaterialPaletteOverride. Custom material palettes will not replicate.");
             }
             else
             {
@@ -55,7 +53,7 @@ internal static class LevelObjectPatches
                 CallingConventions.Any, new Type[] { typeof(ISleekInt32Field), typeof(int) }, null);
             if (onTypedMaterialIndexOverride == null || !onTypedMaterialIndexOverride.IsStatic)
             {
-                Logger.LogWarning("Method not found: static EditorLevelObjectsUI.OnTypedMaterialIndexOverride. Material index overrides will not replicate.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Method not found: static EditorLevelObjectsUI.OnTypedMaterialIndexOverride. Material index overrides will not replicate.");
             }
             else
             {
@@ -65,8 +63,7 @@ internal static class LevelObjectPatches
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Failed to patch recommended patches for Level Objects.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, "Failed to patch recommended patches for Level Objects.");
         }
     }
 
@@ -82,92 +79,92 @@ internal static class LevelObjectPatches
         MethodInfo? pointSelection = eo.GetMethod("pointSelection", BindingFlags.Static | BindingFlags.Public, null, Type.EmptyTypes, null);
         if (pointSelection == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: EditorObjects.pointSelection.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: EditorObjects.pointSelection.");
             DevkitServerModule.Fault();
         }
         FieldInfo? selectedObjects = eo.GetField("selection", BindingFlags.Static | BindingFlags.NonPublic);
         if (selectedObjects == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find field: EditorObjects.selection.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find field: EditorObjects.selection.");
             DevkitServerModule.Fault();
         }
         FieldInfo? handles = eo.GetField("handles", BindingFlags.Static | BindingFlags.NonPublic);
         if (handles == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find field: EditorObjects.handles.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find field: EditorObjects.handles.");
             DevkitServerModule.Fault();
         }
         MethodInfo? selectedObjectsCount = selectedObjects?.FieldType.GetProperty(nameof(List<object>.Count), BindingFlags.Instance | BindingFlags.Public)?.GetMethod;
         if (selectedObjectsCount == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find property: EditorObjects.selection.Count.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find property: EditorObjects.selection.Count.");
             DevkitServerModule.Fault();
         }
         FieldInfo? copiedObjects = eo.GetField("copies", BindingFlags.Static | BindingFlags.NonPublic);
         if (copiedObjects == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find field: EditorObjects.copies.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find field: EditorObjects.copies.");
             DevkitServerModule.Fault();
         }
         MethodInfo? copiedObjectsCount = copiedObjects?.FieldType.GetProperty(nameof(List<object>.Count), BindingFlags.Instance | BindingFlags.Public)?.GetMethod;
         if (copiedObjectsCount == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find property: EditorObjects.copies.Count.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find property: EditorObjects.copies.Count.");
             DevkitServerModule.Fault();
         }
         MethodInfo? clearCopiedObjects = copiedObjects?.FieldType.GetMethod(nameof(List<object>.Clear), BindingFlags.Instance | BindingFlags.Public);
         if (clearCopiedObjects == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: EditorObjects.copies.Clear.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: EditorObjects.copies.Clear.");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? clearSelection = eo.GetMethod("clearSelection", BindingFlags.Static | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
         if (clearSelection == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: EditorObjects.clearSelection.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: EditorObjects.clearSelection.");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? calculateHandleOffsets = eo.GetMethod("calculateHandleOffsets", BindingFlags.Static | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
         if (calculateHandleOffsets == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: EditorObjects.calculateHandleOffsets.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: EditorObjects.calculateHandleOffsets.");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? undo = lo.GetMethod("undo", BindingFlags.Static | BindingFlags.Public, null, Type.EmptyTypes, null);
         if (undo == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelObjects.undo.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: LevelObjects.undo.");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? redo = lo.GetMethod("redo", BindingFlags.Static | BindingFlags.Public, null, Type.EmptyTypes, null);
         if (redo == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelObjects.redo.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: LevelObjects.redo.");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? recordDestruction = dtu.GetMethod(nameof(DevkitTransactionUtility.recordDestruction), BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(GameObject) }, null);
         if (recordDestruction == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: DevkitTransactionUtility.recordDestruction.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: DevkitTransactionUtility.recordDestruction.");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? registerAddObject = lo.GetMethod(nameof(LevelObjects.registerAddObject), BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(Vector3), typeof(Quaternion), typeof(Vector3), typeof(ObjectAsset), typeof(ItemAsset) }, null);
         if (registerAddObject == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelObjects.registerAddObject.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: LevelObjects.registerAddObject.");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? addSelection = eo.GetMethod(nameof(EditorObjects.addSelection), BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(Transform) }, null);
         if (registerAddObject == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: EditorObjects.addSelection.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: EditorObjects.addSelection.");
             DevkitServerModule.Fault();
         }
 
@@ -180,7 +177,7 @@ internal static class LevelObjectPatches
         bool patchedInstantiate = false;
         bool patchedTranslate = false;
 
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> ins = [..instructions];
         ins.Insert(0, new CodeInstruction(OpCodes.Call, Accessor.GetMethod(OnUpdate)));
         for (int i = 1; i < ins.Count; ++i)
         {
@@ -191,7 +188,7 @@ internal static class LevelObjectPatches
                 MethodBase? original = ins[i + 1].operand as MethodBase;
                 ins.RemoveAt(i + 1);
                 ins[i] = new CodeInstruction(OpCodes.Call, invoker);
-                Logger.LogDebug($"[{Source}] Removed call to {original.Format()} in place of {invoker.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Removed call to {original.Format()} in place of {invoker.Format()}.");
                 ++patchedReun;
                 continue;
             }
@@ -239,7 +236,7 @@ internal static class LevelObjectPatches
             {
                 Label? @goto = PatchUtil.GetNextBranchTarget(ins, i - 1);
                 PatchUtil.ReturnIfFalse(ins, generator, ref i, OnDeleteSelection, @goto);
-                Logger.LogDebug($"[{Source}] Patched deleting objects.");
+                Logger.DevkitServer.LogDebug(Source, "Patched deleting objects.");
                 patchedDelete = true;
                 continue;
             }
@@ -252,7 +249,7 @@ internal static class LevelObjectPatches
             {
                 Label? @goto = PatchUtil.GetNextBranchTarget(ins, i - 1);
                 PatchUtil.ReturnIfFalse(ins, generator, ref i, CheckCanCopy, @goto);
-                Logger.LogDebug($"[{Source}] Patched copying objects.");
+                Logger.DevkitServer.LogDebug(Source, "Patched copying objects.");
                 patchedCopy = true;
                 continue;
             }
@@ -290,7 +287,7 @@ internal static class LevelObjectPatches
                 ins.Insert(i + 1, new CodeInstruction(OpCodes.Br, @goto.Value));
                 PatchUtil.ReturnIfFalse(ins, generator, ref i, CheckCanPaste, @goto);
                 i += 2;
-                Logger.LogDebug($"[{Source}] Patched pasteing objects.");
+                Logger.DevkitServer.LogDebug(Source, "Patched pasteing objects.");
                 patchedPaste = true;
                 int index2 = PatchUtil.FindLabelDestinationIndex(ins, @goto.Value, i);
                 if (index2 >= 0)
@@ -326,7 +323,7 @@ internal static class LevelObjectPatches
                 ins.Insert(i++, instr);
                 instr.labels.AddRange(ins[i].labels);
                 ins[i].labels.Clear();
-                Logger.LogDebug($"[{Source}] Patched pasteing transform.");
+                Logger.DevkitServer.LogDebug(Source, "Patched pasteing transform.");
                 patchedPasteTransform = true;
                 continue;
             }
@@ -352,42 +349,42 @@ internal static class LevelObjectPatches
 
         if (!patchedCopy)
         {
-            Logger.LogWarning($"Unable to patch copy operations in {method.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to patch copy operations in {method.Format()}.");
             DevkitServerModule.Fault();
         }
         if (!patchedPaste)
         {
-            Logger.LogWarning($"Unable to replace paste operations in {method.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to replace paste operations in {method.Format()}.");
             DevkitServerModule.Fault();
         }
         if (!patchedDelete)
         {
-            Logger.LogWarning($"Unable to patch delete operations in {method.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to patch delete operations in {method.Format()}.");
             DevkitServerModule.Fault();
         }
         if (!patchedPasteTransform)
         {
-            Logger.LogWarning($"Unable to patch paste transform (Ctrl + N) operations in {method.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to patch paste transform (Ctrl + N) operations in {method.Format()}.");
             DevkitServerModule.Fault();
         }
         if (!patchedInstantiate)
         {
-            Logger.LogWarning($"Unable to patch instantiate (E) operations in {method.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to patch instantiate (E) operations in {method.Format()}.");
             DevkitServerModule.Fault();
         }
         if (!patchedHandleDown)
         {
-            Logger.LogWarning($"Unable to patch handle down operation in {method.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to patch handle down operation in {method.Format()}.");
             DevkitServerModule.Fault();
         }
         if (!patchedTranslate)
         {
-            Logger.LogWarning($"Unable to patch translate (E) operation in {method.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to patch translate (E) operation in {method.Format()}.");
             DevkitServerModule.Fault();
         }
         if (patchedReun < 2)
         {
-            Logger.LogWarning($"Patched {patchedReun.Format()}/{2.Format()} undo/redo operations in {method.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Patched {patchedReun.Format()}/{2.Format()} undo/redo operations in {method.Format()}.");
             DevkitServerModule.Fault();
         }
         
@@ -449,7 +446,7 @@ internal static class LevelObjectPatches
             return;
         }
 
-        Logger.LogDebug($"[CLIENT EVENTS] Move final requested at: {string.Join(",", selections.Select(selection => selection.transform.gameObject.name.Format()))}.");
+        Logger.DevkitServer.LogDebug(Source, $"Move final requested at: {string.Join(",", selections.Select(selection => selection.transform.gameObject.name.Format()))}.");
 
         const TransformationDelta.TransformFlags flags = TransformationDelta.TransformFlags.All;
         
@@ -592,7 +589,7 @@ internal static class LevelObjectPatches
         if (objectAsset == null && buildableAsset == null)
             return;
 
-        Logger.LogDebug($"[{Source}] Checking instantiate.");
+        Logger.DevkitServer.LogDebug(Source, "Checking instantiate.");
         if (IsSyncing || EditorActions.HasLargeQueue())
         {
             EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
@@ -605,7 +602,7 @@ internal static class LevelObjectPatches
             return;
         }
 
-        LevelObjectUtil.RequestInstantiation(objectAsset == null ? buildableAsset.GUID : objectAsset.GUID, position, rotation, scale);
+        LevelObjectUtil.RequestInstantiation(objectAsset?.GUID ?? buildableAsset.GUID, position, rotation, scale);
     }
     
     private static bool OnDeleteSelection()
@@ -618,7 +615,7 @@ internal static class LevelObjectPatches
             return false;
         }
         List<EditorSelection> selections = LevelObjectUtil.EditorObjectSelection;
-        Logger.LogDebug($"[{Source}] Deleting selection.");
+        Logger.DevkitServer.LogDebug(Source, "Deleting selection.");
 
         List<NetId> netIds = ListPool<NetId>.claim();
         netIds.IncreaseCapacity(selections.Count);
@@ -693,7 +690,7 @@ internal static class LevelObjectPatches
             EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("TooManySelections", LevelObjectUtil.EditorObjectSelection.Count, LevelObjectUtil.MaxCopySelectionSize));
             return false;
         }
-        Logger.LogDebug($"[{Source}] Copying.");
+        Logger.DevkitServer.LogDebug(Source, "Copying.");
 
         return true;
     }
@@ -701,7 +698,7 @@ internal static class LevelObjectPatches
     {
         if (!DevkitServerModule.IsEditing || IsSyncing)
             return;
-        Logger.LogDebug($"[{Source}] Pasteing.");
+        Logger.DevkitServer.LogDebug(Source, "Pasteing.");
         LevelObjectUtil.ClearSelection();
         LevelObjectUtil.ClientInstantiateObjectsAndLock(LevelObjectUtil.EditorObjectCopies.ToArrayFast());
     }
@@ -709,7 +706,7 @@ internal static class LevelObjectPatches
     {
         if (!DevkitServerModule.IsEditing)
             return true;
-        Logger.LogDebug($"[{Source}] Checking paste.");
+        Logger.DevkitServer.LogDebug(Source, "Checking paste.");
         if (IsSyncing || EditorActions.HasLargeQueue())
         {
             EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
@@ -737,7 +734,7 @@ internal static class LevelObjectPatches
             return false;
         }
         List<EditorSelection> selection = LevelObjectUtil.EditorObjectSelection;
-        Logger.LogDebug($"[{Source}] Checking move.");
+        Logger.DevkitServer.LogDebug(Source, "Checking move.");
 
         for (int i = 0; i < selection.Count; ++i)
         {
@@ -759,14 +756,14 @@ internal static class LevelObjectPatches
             }
         }
 
-        Logger.LogDebug($"[{Source}] Can move.");
+        Logger.DevkitServer.LogDebug(Source, "Can move.");
         return true;
     }
     private static void PreIsFinalExternallyTransforming()
     {
         if (!DevkitServerModule.IsEditing)
             return;
-        Logger.LogDebug($"[{Source}] Setting next ExternallyTransformPoint to final.");
+        Logger.DevkitServer.LogDebug(Source, "Setting next ExternallyTransformPoint to final.");
 
         IsFinalTransform = true;
     }
@@ -774,7 +771,7 @@ internal static class LevelObjectPatches
     {
         if (!DevkitServerModule.IsEditing || LevelObjectUtil.EditorObjectSelection.Count != 1)
             return;
-        Logger.LogDebug($"[{Source}] Moving single.");
+        Logger.DevkitServer.LogDebug(Source, "Moving single.");
 
         EditorSelection selection = LevelObjectUtil.EditorObjectSelection[0];
         Transform transform = selection.transform;
@@ -813,11 +810,11 @@ internal static class LevelObjectPatches
         FieldInfo? field = typeof(LevelObject).GetField("customMaterialOverride", BindingFlags.NonPublic | BindingFlags.Instance);
         if (field == null || !typeof(AssetReference<MaterialPaletteAsset>).IsAssignableFrom(field.FieldType))
         {
-            Logger.LogWarning($"Field not found: LevelObject.customMaterialOverride in method {method.Format()}. Custom material palettes will not replicate.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Field not found: LevelObject.customMaterialOverride in method {method.Format()}. Custom material palettes will not replicate.");
             return instructions;
         }
 
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> ins = [..instructions];
         bool patchedInner = false;
         bool patchedOuter = false;
         LocalBuilder lcl = generator.DeclareLocal(typeof(AssetReference<MaterialPaletteAsset>));
@@ -839,7 +836,7 @@ internal static class LevelObjectPatches
                 ins.Insert(i + 7, new CodeInstruction(OpCodes.Call, new Action<LevelObject, AssetReference<MaterialPaletteAsset>, AssetReference<MaterialPaletteAsset>>(OnCustomMaterialPaletteOverrideUpdated).Method));
                 i += 7;
                 patchedInner = true;
-                Logger.LogDebug($"[{Source}] Patched {method.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Patched {method.Format()}.");
             }
             else if (patchedInner && !patchedOuter && ins[i].opcode == OpCodes.Endfinally)
             {
@@ -853,12 +850,12 @@ internal static class LevelObjectPatches
         {
             ins.RemoveRange(indexRangeSt + 4, 4);
             ins.RemoveRange(indexRangeSt, 3);
-            Logger.LogWarning($"[{Source}] Unpatched {method.Format()} to avoid a memory leak because patch was not successful.");
+            Logger.DevkitServer.LogWarning(Source, $"Unpatched {method.Format()} to avoid a memory leak because patch was not successful.");
         }
         else if (!patchedInner)
-            Logger.LogWarning($"Failed to patch {method.Format()} loop. Custom material palettes will not replicate.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Failed to patch {method.Format()} loop. Custom material palettes will not replicate.");
         if (!patchedOuter)
-            Logger.LogWarning($"Failed to patch {method.Format()} finally. Custom material palettes will not replicate.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Failed to patch {method.Format()} finally. Custom material palettes will not replicate.");
 
         return ins;
     }
@@ -873,7 +870,7 @@ internal static class LevelObjectPatches
             return;
         }
 
-        Logger.LogDebug($"Custom material updated: {obj.asset.Format()}, {old.GUID.Format()} -> {@new.GUID.Format()}");
+        Logger.DevkitServer.LogDebug(Source, $"Custom material updated: {obj.asset.Format()}, {old.GUID.Format()} -> {@new.GUID.Format()}");
         PendingMaterialUpdates.Add(obj);
     }
     private static void EndCustomMaterialPaletteOverrideChangeGroup(AssetReference<MaterialPaletteAsset> value)
@@ -917,11 +914,11 @@ internal static class LevelObjectPatches
         FieldInfo? field = typeof(LevelObject).GetField("materialIndexOverride", BindingFlags.NonPublic | BindingFlags.Instance);
         if (field == null || !typeof(int).IsAssignableFrom(field.FieldType))
         {
-            Logger.LogWarning($"Field not found: LevelObject.materialIndexOverride in method {method.Format()}. Material index overrides will not replicate.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Field not found: LevelObject.materialIndexOverride in method {method.Format()}. Material index overrides will not replicate.");
             return instructions;
         }
 
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> ins = [..instructions];
         bool patchedInner = false;
         bool patchedOuter = false;
         LocalBuilder lcl = generator.DeclareLocal(typeof(int));
@@ -940,7 +937,7 @@ internal static class LevelObjectPatches
                 ins.Insert(i + 7, new CodeInstruction(OpCodes.Call, new Action<LevelObject, int, int>(OnMaterialIndexOverrideUpdated).Method));
                 i += 7;
                 patchedInner = true;
-                Logger.LogDebug($"[{Source}] Patched {method.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Patched {method.Format()}.");
             }
             else if (patchedInner && !patchedOuter && ins[i].opcode == OpCodes.Endfinally)
             {
@@ -954,12 +951,12 @@ internal static class LevelObjectPatches
         {
             ins.RemoveRange(indexRangeSt + 4, 4);
             ins.RemoveRange(indexRangeSt, 3);
-            Logger.LogWarning($"[{Source}] Unpatched {method.Format()} to avoid a memory leak because patch was not successful.");
+            Logger.DevkitServer.LogWarning(Source, $"Unpatched {method.Format()} to avoid a memory leak because patch was not successful.");
         }
         else if (!patchedInner)
-            Logger.LogWarning($"Failed to patch {method.Format()} loop. Material index overrides will not replicate.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Failed to patch {method.Format()} loop. Material index overrides will not replicate.");
         if (!patchedOuter)
-            Logger.LogWarning($"Failed to patch {method.Format()} finally. Material index overrides will not replicate.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Failed to patch {method.Format()} finally. Material index overrides will not replicate.");
 
         return ins;
     }
@@ -974,7 +971,7 @@ internal static class LevelObjectPatches
             return;
         }
 
-        Logger.LogDebug($"Material index updated: {obj.asset.Format()}, {old.Format()} -> {@new.Format()}");
+        Logger.DevkitServer.LogDebug(Source, $"Material index updated: {obj.asset.Format()}, {old.Format()} -> {@new.Format()}");
         PendingMaterialUpdates.Add(obj);
     }
     private static void EndMaterialIndexOverrideChangeGroup(int value)
@@ -1052,7 +1049,7 @@ internal static class LevelObjectPatches
                 LevelObjectNetIdDatabase.TryGetBuildableNetId(__state, out netId);
                 if (toX != fromX || toY != fromY)
                 {
-                    Logger.LogDebug($"Buildable moved regions: {__state.Format()} -> {toId.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"Buildable moved regions: {__state.Format()} -> {toId.Format()}.");
                     LevelObjectUtil.EventOnBuildableRegionUpdated.TryInvoke(buildable, __state, toId);
                 }
 
@@ -1068,7 +1065,7 @@ internal static class LevelObjectPatches
         LevelObjectNetIdDatabase.TryGetObjectNetId(obj, out netId);
         if (toX != fromX || toY != fromY)
         {
-            Logger.LogDebug($"Object moved regions: {__state.Format()} -> {toId.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Object moved regions: {__state.Format()} -> {toId.Format()}.");
             LevelObjectUtil.EventOnLevelObjectRegionUpdated.TryInvoke(obj, __state, toId);
         }
 
@@ -1084,16 +1081,16 @@ internal static class LevelObjectPatches
         MethodInfo? destroyMethod = typeof(LevelBuildableObject).GetMethod(nameof(LevelBuildableObject.destroy), BindingFlags.Instance | BindingFlags.Public, null, Type.EmptyTypes, null);
         if (destroyMethod == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelBuildableObject.destroy.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: LevelBuildableObject.destroy.");
             DevkitServerModule.Fault();
         }
         MethodInfo? removeAtMethod = typeof(List<LevelBuildableObject>).GetMethod(nameof(List<LevelBuildableObject>.RemoveAt), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int) }, null);
         if (removeAtMethod == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: List<LevelBuildableObject>.RemoveAt.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: List<LevelBuildableObject>.RemoveAt.");
             DevkitServerModule.Fault();
         }
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> ins = [..instructions];
         TranspileRemoveObject(ins, generator, method, destroyMethod, removeAtMethod, new Action<LevelBuildableObject, byte, byte, int>(BuildableRemovedInvoker).Method);
         return ins;
     }
@@ -1105,16 +1102,16 @@ internal static class LevelObjectPatches
         MethodInfo? destroyMethod = typeof(LevelObject).GetMethod(nameof(LevelObject.destroy), BindingFlags.Instance | BindingFlags.Public, null, Type.EmptyTypes, null);
         if (destroyMethod == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelObject.destroy.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: LevelObject.destroy.");
             DevkitServerModule.Fault();
         }
         MethodInfo? removeAtMethod = typeof(List<LevelObject>).GetMethod(nameof(List<LevelObject>.RemoveAt), BindingFlags.Instance | BindingFlags.Public, null, new Type[] { typeof(int) }, null);
         if (removeAtMethod == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: List<LevelObject>.RemoveAt.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: List<LevelObject>.RemoveAt.");
             DevkitServerModule.Fault();
         }
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> ins = [..instructions];
         TranspileRemoveObject(ins, generator, method, destroyMethod, removeAtMethod, new Action<LevelObject, byte, byte, int>(ObjectRemovedInvoker).Method);
         return ins;
     }
@@ -1170,7 +1167,7 @@ internal static class LevelObjectPatches
         }
         if (!removePatch)
         {
-            Logger.LogWarning($"Unable to patch in an event in {method.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to patch in an event in {method.Format()}.");
             DevkitServerModule.Fault();
         }
     }
@@ -1179,7 +1176,7 @@ internal static class LevelObjectPatches
         RegionIdentifier id = new RegionIdentifier(x, y, index);
         LevelObjectNetIdDatabase.TryGetBuildableNetId(buildable, out NetId netId);
         LevelObjectUtil.EventOnBuildableRemoved.TryInvoke(buildable, id);
-        Logger.LogDebug($"Buildable removed: {id.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Buildable removed: {id.Format()}.");
 
         if (!netId.IsNull())
             LevelObjectUtil.SyncIfAuthority(netId);
@@ -1194,7 +1191,7 @@ internal static class LevelObjectPatches
         RegionIdentifier id = new RegionIdentifier(x, y, index);
         LevelObjectNetIdDatabase.TryGetObjectNetId(levelObject, out NetId netId);
         LevelObjectUtil.EventOnLevelObjectRemoved.TryInvoke(levelObject, id);
-        Logger.LogDebug($"Object removed: {id.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Object removed: {id.Format()}.");
 
         if (!netId.IsNull())
             LevelObjectUtil.SyncIfAuthority(netId);

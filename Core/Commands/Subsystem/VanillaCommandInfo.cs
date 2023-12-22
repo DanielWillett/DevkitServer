@@ -414,7 +414,7 @@ public static class VanillaCommandInfo
         }
         else
         {
-            Logger.LogWarning($"Unknown vanilla command type: {command.Format()}. This command may be allowed at times it shouldn't be.");
+            Logger.DevkitServer.LogWarning(nameof(VanillaCommandInfo), $"Unknown vanilla command type: {command.Format()}. This command may be allowed at times it shouldn't be.");
         }
 
         serverOnly |= dedicatedServerOnly;

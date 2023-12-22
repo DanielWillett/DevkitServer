@@ -48,9 +48,9 @@ public class BundledStripChartColorProvider : RaycastChartColorProvider
         if (!File.Exists(path))
         {
             if (isExplicitlyDefined)
-                Logger.LogInfo($"[{nameof(BundledStripChartColorProvider)}] Skipping because there is no chart data at {path.Format()}.");
+                Logger.DevkitServer.LogInfo(nameof(BundledStripChartColorProvider), $"Skipping because there is no chart data at {path.Format()}.");
             else
-                Logger.LogDebug($"[{nameof(BundledStripChartColorProvider)}] Skipping because there is no chart data at {path.Format()}.");
+                Logger.DevkitServer.LogDebug(nameof(BundledStripChartColorProvider), $"Skipping because there is no chart data at {path.Format()}.");
             return false;
         }
 
@@ -58,7 +58,7 @@ public class BundledStripChartColorProvider : RaycastChartColorProvider
 
         if (bundle == null)
         {
-            Logger.LogWarning($"Unable to find chart bundle at {path.Format()}.", method: nameof(BundledStripChartColorProvider));
+            Logger.DevkitServer.LogWarning(nameof(BundledStripChartColorProvider), $"Unable to find chart bundle at {path.Format()}.");
             return false;
         }
 
@@ -69,7 +69,7 @@ public class BundledStripChartColorProvider : RaycastChartColorProvider
         if (heightStrip == null || heightStrip.width < 2)
         {
             _heightPixels = new Color32[32];
-            Logger.LogWarning($"Unable to find valid Height_Strip image in chart bundle at {path.Format()}. Using {"Washington".Colorize(DevkitServerModule.UnturnedColor)} defaults.", method: nameof(BundledStripChartColorProvider));
+            Logger.DevkitServer.LogWarning(nameof(BundledStripChartColorProvider), $"Unable to find valid Height_Strip image in chart bundle at {path.Format()}. Using {"Washington".Colorize(DevkitServerModule.UnturnedColor)} defaults.");
             
             // Washington defaults
             _heightPixels[0] = new Color32(48,  90,  89,  255);
@@ -96,7 +96,7 @@ public class BundledStripChartColorProvider : RaycastChartColorProvider
         if (layerStrip == null)
         {
             _layerPixels = new Color32[32];
-            Logger.LogWarning($"Unable to find Layer_Strip image in chart bundle at {path.Format()}. Using {"Washington".Colorize(DevkitServerModule.UnturnedColor)} defaults.", method: nameof(BundledStripChartColorProvider));
+            Logger.DevkitServer.LogWarning(nameof(BundledStripChartColorProvider), $"Unable to find Layer_Strip image in chart bundle at {path.Format()}. Using {"Washington".Colorize(DevkitServerModule.UnturnedColor)} defaults.");
 
             // Washington defaults
             _layerPixels[0]  = new Color32(227, 119, 40,  255);

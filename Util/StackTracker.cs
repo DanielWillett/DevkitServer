@@ -9,19 +9,12 @@ namespace DevkitServer.Util;
 /// Tool for keeping up with the stack size of a transpiler.
 /// </summary>
 /// <remarks>It's okay if the given list changes after passing it.</remarks>
-public class StackTracker
+public class StackTracker(List<CodeInstruction> instructions, MethodBase method)
 {
     private static readonly InstanceGetter<SignatureHelper, Type[]>? GetArguments = Accessor.GenerateInstanceGetter<SignatureHelper, Type[]>("arguments");
     private static readonly InstanceGetter<SignatureHelper, Type>? GetReturnType = Accessor.GenerateInstanceGetter<SignatureHelper, Type>("returnType");
-    private readonly List<CodeInstruction> _instructions;
-    private readonly MethodBase _method;
     private int _lastStackSizeIs0;
     private int _listVersion;
-    public StackTracker(List<CodeInstruction> instructions, MethodBase method)
-    {
-        _instructions = instructions;
-        _method = method;
-    }
 
     /// <summary>
     /// Get the stack size change of this <see cref="OpCode"/> with the given operand and method.
@@ -124,16 +117,16 @@ public class StackTracker
     {
         int stackSize = 0;
         int lastStack = _lastStackSizeIs0;
-        if (_lastStackSizeIs0 >= startIndex || !Accessor.TryGetListVersion(_instructions, out int version) || version != _listVersion)
+        if (_lastStackSizeIs0 >= startIndex || !Accessor.TryGetListVersion(instructions, out int version) || version != _listVersion)
             lastStack = 0;
 
         int last = -1;
-        for (int i = lastStack; i < _instructions.Count; ++i)
+        for (int i = lastStack; i < instructions.Count; ++i)
         {
-            CodeInstruction current = _instructions[i];
+            CodeInstruction current = instructions[i];
             if ((current.opcode == OpCodes.Br || current.opcode == OpCodes.Br_S) && stackSize != 0 && current.operand is Label lbl)
             {
-                int index = _instructions.FindIndex(i, x => x.labels.Contains(lbl));
+                int index = instructions.FindIndex(i, x => x.labels.Contains(lbl));
                 if (index != -1)
                 {
                     i = index - 1;
@@ -149,27 +142,27 @@ public class StackTracker
                     if (i >= startIndex)
                     {
                         _lastStackSizeIs0 = lastStack;
-                        Accessor.TryGetListVersion(_instructions, out _listVersion);
+                        Accessor.TryGetListVersion(instructions, out _listVersion);
                         return last;
                     }
                     last = i;
                 }
             }
-            stackSize += GetStackChange(current.opcode, current.operand, _method);
+            stackSize += GetStackChange(current.opcode, current.operand, method);
             if (current.blocks.Any(x => x.blockType == ExceptionBlockType.BeginCatchBlock))
                 ++stackSize;
             if (stackSize < 0)
             {
-                Logger.LogError("Stack size less than 0 around the following lines of IL: ");
+                Logger.DevkitServer.LogError(nameof(StackTracker), "Stack size less than 0 around the following lines of IL: ");
 
-                for (int j = Math.Max(0, i - 2); j < Math.Min(_instructions.Count - 1, i + 2); ++j)
-                    Logger.LogError($"#{j.Format("F4")} {_instructions[j].Format()}.");
+                for (int j = Math.Max(0, i - 2); j < Math.Min(instructions.Count - 1, i + 2); ++j)
+                    Logger.DevkitServer.LogError(nameof(StackTracker), $"#{j.Format("F4")} {instructions[j].Format()}.");
 
                 throw new InvalidProgramException($"Stack size should never be less than zero. There is an issue with your IL code around index {i}.");
             }
         }
 
-        Accessor.TryGetListVersion(_instructions, out _listVersion);
+        Accessor.TryGetListVersion(instructions, out _listVersion);
         return last;
     }
 
@@ -184,16 +177,16 @@ public class StackTracker
     {
         int stackSize = 0;
         int lastStack = _lastStackSizeIs0;
-        if (_lastStackSizeIs0 >= startIndex || !Accessor.TryGetListVersion(_instructions, out int version) || version != _listVersion)
+        if (_lastStackSizeIs0 >= startIndex || !Accessor.TryGetListVersion(instructions, out int version) || version != _listVersion)
             lastStack = 0;
 
         int last = -1;
-        for (int i = lastStack; i < _instructions.Count; ++i)
+        for (int i = lastStack; i < instructions.Count; ++i)
         {
-            CodeInstruction current = _instructions[i];
+            CodeInstruction current = instructions[i];
             if ((current.opcode == OpCodes.Br || current.opcode == OpCodes.Br_S) && stackSize != 0 && current.operand is Label lbl)
             {
-                int index = _instructions.FindIndex(i, x => x.labels.Contains(lbl));
+                int index = instructions.FindIndex(i, x => x.labels.Contains(lbl));
                 if (index != -1)
                 {
                     i = index - 1;
@@ -210,27 +203,27 @@ public class StackTracker
                     if (i >= startIndex)
                     {
                         _lastStackSizeIs0 = lastStack;
-                        Accessor.TryGetListVersion(_instructions, out _listVersion);
+                        Accessor.TryGetListVersion(instructions, out _listVersion);
                         return last;
                     }
                     last = i;
                 }
             }
-            stackSize += GetStackChange(current.opcode, current.operand, _method);
+            stackSize += GetStackChange(current.opcode, current.operand, method);
             if (current.blocks.Any(x => x.blockType == ExceptionBlockType.BeginCatchBlock))
                 ++stackSize;
             if (stackSize < 0)
             {
-                Logger.LogError("Stack size less than 0 around the following lines of IL: ");
+                Logger.DevkitServer.LogError(nameof(StackTracker), "Stack size less than 0 around the following lines of IL: ");
 
-                for (int j = Math.Max(0, i - 2); j < Math.Min(_instructions.Count - 1, i + 2); ++j)
-                    Logger.LogError($"#{j.Format("F4")} {_instructions[j].Format()}.");
+                for (int j = Math.Max(0, i - 2); j < Math.Min(instructions.Count - 1, i + 2); ++j)
+                    Logger.DevkitServer.LogError(nameof(StackTracker), $"#{j.Format("F4")} {instructions[j].Format()}.");
 
                 throw new InvalidProgramException($"Stack size should never be less than zero. There is an issue with your IL code around index {i}.");
             }
         }
         
-        Accessor.TryGetListVersion(_instructions, out _listVersion);
+        Accessor.TryGetListVersion(instructions, out _listVersion);
         return last;
     }
 

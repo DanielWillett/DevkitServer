@@ -1,8 +1,8 @@
 ﻿using DevkitServer.API.Permissions;
-using DevkitServer.Configuration;
-using DevkitServer.Multiplayer;
 #if SERVER
+using DevkitServer.Configuration;
 using DevkitServer.Core.Permissions;
+using DevkitServer.Multiplayer;
 using DevkitServer.Util.Encoding;
 #endif
 
@@ -149,7 +149,7 @@ public class DevkitServerPermissions : IUserPermissionHandler, IPermissionHandle
 #endif
             _permissionGroups.Add(group);
             if (DebugLogging)
-                Logger.LogInfo($"[{Source}] Permission group registered: {group.Format()}.");
+                Logger.DevkitServer.LogInfo(Source, $"Permission group registered: {group.Format()}.");
         }
         finally
         {
@@ -166,7 +166,7 @@ public class DevkitServerPermissions : IUserPermissionHandler, IPermissionHandle
         {
             removed = _permissionGroups.RemoveAll(x => x.Id.Equals(group.Id, StringComparison.InvariantCultureIgnoreCase)) > 0;
             if (DebugLogging)
-                Logger.LogInfo($"[{Source}] Permission group deregistered: {group.Format()}.");
+                Logger.DevkitServer.LogInfo(Source, $"Permission group deregistered: {group.Format()}.");
         }
         finally
         {
@@ -364,13 +364,13 @@ public class DevkitServerPermissions : IUserPermissionHandler, IPermissionHandle
                         _permissionGroups.Add(grp);
                 }
 
-                Logger.LogInfo("Permission group updated: " + grp.Format() + ".");
+                Logger.DevkitServer.LogInfo(Source, $"Permission group updated: {grp.Format()}.");
                 EventPermissionGroupUpdated.TryInvoke(grp);
                 return true;
             }
 
             _permissionGroups.Add(group);
-            Logger.LogInfo("Permission group added during update: " + group.Format() + ".");
+            Logger.DevkitServer.LogInfo(Source, "Permission group added during update: " + group.Format() + ".");
             EventPermissionGroupUpdated.TryInvoke(group);
             return false;
         }
@@ -653,7 +653,7 @@ public class DevkitServerPermissions : IUserPermissionHandler, IPermissionHandle
                         if (PermissionBranch.TryParse(id, out PermissionBranch branch))
                             list.Add(branch);
                         else if (branch.Path != null)
-                            Logger.LogDebug($"Invalid permission skipped: {branch.Format()}.");
+                            Logger.DevkitServer.LogDebug(nameof(GetPermissions), $"Invalid permission skipped: {branch.Format()}.");
                     }
                     else
                     {
@@ -663,7 +663,7 @@ public class DevkitServerPermissions : IUserPermissionHandler, IPermissionHandle
                         if (branch.Valid)
                             list.Add(branch);
                         else
-                            Logger.LogDebug($"Invalid permission skipped: {branch.Format()}.");
+                            Logger.DevkitServer.LogDebug(nameof(GetPermissions), $"Invalid permission skipped: {branch.Format()}.");
                     }
                 }
                 return list.AsReadOnly();
@@ -697,7 +697,7 @@ public class DevkitServerPermissions : IUserPermissionHandler, IPermissionHandle
                     else
                     {
                         if (!temp)
-                            Logger.LogWarning("Unknown permission group in " + user + "'s permission group save, ignoring.");
+                            Logger.DevkitServer.LogWarning(nameof(GetPermissionGroups), $"Unknown permission group in {user.Format()}'s permission group save, ignoring.");
                         list.Add(new PermissionGroup(id, id, Color.white, int.MinValue, Array.Empty<PermissionBranch>()));
                     }
                     if (_reader.HasFailed)
@@ -714,7 +714,7 @@ public class DevkitServerPermissions : IUserPermissionHandler, IPermissionHandle
                     if (this.TryFindPermissionGroup(def[i], out PermissionGroup group))
                         list.Add(group);
                     else
-                        Logger.LogWarning("Unknown default permission group: " + def[i].Format() + ".");
+                        Logger.DevkitServer.LogWarning(nameof(GetPermissionGroups), $"Unknown default permission group: {def[i].Format()}.");
                 }
 
                 SavePermissionGroups(user, list);

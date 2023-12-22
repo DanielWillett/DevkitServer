@@ -52,7 +52,7 @@ public class LevelCartographyConfigData : SchemaConfiguration
         if (File.Exists(file))
             return Read(file);
 
-        Logger.LogInfo($"No 'cartography_config.json' is present in {info.getLocalizedName().Format(false)}.");
+        Logger.DevkitServer.LogInfo(nameof(LevelCartographyConfigData), $"No 'cartography_config.json' is present in {info.getLocalizedName().Format(false)}.");
         return null;
     }
 
@@ -68,21 +68,20 @@ public class LevelCartographyConfigData : SchemaConfiguration
 
             Utf8JsonReader reader = new Utf8JsonReader(bytes, DevkitServerConfig.ReaderOptions);
             data = JsonSerializer.Deserialize<LevelCartographyConfigData>(ref reader, DevkitServerConfig.SerializerSettings);
-            Logger.LogDebug($"[{nameof(LevelCartographyConfigData)}] Using level cartography config at {file.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(LevelCartographyConfigData), $"Using level cartography config at {file.Format()}.");
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Unable to read {file.Format()} for cartography config. Json parser exception. Using default options.", method: nameof(LevelCartographyConfigData));
-            Logger.LogInfo($"[{nameof(LevelCartographyConfigData)}] See {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/Cartography Rendering.md", false).Format(false)} for how to format your cartography config.");
-            Logger.LogError(ex, method: nameof(LevelCartographyConfigData));
+            Logger.DevkitServer.LogError(nameof(LevelCartographyConfigData), ex, $"Unable to read {file.Format()} for cartography config. Json parser exception. Using default options.");
+            Logger.DevkitServer.LogInfo(nameof(LevelCartographyConfigData), $"See {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/Cartography Rendering.md", false).Format(false)} for how to format your cartography config.");
             return null;
         }
 
         if (data != null)
             return data;
 
-        Logger.LogWarning($"Unable to read {file.Format()} for cartography config. No value available. Using default options.", method: nameof(LevelCartographyConfigData));
-        Logger.LogInfo($"[{nameof(LevelCartographyConfigData)}] See {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/Cartography Rendering.md", false).Format(false)} for how to format your cartography config.");
+        Logger.DevkitServer.LogWarning(nameof(LevelCartographyConfigData), $"Unable to read {file.Format()} for cartography config. No value available. Using default options.");
+        Logger.DevkitServer.LogInfo(nameof(LevelCartographyConfigData), $"[{nameof(LevelCartographyConfigData)}] See {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/Cartography Rendering.md", false).Format(false)} for how to format your cartography config.");
         return null;
     }
 }

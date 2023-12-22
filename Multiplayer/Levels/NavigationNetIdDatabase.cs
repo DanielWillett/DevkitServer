@@ -34,7 +34,7 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
 
         if (!blockingNetId.IsNull())
         {
-            Logger.LogDebug($"[{Source}] Released blocking net id to save navigation flag: # {fromNav.Format()} ({netId.Format()}, # {toNav.Format()}).");
+            Logger.DevkitServer.LogDebug(Source, $"Released blocking net id to save navigation flag: # {fromNav.Format()} ({netId.Format()}, # {toNav.Format()}).");
             NetIdRegistry.Release(blockingNetId);
         }
 
@@ -42,7 +42,7 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
         NetIdRegistry.Assign(netId, toNav);
         NetIds[fromNav] = NetId.INVALID;
         NetIds[toNav] = netId;
-        Logger.LogDebug($"[{Source}] Moved navigation flag NetId: # {fromNav.Format()} ({netId.Format()}, # {toNav.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Moved navigation flag NetId: # {fromNav.Format()} ({netId.Format()}, # {toNav.Format()}).");
     }
     private static void OnFlagRemoved(Flag flag, byte nav)
     {
@@ -55,7 +55,7 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
 
         NetIdRegistry.Release(netId);
         NetIds[nav] = NetId.INVALID;
-        Logger.LogDebug($"[{Source}] Removed navigation flag NetId: ({netId.Format()}, # {nav.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Removed navigation flag NetId: ({netId.Format()}, # {nav.Format()}).");
     }
 #if CLIENT
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendBindNavigation)]
@@ -70,17 +70,17 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
         NetId id = NetIds[nav];
         if (id.IsNull())
         {
-            Logger.LogWarning($"Unable to release NetId to navigation flag {nav.Format()}, NetId not registered.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to release NetId to navigation flag {nav.Format()}, NetId not registered.");
             return;
         }
 
         if (!NetIdRegistry.Release(id))
-            Logger.LogWarning($"Unable to release NetId to navigation flag {nav.Format()}, NetId not registered in NetIdRegistry.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to release NetId to navigation flag {nav.Format()}, NetId not registered in NetIdRegistry.");
 
         NetIds[nav] = NetId.INVALID;
 
         if (Level.isLoaded)
-            Logger.LogDebug($"[{Source}] Released navigation flag NetId: {id.Format()} ({nav.Format()}).");
+            Logger.DevkitServer.LogDebug(Source, $"Released navigation flag NetId: {id.Format()} ({nav.Format()}).");
     }
     public static NetId AddNavigation(byte nav)
     {
@@ -115,14 +115,14 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
         if (!old.IsNull() && old != netId && NetIdRegistry.Release(old))
         {
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Released old NetId pairing: {old.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {old.Format()}.");
         }
 
         NetIds[nav] = netId;
         NetIdRegistry.Assign(netId, nav);
 
         if (Level.isLoaded)
-            Logger.LogDebug($"[{Source}] Claimed new NetId: {netId.Format()} to navigation flag {nav.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Claimed new NetId: {netId.Format()} to navigation flag {nav.Format()}.");
     }
 
 #if SERVER
@@ -142,7 +142,7 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
         for (; nav < ct; ++nav)
             AddNavigation((byte)nav);
 
-        Logger.LogInfo($"[{Source}] Assigned NetIds for {nav.Format()} navigation flag{nav.S()}.");
+        Logger.DevkitServer.LogInfo(Source, $"Assigned NetIds for {nav.Format()} navigation flag{nav.S()}.");
     }
 #endif
 

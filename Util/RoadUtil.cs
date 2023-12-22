@@ -1,5 +1,4 @@
-﻿using System.Globalization;
-using DevkitServer.API;
+﻿using DevkitServer.API;
 using DevkitServer.API.Permissions;
 using DevkitServer.Configuration;
 using DevkitServer.Core.Permissions;
@@ -9,6 +8,7 @@ using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players;
+using System.Globalization;
 #if SERVER
 using DevkitServer.API.UI;
 #endif
@@ -258,12 +258,12 @@ public static class RoadUtil
     /// <summary>
     /// The index of the selected road vertex in <see cref="EditorRoads.road"/>, or -1 if none are selected (or in the case of a reflection failure).
     /// </summary>
-    public static int SelectedVertexIndex => GetVertexIndex != null ? GetVertexIndex() : -1;
+    public static int SelectedVertexIndex => GetVertexIndex?.Invoke() ?? -1;
 
     /// <summary>
     /// The index of the selected tangent handle (0 or 1) in <see cref="EditorRoads.road"/> at vertex <see cref="SelectedVertexIndex"/>, or -1 if none are selected (or in the case of a reflection failure).
     /// </summary>
-    public static int SelectedTangentIndex => GetTangentIndex != null ? GetTangentIndex() : -1;
+    public static int SelectedTangentIndex => GetTangentIndex?.Invoke() ?? -1;
 
     /// <summary>
     /// The <see cref="Transform"/> of the element selected, or <see langref="null"/> if nothing is selected (or in the case of a reflection failure).
@@ -414,8 +414,7 @@ public static class RoadUtil
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Failed to initialize road: {netId.Format()}.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, $"Failed to initialize road: {netId.Format()}.");
             return StandardErrorCode.GenericError;
         }
         finally
@@ -441,7 +440,7 @@ public static class RoadUtil
         {
             if (!RoadNetIdDatabase.TryGetRoad(roadNetId, out road, out int roadIndex))
             {
-                Logger.LogWarning($"Failed to find road of net id {roadNetId.Format()}.", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(ReceiveVertexInstantiation), $"Failed to find road of net id {roadNetId.Format()}.");
                 return StandardErrorCode.NotFound;
             }
             
@@ -483,8 +482,7 @@ public static class RoadUtil
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Failed to initialize vertex # {vertexIndex.Format()} on road {roadNetId.Format()}: {vertexNetId.Format()}.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, $"Failed to initialize vertex # {vertexIndex.Format()} on road {roadNetId.Format()}: {vertexNetId.Format()}.");
             return StandardErrorCode.GenericError;
         }
         finally
@@ -504,7 +502,7 @@ public static class RoadUtil
         EditorUser? user = ctx.GetCaller();
         if (user == null || !user.IsOnline)
         {
-            Logger.LogError("Unable to get user from road instantiation request.", method: Source);
+            Logger.DevkitServer.LogError(nameof(ReceiveRoadInstantiationRequest), "Unable to get user from road instantiation request.");
             ctx.Acknowledge(StandardErrorCode.NoPermissions);
             return;
         }
@@ -518,7 +516,7 @@ public static class RoadUtil
 
         AddRoad(firstVertexPosition, materialIndex, ctx);
         
-        Logger.LogDebug($"[{Source}] Granted request for instantiation of road at {firstVertexPosition.Format()}, material: {materialIndex.Format()} from {user.SteamId.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Granted request for instantiation of road at {firstVertexPosition.Format()}, material: {materialIndex.Format()} from {user.SteamId.Format()}.");
 
         ctx.Acknowledge(StandardErrorCode.Success);
     }
@@ -529,7 +527,7 @@ public static class RoadUtil
         EditorUser? user = ctx.GetCaller();
         if (user == null || !user.IsOnline)
         {
-            Logger.LogError("Unable to get user from road instantiation request.", method: Source);
+            Logger.DevkitServer.LogError(nameof(ReceiveRoadVertexInstantiationRequest), "Unable to get user from road instantiation request.");
             ctx.Acknowledge(StandardErrorCode.NoPermissions);
             return;
         }
@@ -550,7 +548,7 @@ public static class RoadUtil
 
         AddVertex(roadNetId, road, roadIndex, vertexIndex, worldPosition, ctx);
         
-        Logger.LogDebug($"[{Source}] Granted request for instantiation of road vertex at {worldPosition.Format()}, index: {vertexIndex.Format()} to road #{roadIndex.Format()} from {user.SteamId.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Granted request for instantiation of road vertex at {worldPosition.Format()}, index: {vertexIndex.Format()} to road #{roadIndex.Format()} from {user.SteamId.Format()}.");
 
         ctx.Acknowledge(StandardErrorCode.Success);
     }
@@ -668,7 +666,7 @@ public static class RoadUtil
         joint.mode = mode;
         EventOnVertexTangentHandleModeUpdated.TryInvoke(road, new RoadVertexIdentifier(roadIndex, vertexIndex), oldMode, mode);
 
-        Logger.LogDebug($"[{Source}] Vertex mode updated: {roadIndex.Format()}/{vertexIndex.Format()} {oldMode.Format()} -> {mode.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(SetVertexTangentHandleModeLocal), $"Vertex mode updated: {roadIndex.Format()}/{vertexIndex.Format()} {oldMode.Format()} -> {mode.Format()}.");
 
         SyncIfAuthority(roadIndex);
 
@@ -722,7 +720,7 @@ public static class RoadUtil
 
         EventOnIsLoopUpdated.TryInvoke(road, roadIndex, isLoop);
 
-        Logger.LogDebug($"[{Source}] Road is loop updated: {roadIndex.Format()} {(!isLoop).Format()} -> {isLoop.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(SetIsLoopLocal), $"Road is loop updated: {roadIndex.Format()} {(!isLoop).Format()} -> {isLoop.Format()}.");
 
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
             road.buildMesh();
@@ -786,7 +784,7 @@ public static class RoadUtil
 
         EventOnMaterialUpdated.TryInvoke(road, roadIndex, oldMaterialIndex, materialIndex, LevelRoads.materials[oldMaterialIndex], LevelRoads.materials[materialIndex]);
 
-        Logger.LogDebug($"[{Source}] Road material updated: {roadIndex.Format()} {oldMaterialIndex.Format()} -> {materialIndex.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(SetMaterialLocal), $"Road material updated: {roadIndex.Format()} {oldMaterialIndex.Format()} -> {materialIndex.Format()}.");
 
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
             road.buildMesh();
@@ -853,7 +851,7 @@ public static class RoadUtil
         joint.ignoreTerrain = ignoreTerrain;
         EventOnVertexIgnoreTerrainUpdated.TryInvoke(road, new RoadVertexIdentifier(roadIndex, vertexIndex), ignoreTerrain);
 
-        Logger.LogDebug($"[{Source}] Vertex ignore terrain updated: {roadIndex.Format()}/{vertexIndex.Format()} {(!joint.ignoreTerrain).Format()} -> {joint.ignoreTerrain.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(SetVertexIgnoreTerrainLocal), $"Vertex ignore terrain updated: {roadIndex.Format()}/{vertexIndex.Format()} {(!joint.ignoreTerrain).Format()} -> {joint.ignoreTerrain.Format()}.");
 
         road.updatePoints();
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
@@ -925,7 +923,7 @@ public static class RoadUtil
 
         EventOnVertexVerticalOffsetUpdated.TryInvoke(road, new RoadVertexIdentifier(roadIndex, vertexIndex), oldVerticalOffset, verticalOffset);
 
-        Logger.LogDebug($"[{Source}] Vertex vertical offset updated: {roadIndex.Format()}/{vertexIndex.Format()} {oldVerticalOffset.Format()} -> {verticalOffset.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(SetVertexVerticalOffsetLocal), $"Vertex vertical offset updated: {roadIndex.Format()}/{vertexIndex.Format()} {oldVerticalOffset.Format()} -> {verticalOffset.Format()}.");
 
         road.updatePoints();
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
@@ -980,7 +978,7 @@ public static class RoadUtil
 
         EventOnVertexMoved.TryInvoke(road, new RoadVertexIdentifier(roadIndex, vertexIndex), oldPos, worldPosition);
 
-        Logger.LogDebug($"[{Source}] Vertex moved: {roadIndex.Format()}/{vertexIndex.Format()} {oldPos.Format("F1")} -> {worldPosition.Format("F1")}.");
+        Logger.DevkitServer.LogDebug(nameof(SetVertexPositionLocal), $"Vertex moved: {roadIndex.Format()}/{vertexIndex.Format()} {oldPos.Format("F1")} -> {worldPosition.Format("F1")}.");
 
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
             road.buildMesh();
@@ -1043,7 +1041,7 @@ public static class RoadUtil
         if (reflectionPos != oldReflectionPos)
             EventOnTangentHandleMoved.TryInvoke(road, new RoadTangentHandleIdentifier(roadIndex, vertexIndex, (TangentHandle)(1 - (int)handle)), oldReflectionPos, reflectionPos, true);
 
-        Logger.LogDebug($"[{Source}] Tangent handle moved: {roadIndex.Format()}/{vertexIndex.Format()}/{handle.Format()} {oldPos.Format("F1")} -> {relativePosition.Format("F1")}.");
+        Logger.DevkitServer.LogDebug(nameof(SetTangentHandlePositionLocal), $"Tangent handle moved: {roadIndex.Format()}/{vertexIndex.Format()}/{handle.Format()} {oldPos.Format("F1")} -> {relativePosition.Format("F1")}.");
 
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
             road.buildMesh();
@@ -1101,7 +1099,7 @@ public static class RoadUtil
 
         EventOnVertexAdded.TryInvoke(road, new RoadVertexIdentifier(roadIndex, vertexIndex));
 
-        Logger.LogDebug($"[{Source}] Vertex added: {roadIndex.Format()}/{vertexIndex.Format()} {worldPosition.Format("F1")}.");
+        Logger.DevkitServer.LogDebug(nameof(AddVertexLocal), $"Vertex added: {roadIndex.Format()}/{vertexIndex.Format()} {worldPosition.Format("F1")}.");
 
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
             road.buildMesh();
@@ -1157,7 +1155,7 @@ public static class RoadUtil
         for (int i = vertexIndex; i < road.joints.Count; ++i)
             EventOnVertexIndexUpdated.TryInvoke(road, new RoadVertexIdentifier(roadIndex, i + 1), new RoadVertexIdentifier(roadIndex, i));
 
-        Logger.LogDebug($"[{Source}] Vertex removed: {roadIndex.Format()}/{vertexIndex.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(RemoveVertexLocal), $"Vertex removed: {roadIndex.Format()}/{vertexIndex.Format()}.");
 
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
             road.buildMesh();
@@ -1187,7 +1185,7 @@ public static class RoadUtil
         EventOnRoadAdded.TryInvoke(road, roadIndex);
         EventOnVertexAdded.TryInvoke(road, new RoadVertexIdentifier(roadIndex, vertexIndex));
 
-        Logger.LogDebug($"[{Source}] Road added: {roadIndex.Format()}/{vertexIndex.Format()} {firstVertexWorldPosition.Format("F1")}.");
+        Logger.DevkitServer.LogDebug(nameof(AddRoadLocal), $"Road added: {roadIndex.Format()}/{vertexIndex.Format()} {firstVertexWorldPosition.Format("F1")}.");
         
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
             road.buildMesh();
@@ -1255,7 +1253,7 @@ public static class RoadUtil
                 EventOnVertexIndexUpdated.TryInvoke(road, new RoadVertexIdentifier(fromIndex, j), new RoadVertexIdentifier(i, j));
         }
 
-        Logger.LogDebug($"[{Source}] Road removed: {roadIndex.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(RemoveRoadLocal), $"Road removed: {roadIndex.Format()}.");
     }
 
     /// <summary>
@@ -1281,7 +1279,7 @@ public static class RoadUtil
 
         EventOnMaterialWidthUpdated.TryInvoke(material, materialIndex, oldWidth, width);
 
-        Logger.LogDebug($"[{Source}] Material width updated: {material.MaterialToString().Format()} ({materialIndex.Format()}) {oldWidth.Format()} -> {width.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(SetMaterialWidthLocal), $"Material width updated: {material.MaterialToString().Format()} ({materialIndex.Format()}) {oldWidth.Format()} -> {width.Format()}.");
 
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
             BakeRoadsWithMaterial(materialIndex);
@@ -1315,7 +1313,7 @@ public static class RoadUtil
 
         EventOnMaterialHeightUpdated.TryInvoke(material, materialIndex, oldHeight, height);
 
-        Logger.LogDebug($"[{Source}] Material height updated: {material.MaterialToString().Format()} ({materialIndex.Format()}) {oldHeight.Format()} -> {height.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(SetMaterialHeightLocal), $"Material height updated: {material.MaterialToString().Format()} ({materialIndex.Format()}) {oldHeight.Format()} -> {height.Format()}.");
 
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
             BakeRoadsWithMaterial(materialIndex);
@@ -1349,7 +1347,7 @@ public static class RoadUtil
 
         EventOnMaterialDepthUpdated.TryInvoke(material, materialIndex, oldDepth, depth);
 
-        Logger.LogDebug($"[{Source}] Material depth updated: {material.MaterialToString().Format()} ({materialIndex.Format()}) {oldDepth.Format()} -> {depth.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(SetMaterialDepthLocal), $"Material depth updated: {material.MaterialToString().Format()} ({materialIndex.Format()}) {oldDepth.Format()} -> {depth.Format()}.");
 
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
             BakeRoadsWithMaterial(materialIndex);
@@ -1383,7 +1381,7 @@ public static class RoadUtil
 
         EventOnMaterialVerticalOffsetUpdated.TryInvoke(material, materialIndex, oldVerticalOffset, verticalOffset);
 
-        Logger.LogDebug($"[{Source}] Material vertical offset updated: {material.MaterialToString().Format()} ({materialIndex.Format()}) {oldVerticalOffset.Format()} -> {verticalOffset.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(SetMaterialVerticalOffsetLocal), $"Material vertical offset updated: {material.MaterialToString().Format()} ({materialIndex.Format()}) {oldVerticalOffset.Format()} -> {verticalOffset.Format()}.");
 
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
             BakeRoadsWithMaterial(materialIndex);
@@ -1416,7 +1414,7 @@ public static class RoadUtil
 
         EventOnMaterialIsConcreteUpdated.TryInvoke(material, materialIndex, isConcrete);
 
-        Logger.LogDebug($"[{Source}] Material is concrete updated: {material.MaterialToString().Format()} ({materialIndex.Format()}) {(!isConcrete).Format()} -> {isConcrete.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(SetMaterialIsConcreteLocal), $"Material is concrete updated: {material.MaterialToString().Format()} ({materialIndex.Format()}) {(!isConcrete).Format()} -> {isConcrete.Format()}.");
         
         // need to bake since chart colors rely on this
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
@@ -1458,7 +1456,7 @@ public static class RoadUtil
         EventOnRoadAdded.TryInvoke(road, roadIndex);
         EventOnVertexAdded.TryInvoke(road, new RoadVertexIdentifier(roadIndex, 0));
 
-        Logger.LogDebug($"[{Source}] Road added: {roadIndex.Format()}/{0.Format()} {firstVertexWorldPosition.Format("F1")}.");
+        Logger.DevkitServer.LogDebug(nameof(AddRoad), $"Road added: {roadIndex.Format()}/{0.Format()} {firstVertexWorldPosition.Format("F1")}.");
 
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
             road.buildMesh();
@@ -1545,7 +1543,7 @@ public static class RoadUtil
 
         EventOnVertexAdded.TryInvoke(road, new RoadVertexIdentifier(roadIndex, vertexIndex));
 
-        Logger.LogDebug($"[{Source}] Vertex added: {roadIndex.Format()}/{vertexIndex.Format()} {worldPosition.Format("F1")}.");
+        Logger.DevkitServer.LogDebug(nameof(AddVertex), $"Vertex added: {roadIndex.Format()}/{vertexIndex.Format()} {worldPosition.Format("F1")}.");
 
         if (!HoldBake && !DevkitServerConfig.RemoveCosmeticImprovements)
             road.buildMesh();
@@ -1777,7 +1775,7 @@ public static class RoadUtil
         {
             if (!RoadNetIdDatabase.TryGetRoadNetId(roadIndex, out NetId netId))
             {
-                Logger.LogWarning($"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetIsLoop({roadIndex.Format()}, {isLoop.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(SetIsLoop), $"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetIsLoop({roadIndex.Format()}, {isLoop.Format()}).");
                 return true;
             }
 
@@ -1851,7 +1849,7 @@ public static class RoadUtil
         {
             if (!RoadNetIdDatabase.TryGetRoadNetId(roadIndex, out NetId netId))
             {
-                Logger.LogWarning($"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetMaterial({roadIndex.Format()}, {materialIndex.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(SetMaterial), $"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetMaterial({roadIndex.Format()}, {materialIndex.Format()}).");
                 return true;
             }
 
@@ -1928,13 +1926,13 @@ public static class RoadUtil
 #if CLIENT
             if (!RoadNetIdDatabase.TryGetRoadNetId(roadIndex, out NetId roadNetId))
             {
-                Logger.LogWarning($"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetVertexIgnoreTerrain({roadIndex.Format()}, {vertexIndex.Format()}, {ignoreTerrain.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(SetVertexIgnoreTerrain), $"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetVertexIgnoreTerrain({roadIndex.Format()}, {vertexIndex.Format()}, {ignoreTerrain.Format()}).");
                 return true;
             }
 #endif
             if (!RoadNetIdDatabase.TryGetVertexNetId(roadIndex, vertexIndex, out NetId vertexMetId))
             {
-                Logger.LogWarning($"Failed to find NetId for vertex {roadIndex.Format()}/{roadIndex.Format()}. Did not replicate in SetVertexIgnoreTerrain({roadIndex.Format()}, {vertexIndex.Format()}, {ignoreTerrain.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(SetVertexIgnoreTerrain), $"Failed to find NetId for vertex {roadIndex.Format()}/{roadIndex.Format()}. Did not replicate in SetVertexIgnoreTerrain({roadIndex.Format()}, {vertexIndex.Format()}, {ignoreTerrain.Format()}).");
                 return true;
             }
 
@@ -2013,13 +2011,13 @@ public static class RoadUtil
 #if CLIENT
             if (!RoadNetIdDatabase.TryGetRoadNetId(roadIndex, out NetId roadNetId))
             {
-                Logger.LogWarning($"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetVertexVerticalOffset({roadIndex.Format()}, {vertexIndex.Format()}, {verticalOffset.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(SetVertexVerticalOffset), $"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetVertexVerticalOffset({roadIndex.Format()}, {vertexIndex.Format()}, {verticalOffset.Format()}).");
                 return true;
             }
 #endif
             if (!RoadNetIdDatabase.TryGetVertexNetId(roadIndex, vertexIndex, out NetId vertexMetId))
             {
-                Logger.LogWarning($"Failed to find NetId for vertex {roadIndex.Format()}/{vertexIndex.Format()}. Did not replicate in SetVertexVerticalOffset({roadIndex.Format()}, {vertexIndex.Format()}, {verticalOffset.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(SetVertexVerticalOffset), $"Failed to find NetId for vertex {roadIndex.Format()}/{vertexIndex.Format()}. Did not replicate in SetVertexVerticalOffset({roadIndex.Format()}, {vertexIndex.Format()}, {verticalOffset.Format()}).");
                 return true;
             }
 
@@ -2097,13 +2095,13 @@ public static class RoadUtil
 #if CLIENT
             if (!RoadNetIdDatabase.TryGetRoadNetId(roadIndex, out NetId roadNetId))
             {
-                Logger.LogWarning($"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetVertexTangentHandleMode({roadIndex.Format()}, {vertexIndex.Format()}, {tangentHandleMode.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(SetVertexTangentHandleMode), $"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetVertexTangentHandleMode({roadIndex.Format()}, {vertexIndex.Format()}, {tangentHandleMode.Format()}).");
                 return true;
             }
 #endif
             if (!RoadNetIdDatabase.TryGetVertexNetId(roadIndex, vertexIndex, out NetId vertexMetId))
             {
-                Logger.LogWarning($"Failed to find NetId for vertex {roadIndex.Format()}/{vertexIndex.Format()}. Did not replicate in SetVertexTangentHandleMode({roadIndex.Format()}, {vertexIndex.Format()}, {tangentHandleMode.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(SetVertexTangentHandleMode), $"Failed to find NetId for vertex {roadIndex.Format()}/{vertexIndex.Format()}. Did not replicate in SetVertexTangentHandleMode({roadIndex.Format()}, {vertexIndex.Format()}, {tangentHandleMode.Format()}).");
                 return true;
             }
 
@@ -2175,13 +2173,13 @@ public static class RoadUtil
 #if CLIENT
             if (!RoadNetIdDatabase.TryGetRoadNetId(roadIndex, out NetId roadNetId))
             {
-                Logger.LogWarning($"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetVertexPosition({roadIndex.Format()}, {vertexIndex.Format()}, {worldPosition.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(SetVertexPosition), $"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetVertexPosition({roadIndex.Format()}, {vertexIndex.Format()}, {worldPosition.Format()}).");
                 return;
             }
 #endif
             if (!RoadNetIdDatabase.TryGetVertexNetId(roadIndex, vertexIndex, out NetId vertexMetId))
             {
-                Logger.LogWarning($"Failed to find NetId for vertex {roadIndex.Format()}/{vertexIndex.Format()}. Did not replicate in SetVertexPosition({roadIndex.Format()}, {vertexIndex.Format()}, {worldPosition.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(SetVertexPosition), $"Failed to find NetId for vertex {roadIndex.Format()}/{vertexIndex.Format()}. Did not replicate in SetVertexPosition({roadIndex.Format()}, {vertexIndex.Format()}, {worldPosition.Format()}).");
                 return;
             }
 
@@ -2251,13 +2249,13 @@ public static class RoadUtil
 #if CLIENT
             if (!RoadNetIdDatabase.TryGetRoadNetId(roadIndex, out NetId roadNetId))
             {
-                Logger.LogWarning($"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetTangentHandlePosition({roadIndex.Format()}, {vertexIndex.Format()}, {handle.Format()}, {relativePosition.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(SetTangentHandlePosition), $"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in SetTangentHandlePosition({roadIndex.Format()}, {vertexIndex.Format()}, {handle.Format()}, {relativePosition.Format()}).");
                 return;
             }
 #endif
             if (!RoadNetIdDatabase.TryGetVertexNetId(roadIndex, vertexIndex, out NetId vertexMetId))
             {
-                Logger.LogWarning($"Failed to find NetId for vertex {roadIndex.Format()}/{vertexIndex.Format()}. Did not replicate in SetTangentHandlePosition({roadIndex.Format()}, {vertexIndex.Format()}, {handle.Format()}, {relativePosition.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(SetTangentHandlePosition), $"Failed to find NetId for vertex {roadIndex.Format()}/{vertexIndex.Format()}. Did not replicate in SetTangentHandlePosition({roadIndex.Format()}, {vertexIndex.Format()}, {handle.Format()}, {relativePosition.Format()}).");
                 return;
             }
 
@@ -2328,13 +2326,13 @@ public static class RoadUtil
 #if CLIENT
             if (!RoadNetIdDatabase.TryGetRoadNetId(roadIndex, out NetId roadNetId))
             {
-                Logger.LogWarning($"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in RemoveVertex({roadIndex.Format()}, {vertexIndex.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(RemoveVertex), $"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in RemoveVertex({roadIndex.Format()}, {vertexIndex.Format()}).");
                 return;
             }
 #endif
             if (!RoadNetIdDatabase.TryGetVertexNetId(roadIndex, vertexIndex, out NetId vertexMetId))
             {
-                Logger.LogWarning($"Failed to find NetId for vertex {roadIndex.Format()}/{vertexIndex.Format()}. Did not replicate in RemoveVertex({roadIndex.Format()}, {vertexIndex.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(RemoveVertex), $"Failed to find NetId for vertex {roadIndex.Format()}/{vertexIndex.Format()}. Did not replicate in RemoveVertex({roadIndex.Format()}, {vertexIndex.Format()}).");
                 return;
             }
 
@@ -2437,7 +2435,7 @@ public static class RoadUtil
         {
             if (!RoadNetIdDatabase.TryGetRoadNetId(roadIndex, out NetId roadNetId))
             {
-                Logger.LogWarning($"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in RemoveRoad({roadIndex.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(RemoveRoad), $"Failed to find NetId for road {roadIndex.Format()}. Did not replicate in RemoveRoad({roadIndex.Format()}).");
                 return;
             }
 
@@ -2480,7 +2478,7 @@ public static class RoadUtil
         vertexNetId = NetId.INVALID;
 #endif
         road = LevelRoads.getRoad(transform, out _, out _);
-        int roadIndex = road == null ? -1 : road.GetRoadIndex();
+        int roadIndex = road?.GetRoadIndex() ?? -1;
         if (roadIndex != -1)
         {
 #if SERVER
@@ -2491,12 +2489,12 @@ public static class RoadUtil
             if (road!.joints.Count > 0)
                 RoadNetIdDatabase.RegisterVertex(roadIndex, 0, vertexNetId);
 #endif
-            Logger.LogDebug($"[{Source}] Assigned road NetId: {roadNetId.Format()}.");
-            Logger.LogDebug($"[{Source}]  + Assigned vertex {0.Format()} NetId: {vertexNetId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(InitializeRoad), $"Assigned road NetId: {roadNetId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(InitializeRoad), $" + Assigned vertex {0.Format()} NetId: {vertexNetId.Format()}.");
             return;
         }
 
-        Logger.LogWarning($"Did not find road of transform {transform.name.Format()}.", method: Source);
+        Logger.DevkitServer.LogWarning(nameof(InitializeRoad), $"Did not find road of transform {transform.name.Format()}.");
     }
     internal static void InitializeVertex(Road road, int roadIndex, int vertexIndex,
 #if SERVER
@@ -2514,10 +2512,10 @@ public static class RoadUtil
 #else
             RoadNetIdDatabase.RegisterVertex(roadIndex, vertexIndex, netId);
 #endif
-            Logger.LogDebug($"[{Source}] Assigned vertex {roadIndex.Format()}/{vertexIndex.Format()} NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(InitializeVertex), $"Assigned vertex {roadIndex.Format()}/{vertexIndex.Format()} NetId: {netId.Format()}.");
             return;
         }
 
-        Logger.LogWarning($"Did not find vertex in road # {roadIndex.Format()}: # {vertexIndex.Format()}.", method: Source);
+        Logger.DevkitServer.LogWarning(nameof(InitializeVertex), $"Did not find vertex in road # {roadIndex.Format()}: # {vertexIndex.Format()}.");
     }
 }

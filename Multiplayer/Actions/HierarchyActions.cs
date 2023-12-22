@@ -1,17 +1,18 @@
-﻿#if SERVER
-using DevkitServer.API.Permissions;
-using DevkitServer.Core.Permissions;
-#endif
-using DevkitServer.API;
+﻿using DevkitServer.API;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Util.Encoding;
 using SDG.Framework.Devkit;
+#if SERVER
+using DevkitServer.API.Permissions;
+using DevkitServer.Core.Permissions;
+#endif
 
 namespace DevkitServer.Multiplayer.Actions;
 
 public sealed class HierarchyActions
 {
+    internal const string Source = "HIERARCHY ACTIONS";
     public EditorActions EditorActions { get; }
     internal HierarchyActions(EditorActions actions)
     {
@@ -85,7 +86,7 @@ public sealed class MovedHierarchyObjectsAction : IAction
 
             if (!HierarchyItemNetIdDatabase.TryGetHierarchyItem(transformation.NetId, out IDevkitHierarchyItem item))
             {
-                Logger.LogWarning($"Unknown hierarchy item: {transformation.NetId.Format()}.");
+                Logger.DevkitServer.LogWarning(HierarchyActions.Source, $"Unknown hierarchy item: {transformation.NetId.Format()}.");
                 continue;
             }
 

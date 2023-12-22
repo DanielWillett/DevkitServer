@@ -205,7 +205,7 @@ public class ByteReader
     {
         _hasFailed = true;
         if (LogOnError)
-            Logger.LogWarning(message, method: "BYTE READER");
+            Logger.DevkitServer.LogWarning("BYTE READER", message);
         if (ThrowOnError)
             throw new ByteEncoderException(message);
     }
@@ -213,7 +213,7 @@ public class ByteReader
     {
         _hasFailed = true;
         if (LogOnError)
-            Logger.LogWarning(message, method: "BYTE READER");
+            Logger.DevkitServer.LogWarning("BYTE READER", message);
         if (ThrowOnError)
             throw new ByteBufferOverflowException(message);
     }
@@ -407,16 +407,17 @@ public class ByteReader
             int length;
             if (_buffer is { Length: > 0 })
             {
-                if (_buffer.Length - _index >= buffer.Length)
+                if (_length - _index >= buffer.Length)
                 {
-                    _buffer.AsSpan(_index).CopyTo(buffer);
+                    _buffer.AsSpan(_index, _length).CopyTo(buffer);
                     _index += buffer.Length;
                     return true;
                 }
 
                 int offset = _length - _index;
-                _index = _buffer.Length;
-                _buffer.AsSpan(_index).CopyTo(buffer[..offset]);
+                _buffer.AsSpan(_index, offset).CopyTo(buffer);
+                _index = _length;
+                _position += offset;
                 length = Stream!.Read(buffer.Slice(offset, buffer.Length - offset));
                 _position += length;
                 if (length + offset >= buffer.Length)
@@ -439,7 +440,7 @@ public class ByteReader
 
         if (!EnsureMoreLength(buffer.Length))
             return false;
-        _buffer.AsSpan(_index).CopyTo(buffer);
+        _buffer.AsSpan(_index, buffer.Length).CopyTo(buffer);
         _index += buffer.Length;
         return true;
     }
@@ -2006,8 +2007,7 @@ public class ByteReader
         }
         catch (ArgumentException ex)
         {
-            Logger.LogError("Failed to create reader delegate for type " + type.FullName);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("BYTE READER", ex, $"Failed to create reader delegate for type {type.Format()}.");
             return null;
         }
     }

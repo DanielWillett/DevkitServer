@@ -4,7 +4,6 @@ using Cysharp.Threading.Tasks;
 using DevkitServer.API.Storage;
 using DevkitServer.API.UI;
 using DevkitServer.Levels;
-using DevkitServer.Multiplayer.Networking;
 using SDG.Framework.Utilities;
 #endif
 
@@ -44,12 +43,13 @@ internal class LevelTransmissionHandler : BaseLargeMessageTransmissionClientHand
         if (Directory.Exists(dir))
             Directory.Delete(dir, true);
         Directory.CreateDirectory(dir);
-        Logger.LogDebug("[RECEIVE LEVEL] Reading level folder.");
+        Logger.DevkitServer.LogDebug("RECEIVE LEVEL", "Reading level folder.");
         LevelData serverPendingLevelData = LevelData.Read(Transmission.Content);
         EditorLevel.ServerPendingLevelData = serverPendingLevelData;
         VirtualDirectoryRoot folder = serverPendingLevelData.LevelFolderContent;
-        Logger.LogDebug("[RECEIVE LEVEL] Writing level folder.");
+        Logger.DevkitServer.LogDebug("RECEIVE LEVEL", "Writing level folder.");
         LoadingUI.NotifyDownloadProgress(0.95f);
+
         UniTask.Create(async () =>
         {
             await folder.SaveAsync(dir, true);
@@ -57,9 +57,9 @@ internal class LevelTransmissionHandler : BaseLargeMessageTransmissionClientHand
             await UniTask.SwitchToMainThread();
 
             LoadingUI.NotifyDownloadProgress(1f);
-            Logger.LogInfo($"[RECEIVE LEVEL] Finished receiving level data ({FormattingUtil.FormatCapacity(TotalBytes, colorize: true)}) for level {_mapName}.", ConsoleColor.DarkCyan);
+            Logger.DevkitServer.LogInfo("RECEIVE LEVEL", $"Finished receiving level data ({FormattingUtil.FormatCapacity(TotalBytes, colorize: true)}) for level {_mapName.Colorize(DevkitServerModule.UnturnedColor)}.", ConsoleColor.DarkCyan);
             
-            EditorLevel.OnLevelReady(Path.Combine(dir, _mapName));
+            EditorLevel.OnLevelReady(dir);
         });
     }
 

@@ -20,7 +20,7 @@ public class UserTransactions : MonoBehaviour
         if (User == null)
         {
             Destroy(this);
-            Logger.LogError("Invalid UserTransactions setup; EditorUser not found!");
+            Logger.DevkitServer.LogError(nameof(UserTransactions), "Invalid UserTransactions setup; EditorUser not found!");
             return;
         }
 
@@ -28,7 +28,7 @@ public class UserTransactions : MonoBehaviour
         IsOwner = User == EditorUser.User;
 #endif
 
-        Logger.LogDebug("User transaction module created for " + User.SteamId.m_SteamID.Format() + " ( owner: " + IsOwner.Format() + " ).");
+        Logger.DevkitServer.LogDebug(nameof(UserTransactions), "User transaction module created for " + User.SteamId.m_SteamID.Format() + " ( owner: " + IsOwner.Format() + " ).");
     }
 #if SERVER
     private void ReceiveReunRequest(bool isRedo)
@@ -37,7 +37,7 @@ public class UserTransactions : MonoBehaviour
             EditorMessage.SendEditorMessage(User, DevkitServerModule.MessageLocalization.Translate("RedoNotSupported"));
         else
             EditorMessage.SendEditorMessage(User, DevkitServerModule.MessageLocalization.Translate("UndoNotSupported"));
-        Logger.LogDebug($"{User.Format()} Requested a{(isRedo ? " redo." : "n undo.")}");
+        Logger.DevkitServer.LogDebug(nameof(UserTransactions), $"{User.Format()} Requested a{(isRedo ? " redo." : "n undo.")}");
     }
     [NetCall(NetCallSource.FromClient, (ushort)DevkitServerNetCall.ReunRequest)]
     [UsedImplicitly]

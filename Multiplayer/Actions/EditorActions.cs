@@ -31,6 +31,8 @@ namespace DevkitServer.Multiplayer.Actions;
 [EarlyTypeInit]
 public sealed class EditorActions : MonoBehaviour, IActionListener
 {
+    internal const string Source = "EDITOR ACTIONS";
+
     internal static readonly FieldInfo LocalLastActionField = typeof(EditorActions).GetField(nameof(LocalLastAction), BindingFlags.NonPublic | BindingFlags.Static)!;
     internal static float LocalLastAction;
     public const ushort DataVersion = 1;
@@ -137,12 +139,12 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         if (User == null && ServerActions != this)
         {
             Destroy(this);
-            Logger.LogError("Invalid EditorActions setup; EditorUser not found!", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogError(Source, "Invalid EditorActions setup; EditorUser not found!");
             return;
         }
         
         Subscribe();
-        Logger.LogDebug($"[EDITOR ACTIONS] Editor actions module created for {(User == null ? "Server".Colorize(Color.cyan) : User.SteamId.Format())} ( owner: {IsOwner.Format()} ).");
+        Logger.DevkitServer.LogDebug(Source, $"Editor actions module created for {(User == null ? "Server".Colorize(Color.cyan) : User.SteamId.Format())} ( owner: {IsOwner.Format()} ).");
         
 #if CLIENT
         if (IsOwner)
@@ -155,7 +157,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 if (CanProcess)
                 {
 #if PRINT_ACTION_SIMPLE
-                    Logger.LogDebug("[EDITOR ACTIONS] Catch-up completed in one frame.");
+                    Logger.DevkitServer.LogDebug(Source, "Catch-up completed in one frame.");
 #endif
                     IsPlayingCatchUp = false;
                 }
@@ -174,7 +176,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 }
                 IsPlayingCatchUp = false;
 #if PRINT_ACTION_SIMPLE
-                Logger.LogDebug("[EDITOR ACTIONS] Catch-up not needed.");
+                Logger.DevkitServer.LogDebug(Source, "Catch-up not needed.");
 #endif
             }
         }
@@ -221,7 +223,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                                     $", queue: {_pendingActions.Count}.{Environment.NewLine}" +
                                     JsonSerializer.Serialize(t, t.GetType(), DevkitServerConfig.SerializerSettings));
 #elif PRINT_ACTION_SIMPLE
-                    Logger.LogDebug($"Action {action.Format()} replaced to {t.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"Action {action.Format()} replaced to {t.Format()}.");
 #endif
                     return;
                 }
@@ -236,7 +238,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                         $", queue: {_pendingActions.Count}.{Environment.NewLine}" +
                         JsonSerializer.Serialize(action, action.GetType(), DevkitServerConfig.SerializerSettings));
 #elif PRINT_ACTION_SIMPLE
-        Logger.LogDebug($"Action queued to write: {action.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Action queued to write: {action.Format()}.");
 #endif
     }
 
@@ -248,7 +250,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     {
         if (!reader.ReadUInt16(out ushort len))
         {
-            Logger.LogError("Failed to read incoming action packet length.", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogError(Source, "Failed to read incoming action packet length.");
             return;
         }
         NetFactory.IncrementByteCount(DevkitServerMessage.ActionRelay, false, len + sizeof(ushort));
@@ -257,13 +259,13 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         EditorUser? user = UserManager.FromConnection(transportConnection);
         if (user == null)
         {
-            Logger.LogError("Failed to find user for action packet from transport connection: " + transportConnection.Format() + ".", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogError(Source, $"Failed to find user for action packet from transport connection: {transportConnection.Format()}.");
             return;
         }
 #endif
         if (!reader.ReadBytesPtr(len, out byte[] buffer, out int offset))
         {
-            Logger.LogError("Failed to read action packet.", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogError(Source, "Failed to read action packet.");
             return;
         }
         Reader.LoadNew(new ArraySegment<byte>(buffer, offset, len));
@@ -281,13 +283,13 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             {
                 ServerActions.HandleReadPackets(Reader);
             }
-            Logger.LogError("Failed to find user for action packet from a steam id: " + s64.Format() + ".", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogError(Source, $"Failed to find user for action packet from a steam id: {s64.Format()}.");
             return;
         }
 
         if (user.IsOwner)
         {
-            Logger.LogError("Received action packet relay back from self.", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogError(Source, "Received action packet relay back from self.");
             return;
         }
 #endif
@@ -303,7 +305,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             return;
 
 #if PRINT_ACTION_SIMPLE
-        Logger.LogDebug("[EDITOR ACTIONS] Flushing " + _pendingActions.Count.Format() + " action(s).");
+        Logger.DevkitServer.LogDebug(Source, $"Flushing {_pendingActions.Count.Format()} action(s).");
 #endif
         WriteEditBuffer(Writer, 0, _pendingActions.Count);
 #if CLIENT
@@ -317,7 +319,8 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         EditorActionsCodeGeneration.Attributes.TryGetValue(action.Type, out ActionAttribute attr)
             ? (attr.Capacity + ActionBaseSize, attr.OptionCapacity + ActionSettingsCollection.BaseSize)
             : (sizeof(float) + ActionBaseSize, ActionSettingsCollection.BaseSize);
-            // DeltaTime
+               // DeltaTime
+
     [UsedImplicitly]
     private void Update()
     {
@@ -339,7 +342,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             {
                 IsPlayingCatchUp = false;
 #if PRINT_ACTION_SIMPLE
-                Logger.LogDebug("[EDITOR ACTIONS] Done playing catch-up.");
+                Logger.DevkitServer.LogDebug(Source, "Done playing catch-up.");
 #endif
             }
 #endif
@@ -380,13 +383,12 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                             $", queue: {listener.QueueSize}.{Environment.NewLine}" +
                             JsonSerializer.Serialize(action, action.GetType(), DevkitServerConfig.SerializerSettings));
 #elif PRINT_ACTION_SIMPLE
-            Logger.LogDebug($"Action applied: {action.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Action applied: {action.Format()}.");
 #endif
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error applying action: {action.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(Source, ex, $"Error applying action: {action.Format()}.");
             return false;
         }
         finally
@@ -455,7 +457,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 continue;
 #endif
 #if PRINT_ACTION_SIMPLE
-            Logger.LogDebug("[EDITOR ACTIONS] Queued action at index " + (i - index).Format() + ": " + action.Format() + ".");
+            Logger.DevkitServer.LogDebug(Source, $"Queued action at index {(i - index).Format()}: {action.Format()}.");
 #endif
             ActionSettingsCollection? toAdd = null;
 
@@ -467,7 +469,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 toAdd.StartIndex = (byte)(i - index);
                 c.Add(toAdd);
 #if PRINT_ACTION_SIMPLE
-                Logger.LogDebug("[EDITOR ACTIONS] Queued data at index " + toAdd.StartIndex.Format() + ": " + toAdd.Format() + ".");
+                Logger.DevkitServer.LogDebug(Source, $"Queued data at index {toAdd.StartIndex.Format()}: {toAdd.Format()}.");
 #endif
             }
         }
@@ -475,7 +477,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         byte ct2 = (byte)c.Count;
         writer.Write(ct2);
 #if PRINT_ACTION_SIMPLE
-        Logger.LogDebug("[EDITOR ACTIONS] Writing " + ct2 + " collections.");
+        Logger.DevkitServer.LogDebug(Source, $"Writing {ct2.Format()} collections.");
 #endif
         for (int i = 0; i < ct2; ++i)
         {
@@ -486,7 +488,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         ListPool<ActionSettingsCollection>.release(c);
 
 #if PRINT_ACTION_SIMPLE
-        Logger.LogDebug("[EDITOR ACTIONS] Writing " + ct + " actions.");
+        Logger.DevkitServer.LogDebug(Source, $"Writing {ct.Format()} actions.");
 #endif
         for (int i = index; i < count2; ++i)
         {
@@ -545,13 +547,13 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 ActionSettingsCollection collection = c[collIndex];
                 Settings.SetSettings(collection);
 #if PRINT_ACTION_SIMPLE
-                Logger.LogDebug($"[EDITOR ACTIONS] Loading option collection at index {collection.StartIndex}: {collection.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Loading option collection at index {collection.StartIndex.Format()}: {collection.Format()}.");
 #endif
             }
             DevkitServerActionType type = reader.ReadEnum<DevkitServerActionType>();
             IAction? action = EditorActionsCodeGeneration.CreateAction!(type);
 #if PRINT_ACTION_SIMPLE
-            Logger.LogDebug($"[EDITOR ACTIONS] Loading action #{i.Format()} {action.Format()}, collection index: {collIndex.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Loading action #{i.Format()} {action.Format()}, collection index: {collIndex.Format()}.");
 #endif
             if (action != null)
             {
@@ -571,7 +573,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 else
                 {
                     anyInvalid = true;
-                    Logger.LogDebug($"[EDITOR ACTIONS] Invalid action request filtered from {action.Instigator.Format()}: {action}.");
+                    Logger.DevkitServer.LogDebug(Source, $"Invalid action request filtered from {action.Instigator.Format()}: {action.Format()}.");
                     if (action is ITerrainAction tAction && TileSync.ServersideAuthority != null && TileSync.ServersideAuthority.HasAuthority)
                     {
                         TileSync.ServersideAuthority.InvalidateBounds(tAction.Bounds, tAction.EditorType switch
@@ -596,7 +598,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 #if SERVER
         if (Provider.clients.Count + EditorLevel.PendingToReceiveActions.Count > 1)
         {
-            Logger.LogDebug("[EDITOR ACTIONS] Relaying " + (_pendingActions.Count - stInd).Format() + " action(s).");
+            Logger.DevkitServer.LogDebug(Source, $"Relaying {(_pendingActions.Count - stInd).Format()} action(s).");
             int capacity = Provider.clients.Count - 1 + EditorLevel.PendingToReceiveActions.Count;
             PooledTransportConnectionList list = NetFactory.GetPooledTransportConnectionList(capacity);
             list.IncreaseCapacity(capacity);
@@ -645,7 +647,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             Array.Reverse(tempBuffer);
             _pendingActions.InsertRange(0, tempBuffer);
 #if PRINT_ACTION_SIMPLE
-            Logger.LogDebug("[EDITOR ACTIONS] Received actions: " + tempBuffer.Length + ".");
+            Logger.DevkitServer.LogDebug(Source, $"Received actions: {tempBuffer.Length.Format()}.");
 #endif
         }
 
@@ -672,6 +674,8 @@ public interface IActionListener
 #if CLIENT
 public class TemporaryEditorActions : IActionListener, IDisposable
 {
+    private const string Source = "TEMP EDITOR ACTIONS";
+
     private static readonly CachedMulticastEvent<Action> EventOnStartListening = new CachedMulticastEvent<Action>(typeof(TemporaryEditorActions), nameof(OnStartListening));
     private static readonly CachedMulticastEvent<Action> EventOnStopListening = new CachedMulticastEvent<Action>(typeof(TemporaryEditorActions), nameof(OnStopListening));
     public static event Action OnStartListening
@@ -699,7 +703,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         Settings = new ActionSettings(this);
         Instance = this;
 #if PRINT_ACTION_SIMPLE
-        Logger.LogDebug("[TEMP EDITOR ACTIONS] Initialized.");
+        Logger.DevkitServer.LogDebug(Source, "Initialized.");
 #endif
     }
     internal void QueueHierarchyItemInstantiation(IHierarchyItemTypeIdentifier type, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
@@ -708,7 +712,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
 
         _hierarchyInstantiations.Add(new PendingHierarchyInstantiation(type, position, rotation, scale, owner, netId));
 #if PRINT_ACTION_SIMPLE
-        Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued hierarchy item instantiation for {type.Format()} when the level loads.");
+        Logger.DevkitServer.LogDebug(Source, $"Queued hierarchy item instantiation for {type.Format()} when the level loads.");
 #endif
     }
     internal void QueueLevelObjectInstantiation(Asset asset, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
@@ -718,28 +722,28 @@ public class TemporaryEditorActions : IActionListener, IDisposable
 
         _lvlObjectInstantiations.Add(new PendingLevelObjectInstantiation(asset.getReferenceTo<Asset>(), position, rotation, scale, owner, netId));
 #if PRINT_ACTION_SIMPLE
-        Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued level object instantiation for {asset.Format()} when the level loads.");
+        Logger.DevkitServer.LogDebug(Source, $"Queued level object instantiation for {asset.Format()} when the level loads.");
 #endif
     }
     internal void QueueRoadInstantiation(long netIds, ushort flags, Vector3 position, Vector3 tangent1, Vector3 tangent2, float offset, ulong owner)
     {
         _roadInstantiations.Add(new PendingRoadInstantiation(netIds, flags, position, tangent1, tangent2, offset, owner));
 #if PRINT_ACTION_SIMPLE
-        Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued road instantiation at {position.Format()} when the level loads.");
+        Logger.DevkitServer.LogDebug(Source, $"Queued road instantiation at {position.Format()} when the level loads.");
 #endif
     }
     internal void QueueRoadVertexInstantiation(NetId roadNetId, Vector3 position, Vector3 tangent1, Vector3 tangent2, bool ignoreTerrain, float verticalOffset, int vertexIndex, ulong owner, NetId vertexNetId, ERoadMode mode)
     {
         _roadVertexInstantiations.Add(new PendingRoadVertexInstantiation(roadNetId, position, tangent1, tangent2, ignoreTerrain, verticalOffset, vertexIndex, owner, vertexNetId, mode));
 #if PRINT_ACTION_SIMPLE
-        Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued road vertex instantiation at {position.Format()} (from road {roadNetId.Format()} at #{vertexIndex}) when the level loads.");
+        Logger.DevkitServer.LogDebug(Source, $"Queued road vertex instantiation at {position.Format()} (from road {roadNetId.Format()} at #{vertexIndex}) when the level loads.");
 #endif
     }
     internal void QueueFlagInstantiation(NetId netId, Vector3 position, Vector2 size, ulong owner, bool infiniteAgroDistance, bool shouldSpawnZombies, byte maxZombies, int maxBossZombies, Guid difficultyAsset)
     {
         _flagInstantiations.Add(new PendingFlagInstantiation(netId, position, size, owner, infiniteAgroDistance, shouldSpawnZombies, maxZombies, maxBossZombies, difficultyAsset));
 #if PRINT_ACTION_SIMPLE
-        Logger.LogDebug($"[TEMP EDITOR ACTIONS] Queued flag instantiation at {position.Format()} when the level loads.");
+        Logger.DevkitServer.LogDebug(Source, $"Queued flag instantiation at {position.Format()} when the level loads.");
 #endif
     }
     internal void HandleReadPackets(CSteamID user, ByteReader reader)
@@ -774,7 +778,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         }
         EditorActions.ReadDataVersion = 0;
 #if PRINT_ACTION_SIMPLE
-        Logger.LogDebug("[TEMP EDITOR ACTIONS] Received actions: " + (_actions.Count - stInd) + ".");
+        Logger.DevkitServer.LogDebug(Source, $"Received actions: {(_actions.Count - stInd).Format()}.");
 #endif
 
         ListPool<ActionSettingsCollection>.release(c);
@@ -786,7 +790,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
             collIndex = index;
             Settings.SetSettings(c[collIndex]);
 #if PRINT_ACTION_SIMPLE
-            Logger.LogDebug("[TEMP EDITOR ACTIONS] Loading option collection: " + c[collIndex].Format() + ".");
+            Logger.DevkitServer.LogDebug(Source, $"Loading option collection: {c[collIndex].Format()}.");
 #endif
         }
     }
@@ -870,7 +874,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         _actions.Clear();
         Instance = null;
 #if PRINT_ACTION_SIMPLE
-        Logger.LogDebug("[TEMP EDITOR ACTIONS] Cleaned up.");
+        Logger.DevkitServer.LogDebug(Source, "Cleaned up.");
 #endif
     }
 

@@ -40,7 +40,7 @@ internal static class RoadsPatches
         MethodInfo? deselect = typeof(EditorRoads).GetMethod("deselect", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
         if (deselect == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: EditorRoads.deselect.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: EditorRoads.deselect.");
         }
 
         MethodInfo? removeRoad = typeof(LevelRoads).GetMethod(nameof(LevelRoads.removeRoad),
@@ -49,7 +49,7 @@ internal static class RoadsPatches
 
         if (removeRoad == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelRoads.removeRoad.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: LevelRoads.removeRoad.");
         }
 
         MethodInfo? addRoad = typeof(LevelRoads).GetMethod(nameof(LevelRoads.addRoad),
@@ -58,7 +58,7 @@ internal static class RoadsPatches
 
         if (addRoad == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelRoads.addRoad.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: LevelRoads.addRoad.");
         }
 
         MethodInfo? removeVertex = typeof(Road).GetMethod(nameof(Road.removeVertex),
@@ -67,7 +67,7 @@ internal static class RoadsPatches
 
         if (removeVertex == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: Road.removeVertex.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: Road.removeVertex.");
         }
 
         MethodInfo? moveTangent = typeof(Road).GetMethod(nameof(Road.moveTangent),
@@ -76,7 +76,7 @@ internal static class RoadsPatches
 
         if (moveTangent == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: Road.moveTangent.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: Road.moveTangent.");
         }
 
         MethodInfo? moveVertex = typeof(Road).GetMethod(nameof(Road.moveVertex),
@@ -85,7 +85,7 @@ internal static class RoadsPatches
 
         if (moveVertex == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: Road.moveVertex.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: Road.moveVertex.");
         }
 
         MethodInfo? addVertex = typeof(Road).GetMethod(nameof(Road.addVertex),
@@ -94,10 +94,10 @@ internal static class RoadsPatches
 
         if (addVertex == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: Road.addVertex.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: Road.addVertex.");
         }
 
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> ins = [..instructions];
         
         bool removingRoad = false, removingVertex = false, movingTangent = false, movingVertex = false, addingRoad = false;
         int addingVertex = 0;
@@ -110,7 +110,7 @@ internal static class RoadsPatches
             {
                 ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(RemoveRoad));
                 removingRoad = true;
-                Logger.LogDebug($"[{Source}] {method.Format()} - Patched on removing road callers.");
+                Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Patched on removing road callers.");
             }
 
             // deleting road verticies
@@ -119,7 +119,7 @@ internal static class RoadsPatches
             {
                 ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(RemoveVertex));
                 removingVertex = true;
-                Logger.LogDebug($"[{Source}] {method.Format()} - Patched on removing vertex callers.");
+                Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Patched on removing vertex callers.");
 
                 if (deselect == null)
                     continue;
@@ -137,7 +137,7 @@ internal static class RoadsPatches
             {
                 ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(MoveTangent));
                 movingTangent = true;
-                Logger.LogDebug($"[{Source}] {method.Format()} - Patched on moving tangent handle callers.");
+                Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Patched on moving tangent handle callers.");
             }
 
             // move vertex with 'E'
@@ -146,7 +146,7 @@ internal static class RoadsPatches
             {
                 ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(MoveVertex));
                 movingVertex = true;
-                Logger.LogDebug($"[{Source}] {method.Format()} - Patched on moving vertex callers.");
+                Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Patched on moving vertex callers.");
             }
 
             // add vertex by left clicking
@@ -155,7 +155,7 @@ internal static class RoadsPatches
             {
                 ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(AddVertex));
                 ++addingVertex;
-                Logger.LogDebug($"[{Source}] {method.Format()} - Patched on adding vertex callers.");
+                Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Patched on adding vertex callers.");
             }
 
             // add road by left clicking
@@ -163,34 +163,34 @@ internal static class RoadsPatches
                     x => addRoad != null && x.Calls(addRoad)))
             {
                 ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(AddRoad));
-                Logger.LogDebug($"[{Source}] {method.Format()} - Patched on adding road callers.");
+                Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Patched on adding road callers.");
                 addingRoad = true;
             }
         }
 
         if (!removingRoad)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to patch {removeRoad.Format()} call.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to patch {removeRoad.Format()} call.");
         }
         if (!removingVertex)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to patch {removeVertex.Format()} call.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to patch {removeVertex.Format()} call.");
         }
         if (!movingTangent)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to patch {moveTangent.Format()} call.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to patch {moveTangent.Format()} call.");
         }
         if (!movingVertex)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to patch {moveVertex.Format()} call.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to patch {moveVertex.Format()} call.");
         }
         if (addingVertex < 3)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to patch at least 3 {addVertex.Format()} calls.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to patch at least 3 {addVertex.Format()} calls.");
         }
         if (!movingVertex)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to patch {addRoad.Format()} call.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to patch {addRoad.Format()} call.");
         }
 
         return ins;
@@ -201,7 +201,7 @@ internal static class RoadsPatches
         MethodInfo? method = typeof(EditorEnvironmentRoadsUI).GetMethod("onSwappedStateMode", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentRoadsUI.onSwappedStateMode.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onSwappedStateMode.");
         }
         else
         {
@@ -211,14 +211,13 @@ internal static class RoadsPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentRoadsUI.onSwappedStateMode.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onSwappedStateMode.");
             }
         }
         method = typeof(EditorEnvironmentRoadsUI).GetMethod("onToggledIgnoreTerrainToggle", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentRoadsUI.onToggledIgnoreTerrainToggle.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onToggledIgnoreTerrainToggle.");
         }
         else
         {
@@ -228,14 +227,13 @@ internal static class RoadsPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentRoadsUI.onToggledIgnoreTerrainToggle.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onToggledIgnoreTerrainToggle.");
             }
         }
         method = typeof(EditorEnvironmentRoadsUI).GetMethod("onToggledLoopToggle", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentRoadsUI.onToggledLoopToggle.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onToggledLoopToggle.");
         }
         else
         {
@@ -245,14 +243,13 @@ internal static class RoadsPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentRoadsUI.onToggledLoopToggle.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onToggledLoopToggle.");
             }
         }
         method = typeof(EditorEnvironmentRoadsUI).GetMethod("onToggledConcreteToggle", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentRoadsUI.onToggledConcreteToggle.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onToggledConcreteToggle.");
         }
         else
         {
@@ -262,14 +259,13 @@ internal static class RoadsPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentRoadsUI.onToggledConcreteToggle.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onToggledConcreteToggle.");
             }
         }
         method = typeof(EditorEnvironmentRoadsUI).GetMethod("onTypedOffsetField", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentRoadsUI.onTypedOffsetField.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onTypedOffsetField.");
         }
         else
         {
@@ -279,14 +275,13 @@ internal static class RoadsPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentRoadsUI.onTypedOffsetField.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onTypedOffsetField.");
             }
         }
         method = typeof(EditorEnvironmentRoadsUI).GetMethod("onTypedWidthField", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentRoadsUI.onTypedWidthField.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onTypedWidthField.");
         }
         else
         {
@@ -296,14 +291,13 @@ internal static class RoadsPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentRoadsUI.onTypedWidthField.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onTypedWidthField.");
             }
         }
         method = typeof(EditorEnvironmentRoadsUI).GetMethod("onTypedHeightField", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentRoadsUI.onTypedHeightField.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onTypedHeightField.");
         }
         else
         {
@@ -313,14 +307,13 @@ internal static class RoadsPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentRoadsUI.onTypedHeightField.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onTypedHeightField.");
             }
         }
         method = typeof(EditorEnvironmentRoadsUI).GetMethod("onTypedDepthField", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentRoadsUI.onTypedDepthField.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onTypedDepthField.");
         }
         else
         {
@@ -330,14 +323,13 @@ internal static class RoadsPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentRoadsUI.onTypedDepthField.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onTypedDepthField.");
             }
         }
         method = typeof(EditorEnvironmentRoadsUI).GetMethod("onTypedOffset2Field", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentRoadsUI.onTypedOffset2Field.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onTypedOffset2Field.");
         }
         else
         {
@@ -347,14 +339,13 @@ internal static class RoadsPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentRoadsUI.onTypedOffset2Field.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onTypedOffset2Field.");
             }
         }
         method = typeof(EditorEnvironmentRoadsUI).GetMethod("onClickedRoadButton", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentRoadsUI.onClickedRoadButton.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentRoadsUI.onClickedRoadButton.");
         }
         else
         {
@@ -364,8 +355,7 @@ internal static class RoadsPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentRoadsUI.onClickedRoadButton.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentRoadsUI.onClickedRoadButton.");
             }
         }
     }
@@ -808,7 +798,7 @@ internal static class RoadsPatches
 
             if (roadNetId.id == 0)
             {
-                Logger.LogWarning("Unable to add vertex: road net ID not found.");
+                Logger.DevkitServer.LogWarning(Source, "Unable to add vertex: road net ID not found.");
                 EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "UnknownError");
                 selectedRoadElement = RoadUtil.SelectedRoadElement;
                 if (selectedRoadElement != null)
@@ -1003,7 +993,7 @@ internal static class RoadsPatches
             return NetId.INVALID;
         if (!RoadNetIdDatabase.TryGetRoadNetId(roadIndex, out NetId netId))
         {
-            Logger.LogWarning($"Unable to find NetId for road: {roadIndex.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to find NetId for road: {roadIndex.Format()}.");
             return NetId.INVALID;
         }
 
@@ -1015,7 +1005,7 @@ internal static class RoadsPatches
             return NetId.INVALID;
         if (!RoadNetIdDatabase.TryGetVertexNetId(new RoadVertexIdentifier(roadIndex, vertexIndex), out NetId netId))
         {
-            Logger.LogWarning($"Unable to find NetId for road: {roadIndex.Format()}, vertex: {vertexIndex.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to find NetId for road: {roadIndex.Format()}, vertex: {vertexIndex.Format()}.");
             return NetId.INVALID;
         }
 

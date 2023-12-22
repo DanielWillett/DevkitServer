@@ -1,10 +1,10 @@
 ﻿using DevkitServer.API;
 using DevkitServer.API.Abstractions;
+using DevkitServer.Patches;
 using HarmonyLib;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
-using DevkitServer.Patches;
 
 namespace DevkitServer.Util;
 
@@ -1191,13 +1191,13 @@ public static class PatchUtil
             return;
         if (invoker == null)
         {
-            Logger.LogWarning("Method invoker not found: " + original.Format() + ".", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(CheckCopiedMethodPatchOutOfDate), "Method invoker not found: " + original.Format() + ".");
             original = null!;
             return;
         }
         ParameterInfo[] p = original.GetParameters();
         ParameterInfo[] p2 = invoker.GetParameters();
-        bool instanceMatches = !original.IsStatic && original.DeclaringType != null && p2.Length > 0 &&
+        bool instanceMatches = original is { IsStatic: false, DeclaringType: not null } && p2.Length > 0 &&
                                (p2[0].ParameterType.IsAssignableFrom(original.DeclaringType) ||
                                 p2[0].ParameterType.IsByRef && p2[0].ParameterType.GetElementType()!
                                     .IsAssignableFrom(original.DeclaringType));
@@ -1205,7 +1205,7 @@ public static class PatchUtil
         {
             if (!instanceMatches || p.Length != p2.Length - 1)
             {
-                Logger.LogWarning("Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".", method: "CLIENT EVENTS");
+                Logger.DevkitServer.LogWarning(nameof(CheckCopiedMethodPatchOutOfDate), "Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".");
 
                 original = null!;
                 return;
@@ -1224,7 +1224,7 @@ public static class PatchUtil
                 if (p2[i + invOffset].ParameterType.IsByRef &&
                     p2[i + invOffset].ParameterType.GetElementType()!.IsAssignableFrom(p[i].ParameterType))
                     continue;
-                Logger.LogWarning("Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".", method: "CLIENT EVENTS");
+                Logger.DevkitServer.LogWarning(nameof(CheckCopiedMethodPatchOutOfDate), "Method patch out of date: " + original.Format() + " vs. " + invoker.Format() + ".");
                 original = null!;
                 return;
             }

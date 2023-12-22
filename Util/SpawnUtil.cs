@@ -330,7 +330,7 @@ public static class SpawnUtil
         SetPlayerSpawnpointIsAlternate.Invoke(spawn, isAlternate);
         if (index >= 0)
         {
-            Logger.LogDebug($"Player spawnpoint updated: {(oldIsAlternate ? "Alternate" : "Primary")} -> {(isAlternate ? "Alternate" : "Primary")}");
+            Logger.DevkitServer.LogDebug(nameof(SetIsAlternate), $"Player spawnpoint updated: {(oldIsAlternate ? "Alternate" : "Primary")} -> {(isAlternate ? "Alternate" : "Primary")}");
             EventOnPlayerSpawnpointIsAlternateChanged.TryInvoke(spawn, index, isAlternate);
         }
     }
@@ -700,10 +700,10 @@ public static class SpawnUtil
             EventOnAnimalSpawnpointRemoved.TryInvoke(spawn, index);
 
             EventOnAnimalSpawnpointIndexUpdated.TryInvoke(changed, oldIndex, index);
-            Logger.LogDebug($"Animal spawnpoint index updated after replacing other removed spawnpoint on add: {oldIndex.Format()} -> {index.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(RemoveAnimalSpawn), $"Animal spawnpoint index updated after replacing other removed spawnpoint on add: {oldIndex.Format()} -> {index.Format()}.");
         }
 
-        Logger.LogDebug($"Animal spawnpoint removed: {index.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(RemoveAnimalSpawn), $"Animal spawnpoint removed: {index.Format()}.");
 
         if (destroyNode && spawn.node != null)
         {
@@ -761,10 +761,10 @@ public static class SpawnUtil
             EventOnVehicleSpawnpointRemoved.TryInvoke(spawn, index);
 
             EventOnVehicleSpawnpointIndexUpdated.TryInvoke(changed, oldIndex, index);
-            Logger.LogDebug($"Vehicle spawnpoint index updated after replacing other removed spawnpoint on add: {oldIndex.Format()} -> {index.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(RemoveVehicleSpawn), $"Vehicle spawnpoint index updated after replacing other removed spawnpoint on add: {oldIndex.Format()} -> {index.Format()}.");
         }
 
-        Logger.LogDebug($"Vehicle spawnpoint removed: {index.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(RemoveVehicleSpawn), $"Vehicle spawnpoint removed: {index.Format()}.");
 
         if (destroyNode && spawn.node != null)
         {
@@ -822,10 +822,10 @@ public static class SpawnUtil
             EventOnPlayerSpawnpointRemoved.TryInvoke(spawn, index);
 
             EventOnPlayerSpawnpointIndexUpdated.TryInvoke(changed, oldIndex, index);
-            Logger.LogDebug($"Player spawnpoint index updated after replacing other removed spawnpoint on add: {oldIndex.Format()} -> {index.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(RemovePlayerSpawn), $"Player spawnpoint index updated after replacing other removed spawnpoint on add: {oldIndex.Format()} -> {index.Format()}.");
         }
 
-        Logger.LogDebug($"Player spawnpoint removed: {index.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(RemovePlayerSpawn), $"Player spawnpoint removed: {index.Format()}.");
         
         if (destroyNode && spawn.node != null)
         {
@@ -878,10 +878,10 @@ public static class SpawnUtil
                 EventOnItemSpawnpointRemoved.TryInvoke(spawn, newRegion);
 
                 EventOnItemSpawnpointRegionUpdated.TryInvoke(changed, oldRegion, newRegion);
-                Logger.LogDebug($"Item spawnpoint index updated after replacing other removed spawnpoint on add: {oldRegion.Format()} -> {newRegion.Format()}.");
+                Logger.DevkitServer.LogDebug(nameof(RemoveItemSpawn), $"Item spawnpoint index updated after replacing other removed spawnpoint on add: {oldRegion.Format()} -> {newRegion.Format()}.");
             }
 
-            Logger.LogDebug($"Item spawnpoint removed: {newRegion.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(RemoveItemSpawn), $"Item spawnpoint removed: {newRegion.Format()}.");
 
             if (destroyNode && spawn.node != null)
             {
@@ -947,10 +947,10 @@ public static class SpawnUtil
                 EventOnZombieSpawnpointRemoved.TryInvoke(spawn, newRegion);
 
                 EventOnZombieSpawnpointRegionUpdated.TryInvoke(changed, oldRegion, newRegion);
-                Logger.LogDebug($"Zombie spawnpoint index updated after replacing other removed spawnpoint on add: {oldRegion.Format()} -> {newRegion.Format()}.");
+                Logger.DevkitServer.LogDebug(nameof(RemoveZombieSpawn), $"Zombie spawnpoint index updated after replacing other removed spawnpoint on add: {oldRegion.Format()} -> {newRegion.Format()}.");
             }
 
-            Logger.LogDebug($"Zombie spawnpoint removed: {newRegion.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(RemoveZombieSpawn), $"Zombie spawnpoint removed: {newRegion.Format()}.");
 
             if (destroyNode && spawn.node != null)
             {
@@ -1009,10 +1009,10 @@ public static class SpawnUtil
         if (added)
         {
             EventOnAnimalSpawnpointAdded.TryInvoke(spawn, index);
-            Logger.LogDebug("Animal spawnpoint added.");
+            Logger.DevkitServer.LogDebug(nameof(AddAnimalSpawn), "Animal spawnpoint added.");
         }
         else
-            Logger.LogDebug("Animal spawnpoint already added.");
+            Logger.DevkitServer.LogDebug(nameof(AddAnimalSpawn), "Animal spawnpoint already added.");
     }
 
     /// <summary>
@@ -1048,10 +1048,10 @@ public static class SpawnUtil
         if (added)
         {
             EventOnVehicleSpawnpointAdded.TryInvoke(spawn, index);
-            Logger.LogDebug("Vehicle spawnpoint added.");
+            Logger.DevkitServer.LogDebug(nameof(AddVehicleSpawn), "Vehicle spawnpoint added.");
         }
         else
-            Logger.LogDebug("Vehicle spawnpoint already added.");
+            Logger.DevkitServer.LogDebug(nameof(AddVehicleSpawn), "Vehicle spawnpoint already added.");
     }
 
     /// <summary>
@@ -1087,10 +1087,10 @@ public static class SpawnUtil
         if (added)
         {
             EventOnPlayerSpawnpointAdded.TryInvoke(spawn, index);
-            Logger.LogDebug("Player spawnpoint added.");
+            Logger.DevkitServer.LogDebug(nameof(AddPlayerSpawn), "Player spawnpoint added.");
         }
         else
-            Logger.LogDebug("Player spawnpoint already added.");
+            Logger.DevkitServer.LogDebug(nameof(AddPlayerSpawn), "Player spawnpoint already added.");
     }
 
     /// <summary>
@@ -1152,7 +1152,7 @@ public static class SpawnUtil
                 region.RemoveAt(index);
             else if (region.Count > 1)
             {
-                region[index] = region[region.Count - 1];
+                region[index] = region[^1];
                 changed = region[index];
                 changedOldRegion = new RegionIdentifier(x, y, region.Count - 1);
                 changedNewRegion = new RegionIdentifier(x, y, index);
@@ -1165,7 +1165,7 @@ public static class SpawnUtil
                 }
 #endif
                 region.RemoveAt(region.Count - 1);
-                Logger.LogDebug($"Item spawnpoint region updated after replacing other removed spawnpoint on add: {changedOldRegion.Value.Format()} -> {changedNewRegion.Value.Format()}.");
+                Logger.DevkitServer.LogDebug(nameof(AddItemSpawn), $"Item spawnpoint region updated after replacing other removed spawnpoint on add: {changedOldRegion.Value.Format()} -> {changedNewRegion.Value.Format()}.");
             }
             alreadyExists = false;
             regionChanged = true;
@@ -1200,12 +1200,12 @@ public static class SpawnUtil
             if (changed != null)
                 EventOnItemSpawnpointRegionUpdated.TryInvoke(changed, changedOldRegion!.Value, changedNewRegion!.Value);
 
-            Logger.LogDebug($"Item spawnpoint region updated on add: {oldRegion.Format()} -> {regionId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(AddItemSpawn), $"Item spawnpoint region updated on add: {oldRegion.Format()} -> {regionId.Format()}.");
         }
         else if (!alreadyExists)
         {
             EventOnItemSpawnpointAdded.TryInvoke(spawn, regionId);
-            Logger.LogDebug($"Item spawnpoint added: {regionId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(AddItemSpawn), $"Item spawnpoint added: {regionId.Format()}.");
         }
     }
 
@@ -1268,7 +1268,7 @@ public static class SpawnUtil
                 region.RemoveAt(index);
             else if (region.Count > 1)
             {
-                region[index] = region[region.Count - 1];
+                region[index] = region[^1];
                 changed = region[index];
                 changedOldRegion = new RegionIdentifier(x, y, region.Count - 1);
                 changedNewRegion = new RegionIdentifier(x, y, index);
@@ -1281,7 +1281,7 @@ public static class SpawnUtil
                 }
 #endif
                 region.RemoveAt(region.Count - 1);
-                Logger.LogDebug($"Zombie spawnpoint region updated after replacing other removed spawnpoint on add: {changedOldRegion.Value.Format()} -> {changedNewRegion.Value.Format()}.");
+                Logger.DevkitServer.LogDebug(nameof(AddZombieSpawn), $"Zombie spawnpoint region updated after replacing other removed spawnpoint on add: {changedOldRegion.Value.Format()} -> {changedNewRegion.Value.Format()}.");
             }
             alreadyExists = false;
             regionChanged = true;
@@ -1316,12 +1316,12 @@ public static class SpawnUtil
             if (changed != null)
                 EventOnZombieSpawnpointRegionUpdated.TryInvoke(changed, changedOldRegion!.Value, changedNewRegion!.Value);
 
-            Logger.LogDebug($"Zombie spawnpoint region updated on add: {oldRegion.Format()} -> {regionId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(AddZombieSpawn), $"Zombie spawnpoint region updated on add: {oldRegion.Format()} -> {regionId.Format()}.");
         }
         else if (!alreadyExists)
         {
             EventOnZombieSpawnpointAdded.TryInvoke(spawn, regionId);
-            Logger.LogDebug($"Zombie spawnpoint added: {regionId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(AddZombieSpawn), $"Zombie spawnpoint added: {regionId.Format()}.");
         }
     }
 
@@ -1353,7 +1353,7 @@ public static class SpawnUtil
         }
 
         EventOnAnimalSpawnpointMoved.TryInvoke(point, oldPosition, position);
-        Logger.LogDebug($"Animal spawnpoint moved: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
+        Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Animal spawnpoint moved: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
     }
 
     /// <summary>
@@ -1384,7 +1384,7 @@ public static class SpawnUtil
         }
 
         EventOnVehicleSpawnpointMoved.TryInvoke(point, oldPosition, position, point.angle, point.angle);
-        Logger.LogDebug($"Vehicle spawnpoint moved: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
+        Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Vehicle spawnpoint moved: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
     }
 
     /// <summary>
@@ -1415,7 +1415,7 @@ public static class SpawnUtil
         }
 
         EventOnPlayerSpawnpointMoved.TryInvoke(point, oldPosition, position, point.angle, point.angle);
-        Logger.LogDebug($"Player spawnpoint moved: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
+        Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Player spawnpoint moved: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
     }
 
     /// <summary>
@@ -1457,7 +1457,7 @@ public static class SpawnUtil
                     region.RemoveAt(index);
                 else if (region.Count > 1)
                 {
-                    region[index] = region[region.Count - 1];
+                    region[index] = region[^1];
                     changed = region[index];
                     changedOldRegion = new RegionIdentifier(coord.x, coord.y, region.Count - 1);
 #if CLIENT
@@ -1469,7 +1469,7 @@ public static class SpawnUtil
                     }
 #endif
                     region.RemoveAt(region.Count - 1);
-                    Logger.LogDebug($"Item spawnpoint region updated after replacing other removed spawnpoint on move: {changedOldRegion.Value.Format()} -> {newRegion.Format()}.");
+                    Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Item spawnpoint region updated after replacing other removed spawnpoint on move: {changedOldRegion.Value.Format()} -> {newRegion.Format()}.");
                 }
             }
             removedFrom = newRegion;
@@ -1508,12 +1508,12 @@ public static class SpawnUtil
 
             EventOnItemSpawnpointMoved.TryInvoke(point, region, oldPosition, position);
 
-            Logger.LogDebug($"Item spawnpoint moved: {removedFrom.Value.Format()} -> {region.Format()}, pos: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
+            Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Item spawnpoint moved: {removedFrom.Value.Format()} -> {region.Format()}, pos: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
         }
         else
         {
             EventOnItemSpawnpointAdded.TryInvoke(point, region);
-            Logger.LogDebug($"Item spawnpoint added on move: {region.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Item spawnpoint added on move: {region.Format()}.");
         }
     }
 
@@ -1556,7 +1556,7 @@ public static class SpawnUtil
                     region.RemoveAt(index);
                 else if (region.Count > 1)
                 {
-                    region[index] = region[region.Count - 1];
+                    region[index] = region[^1];
                     changed = region[index];
                     changedOldRegion = new RegionIdentifier(coord.x, coord.y, region.Count - 1);
 #if CLIENT
@@ -1568,7 +1568,7 @@ public static class SpawnUtil
                     }
 #endif
                     region.RemoveAt(region.Count - 1);
-                    Logger.LogDebug($"Zombie spawnpoint region updated after replacing other removed spawnpoint on move: {changedOldRegion.Value.Format()} -> {newRegion.Format()}.");
+                    Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Zombie spawnpoint region updated after replacing other removed spawnpoint on move: {changedOldRegion.Value.Format()} -> {newRegion.Format()}.");
                 }
             }
             removedFrom = newRegion;
@@ -1607,12 +1607,12 @@ public static class SpawnUtil
 
             EventOnZombieSpawnpointMoved.TryInvoke(point, region, oldPosition, position);
 
-            Logger.LogDebug($"Zombie spawnpoint moved: {removedFrom.Value.Format()} -> {region.Format()}, pos: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
+            Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Zombie spawnpoint moved: {removedFrom.Value.Format()} -> {region.Format()}, pos: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
         }
         else
         {
             EventOnZombieSpawnpointAdded.TryInvoke(point, region);
-            Logger.LogDebug($"Zombie spawnpoint added on move: {region.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Zombie spawnpoint added on move: {region.Format()}.");
         }
     }
 
@@ -1644,7 +1644,7 @@ public static class SpawnUtil
         }
 
         EventOnVehicleSpawnpointMoved.TryInvoke(point, point.point, point.point, oldYaw, yaw);
-        Logger.LogDebug($"Vehicle spawnpoint rotated: {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
+        Logger.DevkitServer.LogDebug(nameof(RotateSpawnpoint), $"Vehicle spawnpoint rotated: {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
     }
 
     /// <summary>
@@ -1675,7 +1675,7 @@ public static class SpawnUtil
         }
 
         EventOnPlayerSpawnpointMoved.TryInvoke(point, point.point, point.point, oldYaw, yaw);
-        Logger.LogDebug($"Player spawnpoint rotated: {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
+        Logger.DevkitServer.LogDebug(nameof(RotateSpawnpoint), $"Player spawnpoint rotated: {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
     }
 
     /// <summary>
@@ -1717,7 +1717,7 @@ public static class SpawnUtil
         }
 
         EventOnVehicleSpawnpointMoved.TryInvoke(point, oldPosition, position, oldYaw, yaw);
-        Logger.LogDebug($"Vehicle spawnpoint transformed: {oldPosition.Format("F0")} -> {position.Format("F0")}, {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
+        Logger.DevkitServer.LogDebug(nameof(TransformSpawnpoint), $"Vehicle spawnpoint transformed: {oldPosition.Format("F0")} -> {position.Format("F0")}, {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
     }
 
     /// <summary>
@@ -1759,7 +1759,7 @@ public static class SpawnUtil
         }
 
         EventOnPlayerSpawnpointMoved.TryInvoke(point, oldPosition, position, oldYaw, yaw);
-        Logger.LogDebug($"Player spawnpoint transformed: {oldPosition.Format("F0")} -> {position.Format("F0")}, {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
+        Logger.DevkitServer.LogDebug(nameof(TransformSpawnpoint), $"Player spawnpoint transformed: {oldPosition.Format("F0")} -> {position.Format("F0")}, {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
     }
 
     internal static void SetPoint(this AnimalSpawnpoint spawn, Vector3 point) => SetAnimalSpawnpointPoint?.Invoke(spawn, point);

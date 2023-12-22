@@ -19,7 +19,6 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-
 #if CLIENT
 using DevkitServer.Multiplayer.Sync;
 #endif
@@ -139,7 +138,7 @@ public static class NetFactory
         NewReceiveBitCount = GetMinBitCount(ReceiveBlockOffset + BlockSize);
         NewWriteBitCount = GetMinBitCount(WriteBlockOffset + BlockSize);
 
-        Logger.LogDebug($"[NET FACTORY] Collected message block data: " +
+        Logger.DevkitServer.LogDebug(Source, "Collected message block data: " +
                         $"Offsets: (Receive = {ReceiveBlockOffset.Format()}, Write = {WriteBlockOffset.Format()}) | " +
                         $"Size = {BlockSize.Format()} | " +
                         $"Original Bit Count = (Receive: {origReceiveBitCount.Format()}b, Write: {origWriteBitCount.Format()}b) | " +
@@ -168,19 +167,19 @@ public static class NetFactory
                 MethodInfo? implMethod = Accessor.GetImplementedMethod(listenerType, interfaceMethod);
                 if (implMethod == null)
                 {
-                    assembly.LogWarning($"Unable to find {typeof(ICustomNetMessageListener).Format()}.{nameof(ICustomNetMessageListener.OnRawMessageReceived).Colorize(FormattingColorType.Method)} " +
-                                      $"implementation in {listenerType.Format()}.", method: Source);
+                    assembly.LogWarning(Source, $"Unable to find {typeof(ICustomNetMessageListener).Format()}.{nameof(ICustomNetMessageListener.OnRawMessageReceived).Colorize(FormattingColorType.Method)} " +
+                                                $"implementation in {listenerType.Format()}.");
                     continue;
                 }
 
                 methods[i] = implMethod;
 
-                assembly.LogInfo($"[{Source}] Registered {typeof(ICustomNetMessageListener).Format()} of type {listenerType.Format()} (receivable on: {listener.ReceivingSide.Format()}).");
+                assembly.LogInfo(Source, $"Registered {typeof(ICustomNetMessageListener).Format()} of type {listenerType.Format()} (receivable on: {listener.ReceivingSide.Format()}).");
             }
         }
         else
         {
-            Logger.LogWarning($"Unable to find {typeof(ICustomNetMessageListener).Format()}.{nameof(ICustomNetMessageListener.OnRawMessageReceived).Colorize(FormattingColorType.Method)}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to find {typeof(ICustomNetMessageListener).Format()}.{nameof(ICustomNetMessageListener.OnRawMessageReceived).Colorize(FormattingColorType.Method)}.");
         }
 
         Delegate[] listeners = new Delegate[methods.Length];
@@ -205,15 +204,15 @@ public static class NetFactory
         if (readMethod == null)
         {
             if (writeMethod == null)
-                Logger.LogError("Unable to find " + readEnum.Name + ".ReadEnum(...) or " + writeEnum.Name + ".WriteEnum(...) !", method: Source);
+                Logger.DevkitServer.LogError(Source, "Unable to find " + readEnum.Format() + ".ReadEnum(...) or " + writeEnum.Format() + ".WriteEnum(...) !");
             else
-                Logger.LogError("Unable to find " + readEnum.Name + ".ReadEnum(...)!", method: Source);
+                Logger.DevkitServer.LogError(Source, "Unable to find " + readEnum.Format() + ".ReadEnum(...)!");
 
             goto reset;
         }
         if (writeMethod == null)
         {
-            Logger.LogError("Unable to find " + writeEnum.Name + ".WriteEnum(...) !", method: Source);
+            Logger.DevkitServer.LogError(Source, "Unable to find " + writeEnum.Format() + ".WriteEnum(...) !");
             goto reset;
         }
 
@@ -234,12 +233,10 @@ public static class NetFactory
                 }
                 catch (Exception ex2)
                 {
-                    Logger.LogWarning($"Unable to unpatch {readEnum.Format()}.ReadEnum(...) after an error patching {writeEnum.Format()}.WriteEnum(...).", method: Source);
-                    Logger.LogError(ex2, method: Source);
+                    Logger.DevkitServer.LogWarning(Source, ex2, $"Unable to unpatch {readEnum.Format()}.ReadEnum(...) after an error patching {writeEnum.Format()}.WriteEnum(...).");
                 }
             }
-            Logger.LogError("Failed to patch networking enum " + (p1 ? "write method." : "read and/or write methods.", method: Source));
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, "Failed to patch networking enum " + (p1 ? "write method." : "read and/or write methods."));
             goto reset;
         }
 
@@ -250,14 +247,13 @@ public static class NetFactory
             netMessagesType = Accessor.AssemblyCSharp.GetType(netMessagesName, true, false);
             if (netMessagesType == null)
             {
-                Logger.LogError("Unable to find type " + netMessagesName + "!", method: Source);
+                Logger.DevkitServer.LogError(Source, $"Unable to find type {netMessagesName.Colorize(FormattingColorType.Class)}!");
                 goto reset;
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError("Unable to find type " + netMessagesName + "!", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, $"Unable to find type {netMessagesName.Colorize(FormattingColorType.Class)}!");
             goto reset;
         }
         RuntimeHelpers.RunClassConstructor(netMessagesType.TypeHandle);
@@ -272,7 +268,7 @@ public static class NetFactory
         FieldInfo? field = netMessagesType.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Static);
         if (field == null)
         {
-            Logger.LogError("Unable to find " + netMessagesType.Format() + "." + fieldName + "!", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Unable to find {netMessagesType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}!");
             goto reset;
         }
         Array readCallbacks = (Array)field.GetValue(null);
@@ -304,7 +300,7 @@ public static class NetFactory
                 Type listenerType = listener.GetType();
                 if ((listener.ReceivingSide & receivingSide) == 0)
                 {
-                    assembly.LogInfo($"Skipping implementing {listenerType.Format()} as it's not received on this connection side ({receivingSide.Format()}).");
+                    assembly.LogInfo(Source, $"Skipping implementing {listenerType.Format()} as it's not received on this connection side ({receivingSide.Format()}).");
                     continue;
                 }
 
@@ -320,9 +316,8 @@ public static class NetFactory
                 }
                 catch (Exception ex)
                 {
-                    assembly.LogError($"Implemented {nameof(ICustomNetMessageListener.OnRawMessageReceived).Colorize(FormattingColorType.Method)} method for " +
-                                      $"{listenerType.Format()} can not be converted to {callbackType.Format()}. Ensure your side settings are correct.", method: Source);
-                    assembly.LogError(ex, method: Source);
+                    assembly.LogError(Source, ex, $"Implemented {nameof(ICustomNetMessageListener.OnRawMessageReceived).Colorize(FormattingColorType.Method)} method for " +
+                                                  $"{listenerType.Format()} can not be converted to {callbackType.Format()}. Ensure your side settings are correct.");
                 }
             }
             else
@@ -336,8 +331,7 @@ public static class NetFactory
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError($"Implemented method for {messageIndex.Format()} can not be converted to {callbackType.Format()}.", method: Source);
-                    Logger.LogError(ex, method: Source);
+                    Logger.DevkitServer.LogError(Source, ex, $"Implemented method for {messageIndex.Format()} can not be converted to {callbackType.Format()}.");
                     goto reset;
                 }
             }
@@ -369,8 +363,7 @@ public static class NetFactory
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Unable to unpatch " + readEnum.Format() + ".ReadEnum(...) while cancelling initialization.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, "Unable to unpatch " + readEnum.Format() + ".ReadEnum(...) while cancelling initialization.");
         }
 
         if (!p2)
@@ -382,8 +375,7 @@ public static class NetFactory
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Unable to unpatch " + writeEnum.Format() + ".WriteEnum(...) while cancelling initialization.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, "Unable to unpatch " + writeEnum.Format() + ".WriteEnum(...) while cancelling initialization.");
         }
 
         return false;
@@ -495,12 +487,12 @@ public static class NetFactory
             }
             else
             {
-                Logger.LogWarning("Couldn't find Get in TransportConnectionListPool, list pooling will not be used.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Couldn't find Get in TransportConnectionListPool, list pooling will not be used.");
             }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Couldn't get Get from TransportConnectionListPool, list pooling will not be used (" + ex.Message + ").", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Couldn't get Get from TransportConnectionListPool, list pooling will not be used (" + ex.Message + ").");
         }
 
         return true;
@@ -524,7 +516,7 @@ public static class NetFactory
             catch (Exception ex)
             {
                 ex2 = ex;
-                Logger.LogError(ex);
+                Logger.DevkitServer.LogError(nameof(GetPooledTransportConnectionList), ex);
                 PullFromTransportConnectionListPool = null;
             }
         }
@@ -539,7 +531,7 @@ public static class NetFactory
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex);
+                Logger.DevkitServer.LogError(nameof(GetPooledTransportConnectionList), ex);
                 if (ex2 != null)
                     throw new AggregateException("Unable to create pooled transport connection!", ex2, ex);
 
@@ -572,12 +564,12 @@ public static class NetFactory
     {
         if (!reader.ReadUInt16(out ushort len))
         {
-            Logger.LogWarning("Received invalid message, can't read length"
+            Logger.DevkitServer.LogWarning(Source, "Received invalid message, can't read length"
 #if SERVER
                               + $" from {transportConnection.Format()}"
 #endif
                               + "."
-                , method: Source);
+                );
             return;
         }
 
@@ -585,19 +577,19 @@ public static class NetFactory
 
         if (!reader.ReadBytesPtr(len, out byte[] bytes, out int offset))
         {
-            Logger.LogWarning($"Received invalid message, can't read bytes of length {len.Format()} B"
+            Logger.DevkitServer.LogWarning(Source, $"Received invalid message, can't read bytes of length {len.Format()} B"
 #if SERVER
                               + $" from {transportConnection.Format()}"
 #endif
                               + $". Expected length <= {reader.RemainingSegmentLength.Format()}."
-                , method: Source);
+                );
             return;
         }
 
         ArraySegment<byte> data = new ArraySegment<byte>(bytes, offset, len);
         if (len < MessageOverhead.MinimumSize)
         {
-            Logger.LogError($"Message too small to create overhead ({len.Format()} B).", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Message too small to create overhead ({len.Format()} B).");
             return;
         }
         MessageOverhead ovh;
@@ -607,7 +599,7 @@ public static class NetFactory
         }
         catch (IndexOutOfRangeException)
         {
-            Logger.LogError($"Message too small to create overhead ({len.Format()} B).", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Message too small to create overhead ({len.Format()} B).");
             return;
         }
 #if SERVER
@@ -635,7 +627,6 @@ public static class NetFactory
 #else
                 value = (EClientMessage)num;
 #endif
-                // Logger.LogDebug($"Reading net message enum {num,2}: {(num <= ReceiveBlockOffset ? ("Unturned." + value) : ("DevkitServer." + (DevkitMessage)(num - ReceiveBlockOffset)))}");
                 __result = flag;
             }
             else
@@ -661,12 +652,6 @@ public static class NetFactory
         if (DevkitServerModule.IsEditing)
         {
             uint v = (uint)value;
-#if SERVER
-            // if (value != EClientMessage.InvokeMethod)
-#else
-            // if (value != EServerMessage.InvokeMethod)
-#endif
-            // Logger.LogDebug($"Writing net message enum {v, 2}: {(v < WriteBlockOffset ? ("Unturned." + value) : ("DevkitServer." + (DevkitMessage)(v - WriteBlockOffset)))}");
             __result = writer.WriteBits(v, NewWriteBitCount);
             return false;
         }
@@ -716,7 +701,7 @@ public static class NetFactory
             return true;
         if (!call.Read(message, out parameters))
         {
-            Logger.LogWarning($"Unable to read incoming message for message {overhead.Format()}\n.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to read incoming message for message {overhead.Format()}.");
             return false;
         }
 
@@ -728,7 +713,7 @@ public static class NetFactory
             parameters[0] = ctx;
 
 #if METHOD_LOGGING
-        Logger.LogDebug($"  Read net method: {overhead.Format()}: {string.Join(", ", parameters.Select(x => x.Format()))}.", ConsoleColor.DarkYellow);
+        Logger.DevkitServer.LogDebug(Source, $"  Read net method: {overhead.Format()}: {string.Join(", ", parameters.Select(x => x.Format()))}.", ConsoleColor.DarkYellow);
 #endif
         return true;
     }
@@ -857,7 +842,7 @@ public static class NetFactory
             });
         }
 #if METHOD_LOGGING
-        Logger.LogDebug($"  Invoked net method: {methodInfo.Method.Format()}.", ConsoleColor.DarkYellow);
+        Logger.DevkitServer.LogDebug(Source, $"  Invoked net method: {methodInfo.Method.Format()}.", ConsoleColor.DarkYellow);
 #endif
 
         return true;
@@ -866,9 +851,8 @@ public static class NetFactory
     {
         if (ex is TargetInvocationException { InnerException: { } t })
             ex = t;
-        Logger.LogError("Error running method " + method.Format(), method: Source);
-        Logger.LogError("Message: " + overhead.Format() + ".", method: Source);
-        Logger.LogError(ex);
+        Logger.DevkitServer.LogError(Source, $"Error running method {method.Format()}.");
+        Logger.DevkitServer.LogError(Source, ex, $"Message: {overhead.Format()}.");
     }
     private static void ParseMessage(in MessageOverhead overhead,
 #if SERVER
@@ -895,13 +879,13 @@ public static class NetFactory
                         if (!FillParameters(in overhead, ref ctx, connection, call, message, hs, ref parameters))
                         {
 #if METHOD_LOGGING
-                            Logger.LogDebug($"  Failed to read method: {overhead.Format()}.", ConsoleColor.DarkYellow);
+                            Logger.DevkitServer.LogDebug(Source, $"  Failed to read method: {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
                             return;
                         }
 
 #if METHOD_LOGGING
-                        Logger.LogDebug("  Satisfied local listener.", ConsoleColor.DarkYellow);
+                        Logger.DevkitServer.LogDebug(Source, "  Satisfied local listener.", ConsoleColor.DarkYellow);
 #endif
                         listener.Task.TellCompleted(parameters!, true);
                     }
@@ -925,7 +909,7 @@ public static class NetFactory
                         }
 
 #if METHOD_LOGGING
-                        Logger.LogDebug($"  Satisfied local acknowledgement listener {(errorCode.HasValue ? errorCode.Value.Format() : ((object?)null).Format())}.", ConsoleColor.DarkYellow);
+                        Logger.DevkitServer.LogDebug(Source, $"  Satisfied local acknowledgement listener {(errorCode.HasValue ? errorCode.Value.Format() : ((object?)null).Format())}.", ConsoleColor.DarkYellow);
 #endif
 
                         listener.Task.TellCompleted(new MessageContext(connection, overhead, hs), true, errorCode);
@@ -960,7 +944,7 @@ public static class NetFactory
                 if (!InvokeMethod(in overhead, ref ctx, connection, netMethodInfo, call, message, hs, parameters))
                 {
 #if METHOD_LOGGING
-                    Logger.LogDebug($"  Failed to read method: {overhead.Format()}.", ConsoleColor.DarkYellow);
+                    Logger.DevkitServer.LogDebug(Source, $"  Failed to read method: {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
                     return;
                 }
@@ -969,7 +953,7 @@ public static class NetFactory
 
         if (!invokedAny)
         {
-            Logger.LogWarning($"Could not find invoker for message from {connection.Format()}: {overhead.Format()}.");
+            Logger.DevkitServer.LogWarning(Source, $"Could not find invoker for message from {connection.Format()}: {overhead.Format()}.");
         }
     }
     internal static void OnReceived(ArraySegment<byte> message,
@@ -983,15 +967,15 @@ public static class NetFactory
         int size = overhead.Size;
         if (size > message.Count)
         {
-            Logger.LogError($"Message overhead read a size larger than the message payload: {size.Format()} B.", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Message overhead read a size larger than the message payload: {size.Format()} B.");
             goto rtn;
         }
 
 #if METHOD_LOGGING
 #if SERVER
-        Logger.LogDebug($"Received message from {connection.Format()}: {overhead.Format()}.", ConsoleColor.DarkYellow);
+        Logger.DevkitServer.LogDebug(Source, $"Received message from {connection.Format()}: {overhead.Format()}.", ConsoleColor.DarkYellow);
 #elif CLIENT
-        Logger.LogDebug($"Received message: {overhead.Format()}.", ConsoleColor.DarkYellow);
+        Logger.DevkitServer.LogDebug(Source, $"Received message: {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
 #endif
 
@@ -1003,7 +987,7 @@ public static class NetFactory
         }
         else
         {
-            Logger.LogWarning($"Could not find invoker for message from {connection.Format()}: {overhead.Format()}.");
+            Logger.DevkitServer.LogWarning(Source, $"Could not find invoker for message from {connection.Format()}: {overhead.Format()}.");
         }
 
         rtn:
@@ -1022,7 +1006,7 @@ public static class NetFactory
                 ListenerTimestamp ts = LocalListenerTimestamps[i];
                 LocalListenerTimestamps.RemoveAt(i);
                 (ts.IsAcknowledgeRequest ? LocalAckRequests : LocalListeners).Remove(ts.RequestId, out _);
-                Logger.LogDebug($"[NET FACTORY] {(ts.IsAcknowledgeRequest ? "Acknowledge request" : "Listener")} expired: {ts.RequestId.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"{(ts.IsAcknowledgeRequest ? "Acknowledge request" : "Listener")} expired: {ts.RequestId.Format()}.");
             }
         }
     }
@@ -1041,7 +1025,7 @@ public static class NetFactory
         int before2 = Invokers.Count;
         ReflectMethods(types, search, outMethods);
         ReflectInvokers(types, outCalls, outMethods);
-        Logger.LogInfo("[NET FACTORY] " + assembly.GetName().Name.Format(false) + " registered " + (Methods.Count - before1).Format() + " net-methods and " + (Invokers.Count - before2).Format() + " invokers.");
+        Logger.DevkitServer.LogInfo("NET REFLECT", assembly.GetName().Name.Format(false) + " registered " + (Methods.Count - before1).Format() + " net-methods and " + (Invokers.Count - before2).Format() + " invokers.");
     }
     private static void ReflectMethods(List<Type> types, NetCallSource search, IList<NetMethodInfo>? outMethods = null)
     {
@@ -1071,10 +1055,10 @@ public static class NetFactory
                     }
                     else
                     {
-                        GuidMethods[guid] = new NetMethodInfo[] { kvp };
+                        GuidMethods[guid] = [ kvp ];
                     }
 #if REFLECTION_LOGGING
-                    Logger.LogDebug($"Registered net method: {method.Format()} to {guid.Format("N")}.", ConsoleColor.DarkYellow);
+                    Logger.DevkitServer.LogDebug("NET REFLECT", $"Registered net method: {method.Format()} to {guid.Format("N")}.", ConsoleColor.DarkYellow);
 #endif
                 }
                 else if (attribute.MethodID != 0)
@@ -1089,10 +1073,10 @@ public static class NetFactory
                     }
                     else
                     {
-                        Methods[attribute.MethodID] = new NetMethodInfo[] { kvp };
+                        Methods[attribute.MethodID] = [ kvp ];
                     }
 #if REFLECTION_LOGGING
-                    Logger.LogDebug($"Registered net method: {method.Format()} to {attribute.MethodID.Format()}.", ConsoleColor.DarkYellow);
+                    Logger.DevkitServer.LogDebug("NET REFLECT", $"Registered net method: {method.Format()} to {attribute.MethodID.Format()}.", ConsoleColor.DarkYellow);
 #endif
                 }
                 else continue;
@@ -1124,8 +1108,8 @@ public static class NetFactory
                     plugin = PluginLoader.FindPluginForMember(field);
                 if (!core && plugin == null)
                 {
-                    Logger.LogWarning($"Unable to link {field.Format()} invoker to a plugin. Use the {typeof(PluginIdentifierAttribute).Format()} on the field to link an invoker to a " +
-                                      "plugin when multiple plugins are loaded from an assembly.", method: "NET REFLECT");
+                    Logger.DevkitServer.LogWarning("NET REFLECT", $"Unable to link {field.Format()} invoker to a plugin. Use the {typeof(PluginIdentifierAttribute).Format()} on the field to link an invoker to a " +
+                                                                  "plugin when multiple plugins are loaded from an assembly.");
                     continue;
                 }
 
@@ -1135,8 +1119,7 @@ public static class NetFactory
                     if (!call.HighSpeed && Invokers.TryGetValue(call.Id, out BaseNetCall c2) || call.HighSpeed && HighSpeedInvokers.TryGetValue(call.Id, out c2))
                     {
                         if (c2.GetType() != call.GetType())
-                            Logger.LogWarning($"Inconsistant duplicate invoker {call.Id.Format()}{(call.HighSpeed ? " (HS)" : string.Empty)} at field {field.Format()}.",
-                                method: "NET REFLECT");
+                            Logger.DevkitServer.LogWarning("NET REFLECT", $"Inconsistant duplicate invoker {call.Id.Format()}{(call.HighSpeed ? " (HS)" : string.Empty)} at field {field.Format()}.");
                         continue;
                     }
                 }
@@ -1145,15 +1128,13 @@ public static class NetFactory
                     if (!call.HighSpeed && GuidInvokers.TryGetValue(call.Guid, out BaseNetCall c2) || call.HighSpeed && GuidHighSpeedInvokers.TryGetValue(call.Guid, out c2))
                     {
                         if (c2.GetType() != call.GetType())
-                            Logger.LogWarning($"Inconsistant duplicate invoker {call.Guid.Format()}{(call.HighSpeed ? " (HS)" : string.Empty)} at field {field.Format()}.",
-                                method: "NET REFLECT");
+                            Logger.DevkitServer.LogWarning("NET REFLECT", $"Inconsistant duplicate invoker {call.Guid.Format()}{(call.HighSpeed ? " (HS)" : string.Empty)} at field {field.Format()}.");
                         continue;
                     }
                 }
                 else
                 {
-                    Logger.LogWarning($"Invoker {field.Format()} does not have a unique ID or GUID.",
-                        method: "NET REFLECT");
+                    Logger.DevkitServer.LogWarning("NET REFLECT", $"Invoker {field.Format()} does not have a unique ID or GUID.");
                     continue;
                 }
                 Type[] generics = callType.GetGenericArguments();
@@ -1187,11 +1168,9 @@ public static class NetFactory
                                 !parameters[0].ParameterType.IsAssignableFrom(ctx) ||
                                 !info.Method.IsStatic)
                             {
-                                Logger.LogWarning($"Method {info.Method.Format()} has the wrong signature for invoker {field.Format()}. {Environment.NewLine}" +
-                                                  $"Expected signature: {FormattingUtil.FormatMethod(typeof(void), info.Method.DeclaringType, info.Method.Name, new (Type type, string? name)[]
-                                                  {
-                                                    (ctx, "ctx")
-                                                  }, isStatic: true)}.", method: "NET REFLECT");
+                                Logger.DevkitServer.LogWarning("NET REFLECT", $"Method {info.Method.Format()} has the wrong signature for invoker {field.Format()}. {Environment.NewLine}" +
+                                                                              $"Expected signature: {FormattingUtil.FormatMethod(typeof(void), info.Method.DeclaringType, info.Method.Name,
+                                                                                  [ (ctx, "ctx") ], isStatic: true)}.");
 
                                 DevkitServerUtility.RemoveFromArray(ref infos, index);
                                 if (guid)
@@ -1209,12 +1188,10 @@ public static class NetFactory
                                 !parameters[1].ParameterType.IsAssignableFrom(typeof(ByteReader)) ||
                                 !info.Method.IsStatic)
                             {
-                                Logger.LogWarning($"Method {info.Method.Format()} has the wrong signature for invoker {field.Format()}. {Environment.NewLine}" +
-                                                  $"Expected signature: {FormattingUtil.FormatMethod(typeof(void), info.Method.DeclaringType, info.Method.Name, new (Type type, string? name)[]
-                                                  {
-                                                      (ctx, "ctx"),
-                                                      (typeof(ByteReader), "reader")
-                                                  }, isStatic: true)}.", method: "NET REFLECT");
+                                Logger.DevkitServer.LogWarning("NET REFLECT", $"Method {info.Method.Format()} has the wrong signature for invoker {field.Format()}. {Environment.NewLine}" +
+                                                                              $"Expected signature: {FormattingUtil.FormatMethod(typeof(void), info.Method.DeclaringType,
+                                                                                  info.Method.Name, [ (ctx, "ctx"), (typeof(ByteReader), "reader") ],
+                                                                                  isStatic: true)}.");
 
                                 DevkitServerUtility.RemoveFromArray(ref infos, index);
                                 if (guid)
@@ -1248,9 +1225,9 @@ public static class NetFactory
                                 {
                                     parameters2[k + 1] = (generics[k], "arg" + k);
                                 }
-                                Logger.LogWarning($"Method {info.Method.Format()} has the wrong signature for invoker {field.Format()}. {Environment.NewLine}" +
-                                                  $"Expected signature: {FormattingUtil.FormatMethod(typeof(void), info.Method.DeclaringType, info.Method.Name, parameters2, isStatic: true)}.",
-                                    method: "NET REFLECT");
+                                Logger.DevkitServer.LogWarning("NET REFLECT", $"Method {info.Method.Format()} has the wrong signature for invoker {field.Format()}. {Environment.NewLine}" +
+                                                                              $"Expected signature: {FormattingUtil.FormatMethod(typeof(void),
+                                                                                  info.Method.DeclaringType, info.Method.Name, parameters2, isStatic: true)}.");
 
                                 DevkitServerUtility.RemoveFromArray(ref infos, index);
                                 if (guid)
@@ -1264,7 +1241,7 @@ public static class NetFactory
 
                         outList?.Add(info);
 #if REFLECTION_LOGGING
-                        Logger.LogDebug($"Registered net call: {field.Format()} to {(call.Guid != Guid.Empty ? call.Guid.Format("N") : call.Id.Format())}.", ConsoleColor.DarkYellow);
+                        Logger.DevkitServer.LogDebug("NET REFLECT", $"Registered net call: {field.Format()} to {(call.Guid != Guid.Empty ? call.Guid.Format("N") : call.Id.Format())}.", ConsoleColor.DarkYellow);
 #endif
                     }
                 }
@@ -1517,13 +1494,13 @@ public static class NetFactory
             conn2.Send(bytes, count, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
 #if METHOD_LOGGING
 
-            Logger.LogDebug("[NET FACTORY] Sending " + count.Format() + " B (HS) to " +
+            Logger.DevkitServer.LogDebug(Source, "Sending " + count.Format() + " B (HS) to " +
 #if SERVER
-                            connection.Format()
+                                                 connection.Format()
 #else
-                            "server"
+                                                 "server"
 #endif
-                            + $": {overhead.Format()}.", ConsoleColor.DarkYellow);
+                                                 + $": {overhead.Format()}.", ConsoleColor.DarkYellow);
 
 #endif
             return;
@@ -1541,7 +1518,7 @@ public static class NetFactory
         int len = Math.Min(ushort.MaxValue, count);
         if (len < count)
         {
-            Logger.LogWarning($"[NET FACTORY] Message to be sent to {connection.Format()} truncated.");
+            Logger.DevkitServer.LogWarning(Source, $"Message to be sent to {connection.Format()} truncated.");
         }
 
         Writer.WriteUInt16((ushort)len);
@@ -1549,13 +1526,13 @@ public static class NetFactory
         IncrementByteCount(DevkitServerMessage.InvokeMethod, true, len);
         Writer.Flush();
 #if METHOD_LOGGING
-        Logger.LogDebug("[NET FACTORY] Sending " + len.Format() + " B to " +
+        Logger.DevkitServer.LogDebug(Source, "Sending " + len.Format() + " B to " +
 #if SERVER
-            connection.Format()
+                                             connection.Format()
 #else
-            "server"
+                                             "server"
 #endif
-            + $": {overhead.Format()}.", ConsoleColor.DarkYellow);
+                                             + $": {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
         connection.Send(Writer.buffer, Writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
     }
@@ -1594,7 +1571,7 @@ public static class NetFactory
             fixed (byte* ptr = bytes)
                 overhead = new MessageOverhead(ptr);
         }
-        Logger.LogDebug($"[NET FACTORY] Sending {bytes.Length.Format()} B to {connections.Count.Format()} user(s): {overhead.Format()}.", ConsoleColor.DarkYellow);
+        Logger.DevkitServer.LogDebug(Source, $"Sending {bytes.Length.Format()} B to {connections.Count.Format()} user(s): {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
         IncrementByteCount(DevkitServerMessage.InvokeMethod, true, bytes.Length * connections.Count);
         for (int i = 0; i < connections.Count; ++i)
@@ -1604,7 +1581,7 @@ public static class NetFactory
                 conn.Send(bytes, bytes.Length, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
 #if METHOD_LOGGING
 
-                Logger.LogDebug($"[NET FACTORY] Sending {bytes.Length.Format()} B (HS) to {conn.Format()}: {overhead.Format()}.", ConsoleColor.DarkYellow);
+                Logger.DevkitServer.LogDebug(Source, $"Sending {bytes.Length.Format()} B (HS) to {conn.Format()}: {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
             }
             

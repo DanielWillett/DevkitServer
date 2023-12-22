@@ -33,7 +33,7 @@ public sealed class HierarchyItemNetIdDatabase : IReplicatedLevelDataSource<Hier
 #if SERVER
         if (!_initialLoaded) return;
 #endif
-        Logger.LogDebug($"[{Source}] Hierarchy item removed: {item.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Hierarchy item removed: {item.Format()}.");
         RemoveHierarchyItem(item);
     }
 #if CLIENT
@@ -62,10 +62,10 @@ public sealed class HierarchyItemNetIdDatabase : IReplicatedLevelDataSource<Hier
                 NetIdRegistry.Release(netId);
             HierarchyItemAssignments.Remove(item.instanceID);
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Released hierarchy item NetId: {netId.Format()} ({item.instanceID}, {item.Format()}).");
+                Logger.DevkitServer.LogDebug(Source, $"Released hierarchy item NetId: {netId.Format()} ({item.instanceID}, {item.Format()}).");
         }
         else
-            Logger.LogWarning($"Unable to release NetId to hierarchy item {netId.Format()} ({item.instanceID}, {item.Format()}), NetId not registered.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to release NetId to hierarchy item {netId.Format()} ({item.instanceID}, {item.Format()}), NetId not registered.");
     }
     public static NetId AddHierarchyItem(IDevkitHierarchyItem item)
     {
@@ -128,7 +128,7 @@ public sealed class HierarchyItemNetIdDatabase : IReplicatedLevelDataSource<Hier
         for (; hierarchyItemIndex < items.Count; ++hierarchyItemIndex)
             AddHierarchyItem(items[hierarchyItemIndex]);
         
-        Logger.LogInfo($"[{Source}] Assigned NetIds for {hierarchyItemIndex.Format()} hierarchy item{hierarchyItemIndex.S()}.");
+        Logger.DevkitServer.LogInfo(Source, $"Assigned NetIds for {hierarchyItemIndex.Format()} hierarchy item{hierarchyItemIndex.S()}.");
     }
 #endif
     private static void ClaimBasicNetId(IDevkitHierarchyItem item, NetId netId)
@@ -139,20 +139,20 @@ public sealed class HierarchyItemNetIdDatabase : IReplicatedLevelDataSource<Hier
             if (t != null)
             {
                 if (Level.isLoaded)
-                    Logger.LogDebug($"[{Source}] NetId already set: {old.Format()} @ {(t == null ? null : t.name).Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"NetId already set: {old.Format()} @ {(t == null ? null : t.name).Format()}.");
                 NetIdRegistry.ReleaseTransform(old, t);
             }
             else if (NetIdRegistry.Release(old))
             {
                 if (Level.isLoaded)
-                    Logger.LogDebug($"[{Source}] Released old NetId pairing: {old.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {old.Format()}.");
             }
         }
 
         HierarchyItemAssignments[item.instanceID] = netId;
         NetIdRegistry.Assign(netId, item.instanceID);
         if (Level.isLoaded)
-            Logger.LogDebug($"[{Source}] Claimed new NetId: {netId.Format()} @ {item.instanceID.Format()} ({item.Format()}).");
+            Logger.DevkitServer.LogDebug(Source, $"Claimed new NetId: {netId.Format()} @ {item.instanceID.Format()} ({item.Format()}).");
     }
     private static void ClaimTransformNetId(IDevkitHierarchyItem item, Transform transform, NetId netId)
     {
@@ -165,17 +165,17 @@ public sealed class HierarchyItemNetIdDatabase : IReplicatedLevelDataSource<Hier
                 {
                     HierarchyItemAssignments[item.instanceID] = netId;
                     if (Level.isLoaded)
-                        Logger.LogDebug($"[{Source}] NetId was already registered: {old.Format()} @ {t.name.Format()}.");
+                        Logger.DevkitServer.LogDebug(Source, $"NetId was already registered: {old.Format()} @ {t.name.Format()}.");
                     return;
                 }
                 if (Level.isLoaded)
-                    Logger.LogDebug($"[{Source}] NetId already set: {old.Format()} @ {(t == null ? null : t.name).Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"NetId already set: {old.Format()} @ {(t == null ? null : t.name).Format()}.");
                 NetIdRegistry.ReleaseTransform(old, t);
             }
             else if (NetIdRegistry.Release(old))
             {
                 if (Level.isLoaded)
-                    Logger.LogDebug($"[{Source}] Released old NetId pairing: {old.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {old.Format()}.");
             }
         }
 
@@ -185,16 +185,16 @@ public sealed class HierarchyItemNetIdDatabase : IReplicatedLevelDataSource<Hier
             if (old == netId)
             {
                 if (Level.isLoaded)
-                    Logger.LogDebug($"[{Source}] NetId was already claimed: {old.Format()} @ {path.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"NetId was already claimed: {old.Format()} @ {path.Format()}.");
                 return;
             }
             NetIdRegistry.ReleaseTransform(old, transform);
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Released old transform pairing NetId: {old.Format()} @ {path.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Released old transform pairing NetId: {old.Format()} @ {path.Format()}.");
         }
         NetIdRegistry.AssignTransform(netId, transform);
         if (Level.isLoaded)
-            Logger.LogDebug($"[{Source}] Claimed new NetId: {netId.Format()} @ {transform.name.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Claimed new NetId: {netId.Format()} @ {transform.name.Format()}.");
     }
 
 
@@ -208,7 +208,7 @@ public sealed class HierarchyItemNetIdDatabase : IReplicatedLevelDataSource<Hier
             uint instanceId = items[i];
             if (!HierarchyUtil.TryFindItem(instanceId, out IDevkitHierarchyItem item))
             {
-                Logger.LogWarning($"Unable to find hierarchy item in level data info: {instanceId.Format()}.");
+                Logger.DevkitServer.LogWarning(Source, $"Unable to find hierarchy item in level data info: {instanceId.Format()}.");
                 continue;
             }
 

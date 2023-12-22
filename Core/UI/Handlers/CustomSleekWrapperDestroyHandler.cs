@@ -8,7 +8,7 @@ namespace DevkitServer.Core.UI.Handlers;
 internal class CustomSleekWrapperDestroyHandler : ICustomOnDestroyUIHandler
 {
     private const string Source = UIAccessTools.Source + ".SLEEK WRAPPER HANDLER";
-    private readonly List<MethodInfo> Implementations = new List<MethodInfo>(3);
+    private readonly List<MethodInfo> _implementations = new List<MethodInfo>(3);
     private static readonly Dictionary<Type, InstanceGetter<object, SleekWrapper>?> WrapperGetters = new Dictionary<Type, InstanceGetter<object, SleekWrapper>?>(1);
 
     public event Action<Type?, object?>? OnDestroyed;
@@ -19,11 +19,11 @@ internal class CustomSleekWrapperDestroyHandler : ICustomOnDestroyUIHandler
         MethodInfo? intlDestroy = typeof(ISleekElement).GetMethod(nameof(ISleekElement.InternalDestroy), BindingFlags.Public | BindingFlags.Instance);
         if (intlDestroy == null)
         {
-            Logger.LogWarning("Unable to find method: ISleekElement.InternalDestroy.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to find method: {FormattingUtil.FormatMethod(typeof(void), typeof(ISleekElement), nameof(ISleekElement.InternalDestroy), arguments: Type.EmptyTypes)}.");
             return;
         }
 
-        Implementations.Clear();
+        _implementations.Clear();
         foreach (Type type in Accessor.GetTypesSafe(new Assembly[] { typeof(Provider).Assembly, typeof(ISleekElement).Assembly })
                      .Where(x => x is { IsAbstract: false, IsClass: true } &&
                                  x.Name.IndexOf("Proxy", StringComparison.Ordinal) != -1 &&
@@ -32,26 +32,25 @@ internal class CustomSleekWrapperDestroyHandler : ICustomOnDestroyUIHandler
             MethodInfo? impl = Accessor.GetImplementedMethod(type, intlDestroy);
 
             if (impl == null)
-                Logger.LogWarning($"Unable to find implemented method: {type.Format()}.InternalDestroy.", method: Source);
-            else Implementations.Add(impl);
+                Logger.DevkitServer.LogWarning(Source, $"Unable to find implemented method: {FormattingUtil.FormatMethod(typeof(void), type, nameof(ISleekElement.InternalDestroy), arguments: Type.EmptyTypes)}.");
+            else _implementations.Add(impl);
         }
 
-        for (int i = 0; i < Implementations.Count; ++i)
+        for (int i = 0; i < _implementations.Count; ++i)
         {
             try
             {
-                patcher.Patch(Implementations[i], prefix: new HarmonyMethod(Accessor.GetMethod(OnDestroyInvoker)!));
+                patcher.Patch(_implementations[i], prefix: new HarmonyMethod(Accessor.GetMethod(OnDestroyInvoker)!));
             }
             catch (Exception ex)
             {
-                Logger.LogWarning($"[{Source}] Unable to patch: {Implementations[i].Format()}.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogWarning(Source, ex, $"[{Source}] Unable to patch: {_implementations[i].Format()}.");
             }
         }
     }
     public void Unpatch(Harmony patcher)
     {
-        foreach (MethodInfo method in Implementations)
+        foreach (MethodInfo method in _implementations)
         {
             try
             {
@@ -59,8 +58,7 @@ internal class CustomSleekWrapperDestroyHandler : ICustomOnDestroyUIHandler
             }
             catch (Exception ex)
             {
-                Logger.LogWarning($"Unable to unpatch: {method.Format()}.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogWarning(Source, ex, $"Unable to unpatch: {method.Format()}.");
             }
         }
     }
@@ -75,14 +73,14 @@ internal class CustomSleekWrapperDestroyHandler : ICustomOnDestroyUIHandler
 
         if (getter == null)
         {
-            Logger.LogWarning($"Unable to get sleek wrapper from proxy implementation: {type.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to get sleek wrapper from proxy implementation: {type.Format()}.");
             return;
         }
 
         __instance = getter(__instance);
         if (__instance == null)
         {
-            Logger.LogWarning($"Sleek wrapper not available from proxy implementation: {type.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Sleek wrapper not available from proxy implementation: {type.Format()}.");
             return;
         }
 
@@ -107,7 +105,7 @@ internal class CustomSleekWrapperDestroyHandler : ICustomOnDestroyUIHandler
         if (property != null)
             return Accessor.GenerateInstancePropertyGetter<SleekWrapper>(type, property.Name);
 
-        Logger.LogWarning($"Failed to find property or field for SleekWrapper in proxy type: {type.Format()}.", method: Source);
+        Logger.DevkitServer.LogWarning(Source, $"Failed to find property or field for SleekWrapper in proxy type: {type.Format()}.");
         return null;
     }
 }

@@ -27,7 +27,7 @@ internal static class FoliageEditorPatches
         if (FoliageModeExact != null && FoliageModeExact.ToString().Equals("EXACT", StringComparison.OrdinalIgnoreCase))
             return;
 
-        Logger.LogWarning("Unable to find foliage mode EXACT.", method: "CLIENT EVENTS");
+        Logger.DevkitServer.LogWarning("FOLIAGE PATCHES", "Unable to find foliage mode EXACT.");
         FoliageModeExact = null;
     }
 
@@ -38,7 +38,7 @@ internal static class FoliageEditorPatches
     {
         if (FoliageEditor == null)
         {
-            Logger.LogWarning("Unable to find type: FoliageEditor.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning("FOLIAGE PATCHES", "Unable to find type: FoliageEditor.");
             foreach (CodeInstruction instruction in instructions)
                 yield return instruction;
             DevkitServerModule.Fault();
@@ -55,27 +55,27 @@ internal static class FoliageEditorPatches
         MethodInfo? removeInstances = FoliageEditor.GetMethod("removeInstances",
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (removeInstances == null)
-            Logger.LogWarning("Unable to find method: FoliageEditor.removeInstances.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning("FOLIAGE PATCHES", "Unable to find method: FoliageEditor.removeInstances.");
         // else
         //     CheckCopiedMethodPatchOutOfDate(ref removeInstances, removeInstancesInvoker);
 
         MethodInfo? rspDestroy = typeof(ResourceSpawnpoint).GetMethod(nameof(ResourceSpawnpoint.destroy),
             BindingFlags.Public | BindingFlags.Instance);
         if (removeInstances == null)
-            Logger.LogWarning("Unable to find method: ResourceSpawnpoint.destroy.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning("FOLIAGE PATCHES", "Unable to find method: ResourceSpawnpoint.destroy.");
 
         MethodInfo? lvlObjRemove = typeof(LevelObjects).GetMethod(nameof(LevelObjects.removeObject),
             BindingFlags.Public | BindingFlags.Static);
         if (removeInstances == null)
-            Logger.LogWarning("Unable to find method: LevelObjects.removeObject.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning("FOLIAGE PATCHES", "Unable to find method: LevelObjects.removeObject.");
 
         MethodInfo? lvlObjTransformGetter = typeof(LevelObject).GetProperty(nameof(LevelObject.transform), BindingFlags.Public | BindingFlags.Instance)?.GetMethod;
         if (lvlObjTransformGetter == null)
-            Logger.LogWarning("Unable to find property getter: LevelObject.transform.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning("FOLIAGE PATCHES", "Unable to find property getter: LevelObject.transform.");
 
         MethodInfo? transformPosGetter = typeof(Transform).GetProperty(nameof(Transform.position), BindingFlags.Public | BindingFlags.Instance)?.GetMethod;
         if (transformPosGetter == null)
-            Logger.LogWarning("Unable to find property getter: Transform.position.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning("FOLIAGE PATCHES", "Unable to find property getter: Transform.position.");
         LocalBuilder sampleCount = generator.DeclareLocal(typeof(int));
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
         LocalBuilder lvlObject = generator.DeclareLocal(typeof(LevelObject));
@@ -98,7 +98,7 @@ internal static class FoliageEditorPatches
                         LocalBuilder? bld = PatchUtil.GetLocal(ins[i - 1], out int index, false);
                         yield return PatchUtil.GetLocalCodeInstruction(bld!, index, false);
                         yield return PatchUtil.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, true);
-                        Logger.LogDebug("[CLIENT EVENTS] Inserted set sample count local instruction.");
+                        Logger.DevkitServer.LogDebug("FOLIAGE PATCHES", "Inserted set sample count local instruction.");
                     }
                     yield return c;
                     for (int j = i - ps.Length; j < i; ++j)
@@ -112,13 +112,13 @@ internal static class FoliageEditorPatches
                             else
                                 yield return new CodeInstruction(l.opcode == OpCodes.Ldloca_S ? OpCodes.Ldarg_S : OpCodes.Ldarg, l.operand);
                             yield return PatchUtil.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, false);
-                            Logger.LogDebug("[CLIENT EVENTS] Inserted get sample count local instruction.");
+                            Logger.DevkitServer.LogDebug("FOLIAGE PATCHES", "Inserted get sample count local instruction.");
                         }
                         else
                             yield return ins[j];
                     }
                     yield return new CodeInstruction(OpCodes.Call, removeInstancesInvoker);
-                    Logger.LogDebug("[CLIENT EVENTS] Patched invoker for " + removeInstances.Format() + ".");
+                    Logger.DevkitServer.LogDebug("FOLIAGE PATCHES", "Patched invoker for " + removeInstances.Format() + ".");
                     ++ri;
                 }
             }
@@ -127,7 +127,7 @@ internal static class FoliageEditorPatches
                 yield return new CodeInstruction(OpCodes.Dup);
                 yield return c;
                 yield return new CodeInstruction(OpCodes.Call, resourceSpawnpointDestroyedInvoker);
-                Logger.LogDebug("[CLIENT EVENTS] Patched invoker for " + rspDestroy.Format() + ".");
+                Logger.DevkitServer.LogDebug("FOLIAGE PATCHES", "Patched invoker for " + rspDestroy.Format() + ".");
                 ++rspd;
             }
             else if (lvlObjRemove != null && c.Calls(lvlObjRemove) && lvlObjTransformGetter != null && transformPosGetter != null && i > 0 &&
@@ -148,7 +148,7 @@ internal static class FoliageEditorPatches
                 yield return PatchUtil.GetLocalCodeInstruction(lvlObjectPos, lvlObjectPos.LocalIndex, false);
                 yield return PatchUtil.GetLocalCodeInstruction(lvlObject, lvlObject.LocalIndex, false);
                 yield return new CodeInstruction(OpCodes.Call, levelObjectRemovedInvoker);
-                Logger.LogDebug("[CLIENT EVENTS] Patched invoker for " + lvlObjRemove.Format() + ".");
+                Logger.DevkitServer.LogDebug("FOLIAGE PATCHES", "Patched invoker for " + lvlObjRemove.Format() + ".");
                 ++lod;
             }
             else yield return c;
@@ -156,17 +156,17 @@ internal static class FoliageEditorPatches
 
         if (lod < 1)
         {
-            Logger.LogError("Failed to patch " + ((lvlObjRemove ?? (object)"LevelObjects.removeObject").Format()) + " into " + method.Format() + ".", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogError("FOLIAGE PATCHES", "Failed to patch " + ((lvlObjRemove ?? (object)"LevelObjects.removeObject").Format()) + " into " + method.Format() + ".");
             DevkitServerModule.Fault();
         }
         if (rspd < 1)
         {
-            Logger.LogError("Failed to patch " + ((rspDestroy ?? (object)"ResourceSpawnpoint.destroy").Format()) + " into " + method.Format() + ".", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogError("FOLIAGE PATCHES", "Failed to patch " + ((rspDestroy ?? (object)"ResourceSpawnpoint.destroy").Format()) + " into " + method.Format() + ".");
             DevkitServerModule.Fault();
         }
         if (ri < 3)
         {
-            Logger.LogError("Failed to patch " + ((removeInstances ?? (object)"FoliageEditor.removeInstances").Format()) + " into " + method.Format() + " 3 times.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogError("FOLIAGE PATCHES", "Failed to patch " + ((removeInstances ?? (object)"FoliageEditor.removeInstances").Format()) + " into " + method.Format() + " 3 times.");
             DevkitServerModule.Fault();
         }
     }
@@ -197,7 +197,7 @@ internal static class FoliageEditorPatches
                             yield return ins[j].CopyWithoutSpecial();
                         }
                         yield return new CodeInstruction(OpCodes.Call, addFoliageInvoker);
-                        Logger.LogDebug("[CLIENT EVENTS] Patched " + method2.Format() + " call in " + method.Format() + ".");
+                        Logger.DevkitServer.LogDebug("FOLIAGE PATCHES", "Patched " + method2.Format() + " call in " + method.Format() + ".");
                         patched = true;
                         continue;
                     }
@@ -209,7 +209,7 @@ internal static class FoliageEditorPatches
 
         if (!patched)
         {
-            Logger.LogError("Failed to patch " + method.Format() + ".", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogError("FOLIAGE PATCHES", "Failed to patch " + method.Format() + ".");
             DevkitServerModule.Fault();
         }
     }
@@ -226,7 +226,7 @@ internal static class FoliageEditorPatches
         {
             LevelObject obj = ObjectManager.getObject(x, y, (ushort)(region.Count - 1));
             if (obj.asset.GUID != objAsset.obj.GUID)
-                Logger.LogWarning("Unable to find recently placed foliage object.");
+                Logger.DevkitServer.LogWarning("FOLIAGE PATCHES", "Unable to find recently placed foliage object.");
             else
                 LevelObjectResponsibilities.Set(obj.instanceID, false);
             objId = obj.instanceID;
@@ -261,7 +261,7 @@ internal static class FoliageEditorPatches
 
         if (obj == null)
         {
-            Logger.LogWarning("Removed unknown level object.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning("FOLIAGE PATCHES", "Removed unknown level object.");
             return;
         }
         

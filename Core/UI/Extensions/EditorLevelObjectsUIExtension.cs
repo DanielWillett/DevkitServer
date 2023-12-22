@@ -242,8 +242,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error updating selection.", method: ObjectIconGenerator.Source);
-            Logger.LogError(ex, method: ObjectIconGenerator.Source);
+            Logger.DevkitServer.LogError(ObjectIconGenerator.Source, ex, "Error updating selection.");
         }
     }
 
@@ -280,7 +279,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
 
         if (target == null)
         {
-            Logger.LogWarning($"Tried to goto asset {selectedAsset.FriendlyName} but not selected.", method: ObjectIconGenerator.Source);
+            Logger.DevkitServer.LogWarning(ObjectIconGenerator.Source, $"Tried to goto asset {selectedAsset.FriendlyName} but not selected.");
             return;
         }
 
@@ -369,7 +368,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
             inst.UpdateSelectedObject(true);
         }
 
-        if (DevkitServerConfig.Config.ShouldCycleLevelObjectMaterialPalette && inst._materialIndex >= 0 && inst._nextIcon > 0f && inst._nextIcon < Time.realtimeSinceStartup)
+        if (DevkitServerConfig.Config.ShouldCycleLevelObjectMaterialPalette && inst is { _materialIndex: >= 0, _nextIcon: > 0f } && inst._nextIcon < Time.realtimeSinceStartup)
             inst.UpdateSelectedObject(true);
     }
 
@@ -504,7 +503,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
         MethodInfo? target = typeof(EditorLevelObjectsUI).GetMethod("onClickedAssetButton", BindingFlags.Static | BindingFlags.NonPublic);
         if (target == null)
         {
-            Logger.LogError("Failed to find method: EditorLevelObjectsUI.onClickedAssetButton", method: "LVL OBJ UI EXT");
+            Logger.DevkitServer.LogError(nameof(EditorLevelObjectsUIExtension), "Failed to find method: EditorLevelObjectsUI.onClickedAssetButton");
             return;
         }
         
@@ -558,22 +557,22 @@ internal class EditorLevelObjectsUIExtension : UIExtension
             if (modId != lastMod)
             {
                 lastMod = modId;
-                Logger.LogInfo($"[{ObjectIconGenerator.Source}]");
+                Logger.DevkitServer.LogInfo(ObjectIconGenerator.Source, default(ReadOnlySpan<char>));
                 string? modName;
                 if (modId == 0ul)
                 {
                     modName = "Vanilla Content";
-                    Logger.LogInfo($"[{ObjectIconGenerator.Source}] === {modName.Format(false)} ===");
+                    Logger.DevkitServer.LogInfo(ObjectIconGenerator.Source, $"=== {modName.Format(false)} ===");
                 }
                 else if (modId == 1ul)
                 {
                     modName = "Sandbox Content";
-                    Logger.LogInfo($"[{ObjectIconGenerator.Source}] === {modName.Format(false)} ===");
+                    Logger.DevkitServer.LogInfo(ObjectIconGenerator.Source, $"=== {modName.Format(false)} ===");
                 }
                 else if (modId == 2ul)
                 {
                     modName = "Map Bundles";
-                    Logger.LogInfo($"[{ObjectIconGenerator.Source}] === {modName.Format(false)} ===");
+                    Logger.DevkitServer.LogInfo(ObjectIconGenerator.Source, $"=== {modName.Format(false)} ===");
                 }
                 else
                 {
@@ -588,7 +587,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
                         }
                     }
 
-                    Logger.LogInfo($"[{ObjectIconGenerator.Source}] " + (modName == null ? $"=== Mod: {modId.Format()} ===" : $"=== Mod: {modName.Format(false)} ({modId.Format()}) ==="));
+                    Logger.DevkitServer.LogInfo(ObjectIconGenerator.Source, (modName == null ? $"=== Mod: {modId.Format()} ===" : $"=== Mod: {modName.Format(false)} ({modId.Format()}) ==="));
                 }
             }
 
@@ -605,7 +604,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
                     path = Path.GetRelativePath(ugc.path, path);
             }
 
-            Logger.LogInfo($"[{ObjectIconGenerator.Source}] Missing Object: {$"{obj.FriendlyName,-33}".Colorize(new Color32(255, 204, 102, 255))} @ {path.Colorize(ConsoleColor.DarkGray)}");
+            Logger.DevkitServer.LogInfo(ObjectIconGenerator.Source, $"Missing Object: {$"{obj.FriendlyName,-33}".Colorize(new Color32(255, 204, 102, 255))} @ {path.Colorize(ConsoleColor.DarkGray)}");
         }
     }
 }

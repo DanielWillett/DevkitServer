@@ -39,12 +39,13 @@ public sealed class ClientInfo
     {
         Info = info;
         PermissionManager.UserPermissions.ReceivePermissions(info.Permissions, info.PermissionGroups);
-        Logger.LogInfo("Received client info.");
-#if DEBUG
-        Logger.LogDebug("=======================================");
-        Logger.DumpJson(info);
-        Logger.LogDebug("=======================================");
-#endif
+        Logger.DevkitServer.LogInfo(nameof(ReceiveClientInfo), "Received client info.");
+        if (Logger.Debug)
+        {
+            Logger.DevkitServer.LogDebug(nameof(ReceiveClientInfo), "=======================================");
+            LoggerExtensions.DumpJson(info);
+            Logger.DevkitServer.LogDebug(nameof(ReceiveClientInfo), "=======================================");
+        }
         ctx.Acknowledge();
 
         OnClientInfoReadyEvent.TryInvoke(info);
@@ -52,7 +53,7 @@ public sealed class ClientInfo
     internal static void OnDisconnect()
     {
         Info = null;
-        Logger.LogDebug("Cleared client info.");
+        Logger.DevkitServer.LogDebug(nameof(ClientInfo), "Cleared client info.");
     }
 #endif
 
@@ -94,7 +95,7 @@ public sealed class ClientInfo
             if (branch.Valid)
                 perms.Add(branch);
             else
-                Logger.LogDebug($"Invalid permission skipped: {branch.Format()}.");
+                Logger.DevkitServer.LogDebug(nameof(ClientInfo), $"Invalid permission skipped: {branch.Format()}.");
         }
 
         Permissions = perms.ToArrayFast();
@@ -139,7 +140,7 @@ public sealed class ClientInfo
 #if SERVER
     internal static void ApplyServerSettings(ClientInfo info, EditorUser user)
     {
-        SystemConfig systemConfig = DevkitServerConfig.Config;
+        DevkitServerSystemConfig systemConfig = DevkitServerConfig.Config;
         info.ServerRemovesCosmeticImprovements = systemConfig.RemoveCosmeticImprovements;
         info.ServerTreatsAdminsAsSuperuser = systemConfig.AdminsAreSuperusers;
         info.ServerMaxClientEditFPS = systemConfig.MaxClientEditFPS;

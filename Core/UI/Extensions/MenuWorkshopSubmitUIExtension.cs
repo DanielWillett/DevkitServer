@@ -1,14 +1,13 @@
 ﻿#if CLIENT
-using DevkitServer.API.UI;
+using DevkitServer.API;
+using DevkitServer.API.UI.Extensions;
+using DevkitServer.API.UI.Extensions.Members;
 using DevkitServer.Patches;
 using HarmonyLib;
 using SDG.Provider;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
-using DevkitServer.API.UI.Extensions;
-using DevkitServer.API.UI.Extensions.Members;
-using DevkitServer.API;
 
 namespace DevkitServer.Core.UI.Extensions;
 
@@ -40,7 +39,7 @@ internal class MenuWorkshopSubmitUIExtension : IDisposable
             MethodInfo? onClickedCreateButton = typeof(MenuWorkshopSubmitUI).GetMethod("onClickedCreateButton", BindingFlags.Static | BindingFlags.NonPublic);
             if (onClickedCreateButton == null)
             {
-                Logger.LogError("Unable to find method: MenuWorkshopSubmitUI.onClickedCreateButton. Override mod ID feature for workshop uploading will not work.");
+                Logger.DevkitServer.LogError(nameof(MenuWorkshopSubmitUIExtension), "Unable to find method: MenuWorkshopSubmitUI.onClickedCreateButton. Override mod ID feature for workshop uploading will not work.");
                 return;
             }
 
@@ -49,8 +48,7 @@ internal class MenuWorkshopSubmitUIExtension : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogError("Failed to patch MenuWorkshopSubmitUI.onClickedCreateButton. Override mod ID feature for workshop uploading will not work.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(nameof(MenuWorkshopSubmitUIExtension), ex, "Failed to patch MenuWorkshopSubmitUI.onClickedCreateButton. Override mod ID feature for workshop uploading will not work.");
         }
 
         try
@@ -59,7 +57,7 @@ internal class MenuWorkshopSubmitUIExtension : IDisposable
             MethodInfo? onClickedPublish = typeof(MenuWorkshopSubmitUI).GetMethod("onClickedPublished", BindingFlags.Static | BindingFlags.NonPublic);
             if (onClickedPublish == null)
             {
-                Logger.LogWarning("Unable to find method: MenuWorkshopSubmitUI.onClickedPublished.");
+                Logger.DevkitServer.LogWarning(nameof(MenuWorkshopSubmitUIExtension), "Unable to find method: MenuWorkshopSubmitUI.onClickedPublished.");
                 return;
             }
 
@@ -68,8 +66,7 @@ internal class MenuWorkshopSubmitUIExtension : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Failed to patch MenuWorkshopSubmitUI.onClickedPublished.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogWarning(nameof(MenuWorkshopSubmitUIExtension), ex, "Failed to patch MenuWorkshopSubmitUI.onClickedPublished.");
         }
     }
 
@@ -87,27 +84,27 @@ internal class MenuWorkshopSubmitUIExtension : IDisposable
         }, null);
         if (prepareUgcStep1 == null)
         {
-            Logger.LogWarning($"{method.Format()} - Failed to find method: TempSteamworksWorkshop.prepareUGC(...) (prepare step 1). Override mod ID feature for workshop uploading will not work.");
+            Logger.DevkitServer.LogWarning(nameof(CreateModTranspiler), $"{method.Format()} - Failed to find method: TempSteamworksWorkshop.prepareUGC(...) (prepare step 1). Override mod ID feature for workshop uploading will not work.");
         }
         MethodInfo? checkEntered = typeof(MenuWorkshopSubmitUI).GetMethod("checkEntered", BindingFlags.NonPublic | BindingFlags.Static, null, Type.EmptyTypes, null);
         if (checkEntered == null)
         {
-            Logger.LogWarning($"{method.Format()} - Failed to find method: MenuWorkshopSubmitUI.checkEntered(). Override mod ID feature for workshop uploading will not work.");
+            Logger.DevkitServer.LogWarning(nameof(CreateModTranspiler), $"{method.Format()} - Failed to find method: MenuWorkshopSubmitUI.checkEntered(). Override mod ID feature for workshop uploading will not work.");
         }
         MethodInfo? prepareUgcStep2 = typeof(TempSteamworksWorkshop).GetMethod("prepareUGC", BindingFlags.Public | BindingFlags.Instance, null, new Type[] { typeof(PublishedFileId_t) }, null);
         if (prepareUgcStep2 == null)
         {
-            Logger.LogWarning($"{method.Format()} - Failed to find method: TempSteamworksWorkshop.prepareUGC(PublishedFileId_t) (prepare step 2). Override mod ID feature for workshop uploading will not work.");
+            Logger.DevkitServer.LogWarning(nameof(CreateModTranspiler), $"{method.Format()} - Failed to find method: TempSteamworksWorkshop.prepareUGC(PublishedFileId_t) (prepare step 2). Override mod ID feature for workshop uploading will not work.");
         }
         MethodInfo? createUgc = typeof(TempSteamworksWorkshop).GetMethod("createUGC", BindingFlags.Public | BindingFlags.Instance, null, new Type[] { typeof(bool) }, null);
         if (createUgc == null)
         {
-            Logger.LogWarning($"{method.Format()} - Failed to find method: TempSteamworksWorkshop.createUgc(bool). Override mod ID feature for workshop uploading will not work.");
+            Logger.DevkitServer.LogWarning(nameof(CreateModTranspiler), $"{method.Format()} - Failed to find method: TempSteamworksWorkshop.createUgc(bool). Override mod ID feature for workshop uploading will not work.");
         }
         MethodInfo? updateUGC = typeof(TempSteamworksWorkshop).GetMethod("updateUGC", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
         if (createUgc == null)
         {
-            Logger.LogWarning($"{method.Format()} - Failed to find method: TempSteamworksWorkshop.updateUGC(). Override mod ID feature for workshop uploading will not work.");
+            Logger.DevkitServer.LogWarning(nameof(CreateModTranspiler), $"{method.Format()} - Failed to find method: TempSteamworksWorkshop.updateUGC(). Override mod ID feature for workshop uploading will not work.");
         }
 
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
@@ -151,10 +148,10 @@ internal class MenuWorkshopSubmitUIExtension : IDisposable
         }
         if (!br2)
         {
-            Logger.LogWarning($"Failed to patch {method.Format()}. Override mod ID feature for workshop uploading will not work.");
+            Logger.DevkitServer.LogWarning(nameof(CreateModTranspiler), $"Failed to patch {method.Format()}. Override mod ID feature for workshop uploading will not work.");
         }
 
-        int index = ins[ins.Count - 1].opcode == OpCodes.Ret ? ins.Count - 1 : ins.Count;
+        int index = ins[^1].opcode == OpCodes.Ret ? ins.Count - 1 : ins.Count;
         ins.Insert(index, new CodeInstruction(OpCodes.Call, Accessor.GetMethod(ClearText)));
 
         return ins;
@@ -171,8 +168,7 @@ internal class MenuWorkshopSubmitUIExtension : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogError("Failed to unpatch MenuWorkshopSubmitUI.onClickedCreateButton.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(nameof(MenuWorkshopSubmitUIExtension), ex, "Failed to unpatch MenuWorkshopSubmitUI.onClickedCreateButton.");
         }
 
         try
@@ -185,8 +181,7 @@ internal class MenuWorkshopSubmitUIExtension : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogError("Failed to unpatch MenuWorkshopSubmitUI.onClickedPublished.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(nameof(MenuWorkshopSubmitUIExtension), ex, "Failed to unpatch MenuWorkshopSubmitUI.onClickedPublished.");
         }
 
         _existingModId = null!;

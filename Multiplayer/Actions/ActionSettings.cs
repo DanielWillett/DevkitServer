@@ -28,7 +28,7 @@ public class ActionSettings : IDisposable
         }
 
         SettingsFlagLength = max + 1;
-        Logger.LogDebug($"[EDITOR ACTIONS] ActionSetting flag length: {SettingsFlagLength.Format()}/{size.Format()} bits.");
+        Logger.DevkitServer.LogDebug("EDITOR ACTIONS", $"ActionSetting flag length: {SettingsFlagLength.Format()}/{size.Format()} bits.");
         ListPool<ActionSettingsCollection>.warmup((uint)(Provider.isServer ? 16 : 2));
 #if CLIENT
         CollectionPool.warmup((uint)(SettingsFlagLength * 4));

@@ -284,41 +284,60 @@ public static class UIExtensionManager
         }
     }
 
-    [Conditional("UI_EXT_DEBUG")]
     internal static void LogDebug(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
+        string src = assembly != null && assembly != Accessor.DevkitServer
+                        ? Source + " | " + assembly.GetName().Name.ToUpperInvariant()
+                        : Source;
+
         if (plugin == null)
-            Logger.LogDebug(assembly == null || assembly == Accessor.DevkitServer ? "[" + Source + "] " + message : "[" + Source + " | " + assembly.GetName().Name.ToUpperInvariant() + "] " + message);
+            Logger.DevkitServer.LogDebug(src, message);
         else
-            plugin.LogDebug(message);
+            plugin.LogDebug(src, message);
     }
     internal static void LogInfo(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
+        string src = assembly != null && assembly != Accessor.DevkitServer
+            ? Source + " | " + assembly.GetName().Name.ToUpperInvariant()
+            : Source;
+
         if (plugin == null)
-            Logger.LogWarning(message, method: assembly == null || assembly == Accessor.DevkitServer ? Source : Source + " | " + assembly.GetName().Name.ToUpperInvariant());
+            Logger.DevkitServer.LogInfo(src, message);
         else
-            plugin.LogWarning(message);
+            plugin.LogInfo(src, message);
     }
     internal static void LogWarning(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
+        string src = assembly != null && assembly != Accessor.DevkitServer
+            ? Source + " | " + assembly.GetName().Name.ToUpperInvariant()
+            : Source;
+
         if (plugin == null)
-            Logger.LogWarning(message, method: assembly == null || assembly == Accessor.DevkitServer ? Source : Source + " | " + assembly.GetName().Name.ToUpperInvariant());
+            Logger.DevkitServer.LogWarning(src, message);
         else
-            plugin.LogWarning(message);
+            plugin.LogWarning(src, message);
     }
     internal static void LogError(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
+        string src = assembly != null && assembly != Accessor.DevkitServer
+            ? Source + " | " + assembly.GetName().Name.ToUpperInvariant()
+            : Source;
+
         if (plugin == null)
-            Logger.LogError(message, method: assembly == null || assembly == Accessor.DevkitServer ? Source : Source + " | " + assembly.GetName().Name.ToUpperInvariant());
+            Logger.DevkitServer.LogError(src, message);
         else
-            plugin.LogError(message);
+            plugin.LogError(src, message);
     }
     internal static void LogError(Exception ex, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
+        string src = assembly != null && assembly != Accessor.DevkitServer
+            ? Source + " | " + assembly.GetName().Name.ToUpperInvariant()
+            : Source;
+
         if (plugin == null)
-            Logger.LogError(ex, method: assembly == null || assembly == Accessor.DevkitServer ? Source : Source + " | " + assembly.GetName().Name.ToUpperInvariant());
+            Logger.DevkitServer.LogError(src, ex);
         else
-            plugin.LogError(ex);
+            plugin.LogError(src, ex);
     }
 
     internal static void Reflect(Assembly assembly)

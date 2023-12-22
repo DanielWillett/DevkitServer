@@ -123,10 +123,10 @@ public static class PermissionManager
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"Error initializing permission provider: {value.GetType().Format()}.");
-                        Logger.LogError(ex);
+                        Logger.DevkitServer.LogError("SetPermissionHandler", ex, $"Error initializing permission provider: {value.GetType().Format()}.");
                         if (Interlocked.CompareExchange(ref _permissions, old, value) != value)
                             return;
+
                         if (value is IDisposable disp)
                         {
                             try
@@ -135,12 +135,11 @@ public static class PermissionManager
                             }
                             catch (Exception ex2)
                             {
-                                Logger.LogError($"Error disposing permission provider after initialization failure: {value.GetType().Format()}.");
-                                Logger.LogError(ex2);
+                                Logger.DevkitServer.LogError("SetPermissionHandler", ex2, $"Error disposing permission provider after initialization failure: {value.GetType().Format()}.");
                             }
                         }
 
-                        Logger.LogInfo($"Rolled back to old permission provider: {old.Format()}");
+                        Logger.DevkitServer.LogInfo("SetPermissionHandler", $"Rolled back to old permission provider: {old.Format()}");
                         return;
                     }
                 }
@@ -155,8 +154,7 @@ public static class PermissionManager
                         }
                         catch (Exception ex)
                         {
-                            Logger.LogError($"Error disposing permission provider: {old.GetType().Format()}.");
-                            Logger.LogError(ex);
+                            Logger.DevkitServer.LogError("SetPermissionHandler", ex, $"Error disposing permission provider: {old.GetType().Format()}.");
                         }
                     }
 
@@ -200,8 +198,7 @@ public static class PermissionManager
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"Error initializing user permission provider: {value.GetType().Format()}.");
-                        Logger.LogError(ex);
+                        Logger.DevkitServer.LogError("SetUserPermissionsHandler", ex, $"Error initializing user permission provider: {value.GetType().Format()}.");
                         if (Interlocked.CompareExchange(ref _userPermissions, old, value) != value)
                             return;
                         if (value is IDisposable disp)
@@ -212,12 +209,11 @@ public static class PermissionManager
                             }
                             catch (Exception ex2)
                             {
-                                Logger.LogError($"Error disposing user permission provider after initialization failure: {value.GetType().Format()}.");
-                                Logger.LogError(ex2);
+                                Logger.DevkitServer.LogError("SetUserPermissionsHandler", ex2, $"Error disposing user permission provider after initialization failure: {value.GetType().Format()}.");
                             }
                         }
 
-                        Logger.LogInfo($"Rolled back to old user permission provider: {old.Format()}");
+                        Logger.DevkitServer.LogInfo("SetUserPermissionsHandler", $"Rolled back to old user permission provider: {old.Format()}");
                         return;
                     }
                 }
@@ -232,8 +228,7 @@ public static class PermissionManager
                         }
                         catch (Exception ex)
                         {
-                            Logger.LogError($"Error disposing user permission provider: {old.GetType().Format()}.");
-                            Logger.LogError(ex);
+                            Logger.DevkitServer.LogError("SetUserPermissionsHandler", ex, $"Error disposing user permission provider: {old.GetType().Format()}.");
                         }
                     }
 
@@ -253,7 +248,7 @@ public static class PermissionManager
 
     internal static void InitHandlers()
     {
-        Logger.LogDebug("Loading permissions...");
+        Logger.DevkitServer.LogDebug("Permissions", "Loading permissions...");
         if (Interlocked.Exchange(ref _inited, 1) == 0)
         {
             IPermissionHandler handler = _permissions;
@@ -263,7 +258,7 @@ public static class PermissionManager
                 userHandler.Init();
         }
 
-        Logger.LogInfo("Found: " + _permissions.PermissionGroups.Count.Format() + " registered permission group(s).");
+        Logger.DevkitServer.LogInfo("Permissions", $"Found: {_permissions.PermissionGroups.Count.Format()} registered permission group(s).");
     }
 
     public static bool Has(this PermissionLeaf leaf

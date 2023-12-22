@@ -10,7 +10,7 @@ namespace DevkitServer.API.Commands;
 /// <summary>
 /// Represents a command ran by either a <see cref="EditorUser"/> or the console.
 /// </summary>
-public interface IExecutableCommand : ITerminalFormattable
+public interface IExecutableCommand : ITerminalFormattable, IDevkitServerSourceLogger
 {
     /// <summary>
     /// Defines when a command is allowed to be executed (singleplayer, multiplayer, etc).

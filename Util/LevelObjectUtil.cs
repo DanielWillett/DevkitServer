@@ -9,8 +9,6 @@ using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Util.Region;
 using DevkitServer.API;
-
-
 #if CLIENT
 using DevkitServer.Core.UI.Extensions;
 using DevkitServer.Patches;
@@ -20,7 +18,6 @@ using System.Reflection;
 #if SERVER
 using DevkitServer.Players;
 #endif
-
 
 namespace DevkitServer.Util;
 
@@ -193,7 +190,7 @@ public static class LevelObjectUtil
         {
             if (Assets.find(asset) is not ItemAsset itemAsset || itemAsset is not ItemBarricadeAsset and not ItemStructureAsset)
             {
-                Logger.LogError($"Asset not found for incoming object: {asset.Format()}.", method: Source);
+                Logger.DevkitServer.LogError(Source, $"Asset not found for incoming object: {asset.Format()}.");
                 return StandardErrorCode.InvalidData;
             }
             if (!EditorActions.HasProcessedPendingLevelObjects)
@@ -218,8 +215,7 @@ public static class LevelObjectUtil
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to initialize buildable: {asset.Format()}.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, $"Failed to initialize buildable: {asset.Format()}.");
                 return StandardErrorCode.GenericError;
             }
 
@@ -248,8 +244,7 @@ public static class LevelObjectUtil
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Failed to initialize object: {asset.Format()}.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, $"Failed to initialize object: {asset.Format()}.");
             return StandardErrorCode.GenericError;
         }
 
@@ -320,7 +315,7 @@ public static class LevelObjectUtil
         EditorUser? user = ctx.GetCaller();
         if (user == null || !user.IsOnline)
         {
-            Logger.LogError("Unable to get user from level object instantiation request.", method: Source);
+            Logger.DevkitServer.LogError(Source, "Unable to get user from level object instantiation request.");
             ctx.Acknowledge(StandardErrorCode.NoPermissions);
             return;
         }
@@ -334,7 +329,7 @@ public static class LevelObjectUtil
 
         if (!GetObjectOrBuildableAsset(guid, out ObjectAsset? objectAsset, out ItemAsset? buildableAsset))
         {
-            Logger.LogError($"Unable to get asset for level object instantiation request from {user.Format()}.", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Unable to get asset for level object instantiation request from {user.Format()}.");
             EditorMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", guid.ToString("N") + " Unknown Asset"));
             ctx.Acknowledge(StandardErrorCode.NotFound);
             return;
@@ -350,7 +345,7 @@ public static class LevelObjectUtil
             transform = LevelObjects.registerAddObject(position, rotation, scale, objectAsset, buildableAsset);
             if (transform == null)
             {
-                Logger.LogError($"Failed to create object: {(objectAsset ?? (Asset?)buildableAsset).Format()}, registerAddObject returned {((object?)null).Format()}.");
+                Logger.DevkitServer.LogError(Source, $"Failed to create object: {(objectAsset ?? (Asset?)buildableAsset).Format()}, registerAddObject returned {((object?)null).Format()}.");
                 return;
             }
             
@@ -366,8 +361,7 @@ public static class LevelObjectUtil
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error instantiating {asset.Format()}.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, $"Error instantiating {asset.Format()}.");
             EditorMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", ex.Message));
             return;
         }
@@ -390,12 +384,12 @@ public static class LevelObjectUtil
         if (levelObject != null)
         {
             LevelObjectResponsibilities.Set(levelObject.instanceID, user.SteamId.m_SteamID);
-            Logger.LogDebug($"[{Source}] Granted request for instantiation of object {asset.Format()}, instance ID: {levelObject.instanceID.Format()} from {user.SteamId.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Granted request for instantiation of object {asset.Format()}, instance ID: {levelObject.instanceID.Format()} from {user.SteamId.Format()}.");
         }
         else 
         {
             BuildableResponsibilities.Set(id, user.SteamId.m_SteamID);
-            Logger.LogDebug($"[{Source}] Granted request for instantiation of buildable {asset.Format()} {id.Format()} from {user.SteamId.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Granted request for instantiation of buildable {asset.Format()} {id.Format()} from {user.SteamId.Format()}.");
         }
 
         SyncIfAuthority(netId);
@@ -420,12 +414,12 @@ public static class LevelObjectUtil
 #else
             LevelObjectNetIdDatabase.RegisterObject(levelObject, netId);
 #endif
-            Logger.LogDebug($"[{Source}] Assigned object NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Assigned object NetId: {netId.Format()}.");
             return;
         }
 
         levelObject = null;
-        Logger.LogWarning($"Did not find object of transform {transform.name.Format()}.", method: Source);
+        Logger.DevkitServer.LogWarning(Source, $"Did not find object of transform {transform.name.Format()}.");
     }
     private static void InitializeBuildable(Transform transform, out RegionIdentifier id,
 #if SERVER
@@ -444,12 +438,12 @@ public static class LevelObjectUtil
 #else
             LevelObjectNetIdDatabase.RegisterBuildable(buildable, id, netId);
 #endif
-            Logger.LogDebug($"[{Source}] Assigned buildable NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Assigned buildable NetId: {netId.Format()}.");
             return;
         }
         
         id = RegionIdentifier.Invalid;
-        Logger.LogWarning($"Did not find buildable of transform {transform.name.Format()}.", method: Source);
+        Logger.DevkitServer.LogWarning(Source, $"Did not find buildable of transform {transform.name.Format()}.");
     }
     
     /// <summary>
@@ -458,7 +452,7 @@ public static class LevelObjectUtil
     [Pure]
     public static int GetMaterialIndexOverride(this LevelObject levelObject)
     {
-        return GetMaterialIndexOverrideIntl == null ? -1 : GetMaterialIndexOverrideIntl(levelObject);
+        return GetMaterialIndexOverrideIntl?.Invoke(levelObject) ?? -1;
     }
 
     /// <summary>
@@ -467,7 +461,7 @@ public static class LevelObjectUtil
     [Pure]
     public static AssetReference<MaterialPaletteAsset> GetCustomMaterialOverride(this LevelObject levelObject)
     {
-        return GetCustomMaterialOverrideIntl == null ? AssetReference<MaterialPaletteAsset>.invalid : GetCustomMaterialOverrideIntl(levelObject);
+        return GetCustomMaterialOverrideIntl?.Invoke(levelObject) ?? AssetReference<MaterialPaletteAsset>.invalid;
     }
 #pragma warning disable CS0162 // Unreachable code
     internal static bool SetMaterialIndexOverrideLocal(LevelObject levelObject, int materialIndexOverride, bool reapply = true)
@@ -1200,7 +1194,7 @@ public static class LevelObjectUtil
                 if (copy.itemAsset == null && copy.objectAsset == null)
                     continue;
                 NetTask instantiateRequest = SendRequestInstantiation.Request(SendLevelObjectInstantiation,
-                    copy.objectAsset != null ? copy.objectAsset.GUID : copy.itemAsset!.GUID,
+                    copy.objectAsset?.GUID ?? copy.itemAsset!.GUID,
                     copy.position, copy.rotation, copy.scale, 5000);
 
                 yield return instantiateRequest;
@@ -1210,7 +1204,7 @@ public static class LevelObjectUtil
 
                 if (!instantiateRequest.Parameters.Success)
                 {
-                    Logger.LogWarning($"Failed to instantiate {copy.GetAsset().Format()} at {copy.position.Format()} (#{i.Format()}). {instantiateRequest.Parameters}.");
+                    Logger.DevkitServer.LogWarning(nameof(PasteObjectsCoroutine), $"Failed to instantiate {copy.GetAsset().Format()} at {copy.position.Format()} (#{i.Format()}). {instantiateRequest.Parameters}.");
                     continue;
                 }
 
@@ -1223,7 +1217,7 @@ public static class LevelObjectUtil
                 Transform pasted = levelObject == null ? buildable!.transform : levelObject.transform;
 
                 EditorObjects.addSelection(pasted);
-                Logger.LogDebug(buildable != null ? $"Pasted buildable: {buildable.asset.itemName}." : $"Pasted object: {levelObject!.asset.objectName}.");
+                Logger.DevkitServer.LogDebug(nameof(PasteObjectsCoroutine), buildable != null ? $"Pasted buildable: {buildable.asset.itemName}." : $"Pasted object: {levelObject!.asset.objectName}.");
 
                 SyncIfAuthority(netId);
             }

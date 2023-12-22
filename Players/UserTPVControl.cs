@@ -23,14 +23,14 @@ public class UserTPVControl : MonoBehaviour
         if (User == null || User.Player == null)
         {
             Destroy(this);
-            Logger.LogError("Invalid UserTPVControl setup; EditorUser not found!");
+            Logger.DevkitServer.LogError(nameof(UserTPVControl), "Invalid UserTPVControl setup; EditorUser not found!");
             return;
         }
         if (_objectPrefab == null)
         {
             if (DevkitServerModule.Bundle == null)
             {
-                Logger.LogError("Unable to set up UserTPVControl object, " + "devkitserver.masterbundle".Format() + " not loaded.");
+                Logger.DevkitServer.LogError(nameof(UserTPVControl), "Unable to set up UserTPVControl object, " + "devkitserver.masterbundle".Format() + " not loaded.");
                 return;
             }
 
@@ -40,7 +40,7 @@ public class UserTPVControl : MonoBehaviour
 
             if (_objectPrefab == null)
             {
-                Logger.LogError("Unable to set up UserTPVControl object, " + "Resources/TPV_Char_Server".Format() + " not found in " + "devkitserver.masterbundle".Format() + " (or it was not loaded).");
+                Logger.DevkitServer.LogError(nameof(UserTPVControl), "Unable to set up UserTPVControl object, " + "Resources/TPV_Char_Server".Format() + " not found in " + "devkitserver.masterbundle".Format() + " (or it was not loaded).");
                 return;
             }
         }
@@ -369,7 +369,6 @@ internal sealed class EditorClothes : MonoBehaviour
     private void Awake()
     {
         _meshes = transform.gameObject.GetComponentsInChildren<Renderer>();
-        Logger.LogDebug("Found meshes: " + _meshes.Length);
         _materialClothing = new Material(GetClothesShader?.Invoke() ?? Shader.Find("Standard/Clothes"))
         {
             hideFlags = HideFlags.HideAndDontSave

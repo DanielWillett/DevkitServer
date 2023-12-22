@@ -21,6 +21,7 @@ namespace DevkitServer.Patches;
 [HarmonyPatch]
 internal static class SelectionToolPatches
 {
+    private const string Source = "SELECT TOOL PATCHES";
     public static InstanceGetter<SelectionTool, TransformHandles>? GetSelectionHandles = Accessor.GenerateInstanceGetter<SelectionTool, TransformHandles>("handles");
 
     [HarmonyPatch(typeof(SelectionTool), nameof(SelectionTool.update))]
@@ -36,37 +37,37 @@ internal static class SelectionToolPatches
         MethodInfo recordDestructionInvoker = new Action<GameObject>(OnDestruction).Method;
         MethodInfo transformSelectionInvoker = new Action(OnFinishTransform).Method;
 
-        MethodInfo? moveHandle = st.GetMethod("moveHandle", BindingFlags.Instance | BindingFlags.NonPublic, null, new Type[] { typeof(Vector3), typeof(Quaternion), typeof(Vector3), typeof(bool), typeof(bool) }, null);
+        MethodInfo? moveHandle = st.GetMethod("moveHandle", BindingFlags.Instance | BindingFlags.NonPublic, null, [ typeof(Vector3), typeof(Quaternion), typeof(Vector3), typeof(bool), typeof(bool) ], null);
         if (moveHandle == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: SelectionTool.moveHandle.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: SelectionTool.moveHandle.");
             DevkitServerModule.Fault();
         }
 
-        MethodInfo? requestInstantiation = st.GetMethod("RequestInstantiation", BindingFlags.Instance | BindingFlags.NonPublic, null, new Type[] { typeof(Vector3) }, null);
+        MethodInfo? requestInstantiation = st.GetMethod("RequestInstantiation", BindingFlags.Instance | BindingFlags.NonPublic, null, [ typeof(Vector3) ], null);
         if (requestInstantiation == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: SelectionTool.RequestInstantiation.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: SelectionTool.RequestInstantiation.");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? transformSelection = st.GetMethod("transformSelection", BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
         if (transformSelection == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: SelectionTool.transformSelection.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: SelectionTool.transformSelection.");
             DevkitServerModule.Fault();
         }
 
-        MethodInfo? recordDestruction = dtu.GetMethod(nameof(DevkitTransactionUtility.recordDestruction), BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(GameObject) }, null);
+        MethodInfo? recordDestruction = dtu.GetMethod(nameof(DevkitTransactionUtility.recordDestruction), BindingFlags.Static | BindingFlags.Public, null, [ typeof(GameObject) ], null);
         if (recordDestruction == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: DevkitTransactionUtility.recordDestruction.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: DevkitTransactionUtility.recordDestruction.");
             DevkitServerModule.Fault();
         }
 
         Label stLbl = generator.DefineLabel();
 
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> ins = [..instructions];
         int i = 0;
         // todo PatchUtil.InsertActionRateLimiter(ref i, stLbl, ins);
         StackTracker tracker = new StackTracker(ins, method);
@@ -94,7 +95,7 @@ internal static class SelectionToolPatches
                     }
 
                     i += i - lastLdArg0;
-                    Logger.LogDebug($"[CLIENT EVENTS] {method.Format()} - Patched in {invoker.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Patched in {invoker.Format()}.");
                 }
             }
             else if (recordDestruction != null && c.Calls(recordDestruction))
@@ -106,7 +107,7 @@ internal static class SelectionToolPatches
                     if (ins[j].operand is LocalBuilder bld && typeof(IEnumerator<DevkitSelection>).IsAssignableFrom(bld.LocalType))
                         break;
                 }
-                Logger.LogDebug($"[CLIENT EVENTS] {method.Format()} - Patched in {recordDestructionInvoker.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Patched in {recordDestructionInvoker.Format()}.");
             }
             else if (requestInstantiation != null && c.Calls(requestInstantiation))
             {
@@ -122,7 +123,7 @@ internal static class SelectionToolPatches
                     ins[i].labels.AddRange(c.labels);
                     ins[i].blocks.AddRange(c.blocks);
                 }
-                Logger.LogDebug($"[CLIENT EVENTS] {method.Format()} - Replaced instantiation request {requestInstantiation.Format()} with {requestInstantiationInvoker.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Replaced instantiation request {requestInstantiation.Format()} with {requestInstantiationInvoker.Format()}.");
             }
         }
 
@@ -138,7 +139,7 @@ internal static class SelectionToolPatches
             return;
 
         // todo (E with multiple selections)
-        Logger.LogDebug($"[CLIENT EVENTS] Set transform move requested at: {string.Join(",", DevkitSelectionManager.selection.Select(selection => selection.gameObject.name.Format()))}: deltaPos: {worldPositionDelta.Format()}, deltaRot: {worldRotationDelta.eulerAngles.Format()}, pivotPos: {pivotPosition.Format()}, modifyRotation: {modifyRotation}.");
+        Logger.DevkitServer.LogDebug(Source, $"Set transform move requested at: {string.Join(",", DevkitSelectionManager.selection.Select(selection => selection.gameObject.name.Format()))}: deltaPos: {worldPositionDelta.Format()}, deltaRot: {worldRotationDelta.eulerAngles.Format()}, pivotPos: {pivotPosition.Format()}, modifyRotation: {modifyRotation}.");
     }
 
     /// <summary>Skipped for no permissions.</summary>
@@ -205,7 +206,7 @@ internal static class SelectionToolPatches
     {
         if (!DevkitServerModule.IsEditing) return;
 
-        Logger.LogDebug("[CLIENT EVENTS] Handle moved: " + position.Format() + " Rot: " + doRotation.Format() + ", Scale: " + hasScale.Format() + ".");
+        Logger.DevkitServer.LogDebug(Source, "Handle moved: " + position.Format() + " Rot: " + doRotation.Format() + ", Scale: " + hasScale.Format() + ".");
         List<FinalTransformation> transformations = ListPool<FinalTransformation>.claim();
         float dt = CachedTime.DeltaTime;
         try
@@ -225,7 +226,7 @@ internal static class SelectionToolPatches
                         IDevkitHierarchyItem item = HierarchyUtil.HierarchyItemBuffer[i];
                         if (!HierarchyItemNetIdDatabase.TryGetHierarchyItemNetId(item, out NetId netId))
                         {
-                            Logger.LogWarning($"Skipped item: {item.Format()} because it was missing a NetId.", method: "CLIENT EVENTS");
+                            Logger.DevkitServer.LogWarning(Source, $"Skipped item: {item.Format()} because it was missing a NetId.");
                             continue;
                         }
 
@@ -317,7 +318,7 @@ internal static class SelectionToolPatches
         else
             EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("UnknownError"));
 
-        Logger.LogDebug("[CLIENT EVENTS] Instantiation requested at: " + position.Format() + " of " + (id == null ? ((object?)null).Format() : id.Format()) + ".");
+        Logger.DevkitServer.LogDebug(Source, "Instantiation requested at: " + position.Format() + " of " + (id == null ? ((object?)null).Format() : id.Format()) + ".");
     }
 
     [UsedImplicitly]
@@ -325,7 +326,7 @@ internal static class SelectionToolPatches
     {
         if (!DevkitServerModule.IsEditing) return;
 
-        Logger.LogDebug("[CLIENT EVENTS] Destruction requested at: " + obj.name.Format() + ".");
+        Logger.DevkitServer.LogDebug(Source, "Destruction requested at: " + obj.name.Format() + ".");
         obj.GetComponents(HierarchyUtil.HierarchyItemBuffer);
         NetId[] netIds = new NetId[HierarchyUtil.HierarchyItemBuffer.Count];
         int index = -1;
@@ -336,7 +337,7 @@ internal static class SelectionToolPatches
                 IDevkitHierarchyItem item = HierarchyUtil.HierarchyItemBuffer[i];
                 if (!HierarchyItemNetIdDatabase.TryGetHierarchyItemNetId(item, out NetId netId))
                 {
-                    Logger.LogWarning($"Skipped item: {item.Format()} because it was missing a NetId.", method: "CLIENT EVENTS");
+                    Logger.DevkitServer.LogWarning(Source, $"Skipped item: {item.Format()} because it was missing a NetId.");
                     continue;
                 }
 
@@ -384,7 +385,7 @@ internal static class SelectionToolPatches
                         IDevkitHierarchyItem item = HierarchyUtil.HierarchyItemBuffer[i];
                         if (!HierarchyItemNetIdDatabase.TryGetHierarchyItemNetId(item, out NetId netId))
                         {
-                            Logger.LogWarning($"Skipped item: {item.Format()} because it was missing a NetId.", method: "CLIENT EVENTS");
+                            Logger.DevkitServer.LogWarning(Source, $"Skipped item: {item.Format()} because it was missing a NetId.");
                             continue;
                         }
 
@@ -414,7 +415,7 @@ internal static class SelectionToolPatches
             ListPool<FinalTransformation>.release(transformations);
         }
 
-        Logger.LogDebug("[CLIENT EVENTS] Move completed for: " + string.Join(",", selections.Select(x => x.transform.name.Format(false))) + ".");
+        Logger.DevkitServer.LogDebug(Source, "Move completed for: " + string.Join(",", selections.Select(x => x.transform.name.Format(false))) + ".");
     }
 }
 #endif

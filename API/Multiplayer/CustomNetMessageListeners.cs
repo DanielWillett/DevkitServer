@@ -96,14 +96,14 @@ public static class CustomNetMessageListeners
     {
         if (!AreLocalMappingsDirty)
         {
-            Logger.LogDebug("Skipping sending local mappings as they aren't dirty.");
+            Logger.DevkitServer.LogDebug(nameof(SendLocalMappings), "Skipping sending local mappings as they aren't dirty.");
             return;
         }
 
         AreLocalMappingsDirty = false;
 
 #if CLIENT
-        Logger.LogDebug("Syncing updated local net message mappings to server.");
+        Logger.DevkitServer.LogDebug(nameof(SendLocalMappings), "Syncing updated local net message mappings to server.");
         SendMappings.Invoke(WriteLocalMappings);
 #else
         IReadOnlyList<ITransportConnection> connections = EditorLevel.PendingToReceiveActions
@@ -115,14 +115,14 @@ public static class CustomNetMessageListeners
         if (connections.Count == 0)
             return;
 
-        Logger.LogDebug($"Syncing updated local net message mappings to {connections.Count.Format()} connection(s).");
+        Logger.DevkitServer.LogDebug(nameof(SendLocalMappings), $"Syncing updated local net message mappings to {connections.Count.Format()} connection(s).");
         SendMappings.Invoke(connections, WriteLocalMappings);
 #endif
     }
 #if SERVER
     internal static void SendLocalMappings(ITransportConnection connection)
     {
-        Logger.LogDebug($"Syncing updated local net message mappings to connection {connection.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(SendLocalMappings), $"Syncing updated local net message mappings to connection {connection.Format()}.");
         SendMappings.Invoke(connection, WriteLocalMappings);
     }
 #endif
@@ -176,9 +176,9 @@ public static class CustomNetMessageListeners
         }
 
 #if CLIENT
-        Logger.LogDebug("Received server net message mappings.");
+        Logger.DevkitServer.LogDebug(nameof(ReceiveRemoteMappings), "Received server net message mappings.");
 #elif SERVER
-        Logger.LogDebug($"Received client net message mappings from {ctx.Connection.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(ReceiveRemoteMappings), $"Received client net message mappings from {ctx.Connection.Format()}.");
 
         // only resend before they're pending
         if (Provider.findPlayer(ctx.Connection) == null && Provider.findPendingPlayer(ctx.Connection) == null)

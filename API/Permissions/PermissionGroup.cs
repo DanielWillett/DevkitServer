@@ -123,10 +123,10 @@ public sealed class PermissionGroup : IReadOnlyList<PermissionBranch>
                                     throw new JsonException($"Invalid syntax for permission[{i}] in permission group: \"{str}\".");
 
 #if SERVER
-                                Logger.LogWarning($"Unrecognized prefix in permission[{i.Format()}] in permission group: \"{branch.Format()}\".");
+                                Logger.DevkitServer.LogWarning("ReadPermissionGroup", $"Unrecognized prefix in permission[{i.Format()}] in permission group: \"{branch.Format()}\".");
 #else
                                 if (DevkitServerPermissions.DebugLogging)
-                                    Logger.LogInfo($"[ReadPermissionGroup] Unrecognized prefix in permission[{i.Format()}] in permission group: \"{branch.Format()}\".");
+                                    Logger.DevkitServer.LogInfo("ReadPermissionGroup", $"[ReadPermissionGroup] Unrecognized prefix in permission[{i.Format()}] in permission group: \"{branch.Format()}\".");
 #endif
                             }
                             else
@@ -220,10 +220,10 @@ public sealed class PermissionGroup : IReadOnlyList<PermissionBranch>
             else
             {
 #if SERVER
-                Logger.LogWarning($"Unrecognized prefix in permission[{i.Format()}] in permission group: \"{branch.Format()}\".");
+                Logger.DevkitServer.LogWarning("ReadPermissionGroup", $"Unrecognized prefix in permission[{i.Format()}] in permission group: \"{branch.Format()}\".");
 #else
                 if (DevkitServerPermissions.DebugLogging)
-                    Logger.LogInfo($"[ReadPermissionGroup] Unrecognized prefix in permission[{i.Format()}] in permission group: \"{branch.Format()}\".");
+                    Logger.DevkitServer.LogInfo("ReadPermissionGroup", $"Unrecognized prefix in permission[{i.Format()}] in permission group: \"{branch.Format()}\".");
 #endif
             }
         }

@@ -17,7 +17,7 @@ public static class Grabber
         T resource = path.GetOrLoad();
         if (resource == null)
         {
-            Logger.LogDebug("Resource not found: " + path.Format() + ".");
+            Logger.DevkitServer.LogDebug(nameof(DownloadResource), "Resource not found: " + path.Format() + ".");
             return false;
         }
 
@@ -37,7 +37,7 @@ public static class Grabber
             Shader? shader = Shader.Find(path);
             if (shader == null)
             {
-                Logger.LogDebug("Resource not found: " + path.Format() + ".");
+                Logger.DevkitServer.LogDebug(nameof(DownloadResource), "Resource not found: " + path.Format() + ".");
                 return false;
             }
 
@@ -58,7 +58,7 @@ public static class Grabber
         T resource = bundle.load<T>(path);
         if (resource == null)
         {
-            Logger.LogDebug("Asset not found: " + bundle.name.Format(false) + "::" + path.Format(false) + ".");
+            Logger.DevkitServer.LogDebug(nameof(DownloadFromBundle), "Asset not found: " + bundle.name.Format(false) + "::" + path.Format(false) + ".");
             return false;
         }
 

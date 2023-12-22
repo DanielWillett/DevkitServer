@@ -8,13 +8,10 @@ namespace DevkitServer.API.Abstractions;
 /// <summary>
 /// Wraps a <see cref="ILGenerator"/> to implement <see cref="IOpCodeEmitter"/>.
 /// </summary>
-public class ILGeneratorEmitter : IOpCodeEmitter
+public class ILGeneratorEmitter(ILGenerator generator) : IOpCodeEmitter
 {
-    private readonly ILGenerator _generator;
-    public ILGeneratorEmitter(ILGenerator generator)
-    {
-        _generator = generator;
-    }
+    private readonly ILGenerator _generator = generator;
+
     /// <summary>
     /// Underlying <see cref="ILGenerator"/> emitter.
     /// </summary>

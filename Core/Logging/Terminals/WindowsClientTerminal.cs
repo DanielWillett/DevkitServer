@@ -1,27 +1,27 @@
 ﻿#if CLIENT
+using DevkitServer.API.Logging;
 using DevkitServer.Core.Commands.Subsystem;
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 using ThreadPriority = System.Threading.ThreadPriority;
 using ThreadState = System.Threading.ThreadState;
 
-namespace DevkitServer.API.Logging.Terminals;
+namespace DevkitServer.Core.Logging.Terminals;
 internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
 {
     public event TerminalPreReadDelegate? OnInput;
     public event TerminalPreWriteDelegate? OnOutput;
-    private readonly List<LogMessage> _messageQueue = new List<LogMessage>();
-    private int _msgIndex;
-    private readonly List<string> _inputQueue = new List<string>();
-    private int _inputIndex;
+    private readonly ConcurrentQueue<LogMessage> _outputQueue = new ConcurrentQueue<LogMessage>();
+    private readonly ConcurrentQueue<string> _inputQueue = new ConcurrentQueue<string>();
     private volatile bool _cancellationRequested;
     private Thread? _keyMonitor;
     private volatile uint _closeHandler;
     private volatile bool _closeRequested;
+    private volatile bool _inText;
+    private volatile bool _writing;
     private bool _setup;
-    private bool _inText;
-    private bool _writing;
     private bool _fallback;
     public bool IsComittingToUnturnedLog => _writing;
     public void Init()
@@ -36,7 +36,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
 
             WindowsConsoleHelper.SetUTF8CodePage();
 
-            // enable extended ANSI support for older terminals
+            // enable extended virtual terminal sequences support for older terminals
             WindowsConsoleHelper.ConfigureConsoleO(x => x | StandardConsoleOutputFlags.ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 
             // allow scrolling and selecting text
@@ -48,7 +48,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
             Console.InputEncoding = new UTF8Encoding(false);
             Console.Title = "Devkit Server Client";
 
-            if (_keyMonitor != null && _keyMonitor.ThreadState == ThreadState.Running)
+            if (_keyMonitor is { ThreadState: ThreadState.Running })
                 _keyMonitor.Abort();
             Thread curThread = Thread.CurrentThread;
             _keyMonitor = new Thread(MonitorKeypress)
@@ -77,16 +77,8 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
     {
         if (_setup)
         {
-            while (_inputQueue.Count > 0)
+            while (_inputQueue.TryDequeue(out string deq))
             {
-                string deq = _inputQueue[_inputIndex];
-                ++_inputIndex;
-
-                if (_inputQueue.Count <= _inputIndex)
-                {
-                    _inputQueue.Clear();
-                    _inputIndex = 0;
-                }
                 bool shouldHandle = true;
                 OnInput?.Invoke(deq, ref shouldHandle);
             }
@@ -97,112 +89,91 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
     }
     private void OutputTick()
     {
-        lock (this)
+        if (_outputQueue.Count > 0)
         {
-            if (_messageQueue.Count > 0)
+            lock (this)
             {
                 if (_inText && !_fallback)
                 {
                     int x = Console.CursorLeft;
                     int y = Console.CursorTop;
-                    while (_messageQueue.Count > 0)
+                    while (_outputQueue.TryDequeue(out LogMessage msg))
                     {
-                        LogMessage msg = _messageQueue[_msgIndex];
-                        ++_msgIndex;
-
-                        if (_messageQueue.Count <= _msgIndex)
-                        {
-                            _messageQueue.Clear();
-                            _msgIndex = 0;
-                        }
                         int h = 1;
-                        for (int i = 0; i < msg.Message.Length; ++i)
-                            if (msg.Message[i] == '\n') ++h;
+                        string text = msg.Message;
+                        for (int i = 0; i < text.Length; ++i)
+                        {
+                            if (text[i] == '\n') ++h;
+                        }
                         Console.MoveBufferArea(0, y, x, 1, 0, y + h);
                         Console.SetCursorPosition(0, y);
                         Console.Write(new string(' ', x));
                         Console.SetCursorPosition(0, y);
-                        msg.Write();
+
+                        if (msg.Color.HasValue)
+                        {
+                            ConsoleColor old = Console.ForegroundColor;
+                            Console.ForegroundColor = msg.Color.Value;
+                            Console.WriteLine(text);
+                            Console.ForegroundColor = old;
+                        }
+                        else
+                            Console.WriteLine(text);
+
                         y += h;
 
-                        if (msg.Save)
+                        if (!msg.SaveToUnturnedLog)
+                            continue;
+
+                        ReadOnlySpan<char> noDate = LoggerExtensions.RemoveDateFromLine(text);
+                        text = FormattingUtil.RemoveVirtualTerminalSequences(noDate);
+                        _writing = true;
+                        CommandHandler.IsLoggingFromDevkitServer = true;
+                        try
                         {
-                            string message = msg.Message;
-                            Logger.TryRemoveDateFromLine(ref message);
-                            _writing = true;
-                            CommandHandler.IsLoggingFromDevkitServer = true;
-                            try
-                            {
-                                Logs.printLine(FormattingUtil.RemoveVirtualTerminalSequences(message));
-                            }
-                            finally
-                            {
-                                CommandHandler.IsLoggingFromDevkitServer = false;
-                                _writing = false;
-                            }
+                            Logs.printLine(text);
+                        }
+                        finally
+                        {
+                            CommandHandler.IsLoggingFromDevkitServer = false;
+                            _writing = false;
                         }
                     }
                     Console.SetCursorPosition(x, y);
                 }
                 else
                 {
-                    while (_messageQueue.Count > 0)
+                    while (_outputQueue.TryDequeue(out LogMessage msg))
                     {
-                        LogMessage msg = _messageQueue[_msgIndex];
-                        ++_msgIndex;
-
-                        if (_messageQueue.Count <= _msgIndex)
-                        {
-                            _messageQueue.Clear();
-                            _msgIndex = 0;
-                        }
-                        if (!_fallback)
-                            msg.Write();
-                        if (msg.Save)
-                        {
-                            string message = msg.Message;
-                            Logger.TryRemoveDateFromLine(ref message);
-                            _writing = true;
-                            CommandHandler.IsLoggingFromDevkitServer = true;
-                            try
-                            {
-                                Logs.printLine(FormattingUtil.RemoveVirtualTerminalSequences(message));
-                            }
-                            finally
-                            {
-                                CommandHandler.IsLoggingFromDevkitServer = false;
-                                _writing = false;
-                            }
-                        }
+                        WriteMessage(ref msg);
                     }
                 }
             }
+        }
 
-            if (!_fallback && _closeRequested)
-            {
-                string reason = "Closing from control signal \"" +
-                                _closeHandler switch
-                                {
-                                    0 => "Ctrl + C",
-                                    1 => "Ctrl + Break",
-                                    2 => "Window Closed",
-                                    5 => "Logging Off",
-                                    6 => "Shutting Down",
-                                    _ => "Unknown: " + _closeHandler.ToString("X2")
-                                } + "\".";
-                Write(reason, ConsoleColor.Red, true, Severity.Info);
+        if (!_fallback && _closeRequested)
+        {
+            string reason = "Closing from control signal \"" +
+                            _closeHandler switch
+                            {
+                                0 => "Ctrl + C",
+                                1 => "Ctrl + Break",
+                                2 => "Window Closed",
+                                5 => "Logging Off",
+                                6 => "Shutting Down",
+                                _ => "Unknown: " + _closeHandler.ToString("X2")
+                            } + "\".";
+            Write(reason, ConsoleColor.Red, true, Severity.Info);
 
-                Provider.QuitGame(reason);
-                _closeHandler = uint.MaxValue;
-            }
+            Provider.QuitGame(reason);
+            _closeHandler = uint.MaxValue;
         }
     }
 
-    public void Write(string input, ConsoleColor color, bool save, Severity severity)
+    public void Write(ReadOnlySpan<char> input, ConsoleColor? color, bool saveToUnturnedLog, Severity severity)
     {
-        OnOutput?.Invoke(ref input, ref color);
-        lock (this)
-            _messageQueue.Add(new LogMessage(input, color, save));
+        OnOutput?.Invoke(ref input, ref color, severity);
+        _outputQueue.Enqueue(new LogMessage(input.ToString(), color, saveToUnturnedLog, severity));
         if (DevkitServerModule.IsMainThread)
             OutputTick();
     }
@@ -227,45 +198,45 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
 
             _setup = false;
         }
-        lock (this)
+        while (_outputQueue.TryDequeue(out LogMessage msg))
         {
-            if (_messageQueue.Count > 0)
-            {
-                while (_messageQueue.Count > 0)
-                {
-                    LogMessage msg = _messageQueue[_msgIndex];
-                    ++_msgIndex;
-
-                    if (_messageQueue.Count <= _msgIndex)
-                    {
-                        _messageQueue.Clear();
-                        _msgIndex = 0;
-                    }
-
-                    if (!_fallback)
-                        msg.Write();
-                    if (msg.Save)
-                    {
-                        string message = msg.Message;
-                        Logger.TryRemoveDateFromLine(ref message);
-                        _writing = true;
-                        CommandHandler.IsLoggingFromDevkitServer = true;
-                        try
-                        {
-                            Logs.printLine(FormattingUtil.RemoveVirtualTerminalSequences(message));
-                        }
-                        finally
-                        {
-                            CommandHandler.IsLoggingFromDevkitServer = false;
-                            _writing = false;
-                        }
-                    }
-                }
-            }
+            WriteMessage(ref msg);
         }
 
-
         WindowsConsoleHelper.FreeConsole();
+    }
+    private void WriteMessage(ref LogMessage message)
+    {
+        string text = message.Message;
+        if (!_fallback)
+        {
+            if (message.Color.HasValue)
+            {
+                ConsoleColor old = Console.ForegroundColor;
+                Console.ForegroundColor = message.Color.Value;
+                Console.WriteLine(text);
+                Console.ForegroundColor = old;
+            }
+            else
+                Console.WriteLine(text);
+        }
+
+        if (!message.SaveToUnturnedLog)
+            return;
+
+        ReadOnlySpan<char> noDate = LoggerExtensions.RemoveDateFromLine(text);
+        text = FormattingUtil.RemoveVirtualTerminalSequences(noDate);
+        _writing = true;
+        CommandHandler.IsLoggingFromDevkitServer = true;
+        try
+        {
+            Logs.printLine(text);
+        }
+        finally
+        {
+            CommandHandler.IsLoggingFromDevkitServer = false;
+            _writing = false;
+        }
     }
     private void MonitorKeypress()
     {
@@ -319,7 +290,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                             Console.Write(new string(' ', Console.BufferWidth));
                             break;
                         }
-                        else if (key.KeyChar == 0 || key.Key == ConsoleKey.OemClear || key.Key >= ConsoleKey.LeftArrow && key.Key <= ConsoleKey.DownArrow)
+                        else if (key.KeyChar == 0 || key.Key == ConsoleKey.OemClear || key.Key is >= ConsoleKey.LeftArrow and <= ConsoleKey.DownArrow)
                         {
                             Console.SetCursorPosition(current.Length, Console.CursorTop);
                             continue;
@@ -338,7 +309,7 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
                 }
                 if (current.Length > 0)
                 {
-                    _inputQueue.Add(current);
+                    _inputQueue.Enqueue(current);
                 }
                 _inText = false;
             }
@@ -347,16 +318,6 @@ internal sealed class WindowsClientTerminal : MonoBehaviour, ITerminal
         {
             CommandWindow.LogError("Error in key monitor thread.");
             CommandWindow.LogError(ex);
-        }
-    }
-    internal readonly struct LogMessage(string message, ConsoleColor color, bool save)
-    {
-        public readonly string Message = FormattingUtil.GetForegroundSequenceString(color, false) + message + FormattingUtil.ForegroundResetSequence;
-        public readonly bool Save = save;
-
-        public void Write()
-        {
-            Console.WriteLine(Message);
         }
     }
 }

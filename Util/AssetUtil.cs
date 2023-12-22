@@ -1,10 +1,10 @@
 ﻿using Cysharp.Threading.Tasks;
+using DevkitServer.API;
+using DevkitServer.API.Abstractions;
 using SDG.Framework.Modules;
 using System.Reflection;
 using System.Reflection.Emit;
-using DevkitServer.API.Abstractions;
 using Module = SDG.Framework.Modules.Module;
-using DevkitServer.API;
 
 namespace DevkitServer.Util;
 
@@ -90,18 +90,17 @@ public static class AssetUtil
             return;
         if (LoadFile == null)
         {
-            Logger.LogWarning($"Unable to load file from origin {origin.name.Format(false)}: {path.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(nameof(LoadFileSync), $"Unable to load file from origin {origin.name.Format(false)}: {path.Format()}.");
             return;
         }
         try
         {
             LoadFile(path, origin);
-            Logger.LogDebug($"[{Source}] Loaded asset: {origin.GetAssets().FirstOrDefault(x => Path.GetFullPath(x.getFilePath()).Equals(path, StringComparison.Ordinal)).Format()}");
+            Logger.DevkitServer.LogDebug(nameof(LoadFileSync), $"Loaded asset: {origin.GetAssets().FirstOrDefault(x => Path.GetFullPath(x.getFilePath()).Equals(path, StringComparison.Ordinal)).Format()}");
         }
         catch (Exception ex)
         {
-            Logger.LogWarning($"Error loading asset from origin {origin.name.Format(false)}: {path.Format()}.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(nameof(LoadFileSync), ex, $"Error loading asset from origin {origin.name.Format(false)}: {path.Format()}.");
         }
     }
 
@@ -132,7 +131,7 @@ public static class AssetUtil
         AllMasterBundlesGetter?.Invoke().Add(config);
 
         if (config.assetBundle != null)
-            Logger.LogInfo($"Loaded master bundle: {config.assetBundleName.Format()} from {masterBundleDatFilePath.Format()}.");
+            Logger.DevkitServer.LogInfo(nameof(LoadMasterBundleSync), $"Loaded master bundle: {config.assetBundleName.Format()} from {masterBundleDatFilePath.Format()}.");
     }
 
     /// <summary>
@@ -153,7 +152,7 @@ public static class AssetUtil
     {
         if (SyncAssetsFromOriginMethod == null)
         {
-            Logger.LogWarning($"Unable to sync assets from origin: {origin.name.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(nameof(SyncAssetsFromOrigin), $"Unable to sync assets from origin: {origin.name.Format()}.");
             return;
         }
         SyncAssetsFromOriginMethod(origin);
@@ -213,7 +212,7 @@ public static class AssetUtil
         if (shouldAssetsOverrideExistingIds)
         {
             if (SetOverrideIDs == null)
-                Logger.LogWarning($"Unable to set asset origin field, 'shouldAssetsOverrideExistingIds' to true: {origin.name.Format()}.", method: Source);
+                Logger.DevkitServer.LogWarning(nameof(CreateAssetOrigin), $"Unable to set asset origin field, 'shouldAssetsOverrideExistingIds' to true: {origin.name.Format()}.");
             else
                 SetOverrideIDs.Invoke(origin, shouldAssetsOverrideExistingIds);
         }
@@ -309,7 +308,7 @@ public static class AssetUtil
                 .CreateDelegate(typeof(Action<AssetOrigin>))!;
             if (SyncAssetsFromOriginMethod == null)
             {
-                Logger.LogError("Method not found: Assets.AddAssetsFromOriginToCurrentMapping.", method: Source);
+                Logger.DevkitServer.LogError(Source, "Method not found: Assets.AddAssetsFromOriginToCurrentMapping.");
                 return;
             }
 
@@ -317,35 +316,35 @@ public static class AssetUtil
             Type? assetInfo = Accessor.AssemblyCSharp.GetType("SDG.Unturned.AssetsWorker+AssetDefinition", false, false);
             if (assetInfo == null)
             {
-                Logger.LogError("Type not found: AssetsWorker.AssetDefinition.", method: Source);
+                Logger.DevkitServer.LogError(Source, "Type not found: AssetsWorker.AssetDefinition.");
                 return;
             }
 
             MethodInfo? loadFileMethod = typeof(Assets).GetMethod("LoadFile", BindingFlags.NonPublic | BindingFlags.Static);
             if (loadFileMethod == null)
             {
-                Logger.LogError("Method not found: Assets.LoadFile.", method: Source);
+                Logger.DevkitServer.LogError(Source, "Method not found: Assets.LoadFile.");
                 return;
             }
 
             MethodInfo? setHash = typeof(MasterBundleConfig).GetProperty(nameof(MasterBundleConfig.hash), BindingFlags.Public | BindingFlags.Instance)?.GetSetMethod(true);
             if (setHash == null)
             {
-                Logger.LogError("Method not found: set MasterBundleConfig.hash.", method: Source);
+                Logger.DevkitServer.LogError(Source, "Method not found: set MasterBundleConfig.hash.");
                 return;
             }
 
             MethodInfo? setAssetBundle = typeof(MasterBundleConfig).GetProperty(nameof(MasterBundleConfig.assetBundle), BindingFlags.Public | BindingFlags.Instance)?.GetSetMethod(true);
             if (setAssetBundle == null)
             {
-                Logger.LogError("Method not found: set MasterBundleConfig.assetBundle.", method: Source);
+                Logger.DevkitServer.LogError(Source, "Method not found: set MasterBundleConfig.assetBundle.");
                 return;
             }
 
             MethodInfo? checkOwnerCustomDataAndMaybeUnload = typeof(MasterBundleConfig).GetMethod("CheckOwnerCustomDataAndMaybeUnload", BindingFlags.NonPublic | BindingFlags.Instance);
             if (checkOwnerCustomDataAndMaybeUnload == null)
             {
-                Logger.LogError("Method not found: MasterBundleConfig.CheckOwnerCustomDataAndMaybeUnload.", method: Source);
+                Logger.DevkitServer.LogError(Source, "Method not found: MasterBundleConfig.CheckOwnerCustomDataAndMaybeUnload.");
                 return;
             }
 
@@ -358,8 +357,7 @@ public static class AssetUtil
             FieldInfo? originField = assetInfo.GetField("origin", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             if (pathField == null || hashField == null || assetDataField == null || translationDataField == null || fallbackTranslationDataField == null || assetErrorField == null || originField == null)
             {
-                Logger.LogError("Missing field in AssetsWorker.AssetDefinition.", method: Source);
-                return;
+                Logger.DevkitServer.LogError(Source, "Missing field in AssetsWorker.AssetDefinition.");
             }
 
             DynamicMethod dm = new DynamicMethod("LoadAsset", typeof(void), new Type[] { typeof(string), typeof(AssetOrigin) }, typeof(AssetUtil).Module, true);
@@ -382,33 +380,54 @@ public static class AssetUtil
             generator.Emit(OpCodes.Ldloca_S, 4);
             generator.Emit(method.GetCallRuntime(), method);
 
-            generator.Emit(OpCodes.Ldloca_S, 5);
-            generator.Emit(OpCodes.Ldarg_0);
-            generator.Emit(OpCodes.Stfld, pathField);
+            if (pathField != null)
+            {
+                generator.Emit(OpCodes.Ldloca_S, 5);
+                generator.Emit(OpCodes.Ldarg_0);
+                generator.Emit(OpCodes.Stfld, pathField);
+            }
 
-            generator.Emit(OpCodes.Ldloca_S, 5);
-            generator.Emit(OpCodes.Ldloc_2);
-            generator.Emit(OpCodes.Stfld, hashField);
+            if (hashField != null)
+            {
+                generator.Emit(OpCodes.Ldloca_S, 5);
+                generator.Emit(OpCodes.Ldloc_2);
+                generator.Emit(OpCodes.Stfld, hashField);
+            }
 
-            generator.Emit(OpCodes.Ldloca_S, 5);
-            generator.Emit(OpCodes.Ldloc_0);
-            generator.Emit(OpCodes.Stfld, assetDataField);
+            if (assetDataField != null)
+            {
+                generator.Emit(OpCodes.Ldloca_S, 5);
+                generator.Emit(OpCodes.Ldloc_0);
+                generator.Emit(OpCodes.Stfld, assetDataField);
+            }
 
-            generator.Emit(OpCodes.Ldloca_S, 5);
-            generator.Emit(OpCodes.Ldloc_3);
-            generator.Emit(OpCodes.Stfld, translationDataField);
+            if (translationDataField != null)
+            {
+                generator.Emit(OpCodes.Ldloca_S, 5);
+                generator.Emit(OpCodes.Ldloc_3);
+                generator.Emit(OpCodes.Stfld, translationDataField);
+            }
 
-            generator.Emit(OpCodes.Ldloca_S, 5);
-            generator.Emit(OpCodes.Ldloc_S, 4);
-            generator.Emit(OpCodes.Stfld, fallbackTranslationDataField);
+            if (fallbackTranslationDataField != null)
+            {
+                generator.Emit(OpCodes.Ldloca_S, 5);
+                generator.Emit(OpCodes.Ldloc_S, 4);
+                generator.Emit(OpCodes.Stfld, fallbackTranslationDataField);
+            }
 
-            generator.Emit(OpCodes.Ldloca_S, 5);
-            generator.Emit(OpCodes.Ldloc_1);
-            generator.Emit(OpCodes.Stfld, assetErrorField);
+            if (assetErrorField != null)
+            {
+                generator.Emit(OpCodes.Ldloca_S, 5);
+                generator.Emit(OpCodes.Ldloc_1);
+                generator.Emit(OpCodes.Stfld, assetErrorField);
+            }
 
-            generator.Emit(OpCodes.Ldloca_S, 5);
-            generator.Emit(OpCodes.Ldarg_1);
-            generator.Emit(OpCodes.Stfld, originField);
+            if (originField != null)
+            {
+                generator.Emit(OpCodes.Ldloca_S, 5);
+                generator.Emit(OpCodes.Ldarg_1);
+                generator.Emit(OpCodes.Stfld, originField);
+            }
 
             generator.Emit(OpCodes.Ldloc_S, 5);
             generator.Emit(loadFileMethod.GetCallRuntime(), loadFileMethod);
@@ -416,7 +435,6 @@ public static class AssetUtil
             generator.Emit(OpCodes.Ret);
 
             LoadFile = (Action<string, AssetOrigin>)dm.CreateDelegate(typeof(Action<string, AssetOrigin>));
-
 
             if (setAssetBundle != null)
             {
@@ -435,9 +453,8 @@ public static class AssetUtil
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Failed to initialize syncronous asset loading tools. Something probably changed on the games side. " +
-                              "The level Bundles folder may not be loaded server-side, and some other minor issues may arise.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, "Failed to initialize syncronous asset loading tools. Something probably changed on the games side. " +
+                                           "The level Bundles folder may not be loaded server-side, and some other minor issues may arise.");
         }
     }
     private static class GetAssetCategoryCache<TAsset> where TAsset : Asset
@@ -506,8 +523,8 @@ public static class AssetUtil
             }
             catch (Exception ex)
             {
-                Logger.LogError("Caller threw an error in " + typeof(AssetUtil).Format() + "." + nameof(OnBeginLevelLoading).Colorize(ConsoleColor.White) + ".");
-                Logger.LogError(ex);
+                Logger.DevkitServer.LogError(dele.Method.Module.Name, ex,
+                    $"Caller in {dele.Method.Format()} threw an error in {typeof(AssetUtil).Format()}.{nameof(OnBeginLevelLoading).Colorize(ConsoleColor.White)}.");
             }
         }
         LoadingUI.NotifyLevelLoadingProgress(1f / 30f);

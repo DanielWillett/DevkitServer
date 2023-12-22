@@ -144,7 +144,7 @@ public static class DevkitServerUtility
 
         if (str.Length > 8 && str[0] == '[')
         {
-            if (str[2] != ':' || str[4] != ':' || str[str.Length - 1] != ']')
+            if (str[2] != ':' || str[4] != ':' || str[^1] != ']')
                 goto fail;
             EAccountType type;
             char c = str[1];
@@ -173,7 +173,7 @@ public static class DevkitServerUtility
             if (!char.IsDigit(uv))
                 goto fail;
             uint acctId;
-            if (str[str.Length - 3] != ':')
+            if (str[^3] != ':')
             {
                 if (!uint.TryParse(str.Substring(5, str.Length - 6), NumberStyles.Number, CultureInfo.InvariantCulture, out acctId))
                     goto fail;
@@ -183,7 +183,7 @@ public static class DevkitServerUtility
                 if (!uint.TryParse(str.Substring(5, str.Length - 8), NumberStyles.Number, CultureInfo.InvariantCulture, out acctId))
                     goto fail;
                 acctId *= 2;
-                uv = str[str.Length - 2];
+                uv = str[^2];
                 if (uv == '1')
                     ++acctId;
                 else if (uv != '0')
@@ -460,10 +460,10 @@ public static class DevkitServerUtility
         results = new List<ITransportConnection>();
         for (int i = 0; i < Provider.clients.Count; ++i)
         {
-            Logger.LogDebug("[GET CONNECTION FROM IP] " + Provider.clients[i].transportConnection.GetAddress().Format() + " vs " + ip.Format() + ":");
+            Logger.DevkitServer.LogDebug(nameof(TryGetConnections), Provider.clients[i].transportConnection.GetAddress().Format() + " vs " + ip.Format() + ":");
             if (Provider.clients[i].transportConnection.GetAddress().MapToIPv4().Equals(ip))
             {
-                Logger.LogDebug("[GET CONNECTION FROM IP]  Matches");
+                Logger.DevkitServer.LogDebug(nameof(TryGetConnections), " Matches");
                 results.Add(Provider.clients[i].transportConnection);
                 break;
             }
@@ -471,10 +471,10 @@ public static class DevkitServerUtility
         
         for (int i = 0; i < Provider.pending.Count; ++i)
         {
-            Logger.LogDebug("[GET CONNECTION FROM IP] " + Provider.pending[i].transportConnection.GetAddress().Format() + " vs " + ip.Format() + ":");
+            Logger.DevkitServer.LogDebug(nameof(TryGetConnections), Provider.pending[i].transportConnection.GetAddress().Format() + " vs " + ip.Format() + ":");
             if (Provider.pending[i].transportConnection.GetAddress().MapToIPv4().Equals(ip))
             {
-                Logger.LogDebug("[GET CONNECTION FROM IP]  Matches");
+                Logger.DevkitServer.LogDebug(nameof(TryGetConnections), " Matches");
                 results.Add(Provider.pending[i].transportConnection);
                 break;
             }
@@ -482,10 +482,10 @@ public static class DevkitServerUtility
 
         for (int i = 0; i < PatchesMain.PendingConnections.Count; ++i)
         {
-            Logger.LogDebug("[GET CONNECTION FROM IP] " + PatchesMain.PendingConnections[i].GetAddress().MapToIPv4().Format() + " vs " + ip.Format() + ":");
+            Logger.DevkitServer.LogDebug(nameof(TryGetConnections), PatchesMain.PendingConnections[i].GetAddress().MapToIPv4().Format() + " vs " + ip.Format() + ":");
             if (PatchesMain.PendingConnections[i].GetAddress().MapToIPv4().Equals(ip))
             {
-                Logger.LogDebug("[GET CONNECTION FROM IP]  Matches");
+                Logger.DevkitServer.LogDebug(nameof(TryGetConnections), " Matches");
                 results.Add(PatchesMain.PendingConnections[i]);
                 break;
             }
@@ -1068,157 +1068,6 @@ public static class DevkitServerUtility
     }
 }
 
-[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
-public sealed class CreateDirectoryAttribute : Attribute
-{
-    private static List<Type>? _checkedTypes = new List<Type>(64);
-    public bool RelativeToGameDir { get; set; }
-    internal bool FaultOnFailure { get; set; } = true;
-    internal static void DisposeLoadList() => _checkedTypes = null;
-    public static void CreateInAssembly(Assembly assembly) => CreateInAssembly(assembly, false);
-    public static void CreateInType(Type type) => CreateInType(type, false);
-    internal static void CreateInAssembly(Assembly assembly, bool allowFault)
-    {
-        List<Type> types = Accessor.GetTypesSafe(assembly, false);
-        for (int index = 0; index < types.Count; index++)
-        {
-            Type type = types[index];
-            CreateInType(type, allowFault);
-        }
-    }
-    internal static void CreateInType(Type type, bool allowFault)
-    {
-        if (_checkedTypes != null && _checkedTypes.Contains(type))
-            return;
-        FieldInfo[] fields = type.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-        for (int f = 0; f < fields.Length; ++f)
-        {
-            FieldInfo field = fields[f];
-            if (!field.IsStatic || IsDefined(field, typeof(IgnoreAttribute)) || GetCustomAttribute(field, typeof(CreateDirectoryAttribute)) is not CreateDirectoryAttribute cdir)
-                continue;
-            if (typeof(string).IsAssignableFrom(field.FieldType))
-            {
-                try
-                {
-                    string? path = (string?)field.GetValue(null);
-                    if (path == null)
-                        Logger.LogWarning($"Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.", method: "CHECK DIR");
-                    else FileUtil.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, field);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning($"Unable to check directory for {field.Format()}, type initializer threw exception.", method: "CHECK DIR");
-                    Logger.LogError(ex, method: "CHECK DIR");
-                }
-            }
-            else if (typeof(FileInfo).IsAssignableFrom(field.FieldType))
-            {
-                try
-                {
-                    FileInfo? fileInfo = (FileInfo?)field.GetValue(null);
-                    cdir.RelativeToGameDir = false;
-                    string? file = fileInfo?.DirectoryName;
-                    if (file == null)
-                    {
-                        if (fileInfo == null)
-                            Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
-                    }
-                    else FileUtil.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, field);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning($"Unable to check directory for {field.Format()}, type initializer threw exception.", method: "CHECK DIR");
-                    Logger.LogError(ex, method: "CHECK DIR");
-                }
-            }
-            else if (typeof(DirectoryInfo).IsAssignableFrom(field.FieldType))
-            {
-                try
-                {
-                    string? dir = ((DirectoryInfo?)field.GetValue(null))?.FullName;
-                    cdir.RelativeToGameDir = false;
-                    if (dir == null)
-                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, field returned {((object?)null).Format()}.");
-                    else FileUtil.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, field);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning($"Unable to check directory for {field.Format()}, type initializer threw exception.", method: "CHECK DIR");
-                    Logger.LogError(ex, method: "CHECK DIR");
-                }
-            }
-            else
-            {
-                Logger.LogWarning($"[CHECK DIR] Unable to check directory for {field.Format()}, valid on types: " +
-                                  $"{typeof(string).Format()}, {typeof(FileInfo).Format()}, or {typeof(DirectoryInfo).Format()}.");
-            }
-        }
-        PropertyInfo[] properties = type.GetProperties(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-        for (int p = 0; p < properties.Length; ++p)
-        {
-            PropertyInfo property = properties[p];
-            if (property.GetMethod == null || property.GetMethod.IsStatic || property.GetIndexParameters() is { Length: > 0 } ||
-                IsDefined(property, typeof(IgnoreAttribute)) || GetCustomAttribute(property, typeof(CreateDirectoryAttribute)) is not CreateDirectoryAttribute cdir)
-                continue;
-            if (typeof(string).IsAssignableFrom(property.PropertyType))
-            {
-                try
-                {
-                    string? path = (string?)property.GetMethod?.Invoke(null, Array.Empty<object>());
-                    if (path == null)
-                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
-                    else FileUtil.CheckDirectory(cdir.RelativeToGameDir, allowFault && cdir.FaultOnFailure, path, property);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning($"Unable to check directory for {property.Format()}, property getter or type initializer threw exception.", method: "CHECK DIR");
-                    Logger.LogError(ex, method: "CHECK DIR");
-                }
-            }
-            else if (typeof(FileInfo).IsAssignableFrom(property.PropertyType))
-            {
-                try
-                {
-                    FileInfo? fileInfo = (FileInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>());
-                    string? file = fileInfo?.DirectoryName;
-                    if (file == null)
-                    {
-                        if (fileInfo == null)
-                            Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
-                    }
-                    else FileUtil.CheckDirectory(false, allowFault && cdir.FaultOnFailure, file, property);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning($"Unable to check directory for {property.Format()}, property getter or type initializer threw exception.", method: "CHECK DIR");
-                    Logger.LogError(ex, method: "CHECK DIR");
-                }
-            }
-            else if (typeof(DirectoryInfo).IsAssignableFrom(property.PropertyType))
-            {
-                try
-                {
-                    string? dir = ((DirectoryInfo?)property.GetMethod?.Invoke(null, Array.Empty<object>()))?.FullName;
-                    if (dir == null)
-                        Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, field returned {((object?)null).Format()}.");
-                    else FileUtil.CheckDirectory(false, allowFault && cdir.FaultOnFailure, dir, property);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning($"Unable to check directory for {property.Format()}, property getter or type initializer threw exception.", method: "CHECK DIR");
-                    Logger.LogError(ex, method: "CHECK DIR");
-                }
-            }
-            else
-            {
-                Logger.LogWarning($"[CHECK DIR] Unable to check directory for {property.Format()}, valid on types: " +
-                                  $"{typeof(string).Format()}, {typeof(FileInfo).Format()}, or {typeof(DirectoryInfo).Format()}.");
-            }
-        }
-
-        _checkedTypes?.Add(type);
-    }
-}
 public enum ScheduleInterval
 {
     /// <summary>

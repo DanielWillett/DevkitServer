@@ -76,7 +76,7 @@ internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFil
                     catch (Exception ex)
                     {
                         ctx.Reply("Exception", CommandTests.Commands[i].Method.Name.ToLowerInvariant(), ex.GetType().Name);
-                        Logger.LogError(ex);
+                        this.LogError(ex);
                     }
                     finally
                     {
@@ -104,7 +104,7 @@ internal sealed class TestCommand : DevkitServerCommand, ICommandLocalizationFil
                     catch (Exception ex)
                     {
                         ctx.Reply("Exception", CommandTests.Commands[i].Method.Name.ToLowerInvariant(), ex.GetType().Name);
-                        Logger.LogError(ex);
+                        this.LogError(ex);
                     }
                     finally
                     {
@@ -291,11 +291,6 @@ internal static class CommandTests
         ctx.ReplyString("<#7bbc5f>Syncing...");
     }
 
-#if SERVER
-
-
-#endif
-
     static CommandTests()
     {
         try
@@ -325,7 +320,7 @@ internal static class CommandTests
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("CommandTests", ex);
             throw;
         }
     }

@@ -59,6 +59,7 @@ public abstract class AuthoritativeSync : MonoBehaviour
 
 public abstract class AuthoritativeSync<TSync> : AuthoritativeSync, ITerminalFormattable where TSync : AuthoritativeSync<TSync>
 {
+    protected static readonly string Source = typeof(TSync).Name;
     public static TSync? Authority { get; private set; }
     public static TSync? ServersideAuthority { get; private set; }
     public bool HasAuthority
@@ -88,9 +89,9 @@ public abstract class AuthoritativeSync<TSync> : AuthoritativeSync, ITerminalFor
             }
             HasAuthorityIntl = value;
             if (User == null)
-                Logger.LogDebug($"Server-side authority {GetType().Format()} {(value ? "gained" : "lost")} authority.");
+                Logger.DevkitServer.LogDebug(Source, $"Server-side authority {GetType().Format()} {(value ? "gained" : "lost")} authority.");
             else
-                Logger.LogDebug($"{User.Format()} {GetType().Format()} {(value ? "gained" : "lost")} authority.");
+                Logger.DevkitServer.LogDebug(Source, $"{User.Format()}'s {GetType().Format()} {(value ? "gained" : "lost")} authority.");
             OnAuthorityUpdated(value);
         }
     }
@@ -152,7 +153,7 @@ public abstract class AuthoritativeSync<TSync> : AuthoritativeSync, ITerminalFor
 #if CLIENT
             IsOwner = false;
 #endif
-            Logger.LogDebug($"Server-side authority {GetType().Format()} initialized.");
+            Logger.DevkitServer.LogDebug(Source, $"Server-side authority {GetType().Format()} initialized.");
             if (ServersideAuthority != null)
                 Destroy(ServersideAuthority);
             ServersideAuthority = (TSync)this;
@@ -160,7 +161,7 @@ public abstract class AuthoritativeSync<TSync> : AuthoritativeSync, ITerminalFor
         }
         else
         {
-            Logger.LogDebug($"Client {User.Format()} {GetType().Format()} initialized.");
+            Logger.DevkitServer.LogDebug(Source, $"Client {User.Format()} {GetType().Format()} initialized.");
 #if CLIENT
             IsOwner = User == EditorUser.User;
 #endif
@@ -179,7 +180,7 @@ public abstract class AuthoritativeSync<TSync> : AuthoritativeSync, ITerminalFor
             ServersideAuthority.HasAuthority = true;
         }
 #endif
-        Logger.LogDebug(this.Format() + " destroyed.");
+        Logger.DevkitServer.LogDebug(Source, this.Format() + " destroyed.");
     }
     public override string ToString() => GetType().Name + " (" + (HasAuthority ? "Authority" : "Non-Authority") + ") (" + (User is null ? "Serverside" : User.SteamId.m_SteamID.ToString()) + ")";
     public string Format(ITerminalFormatProvider provider) => GetType().Format() + " (" + (HasAuthority ? "Authority".Colorize(AuthColor) : "Non-Authority".Colorize(NoAuthColor)) + ") (" + (User is null ? "Serverside" : User.SteamId.m_SteamID.Format()) + ")";

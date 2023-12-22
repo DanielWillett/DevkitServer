@@ -24,7 +24,7 @@ public static class EditorLevel
     private static readonly NetCall<byte[]> SendPending = new NetCall<byte[]>(DevkitServerNetCall.SendPending);
     internal static List<ITransportConnection> PendingToReceiveActions = new List<ITransportConnection>(4);
 #if CLIENT
-    public static string TempLevelPath => Path.Combine(DevkitServerConfig.ServerFolder, "Levels", Provider.CurrentServerAdvertisement?.map ?? Guid.NewGuid().ToString("N"), "Level Install");
+    public static string TempLevelPath => Path.Combine(DevkitServerConfig.ServerFolder, "Levels", Provider.CurrentServerAdvertisement?.map ?? Guid.NewGuid().ToString("N"));
 #endif
 #if SERVER
     [NetCall(NetCallSource.FromClient, (ushort)DevkitServerNetCall.RequestLevel)]
@@ -32,12 +32,12 @@ public static class EditorLevel
     {
         if (!string.IsNullOrEmpty(Provider.serverPassword) && !Hash.verifyHash(passwordSHA1, Provider.serverPasswordHash))
         {
-            Logger.LogInfo($"[SEND LEVEL] {ctx.Connection.Format()} tried to request level data with an invalid password.");
+            Logger.DevkitServer.LogInfo("SEND LEVEL", $"{ctx.Connection.Format()} tried to request level data with an invalid password.");
             DevkitServerUtility.CustomDisconnect(ctx.Connection, ESteamRejection.WRONG_PASSWORD);
             return StandardErrorCode.AccessViolation;
         }
 
-        Logger.LogInfo($"[SEND LEVEL] Received level request from ({ctx.Connection.Format()}).", ConsoleColor.DarkCyan);
+        Logger.DevkitServer.LogInfo("SEND LEVEL", $"Received level request from ({ctx.Connection.Format()}).", ConsoleColor.DarkCyan);
         SendLevel(ctx.Connection);
         return StandardErrorCode.Success;
     }
@@ -65,11 +65,11 @@ public static class EditorLevel
             {
                 if (await transmission.Send(DevkitServerModule.UnloadToken))
                 {
-                    Logger.LogInfo($"[{transmission.LogSource}] Sent level {Provider.map.Format(false)} (size: {FormattingUtil.FormatCapacity(transmission.OriginalSize, colorize: true)}) to {connection.Format()}.");
+                    Logger.DevkitServer.LogInfo(transmission.LogSource, $"Sent level {Provider.map.Format(false)} (size: {FormattingUtil.FormatCapacity(transmission.OriginalSize, colorize: true)}) to {connection.Format()}.");
                     return;
                 }
 
-                Logger.LogWarning($"Failed to send level {Provider.map.Format(false)} (size: {FormattingUtil.FormatCapacity(transmission.OriginalSize, colorize: true)}) to {connection.Format()}.", method: transmission.LogSource);
+                Logger.DevkitServer.LogWarning(transmission.LogSource, $"Failed to send level {Provider.map.Format(false)} (size: {FormattingUtil.FormatCapacity(transmission.OriginalSize, colorize: true)}) to {connection.Format()}.");
             }
             catch (OperationCanceledException)
             {
@@ -80,8 +80,7 @@ public static class EditorLevel
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to send level to connection: {connection.Format()}.", method: transmission.LogSource);
-                Logger.LogError(ex, method: transmission.LogSource);
+                Logger.DevkitServer.LogError(transmission.LogSource, ex, $"Failed to send level to connection: {connection.Format()}.");
             }
             finally
             {
@@ -110,13 +109,13 @@ public static class EditorLevel
         {
             if (task.Parameters.ErrorCode is (int)StandardErrorCode.AccessViolation)
             {
-                Logger.LogInfo($"[SEND LEVEL] Password incorrect for server: {Provider.serverName.Format()}.");
+                Logger.DevkitServer.LogInfo("SEND LEVEL", $"Password incorrect for server: {Provider.serverName.Format()}.");
                 DevkitServerUtility.CustomDisconnect(ESteamConnectionFailureInfo.PASSWORD);
                 yield break;
             }
             if (task.Parameters.ErrorCode is not (int)StandardErrorCode.Success)
             {
-                Logger.LogInfo($"[SEND LEVEL] Failed to begin pending level download: {(task.Parameters.ErrorCode.HasValue ? ((StandardErrorCode)task.Parameters.ErrorCode.Value).Format() : "Unknown Error".Colorize(ConsoleColor.Red))}.");
+                Logger.DevkitServer.LogInfo("SEND LEVEL", $"Failed to begin pending level download: {(task.Parameters.ErrorCode.HasValue ? ((StandardErrorCode)task.Parameters.ErrorCode.Value).Format() : "Unknown Error".Colorize(ConsoleColor.Red))}.");
                 DevkitServerUtility.CustomDisconnect($"Error connecting: {(task.Parameters.ErrorCode.HasValue ? ((StandardErrorCode)task.Parameters.ErrorCode.Value).ToString() : "Unknown Error")}.");
                 yield break;
             }
@@ -126,17 +125,17 @@ public static class EditorLevel
             yield return new WaitForSeconds(0.1f);
             
             task = SendRequestLevel.RequestAck(passwordHash, 3000);
-            Logger.LogDebug("[SEND LEVEL] Sent level request.", ConsoleColor.DarkCyan);
+            Logger.DevkitServer.LogDebug("SEND LEVEL", "Sent level request.", ConsoleColor.DarkCyan);
             yield return task;
         }
         if (!task.Parameters.Responded)
         {
-            Logger.LogWarning("[SEND LEVEL] Did not receive acknowledgement to level request; request timed out.");
+            Logger.DevkitServer.LogWarning("SEND LEVEL", "Did not receive acknowledgement to level request; request timed out.");
             DevkitServerUtility.CustomDisconnect("Did not receive acknowledgement to level request; request timed out.");
         }
         else
         {
-            Logger.LogDebug("[SEND LEVEL] Received acknowledgement to level request.", ConsoleColor.DarkCyan);
+            Logger.DevkitServer.LogDebug("SEND LEVEL", "Received acknowledgement to level request.", ConsoleColor.DarkCyan);
             LoadingUI.SetDownloadFileName("Level | Server Compressing Level");
             LoadingUI.NotifyDownloadProgress(1f);
         }
@@ -167,7 +166,7 @@ public static class EditorLevel
         LevelInfo? info = ReadLevelInfo(dir, 0ul);
         if (info == null)
         {
-            Logger.LogWarning("[SEND LEVEL] Failed to read received level at: \"" + dir + "\".", ConsoleColor.DarkCyan);
+            Logger.DevkitServer.LogWarning("SEND LEVEL", $"Failed to read received level at: {dir.Format(true)}.", ConsoleColor.DarkCyan);
             DevkitServerUtility.CustomDisconnect("Failed to read received level.");
             yield break;
         }
@@ -191,7 +190,7 @@ public static class EditorLevel
 #if DEBUG
             List<Asset> allAssets = new List<Asset>(8192);
             Assets.find(allAssets);
-            Logger.LogInfo($"[SEND LEVEL] Loaded {allAssets.Count(x => x.GetOrigin() == origin).Format()} asset(s) from {origin.name.Format()}");
+            Logger.DevkitServer.LogInfo("SEND LEVEL", $"Loaded {allAssets.Count(x => x.GetOrigin() == origin).Format()} asset(s) from {origin.name.Format()}");
 #endif
 
             GC.Collect();

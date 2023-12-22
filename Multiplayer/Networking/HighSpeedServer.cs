@@ -2,8 +2,6 @@
 using DevkitServer.Configuration;
 using System.Net;
 using System.Net.Sockets;
-using SDG.Framework.Debug;
-using SDG.NetTransport.SteamNetworkingSockets;
 
 namespace DevkitServer.Multiplayer.Networking;
 public class HighSpeedServer : IDisposable
@@ -40,7 +38,7 @@ public class HighSpeedServer : IDisposable
         VerifiedConnections = _connections.AsReadOnly();
         PendingConnections = _pending.AsReadOnly();
         _listener.BeginAcceptTcpClient(EndAccept, _listener);
-        Logger.LogInfo("[HIGH SPEED SERVER] Listening for connections on " + SteamGameServer.GetPublicIP().ToIPAddress().Format() + ":" + DevkitServerConfig.Config.TcpSettings.HighSpeedPort.Format() + ".");
+        Logger.DevkitServer.LogInfo("HIGH SPEED SERVER", "Listening for connections on " + SteamGameServer.GetPublicIP().ToIPAddress().Format() + ":" + DevkitServerConfig.Config.TcpSettings.HighSpeedPort.Format() + ".");
     }
     private void EndAccept(IAsyncResult ar)
     {
@@ -49,15 +47,15 @@ public class HighSpeedServer : IDisposable
             TcpClient client = (ar.AsyncState as TcpListener ?? _listener).EndAcceptTcpClient(ar);
             if (client.Client.RemoteEndPoint is not IPEndPoint ep)
             {
-                Logger.LogWarning("[HIGH SPEED SERVER] Client connecting with unsupported end point type: " +
-                                  client.Client.RemoteEndPoint.Format() + ".");
+                Logger.DevkitServer.LogWarning("HIGH SPEED SERVER", "Client connecting with unsupported end point type: " +
+                                                                    client.Client.RemoteEndPoint.Format() + ".");
                 Reject(client);
                 return;
             }
             
             if (!DevkitServerUtility.TryGetConnections(ep.Address, out List<ITransportConnection> results))
             {
-                Logger.LogWarning("[HIGH SPEED SERVER] Unknown client connecting from " + ep.Format() + ".");
+                Logger.DevkitServer.LogWarning("HIGH SPEED SERVER", "Unknown client connecting from " + ep.Format() + ".");
                 Reject(client);
                 return;
             }
@@ -65,8 +63,8 @@ public class HighSpeedServer : IDisposable
             client.SendBufferSize = HighSpeedNetFactory.BufferSize;
             client.ReceiveBufferSize = HighSpeedNetFactory.BufferSize;
 
-            Logger.LogInfo("[HIGH SPEED SERVER] Client connecting to high-speed server: " +
-                           string.Join(" or ", results.Select(x => x.Format())));
+            Logger.DevkitServer.LogInfo("HIGH SPEED SERVER", "Client connecting to high-speed server: " +
+                                                             string.Join(" or ", results.Select(x => x.Format())));
             HighSpeedConnection hsConn = new HighSpeedConnection(client, results, this);
             hsConn.Listen();
             _pending.Add(hsConn);
@@ -74,8 +72,7 @@ public class HighSpeedServer : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogError("[HIGH SPEED SERVER] Error accepting high-speed client.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("HIGH SPEED SERVER", ex, "Error accepting high-speed client.");
         }
         finally
         {
@@ -93,18 +90,18 @@ public class HighSpeedServer : IDisposable
 
                 _pending.RemoveAtFast(i);
                 _connections.Add(hs);
-                Logger.LogDebug("[HIGH SPEED SERVER] High-speed connection established to: " + hs.Steam64.Format() + " (" + hs.Format() + ").");
+                Logger.DevkitServer.LogDebug("HIGH SPEED SERVER", "High-speed connection established to: " + hs.Steam64.Format() + " (" + hs.Format() + ").");
                 HighSpeedNetFactory.HighSpeedVerifyConfirm.Invoke(hs);
                 return;
             }
         }
-        Logger.LogWarning("[HIGH SPEED SERVER] High-speed connection not verified, couldn't match steam connection (" + connection.GetAddress().Format() + ") to a high speed connection.");
+        Logger.DevkitServer.LogWarning("HIGH SPEED SERVER", "High-speed connection not verified, couldn't match steam connection (" + connection.GetAddress().Format() + ") to a high speed connection.");
     }
     internal void Disconnect(HighSpeedConnection connection)
     {
         _pending.Remove(connection);
         _connections.Remove(connection);
-        Logger.LogDebug("[HIGH SPEED SERVER] Client disconnected: " + connection.GetAddress().Format() + ".");
+        Logger.DevkitServer.LogDebug("HIGH SPEED SERVER", "Client disconnected: " + connection.GetAddress().Format() + ".");
     }
     internal static void Disconnect(CSteamID player)
     {
@@ -120,7 +117,7 @@ public class HighSpeedServer : IDisposable
     }
     private static void Reject(TcpClient client)
     {
-        Logger.LogDebug("[HIGH SPEED SERVER] Client rejected: " + client.Client.RemoteEndPoint.Format() + ".");
+        Logger.DevkitServer.LogDebug("HIGH SPEED SERVER", "Client rejected: " + client.Client.RemoteEndPoint.Format() + ".");
         client.Dispose();
     }
     public void Dispose()

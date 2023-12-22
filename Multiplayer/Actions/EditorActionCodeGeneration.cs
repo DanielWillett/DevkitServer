@@ -37,7 +37,7 @@ internal static class EditorActionsCodeGeneration
                         actionAttr.Type = t;
                         if (Attributes.TryGetValue(actionAttr.ActionType, out ActionAttribute attribute))
                         {
-                            Logger.LogWarning($"[EDITOR ACTIONS] Duplicate action attribute for type ignored: {actionAttr.ActionType.Format()}, {t.Format()} already overridden by {attribute.Type.Format()}.");
+                            Logger.DevkitServer.LogWarning(EditorActions.Source, $"Duplicate action attribute for type ignored: {actionAttr.ActionType.Format()}, {t.Format()} already overridden by {attribute.Type.Format()}.");
                         }
                         else
                         {
@@ -51,18 +51,18 @@ internal static class EditorActionsCodeGeneration
             if (t.TryGetAttributeSafe(out ActionSettingAttribute settingAttr))
             {
                 PropertyInfo[] props = t.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                properties.Add((t, settingAttr, new List<PropertyInfo>(props)));
+                properties.Add((t, settingAttr, [ ..props ]));
             }
         }
 
         const MethodAttributes attributes = MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig;
-        Logger.LogDebug($"[EDITOR ACTIONS] Found {actions.Count.Format()} action types.");
-        Logger.LogDebug($"[EDITOR ACTIONS] Found {properties.Count.Format()} setting interfaces with {c.Format()} total properties.");
+        Logger.DevkitServer.LogDebug(EditorActions.Source, $"Found {actions.Count.Format()} action types.");
+        Logger.DevkitServer.LogDebug(EditorActions.Source, $"Found {properties.Count.Format()} setting interfaces with {c.Format()} total properties.");
         
         MethodInfo? getActionSettings = typeof(IActionListener).GetProperty(nameof(IActionListener.Settings), BindingFlags.Instance | BindingFlags.Public)?.GetMethod;
         if (getActionSettings == null)
         {
-            Logger.LogWarning($"Failed to find {typeof(IActionListener).Format()}.Settings getter.", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogWarning(EditorActions.Source, $"Failed to find {typeof(IActionListener).Format()}.Settings getter.");
             DevkitServerModule.Fault();
             return;
         }
@@ -70,14 +70,14 @@ internal static class EditorActionsCodeGeneration
         MethodInfo? getSettings = typeof(ActionSettings).GetMethod(nameof(ActionSettings.GetSettings), BindingFlags.Instance | BindingFlags.Public);
         if (getSettings == null)
         {
-            Logger.LogWarning($"Failed to find {typeof(ActionSettings).Format()}.GetSettings method.", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogWarning(EditorActions.Source, $"Failed to find {typeof(ActionSettings).Format()}.GetSettings method.");
             DevkitServerModule.Fault();
             return;
         }
         MethodInfo? setSettings = typeof(ActionSettings).GetMethod(nameof(ActionSettings.SetSettings), BindingFlags.Instance | BindingFlags.NonPublic);
         if (setSettings == null)
         {
-            Logger.LogWarning($"Failed to find {typeof(ActionSettings).Format()}.SetSettings method.", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogWarning(EditorActions.Source, $"Failed to find {typeof(ActionSettings).Format()}.SetSettings method.");
             DevkitServerModule.Fault();
             return;
         }
@@ -85,14 +85,14 @@ internal static class EditorActionsCodeGeneration
             null, CallingConventions.Any, new Type[] { typeof(float), typeof(float), typeof(float) }, null);
         if (nearlyEqual == null)
         {
-            Logger.LogWarning($"Failed to find {typeof(MathfEx).Format()}.IsNearlyEqual method.", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogWarning(EditorActions.Source, $"Failed to find {typeof(MathfEx).Format()}.IsNearlyEqual method.");
             DevkitServerModule.Fault();
             return;
         }
         MethodInfo? objEquals = typeof(object).GetMethod(nameof(Equals), BindingFlags.Instance | BindingFlags.Public);
         if (objEquals == null)
         {
-            Logger.LogWarning($"Failed to find {typeof(object).Format()}.Equals method.", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogWarning(EditorActions.Source, $"Failed to find {typeof(object).Format()}.Equals method.");
             DevkitServerModule.Fault();
             return;
         }
@@ -102,28 +102,28 @@ internal static class EditorActionsCodeGeneration
             CallingConventions.Any, Type.EmptyTypes, null);
         if (claimFromPool == null)
         {
-            Logger.LogWarning($"Failed to find {typeof(Pool<ActionSettingsCollection>).Format()}.claim method.", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogWarning(EditorActions.Source, $"Failed to find {typeof(Pool<ActionSettingsCollection>).Format()}.claim method.");
             DevkitServerModule.Fault();
             return;
         }
         FieldInfo? poolField = typeof(ActionSettings).GetField("CollectionPool", BindingFlags.Static | BindingFlags.NonPublic);
         if (poolField == null)
         {
-            Logger.LogWarning($"Failed to find {typeof(ActionSettings).Format()}.CollectionPool field.", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogWarning(EditorActions.Source, $"Failed to find {typeof(ActionSettings).Format()}.CollectionPool field.");
             DevkitServerModule.Fault();
             return;
         }
         PropertyInfo? flagsProperty = typeof(ActionSettingsCollection).GetProperty(nameof(ActionSettingsCollection.Flags), BindingFlags.Instance | BindingFlags.Public);
         if (flagsProperty == null || flagsProperty.GetMethod == null || flagsProperty.GetSetMethod(true) == null)
         {
-            Logger.LogWarning($"Failed to find {typeof(ActionSettingsCollection).Format()}.Flags field.", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogWarning(EditorActions.Source, $"Failed to find {typeof(ActionSettingsCollection).Format()}.Flags field.");
             DevkitServerModule.Fault();
             return;
         }
         MethodInfo? reset = typeof(ActionSettingsCollection).GetMethod(nameof(ActionSettingsCollection.Reset), BindingFlags.Instance | BindingFlags.Public);
         if (reset == null)
         {
-            Logger.LogWarning($"Failed to find {typeof(ActionSettingsCollection).Format()}.Reset method.", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogWarning(EditorActions.Source, $"Failed to find {typeof(ActionSettingsCollection).Format()}.Reset method.");
             DevkitServerModule.Fault();
             return;
         }
@@ -132,7 +132,7 @@ internal static class EditorActionsCodeGeneration
             CallingConventions.Any, new Type[] { typeof(object) }, null);
         if (append == null)
         {
-            Logger.LogWarning($"Failed to find {typeof(StringBuilder).Format()}.Append method.", method: "EDITOR ACTIONS");
+            Logger.DevkitServer.LogWarning(EditorActions.Source, $"Failed to find {typeof(StringBuilder).Format()}.Append method.");
             DevkitServerModule.Fault();
             return;
         }
@@ -228,7 +228,7 @@ internal static class EditorActionsCodeGeneration
 
                 if (settingsProperty == null || settingsProperty.GetMethod == null || settingsProperty.SetMethod == null)
                 {
-                    Logger.LogWarning($"Failed to find {typeof(ActionSettingsCollection).Format()}'s matching {attr.ActionSetting.Format()} property, skipped code generation.", method: "EDITOR ACTIONS");
+                    Logger.DevkitServer.LogWarning(EditorActions.Source, $"Failed to find {typeof(ActionSettingsCollection).Format()}'s matching {attr.ActionSetting.Format()} property, skipped code generation.");
                     continue;
                 }
 
@@ -411,7 +411,7 @@ internal static class EditorActionsCodeGeneration
                 if (last + 1 != (int)attr.ActionType)
                 {
                     for (int i = last + 1; i < (int)attr.ActionType; ++i)
-                        Logger.LogWarning($"Missing {((DevkitServerActionType)i).Format()} action to use switch expression in generated method.", method: "EDITOR ACTIONS");
+                        Logger.DevkitServer.LogWarning(EditorActions.Source, $"Missing {((DevkitServerActionType)i).Format()} action to use switch expression in generated method.");
                     gap = true;
                 }
                 else last = (int)attr.ActionType;
@@ -421,7 +421,7 @@ internal static class EditorActionsCodeGeneration
             {
                 method = type.GetMethod(attr.CreateMethod!, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, CallingConventions.Any, Type.EmptyTypes, null);
                 if (method == null || !typeof(IAction).IsAssignableFrom(((MethodInfo)method).ReturnType))
-                    Logger.LogWarning($"Unable to find method {type.Format()}.{attr.CreateMethod.Format(false)} when creating the action creator method.", method: "EDITOR ACTIONS");
+                    Logger.DevkitServer.LogWarning(EditorActions.Source, $"Unable to find method {type.Format()}.{attr.CreateMethod.Format(false)} when creating the action creator method.");
             }
             if (method == null)
             {
@@ -436,7 +436,7 @@ internal static class EditorActionsCodeGeneration
             if (method != null)
                 lbls.Add((createGenerator.DefineLabel(), method, attr.ActionType));
             else
-                Logger.LogWarning($"Unable to find a method or constructor for {type.Format()} when creating the action creator method.", method: "EDITOR ACTIONS");
+                Logger.DevkitServer.LogWarning(EditorActions.Source, $"Unable to find a method or constructor for {type.Format()} when creating the action creator method.");
         }
         if (lbls.Count > 0)
         {
@@ -504,14 +504,14 @@ internal static class EditorActionsCodeGeneration
         {
             if (property.GetMethod == null || property.GetSetMethod(true) == null)
             {
-                Logger.LogWarning($"Unable to find a getter for {property.Format()} when creating the read/write methods.", method: "EDITOR ACTIONS");
+                Logger.DevkitServer.LogWarning(EditorActions.Source, $"Unable to find a getter for {property.Format()} when creating the read/write methods.");
                 return;
             }
             MethodInfo? write = ByteWriter.GetWriteMethod(property.PropertyType);
             MethodInfo? read = ByteReader.GetReadMethod(property.PropertyType);
             if (write == null || read == null || write.GetParameters().Length != 1 || read.GetParameters().Length != 0 || !write.GetParameters()[0].ParameterType.IsAssignableFrom(property.PropertyType) || read.ReturnType == typeof(void) || !property.PropertyType.IsAssignableFrom(read.ReturnType))
             {
-                Logger.LogWarning($"Unable to find a read or write method for {property.Format()}'s type: {property.PropertyType.Format()} when creating the read/write methods.", method: "EDITOR ACTIONS");
+                Logger.DevkitServer.LogWarning(EditorActions.Source, $"Unable to find a read or write method for {property.Format()}'s type: {property.PropertyType.Format()} when creating the read/write methods.");
                 return;
             }
 
@@ -594,7 +594,7 @@ internal static class EditorActionsCodeGeneration
         catch (NullReferenceException) { }
         catch (Exception ex)
         {
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(EditorActions.Source, ex, "Invalid OnWritingAction.");
             anyFail = true;
         }
 
@@ -605,7 +605,7 @@ internal static class EditorActionsCodeGeneration
         catch (NullReferenceException) { }
         catch (Exception ex)
         {
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(EditorActions.Source, ex, "Invalid OnReadingAction.");
             anyFail = true;
         }
 
@@ -616,7 +616,7 @@ internal static class EditorActionsCodeGeneration
         catch (NullReferenceException) { }
         catch (Exception ex)
         {
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(EditorActions.Source, ex, "Invalid CreateAction.");
             anyFail = true;
         }
 
@@ -627,7 +627,7 @@ internal static class EditorActionsCodeGeneration
         catch (NullReferenceException) { }
         catch (Exception ex)
         {
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(EditorActions.Source, ex, "Invalid WriteSettingsCollection.");
             anyFail = true;
         }
 
@@ -638,7 +638,7 @@ internal static class EditorActionsCodeGeneration
         catch (NullReferenceException) { }
         catch (Exception ex)
         {
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(EditorActions.Source, ex, "Invalid ReadSettingsCollection.");
             anyFail = true;
         }
         
@@ -650,7 +650,7 @@ internal static class EditorActionsCodeGeneration
         catch (NullReferenceException) { }
         catch (Exception ex)
         {
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(EditorActions.Source, ex, "Invalid AppendSettingsCollection.");
             anyFail = true;
         }
 
@@ -671,19 +671,15 @@ internal delegate void HandleByteReadSettings(ActionSettingsCollection collectio
 internal delegate void HandleAppendSettingsCollection(ActionSettingsCollection collection, StringBuilder builder);
 
 [AttributeUsage(AttributeTargets.Interface)]
-internal sealed class ActionSettingAttribute : Attribute
+internal sealed class ActionSettingAttribute(ActionSetting setting) : Attribute
 {
-    public ActionSetting ActionSetting { get; }
-    public ActionSettingAttribute(ActionSetting setting)
-    {
-        ActionSetting = setting;
-    }
+    public ActionSetting ActionSetting { get; } = setting;
 }
 
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-internal sealed class ActionAttribute : Attribute
+internal sealed class ActionAttribute(DevkitServerActionType type, int capacity, int optionCapacity) : Attribute
 {
-    public DevkitServerActionType ActionType { get; }
+    public DevkitServerActionType ActionType { get; } = type;
 
     /// <summary>
     /// Name of a static method in this class to use to create the action (instead of default constructor).
@@ -693,21 +689,15 @@ internal sealed class ActionAttribute : Attribute
     /// <summary>
     /// Max size in bytes.
     /// </summary>
-    public int Capacity { get; }
+    public int Capacity { get; } = capacity;
 
     /// <summary>
     /// Max size in bytes of a full option change.
     /// </summary>
-    public int OptionCapacity { get; }
+    public int OptionCapacity { get; } = optionCapacity;
 
     /// <summary>
     /// Set at runtime.
     /// </summary>
     public Type? Type { get; internal set; }
-    public ActionAttribute(DevkitServerActionType type, int capacity, int optionCapacity)
-    {
-        ActionType = type;
-        Capacity = capacity;
-        OptionCapacity = optionCapacity;
-    }
 }

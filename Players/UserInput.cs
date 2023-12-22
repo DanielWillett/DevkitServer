@@ -1,11 +1,11 @@
-﻿using DevkitServer.API.Permissions;
+﻿using DevkitServer.API;
+using DevkitServer.API.Permissions;
 using DevkitServer.API.UI;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 using SDG.NetPak;
-using DevkitServer.API;
 #if CLIENT
 using DevkitServer.API.Abstractions;
 using HarmonyLib;
@@ -22,6 +22,7 @@ namespace DevkitServer.Players;
 #endif
 public class UserInput : MonoBehaviour
 {
+    private const string Source = "INPUT";
     private static readonly CachedMulticastEvent<Action<EditorUser>> EventOnUserEditorPositionUpdated = new CachedMulticastEvent<Action<EditorUser>>(typeof(UserInput), nameof(OnUserEditorPositionUpdated));
     private static readonly CachedMulticastEvent<Action<EditorUser>> EventOnUserControllerUpdated = new CachedMulticastEvent<Action<EditorUser>>(typeof(UserInput), nameof(OnUserControllerUpdated));
 #if SERVER
@@ -199,26 +200,26 @@ public class UserInput : MonoBehaviour
         Type? type = Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract");
         if (type == null)
         {
-            Logger.LogWarning("Unable to find type: SDG.Unturned.EditorInteract.");
+            Logger.DevkitServer.LogWarning(Source, "Unable to find type: SDG.Unturned.EditorInteract.");
             return;
         }
         FieldInfo? instanceField = type.GetField("instance", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
         if (instanceField == null || !instanceField.IsStatic || !type.IsAssignableFrom(instanceField.FieldType))
         {
-            Logger.LogWarning("Unable to find field: EditorInteract.instance.");
+            Logger.DevkitServer.LogWarning(Source, "Unable to find field: EditorInteract.instance.");
             return;
         }
         FieldInfo? toolField = type.GetField("activeTool", BindingFlags.Instance | BindingFlags.NonPublic);
         if (toolField == null || toolField.IsStatic || !typeof(IDevkitTool).IsAssignableFrom(toolField.FieldType))
         {
-            Logger.LogWarning("Unable to find field: EditorInteract.activeTool.");
+            Logger.DevkitServer.LogWarning(Source, "Unable to find field: EditorInteract.activeTool.");
         }
         MethodInfo? setToolMethod = type.GetMethod("SetActiveTool", BindingFlags.Instance | BindingFlags.Static |
                                                                     BindingFlags.NonPublic | BindingFlags.Public, null,
                                                                     CallingConventions.Any, new Type[] { typeof(IDevkitTool) }, null);
         if (setToolMethod == null)
         {
-            Logger.LogWarning("Unable to find method: EditorInteract.SetActiveTool.");
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorInteract.SetActiveTool.");
         }
 
         Accessor.GetDynamicMethodFlags(true, out MethodAttributes attributes, out CallingConventions conventions);
@@ -257,7 +258,7 @@ public class UserInput : MonoBehaviour
         if (User == null)
         {
             Destroy(this);
-            Logger.LogError("Invalid UserInput setup; EditorUser not found!");
+            Logger.DevkitServer.LogError(Source, "Invalid UserInput setup; EditorUser not found!");
             return;
         }
 
@@ -269,7 +270,7 @@ public class UserInput : MonoBehaviour
             if (!User.EditorObject.TryGetComponent(out _movement))
             {
                 Destroy(this);
-                Logger.LogError("Invalid UserInput setup; EditorMovement not found!");
+                Logger.DevkitServer.LogError(Source, "Invalid UserInput setup; EditorMovement not found!");
                 return;
             }
             PlayerUI? plUi = User.gameObject.GetComponentInChildren<PlayerUI>();
@@ -300,7 +301,7 @@ public class UserInput : MonoBehaviour
         }
 #endif
 
-        Logger.LogDebug("User input module created for " + User.SteamId.m_SteamID.Format() + " ( owner: " + IsOwner.Format() + " ).");
+        Logger.DevkitServer.LogDebug(Source, $"User input module created for {User.SteamId.m_SteamID.Format()} ( owner: {IsOwner.Format()} ).");
     }
 
 #if CLIENT
@@ -327,7 +328,7 @@ public class UserInput : MonoBehaviour
         {
             input.transform.SetPositionAndRotation(pos, Quaternion.Euler(eulerRotation));
         }
-        Logger.LogDebug($"Received initial transform {user.Format()}: {pos.Format()}, {eulerRotation.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Received initial transform {user.Format()}: {pos.Format()}, {eulerRotation.Format()}.");
         ctx.Acknowledge(StandardErrorCode.Success);
         EventOnUserEditorPositionUpdated.TryInvoke(user);
     }
@@ -385,72 +386,61 @@ public class UserInput : MonoBehaviour
             GameObject? ctrl = ControllerObject;
             if (ctrl == null || !SetActiveMainCamera(ctrl.transform))
             {
-                Logger.LogDebug($"Unable to set main camera: {ctrl.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Unable to set main camera: {ctrl.Format()}.");
                 return;
             }
 #if DEBUG
             PlayerUI? playerUi = UIAccessTools.PlayerUI;
             if (playerUi != null)
-                Logger.LogDebug("PlayerUI " + (playerUi.gameObject.activeInHierarchy ? "active" : "inactive") + " (" + (playerUi.enabled ? "enabled" : "disabled") + "): " + playerUi.gameObject.GetSceneHierarchyPath() + ".");
+                Logger.DevkitServer.LogDebug(Source, "PlayerUI " + (playerUi.gameObject.activeInHierarchy ? "active" : "inactive") +
+                                                     " (" + (playerUi.enabled ? "enabled" : "disabled") + "): " + playerUi.gameObject.GetSceneHierarchyPath().Format(false) + ".");
             EditorUI? editorUi = UIAccessTools.EditorUI;
             if (editorUi != null)
-                Logger.LogDebug("EditorUI " + (editorUi.gameObject.activeInHierarchy ? "active" : "inactive") + " (" + (editorUi.enabled ? "enabled" : "disabled") + "): " + editorUi.gameObject.GetSceneHierarchyPath() + ".");
+                Logger.DevkitServer.LogDebug(Source, "EditorUI " + (editorUi.gameObject.activeInHierarchy ? "active" : "inactive") +
+                                                     " (" + (editorUi.enabled ? "enabled" : "disabled") + "): " + editorUi.gameObject.GetSceneHierarchyPath().Format(false) + ".");
 #endif
 
-            Logger.LogInfo($"Camera controller set to {Controller.Format()}.", ConsoleColor.DarkCyan);
+            Logger.DevkitServer.LogInfo(Source, $"Camera controller set to {Controller.Format()}.", ConsoleColor.DarkCyan);
         }
 #endif
         EventOnUserControllerUpdated.TryInvoke(User);
     }
 #if CLIENT
-    [HarmonyPatch(typeof(PlayerLook), "updateScope")]
-    [HarmonyFinalizer]
-    [UsedImplicitly]
-    private static void PlayerLookUpdateScopeFinalizer(ref Exception __exception)
-    {
-        if (__exception != null)
-        {
-            Logger.LogError("Error updating player look scope settings.");
-            Logger.LogError(__exception);
-            __exception = null!;
-        }
-    }
-
     internal static bool SetActiveMainCamera(Transform tranform)
     {
         Transform? child = tranform.FindChildRecursive("Camera");
         if (child == null)
         {
-            Logger.LogWarning("Failed to find 'Camera' child.");
+            Logger.DevkitServer.LogWarning(Source, "Failed to find 'Camera' child.");
             return false;
         }
 
         MainCamera? cameraObj = child.GetComponentInChildren<MainCamera>();
         if (cameraObj == null)
         {
-            Logger.LogWarning("Failed to find MainCamera component.");
+            Logger.DevkitServer.LogWarning(Source, "Failed to find MainCamera component.");
             return false;
         }
         
         if (!cameraObj.transform.TryGetComponent(out Camera camera))
         {
-            Logger.LogWarning("Failed to find Camera component on MainCamera object.");
+            Logger.DevkitServer.LogWarning(Source, "Failed to find Camera component on MainCamera object.");
             return false;
         }
 
         if (MainCamera.instance == camera)
         {
-            Logger.LogDebug("Camera already set to the correct instance.");
+            Logger.DevkitServer.LogDebug(Source, "Camera already set to the correct instance.");
             return true;
         }
         camera.enabled = true;
-        Logger.LogDebug("Camera enabled: " + camera.gameObject.GetSceneHierarchyPath() + ".");
+        Logger.DevkitServer.LogDebug(Source, "Camera enabled: " + camera.gameObject.GetSceneHierarchyPath().Format(false) + ".");
 
         Camera oldCamera = MainCamera.instance;
         if (oldCamera != null)
         {
             oldCamera.enabled = false;
-            Logger.LogDebug("Camera disabled: " + oldCamera.gameObject.GetSceneHierarchyPath() + ".");
+            Logger.DevkitServer.LogDebug(Source, "Camera disabled: " + oldCamera.gameObject.GetSceneHierarchyPath().Format(false) + ".");
         }
 
         try
@@ -460,8 +450,7 @@ public class UserInput : MonoBehaviour
         }
         catch (Exception ex)
         {
-            Logger.LogError("Failed to set camera instance to \"" + tranform.gameObject.GetSceneHierarchyPath() + "\".");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(Source, ex, "Failed to set camera instance to " + tranform.gameObject.GetSceneHierarchyPath().Format(false) + ".");
         }
 
         return false;
@@ -476,7 +465,7 @@ public class UserInput : MonoBehaviour
     {
         if (!reader.ReadUInt16(out ushort len))
         {
-            Logger.LogError("Failed to read incoming movement packet length.");
+            Logger.DevkitServer.LogError(Source, "Failed to read incoming movement packet length.");
             return;
         }
         NetFactory.IncrementByteCount(DevkitServerMessage.MovementRelay, false, len + sizeof(ushort));
@@ -485,13 +474,13 @@ public class UserInput : MonoBehaviour
         EditorUser? user = UserManager.FromConnection(transportConnection);
         if (user == null)
         {
-            Logger.LogError("Failed to find user for movement packet from transport connection: " + transportConnection.Format() + ".");
+            Logger.DevkitServer.LogError(Source, "Failed to find user for movement packet from transport connection: " + transportConnection.Format() + ".");
             return;
         }
 #endif
         if (!reader.ReadBytesPtr(len, out byte[] buffer, out int offset))
         {
-            Logger.LogError("Failed to read movement packet.");
+            Logger.DevkitServer.LogError(Source, "Failed to read movement packet.");
             return;
         }
         Reader.LoadNew(new ArraySegment<byte>(buffer, offset, len));
@@ -500,7 +489,7 @@ public class UserInput : MonoBehaviour
         EditorUser? user = UserManager.FromId(s64);
         if (user == null)
         {
-            Logger.LogError("Failed to find user for movement packet from a steam id: " + s64.Format() + ".");
+            Logger.DevkitServer.LogError(Source, $"Failed to find user for movement packet from a steam id: {s64.Format()}.");
             return;
         }
 #endif
@@ -572,7 +561,7 @@ public class UserInput : MonoBehaviour
     [UsedImplicitly]
     private void OnDestroy()
     {
-        Logger.LogDebug("EditorInput destroyed.");
+        Logger.DevkitServer.LogDebug(Source, "EditorInput destroyed.");
 #if SERVER
         SaveManager.onPostSave -= Save;
 #endif
@@ -857,7 +846,7 @@ public class UserInput : MonoBehaviour
                 if (v is > 0 and < 4)
                     block.readByte();
 
-                Logger.LogDebug($" Loaded position: {pos.Format()}, rotation: {_lastYaw.Format()}, {_lastPitch.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $" Loaded position: {pos.Format()}, rotation: {_lastYaw.Format()}, {_lastPitch.Format()}.");
                 SetEditorPosition(pos, new Vector3(_lastYaw, _lastPitch, 0f));
                 return;
             }
@@ -865,7 +854,7 @@ public class UserInput : MonoBehaviour
 
         PlayerSpawnpoint spawn = LevelPlayers.getSpawn(false);
         pos = spawn.point + new Vector3(0.0f, 2f, 0.0f);
-        Logger.LogDebug(" Loaded random position: " + pos.Format() + ", " + spawn.angle.Format() + "°.");
+        Logger.DevkitServer.LogDebug(Source, $" Loaded random position: {pos.Format()}, {spawn.angle.Format()}°.");
         SetEditorPosition(pos, new Vector3(0f, spawn.angle, 0f));
 
     }
@@ -884,7 +873,7 @@ public class UserInput : MonoBehaviour
         Block block = new Block();
         block.writeUInt16(SaveDataVersion);
         block.writeSingleVector3(_lastPos);
-        Logger.LogDebug(" Saved position: " + _lastPos.Format() + ", (" + _lastPitch.Format() + ", " + _lastYaw.Format() + ").");
+        Logger.DevkitServer.LogDebug(Source, $" Saved position: {_lastPos.Format()}, ({_lastPitch.Format()}, {_lastYaw.Format()}).");
         PlayerSavedata.writeBlock(User.Player.playerID, "/DevkitServer/Input.dat", block);
     }
 #endif
@@ -911,7 +900,7 @@ public class UserInput : MonoBehaviour
         }
         SetPitch?.Invoke(Mathf.Clamp(euler.x, -90f, 90f));
         SetYaw?.Invoke(euler.y);
-        Logger.LogDebug($"Set editor transform: {position.Format()}, {euler.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Set editor transform: {position.Format()}, {euler.Format()}.");
     }
     public static Ray GetLocalLookRay()
     {

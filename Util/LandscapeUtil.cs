@@ -1,13 +1,16 @@
 ﻿#define TIME_TRANSACTIONS
 using DevkitServer.API;
+using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Sync;
 using SDG.Framework.Devkit;
 using SDG.Framework.Landscapes;
 using System.Globalization;
 using System.Reflection;
-using DevkitServer.Multiplayer.Actions;
-
 #if DEBUG && TIME_TRANSACTIONS
 using System.Diagnostics;
+#endif
+#if CLIENT
+using DevkitServer.Players;
 #endif
 
 namespace DevkitServer.Util;
@@ -216,20 +219,18 @@ public static class LandscapeUtil
                     try
                     {
                         File.Delete(hmFile);
-                        Logger.LogDebug($"[CLEANUP TILE] Cleaned up heightmap for tile {coordinate.Format()}: {hmFile.Format(true)}.");
+                        Logger.DevkitServer.LogDebug(nameof(CleanupTile), $"Cleaned up heightmap for tile {coordinate.Format()}: {hmFile.Format(true)}.");
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"Error cleaning up heightmap for tile {coordinate.Format()}: {hmFile.Format(true)}.", method: "CLEANUP TILE");
-                        Logger.LogError(ex, method: "CLEANUP TILE");
+                        Logger.DevkitServer.LogError(nameof(CleanupTile), ex, $"Error cleaning up heightmap for tile {coordinate.Format()}: {hmFile.Format(true)}.");
                     }
                 }
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error cleaning up heightmaps for tile {coordinate.Format()} in: {hmDir.Format(true)}.", method: "CLEANUP TILE");
-            Logger.LogError(ex, method: "CLEANUP TILE");
+            Logger.DevkitServer.LogError(nameof(CleanupTile), ex, $"Error cleaning up heightmaps for tile {coordinate.Format()} in: {hmDir.Format(true)}.");
         }
 
         string smDir = Path.Combine(Level.info.path, "Landscape", "Splatmaps");
@@ -243,20 +244,18 @@ public static class LandscapeUtil
                     try
                     {
                         File.Delete(smFile);
-                        Logger.LogDebug($"[CLEANUP TILE] Cleaned up splatmap for tile {coordinate.Format()}: {smFile.Format(true)}.");
+                        Logger.DevkitServer.LogDebug(nameof(CleanupTile), $"Cleaned up splatmap for tile {coordinate.Format()}: {smFile.Format(true)}.");
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"Error cleaning up splatmap for tile {coordinate.Format()}: {smFile.Format(true)}.", method: "CLEANUP TILE");
-                        Logger.LogError(ex, method: "CLEANUP TILE");
+                        Logger.DevkitServer.LogError(nameof(CleanupTile), ex, $"Error cleaning up splatmap for tile {coordinate.Format()}: {smFile.Format(true)}.");
                     }
                 }
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error cleaning up splatmaps for tile {coordinate.Format()} in: {smDir.Format(true)}.", method: "CLEANUP TILE");
-            Logger.LogError(ex, method: "CLEANUP TILE");
+            Logger.DevkitServer.LogError(nameof(CleanupTile), ex, $"Error cleaning up splatmaps for tile {coordinate.Format()} in: {smDir.Format(true)}.");
         }
 
         string hlDir = Path.Combine(Level.info.path, "Landscape", "Holes");
@@ -270,20 +269,18 @@ public static class LandscapeUtil
                     try
                     {
                         File.Delete(hlFile);
-                        Logger.LogDebug($"[CLEANUP TILE] Cleaned up holes for tile {coordinate.Format()}: {hlFile.Format(true)}.");
+                        Logger.DevkitServer.LogDebug(nameof(CleanupTile), $"Cleaned up holes for tile {coordinate.Format()}: {hlFile.Format(true)}.");
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"Error cleaning up holes for tile {coordinate.Format()}: {hlFile.Format(true)}.", method: "CLEANUP TILE");
-                        Logger.LogError(ex, method: "CLEANUP TILE");
+                        Logger.DevkitServer.LogError(nameof(CleanupTile), ex, $"Error cleaning up holes for tile {coordinate.Format()}: {hlFile.Format(true)}.");
                     }
                 }
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error cleaning up holes for tile {coordinate.Format()} in: {hlDir.Format(true)}.", method: "CLEANUP TILE");
-            Logger.LogError(ex, method: "CLEANUP TILE");
+            Logger.DevkitServer.LogError(nameof(CleanupTile), ex, $"Error cleaning up holes for tile {coordinate.Format()} in: {hlDir.Format(true)}.");
         }
     }
     /// <summary>
@@ -330,19 +327,17 @@ public static class LandscapeUtil
                     try
                     {
                         File.Delete(file);
-                        Logger.LogDebug($"[DELETE UNUSED TILE DATA] Cleaned up {type} for tile {coordinate.Format()}: {file.Format(true)}.");
+                        Logger.DevkitServer.LogDebug(nameof(DeleteUnusedTileData), $"Cleaned up {type} for tile {coordinate.Format()}: {file.Format(true)}.");
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"Error cleaning up {type} for tile {coordinate.Format()}: {file.Format(true)}.", method: "DELETE UNUSED TILE DATA");
-                        Logger.LogError(ex, method: "DELETE UNUSED TILE DATA");
+                        Logger.DevkitServer.LogError(nameof(DeleteUnusedTileData), ex, $"Error cleaning up {type} for tile {coordinate.Format()}: {file.Format(true)}.");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Error cleaning up {category}.", method: "DELETE UNUSED TILE DATA");
-                Logger.LogError(ex, method: "DELETE UNUSED TILE DATA");
+                Logger.DevkitServer.LogError(nameof(DeleteUnusedTileData), ex, $"Error cleaning up {category}.");
             }
         }
     }
@@ -475,7 +470,6 @@ public static class LandscapeUtil
         int blockSize = sizeY * sizeof(float);
         fixed (float* tileData = tile.heightmap)
         {
-            Logger.LogDebug($"[TERRAIN COPY] Reading heightmap: Offset: ({offsetX.Format()}, {offsetY.Format()}). Size: ({sizeX.Format()}, {sizeY.Format()}). Tile Size: {tileSize.Format()}. Block Size: {blockSize.Format()}.");
             for (int x = offsetX; x < offsetX + sizeX; ++x)
             {
                 Buffer.MemoryCopy(tileData + x * tileSize + offsetY, buffer, blockSize, blockSize);
@@ -495,7 +489,6 @@ public static class LandscapeUtil
         int blockSize = sizeY * sizeof(float);
         fixed (float* tileData = tile.heightmap)
         {
-            Logger.LogDebug($"[TERRAIN COPY] Writing heightmap: Offset: ({offsetX.Format()}, {offsetY.Format()}). Size: ({sizeX.Format()}, {sizeY.Format()}). Tile Size: {tileSize.Format()}. Block Size: {blockSize.Format()}.");
             for (int x = offsetX; x < offsetX + sizeX; ++x)
             {
                 Buffer.MemoryCopy(buffer, tileData + x * tileSize + offsetY, blockSize, blockSize);
@@ -505,7 +498,6 @@ public static class LandscapeUtil
 
         if (apply)
         {
-            Logger.LogDebug("Applying heightmap to " + tile.coord.Format() + ".");
             tile.SetHeightsDelayLOD();
             tile.SyncHeightmap();
             LevelHierarchy.MarkDirty();
@@ -523,7 +515,6 @@ public static class LandscapeUtil
         int blockSize = sizeY * layers * sizeof(float);
         fixed (float* tileData = tile.splatmap)
         {
-            Logger.LogDebug($"[TERRAIN COPY] Reading splatmap: Offset: ({offsetX.Format()}, {offsetY.Format()}). Size: ({sizeX.Format()}, {sizeY.Format()}). Tile Size: {tileSize.Format()}. Block Size: {blockSize.Format()}.");
             for (int x = offsetX; x < offsetX + sizeX; ++x)
             {
                 Buffer.MemoryCopy(tileData + x * tileSize + offsetY * layers, buffer, blockSize, blockSize);
@@ -544,7 +535,6 @@ public static class LandscapeUtil
 
         fixed (float* tileData = tile.splatmap)
         {
-            Logger.LogDebug($"[TERRAIN COPY] Writing splatmap: Offset: ({offsetX.Format()}, {offsetY.Format()}). Size: ({sizeX.Format()}, {sizeY.Format()}). Tile Size: {tileSize.Format()}. Block Size: {blockSize.Format()}.");
             for (int x = offsetX; x < offsetX + sizeX; ++x)
             {
                 Buffer.MemoryCopy(buffer, tileData + x * tileSize + offsetY * layers, blockSize, blockSize);
@@ -554,7 +544,6 @@ public static class LandscapeUtil
         
         if (apply)
         {
-            Logger.LogDebug("Applying splatmap to " + tile.coord.Format() + ".");
             tile.data.SetAlphamaps(0, 0, tile.splatmap);
             LevelHierarchy.MarkDirty();
         }
@@ -572,8 +561,6 @@ public static class LandscapeUtil
         int offsetY = bounds.min.y;
         int sizeX = bounds.max.x - offsetX + 1;
         int sizeY = bounds.max.y - offsetY + 1;
-        const int tileSize = Landscape.HOLES_RESOLUTION;
-        Logger.LogDebug($"[TERRAIN COPY] Reading holes: Offset: ({offsetX.Format()}, {offsetY.Format()}). Size: ({sizeX.Format()}, {sizeY.Format()}). Tile Size: {tileSize.Format()}.");
         int bitCt = 0;
         for (int x = offsetX; x < offsetX + sizeX; ++x)
         {
@@ -595,8 +582,6 @@ public static class LandscapeUtil
         int offsetY = bounds.min.y;
         int sizeX = bounds.max.x - offsetX + 1;
         int sizeY = bounds.max.y - offsetY + 1;
-        const int tileSize = Landscape.HOLES_RESOLUTION;
-        Logger.LogDebug($"[TERRAIN COPY] Writing holes: Offset: ({offsetX.Format()}, {offsetY.Format()}). Size: ({sizeX.Format()}, {sizeY.Format()}). Tile Size: {tileSize.Format()}.");
         int bitCt = 0;
         for (int x = offsetX; x < offsetX + sizeX; ++x)
         {
@@ -609,7 +594,6 @@ public static class LandscapeUtil
 
         if (apply)
         {
-            Logger.LogDebug("Applying holes to " + tile.coord.Format() + ".");
             tile.data.SetHoles(0, 0, tile.holes);
             tile.hasAnyHolesData = true;
             LevelHierarchy.MarkDirty();
@@ -632,8 +616,7 @@ public static class LandscapeUtil
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error writing to heightmap.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(nameof(WriteHeightmapNoTransactions), ex, "Error writing to heightmap.");
         }
         finally
         {
@@ -643,7 +626,7 @@ public static class LandscapeUtil
             SaveTransactions = true;
         }
 #if DEBUG && TIME_TRANSACTIONS
-        Logger.LogDebug($"Heightmap on {worldBounds.Format()} ({callback.Method.Name.Format(false)}): {sw.GetElapsedMilliseconds().Format("F2")} ms.");
+        Logger.DevkitServer.LogDebug(nameof(WriteHeightmapNoTransactions), $"Heightmap on {worldBounds.Format()} ({callback.Method.Name.Format(false)}): {sw.GetElapsedMilliseconds().Format("F2")} ms.");
 #endif
     }
     public static void WriteSplatmapNoTransactions(Bounds worldBounds, Landscape.LandscapeWriteSplatmapHandler callback)
@@ -663,8 +646,7 @@ public static class LandscapeUtil
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error writing to splatmap.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(nameof(WriteSplatmapNoTransactions), ex, "Error writing to splatmap.");
         }
         finally
         {
@@ -674,7 +656,7 @@ public static class LandscapeUtil
             SaveTransactions = true;
         }
 #if DEBUG && TIME_TRANSACTIONS
-        Logger.LogDebug($"Splatmap on {worldBounds.Format()} ({callback.Method.Name.Format(false)}): {sw.GetElapsedMilliseconds().Format("F2")} ms.");
+        Logger.DevkitServer.LogDebug(nameof(WriteSplatmapNoTransactions), $"Splatmap on {worldBounds.Format()} ({callback.Method.Name.Format(false)}): {sw.GetElapsedMilliseconds().Format("F2")} ms.");
 #endif
     }
     public static void WriteHolesNoTransactions(Bounds worldBounds, Landscape.LandscapeWriteHolesHandler callback)
@@ -694,8 +676,7 @@ public static class LandscapeUtil
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error writing to holes.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(nameof(WriteHolesNoTransactions), ex, "Error writing to holes.");
         }
         finally
         {
@@ -705,11 +686,32 @@ public static class LandscapeUtil
             SaveTransactions = true;
         }
 #if DEBUG && TIME_TRANSACTIONS
-        Logger.LogDebug($"Holes on {worldBounds.Format()} ({callback.Method.Name.Format(false)}): {sw.GetElapsedMilliseconds().Format("F2")} ms.");
+        Logger.DevkitServer.LogDebug(nameof(WriteHolesNoTransactions), $"Holes on {worldBounds.Format()} ({callback.Method.Name.Format(false)}): {sw.GetElapsedMilliseconds().Format("F2")} ms.");
 #endif
     }
     public static float GetBrushAlpha(IBrushFalloffAction action, float distance)
     {
         return distance < action.BrushFalloff ? 1f : (1f - distance) / (1f - action.BrushFalloff);
+    }
+    internal static bool CheckSync(out TileSync sync)
+    {
+        sync = null!;
+#if CLIENT
+        if (!DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.TileSync == null || !EditorUser.User.TileSync.HasAuthority)
+            return false;
+        sync = EditorUser.User.TileSync;
+#elif SERVER
+        if (!DevkitServerModule.IsEditing || TileSync.ServersideAuthority == null || !TileSync.ServersideAuthority.HasAuthority)
+            return false;
+        sync = TileSync.ServersideAuthority;
+#endif
+        return true;
+    }
+    public static bool SyncIfAuthority(Bounds bounds, TileSync.DataType type)
+    {
+        if (!CheckSync(out TileSync sync))
+            return false;
+        sync.InvalidateBounds(bounds, type, CachedTime.RealtimeSinceStartup);
+        return true;
     }
 }

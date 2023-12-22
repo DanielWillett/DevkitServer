@@ -1,7 +1,4 @@
 ﻿using DevkitServer.API.Commands;
-#if SERVER
-using DevkitServer.Players;
-#endif
 
 namespace DevkitServer.Core.Commands.Subsystem;
 public class CommandParser(ICommandHandler handler)
@@ -24,7 +21,7 @@ public class CommandParser(ICommandHandler handler)
 #if CLIENT
         bool console,
 #endif
-        string message, ref bool shouldList, bool requirePrefix)
+        ReadOnlySpan<char> message, ref bool shouldList, bool requirePrefix)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -346,7 +343,7 @@ public class CommandParser(ICommandHandler handler)
                 args[++i3] = new string(ptr, ai.Start, ai.End - ai.Start + 1);
             }
 
-            string originalMessage = message;
+            string originalMessage = message.ToString();
             if (!requirePrefix && Prefixes.Length > 0)
             {
                 // add prefix for consistancy if left out

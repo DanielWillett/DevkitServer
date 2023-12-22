@@ -7,16 +7,9 @@ using System.Reflection.Emit;
 
 namespace DevkitServer.Core.UI.Handlers;
 
-internal class CustomNodeMenuHandler : CustomSelectionToolMenuHandler
-{
-    public CustomNodeMenuHandler() : base(UIAccessTools.EditorEnvironmentNodesUIType, "EditorEnvironmentNodesUI") { }
-}
-internal class CustomVolumeMenuHandler : CustomSelectionToolMenuHandler
-{
-    public CustomVolumeMenuHandler() : base(UIAccessTools.EditorVolumesUIType, "EditorVolumesUI") { }
-}
-
-internal abstract class CustomSelectionToolMenuHandler : ICustomOnCloseUIHandler, ICustomOnOpenUIHandler
+internal class CustomNodeMenuHandler() : CustomSelectionToolMenuHandler(UIAccessTools.EditorEnvironmentNodesUIType, "EditorEnvironmentNodesUI");
+internal class CustomVolumeMenuHandler() : CustomSelectionToolMenuHandler(UIAccessTools.EditorVolumesUIType, "EditorVolumesUI");
+internal abstract class CustomSelectionToolMenuHandler(Type? type, string backupName) : ICustomOnCloseUIHandler, ICustomOnOpenUIHandler
 {
     private const string Source = UIAccessTools.Source + ".SELECTION TOOL HANDLER";
     
@@ -26,26 +19,21 @@ internal abstract class CustomSelectionToolMenuHandler : ICustomOnCloseUIHandler
     public bool HasOnCloseBeenInitialized { get; set; }
     public bool HasOnOpenBeenInitialized { get; set; }
     public bool HasOnDestroyBeenInitialized { get; set; }
-    public Type? Type { get; }
-    public string TypeName { get; }
-    protected CustomSelectionToolMenuHandler(Type? type, string backupName)
-    {
-        Type = type;
-        TypeName = type?.Name ?? backupName;
-    }
-    
+    public Type? Type { get; } = type;
+    public string TypeName { get; } = type?.Name ?? backupName;
+
     public void Patch(Harmony patcher)
     {
         if (Type == null)
         {
-            Logger.LogWarning($"Unable to find type: {TypeName.Format(false)}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to find type: {TypeName.Format(false)}.");
             return;
         }
 
         MethodInfo? onUpdateMethod = Type.GetMethod("OnUpdate", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         if (onUpdateMethod == null)
         {
-            Logger.LogWarning($"Unable to find method: {Type.Format()}.OnUpdate.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to find method: {FormattingUtil.FormatMethod(typeof(void), Type, "OnUpdate", arguments: Type.EmptyTypes)}.");
             return;
         }
 
@@ -56,15 +44,14 @@ internal abstract class CustomSelectionToolMenuHandler : ICustomOnCloseUIHandler
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Unable to patch: {onUpdateMethod.Format()}.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, $"Unable to patch: {onUpdateMethod.Format()}.");
             return;
         }
 
         MethodInfo? closeMethod = Type!.GetMethod("Close", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         if (closeMethod == null)
         {
-            Logger.LogWarning($"Unable to find method: {Type.Format()}.Close.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to find method: {FormattingUtil.FormatMethod(typeof(void), Type, "Close", arguments: Type.EmptyTypes)}.");
             return;
         }
 
@@ -75,8 +62,7 @@ internal abstract class CustomSelectionToolMenuHandler : ICustomOnCloseUIHandler
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Unable to patch: {closeMethod.Format()}.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, $"Unable to patch: {closeMethod.Format()}.");
         }
     }
 
@@ -98,12 +84,12 @@ internal abstract class CustomSelectionToolMenuHandler : ICustomOnCloseUIHandler
         MethodInfo removeInvoker = Accessor.GetMethod(OnClosedAndDestroyedInvoker)!;
         MethodInfo? addMethod = typeof(SleekWrapper).GetMethod(nameof(SleekWrapper.AddChild), BindingFlags.Instance | BindingFlags.Public);
         if (addMethod == null)
-            Logger.LogError("Unable to find method: SleekWrapper.AddChild.", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Unable to find method: {FormattingUtil.FormatMethod(typeof(void), typeof(SleekWrapper), nameof(SleekWrapper.AddChild), [ (typeof(ISleekElement), "sleek") ])}.");
         MethodInfo? removeMethod = typeof(SleekWrapper).GetMethod(nameof(SleekWrapper.RemoveChild), BindingFlags.Instance | BindingFlags.Public);
         if (removeMethod == null)
-            Logger.LogError("Unable to find method: SleekWrapper.RemoveChild.", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Unable to find method: {FormattingUtil.FormatMethod(typeof(void), typeof(SleekWrapper), nameof(SleekWrapper.RemoveChild), [ (typeof(ISleekElement), "sleek") ])}.");
 
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> ins = [..instructions];
 
         bool add = false, remove = false;
         for (int i = 0; i < ins.Count; ++i)
@@ -133,11 +119,11 @@ internal abstract class CustomSelectionToolMenuHandler : ICustomOnCloseUIHandler
         }
         if (!add)
         {
-            Logger.LogError($"Failed to patch: {method.Format()}, unable to insert add child invoker (on opened).", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Failed to patch: {method.Format()}, unable to insert add child invoker (on opened).");
         }
         if (!remove)
         {
-            Logger.LogError($"Failed to patch: {method.Format()}, unable to insert remove child invoker (on closed).", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Failed to patch: {method.Format()}, unable to insert remove child invoker (on closed).");
         }
 
         return ins;

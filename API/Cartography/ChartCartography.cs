@@ -1,11 +1,11 @@
 ﻿extern alias NSJ;
+using Cysharp.Threading.Tasks;
 using DevkitServer.API.Cartography.ChartColorProviders;
+using DevkitServer.Core.Cartography;
 using DevkitServer.Core.Cartography.ChartColorProviders;
 using DevkitServer.Core.Cartography.Jobs;
 using DevkitServer.Plugins;
 using System.Diagnostics;
-using Cysharp.Threading.Tasks;
-using DevkitServer.Core.Cartography;
 using Unity.Collections;
 using Unity.Jobs;
 using TransformCacheEntry = (UnityEngine.Transform transform, int layer);
@@ -61,13 +61,13 @@ public static class ChartCartography
 
         if (colorProvider == null)
         {
-            Logger.LogError($"No available color providers. See {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/Cartography Rendering.md", false).Format(false)} for how to set up a chart color provider.");
+            Logger.DevkitServer.LogError(nameof(ChartCartography), $"No available color providers. See {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/Cartography Rendering.md", false).Format(false)} for how to set up a chart color provider.");
             return null;
         }
 
         if (CallGetObjectState == null || RestorePreCaptureState == null)
         {
-            Logger.LogWarning("Failed to save/load pre-capture state during chart capture. Check for updates or report this as a bug.");
+            Logger.DevkitServer.LogWarning(nameof(ChartCartography), "Failed to save/load pre-capture state during chart capture. Check for updates or report this as a bug.");
         }
 
         object? captureState = CallGetObjectState?.Invoke();
@@ -91,18 +91,18 @@ public static class ChartCartography
                     default:
                         if (providerInfo.Plugin != null)
                         {
-                            providerInfo.Plugin.LogInfo($"Chart color provider {providerInfo.Type.Format()} did not perform any action.");
-                            providerInfo.Plugin.LogInfo($"Recommended to implement one of the following parents: {typeof(RaycastChartColorProvider).Format()}, {typeof(ISamplingChartColorProvider).Format()}, {typeof(IFullChartColorProvider).Format()}.");
+                            providerInfo.Plugin.LogInfo(nameof(ChartCartography), $"Chart color provider {providerInfo.Type.Format()} did not perform any action.");
+                            providerInfo.Plugin.LogInfo(nameof(ChartCartography), $"Recommended to implement one of the following parents: {typeof(RaycastChartColorProvider).Format()}, {typeof(ISamplingChartColorProvider).Format()}, {typeof(IFullChartColorProvider).Format()}.");
                         }
                         else
-                            Logger.LogError($"Color provider {providerInfo.Type.Format()} did not perform any action.");
+                            Logger.DevkitServer.LogError(nameof(ChartCartography), $"Color provider {providerInfo.Type.Format()} did not perform any action.");
 
                         break;
                 }
             }
             sw.Stop();
 
-            Logger.LogInfo($"[{nameof(CaptureChart)}] Captured chart background in {sw.GetElapsedMilliseconds().Format("F2")} ms.");
+            Logger.DevkitServer.LogInfo(nameof(ChartCartography), $"Captured chart background in {sw.GetElapsedMilliseconds().Format("F2")} ms.");
         }
         finally
         {
@@ -124,15 +124,15 @@ public static class ChartCartography
         if (!CartographyCompositing.CompositeForeground(outputTexture, configData, in data))
         {
             sw.Stop();
-            Logger.LogInfo($"[{nameof(CaptureChart)}] No compositing was done.");
+            Logger.DevkitServer.LogInfo(nameof(ChartCartography), $"No compositing was done.");
         }
         else
         {
             sw.Stop();
-            Logger.LogInfo($"[{nameof(CaptureChart)}] Composited chart in {sw.GetElapsedMilliseconds().Format("F2")} ms.");
+            Logger.DevkitServer.LogInfo(nameof(ChartCartography), $"Composited chart in {sw.GetElapsedMilliseconds().Format("F2")} ms.");
         }
 #else
-        Logger.LogInfo($"[{nameof(CaptureChart)}] No compositing was done (because this is a server build).");
+        Logger.DevkitServer.LogInfo(nameof(ChartCartography), $"No compositing was done (because this is a server build).");
 #endif
 
         if (captureState != null)
@@ -245,13 +245,11 @@ public static class ChartCartography
         {
             if (providerInfo.Plugin != null)
             {
-                providerInfo.Plugin.LogError($"Exception thrown while rendering chart for {data.Level.name.Format(false)} in color provider {colorProvider.GetType().Format()}.");
-                providerInfo.Plugin.LogError(ex);
+                providerInfo.Plugin.LogError(nameof(ChartCartography), ex, $"Exception thrown while rendering chart for {data.Level.name.Format(false)} in color provider {colorProvider.GetType().Format()}.");
             }
             else
             {
-                Logger.LogError($"Exception thrown while rendering chart for {data.Level.name.Format(false)} in color provider {colorProvider.GetType().Format()}.", method: colorProvider.GetType().Name);
-                Logger.LogError(ex, method: colorProvider.GetType().Name);
+                Logger.DevkitServer.LogError(nameof(ChartCartography), ex, $"Exception thrown while rendering chart for {data.Level.name.Format(false)} in color provider {colorProvider.GetType().Format()}.");
             }
         }
         finally
@@ -347,13 +345,11 @@ public static class ChartCartography
         {
             if (providerInfo.Plugin != null)
             {
-                providerInfo.Plugin.LogError($"Exception thrown while rendering chart for {data.Level.name.Format(false)} in color provider {colorProvider.GetType().Format()}.");
-                providerInfo.Plugin.LogError(ex);
+                providerInfo.Plugin.LogError(nameof(ChartCartography), ex, $"Exception thrown while rendering chart for {data.Level.name.Format(false)} in color provider {colorProvider.GetType().Format()}.");
             }
             else
             {
-                Logger.LogError($"Exception thrown while rendering chart for {data.Level.name.Format(false)} in color provider {colorProvider.GetType().Format()}.", method: colorProvider.GetType().Name);
-                Logger.LogError(ex, method: colorProvider.GetType().Name);
+                Logger.DevkitServer.LogError(nameof(ChartCartography), ex, $"Exception thrown while rendering chart for {data.Level.name.Format(false)} in color provider {colorProvider.GetType().Format()}.");
             }
         }
     }
@@ -380,7 +376,7 @@ public static class ChartCartography
 
             if (info.Type == null || !typeof(IChartColorProvider).IsAssignableFrom(info.Type) || info.Type.IsAbstract || info.Type.IsInterface)
             {
-                Logger.LogWarning($"Unknown chart provider: {colorProvider.Format()}, using defaults. Make sure your provider implements {typeof(IChartColorProvider).Format()}.");
+                Logger.DevkitServer.LogWarning(nameof(ChartCartography), $"Unknown chart provider: {colorProvider.Format()}, using defaults. Make sure your provider implements {typeof(IChartColorProvider).Format()}.");
             }
             else
             {
@@ -393,7 +389,7 @@ public static class ChartCartography
                         if (!provider.TryInitialize(in data, true))
                         {
                             Dispose(provider, info);
-                            Logger.LogError("Requested chart provider did not initialize correctly. Check logs above for more details.");
+                            Logger.DevkitServer.LogError(nameof(ChartCartography), "Requested chart provider did not initialize correctly. Check logs above for more details.");
                             providerInfo = info;
                             return null;
                         }
@@ -405,9 +401,9 @@ public static class ChartCartography
                     }
 
                     if (info.Plugin != null)
-                        info.Plugin.LogDebug($"Using color provider of type {info.Type.Format()} as requested by config.");
+                        info.Plugin.LogDebug(nameof(ChartCartography), $"Using color provider of type {info.Type.Format()} as requested by config.");
                     else
-                        Logger.LogDebug($"[{nameof(GetChartColorProvider)}] Using color provider of type {info.Type.Format()} as requested by config.");
+                        Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Using color provider of type {info.Type.Format()} as requested by config.");
 
                     providerInfo = info;
                     return provider;
@@ -416,13 +412,11 @@ public static class ChartCartography
                 {
                     if (info.Plugin != null)
                     {
-                        info.Plugin.LogError($"Exception thrown while initializing color provider of type {info.Type.Format()}.");
-                        info.Plugin.LogError(ex);
+                        info.Plugin.LogError(nameof(ChartCartography), ex, $"Exception thrown while initializing color provider of type {info.Type.Format()}.");
                     }
                     else
                     {
-                        Logger.LogError($"Exception thrown while initializing color provider of type {info.Type.Format()}.", method: info.Type.Name);
-                        Logger.LogError(ex, method: info.Type.Name);
+                        Logger.DevkitServer.LogError(nameof(ChartCartography), ex, $"Exception thrown while initializing color provider of type {info.Type.Format()}.");
                     }
 
                     providerInfo = default;
@@ -465,9 +459,9 @@ public static class ChartCartography
                 }
 
                 if (info.Plugin != null)
-                    info.Plugin.LogDebug($"Using color provider of type {info.Type.Format()}.");
+                    info.Plugin.LogDebug(nameof(ChartCartography), $"Using color provider of type {info.Type.Format()}.");
                 else
-                    Logger.LogDebug($"[{nameof(GetChartColorProvider)}] Using color provider of type {info.Type.Format()}.");
+                    Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Using color provider of type {info.Type.Format()}.");
 
                 providerInfo = info;
                 return provider;
@@ -476,13 +470,11 @@ public static class ChartCartography
             {
                 if (info.Plugin != null)
                 {
-                    info.Plugin.LogError($"Exception thrown while initializing color provider of type {info.Type.Format()}.");
-                    info.Plugin.LogError(ex);
+                    info.Plugin.LogError(nameof(ChartCartography), ex, $"Exception thrown while initializing color provider of type {info.Type.Format()}.");
                 }
                 else
                 {
-                    Logger.LogError($"Exception thrown while initializing color provider of type {info.Type.Format()}.", method: info.Type.Name);
-                    Logger.LogError(ex, method: info.Type.Name);
+                    Logger.DevkitServer.LogError(nameof(ChartCartography), ex, $"Exception thrown while initializing color provider of type {info.Type.Format()}.");
                 }
             }
         }
@@ -503,13 +495,11 @@ public static class ChartCartography
             {
                 if (info.Plugin != null)
                 {
-                    info.Plugin.LogError($"Exception thrown while disposing color provider of type {info.Type.Format()}. Providers are disposed even if they're not sucessfully initialized.");
-                    info.Plugin.LogError(ex);
+                    info.Plugin.LogError(nameof(ChartCartography), ex, $"Exception thrown while disposing color provider of type {info.Type.Format()}. Providers are disposed even if they're not sucessfully initialized.");
                 }
                 else
                 {
-                    Logger.LogError($"Exception thrown while disposing color provider of type {info.Type.Format()}. Providers are disposed even if they're not sucessfully initialized.", method: info.Type.Name);
-                    Logger.LogError(ex, method: info.Type.Name);
+                    Logger.DevkitServer.LogError(nameof(ChartCartography), ex, $"Exception thrown while disposing color provider of type {info.Type.Format()}. Providers are disposed even if they're not sucessfully initialized.");
                 }
             }
         }

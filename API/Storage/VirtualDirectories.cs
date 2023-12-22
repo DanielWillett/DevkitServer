@@ -103,6 +103,7 @@ public static class VirtualDirectories
     public static void Save(this VirtualDirectoryRoot root, string directory, bool restrictUnexpectedFileTypes = true)
     {
         directory = Path.GetFullPath(directory);
+        Logger.DevkitServer.LogDebug(nameof(VirtualDirectories), $"Saving virtual directory to {directory.Format(false)}...");
 
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
@@ -129,6 +130,9 @@ public static class VirtualDirectories
             using FileStream fs = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.Read);
             fs.Write(file.Content);
         }
+#if DEBUG
+        Logger.DevkitServer.LogDebug(nameof(VirtualDirectories), "  Done");
+#endif
     }
 
     /// <summary>
@@ -139,6 +143,7 @@ public static class VirtualDirectories
     public static Task SaveAsync(this VirtualDirectoryRoot root, string directory, bool restrictUnexpectedFileTypes = true, CancellationToken token = default)
     {
         directory = Path.GetFullPath(directory);
+        Logger.DevkitServer.LogDebug(nameof(VirtualDirectories), $"Saving virtual directory to {directory.Format(false)}...");
 
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
@@ -175,27 +180,30 @@ public static class VirtualDirectories
             await using FileStream fs = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.Read);
             await fs.WriteAsync(file.Content, token);
         }
+#if DEBUG
+        Logger.DevkitServer.LogDebug(nameof(VirtualDirectories), "  Done");
+#endif
     }
     private static bool VerifyDirectory(string directory)
     {
         if (directory.IndexOf("..", StringComparison.Ordinal) == -1)
             return true;
 
-        Logger.LogWarning($"Skipping directory: {directory} because it contains a 'move up' path element (..).", method: nameof(VirtualDirectoryRoot));
+        Logger.DevkitServer.LogWarning(nameof(VirtualDirectoryRoot), $"Skipping directory: {directory} because it contains a 'move up' path element (..).");
         return false;
     }
     private static bool VerifyFile(VirtualFile file, bool restrictUnexpectedFileTypes)
     {
         if (file.Path.IndexOf("..", StringComparison.Ordinal) != -1)
         {
-            Logger.LogWarning($"Skipping file: {file.Path} because it contains a 'move up' path element (..).", method: nameof(VirtualDirectoryRoot));
+            Logger.DevkitServer.LogWarning(nameof(VirtualDirectoryRoot), $"Skipping file: {file.Path} because it contains a 'move up' path element (..).");
             return false;
         }
         string ext = Path.GetExtension(file.Path);
         if (!restrictUnexpectedFileTypes || string.IsNullOrEmpty(ext) || !RestrictedFileTypesIntl.Contains(ext))
             return true;
 
-        Logger.LogWarning($"Skipping file: {file.Path} because of it's file type.", method: nameof(VirtualDirectoryRoot));
+        Logger.DevkitServer.LogWarning(nameof(VirtualDirectoryRoot), $"Skipping file: {file.Path} because of it's file type.");
         return false;
 
     }

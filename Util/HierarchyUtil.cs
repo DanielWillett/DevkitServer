@@ -7,20 +7,18 @@ using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players;
+using SDG.Framework.Devkit;
 #if SERVER
 using DevkitServer.API.UI;
 using DevkitServer.Core.Permissions;
 #elif CLIENT
 using DevkitServer.Multiplayer.Actions;
 #endif
-using SDG.Framework.Devkit;
 
 namespace DevkitServer.Util;
 [EarlyTypeInit]
 public static class HierarchyUtil
 {
-    private const string Source = "LEVEL HIERARCHY";
-
     internal static readonly List<IDevkitHierarchyItem> HierarchyItemBuffer = new List<IDevkitHierarchyItem>(64);
     
     [UsedImplicitly]
@@ -57,8 +55,7 @@ public static class HierarchyUtil
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error instantiating {type.Format()} at Net ID {netId.Format()}.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(nameof(ReceiveHierarchyInstantiation), ex, $"Error instantiating {type.Format()} at Net ID {netId.Format()}.");
             return StandardErrorCode.GenericError;
         }
 
@@ -73,7 +70,7 @@ public static class HierarchyUtil
             return StandardErrorCode.Success;
         }
 
-        Logger.LogError($"Failed to create {type.Format()}, at Net ID {netId.Format()}.", method: Source);
+        Logger.DevkitServer.LogError(nameof(ReceiveHierarchyInstantiation), $"Failed to create {type.Format()}, at Net ID {netId.Format()}.");
         return StandardErrorCode.GenericError;
     }
 #elif SERVER
@@ -83,7 +80,7 @@ public static class HierarchyUtil
         EditorUser? user = ctx.GetCaller();
         if (user == null || !user.IsOnline)
         {
-            Logger.LogError("Unable to get user from hierarchy instantiation request.", method: Source);
+            Logger.DevkitServer.LogError(nameof(ReceiveRequestHierarchyInstantiation), "Unable to get user from hierarchy instantiation request.");
             ctx.Acknowledge(StandardErrorCode.NoPermissions);
             return;
         }
@@ -108,8 +105,7 @@ public static class HierarchyUtil
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error instantiating {type.Format()}.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(nameof(ReceiveRequestHierarchyInstantiation), ex, $"Error instantiating {type.Format()}.");
             EditorMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("Error", ex.Message));
             return;
         }
@@ -117,7 +113,7 @@ public static class HierarchyUtil
         IDevkitHierarchyItem? newItem = LevelHierarchy.instance.items.Count > 0 ? LevelHierarchy.instance.items.GetTail() : null;
         if (newItem == null || !type.Type.IsInstanceOfType(newItem))
         {
-            Logger.LogError($"Failed to create {type.Format()}.", method: Source);
+            Logger.DevkitServer.LogError(nameof(ReceiveRequestHierarchyInstantiation), $"Failed to create {type.Format()}.");
             EditorMessage.SendEditorMessage(user, DevkitServerModule.MessageLocalization.Translate("UnknownError"));
             return;
         }
@@ -142,7 +138,7 @@ public static class HierarchyUtil
         else list = DevkitServerUtility.GetAllConnections();
 
         SendInstantiation.Invoke(list, type, position, rotation, scale, user.SteamId.m_SteamID, netId);
-        Logger.LogDebug($"[{Source}] Granted request for instantiation of {type.Format()}, instance ID: {newItem.instanceID.Format()} ({newItem.Format()}) from {user.SteamId.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(ReceiveRequestHierarchyInstantiation), $"Granted request for instantiation of {type.Format()}, instance ID: {newItem.instanceID.Format()} ({newItem.Format()}) from {user.SteamId.Format()}.");
         SyncIfAuthority(newItem);
     }
 #endif
@@ -379,10 +375,8 @@ public static class HierarchyUtil
 #if DEBUG
         if (closestNode == null)
         {
-            Logger.LogDebug($"No nodes available in {FormattingUtil.FormatMethod(typeof(TNode), typeof(HierarchyUtil), nameof(GetNearestNode), new (Type type, string? name)[]
-            {
-                (typeof(Vector3), nameof(position))
-            }, null, new Type[] { typeof(TNode) }, true)}");
+            Logger.DevkitServer.LogDebug(nameof(GetNearestNode), $"No nodes available in {FormattingUtil.FormatMethod(typeof(TNode), typeof(HierarchyUtil), nameof(GetNearestNode),
+                [ ( typeof(Vector3), nameof(position)) ], null, [ typeof(TNode) ], true)}");
         }
 #endif
 
@@ -415,10 +409,8 @@ public static class HierarchyUtil
 #if DEBUG
         if (closestNode == null)
         {
-            Logger.LogDebug($"No volumes available in {FormattingUtil.FormatMethod(typeof(TVolume), typeof(HierarchyUtil), nameof(GetNearestVolume), new (Type type, string? name)[]
-            {
-                (typeof(Vector3), nameof(position))
-            }, null, new Type[] { typeof(TVolume) }, true)}");
+            Logger.DevkitServer.LogDebug(nameof(GetNearestVolume), $"No volumes available in {FormattingUtil.FormatMethod(typeof(TVolume),
+                typeof(HierarchyUtil), nameof(GetNearestVolume), [ (typeof(Vector3), nameof(position)) ], null, [ typeof(TVolume) ], true)}");
         }
 #endif
 

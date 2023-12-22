@@ -42,7 +42,7 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
 
         if (!blockingNetId.IsNull())
         {
-            Logger.LogDebug($"[{Source}] Released blocking net id to save road: # {fromIndex.Format()} ({netId.Format()}, # {toIndex.Format()}).");
+            Logger.DevkitServer.LogDebug(Source, $"Released blocking net id to save road: # {fromIndex.Format()} ({netId.Format()}, # {toIndex.Format()}).");
             NetIdRegistry.Release(blockingNetId);
         }
 
@@ -50,7 +50,7 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
         NetIdRegistry.Assign(netId, toIndex);
         RoadAssignments.Remove(fromIndex);
         RoadAssignments[toIndex] = netId;
-        Logger.LogDebug($"[{Source}] Moved road NetId: # {fromIndex.Format()} ({netId.Format()}, # {toIndex.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Moved road NetId: # {fromIndex.Format()} ({netId.Format()}, # {toIndex.Format()}).");
     }
     private static void OnVertexIndexUpdated(Road road, RoadVertexIdentifier fromIndex, RoadVertexIdentifier toIndex)
     {
@@ -64,7 +64,7 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
 
         if (!blockingNetId.IsNull())
         {
-            Logger.LogDebug($"[{Source}] Released blocking net id to save vertex: {fromIndex.Format()} ({netId.Format()}, {toIndex.Format()}).");
+            Logger.DevkitServer.LogDebug(Source, $"Released blocking net id to save vertex: {fromIndex.Format()} ({netId.Format()}, {toIndex.Format()}).");
             NetIdRegistry.Release(blockingNetId);
         }
 
@@ -72,7 +72,7 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
         NetIdRegistry.Assign(netId, toIndex);
         VertexAssignments.Remove(fromIndex);
         VertexAssignments[toIndex] = netId;
-        Logger.LogDebug($"[{Source}] Moved vertex NetId: {fromIndex.Format()} ({netId.Format()}, {toIndex.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Moved vertex NetId: {fromIndex.Format()} ({netId.Format()}, {toIndex.Format()}).");
     }
     private static void OnRoadRemoved(Road road, int index)
     {
@@ -85,7 +85,7 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
 
         NetIdRegistry.Release(netId);
         RoadAssignments.Remove(index);
-        Logger.LogDebug($"[{Source}] Removed road NetId: ({netId.Format()}, # {index.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Removed road NetId: ({netId.Format()}, # {index.Format()}).");
     }
     private static void OnVertexRemoved(Road road, RoadVertexIdentifier vertex)
     {
@@ -98,7 +98,7 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
 
         NetIdRegistry.Release(netId);
         VertexAssignments.Remove(vertex);
-        Logger.LogDebug($"[{Source}] Removed road vertex NetId: ({netId.Format()}, {vertex.Format()}).");
+        Logger.DevkitServer.LogDebug(Source, $"Removed road vertex NetId: ({netId.Format()}, {vertex.Format()}).");
     }
     
 #if CLIENT
@@ -131,10 +131,10 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
             NetIdRegistry.Release(netId);
             VertexAssignments.Remove(vertex);
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Released vertex NetId: {netId.Format()} ({vertex.Format()}).");
+                Logger.DevkitServer.LogDebug(Source, $"Released vertex NetId: {netId.Format()} ({vertex.Format()}).");
         }
         else
-            Logger.LogWarning($"Unable to release NetId to vertex {vertex.Format()}, NetId not registered.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to release NetId to vertex {vertex.Format()}, NetId not registered.");
     }
     public static NetId AddVertex(RoadVertexIdentifier vertex)
     {
@@ -279,7 +279,7 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
             Road? road = LevelRoads.getRoad(i);
             if (road == null)
             {
-                Logger.LogInfo($"[{Source}] Assigned NetIds for {i.Format()} road{i.S()}.");
+                Logger.DevkitServer.LogInfo(Source, $"Assigned NetIds for {i.Format()} road{i.S()}.");
                 break;
             }
 
@@ -292,7 +292,7 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
             }
         }
 
-        Logger.LogInfo($"[{Source}] Assigned NetIds for {vertexCount.Format()} road {(vertexCount == 1 ? "vertex" : "verticies")}.");
+        Logger.DevkitServer.LogInfo(Source, $"Assigned NetIds for {vertexCount.Format()} road {(vertexCount == 1 ? "vertex" : "verticies")}.");
     }
 #endif
     private static void ClaimVertexNetId(RoadVertexIdentifier vertex, NetId netId)
@@ -300,14 +300,13 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
         if (!netId.IsNull() && NetIdRegistry.Release(netId))
         {
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Released old NetId pairing: {netId.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {netId.Format()}.");
         }
 
-        if (VertexAssignments.TryGetValue(vertex, out NetId old))
-            VertexAssignments.Remove(vertex);
+        VertexAssignments.Remove(vertex, out NetId old);
 
         if (NetIdRegistry.Release(old) && Level.isLoaded)
-            Logger.LogDebug($"[{Source}] Released old vertex NetId pairing for {vertex.Format()}: {old.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Released old vertex NetId pairing for {vertex.Format()}: {old.Format()}.");
         
 
         if (!netId.IsNull())
@@ -316,11 +315,11 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
             NetIdRegistry.Assign(netId, vertex);
 
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Claimed new vertex NetId: {netId.Format()} for {vertex.Format()}).");
+                Logger.DevkitServer.LogDebug(Source, $"Claimed new vertex NetId: {netId.Format()} for {vertex.Format()}).");
         }
         else
         {
-            Logger.LogDebug($"[{Source}] Released vertex NetId: {netId.Format()} for {vertex.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Released vertex NetId: {netId.Format()} for {vertex.Format()}.");
         }
     }
     private static void ClaimRoadNetId(int roadIndex, NetId netId)
@@ -328,14 +327,13 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
         if (!netId.IsNull() && NetIdRegistry.Release(netId))
         {
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Released old NetId pairing: {netId.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {netId.Format()}.");
         }
 
-        if (RoadAssignments.TryGetValue(roadIndex, out NetId old))
-            RoadAssignments.Remove(roadIndex);
+        RoadAssignments.Remove(roadIndex, out NetId old);
 
         if (NetIdRegistry.Release(old) && Level.isLoaded)
-            Logger.LogDebug($"[{Source}] Released old road NetId pairing for #{roadIndex.Format()}: {old.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Released old road NetId pairing for #{roadIndex.Format()}: {old.Format()}.");
         
 
         if (!netId.IsNull())
@@ -344,11 +342,11 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
             NetIdRegistry.Assign(netId, roadIndex);
 
             if (Level.isLoaded)
-                Logger.LogDebug($"[{Source}] Claimed new road NetId: {netId.Format()} for #{roadIndex.Format()}).");
+                Logger.DevkitServer.LogDebug(Source, $"Claimed new road NetId: {netId.Format()} for #{roadIndex.Format()}).");
         }
         else
         {
-            Logger.LogDebug($"[{Source}] Released road NetId: {netId.Format()} for #{roadIndex.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Released road NetId: {netId.Format()} for #{roadIndex.Format()}.");
         }
     }
     public static void RegisterRoad(int roadIndex, NetId netId) => ClaimRoadNetId(roadIndex, netId);

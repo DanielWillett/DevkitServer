@@ -9,12 +9,20 @@
       "description": "Add a log to Unturned/Logs that includes whatever visual ANSI codes are used to color the console.",
       "type": "boolean"
     },
-    "extended_visual_ansi_support": {
-      "description": "Full (24-bit) console color support (works in the Win 11 terminal and most web terminals).",
+    "terminal_full_rgb_support": {
+      "description": "Full (24-bit RGB) console color support using virtual terminal sequences (works in the Windows command prompt and most web terminals).",
       "type": "boolean"
     },
-    "visual_ansi_support": {
-      "description": "Basic (4-bit) console color support (works in most terminals).",
+    "terminal_virtual_sequence_support": {
+      "description": "Basic (4-bit) console color support using virtual terminal sequences (works in most terminals).",
+      "type": "boolean"
+    },
+    "debug_logging": {
+      "description": "Adds extra debug logging from DevkitServer. Helps with diagnosing problems but could lower performance.",
+      "type": "boolean"
+    },
+    "disable_terminal": {
+      "description": "On Windows, disables opening the terminal window when you launch the game.",
       "type": "boolean"
     },
     "walmart_pc_support": {

@@ -1,4 +1,5 @@
 ﻿using DevkitServer.API;
+using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Patches;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
@@ -19,6 +20,8 @@ using DevkitServer.API.UI;
 namespace DevkitServer.Multiplayer.Actions;
 public sealed class TerrainActions
 {
+    internal const string Source = "TERRAIN ACTIONS";
+
     private static readonly Dictionary<LandscapeCoord, float> PendingLODUpdates = new Dictionary<LandscapeCoord, float>(16);
     private static bool _isUpdating;
     public EditorActions EditorActions { get; }
@@ -107,7 +110,7 @@ public sealed class TerrainActions
                 continue;
 
             tile.SyncHeightmap();
-            Logger.LogDebug($"Synced heightmap: {pendingLODUpdate.Key.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Synced heightmap: {pendingLODUpdate.Key.Format()}.");
             break;
         }
 
@@ -515,17 +518,23 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadiusAction, 
     public float SmoothTarget { get; set; }
     static HeightmapSmoothAction()
     {
+        MethodInfo? method = Accessor.GetMethod(SampleHeightPixelSmooth);
+        if (method == null)
+        {
+            Logger.DevkitServer.LogError(nameof(HeightmapSmoothAction), "Error reverse patching TerrainEditor.SampleHeightPixelSmooth, method not found.");
+            DevkitServerModule.Fault();
+            return;
+        }
         try
         {
             PatchesMain.Patcher.CreateReversePatcher(
                     typeof(TerrainEditor).GetMethod("SampleHeightPixelSmooth", BindingFlags.Instance | BindingFlags.NonPublic),
-                    new HarmonyMethod(typeof(HeightmapSmoothAction).GetMethod(nameof(SampleHeightPixelSmooth), BindingFlags.Static | BindingFlags.NonPublic)))
+                    new HarmonyMethod(method))
                 .Patch(HarmonyReversePatchType.Original);
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error reverse patching TerrainEditor.blendSplatmapWeights.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(nameof(HeightmapSmoothAction), ex, "Error reverse patching TerrainEditor.SampleHeightPixelSmooth.");
             DevkitServerModule.Fault();
         }
 
@@ -537,12 +546,12 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadiusAction, 
         }
         catch (NotImplementedException)
         {
-            Logger.LogError("Failed to reverse patch " + Accessor.GetMethod(SampleHeightPixelSmooth)?.Format() + ".");
+            Logger.DevkitServer.LogError(nameof(HeightmapSmoothAction), $"Failed to reverse patch {method.Format()}.");
             DevkitServerModule.Fault();
             return;
         }
 
-        Logger.LogDebug("Reverse patched " + Accessor.GetMethod(SampleHeightPixelSmooth)?.Format() + ".");
+        Logger.DevkitServer.LogDebug(nameof(HeightmapSmoothAction), $"Reverse patched {method.Format()}.");
     }
     public void Apply()
     {
@@ -592,11 +601,11 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadiusAction, 
         {
             FieldInfo? field = typeof(TerrainEditor).GetField("heightmapPixelSmoothBuffer", BindingFlags.Instance | BindingFlags.NonPublic);
             if (field == null || typeof(Dictionary<LandscapeCoord, float[,]>) != field.FieldType)
-                Logger.LogWarning("Unable to find field: TerrainEditor.heightmapPixelSmoothBuffer.");
+                Logger.DevkitServer.LogWarning(nameof(HeightmapSmoothAction), "Unable to find field: TerrainEditor.heightmapPixelSmoothBuffer.");
 
             FieldInfo buffer = typeof(HeightmapSmoothAction).GetField(nameof(PixelSmoothBuffer), BindingFlags.Static | BindingFlags.NonPublic)!;
 
-            List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+            List<CodeInstruction> ins = [..instructions];
             bool one = false;
             for (int i = 0; i < ins.Count; ++i)
             {
@@ -611,14 +620,14 @@ public sealed class HeightmapSmoothAction : ITerrainAction, IBrushRadiusAction, 
                     yield return c2;
                     one = true;
                     ++i;
-                    Logger.LogDebug("Replaced " + ins[i].Format() + " with " + c2.Format() + ".");
+                    Logger.DevkitServer.LogDebug(nameof(HeightmapSmoothAction), $"Replaced {ins[i].Format()} with {c2.Format()}.");
                     continue;
                 }
                 yield return c;
             }
             if (!one)
             {
-                Logger.LogWarning("Unable to replace load of " + field?.Format() + " with " + buffer.Format() + ".");
+                Logger.DevkitServer.LogWarning(nameof(HeightmapSmoothAction), $"Unable to replace load of {field?.Format()} with {buffer.Format()}.");
             }
         }
     }
@@ -659,26 +668,33 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadiusAction, IB
             FoundationHits = (RaycastHit[])typeof(TerrainEditor).GetField("FOUNDATION_HITS", BindingFlags.Static | BindingFlags.NonPublic)?
                 .GetValue(null)!;
             if (FoundationHits == null)
-                Logger.LogWarning("Failed to get foundation buffer (not a huge deal).");
+                Logger.DevkitServer.LogWarning(nameof(SplatmapPaintAction), "Failed to get foundation buffer (not a huge deal).");
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Failed to get foundation buffer (not a huge deal).");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogWarning(nameof(SplatmapPaintAction), ex, "Failed to get foundation buffer (not a huge deal).");
         }
 
         FoundationHits ??= new RaycastHit[4];
+
+        MethodInfo? blendSplatmapWeights = Accessor.GetMethod(BlendSplatmapWeights);
+        if (blendSplatmapWeights == null)
+        {
+            Logger.DevkitServer.LogError(nameof(SplatmapPaintAction), "Error reverse patching TerrainEditor.blendSplatmapWeights, method not found.");
+            DevkitServerModule.Fault();
+            return;
+        }
+
         try
         {
             PatchesMain.Patcher.CreateReversePatcher(
                     typeof(TerrainEditor).GetMethod("blendSplatmapWeights", BindingFlags.Instance | BindingFlags.NonPublic),
-                    new HarmonyMethod(typeof(SplatmapPaintAction).GetMethod(nameof(BlendSplatmapWeights), BindingFlags.Static | BindingFlags.NonPublic)))
+                    new HarmonyMethod(blendSplatmapWeights))
                 .Patch(HarmonyReversePatchType.Original);
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error reverse patching TerrainEditor.blendSplatmapWeights.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(nameof(SplatmapPaintAction), ex, "Error reverse patching TerrainEditor.blendSplatmapWeights.");
             DevkitServerModule.Fault();
         }
 
@@ -688,25 +704,32 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadiusAction, IB
         }
         catch (NotImplementedException)
         {
-            Logger.LogError("Failed to reverse patch " + Accessor.GetMethod(BlendSplatmapWeights)?.Format() + ".");
+            Logger.DevkitServer.LogError(nameof(SplatmapPaintAction), "Failed to reverse patch " + blendSplatmapWeights.Format() + ".");
             DevkitServerModule.Fault();
         }
         catch (NullReferenceException)
         {
-            Logger.LogDebug("Reverse patched " + Accessor.GetMethod(BlendSplatmapWeights)?.Format() + ".");
+            Logger.DevkitServer.LogDebug(nameof(SplatmapPaintAction), "Reverse patched " + blendSplatmapWeights.Format() + ".");
+        }
+
+        MethodInfo? getSplatmapTargetMaterialLayerIndex = Accessor.GetMethod(GetSplatmapTargetMaterialLayerIndex);
+        if (getSplatmapTargetMaterialLayerIndex == null)
+        {
+            Logger.DevkitServer.LogError(nameof(SplatmapPaintAction), "Error reverse patching TerrainEditor.blendSplatmapWeights, method not found.");
+            DevkitServerModule.Fault();
+            return;
         }
 
         try
         {
             PatchesMain.Patcher.CreateReversePatcher(
                     typeof(TerrainEditor).GetMethod("getSplatmapTargetMaterialLayerIndex", BindingFlags.Instance | BindingFlags.NonPublic),
-                    new HarmonyMethod(typeof(SplatmapPaintAction).GetMethod(nameof(GetSplatmapTargetMaterialLayerIndex), BindingFlags.Static | BindingFlags.NonPublic)))
+                    new HarmonyMethod(getSplatmapTargetMaterialLayerIndex))
                 .Patch(HarmonyReversePatchType.Original);
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error reverse patching TerrainEditor.getSplatmapTargetMaterialLayerIndex.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(nameof(SplatmapPaintAction), ex, "Error reverse patching TerrainEditor.getSplatmapTargetMaterialLayerIndex.");
             DevkitServerModule.Fault();
         }
 
@@ -714,16 +737,16 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadiusAction, IB
         {
             int val = GetSplatmapTargetMaterialLayerIndex(null, null!, default); // invalid material returns -1
             if (val == -1)
-                Logger.LogDebug("Reverse patched " + Accessor.GetMethod(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
+                Logger.DevkitServer.LogDebug(nameof(SplatmapPaintAction), $"Reverse patched {getSplatmapTargetMaterialLayerIndex.Format()}.");
         }
         catch (NotImplementedException)
         {
-            Logger.LogError("Failed to reverse patch " + Accessor.GetMethod(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
+            Logger.DevkitServer.LogError(nameof(SplatmapPaintAction), $"Failed to reverse patch {getSplatmapTargetMaterialLayerIndex.Format()}.");
             DevkitServerModule.Fault();
         }
         catch (NullReferenceException)
         {
-            Logger.LogDebug("Reverse patched " + Accessor.GetMethod(GetSplatmapTargetMaterialLayerIndex)?.Format() + ".");
+            Logger.DevkitServer.LogDebug(nameof(SplatmapPaintAction), $"Reverse patched {getSplatmapTargetMaterialLayerIndex.Format()}.");
         }
     }
 
@@ -808,7 +831,7 @@ public sealed class SplatmapPaintAction : ITerrainAction, IBrushRadiusAction, IB
         if (_asset == null)
         {
             if (SplatmapMaterial.isValid)
-                Logger.LogWarning($"[TERRAIN ACTIONS] Failed to find splatmap asset: {SplatmapMaterial.Format()} (from: {Instigator.Format()}).");
+                Logger.DevkitServer.LogWarning(nameof(SplatmapPaintAction), $"Failed to find splatmap asset: {SplatmapMaterial.Format()} (from: {Instigator.Format()}).");
             return;
         }
 
@@ -1175,12 +1198,17 @@ public sealed class TileModifyAction : IAction, ICoordinatesAction
         if (IsDelete)
         {
             LandscapeUtil.RemoveTileLocal(Coordinates);
-            Logger.LogInfo("Tile deleted: " + Coordinates + ".", ConsoleColor.DarkRed);
+            Logger.DevkitServer.LogInfo(nameof(TileModifyAction), $"Tile deleted: {Coordinates.Format()}.", ConsoleColor.DarkRed);
             return;
         }
 
-        LandscapeUtil.AddTileLocal(Coordinates);
-        Logger.LogInfo("Tile added: " + Coordinates + ".", ConsoleColor.Green);
+        LandscapeTile tile = LandscapeUtil.AddTileLocal(Coordinates);
+        Bounds tileBounds = tile.worldBounds;
+        Logger.DevkitServer.LogInfo(nameof(TileModifyAction), $"Tile added: {Coordinates.Format()}.", ConsoleColor.Green);
+
+        LandscapeUtil.SyncIfAuthority(tileBounds, TileSync.DataType.Heightmap);
+        LandscapeUtil.SyncIfAuthority(tileBounds, TileSync.DataType.Splatmap);
+        LandscapeUtil.SyncIfAuthority(tileBounds, TileSync.DataType.Holes);
     }
 #if SERVER
     public bool CheckCanApply()
@@ -1251,7 +1279,7 @@ public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinatesAction
 
                 tile.materials[i] = layer;
                 diff |= 1 << i;
-                Logger.LogDebug("Layer updated: " + Coordinates.Format() + ", #" + i.Format() + " (" + layer.Find()?.FriendlyName.Format() + ").");
+                Logger.DevkitServer.LogDebug(nameof(TileSplatmapLayersUpdateAction), $"Layer updated: {Coordinates.Format()}, #{i.Format()} ({layer.Find()?.FriendlyName.Format()}).");
             }
 
             if (diff == 0)
@@ -1290,7 +1318,7 @@ public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinatesAction
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
-        int amt = Math.Min(byte.MaxValue, Layers == null ? 0 : Layers.Length);
+        int amt = Math.Min(byte.MaxValue, Layers?.Length ?? 0);
         writer.Write((byte)amt);
         for (int i = 0; i < amt; ++i)
             writer.Write(Layers![i].GUID);
@@ -1304,5 +1332,5 @@ public sealed class TileSplatmapLayersUpdateAction : IAction, ICoordinatesAction
         for (int i = 0; i < amt; ++i)
             Layers[i] = new AssetReference<LandscapeMaterialAsset>(reader.ReadGuid());
     }
-    public int CalculateSize() => 5 + Math.Min(byte.MaxValue, Layers == null ? 0 : Layers.Length) * 16;
+    public int CalculateSize() => 5 + Math.Min(byte.MaxValue, Layers?.Length ?? 0) * 16;
 }

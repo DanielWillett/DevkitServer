@@ -11,7 +11,6 @@ public class RoadSync : AuthoritativeSync<RoadSync>
 {
     private readonly List<NetId> _syncQueue = new List<NetId>(2);
     private readonly List<byte> _dirtyMaterials = new List<byte>(8);
-    private const string Source = "ROAD SYNC";
     private const float Delay = 0.5f;
     private const float SendDelay = 3f;
     private static readonly NetCallRaw<ulong, RoadSyncData> SendRoadSyncData = new NetCallRaw<ulong, RoadSyncData>(DevkitServerNetCall.SendRoadSyncData, null, reader => new RoadSyncData(reader), null, (writer, obj) => obj.Write(writer));
@@ -37,12 +36,12 @@ public class RoadSync : AuthoritativeSync<RoadSync>
         if (time - _lastSent < Delay)
             return;
         _lastSent = time;
-        NetId netId = _syncQueue[_syncQueue.Count - 1];
+        NetId netId = _syncQueue[^1];
         _syncQueue.RemoveAt(_syncQueue.Count - 1);
         RoadSyncData obj;
         if (!RoadNetIdDatabase.TryGetRoad(netId, out Road road, out int roadIndex))
         {
-            obj = new RoadSyncData(netId, _dirtyMaterials.Count > 0 ? _dirtyMaterials[_dirtyMaterials.Count - 1] : null);
+            obj = new RoadSyncData(netId, _dirtyMaterials.Count > 0 ? _dirtyMaterials[^1] : null);
             if (_dirtyMaterials.Count > 0)
                 _dirtyMaterials.RemoveAt(_dirtyMaterials.Count - 1);
         }
@@ -51,7 +50,7 @@ public class RoadSync : AuthoritativeSync<RoadSync>
             obj = new RoadSyncData(netId, road, roadIndex, _dirtyMaterials.Contains(road.material));
             _dirtyMaterials.Remove(road.material);
         }
-        Logger.LogDebug($"[{Source}] Syncing {netId.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Syncing {netId.Format()}.");
 #if SERVER
         SendRoadSyncData.Invoke(Provider.GatherClientConnections(), 0ul, obj);
 #elif CLIENT
@@ -73,12 +72,12 @@ public class RoadSync : AuthoritativeSync<RoadSync>
 
         if (sync == null)
         {
-            Logger.LogError($"Unable to find road sync source for relay ID: {relaySource.Format()}.", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Unable to find road sync source for relay ID: {relaySource.Format()}.");
             return;
         }
         if (!sync.HasAuthority)
         {
-            Logger.LogError($"Found road sync relay source, but it didn't have authority: {relaySource.Format()}, {sync.Format()}.", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Found road sync relay source, but it didn't have authority: {relaySource.Format()}, {sync.Format()}.");
             return;
         }
 
@@ -90,7 +89,7 @@ public class RoadSync : AuthoritativeSync<RoadSync>
     {
         if (!HasAuthority || _syncQueue.Count == 0)
             return;
-        if (!RoadNetIdDatabase.TryGetRoad(_syncQueue[_syncQueue.Count - 1], out Road road))
+        if (!RoadNetIdDatabase.TryGetRoad(_syncQueue[^1], out Road road))
             return;
         if (road.joints.Count <= 0)
             return;
@@ -106,7 +105,7 @@ public class RoadSync : AuthoritativeSync<RoadSync>
 #endif
     private static void ReceiveRoadSyncData(in RoadSyncData obj)
     {
-        Logger.LogDebug($"[{Source}] Received road sync data for NetID: {obj.NetId.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Received road sync data for NetID: {obj.NetId.Format()}.");
 
         if (!RoadNetIdDatabase.TryGetRoad(obj.NetId, out Road road, out int roadIndex))
         {
@@ -115,13 +114,13 @@ public class RoadSync : AuthoritativeSync<RoadSync>
                 obj.SyncMaterial(false);
                 return;
             }
-            Logger.LogWarning($"Expected road ({obj.NetId.Format()}) not found.");
+            Logger.DevkitServer.LogWarning(Source, $"Expected road ({obj.NetId.Format()}) not found.");
             obj.CreateRoad();
             obj.SyncMaterial(false);
         }
         else if (!obj.IsAlive)
         {
-            Logger.LogDebug($"[{Source}] Deleting road that should've already been deleted: {roadIndex.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Deleting road that should've already been deleted: {roadIndex.Format()}.");
             RoadUtil.RemoveRoadLocal(roadIndex);
             obj.SyncMaterial(false);
         }
@@ -166,7 +165,7 @@ public class RoadSync : AuthoritativeSync<RoadSync>
         if (_syncQueue.Count == 0 || _syncQueue[0].id != netId.id)
             _syncQueue.Insert(0, netId);
         _lastSent = CachedTime.RealtimeSinceStartup + Math.Max(-Delay, SendDelay - _syncQueue.Count * Delay);
-        Logger.LogDebug($"[{Source}] Requested sync for: {netId.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Requested sync for: {netId.Format()}.");
     }
     public void EnqueueMaterialSync(byte material)
     {
@@ -185,7 +184,7 @@ public class RoadSync : AuthoritativeSync<RoadSync>
 
         if (_dirtyMaterials.Count == 0 || _dirtyMaterials[0] != material)
             _dirtyMaterials.Insert(0, material);
-        Logger.LogDebug($"[{Source}] Marked material {RoadUtil.MaterialToString(material).Format()} dirty.");
+        Logger.DevkitServer.LogDebug(Source, $"Marked material {RoadUtil.MaterialToString(material).Format()} dirty.");
     }
     private sealed class RoadSyncData
     {
@@ -425,36 +424,36 @@ public class RoadSync : AuthoritativeSync<RoadSync>
             {
                 if (Mathf.Abs(mat.width - _materialDimensions.x) > 0.001f)
                 {
-                    Logger.LogInfo($"[{Source}] [ROAD MAT {_materialIndex.Format()}] " +
-                                   $"Existing width ({mat.width.Format("F2")}) does not match synced width ({_materialDimensions.x.Format("F2")}).");
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD MAT {_materialIndex.Format()}] " +
+                                                        $"Existing width ({mat.width.Format("F2")}) does not match synced width ({_materialDimensions.x.Format("F2")}).");
                     RoadUtil.SetMaterialWidthLocal(_materialIndex, _materialDimensions.x);
                     anyUpdates = true;
                 }
                 if (Mathf.Abs(mat.height - _materialDimensions.y) > 0.001f)
                 {
-                    Logger.LogInfo($"[{Source}] [ROAD MAT {_materialIndex.Format()}] " +
-                                   $"Existing height ({mat.height.Format("F2")}) does not match synced height ({_materialDimensions.y.Format("F2")}).");
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD MAT {_materialIndex.Format()}] " +
+                                                        $"Existing height ({mat.height.Format("F2")}) does not match synced height ({_materialDimensions.y.Format("F2")}).");
                     RoadUtil.SetMaterialHeightLocal(_materialIndex, _materialDimensions.y);
                     anyUpdates = true;
                 }
                 if (Mathf.Abs(mat.depth - _materialDimensions.z) > 0.001f)
                 {
-                    Logger.LogInfo($"[{Source}] [ROAD MAT {_materialIndex.Format()}] " +
-                                   $"Existing depth ({mat.depth.Format("F2")}) does not match synced depth ({_materialDimensions.z.Format("F2")}).");
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD MAT {_materialIndex.Format()}] " +
+                                                        $"Existing depth ({mat.depth.Format("F2")}) does not match synced depth ({_materialDimensions.z.Format("F2")}).");
                     RoadUtil.SetMaterialDepthLocal(_materialIndex, _materialDimensions.z);
                     anyUpdates = true;
                 }
                 if (Mathf.Abs(mat.offset - _materialDimensions.w) > 0.001f)
                 {
-                    Logger.LogInfo($"[{Source}] [ROAD MAT {_materialIndex.Format()}] " +
-                                   $"Existing vertical offset ({mat.offset.Format("F2")}) does not match synced vertical offset ({_materialDimensions.w.Format("F2")}).");
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD MAT {_materialIndex.Format()}] " +
+                                                        $"Existing vertical offset ({mat.offset.Format("F2")}) does not match synced vertical offset ({_materialDimensions.w.Format("F2")}).");
                     RoadUtil.SetMaterialVerticalOffsetLocal(_materialIndex, _materialDimensions.w);
                     anyUpdates = true;
                 }
                 if (mat.isConcrete != _materialIsConcrete)
                 {
-                    Logger.LogInfo($"[{Source}] [ROAD MAT {_materialIndex.Format()}] " +
-                                   $"Existing isConcrete ({mat.isConcrete.Format()}) does not match synced isConcrete ({_materialIsConcrete.Format()}).");
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD MAT {_materialIndex.Format()}] " +
+                                                        $"Existing isConcrete ({mat.isConcrete.Format()}) does not match synced isConcrete ({_materialIsConcrete.Format()}).");
                     RoadUtil.SetMaterialIsConcreteLocal(_materialIndex, _materialIsConcrete);
                     anyUpdates = true;
                 }
@@ -475,15 +474,15 @@ public class RoadSync : AuthoritativeSync<RoadSync>
             bool anyUpdates = false;
             if (road.isLoop != _isLoop)
             {
-                Logger.LogInfo($"[{Source}] [ROAD {roadIndex.Format()}] " +
-                               $"Existing isLoop ({road.isLoop.Format()}) does not match synced isLoop ({_isLoop.Format()}).");
+                Logger.DevkitServer.LogInfo(Source, $"[ROAD {roadIndex.Format()}] " +
+                                                    $"Existing isLoop ({road.isLoop.Format()}) does not match synced isLoop ({_isLoop.Format()}).");
                 RoadUtil.SetIsLoopLocal(roadIndex, _isLoop);
                 anyUpdates = true;
             }
             if (road.material != _materialIndex)
             {
-                Logger.LogInfo($"[{Source}] [ROAD {roadIndex.Format()}] " +
-                               $"Existing material ({RoadUtil.MaterialToString(road.material).Format()}) does not match synced material ({RoadUtil.MaterialToString(_materialIndex).Format()}).");
+                Logger.DevkitServer.LogInfo(Source, $"[ROAD {roadIndex.Format()}] " +
+                                                    $"Existing material ({RoadUtil.MaterialToString(road.material).Format()}) does not match synced material ({RoadUtil.MaterialToString(_materialIndex).Format()}).");
                 RoadUtil.SetMaterialLocal(roadIndex, _materialIndex);
                 anyUpdates = true;
             }
@@ -492,8 +491,8 @@ public class RoadSync : AuthoritativeSync<RoadSync>
             {
                 if (!RoadNetIdDatabase.TryGetVertexNetId(new RoadVertexIdentifier(roadIndex, j), out NetId netId))
                 {
-                    Logger.LogDebug($"[{Source}] [ROAD {roadIndex.Format()}] [VERTEX {j.Format()}] " +
-                                   $"Existing vertex does not have a NetId.");
+                    Logger.DevkitServer.LogDebug(Source, $"[ROAD {roadIndex.Format()}] [VERTEX {j.Format()}] " +
+                                                         $"Existing vertex does not have a NetId.");
                     anyUpdates = true;
                     continue;
                 }
@@ -510,8 +509,8 @@ public class RoadSync : AuthoritativeSync<RoadSync>
                 if (!exists)
                 {
                     RoadUtil.RemoveVertexLocal(roadIndex, j);
-                    Logger.LogInfo($"[{Source}] [ROAD {roadIndex.Format()}] [VERTEX {j.Format()}] " +
-                                   $"Existing vertex is not supposed to exist.");
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD {roadIndex.Format()}] [VERTEX {j.Format()}] " +
+                                                        $"Existing vertex is not supposed to exist.");
                     anyUpdates = true;
                 }
             }
@@ -530,8 +529,8 @@ public class RoadSync : AuthoritativeSync<RoadSync>
                 }
                 if (index == -1)
                 {
-                    Logger.LogInfo($"[{Source}] [ROAD {roadIndex.Format()}] [VERTEX {i.Format()}] " +
-                                   $"Syncing vertex does not exist on current road.");
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD {roadIndex.Format()}] [VERTEX {i.Format()}] " +
+                                                        $"Syncing vertex does not exist on current road.");
                     RoadUtil.AddVertexLocal(roadIndex, i, _vertices[i].Position);
                     anyUpdates = true;
                     if (!vNetId.IsNull())
@@ -542,22 +541,22 @@ public class RoadSync : AuthoritativeSync<RoadSync>
                 Vertex sync = _vertices[i];
                 if (Mathf.Abs(existing.offset - sync.VerticalOffset) > 0.01f)
                 {
-                    Logger.LogInfo($"[{Source}] [ROAD {roadIndex.Format()}] [VERTEX {index.Format()}] " +
-                                   $"Existing vertical offset ({existing.offset.Format("F2")}) does not match synced vertical offset ({sync.VerticalOffset.Format("F2")}).");
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD {roadIndex.Format()}] [VERTEX {index.Format()}] " +
+                                                        $"Existing vertical offset ({existing.offset.Format("F2")}) does not match synced vertical offset ({sync.VerticalOffset.Format("F2")}).");
                     RoadUtil.SetVertexVerticalOffsetLocal(roadIndex, index, sync.VerticalOffset);
                     anyUpdates = true;
                 }
                 if (existing.ignoreTerrain != sync.IgnoreTerrain)
                 {
-                    Logger.LogInfo($"[{Source}] [ROAD {roadIndex.Format()}] [VERTEX {index.Format()}] " +
-                                   $"Existing ignoreTerrain ({existing.ignoreTerrain.Format()}) does not match synced ignoreTerrain ({sync.IgnoreTerrain.Format()}).");
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD {roadIndex.Format()}] [VERTEX {index.Format()}] " +
+                                                        $"Existing ignoreTerrain ({existing.ignoreTerrain.Format()}) does not match synced ignoreTerrain ({sync.IgnoreTerrain.Format()}).");
                     RoadUtil.SetVertexIgnoreTerrain(roadIndex, index, sync.IgnoreTerrain);
                     anyUpdates = true;
                 }
                 if (!existing.getTangent(0).IsNearlyEqual(sync.Tangent1, 0.01f) || !existing.getTangent(1).IsNearlyEqual(sync.Tangent2, 0.01f))
                 {
-                    Logger.LogInfo($"[{Source}] [ROAD {roadIndex.Format()}] [VERTEX {index.Format()}] " +
-                                   $"Existing tangent handles ({existing.getTangent(0).Format()}, {existing.getTangent(1).Format()}) do not match synced tangent handles ({sync.Tangent1.Format()}, {sync.Tangent2.Format()}).");
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD {roadIndex.Format()}] [VERTEX {index.Format()}] " +
+                                                        $"Existing tangent handles ({existing.getTangent(0).Format()}, {existing.getTangent(1).Format()}) do not match synced tangent handles ({sync.Tangent1.Format()}, {sync.Tangent2.Format()}).");
                     ERoadMode old = existing.mode;
                     existing.mode = ERoadMode.FREE;
                     RoadUtil.SetTangentHandlePositionLocal(roadIndex, index, TangentHandle.Negative, sync.Tangent1);
@@ -567,15 +566,15 @@ public class RoadSync : AuthoritativeSync<RoadSync>
                 }
                 if (existing.mode != sync.Mode)
                 {
-                    Logger.LogInfo($"[{Source}] [ROAD {roadIndex.Format()}] [VERTEX {index.Format()}] " +
-                                   $"Existing handle mode ({existing.mode.Format()}) does not match synced handle mode ({sync.Mode.Format()}).");
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD {roadIndex.Format()}] [VERTEX {index.Format()}] " +
+                                                        $"Existing handle mode ({existing.mode.Format()}) does not match synced handle mode ({sync.Mode.Format()}).");
                     RoadUtil.SetVertexTangentHandleModeLocal(roadIndex, i, sync.Mode);
                     anyUpdates = true;
                 }
                 if (!existing.vertex.IsNearlyEqual(sync.Position, 0.01f))
                 {
-                    Logger.LogInfo($"[{Source}] [ROAD {roadIndex.Format()}] [VERTEX {index.Format()}] " +
-                                   $"Existing position ({existing.vertex.Format()}) does not match synced position ({sync.Position.Format()}).");
+                    Logger.DevkitServer.LogInfo(Source, $"[ROAD {roadIndex.Format()}] [VERTEX {index.Format()}] " +
+                                                        $"Existing position ({existing.vertex.Format()}) does not match synced position ({sync.Position.Format()}).");
                     RoadUtil.SetVertexTangentHandleModeLocal(roadIndex, index, sync.Mode);
                     anyUpdates = true;
                 }

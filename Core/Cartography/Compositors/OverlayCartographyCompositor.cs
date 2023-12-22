@@ -42,9 +42,9 @@ internal class OverlayCartographyCompositor : ICartographyCompositor
 
             bool didAnything = false;
             if (isExplicitlyDefined)
-                Logger.LogInfo($"[{nameof(OverlayCartographyCompositor)}] Looking for overlays in {dir.Format()}.");
+                Logger.DevkitServer.LogInfo(nameof(OverlayCartographyCompositor), $"Looking for overlays in {dir.Format()}.");
             else
-                Logger.LogDebug($"[{nameof(OverlayCartographyCompositor)}] Looking for overlays in {dir.Format()}.");
+                Logger.DevkitServer.LogDebug(nameof(OverlayCartographyCompositor), $"Looking for overlays in {dir.Format()}.");
             foreach (string file in Directory.EnumerateFiles(dir, "*", SearchOption.TopDirectoryOnly).OrderByDescending(Path.GetFileName))
             {
                 string fn = Path.GetFileNameWithoutExtension(file);
@@ -75,7 +75,7 @@ internal class OverlayCartographyCompositor : ICartographyCompositor
                 foundImages.Add(compositedTexture);
                 try
                 {
-                    Logger.LogInfo($"[{nameof(OverlayCartographyCompositor)}] Applying overlay: {file.Format()}.");
+                    Logger.DevkitServer.LogInfo(nameof(OverlayCartographyCompositor), $"Applying overlay: {file.Format()}.");
 
                     compositedTexture.LoadImage(File.ReadAllBytes(file), false);
                     _ = texture.Value; // ensure the render texture has been initialized.
@@ -88,8 +88,7 @@ internal class OverlayCartographyCompositor : ICartographyCompositor
                 catch (Exception ex)
                 {
                     foundImages.RemoveAt(foundImages.Count - 1);
-                    Logger.LogError($"Failed to read composited overlay at {file.Format()}.", method: nameof(OverlayCartographyCompositor));
-                    Logger.LogError(ex, method: nameof(OverlayCartographyCompositor));
+                    Logger.DevkitServer.LogError(nameof(OverlayCartographyCompositor), ex, $"Failed to read composited overlay at {file.Format()}.");
                 }
                 finally
                 {

@@ -10,6 +10,7 @@ using DevkitServer.Core.Permissions;
 namespace DevkitServer.Multiplayer.Actions;
 public sealed class RoadActions
 {
+    internal const string Source = "ROAD ACTIONS";
     public EditorActions EditorActions { get; }
     internal RoadActions(EditorActions actions)
     {
@@ -218,7 +219,7 @@ public sealed class SetRoadIsLoopAction : IReplacableAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetRoad(netId, out int roadIndex))
         {
-            Logger.LogWarning($"Unknown road with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road with NetId: {netId.Format()}.");
             return;
         }
 
@@ -230,7 +231,7 @@ public sealed class SetRoadIsLoopAction : IReplacableAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetRoad(netId, out int _))
         {
-            Logger.LogWarning($"Unknown road with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road with NetId: {netId.Format()}.");
             return false;
         }
         return VanillaPermissions.EditRoads.Has(Instigator.m_SteamID, true);
@@ -271,7 +272,7 @@ public sealed class SetRoadMaterialAction : IReplacableAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetRoad(netId, out int roadIndex))
         {
-            Logger.LogWarning($"Unknown road with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road with NetId: {netId.Format()}.");
             return;
         }
 
@@ -283,7 +284,7 @@ public sealed class SetRoadMaterialAction : IReplacableAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetRoad(netId, out int _))
         {
-            Logger.LogWarning($"Unknown road with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road with NetId: {netId.Format()}.");
             return false;
         }
         return VanillaPermissions.EditRoads.Has(Instigator.m_SteamID, true);
@@ -325,7 +326,7 @@ public sealed class SetRoadVertexIgnoreTerrainAction : IReplacableAction, IInsta
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetVertex(netId, out RoadVertexIdentifier vertex))
         {
-            Logger.LogWarning($"Unknown vertex with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown vertex with NetId: {netId.Format()}.");
             return;
         }
 
@@ -337,7 +338,7 @@ public sealed class SetRoadVertexIgnoreTerrainAction : IReplacableAction, IInsta
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetVertex(netId, out RoadVertexIdentifier _))
         {
-            Logger.LogWarning($"Unknown vertex with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown vertex with NetId: {netId.Format()}.");
             return false;
         }
         return VanillaPermissions.EditRoads.Has(Instigator.m_SteamID, true);
@@ -379,7 +380,7 @@ public sealed class SetRoadVertexVerticalOffsetAction : IReplacableAction, IInst
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetVertex(netId, out RoadVertexIdentifier vertex))
         {
-            Logger.LogWarning($"Unknown vertex with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown vertex with NetId: {netId.Format()}.");
             return;
         }
 
@@ -391,7 +392,7 @@ public sealed class SetRoadVertexVerticalOffsetAction : IReplacableAction, IInst
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetVertex(netId, out RoadVertexIdentifier _))
         {
-            Logger.LogWarning($"Unknown vertex with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown vertex with NetId: {netId.Format()}.");
             return false;
         }
         return VanillaPermissions.EditRoads.Has(Instigator.m_SteamID, true);
@@ -424,7 +425,7 @@ public sealed class SetRoadVertexTangentHandleModeAction : IAction, IInstanceIdA
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetVertex(netId, out RoadVertexIdentifier vertex))
         {
-            Logger.LogWarning($"Unknown vertex with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown vertex with NetId: {netId.Format()}.");
             return;
         }
 
@@ -436,7 +437,7 @@ public sealed class SetRoadVertexTangentHandleModeAction : IAction, IInstanceIdA
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetVertex(netId, out RoadVertexIdentifier _))
         {
-            Logger.LogWarning($"Unknown vertex with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown vertex with NetId: {netId.Format()}.");
             return false;
         }
         return VanillaPermissions.EditRoads.Has(Instigator.m_SteamID, true);
@@ -477,7 +478,7 @@ public sealed class SetRoadMaterialWidthAction : IReplacableAction, IInstanceIdA
     {
         if (InstanceId > byte.MaxValue || InstanceId >= LevelRoads.materials.Length)
         {
-            Logger.LogWarning($"Unknown road material at index: {InstanceId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road material at index: {InstanceId.Format()}.");
             return;
         }
 
@@ -488,7 +489,7 @@ public sealed class SetRoadMaterialWidthAction : IReplacableAction, IInstanceIdA
     {
         if (InstanceId > byte.MaxValue || InstanceId >= LevelRoads.materials.Length)
         {
-            Logger.LogWarning($"Unknown road material at index: {InstanceId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road material at index: {InstanceId.Format()}.");
             return false;
         }
         return VanillaPermissions.EditRoadMaterials.Has(Instigator.m_SteamID, true);
@@ -529,7 +530,7 @@ public sealed class SetRoadMaterialHeightAction : IReplacableAction, IInstanceId
     {
         if (InstanceId > byte.MaxValue || InstanceId >= LevelRoads.materials.Length)
         {
-            Logger.LogWarning($"Unknown road material at index: {InstanceId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road material at index: {InstanceId.Format()}.");
             return;
         }
 
@@ -540,7 +541,7 @@ public sealed class SetRoadMaterialHeightAction : IReplacableAction, IInstanceId
     {
         if (InstanceId > byte.MaxValue || InstanceId >= LevelRoads.materials.Length)
         {
-            Logger.LogWarning($"Unknown road material at index: {InstanceId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road material at index: {InstanceId.Format()}.");
             return false;
         }
         return VanillaPermissions.EditRoadMaterials.Has(Instigator.m_SteamID, true);
@@ -581,7 +582,7 @@ public sealed class SetRoadMaterialDepthAction : IReplacableAction, IInstanceIdA
     {
         if (InstanceId > byte.MaxValue || InstanceId >= LevelRoads.materials.Length)
         {
-            Logger.LogWarning($"Unknown road material at index: {InstanceId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road material at index: {InstanceId.Format()}.");
             return;
         }
 
@@ -592,7 +593,7 @@ public sealed class SetRoadMaterialDepthAction : IReplacableAction, IInstanceIdA
     {
         if (InstanceId > byte.MaxValue || InstanceId >= LevelRoads.materials.Length)
         {
-            Logger.LogWarning($"Unknown road material at index: {InstanceId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road material at index: {InstanceId.Format()}.");
             return false;
         }
         return VanillaPermissions.EditRoadMaterials.Has(Instigator.m_SteamID, true);
@@ -633,7 +634,7 @@ public sealed class SetRoadMaterialVerticalOffsetAction : IReplacableAction, IIn
     {
         if (InstanceId > byte.MaxValue || InstanceId >= LevelRoads.materials.Length)
         {
-            Logger.LogWarning($"Unknown road material at index: {InstanceId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road material at index: {InstanceId.Format()}.");
             return;
         }
 
@@ -644,7 +645,7 @@ public sealed class SetRoadMaterialVerticalOffsetAction : IReplacableAction, IIn
     {
         if (InstanceId > byte.MaxValue || InstanceId >= LevelRoads.materials.Length)
         {
-            Logger.LogWarning($"Unknown road material at index: {InstanceId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road material at index: {InstanceId.Format()}.");
             return false;
         }
         return VanillaPermissions.EditRoadMaterials.Has(Instigator.m_SteamID, true);
@@ -685,7 +686,7 @@ public sealed class SetRoadMaterialIsConcreteAction : IReplacableAction, IInstan
     {
         if (InstanceId > byte.MaxValue || InstanceId >= LevelRoads.materials.Length)
         {
-            Logger.LogWarning($"Unknown road material at index: {InstanceId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road material at index: {InstanceId.Format()}.");
             return;
         }
 
@@ -696,7 +697,7 @@ public sealed class SetRoadMaterialIsConcreteAction : IReplacableAction, IInstan
     {
         if (InstanceId > byte.MaxValue || InstanceId >= LevelRoads.materials.Length)
         {
-            Logger.LogWarning($"Unknown road material at index: {InstanceId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road material at index: {InstanceId.Format()}.");
             return false;
         }
         return VanillaPermissions.EditRoadMaterials.Has(Instigator.m_SteamID, true);
@@ -729,7 +730,7 @@ public sealed class MoveRoadVertexAction : IAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetVertex(netId, out RoadVertexIdentifier vertex))
         {
-            Logger.LogWarning($"Unknown vertex with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown vertex with NetId: {netId.Format()}.");
             return;
         }
 
@@ -741,7 +742,7 @@ public sealed class MoveRoadVertexAction : IAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetVertex(netId, out RoadVertexIdentifier _))
         {
-            Logger.LogWarning($"Unknown vertex with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown vertex with NetId: {netId.Format()}.");
             return false;
         }
         return VanillaPermissions.EditRoads.Has(Instigator.m_SteamID, true);
@@ -775,12 +776,12 @@ public sealed class MoveRoadTangentHandleAction : IAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetVertex(netId, out RoadVertexIdentifier vertex))
         {
-            Logger.LogWarning($"Unknown vertex with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown vertex with NetId: {netId.Format()}.");
             return;
         }
         if (Handle is not TangentHandle.Negative and not TangentHandle.Positive)
         {
-            Logger.LogWarning($"Handle not valid: {Handle.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Handle not valid: {Handle.Format()}.");
             return;
         }
 
@@ -792,12 +793,12 @@ public sealed class MoveRoadTangentHandleAction : IAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetVertex(netId, out RoadVertexIdentifier _))
         {
-            Logger.LogWarning($"Unknown vertex with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown vertex with NetId: {netId.Format()}.");
             return false;
         }
         if (Handle is not TangentHandle.Negative and not TangentHandle.Positive)
         {
-            Logger.LogWarning($"Handle not valid: {Handle.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Handle not valid: {Handle.Format()}.");
             return false;
         }
 
@@ -832,7 +833,7 @@ public sealed class DeleteRoadVertexAction : IAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetVertex(netId, out RoadVertexIdentifier vertex))
         {
-            Logger.LogWarning($"Unknown vertex with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown vertex with NetId: {netId.Format()}.");
             return;
         }
 
@@ -844,7 +845,7 @@ public sealed class DeleteRoadVertexAction : IAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetVertex(netId, out RoadVertexIdentifier _))
         {
-            Logger.LogWarning($"Unknown vertex with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown vertex with NetId: {netId.Format()}.");
             return false;
         }
 
@@ -875,7 +876,7 @@ public sealed class DeleteRoadAction : IAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetRoad(netId, out int roadIndex))
         {
-            Logger.LogWarning($"Unknown road with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road with NetId: {netId.Format()}.");
             return;
         }
 
@@ -887,7 +888,7 @@ public sealed class DeleteRoadAction : IAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!RoadNetIdDatabase.TryGetRoad(netId, out int _))
         {
-            Logger.LogWarning($"Unknown road with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(RoadActions.Source, $"Unknown road with NetId: {netId.Format()}.");
             return false;
         }
         return VanillaPermissions.EditRoads.Has(Instigator.m_SteamID, true);

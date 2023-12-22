@@ -138,40 +138,54 @@ public class CommandHandler : ICommandHandler, IDisposable
         Parser = new CommandParser(this);
         try
         {
-            _logMethod = typeof(Logs).GetMethod(nameof(Logs.printLine), BindingFlags.Static | BindingFlags.Public);
+            _logMethod = Accessor.GetMethod(Logs.printLine);
             if (_logMethod == null)
-                Logger.LogWarning("Unable to find method " + typeof(Logs).Format() + "." + nameof(Logs.printLine).Colorize(Color.red) + " for a patch to listen to vanilla command responses.");
+            {
+                Logger.DevkitServer.LogWarning(nameof(CommandHandler), $"Unable to find method {FormattingUtil.FormatMethod(typeof(void), typeof(Logs),
+                                                                                                nameof(Logs.printLine), arguments: Type.EmptyTypes, isStatic: true)} " +
+                                                                       $"for a patch to listen to vanilla command responses.");
+            }
             else
             {
                 _logPrefix = Accessor.GetMethod(OnLogged);
                 PatchesMain.Patcher.Patch(_logMethod, prefix: new HarmonyMethod(_logPrefix));
                 _logPatched = true;
-                Logger.LogDebug("Patched " + _logMethod.Format() + " to listen to vanilla command responses.");
+                Logger.DevkitServer.LogDebug(nameof(CommandHandler), $"Patched {_logMethod.Format()} to listen to vanilla command responses.");
             }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Unable to patch " + typeof(Logs).Format() + "." + nameof(Logs.printLine).Colorize(Color.red) + " to listen to vanilla command responses.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogWarning(nameof(CommandHandler), ex, $"Unable to patch {FormattingUtil.FormatMethod(typeof(void), typeof(Logs),
+                                                                                          nameof(Logs.printLine), arguments: Type.EmptyTypes, isStatic: true)} " +
+                                                                       $"to listen to vanilla command responses.");
         }
 #if CLIENT
         try
         {
             _chatMethod = typeof(ChatManager).GetMethod(nameof(ChatManager.sendChat), BindingFlags.Static | BindingFlags.Public);
             if (_chatMethod == null)
-                Logger.LogWarning("Unable to find method " + typeof(ChatManager).Format() + "." + nameof(ChatManager.sendChat).Colorize(Color.red) + " for a patch to listen to client commands.");
+            {
+                Logger.DevkitServer.LogWarning(nameof(CommandHandler), $"Unable to find method {FormattingUtil.FormatMethod(typeof(void), typeof(ChatManager),
+                                                                                                nameof(ChatManager.sendChat),
+                                                                                                namedArguments: [ (typeof(EChatMode), "mode"), (typeof(string), "text") ],
+                                                                                                isStatic: true)} " +
+                                                                       $"for a patch to listen to vanilla command responses.");
+            }
             else
             {
                 _chatPrefix = Accessor.GetMethod(OnClientChatted);
                 PatchesMain.Patcher.Patch(_chatMethod, prefix: new HarmonyMethod(_chatPrefix));
                 _chatPatched = true;
-                Logger.LogDebug("Patched " + _chatMethod.Format() + " to listen to client commands.");
+                Logger.DevkitServer.LogDebug(nameof(CommandHandler), $"Patched {_chatMethod.Format()} to listen to client commands.");
             }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Unable to patch " + typeof(ChatManager).Format() + "." + nameof(ChatManager.sendChat).Colorize(Color.red) + " to listen to client commands.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogWarning(nameof(CommandHandler), ex, $"Unable to patch {FormattingUtil.FormatMethod(typeof(void), typeof(ChatManager),
+                                                                                          nameof(ChatManager.sendChat),
+                                                                                          namedArguments: [(typeof(EChatMode), "mode"), (typeof(string), "text")],
+                                                                                          isStatic: true)} " +
+                                                                       $"to listen to client commands.");
         }
 #endif
     }
@@ -256,9 +270,9 @@ public class CommandHandler : ICommandHandler, IDisposable
         if (command is VanillaCommand)
             _activeVanillaCommand = ctx;
 #if CLIENT
-        Logger.LogDebug($"Executing command clientside: {command.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(ExecuteCommand), $"Executing command clientside: {command.Format()}.");
 #else
-        Logger.LogDebug($"Executing command serverside for {user.Format()}: {command.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(ExecuteCommand), $"Executing command serverside for {user.Format()}: {command.Format()}.");
 #endif
         UniTask.Create(ctx.ExecuteAsync);
 
@@ -275,15 +289,15 @@ public class CommandHandler : ICommandHandler, IDisposable
     }
     public virtual void Init()
     {
-        if (!Initialized)
-        {
-            ChatManager.onCheckPermissions += OnChatProcessing;
-            Logger.OnInputting += OnCommandInput;
-            Initialized = true;
-            CommandEx.DefaultReflectCommands();
-            Logger.LogInfo("[CMD] Registered " + _registeredCommands.Count + " command(s).", ConsoleColor.DarkGreen);
-            Level.onLevelLoaded += OnLevelLoaded;
-        }
+        if (Initialized)
+            return;
+
+        ChatManager.onCheckPermissions += OnChatProcessing;
+        Logger.OnInputting += OnCommandInput;
+        Initialized = true;
+        CommandEx.DefaultReflectCommands();
+        Logger.DevkitServer.LogInfo(nameof(CommandHandler), $"Registered {_registeredCommands.Count.Format()} command(s).", ConsoleColor.DarkGreen);
+        Level.onLevelLoaded += OnLevelLoaded;
     }
     private static void OnLevelLoaded(int level)
     {
@@ -307,8 +321,8 @@ public class CommandHandler : ICommandHandler, IDisposable
             catch (Exception ex)
             {
                 if (_logMethod != null)
-                    Logger.LogError("Failed to unpatch " + _logMethod.Format() + " when disposing of a " + GetType().Format() + ".");
-                Logger.LogError(ex);
+                    Logger.DevkitServer.LogError(nameof(CommandHandler), ex, $"Failed to unpatch {_logMethod.Format()} when disposing of a {GetType().Format()}.");
+                else Logger.DevkitServer.LogError(nameof(CommandHandler), ex);
             }
 #if CLIENT
             try
@@ -324,8 +338,8 @@ public class CommandHandler : ICommandHandler, IDisposable
             catch (Exception ex)
             {
                 if (_chatMethod != null)
-                    Logger.LogError("Failed to unpatch " + _chatMethod.Format() + " when disposing of a " + GetType().Format() + ".");
-                Logger.LogError(ex);
+                    Logger.DevkitServer.LogError(nameof(CommandHandler), ex, $"Failed to unpatch {_chatMethod.Format()} when disposing of a {GetType().Format()}.");
+                else Logger.DevkitServer.LogError(nameof(CommandHandler), ex);
             }
 #endif
             ChatManager.onCheckPermissions -= OnChatProcessing;
@@ -340,7 +354,7 @@ public class CommandHandler : ICommandHandler, IDisposable
             _registeredCommands.Clear();
         }
     }
-    protected virtual void OnCommandInput(string inputmessage, ref bool shouldHandle)
+    protected virtual void OnCommandInput(ReadOnlySpan<char> inputmessage, ref bool shouldHandle)
     {
         if (!shouldHandle) return;
         shouldHandle = false;
@@ -359,15 +373,17 @@ public class CommandHandler : ICommandHandler, IDisposable
             // run as server command or send chat
             if (Provider.isClient)
             {
+                string msg;
                 if (Array.IndexOf(CommandParser.Prefixes, inputmessage[0]) == -1)
                 {
                     if (inputmessage[0] is '>' && inputmessage.Length > 1)
-                        inputmessage = inputmessage.Substring(char.IsWhiteSpace(inputmessage[1]) && inputmessage.Length > 1 ? 2 : 1);
+                        msg = inputmessage.Slice(char.IsWhiteSpace(inputmessage[1]) && inputmessage.Length > 1 ? 2 : 1).ToString();
                     else
-                        inputmessage = CommandParser.Prefixes[0] + inputmessage;
+                        msg = CommandParser.Prefixes[0] + inputmessage.ToString();
                 }
+                else msg = inputmessage.ToString();
 
-                ChatManager.sendChat(EChatMode.GLOBAL, inputmessage);
+                ChatManager.sendChat(EChatMode.GLOBAL, msg);
             }
             else
             {
@@ -477,28 +493,52 @@ public class CommandHandler : ICommandHandler, IDisposable
 #endif
         void Log(string msg)
         {
-            if (command != null)
+            IDevkitServerLogger logger = command ?? Logger.DevkitServer;
+
+            if (logger is IDevkitServerSourceLogger src)
             {
                 switch (severity)
                 {
-                    case Severity.Error:
                     case Severity.Fatal:
-                        command.LogError(msg);
+                        src.LogFatal(msg);
+                        break;
+                    case Severity.Error:
+                        src.LogError(msg);
                         break;
                     case Severity.Warning:
-                        command.LogWarning(msg);
+                        src.LogWarning(msg);
                         break;
                     case Severity.Debug:
-                        command.LogDebug(msg);
+                        src.LogDebug(msg);
                         break;
                     case Severity.Info:
                     default:
-                        command.LogInfo(msg);
+                        src.LogInfo(msg);
                         break;
                 }
             }
             else
-                Logger.Log(severity, msg);
+            {
+                switch (severity)
+                {
+                    case Severity.Fatal:
+                        logger.LogFatal(nameof(CommandHandler), msg);
+                        break;
+                    case Severity.Error:
+                        logger.LogError(nameof(CommandHandler), msg);
+                        break;
+                    case Severity.Warning:
+                        logger.LogWarning(nameof(CommandHandler), msg);
+                        break;
+                    case Severity.Debug:
+                        logger.LogDebug(nameof(CommandHandler), msg);
+                        break;
+                    case Severity.Info:
+                    default:
+                        logger.LogInfo(nameof(CommandHandler), msg);
+                        break;
+                }
+            }
         }
     }
     public virtual bool TryRegisterCommand(IExecutableCommand command)
@@ -638,8 +678,7 @@ public class CommandHandler : ICommandHandler, IDisposable
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Exception deregistering command: {command.GetType().Format()}.");
-                Logger.LogError(ex);
+                Logger.DevkitServer.LogError(nameof(TryDeregisterCommand), ex, $"Exception deregistering command: {command.GetType().Format()}.");
             }
         }
 
@@ -648,8 +687,7 @@ public class CommandHandler : ICommandHandler, IDisposable
 
     public virtual void HandleCommandException(CommandContext ctx, Exception ex)
     {
-        Logger.LogError("Error while executing " + ctx.Format() + ".");
-        Logger.LogError(ex);
+        Logger.DevkitServer.LogError(nameof(ExecuteCommand), ex, "Error while executing " + ctx.Format() + ".");
         if (!ctx.IsConsole)
             ctx.Reply("Exception", ex.GetType().Name);
     }

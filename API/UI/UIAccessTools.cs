@@ -609,7 +609,7 @@ public static class UIAccessTools
             const MethodAttributes attr = MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig;
             if (uiType == null)
             {
-                Logger.LogWarning("Unable to find type for field " + fieldName.Format() + ".", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Unable to find type for field " + fieldName.Format() + ".");
                 DevkitServerModule.Fault();
                 if (throwOnFailure)
                     throw new MemberAccessException("Unable to find type for field: \"" + fieldName + "\".");
@@ -625,7 +625,7 @@ public static class UIAccessTools
             Type? memberType = field is FieldInfo f2 ? f2.FieldType : field is PropertyInfo p2 ? p2.PropertyType : null;
             if (memberType == null || field == null || field is PropertyInfo prop && (prop.GetIndexParameters() is { Length: > 0 } || prop.GetGetMethod(true) == null))
             {
-                Logger.LogWarning("Unable to find field or property: " + uiType.Format() + "." + fieldName.Colorize(Color.red) + ".", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Unable to find field or property: " + uiType.Format() + "." + fieldName.Colorize(Color.red) + ".");
                 DevkitServerModule.Fault();
                 if (throwOnFailure)
                     throw new MemberAccessException("Unable to find field or property: \"" + uiType.Name + "." + fieldName + "\".");
@@ -633,7 +633,7 @@ public static class UIAccessTools
             }
             if (rtnType != null && !rtnType.IsAssignableFrom(memberType))
             {
-                Logger.LogWarning("Field or property " + field.Format() + " is not assignable to " + rtnType.Format() + ".", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Field or property " + field.Format() + " is not assignable to " + rtnType.Format() + ".");
                 DevkitServerModule.Fault();
                 if (throwOnFailure)
                     throw new MemberAccessException("Field " + field.DeclaringType?.Name + "." + field.Name + " is not assignable to " + rtnType.Name + ".");
@@ -650,7 +650,7 @@ public static class UIAccessTools
                 }
                 catch (Exception)
                 {
-                    Logger.LogWarning($"Error creating simplified getter delegate for {((PropertyInfo)field).Format()} UI accessor.", method: Source);
+                    Logger.DevkitServer.LogWarning(Source, $"Error creating simplified getter delegate for {((PropertyInfo)field).Format()} UI accessor.");
                     DevkitServerModule.Fault();
                     if (throwOnFailure)
                         throw;
@@ -676,7 +676,7 @@ public static class UIAccessTools
             {
                 if (getter == null)
                 {
-                    Logger.LogWarning("Property " + property.Format() + " does not have a getter.", method: Source);
+                    Logger.DevkitServer.LogWarning(Source, "Property " + property.Format() + " does not have a getter.");
                     DevkitServerModule.Fault();
                     if (throwOnFailure)
                         throw new MemberAccessException("Property \"" + property.DeclaringType?.Name + "." + property.Name + "\" does not have a getter.");
@@ -693,10 +693,13 @@ public static class UIAccessTools
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Error creating " + ((object?)field ?? fieldName).Format() + " accessor.", method: Source);
             if (throwOnFailure)
+            {
+                Logger.DevkitServer.LogWarning(Source, "Error creating " + ((object?)field ?? fieldName).Format() + " accessor.");
                 throw;
-            Logger.LogError(ex, method: Source);
+            }
+
+            Logger.DevkitServer.LogWarning(Source, ex, "Error creating " + ((object?)field ?? fieldName).Format() + " accessor.");
             return null;
         }
     }
@@ -804,7 +807,7 @@ public static class UIAccessTools
         MethodInfo? method = null;
         if (uiType == null)
         {
-            Logger.LogWarning("Unable to find type for method " + methodName.Format() + ".", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find type for method " + methodName.Format() + ".");
             DevkitServerModule.Fault();
             if (throwOnFailure)
                 throw new MemberAccessException("Unable to find type for method: \"" + methodName + "\".");
@@ -830,7 +833,7 @@ public static class UIAccessTools
 
         if (method == null)
         {
-            Logger.LogError("Unable to find matching method " + methodName.Format() + ".", method: Source);
+            Logger.DevkitServer.LogError(Source, "Unable to find matching method " + methodName.Format() + ".");
             if (throwOnFailure)
                 throw new Exception("Unable to find matching method: " + methodName + ".");
             return null;
@@ -845,7 +848,7 @@ public static class UIAccessTools
         MethodInfo? method = null;
         if (uiType == null)
         {
-            Logger.LogWarning("Unable to find type for method " + methodName.Format() + ".", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find type for method " + methodName.Format() + ".");
             DevkitServerModule.Fault();
             if (throwOnFailure)
                 throw new MemberAccessException("Unable to find type for method: \"" + methodName + "\".");
@@ -870,7 +873,7 @@ public static class UIAccessTools
 
         if (method == null)
         {
-            Logger.LogError("Unable to find matching method " + methodName.Format() + ".", method: Source);
+            Logger.DevkitServer.LogError(Source, "Unable to find matching method " + methodName.Format() + ".");
             if (throwOnFailure)
                 throw new Exception("Unable to find matching method: " + methodName + ".");
             return null;
@@ -886,7 +889,7 @@ public static class UIAccessTools
         ParameterInfo[] p = method.GetParameters();
         if (p.Length > (rtn ? Accessor.FuncTypes!.Length : Accessor.ActionTypes!.Length))
         {
-            Logger.LogWarning("Method " + method.Format() + " can not have more than " + (rtn ? Accessor.FuncTypes!.Length : Accessor.ActionTypes!.Length) + " arguments!", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Method " + method.Format() + " can not have more than " + (rtn ? Accessor.FuncTypes!.Length : Accessor.ActionTypes!.Length) + " arguments!");
             if (throwOnFailure)
                 throw new ArgumentException("Method can not have more than " + (rtn ? Accessor.FuncTypes!.Length : Accessor.ActionTypes!.Length) + " arguments!", nameof(method));
             return null;
@@ -899,7 +902,7 @@ public static class UIAccessTools
                 Type[] p2 = new Type[p.Length + 1];
                 for (int i = 1; i < p2.Length - 1; ++i)
                     p2[i] = p[i].ParameterType;
-                p2[p2.Length - 1] = method.ReturnType;
+                p2[^1] = method.ReturnType;
                 deleType = Accessor.FuncTypes![p.Length].MakeGenericType(p2);
             }
             else
@@ -913,8 +916,7 @@ public static class UIAccessTools
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error generating UI caller for " + method.Format() + ".", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, "Error generating UI caller for " + method.Format() + ".");
             if (throwOnFailure)
                 throw;
             return null;
@@ -926,7 +928,7 @@ public static class UIAccessTools
     {
         if (info == null)
         {
-            Logger.LogError("Error generating UI caller of type " + typeof(TDelegate).Format() + ".", method: Source);
+            Logger.DevkitServer.LogError(Source, "Error generating UI caller of type " + typeof(TDelegate).Format() + ".");
             if (throwOnFailure)
                 throw new MissingMethodException("Error generating UI caller of type " + typeof(TDelegate).Format() + ".");
 
@@ -940,7 +942,7 @@ public static class UIAccessTools
 
         if (d != null)
         {
-            Logger.LogError("Error generating UI caller for " + info.Format() + ".", method: Source);
+            Logger.DevkitServer.LogError(Source, "Error generating UI caller for " + info.Format() + ".");
             if (throwOnFailure)
                 throw new InvalidCastException("Failed to convert from " + d.GetType() + " to " + typeof(TDelegate) + ".");
         }
@@ -953,7 +955,7 @@ public static class UIAccessTools
     {
         if (uiType == null)
         {
-            Logger.LogWarning("Unable to find type for method " + method.Format() + ".", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find type for method " + method.Format() + ".");
             DevkitServerModule.Fault();
             if (throwOnFailure)
                 throw new MemberAccessException("Unable to find type for method: \"" + method.FullDescription() + "\".");
@@ -982,8 +984,7 @@ public static class UIAccessTools
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Unable to create UI caller for " + (method.DeclaringType?.Format() ?? "<unknown-type>") + "." + method.Name, method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, "Unable to create UI caller for " + (method.DeclaringType?.Format() ?? "<unknown-type>") + "." + method.Name);
             if (throwOnFailure)
                 throw;
             return null;
@@ -1028,7 +1029,7 @@ public static class UIAccessTools
             EditorTerrainHeightUIType = rtnType;
             if (rtnType == null)
             {
-                Logger.LogWarning("Unable to find type: SDG.Unturned.EditorTerrainHeightUI.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Unable to find type: SDG.Unturned.EditorTerrainHeightUI.");
                 DevkitServerModule.Fault();
                 return;
             }
@@ -1036,7 +1037,7 @@ public static class UIAccessTools
                                containerType.GetField("heights", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             if (field == null || field.IsStatic || !rtnType.IsAssignableFrom(field.FieldType))
             {
-                Logger.LogWarning("Unable to find field: EditorTerrainUI.heightV2.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Unable to find field: EditorTerrainUI.heightV2.");
                 DevkitServerModule.Fault();
                 return;
             }
@@ -1054,7 +1055,7 @@ public static class UIAccessTools
             EditorTerrainMaterialsUIType = rtnType;
             if (rtnType == null)
             {
-                Logger.LogWarning("Unable to find type: SDG.Unturned.EditorTerrainMaterialsUI.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Unable to find type: SDG.Unturned.EditorTerrainMaterialsUI.");
                 DevkitServerModule.Fault();
                 return;
             }
@@ -1062,7 +1063,7 @@ public static class UIAccessTools
                     containerType.GetField("materials", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             if (field == null || field.IsStatic || !rtnType.IsAssignableFrom(field.FieldType))
             {
-                Logger.LogWarning("Unable to find field: EditorTerrainUI.materialsV2.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Unable to find field: EditorTerrainUI.materialsV2.");
                 DevkitServerModule.Fault();
                 return;
             }
@@ -1080,7 +1081,7 @@ public static class UIAccessTools
             EditorTerrainDetailsUIType = rtnType;
             if (rtnType == null)
             {
-                Logger.LogWarning("Unable to find type: SDG.Unturned.EditorTerrainDetailsUI.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Unable to find type: SDG.Unturned.EditorTerrainDetailsUI.");
                 DevkitServerModule.Fault();
                 return;
             }
@@ -1088,7 +1089,7 @@ public static class UIAccessTools
                     containerType.GetField("details", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             if (field == null || field.IsStatic || !rtnType.IsAssignableFrom(field.FieldType))
             {
-                Logger.LogWarning("Unable to find field: EditorTerrainUI.detailsV2.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Unable to find field: EditorTerrainUI.detailsV2.");
                 DevkitServerModule.Fault();
                 return;
             }
@@ -1106,7 +1107,7 @@ public static class UIAccessTools
             EditorTerrainTilesUIType = rtnType;
             if (rtnType == null)
             {
-                Logger.LogWarning("Unable to find type: SDG.Unturned.EditorTerrainTilesUI.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Unable to find type: SDG.Unturned.EditorTerrainTilesUI.");
                 DevkitServerModule.Fault();
                 return;
             }
@@ -1114,7 +1115,7 @@ public static class UIAccessTools
                     containerType.GetField("tilesV2", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             if (field == null || field.IsStatic || !rtnType.IsAssignableFrom(field.FieldType))
             {
-                Logger.LogWarning("Unable to find field: EditorTerrainUI.tiles.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Unable to find field: EditorTerrainUI.tiles.");
                 DevkitServerModule.Fault();
                 return;
             }
@@ -1137,7 +1138,7 @@ public static class UIAccessTools
             EditorEnvironmentNodesUIType = rtnType;
             if (rtnType == null)
             {
-                Logger.LogWarning("Unable to find type: SDG.Unturned.EditorEnvironmentNodesUI.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Unable to find type: SDG.Unturned.EditorEnvironmentNodesUI.");
                 DevkitServerModule.Fault();
                 return;
             }
@@ -1145,7 +1146,7 @@ public static class UIAccessTools
                     containerType.GetField("nodes", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
             if (field == null || !field.IsStatic || !rtnType.IsAssignableFrom(field.FieldType))
             {
-                Logger.LogWarning("Unable to find field: EditorEnvironmentUI.nodesUI.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Unable to find field: EditorEnvironmentUI.nodesUI.");
                 DevkitServerModule.Fault();
                 return;
             }
@@ -1167,7 +1168,7 @@ public static class UIAccessTools
             EditorVolumesUIType = rtnType;
             if (rtnType == null)
             {
-                Logger.LogWarning("Unable to find type: SDG.Unturned.EditorVolumesUI.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Unable to find type: SDG.Unturned.EditorVolumesUI.");
                 DevkitServerModule.Fault();
                 return;
             }
@@ -1175,7 +1176,7 @@ public static class UIAccessTools
                     containerType.GetField("volumes", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
             if (field == null || !field.IsStatic || !rtnType.IsAssignableFrom(field.FieldType))
             {
-                Logger.LogWarning("Unable to find field: EditorLevelUI.volumesUI.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Unable to find field: EditorLevelUI.volumesUI.");
                 DevkitServerModule.Fault();
                 return;
             }
@@ -1201,7 +1202,7 @@ public static class UIAccessTools
                             containerType.GetField("cartMenuUI", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
                     if (field == null || field.IsStatic || !rtnType.IsAssignableFrom(field.FieldType))
                     {
-                        Logger.LogWarning("Unable to find field: ItemStoreMenu.cartMenu.", method: Source);
+                        Logger.DevkitServer.LogWarning(Source, "Unable to find field: ItemStoreMenu.cartMenu.");
                     }
                     else
                     {
@@ -1221,7 +1222,7 @@ public static class UIAccessTools
                 }
                 else
                 {
-                    Logger.LogWarning("Unable to find type: SDG.Unturned.ItemStoreCartMenu.", method: Source);
+                    Logger.DevkitServer.LogWarning(Source, "Unable to find type: SDG.Unturned.ItemStoreCartMenu.");
                 }
 
                 /* DETAILS MENU */
@@ -1232,7 +1233,7 @@ public static class UIAccessTools
                             containerType.GetField("detailsMenuUI", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
                     if (field == null || field.IsStatic || !rtnType.IsAssignableFrom(field.FieldType))
                     {
-                        Logger.LogWarning("Unable to find field: ItemStoreMenu.detailsMenu.", method: Source);
+                        Logger.DevkitServer.LogWarning(Source, "Unable to find field: ItemStoreMenu.detailsMenu.");
                     }
                     else
                     {
@@ -1252,18 +1253,17 @@ public static class UIAccessTools
                 }
                 else
                 {
-                    Logger.LogWarning("Unable to find type: SDG.Unturned.ItemStoreCartMenu.", method: Source);
+                    Logger.DevkitServer.LogWarning(Source, "Unable to find type: SDG.Unturned.ItemStoreCartMenu.");
                 }
             }
             else
             {
-                Logger.LogWarning("Unable to find type: SDG.Unturned.ItemStoreMenu.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Unable to find type: SDG.Unturned.ItemStoreMenu.");
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error initializing UI access tools.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, "Error initializing UI access tools.");
             DevkitServerModule.Fault();
         }
     }
@@ -1933,7 +1933,7 @@ public static class UIAccessTools
                         };
                     }
                 }
-                Logger.LogDebug($"[{Source}] Discovered {MenuTypes.Count} editor node/volume menu type(s).");
+                Logger.DevkitServer.LogDebug(Source, $"Discovered {MenuTypes.Count.Format()} editor node/volume menu type(s).");
                 int c = typeInfo.Count;
                 foreach (Type sleekWrapper in types.Where(x => typeof(SleekWrapper).IsAssignableFrom(x)))
                 {
@@ -1951,7 +1951,7 @@ public static class UIAccessTools
                         CloseOnDestroy = true
                     });
                 }
-                Logger.LogDebug($"[{Source}] Discovered {typeInfo.Count - c} UI wrapper type(s).");
+                Logger.DevkitServer.LogDebug(Source, $"Discovered {(typeInfo.Count - c).Format()} UI wrapper type(s).");
                 c = typeInfo.Count;
                 Type? playerUi = FindUIType(nameof(SDG.Unturned.PlayerUI));
                 if (playerUi != null)
@@ -1977,13 +1977,12 @@ public static class UIAccessTools
                             CustomOnDestroy = useableHandler
                         });
                     }
-                    Logger.LogDebug($"[{Source}] Discovered {typeInfo.Count - c} useable UI type(s).");
+                    Logger.DevkitServer.LogDebug(Source, $"Discovered {(typeInfo.Count - c).Format()} useable UI type(s).");
                 }
             }
             catch (Exception ex)
             {
-                Logger.LogWarning("Error initializing volume and node UI info.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogWarning(Source, ex, "Error initializing volume and node UI info.");
             }
 
             int ct = typeInfo.Count;
@@ -1992,16 +1991,15 @@ public static class UIAccessTools
 
             ct = typeInfo.Count - ct;
             if (ct > 0)
-                Logger.LogDebug($"[{Source}] Plugins added {ct.Format()} UI type(s).");
+                Logger.DevkitServer.LogDebug(Source, $"Plugins added {ct.Format()} UI type(s).");
 
             _typeInfoIntl = typeInfo;
-            Logger.LogDebug($"[{Source}] Discovered {typeInfo.Count.Format()} UI type(s).");
+            Logger.DevkitServer.LogDebug(Source, $"Discovered {typeInfo.Count.Format()} UI type(s).");
             TypeInfo = new ReadOnlyDictionary<Type, UITypeInfo>(typeInfo);
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error initializing {typeof(UITypeInfo).Format()} records.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, $"Error initializing {typeof(UITypeInfo).Format()} records.");
         }
     }
 
@@ -2054,7 +2052,7 @@ public static class UIAccessTools
     private static void EditorUIStartPostfix()
     {
         EditorUIReady?.Invoke();
-        Logger.LogInfo("Editor UI ready.");
+        Logger.DevkitServer.LogInfo("EditorUI.Start", "Editor UI ready.");
     }
 
     [HarmonyPatch(typeof(PlayerUI), "InitializePlayer")]
@@ -2063,7 +2061,7 @@ public static class UIAccessTools
     private static void PlayerUIStartPostfix()
     {
         PlayerUIReady?.Invoke();
-        Logger.LogInfo("Player UI ready.");
+        Logger.DevkitServer.LogInfo("PlayerUI.InitializePlayer", "Player UI ready.");
     }
 }
 

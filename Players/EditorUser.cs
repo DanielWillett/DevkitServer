@@ -90,7 +90,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     {
         SteamId = player;
         DisplayName = displayName;
-        Logger.LogDebug("[USERS] Editor User created: " + SteamId.m_SteamID.Format() + " (" + displayName.Format() + ").");
+        Logger.DevkitServer.LogDebug("USERS", "Editor User created: " + SteamId.m_SteamID.Format() + " (" + displayName.Format() + ").");
     }
     internal void Init()
     {
@@ -128,21 +128,21 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         ClientInfo.ApplyServerSettings(ClientInfo, this);
         ClientInfo.OnClientInfoReadyEvent.TryInvoke(this, ClientInfo);
         ClientInfo.SendClientInfo.Invoke(Connection, ClientInfo);
-        Logger.DumpJson(ClientInfo);
+        LoggerExtensions.DumpJson(ClientInfo);
         TileSync.SendAuthority(Connection);
         ObjectSync.SendAuthority(Connection);
         HierarchySync.SendAuthority(Connection);
         NavigationSync.SendAuthority(Connection);
         RoadSync.SendAuthority(Connection);
 #endif
-        Logger.LogDebug("[USERS] Editor User initialized: " + SteamId.m_SteamID.Format() + " (" + DisplayName.Format() + ").");
+        Logger.DevkitServer.LogDebug("USERS", "Editor User initialized: " + SteamId.m_SteamID.Format() + " (" + DisplayName.Format() + ").");
     }
 #if CLIENT
     private IEnumerator DeactivateAfterFrame()
     {
         yield return new WaitForEndOfFrame();
         Player!.player.gameObject.SetActive(false);
-        Logger.LogDebug("[USERS] Player deactivated.");
+        Logger.DevkitServer.LogDebug("USERS", "Player deactivated.");
     }
 #endif
 #if SERVER
@@ -262,7 +262,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         Player = null;
         IsOnline = false;
         if (!IsOwner && EditorObject != null) Destroy(EditorObject);
-        Logger.LogDebug("[USERS] Editor User destroyed: " + SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture) + ".");
+        Logger.DevkitServer.LogDebug("USERS", $"Editor User destroyed: {SteamId.Format()}.");
     }
 #if CLIENT
     internal static void OnClientConnected()
@@ -274,10 +274,10 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         Commander.init();
         if (!SDG.Unturned.Player.player.TryGetComponent(out EditorUser user))
         {
-            Logger.LogWarning("Unable to find Editor user in client-side player.");
+            Logger.DevkitServer.LogWarning("USERS", "Unable to find Editor user in client-side player.");
             return;
         }
-        Logger.LogDebug("Registered client-side editor user.");
+        Logger.DevkitServer.LogDebug("USERS", "Registered client-side editor user.");
         User = user;
         UserManager.EventOnConnectedToServer.TryInvoke();
     }
@@ -295,8 +295,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Unable to close high-speed server!");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogWarning("USERS", ex, "Unable to close high-speed server!");
         }
         UserManager.Disconnect();
 
@@ -306,7 +305,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
                 Destroy(User);
 
             User = null;
-            Logger.LogDebug("Deregistered client-side editor user.");
+            Logger.DevkitServer.LogDebug("USERS", "Deregistered client-side editor user.");
         }
         if (DevkitServerModule.IsEditing)
         {

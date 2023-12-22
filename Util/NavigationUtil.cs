@@ -8,7 +8,6 @@ using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
 using Pathfinding;
-
 #if SERVER
 using DevkitServer.API.UI;
 #endif
@@ -243,8 +242,7 @@ public static class NavigationUtil
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Failed to initialize road: {netId.Format()}.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, $"Failed to initialize road: {netId.Format()}.");
             HoldUIUpdate = false;
             return StandardErrorCode.GenericError;
         }
@@ -259,7 +257,7 @@ public static class NavigationUtil
         EditorUser? user = ctx.GetCaller();
         if (user == null || !user.IsOnline)
         {
-            Logger.LogError("Unable to get user from flag instantiation request.", method: Source);
+            Logger.DevkitServer.LogError(Source, "Unable to get user from flag instantiation request.");
             ctx.Acknowledge(StandardErrorCode.NoPermissions);
             return;
         }
@@ -273,7 +271,7 @@ public static class NavigationUtil
 
         AddFlag(position, ctx);
         
-        Logger.LogDebug($"[{Source}] Granted request for instantiation of flag at {position.Format()} from {user.SteamId.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Granted request for instantiation of flag at {position.Format()} from {user.SteamId.Format()}.");
 
         ctx.Acknowledge(StandardErrorCode.Success);
     }
@@ -735,7 +733,7 @@ public static class NavigationUtil
 
         EventOnFlagAdded.TryInvoke(flag, nav);
 
-        Logger.LogDebug($"[{Source}] Flag added: {nav.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Flag added: {nav.Format()}.");
 
         return flag;
     }
@@ -1269,7 +1267,7 @@ public static class NavigationUtil
         {
             if (!NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
             {
-                Logger.LogWarning($"Failed to find NetId for flag {nav.Format()}. Did not replicate in RemoveFlag({nav.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Failed to find NetId for flag {nav.Format()}. Did not replicate in RemoveFlag({nav.Format()}).");
                 return;
             }
 
@@ -1317,7 +1315,7 @@ public static class NavigationUtil
         {
             if (!NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
             {
-                Logger.LogWarning($"Failed to find NetId for flag {nav.Format()}. Did not replicate in SetFlagPosition({nav.Format()}, {position.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Failed to find NetId for flag {nav.Format()}. Did not replicate in SetFlagPosition({nav.Format()}, {position.Format()}).");
                 return;
             }
 
@@ -1369,7 +1367,7 @@ public static class NavigationUtil
         {
             if (!NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
             {
-                Logger.LogWarning($"Failed to find NetId for flag {nav.Format()}. Did not replicate in SetFlagSize({nav.Format()}, {size.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Failed to find NetId for flag {nav.Format()}. Did not replicate in SetFlagSize({nav.Format()}, {size.Format()}).");
                 return true;
             }
 
@@ -1422,7 +1420,7 @@ public static class NavigationUtil
         {
             if (!NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
             {
-                Logger.LogWarning($"Failed to find NetId for flag {nav.Format()}. Did not replicate in SetFlagDifficulty({nav.Format()}, {difficulty.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Failed to find NetId for flag {nav.Format()}. Did not replicate in SetFlagDifficulty({nav.Format()}, {difficulty.Format()}).");
                 return true;
             }
 
@@ -1479,7 +1477,7 @@ public static class NavigationUtil
         {
             if (!NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
             {
-                Logger.LogWarning($"Failed to find NetId for flag {nav.Format()}. Did not replicate in SetFlagMaximumZombies({nav.Format()}, {maximumZombies.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Failed to find NetId for flag {nav.Format()}. Did not replicate in SetFlagMaximumZombies({nav.Format()}, {maximumZombies.Format()}).");
                 return true;
             }
 
@@ -1532,7 +1530,7 @@ public static class NavigationUtil
         {
             if (!NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
             {
-                Logger.LogWarning($"Failed to find NetId for flag {nav.Format()}. Did not replicate in SetFlagMaximumBossZombies({nav.Format()}, {maximumBossZombies.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Failed to find NetId for flag {nav.Format()}. Did not replicate in SetFlagMaximumBossZombies({nav.Format()}, {maximumBossZombies.Format()}).");
                 return true;
             }
 
@@ -1584,7 +1582,7 @@ public static class NavigationUtil
         {
             if (!NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
             {
-                Logger.LogWarning($"Failed to find NetId for flag {nav.Format()}. Did not replicate in SetFlagShouldSpawnZombies({nav.Format()}, {shouldSpawnZombies.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Failed to find NetId for flag {nav.Format()}. Did not replicate in SetFlagShouldSpawnZombies({nav.Format()}, {shouldSpawnZombies.Format()}).");
                 return true;
             }
 
@@ -1636,7 +1634,7 @@ public static class NavigationUtil
         {
             if (!NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
             {
-                Logger.LogWarning($"Failed to find NetId for flag {nav.Format()}. Did not replicate in SetFlagInfiniteAgroDistance({nav.Format()}, {infiniteAgroDistance.Format()}).", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Failed to find NetId for flag {nav.Format()}. Did not replicate in SetFlagInfiniteAgroDistance({nav.Format()}, {infiniteAgroDistance.Format()}).");
                 return true;
             }
 
@@ -1694,7 +1692,7 @@ public static class NavigationUtil
 
         EventOnFlagAdded.TryInvoke(flag, nav);
 
-        Logger.LogDebug($"[{Source}] Flag added: {nav.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Flag added: {nav.Format()}.");
 
         position = flag.point;
 
@@ -1734,11 +1732,11 @@ public static class NavigationUtil
 #else
             NavigationNetIdDatabase.RegisterNavigation((byte)flagIndex, flagNetId);
 #endif
-            Logger.LogDebug($"[{Source}] Assigned flag NetId: {flagNetId.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Assigned flag NetId: {flagNetId.Format()}.");
             return;
         }
 
-        Logger.LogWarning($"Did not find flag at {(flag == null ? ((object?)null).Format() : flag.point.Format())} in list.", method: Source);
+        Logger.DevkitServer.LogWarning(Source, $"Did not find flag at {(flag == null ? ((object?)null).Format() : flag.point.Format())} in list.");
     }
 #if CLIENT
     private static void UpdateUIWhenSelected(Flag flag)

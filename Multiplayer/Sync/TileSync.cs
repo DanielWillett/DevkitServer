@@ -194,35 +194,30 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
 
     private readonly List<MapInvalidation> _invalidations = new List<MapInvalidation>(32);
 #if GL_SAMPLES
-    private struct PreviewSample
+    private struct PreviewSample(Vector3 position, Color color)
     {
-        public readonly Vector3 Position;
-        public readonly Color Color;
-        public PreviewSample(Vector3 position, Color color)
-        {
-            Position = position;
-            Color = color;
-        }
+        public readonly Vector3 Position = position;
+        public readonly Color Color = color;
     }
 #endif
     private void ReceiveTileData(byte[] data, int offset)
     {
         if (!HasAuthority || IsOwner)
         {
-            Logger.LogWarning("[TILE SYNC] Received tile data from non-authority tile sync.");
+            Logger.DevkitServer.LogWarning(Source, "Received tile data from non-authority tile sync.");
             return;
         }
 
         byte hdrSize = data[offset];
         if (hdrSize != PacketHeaderSize)
         {
-            Logger.LogWarning($"[TILE SYNC] Out of date packet header: {hdrSize.Format()}B.");
+            Logger.DevkitServer.LogWarning(Source, $"Out of date packet header: {hdrSize.Format()}B.");
             return;
         }
 
         int packetId = BitConverter.ToInt32(data, offset + 1);
         int len = BitConverter.ToUInt16(data, offset + 1 + sizeof(int));
-        Logger.LogDebug($"Packet received: #{packetId.Format()}, len: {len.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Packet received: #{packetId.Format()}, len: {len.Format()}.");
         offset += PacketHeaderSize;
         if (packetId == 0)
         {
@@ -231,7 +226,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             hdrSize = data[offset + 1];
             if (hdrSize != HeaderSize)
             {
-                Logger.LogWarning($"[TILE SYNC] Out of date header: {hdrSize.Format()}B.");
+                Logger.DevkitServer.LogWarning(Source, $"Out of date header: {hdrSize.Format()}B.");
                 return;
             }
             _bufferLen = BitConverter.ToInt32(data, offset + 2) - hdrSize;
@@ -261,16 +256,16 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             _gl = _receiving;
 #endif
 #endif
-            Logger.LogDebug($"Received starting packet: Len: {_bufferLen}. Packets: {_ttlPackets}. {_receiving.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Received starting packet: Len: {_bufferLen}. Packets: {_ttlPackets}. {_receiving.Format()}.");
         }
         else if (packetId >= _ttlPackets)
         {
-            Logger.LogWarning($"[TILE SYNC] Received out of bounds packet: {(packetId + 1).Format()}/{_ttlPackets}.");
+            Logger.DevkitServer.LogWarning(Source, $"Received out of bounds packet: {(packetId + 1).Format()}/{_ttlPackets}.");
         }
         else _packetMask![packetId] = true;
-        Logger.LogDebug($"[TILE SYNC] Offset: {offset.Format()}, copying {len} B to {_index}.");
+        Logger.DevkitServer.LogDebug(Source, $"Offset: {offset.Format()}, copying {len} B to {_index}.");
         Buffer.BlockCopy(data, offset, _buffer, _index, len);
-        Logger.LogDebug($"[TILE SYNC] Receiving packet #{packetId.Format()} for tile {_receiving.Tile.Format()} ({FormattingUtil.FormatCapacity(len, colorize: true)} @ {FormattingUtil.FormatCapacity(_index, colorize: true)})");
+        Logger.DevkitServer.LogDebug(Source, $"Receiving packet #{packetId.Format()} for tile {_receiving.Tile.Format()} ({FormattingUtil.FormatCapacity(len, colorize: true)} @ {FormattingUtil.FormatCapacity(_index, colorize: true)}).");
 
         _index += len;
         int missingCt = 0;
@@ -288,7 +283,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
         {
             if (missingCt > 0)
             {
-                Logger.LogWarning($"[TILE SYNC] Missing packets: {missingCt}/{_ttlPackets} ({missingCt / _ttlPackets:P0}.");
+                Logger.DevkitServer.LogWarning(Source, $"Missing packets: {missingCt}/{_ttlPackets} ({missingCt / _ttlPackets:P0}).");
                 _receiving = default;
                 _index = 0;
                 _packetId = 0;
@@ -303,14 +298,14 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
     {
         if (!reader.ReadUInt16(out ushort len))
         {
-            Logger.LogError("[TILE SYNC] Failed to read incoming tile data packet length.");
+            Logger.DevkitServer.LogError(Source, "Failed to read incoming tile data packet length.");
             return;
         }
         NetFactory.IncrementByteCount(DevkitServerMessage.SendTileData, false, len + sizeof(ushort));
 
         if (!reader.ReadBytesPtr(len, out byte[] buffer, out int offset))
         {
-            Logger.LogError("[TILE SYNC] Failed to read tile data packet.");
+            Logger.DevkitServer.LogError(Source, "Failed to read tile data packet.");
             return;
         }
 
@@ -322,7 +317,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             EditorUser? user = UserManager.FromId(fromPlayer);
             if (user == null || user.TileSync == null)
             {
-                Logger.LogWarning($"Unable to find a player to receive tile data on: {fromPlayer.Format()}.");
+                Logger.DevkitServer.LogWarning(Source, $"Unable to find a player to receive tile data on: {fromPlayer.Format()}.");
                 return;
             }
             sync = user.TileSync;
@@ -333,7 +328,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
         }
         if (sync == null)
         {
-            Logger.LogWarning("Unable to find TileSync for tile data.");
+            Logger.DevkitServer.LogWarning(Source, "Unable to find TileSync for tile data.");
             return;
         }
 
@@ -355,7 +350,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             sync.ReceiveTileData(buffer, offset + sizeof(ulong));
         }
         else
-            Logger.LogWarning($"Received tile data from non-authoritive TileSync: {(sync.User == null ? "server-side authority" : sync.User.Format())}.");
+            Logger.DevkitServer.LogWarning(Source, $"Received tile data from non-authoritive TileSync: {(sync.User == null ? "server-side authority" : sync.User.Format())}.");
     }
     private bool AddBounds(LandscapeCoord coord, MapInvalidation bounds, float time)
     {
@@ -428,12 +423,12 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             return;
 
         _index = 0;
-        Logger.LogDebug("[TILE SYNC] Buffering " + _dataType + "[" + _invalidateIndex + "].");
+        Logger.DevkitServer.LogDebug(Source, "Buffering " + _dataType + "[" + _invalidateIndex + "].");
         MapInvalidation inv = _invalidations[_invalidateIndex];
         LandscapeTile? tile = Landscape.getTile(inv.Tile);
         if (tile == null)
         {
-            Logger.LogWarning("[TILE SYNC]  Tile not found in BufferData: " + inv.Tile + ".");
+            Logger.DevkitServer.LogWarning(Source, " Tile not found in BufferData: " + inv.Tile + ".");
             return;
         }
 
@@ -481,14 +476,14 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             UnsafeBitConverter.GetBytes(ptr, tile.coord.y, offset);
         }
 
-        Logger.LogDebug("[TILE SYNC]  Buffered " + FormattingUtil.FormatCapacity(_bufferLen - HeaderSize, colorize: true) + " (" + _dataType.ToString().ToUpperInvariant().Colorize(FormattingColorType.Struct) + ").");
+        Logger.DevkitServer.LogDebug(Source, " Buffered " + FormattingUtil.FormatCapacity(_bufferLen - HeaderSize, colorize: true) + " (" + _dataType.ToString().ToUpperInvariant().Colorize(FormattingColorType.Struct) + ").");
     }
     private unsafe void ApplyBuffer()
     {
         LandscapeTile? tile = Landscape.getTile(_receiving.Tile);
         if (tile == null)
         {
-            Logger.LogWarning($"[TILE SYNC] Tile not found in ApplyBuffer: {_receiving.Tile.Format()}.");
+            Logger.DevkitServer.LogWarning(Source, $"Tile not found in ApplyBuffer: {_receiving.Tile.Format()}.");
             return;
         }
 
@@ -563,7 +558,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             LandscapeTile? tile = Landscape.getTile(coord);
             if (tile == null)
             {
-                Logger.LogWarning("[TILE SYNC] Tile not found in BufferData: " + coord + ".");
+                Logger.DevkitServer.LogWarning(Source, "Tile not found in BufferData: " + coord + ".");
                 goto flush;
             }
 
@@ -589,7 +584,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
 #endif
                 length: PacketHeaderSize + sizeof(ulong) + len, reliable: true);
             // DevkitServerUtility.PrintBytesHex(PacketBuffer, len: PacketHeaderSize + sizeof(ulong) + len);
-            Logger.LogDebug($"#{_packetId.Format()} Tile: {tile.coord.Format()} Length: {len.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"#{_packetId.Format()} Tile: {tile.coord.Format()} Length: {len.Format()}.");
 
             _index += len;
             ++_packetId;

@@ -96,7 +96,7 @@ public abstract class ContainerUIExtension : UIExtension, IDisposable
     {
         if (Parent == null)
         {
-            Logger.LogError($"Parent null trying to add container: {GetType().Name}.", method: "CONTAINER EXTENSION");
+            Logger.DevkitServer.LogError("CONTAINER EXTENSION", $"Parent null trying to add container: {GetType().Name}.");
             return;
         }
         if (!_containerHasBeenParented || Parent.FindIndexOfChild(Container) == -1)
@@ -109,10 +109,7 @@ public abstract class ContainerUIExtension : UIExtension, IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogDebug("[CONTAINER EXTENSION] Error destroying container.");
-#if DEBUG
-                    Logger.LogError(ex, method: "CONTAINER EXTENSION");
-#endif
+                    Logger.DevkitServer.LogDebug("CONTAINER EXTENSION", ex, "Error destroying container.");
                 }
 
                 Container = new SleekFullscreenBox

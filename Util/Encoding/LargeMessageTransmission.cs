@@ -216,14 +216,13 @@ public class LargeMessageTransmission : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError($"Failed to create a large transmission handler for {HandlerType.Format()}.", method: LogSource);
-                    Logger.LogError(ex, method: LogSource);
+                    Logger.DevkitServer.LogError(LogSource, ex, $"Failed to create a large transmission handler for {HandlerType.Format()}.");
                 }
             }
             else
             {
-                Logger.LogError($"Failed to create a large transmission handler for {HandlerType.Format()}, " +
-                                $"must be assignable from {typeof(BaseLargeMessageTransmissionClientHandler).Format()}.", method: LogSource);
+                Logger.DevkitServer.LogError(LogSource, $"Failed to create a large transmission handler for {HandlerType.Format()}, " +
+                                                      $"must be assignable from {typeof(BaseLargeMessageTransmissionClientHandler).Format()}.");
             }
         }
 
@@ -239,8 +238,7 @@ public class LargeMessageTransmission : IDisposable
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.", method: LogSource);
-                Logger.LogError(ex, method: LogSource);
+                Logger.DevkitServer.LogError(LogSource, ex, $"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.");
             }
         }
     }
@@ -336,8 +334,7 @@ public class LargeMessageTransmission : IDisposable
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.", method: LogSource);
-                Logger.LogError(ex, method: LogSource);
+                Logger.DevkitServer.LogError(LogSource, ex, $"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.");
             }
         }
         bool sent;
@@ -351,8 +348,7 @@ public class LargeMessageTransmission : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error sending transmission.", method: LogSource);
-            Logger.LogError(ex, method: LogSource);
+            Logger.DevkitServer.LogError(LogSource, ex, "Error sending transmission.");
             sent = false;
         }
 
@@ -368,8 +364,7 @@ public class LargeMessageTransmission : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.", method: LogSource);
-            Logger.LogError(ex, method: LogSource);
+            Logger.DevkitServer.LogError(LogSource, ex, $"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.");
         }
 
         return sent;
@@ -411,8 +406,8 @@ public class LargeMessageTransmission : IDisposable
             IsCompressed = true;
             FinalContent = new ArraySegment<byte>(compressedContent, 0, length);
             FinalSize = length;
-            Logger.LogInfo($"[{LogSource}] Compresssed data from {FormattingUtil.FormatCapacity(source.Count, colorize: true)} " +
-                           $"to {FormattingUtil.FormatCapacity(FinalContent.Count, colorize: true)}.");
+            Logger.DevkitServer.LogInfo(LogSource, $"Compresssed data from {FormattingUtil.FormatCapacity(source.Count, colorize: true)} " +
+                                                   $"to {FormattingUtil.FormatCapacity(FinalContent.Count, colorize: true)}.");
         }
         else
         {
@@ -446,13 +441,13 @@ public class LargeMessageTransmission : IDisposable
         await UniTask.SwitchToMainThread(PlayerLoopTiming.EarlyUpdate, token);
         if (OriginalSize != count)
         {
-            Logger.LogWarning($"Expected data of length {FormattingUtil.FormatCapacity(OriginalSize, colorize: true)} " +
-                              $"but instead got data of length {FormattingUtil.FormatCapacity(count, colorize: true)}.", method: LogSource);
+            Logger.DevkitServer.LogWarning(LogSource, $"Expected data of length {FormattingUtil.FormatCapacity(OriginalSize, colorize: true)} " +
+                                                      $"but instead got data of length {FormattingUtil.FormatCapacity(count, colorize: true)}.");
         }
 
         Content = new ArraySegment<byte>(buffer, 0, count);
 
-        Logger.LogDebug($"[{LogSource}] Decompressed content from {FormattingUtil.FormatCapacity(source.Count, colorize: true)} to {FormattingUtil.FormatCapacity(count, colorize: true)}.");
+        Logger.DevkitServer.LogDebug(LogSource, $"Decompressed content from {FormattingUtil.FormatCapacity(source.Count, colorize: true)} to {FormattingUtil.FormatCapacity(count, colorize: true)}.");
 
         await UniTask.SwitchToMainThread(token);
     }
@@ -478,8 +473,7 @@ public class LargeMessageTransmission : IDisposable
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to run OnFinished(Failure) on handler: {Handler.GetType().Format()}.", method: LogSource);
-                Logger.LogError(ex, method: LogSource);
+                Logger.DevkitServer.LogError(LogSource, ex, $"Failed to run OnFinished(Failure) on handler: {Handler.GetType().Format()}.");
             }
         }
 
@@ -494,8 +488,7 @@ public class LargeMessageTransmission : IDisposable
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to dispose handler: {Handler.GetType().Format()}.", method: LogSource);
-                Logger.LogError(ex, method: LogSource);
+                Logger.DevkitServer.LogError(LogSource, ex, $"Failed to dispose handler: {Handler.GetType().Format()}.");
             }
         }
 
@@ -529,8 +522,7 @@ public class LargeMessageTransmission : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError($"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.", method: LogSource);
-                    Logger.LogError(ex, method: LogSource);
+                    Logger.DevkitServer.LogError(LogSource, ex, $"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.");
                 }
                 try
                 {
@@ -538,8 +530,7 @@ public class LargeMessageTransmission : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError($"Failed to run OnFinished(Success) on handler: {Handler.GetType().Format()}.", method: LogSource);
-                    Logger.LogError(ex, method: LogSource);
+                    Logger.DevkitServer.LogError(LogSource, ex, $"Failed to run OnFinished(Success) on handler: {Handler.GetType().Format()}.");
                 }
             }
 

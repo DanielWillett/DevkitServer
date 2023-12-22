@@ -206,7 +206,7 @@ public sealed class BuildableResponsibilities : IReplicatedLevelDataSource<Build
 
                 int ct = ReadToTable(Reader, Table);
 
-                Logger.LogDebug($"[{Source}] Read {ct.Format()} responsiblities in table stored at {SavePath.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Read {ct.Format()} responsiblities in table stored at {SavePath.Format()}.");
             }
             else
             {
@@ -214,38 +214,38 @@ public sealed class BuildableResponsibilities : IReplicatedLevelDataSource<Build
                 {
                     for (int y = 0; y < worldSize; ++y)
                     {
-                        if (Table[x, y] != null)
-                            Table[x, y].Clear();
-                        else Table[x, y] = new List<ulong>();
+                        ref List<ulong> region = ref Table[x, y];
+                        if (region != null)
+                            region.Clear();
+                        else region = new List<ulong>();
                     }
                 }
-                Logger.LogDebug($"[{Source}] Loaded new responsiblities table.");
+                Logger.DevkitServer.LogDebug(Source, "Loaded new responsiblities table.");
             }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Error reading buildable responsibilities.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, "Error reading buildable responsibilities.");
             try
             {
                 if (File.Exists(SavePath))
                 {
                     string backup = FileUtil.BackupFile(SavePath, true);
-                    Logger.LogInfo($"[{Source}] Backed up {SavePath.Format()} to {backup.Format()}.");
+                    Logger.DevkitServer.LogInfo(Source, $"Backed up {SavePath.Format()} to {backup.Format()}.");
                 }
             }
             catch (Exception ex2)
             {
-                Logger.LogWarning("Error backing up buildable responsibilities.", method: Source);
-                Logger.LogError(ex2, method: Source);
+                Logger.DevkitServer.LogWarning(Source, ex2, "Error backing up buildable responsibilities.");
             }
             for (int x = 0; x < worldSize; ++x)
             {
                 for (int y = 0; y < worldSize; ++y)
                 {
-                    if (Table[x, y] != null)
-                        Table[x, y].Clear();
-                    else Table[x, y] = new List<ulong>();
+                    ref List<ulong> region = ref Table[x, y];
+                    if (region != null)
+                        region.Clear();
+                    else region = new List<ulong>();
                 }
             }
         }

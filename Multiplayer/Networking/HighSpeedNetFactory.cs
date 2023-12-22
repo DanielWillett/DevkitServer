@@ -26,7 +26,7 @@ public static class HighSpeedNetFactory
     internal static void StartVerifying(HighSpeedConnection pending)
     {
         pending.SteamToken = Guid.NewGuid();
-        Logger.LogDebug("Verifying high speed connection: " + pending.GetAddress().Format() + ".");
+        Logger.DevkitServer.LogDebug("HIGH SPEED NETWORKING", "Verifying high speed connection: " + pending.GetAddress().Format() + ".");
         HighSpeedVerify.Invoke(pending, pending.SteamToken);
     }
     /// <summary>Call <see cref="ReleaseConnection"/> when you're done.</summary>
@@ -73,7 +73,7 @@ public static class HighSpeedNetFactory
                 RequestResponse response = await hsTask;
                 if (!response.Responded || response.ErrorCode is not (int)StandardErrorCode.Success)
                 {
-                    Logger.LogWarning("Failed to create high-speed connection.");
+                    Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", "Failed to create high-speed connection.");
                     return null;
                 }
             }
@@ -83,7 +83,7 @@ public static class HighSpeedNetFactory
             hsConn = connection.FindHighSpeedConnection();
             if (hsConn == null)
             {
-                Logger.LogWarning("Unable to find created high-speed connection.");
+                Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", "Unable to find created high-speed connection.");
                 return null;
             }
         }
@@ -101,7 +101,7 @@ public static class HighSpeedNetFactory
             }
             catch (OperationCanceledException) when (!token.IsCancellationRequested) // only for timeout token.
             {
-                Logger.LogWarning("Timed out trying to verify connection (5 seconds).");
+                Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", "Timed out trying to verify connection (5 seconds).");
                 return null;
             }
         }
@@ -131,12 +131,12 @@ public static class HighSpeedNetFactory
         HighSpeedServer server = HighSpeedServer.Instance;
         if (server == null)
         {
-            Logger.LogWarning("Received steam high-speed verify packet before server was initialized.");
+            Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", "Received steam high-speed verify packet before server was initialized.");
             return;
         }
 
         server.ReceiveVerifyPacket(ctx.Connection, received, steam64);
-        Logger.LogDebug("Received steam token from: " + ctx.Connection.GetAddress().Format() + ".");
+        Logger.DevkitServer.LogDebug("HIGH SPEED NETWORKING", "Received steam token from: " + ctx.Connection.GetAddress().Format() + ".");
     }
 
     public static NetTask TryCreate(ITransportConnection connection, out bool failedConfigCheck)
@@ -147,9 +147,9 @@ public static class HighSpeedNetFactory
         
         if (Provider.configData.Server.Use_FakeIP)
         {
-            Logger.LogWarning($"Can not use a high-speed server with \"{"Use_FakeIP".Colorize(DevkitServerModule.UnturnedColor)}\" enabled in Config.json.", method: "HighSpeedNetFactory");
-            Logger.LogWarning($"Either disable {"FakeIP".Colorize(DevkitServerModule.UnturnedColor)} or disable high speed support in " +
-                              $"Servers/{Provider.serverID}/DevkitServer/server_config.json".Colorize(ConsoleColor.White) + " to hide this warning.", method: "HighSpeedNetFactory");
+            Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", $"Can not use a high-speed server with \"{"Use_FakeIP".Colorize(DevkitServerModule.UnturnedColor)}\" enabled in Config.json.");
+            Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", $"Either disable {"FakeIP".Colorize(DevkitServerModule.UnturnedColor)} or disable high speed support in " +
+                                                                    $"Servers/{Provider.serverID}/DevkitServer/server_config.json".Colorize(ConsoleColor.White) + " to hide this warning.");
             return NetTask.Completed;
         }
 
@@ -227,12 +227,12 @@ public static class HighSpeedNetFactory
     {
         if (ctx.Connection is not HighSpeedConnection conn)
         {
-            Logger.LogWarning("Received steam token on non-high-speed connection: " + ctx.Connection.GetType().Format() + ".");
+            Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", "Received steam token on non-high-speed connection: " + ctx.Connection.GetType().Format() + ".");
             return;
         }
         
         conn.SteamToken = received;
-        Logger.LogDebug("Sent steam token for high-speed connection.");
+        Logger.DevkitServer.LogDebug("HIGH SPEED NETWORKING", "Sent steam token for high-speed connection.");
         SteamVerify.Invoke(received, Provider.client.m_SteamID);
     }
 
@@ -241,12 +241,12 @@ public static class HighSpeedNetFactory
     {
         if (ctx.Connection is not HighSpeedConnection conn)
         {
-            Logger.LogWarning("Received steam token on non-high-speed connection: " + ctx.Connection.GetType().Format() + ".");
+            Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", "Received steam token on non-high-speed connection: " + ctx.Connection.GetType().Format() + ".");
             return;
         }
 
         conn.Verified = true;
-        Logger.LogDebug("Verified high-speed connection.");
+        Logger.DevkitServer.LogDebug("HIGH SPEED NETWORKING", "Verified high-speed connection.");
         lock (PendingConnects)
         {
             for (int i = 0; i < PendingConnects.Count; i++)
@@ -259,7 +259,7 @@ public static class HighSpeedNetFactory
     private static void BeginGetConnectionToServer(ushort port)
     {
         IPAddress ip = new IPAddress(DevkitServerUtility.ReverseUInt32(Provider.CurrentServerAdvertisement.ip));
-        Logger.LogInfo("Connecting to server at " + ip.Format() + ":" + port.Format() + ".");
+        Logger.DevkitServer.LogInfo("HIGH SPEED NETWORKING", "Connecting to server at " + ip.Format() + ":" + port.Format() + ".");
         TcpClient client = new TcpClient
         {
             ReceiveBufferSize = BufferSize,
@@ -272,13 +272,11 @@ public static class HighSpeedNetFactory
         }
         catch (SocketException ex)
         {
-            Logger.LogError("Unable to connect to server: ");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("HIGH SPEED NETWORKING", ex, "Unable to connect to server: ");
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error connecting: ");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("HIGH SPEED NETWORKING", ex, "Error connecting: ");
         }
 
         lock (PendingConnects)
@@ -296,20 +294,18 @@ public static class HighSpeedNetFactory
             try
             {
                 client.EndConnect(ar);
-                Logger.LogInfo("Finished connecting to " + client.Client.RemoteEndPoint.Format() + ".");
+                Logger.DevkitServer.LogInfo("HIGH SPEED NETWORKING", "Finished connecting to " + client.Client.RemoteEndPoint.Format() + ".");
                 HighSpeedConnection conn = new HighSpeedConnection(client, Provider.client.m_SteamID);
                 conn.Listen();
                 return;
             }
             catch (SocketException ex)
             {
-                Logger.LogError("Unable to connect to server: ");
-                Logger.LogError(ex);
+                Logger.DevkitServer.LogError("HIGH SPEED NETWORKING", ex, "Unable to connect to server: ");
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error connecting: ");
-                Logger.LogError(ex);
+                Logger.DevkitServer.LogError("HIGH SPEED NETWORKING", ex, "Error connecting: ");
             }
         }
 

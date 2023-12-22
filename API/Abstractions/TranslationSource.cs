@@ -1,11 +1,11 @@
 ﻿using DevkitServer.API.Commands;
+using DevkitServer.Core.Commands.Subsystem;
 using DevkitServer.Plugins;
 using DevkitServer.Util.Encoding;
+using SDG.Framework.Modules;
 using System.Globalization;
 using System.Reflection;
-using SDG.Framework.Modules;
 using Module = SDG.Framework.Modules.Module;
-using DevkitServer.Core.Commands.Subsystem;
 
 namespace DevkitServer.API.Abstractions;
 /// <summary>
@@ -14,6 +14,8 @@ namespace DevkitServer.API.Abstractions;
 /// <remarks>Use <see cref="TranslationData"/> to package this data and send it to a client.</remarks>
 public class TranslationSource
 {
+    internal const string Source = "TRANSLATION SOURCE";
+
     /// <summary>
     /// Translation source referencing <see cref="DevkitServerModule.MainLocalization"/>.
     /// </summary>
@@ -162,8 +164,7 @@ public class TranslationSource
             }
             catch (Exception ex)
             {
-                Logger.LogError("Failed to read tranlation source.");
-                Logger.LogError(ex);
+                Logger.DevkitServer.LogError(Source, ex, "Failed to read tranlation source.");
                 return null;
             }
         }
@@ -183,7 +184,7 @@ public class TranslationSource
 
         if (source == null)
         {
-            Logger.LogError($"Failed to read tranlation source: {code.Format("x")}.");
+            Logger.DevkitServer.LogError(Source, $"Failed to read tranlation source: {code.Format("x")}.");
             return null;
         }
         source.Read(reader);
@@ -404,7 +405,7 @@ public sealed class ExplicitTranslationSource : ITranslationSource
                         args += ",";
                     args += $"{{{j.Format()}}} = {parameters[j].Format()}";
                 }
-                Logger.LogError($"Caught localization string formatting exception (key: {key.Format()} (in {typeof(ExplicitTranslationSource).Format()}) text: {Values[1, i].Format()} {args})");
+                Logger.DevkitServer.LogError(TranslationSource.Source, $"Caught localization string formatting exception (key: {key.Format()} (in {typeof(ExplicitTranslationSource).Format()}) text: {Values[1, i].Format()} {args})");
                 return key;
             }
         }
@@ -507,8 +508,7 @@ public sealed class FileTranslationSource : ITranslationSource
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error accessing a file for translation.", method: "FILE TRANSLATION SOURCE");
-            Logger.LogError(ex, method: "FILE TRANSLATION SOURCE");
+            Logger.DevkitServer.LogError("FILE TRANSLATION SOURCE", ex, "Error accessing a file for translation.");
             return key;
         }
     }

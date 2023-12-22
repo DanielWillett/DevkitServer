@@ -9,43 +9,6 @@ namespace DevkitServer.Core.Commands.Subsystem;
 public static class CommandEx
 {
     public static Type GetPluginType(this IExecutableCommand command) => command.Plugin?.GetType() ?? (command is VanillaCommand ? typeof(Provider) : typeof(DevkitServerModule));
-    public static void LogDebug(this IExecutableCommand command, string message, ConsoleColor color = ConsoleColor.DarkGray)
-    {
-        message = "[" + command.CommandName.ToUpperInvariant() + " CMD] " + message;
-        if (command.Plugin != null)
-            command.Plugin.LogDebug(message, color);
-        else
-            Logger.LogDebug(message, color);
-    }
-    public static void LogInfo(this IExecutableCommand command, string message, ConsoleColor color = ConsoleColor.DarkCyan)
-    {
-        message = "[" + command.CommandName.ToUpperInvariant() + " CMD] " + message;
-        if (command.Plugin != null)
-            command.Plugin.LogInfo(message, color);
-        else
-            Logger.LogInfo(message, color);
-    }
-    public static void LogWarning(this IExecutableCommand command, string message, ConsoleColor color = ConsoleColor.Yellow)
-    {
-        if (command.Plugin != null)
-            command.Plugin.LogWarning("[" + command.CommandName.ToUpperInvariant() + " CMD] " + message, color);
-        else
-            Logger.LogWarning(message, color, method: command.CommandName.ToUpperInvariant() + " CMD");
-    }
-    public static void LogError(this IExecutableCommand command, string message, ConsoleColor color = ConsoleColor.Red)
-    {
-        if (command.Plugin != null)
-            command.Plugin.LogError("[" + command.CommandName.ToUpperInvariant() + " CMD] " + message, color);
-        else
-            Logger.LogError(message, color, method: command.CommandName.ToUpperInvariant() + " CMD");
-    }
-    public static void LogError(this IExecutableCommand command, Exception ex)
-    {
-        if (command.Plugin != null)
-            command.Plugin.LogError(ex);
-        else
-            Logger.LogError(ex, method: command.CommandName.ToUpperInvariant() + " CMD");
-    }
     public static void RegisterVanillaCommands()
     {
         try
@@ -58,7 +21,7 @@ public static class CommandEx
                 {
                     if (!Commander.commands!.Contains(command.Command))
                     {
-                        Logger.LogDebug($"Removing command: {command.Format()}, outdated.");
+                        Logger.DevkitServer.LogDebug(nameof(RegisterVanillaCommands), $"Removing command: {command.Format()}, outdated.");
                         CommandHandler.Handler.TryDeregisterCommand(command);
                         continue;
                     }
@@ -66,34 +29,34 @@ public static class CommandEx
                     VanillaCommandInfo.GetInfo(command.Command.GetType(), out CommandExecutionMode mode, out _, out bool dedicatedServerOnly, out bool serverOnly, out bool startupOnly);
                     if (mode == CommandExecutionMode.Disabled)
                     {
-                        Logger.LogDebug($"Removing command: {command.Format()}, disabled.");
+                        Logger.DevkitServer.LogDebug(nameof(RegisterVanillaCommands), $"Removing command: {command.Format()}, disabled.");
                         CommandHandler.Handler.TryDeregisterCommand(command);
                         continue;
                     }
 
                     if (startupOnly)
                     {
-                        Logger.LogDebug($"Removing command: {command.Format()}, startup only.");
+                        Logger.DevkitServer.LogDebug(nameof(RegisterVanillaCommands), $"Removing command: {command.Format()}, startup only.");
                         CommandHandler.Handler.TryDeregisterCommand(command);
                         continue;
                     }
 #if CLIENT
                     if (dedicatedServerOnly)
                     {
-                        Logger.LogDebug($"Removing command: {command.Format()}, dedicated server only.");
+                        Logger.DevkitServer.LogDebug(nameof(RegisterVanillaCommands), $"Removing command: {command.Format()}, dedicated server only.");
                         CommandHandler.Handler.TryDeregisterCommand(command);
                         continue;
                     }
 #endif
                     if (serverOnly && !Provider.isServer)
                     {
-                        Logger.LogDebug($"Removing command: {command.Format()}, authority only.");
+                        Logger.DevkitServer.LogDebug(nameof(RegisterVanillaCommands), $"Removing command: {command.Format()}, authority only.");
                         CommandHandler.Handler.TryDeregisterCommand(command);
                     }
 
                     if (!PassesMode(mode))
                     {
-                        Logger.LogDebug($"Removing command: {command.Format()}, not executable in this mode.");
+                        Logger.DevkitServer.LogDebug(nameof(RegisterVanillaCommands), $"Removing command: {command.Format()}, not executable in this mode.");
                         CommandHandler.Handler.TryDeregisterCommand(command);
                     }
                 }
@@ -108,31 +71,31 @@ public static class CommandEx
 
                 if (mode == CommandExecutionMode.Disabled)
                 {
-                    Logger.LogDebug($"Skipping command: {command.Format()}, disabled.");
+                    Logger.DevkitServer.LogDebug(nameof(RegisterVanillaCommands), $"Skipping command: {command.Format()}, disabled.");
                     continue;
                 }
 
                 if (startupOnly)
                 {
-                    Logger.LogDebug($"Skipping command: {command.Format()}, startup only.");
+                    Logger.DevkitServer.LogDebug(nameof(RegisterVanillaCommands), $"Skipping command: {command.Format()}, startup only.");
                     continue;
                 }
 #if CLIENT
                 if (dedicatedServerOnly)
                 {
-                    Logger.LogDebug($"Skipping command: {command.Format()}, dedicated server only.");
+                    Logger.DevkitServer.LogDebug(nameof(RegisterVanillaCommands), $"Skipping command: {command.Format()}, dedicated server only.");
                     continue;
                 }
 #endif
                 if (serverOnly && !Provider.isServer)
                 {
-                    Logger.LogDebug($"Skipping command: {command.Format()}, authority only.");
+                    Logger.DevkitServer.LogDebug(nameof(RegisterVanillaCommands), $"Skipping command: {command.Format()}, authority only.");
                     continue;
                 }
 
                 if (!PassesMode(mode))
                 {
-                    Logger.LogDebug($"Skipping command: {command.Format()}, not executable in this mode.");
+                    Logger.DevkitServer.LogDebug(nameof(RegisterVanillaCommands), $"Skipping command: {command.Format()}, not executable in this mode.");
                     continue;
                 }
 
@@ -143,8 +106,7 @@ public static class CommandEx
         }
         catch (Exception ex)
         {
-            Logger.LogError("Failed to register vanilla commands.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(nameof(RegisterVanillaCommands), ex, "Failed to register vanilla commands.");
         }
     }
     public static void DefaultReflectCommands()
@@ -198,9 +160,8 @@ public static class CommandEx
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError("Error loading command of type " + type.Format() + " from assembly " + asm.GetName().Name.Format() + ".");
-                    Logger.LogInfo("If you don't want this command to load, add the " + typeof(IgnoreAttribute).Format() + " to it's class.");
-                    Logger.LogError(ex);
+                    Logger.DevkitServer.LogError(nameof(DefaultReflectCommands), ex, $"Error loading command of type {type.Format()} from assembly {asm.GetName().Name.Format()}.");
+                    Logger.DevkitServer.LogInfo(nameof(DefaultReflectCommands), $"If you don't want this command to load, add the {typeof(IgnoreAttribute).Format()} to it's class.");
                 }
             }
         }

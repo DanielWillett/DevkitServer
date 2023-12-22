@@ -1,4 +1,5 @@
-﻿using DevkitServer.API.Storage;
+﻿using DevkitServer.API.Logging;
+using DevkitServer.API.Storage;
 using DevkitServer.Configuration;
 using System.Diagnostics;
 using System.Globalization;
@@ -19,7 +20,7 @@ public sealed class BackupManager : MonoBehaviour
     /// </summary>
     public const string FileNameDateFormat = "yyyy-MM-dd_HH-mm-ss";
 
-    private const string Source = "BACKUPS";
+    internal const string Source = "BACKUPS";
     private Coroutine? _backupCoroutine;
     private bool _event;
     private float _lastSave;
@@ -55,7 +56,7 @@ public sealed class BackupManager : MonoBehaviour
             }
             else
             {
-                Logger.LogInfo($"[{Source}] Skipped startup backup because a backup was made {(DateTime.UtcNow - utcTimestamp).TotalMinutes.Format("F0")} min ago.");
+                Logger.DevkitServer.LogInfo(Source, $"Skipped startup backup because a backup was made {(DateTime.UtcNow - utcTimestamp).TotalMinutes.Format("F0")} minute(s) ago.");
             }
         }
     }
@@ -87,9 +88,9 @@ public sealed class BackupManager : MonoBehaviour
             LogNotEnabled();
             if (config.Behavior != BackupConfiguration.BackupBehavior.Disabled)
             {
-                Logger.LogWarning($"[BACKUPS] This is because \"{"max_backups".Colorize(DevkitServerModule.ModuleColor)}\" or " +
+                Logger.DevkitServer.LogWarning(Source, $"This is because \"{"max_backups".Colorize(DevkitServerModule.ModuleColor)}\" or " +
                                   $"\"{"max_total_backup_size_mb".Colorize(DevkitServerModule.ModuleColor)}\" is set to zero. " +
-                                  $"Use {(-1).Format()} instead for unlimited.", method: Source);
+                                  $"Use {(-1).Format()} instead for unlimited.");
             }
             return;
         }
@@ -98,22 +99,22 @@ public sealed class BackupManager : MonoBehaviour
         {
             if (config.MaxBackupSizeMegabytes > 0)
             {
-                Logger.LogInfo($"[{Source}] Limits: {config.MaxBackups.Format()} backup{config.MaxBackups.S()}, " +
-                               $"Size: {FormattingUtil.FormatCapacity(DevkitServerUtility.ConvertMBToB(config.MaxBackupSizeMegabytes), colorize: true)}.");
+                Logger.DevkitServer.LogInfo(Source, $"Limits: {config.MaxBackups.Format()} backup{config.MaxBackups.S()}, " +
+                                            $"Size: {FormattingUtil.FormatCapacity(DevkitServerUtility.ConvertMBToB(config.MaxBackupSizeMegabytes), colorize: true)}.");
             }
             else
-                Logger.LogInfo($"[{Source}] Limit: {config.MaxBackups.Format()} backup{config.MaxBackups.S()}.");
+                Logger.DevkitServer.LogInfo(Source, $"Limit: {config.MaxBackups.Format()} backup{config.MaxBackups.S()}.");
         }
         else if (config.MaxBackupSizeMegabytes > 0)
         {
-            Logger.LogInfo($"[{Source}] Size Limit: {FormattingUtil.FormatCapacity(DevkitServerUtility.ConvertMBToB(config.MaxBackupSizeMegabytes), colorize: true)}.");
+            Logger.DevkitServer.LogInfo(Source, $"Size Limit: {FormattingUtil.FormatCapacity(DevkitServerUtility.ConvertMBToB(config.MaxBackupSizeMegabytes), colorize: true)}.");
         }
         else
         {
-            Logger.LogWarning("There are no limits set on backups, not recommended. " +
-                             $"Set \"{"max_backups".Colorize(DevkitServerModule.ModuleColor)}\" and/or " +
-                             $"\"{"max_total_backup_size_mb".Colorize(DevkitServerModule.ModuleColor)}\" " +
-                              "to create a ring buffer for backups.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "There are no limits set on backups, not recommended. " +
+                                                   $"Set \"{"max_backups".Colorize(DevkitServerModule.ModuleColor)}\" and/or " +
+                                                   $"\"{"max_total_backup_size_mb".Colorize(DevkitServerModule.ModuleColor)}\" " +
+                                                   "to create a ring buffer for backups.");
         }
 
         switch (config.Behavior)
@@ -130,12 +131,12 @@ public sealed class BackupManager : MonoBehaviour
                 _backupCoroutine = StartCoroutine(ScheduleBackup());
                 break;
             default:
-                Logger.LogError($"Invalid value for backup behavior: {config.Behavior.ToString().Colorize(ConsoleColor.DarkRed)}.", method: Source);
+                Logger.DevkitServer.LogError(Source, $"Invalid value for backup behavior: {config.Behavior.ToString().Colorize(ConsoleColor.DarkRed)}.");
                 LogNotEnabled();
                 break;
         }
     }
-    private static void LogNotEnabled() => Logger.LogWarning($"Backups {"disabled".Colorize(ConsoleColor.Red)} (not recommended).", method: Source);
+    private static void LogNotEnabled() => Logger.DevkitServer.LogWarning(Source, $"Backups {"disabled".Colorize(ConsoleColor.Red)} (not recommended).");
 
     /// <summary>
     /// Gets the path of a backup saved at <paramref name="timestamp"/>.
@@ -217,7 +218,7 @@ public sealed class BackupManager : MonoBehaviour
         if (CachedTime.RealtimeSinceStartup - _lastSave > 5f)
             Backup();
         else
-            Logger.LogInfo($"[{Source}] Backup {DateTime.UtcNow.ToString(FileNameDateFormat).Format(false)} (UTC) skipped because the level was very recently backed up.");
+            Logger.DevkitServer.LogInfo(Source, $"Backup {DateTime.UtcNow.ToString(FileNameDateFormat).Format(false)} (UTC) skipped because the level was very recently backed up.");
     }
 
     /// <summary>
@@ -240,7 +241,7 @@ public sealed class BackupManager : MonoBehaviour
         try
         {
             _lastSave = CachedTime.RealtimeSinceStartup;
-            Logger.LogInfo($"[{Source}] Backing up {Level.info.name.Format(false)}...");
+            Logger.DevkitServer.LogInfo(Source, $"Backing up {Level.info.name.Format(false)}...");
             timestamp = DateTimeOffset.UtcNow;
 
             saveTask = LevelData.GatherLevelData(true, token: DevkitServerModule.UnloadToken);
@@ -265,13 +266,12 @@ public sealed class BackupManager : MonoBehaviour
             catch (OperationCanceledException)
             {
                 path = null!;
-                Logger.LogError($"Cancelled backing up level {Level.info.name.Colorize(DevkitServerModule.UnturnedColor)}.", method: Source);
+                Logger.DevkitServer.LogError(Source, $"Cancelled backing up level {Level.info.name.Colorize(DevkitServerModule.UnturnedColor)}.");
             }
             catch (Exception ex)
             {
                 path = null!;
-                Logger.LogError($"Error backing up level {Level.info.name.Colorize(DevkitServerModule.UnturnedColor)}.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, $"Error backing up level {Level.info.name.Colorize(DevkitServerModule.UnturnedColor)}.");
             }
             finally
             {
@@ -285,7 +285,7 @@ public sealed class BackupManager : MonoBehaviour
             }
 
             timer.Stop();
-            Logger.LogInfo($"[{Source}] Backed up to {path.Format()} in {timer.GetElapsedMilliseconds().Format("F2")} ms.");
+            Logger.DevkitServer.LogInfo(Source, $"Backed up to {path.Format()} in {timer.GetElapsedMilliseconds().Format("F2")} ms.");
         });
     }
     private async Task ZipAndClear(string path, LevelData save, int maxBackups, double maxBackupSizeMegabytes)
@@ -313,7 +313,7 @@ public sealed class BackupManager : MonoBehaviour
         long streamLength = stream.Length;
         _lastSize = (int)Math.Min(1073741824L, streamLength);
 
-        Logger.LogDebug($"[{Source}] Zipped {FormattingUtil.FormatCapacity(streamLength, colorize: true)}.");
+        Logger.DevkitServer.LogDebug(Source, $"Zipped {FormattingUtil.FormatCapacity(streamLength, colorize: true)}.");
         ClearBackups(streamLength, maxBackups < 0 ? null : maxBackups,
             maxBackupSizeMegabytes >= 0 ? DevkitServerUtility.ConvertMBToB(maxBackupSizeMegabytes) : null);
 
@@ -343,8 +343,7 @@ public sealed class BackupManager : MonoBehaviour
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error trying to calculate backup folder size.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error trying to calculate backup folder size.");
             }
         }
         if (maxBackups.HasValue)
@@ -359,8 +358,7 @@ public sealed class BackupManager : MonoBehaviour
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error trying to calculate backup count.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error trying to calculate backup count.");
             }
         }
     }
@@ -497,7 +495,7 @@ public sealed class BackupManager : MonoBehaviour
                 File.Delete(path);
                 deleted = true;
                 ++ctDeleted;
-                Logger.LogInfo($"[{Source}] Deleted old backup: {backups[index].UtcTimestamp.ToString(FileNameDateFormat).Format(false)} (UTC).");
+                Logger.DevkitServer.LogInfo(Source, $"Deleted old backup: {backups[index].UtcTimestamp.ToString(FileNameDateFormat).Format(false)} (UTC).");
                 path = GetLogFolderPath(levelName, backups[index].UtcTimestamp);
                 if (Directory.Exists(path))
                     Directory.Delete(path, true);
@@ -506,8 +504,7 @@ public sealed class BackupManager : MonoBehaviour
             {
                 if (!deleted)
                     ++ct;
-                Logger.LogError($"Error trying to delete old backup: {path.Format()} (UTC).", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, $"Error trying to delete old backup: {path.Format()} (UTC).");
             }
         }
 
@@ -524,7 +521,7 @@ public sealed class BackupManager : MonoBehaviour
         bool configSaveLogs = config.SaveBackupLogs;
         while (DevkitServerModule.IsAuthorityEditor)
         {
-            Logger.LogInfo($"[{Source}] Next Backup: {DateTime.Now.AddSeconds(interval).ToString("G").Format(false)} (LOCAL).");
+            Logger.DevkitServer.LogInfo(Source, $"Next Backup: {DateTime.Now.AddSeconds(interval).ToString("G").Format(false)} (LOCAL).");
 
             yield return new WaitForSecondsRealtime((float)interval);
             if (!DevkitServerModule.IsAuthorityEditor)
@@ -534,11 +531,11 @@ public sealed class BackupManager : MonoBehaviour
                 if (CachedTime.RealtimeSinceStartup - _lastSave > 5f)
                     Backup(maxBackups, maxSizeMb, configSaveLogs);
                 else
-                    Logger.LogInfo($"[{Source}] Backup {DateTime.Now.ToString(FileNameDateFormat).Format(false)} (LOCAL) skipped because the level was very recently backed up.");
+                    Logger.DevkitServer.LogInfo(Source, $"Backup {DateTime.Now.ToString(FileNameDateFormat).Format(false)} (LOCAL) skipped because the level was very recently backed up.");
             }
             else
             {
-                Logger.LogInfo($"[{Source}] Backup {DateTime.Now.ToString(FileNameDateFormat).Format(false)} (LOCAL) skipped because of inactivity.");
+                Logger.DevkitServer.LogInfo(Source, $"Backup {DateTime.Now.ToString(FileNameDateFormat).Format(false)} (LOCAL) skipped because of inactivity.");
             }
         }
     }
@@ -554,7 +551,7 @@ public sealed class BackupManager : MonoBehaviour
         ScheduleInterval configScheduleInterval = config.BackupScheduleInterval;
         if (configSchedule == null)
         {
-            Logger.LogWarning($"Schedule not specified for {"Scheduled".Colorize(ConsoleColor.Green)} backup mode.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Schedule not specified for {"Scheduled".Colorize(ConsoleColor.Green)} backup mode.");
             LogNotEnabled();
             yield break;
         }
@@ -563,11 +560,11 @@ public sealed class BackupManager : MonoBehaviour
             DateTime? next = DevkitServerUtility.FindNextSchedule(configSchedule, false, configScheduleInterval);
             if (!next.HasValue)
             {
-                Logger.LogWarning("Schedule has no queued upcoming events.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Schedule has no queued upcoming events.");
                 LogNotEnabled();
                 yield break;
             }
-            Logger.LogInfo($"[{Source}] Next Backup: {next.Value.ToString("G").Format(false)} ({(configUtc ? "UTC" : "LOCAL")}).");
+            Logger.DevkitServer.LogInfo(Source, $"Next Backup: {next.Value.ToString("G").Format(false)} ({(configUtc ? "UTC" : "LOCAL")}).");
             DateTime now = configUtc ? DateTime.UtcNow : DateTime.Now;
             yield return new WaitForSecondsRealtime((float)(next.Value - now).TotalSeconds);
             if (!DevkitServerModule.IsAuthorityEditor)
@@ -577,11 +574,11 @@ public sealed class BackupManager : MonoBehaviour
                 if (CachedTime.RealtimeSinceStartup - _lastSave > 5f)
                     Backup(maxBackups, maxSizeMb, configSaveLogs);
                 else
-                    Logger.LogInfo($"[{Source}] Backup {DateTime.Now.ToString(FileNameDateFormat).Format(false)} (LOCAL) skipped because the level was very recently backed up.");
+                    Logger.DevkitServer.LogInfo(Source, $"Backup {DateTime.Now.ToString(FileNameDateFormat).Format(false)} (LOCAL) skipped because the level was very recently backed up.");
             }
             else
             {
-                Logger.LogInfo($"[{Source}] Backup {DateTime.Now.ToString(FileNameDateFormat).Format(false)} (LOCAL) skipped because of inactivity.");
+                Logger.DevkitServer.LogInfo(Source, $"Backup {DateTime.Now.ToString(FileNameDateFormat).Format(false)} (LOCAL) skipped because of inactivity.");
             }
         }
     }

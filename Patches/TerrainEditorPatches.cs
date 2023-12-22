@@ -32,7 +32,7 @@ internal static class TerrainEditorPatches
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (rampHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleHeightmapWriteRamp.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: TerrainEditor.handleHeightmapWriteRamp.");
             DevkitServerModule.Fault();
         }
 
@@ -40,7 +40,7 @@ internal static class TerrainEditorPatches
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (adjustHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleHeightmapWriteAdjust.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: TerrainEditor.handleHeightmapWriteAdjust.");
             DevkitServerModule.Fault();
         }
 
@@ -48,7 +48,7 @@ internal static class TerrainEditorPatches
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (flattenHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleHeightmapWriteFlatten.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: TerrainEditor.handleHeightmapWriteFlatten.");
             DevkitServerModule.Fault();
         }
 
@@ -56,7 +56,7 @@ internal static class TerrainEditorPatches
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (smoothHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleHeightmapWriteSmooth.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: TerrainEditor.handleHeightmapWriteSmooth.");
             DevkitServerModule.Fault();
         }
 
@@ -64,7 +64,7 @@ internal static class TerrainEditorPatches
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (paintHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleSplatmapWritePaint.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: TerrainEditor.handleSplatmapWritePaint.");
             DevkitServerModule.Fault();
         }
 
@@ -72,7 +72,7 @@ internal static class TerrainEditorPatches
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (autoPaintHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleSplatmapWriteAuto.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: TerrainEditor.handleSplatmapWriteAuto.");
             DevkitServerModule.Fault();
         }
 
@@ -80,7 +80,7 @@ internal static class TerrainEditorPatches
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (paintSmoothHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleSplatmapWriteSmooth.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: TerrainEditor.handleSplatmapWriteSmooth.");
             DevkitServerModule.Fault();
         }
 
@@ -88,7 +88,7 @@ internal static class TerrainEditorPatches
             BindingFlags.NonPublic | BindingFlags.Instance);
         if (holesHandler == null)
         {
-            Logger.LogWarning("Unable to find method: TerrainEditor.handleSplatmapWriteCut.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: TerrainEditor.handleSplatmapWriteCut.");
             DevkitServerModule.Fault();
         }
 
@@ -96,7 +96,7 @@ internal static class TerrainEditorPatches
             BindingFlags.Public | BindingFlags.Static);
         if (addTile == null)
         {
-            Logger.LogWarning("Unable to find method: Landscape.addTile.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: Landscape.addTile.");
             DevkitServerModule.Fault();
         }
 
@@ -104,7 +104,7 @@ internal static class TerrainEditorPatches
             BindingFlags.Public | BindingFlags.Static);
         if (removeTile == null)
         {
-            Logger.LogWarning("Unable to find method: Landscape.removeTile.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: Landscape.removeTile.");
             DevkitServerModule.Fault();
         }
 
@@ -112,7 +112,7 @@ internal static class TerrainEditorPatches
             BindingFlags.Public | BindingFlags.Static);
         if (lHMarkDirty == null)
         {
-            Logger.LogWarning("Unable to find method: LevelHierarchy.MarkDirty.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: LevelHierarchy.MarkDirty.");
             DevkitServerModule.Fault();
         }
 
@@ -120,7 +120,7 @@ internal static class TerrainEditorPatches
             BindingFlags.Public | BindingFlags.Static);
         if (writeHeightmap == null)
         {
-            Logger.LogWarning("Unable to find method: Landscape.writeHeightmap.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: Landscape.writeHeightmap.");
             DevkitServerModule.Fault();
         }
 
@@ -128,7 +128,7 @@ internal static class TerrainEditorPatches
             BindingFlags.Public | BindingFlags.Static);
         if (writeSplatmap == null)
         {
-            Logger.LogWarning("Unable to find method: Landscape.writeSplatmap.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: Landscape.writeSplatmap.");
             DevkitServerModule.Fault();
         }
 
@@ -136,26 +136,27 @@ internal static class TerrainEditorPatches
             BindingFlags.Public | BindingFlags.Static);
         if (writeHoles == null)
         {
-            Logger.LogWarning("Unable to find method: Landscape.writeHoles.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: Landscape.writeHoles.");
             DevkitServerModule.Fault();
         }
-        MethodInfo? rampInvoker = tep.GetMethod(nameof(OnRampConfirm), BindingFlags.Static | BindingFlags.NonPublic);
-        MethodInfo? adjustInvoker = tep.GetMethod(nameof(OnAdjustConfirm), BindingFlags.Static | BindingFlags.NonPublic);
-        MethodInfo? flattenInvoker = tep.GetMethod(nameof(OnFlattenConfirm), BindingFlags.Static | BindingFlags.NonPublic);
-        MethodInfo? smoothInvoker = tep.GetMethod(nameof(OnSmoothConfirm), BindingFlags.Static | BindingFlags.NonPublic);
-        MethodInfo? paintInvoker = tep.GetMethod(nameof(OnPaintConfirm), BindingFlags.Static | BindingFlags.NonPublic);
-        MethodInfo? autoPaintInvoker = tep.GetMethod(nameof(OnAutoPaintConfirm), BindingFlags.Static | BindingFlags.NonPublic);
-        MethodInfo? paintSmoothInvoker = tep.GetMethod(nameof(OnPaintSmoothConfirm), BindingFlags.Static | BindingFlags.NonPublic);
-        MethodInfo? holesInvoker = tep.GetMethod(nameof(OnHoleConfirm), BindingFlags.Static | BindingFlags.NonPublic);
-        MethodInfo? addTileInvoker = tep.GetMethod(nameof(OnAddTile), BindingFlags.Static | BindingFlags.NonPublic);
-        MethodInfo? removeTileInvoker = tep.GetMethod(nameof(OnRemoveTile), BindingFlags.Static | BindingFlags.NonPublic);
+
+        MethodInfo? rampInvoker = Accessor.GetMethod(OnRampConfirm);
+        MethodInfo? adjustInvoker = Accessor.GetMethod(OnAdjustConfirm);
+        MethodInfo? flattenInvoker = Accessor.GetMethod(OnFlattenConfirm);
+        MethodInfo? smoothInvoker = Accessor.GetMethod(OnSmoothConfirm);
+        MethodInfo? paintInvoker = Accessor.GetMethod(OnPaintConfirm);
+        MethodInfo? autoPaintInvoker = Accessor.GetMethod(OnAutoPaintConfirm);
+        MethodInfo? paintSmoothInvoker = Accessor.GetMethod(OnPaintSmoothConfirm);
+        MethodInfo? holesInvoker = Accessor.GetMethod(OnHoleConfirm);
+        MethodInfo? addTileInvoker = Accessor.GetMethod(OnAddTile);
+        MethodInfo? removeTileInvoker = Accessor.GetMethod(OnRemoveTile);
         if (rampInvoker == null || adjustInvoker == null ||
             flattenInvoker == null || smoothInvoker == null ||
             paintInvoker == null || autoPaintInvoker == null ||
             paintSmoothInvoker == null || holesInvoker == null ||
             addTileInvoker == null || removeTileInvoker == null)
         {
-            Logger.LogWarning("Unable to find one or more of the TerrainEditor patch trigger methods.");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find one or more of the TerrainEditor patch trigger methods.");
             DevkitServerModule.Fault();
         }
         FieldInfo? permissionWriteHeightmap = vp.GetField(nameof(VanillaPermissions.EditHeightmap));
@@ -163,7 +164,7 @@ internal static class TerrainEditorPatches
         FieldInfo? permissionWriteHoles = vp.GetField(nameof(VanillaPermissions.EditHoles));
         if (permissionWriteHeightmap == null || permissionWriteSplatmap == null || permissionWriteHoles == null)
         {
-            Logger.LogWarning("Unable to find one or more of the VanillaPermissions fields.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find one or more of the VanillaPermissions fields.");
             DevkitServerModule.Fault();
         }
 
@@ -171,19 +172,19 @@ internal static class TerrainEditorPatches
             BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(PermissionLeaf), typeof(bool) }, null);
         if (hasPermission == null)
         {
-            Logger.LogWarning("Unable to find method: PermissionsEx.Has.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: PermissionsEx.Has.");
             DevkitServerModule.Fault();
         }
 
         MethodInfo? onNoPermissionInvoker = tep.GetMethod(nameof(OnNoPermissionsInvoker), BindingFlags.Static | BindingFlags.NonPublic);
         MethodInfo? onPermissionInvoker = tep.GetMethod(nameof(OnPermissionsInvoker), BindingFlags.Static | BindingFlags.NonPublic);
         if (hasPermission == null)
-            Logger.LogWarning("Unable to find method: ClientEvents.OnNoPermissionsInvoker.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to find method: ClientEvents.OnNoPermissionsInvoker.");
 
         FieldInfo lastEditedTerrainField = typeof(TerrainEditorPatches).GetField(nameof(LastEditedTerrain), BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static)!;
 
         LocalBuilder localBounds = generator.DeclareLocal(typeof(Bounds));
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> ins = [..instructions];
         int addTileCt = 0;
         int addTileLcl = -1;
         LocalBuilder? addTileLcl2 = null;
@@ -283,13 +284,13 @@ internal static class TerrainEditorPatches
                     if (invoker != null)
                     {
                         yield return new CodeInstruction(OpCodes.Call, invoker);
-                        Logger.LogDebug("[CLIENT EVENTS] Patched in " + invoker.Format() + " call.");
+                        Logger.DevkitServer.LogDebug(nameof(TerrainEditorUpdateTranspiler), $"Patched in {invoker.Format()} call.");
                         ++pCt;
                     }
                     else
                     {
                         yield return new CodeInstruction(OpCodes.Pop);
-                        Logger.LogWarning("Unknown function pointer-based method call: " + method.Format() + ".", method: "CLIENT EVENTS");
+                        Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), $"Unknown function pointer-based method call: {method.Format()}.");
                     }
 
                     yield return new CodeInstruction(OpCodes.Ldc_I4_1);
@@ -308,7 +309,7 @@ internal static class TerrainEditorPatches
                     addTileCt = 2;
                 if (addTileCt == 2)
                 {
-                    Logger.LogWarning("Unable to patch OnAddTile event.");
+                    Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), "Unable to patch OnAddTile event.");
                 }
             }
             // landscape hierarchy is invalidated
@@ -317,7 +318,7 @@ internal static class TerrainEditorPatches
                 yield return c;
                 yield return PatchUtil.GetLocalCodeInstruction(addTileLcl2, addTileLcl, false);
                 yield return new CodeInstruction(OpCodes.Call, addTileInvoker);
-                Logger.LogDebug("[CLIENT EVENTS] Patched in OnAddTile call.");
+                Logger.DevkitServer.LogDebug(nameof(TerrainEditorUpdateTranspiler), "Patched in OnAddTile call.");
                 addTileCt = 2;
                 pAddTile = true;
                 continue;
@@ -327,7 +328,7 @@ internal static class TerrainEditorPatches
             {
                 yield return c;
                 yield return new CodeInstruction(OpCodes.Call, removeTileInvoker);
-                Logger.LogDebug("[CLIENT EVENTS] Patched in OnRemoveTile call.");
+                Logger.DevkitServer.LogDebug(nameof(TerrainEditorUpdateTranspiler), "Patched in OnRemoveTile call.");
                 pRemoveTile = true;
                 continue;
             }
@@ -336,7 +337,7 @@ internal static class TerrainEditorPatches
         }
         if (!pRemoveTile || !pAddTile || pCt != 8)
         {
-            Logger.LogWarning($"Patching error for TerrainEditor.update. Invalid transpiler operation: Remove Tile: {pRemoveTile}, Add Tile: {pAddTile}, invoker counts: {pCt} / 8.", method: "CLIENT EVENTS");
+            Logger.DevkitServer.LogWarning(nameof(TerrainEditorUpdateTranspiler), $"Patching error for TerrainEditor.update. Invalid transpiler operation: Remove Tile: {pRemoveTile.Format()}, Add Tile: {pAddTile.Format()}, invoker counts: {pCt.Format()} / 8.");
             DevkitServerModule.Fault();
         }
     }

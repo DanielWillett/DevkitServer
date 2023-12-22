@@ -19,7 +19,7 @@ internal static class ServerGizmoPatches
         foreach (MethodInfo method in Patched)
         {
             PatchesMain.Patcher.Patch(method, transpiler: new HarmonyMethod(TranspilerMethod));
-            Logger.LogDebug($"Emptied method {method.Format()} on the server to help with performance.");
+            Logger.DevkitServer.LogDebug(nameof(ServerGizmoPatches), $"Emptied method {method.Format()} on the server to help with performance.");
         }
     }
     private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> old) => new CodeInstruction[] { new CodeInstruction(OpCodes.Ret) }.Concat(old);

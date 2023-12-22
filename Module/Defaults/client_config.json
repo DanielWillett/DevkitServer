@@ -7,16 +7,28 @@
   "ansi_log": true,
 
   /*
-   *  Full (24-bit) console color support (works in the Win 11 terminal and most web terminals).
+   *  Full (24-bit RGB) console color support using virtual terminal sequences (works in the Windows command prompt and most web terminals).
    *
    *  If your console contains weird symbols, try setting this to false.
    */
-  "extended_visual_ansi_support": true,
+  "terminal_full_rgb_support": true,
 
   /*
-   *  Basic (4-bit) console color support (works in most terminals).
+   *  Basic (4-bit) console color support using virtual terminal sequences (works in most terminals).
+   *
+   *  If your console contains weird symbols after setting 'terminal_full_rgb_support' to false, try setting this to false.
    */
-  "visual_ansi_support": true,
+  "terminal_virtual_sequence_support": true,
+
+  /*
+   *  Adds extra debug logging from DevkitServer. Helps with diagnosing problems but could lower performance.
+   */
+  "debug_logging": false,
+
+  /*
+   *  On Windows, disables opening the terminal window when you launch the game.
+   */
+  "disable_terminal": false,
 
   /*
    *  Removes cosmetic improvements.

@@ -52,7 +52,7 @@ internal static class CartographyCompositing
 
                 if (info.Type == null || !typeof(ICartographyCompositor).IsAssignableFrom(info.Type) || info.Type.IsAbstract || info.Type.IsInterface)
                 {
-                    Logger.LogWarning($"Unknown chart provider: {compositorName.Format()}, skipping this compositor. Make sure your compositor implements {typeof(ICartographyCompositor).Format()}.");
+                    Logger.DevkitServer.LogWarning(nameof(CartographyCompositing), $"Unknown chart provider: {compositorName.Format()}, skipping this compositor. Make sure your compositor implements {typeof(ICartographyCompositor).Format()}.");
                     continue;
                 }
 
@@ -71,7 +71,7 @@ internal static class CartographyCompositing
             active = RenderTexture.active;
             RenderTexture.active = rt;
             Graphics.Blit(texture, rt);
-            Logger.LogDebug("Created compositing render texture.");
+            Logger.DevkitServer.LogDebug(nameof(CartographyCompositing), "Created compositing render texture.");
 
             return rt;
         }, LazyThreadSafetyMode.None);
@@ -85,18 +85,18 @@ internal static class CartographyCompositing
             if (!info.SupportsChart && data.IsChart)
             {
                 if (info.Plugin != null)
-                    info.Plugin.LogDebug($"Skipping compositor {info.Type.Format()} as it doesn't support chart renders.");
+                    info.Plugin.LogDebug(nameof(CartographyCompositing), $"Skipping compositor {info.Type.Format()} as it doesn't support chart renders.");
                 else
-                    Logger.LogDebug($"Skipping compositor {info.Type.Format()} as it doesn't support chart renders.");
+                    Logger.DevkitServer.LogDebug(nameof(CartographyCompositing), $"Skipping compositor {info.Type.Format()} as it doesn't support chart renders.");
 
                 continue;
             }
             if (!info.SupportsSatellite && !data.IsChart)
             {
                 if (info.Plugin != null)
-                    info.Plugin.LogDebug($"Skipping compositor {info.Type.Format()} as it doesn't support satellite renders.");
+                    info.Plugin.LogDebug(nameof(CartographyCompositing), $"Skipping compositor {info.Type.Format()} as it doesn't support satellite renders.");
                 else
-                    Logger.LogDebug($"Skipping compositor {info.Type.Format()} as it doesn't support satellite renders.");
+                    Logger.DevkitServer.LogDebug(nameof(CartographyCompositing), $"Skipping compositor {info.Type.Format()} as it doesn't support satellite renders.");
 
                 continue;
             }
@@ -104,9 +104,9 @@ internal static class CartographyCompositing
             try
             {
                 if (info.Plugin != null)
-                    info.Plugin.LogDebug($"Applying compositor of type {info.Type.Format()}.");
+                    info.Plugin.LogDebug(nameof(CartographyCompositing), $"Applying compositor of type {info.Type.Format()}.");
                 else
-                    Logger.LogDebug($"[{nameof(CompositeForeground)}] Applying compositor of type {info.Type.Format()}.");
+                    Logger.DevkitServer.LogDebug(nameof(CartographyCompositing), $"Applying compositor of type {info.Type.Format()}.");
                 
                 ICartographyCompositor compositor = (ICartographyCompositor)Activator.CreateInstance(info.Type, true);
 
@@ -120,29 +120,27 @@ internal static class CartographyCompositing
                 {
                     didAnything = true;
                     if (info.Plugin != null)
-                        info.Plugin.LogInfo($"Applied compositor of type {info.Type.Format()} in {sw.GetElapsedMilliseconds().Format("F2")} ms.");
+                        info.Plugin.LogInfo(nameof(CartographyCompositing), $"Applied compositor of type {info.Type.Format()} in {sw.GetElapsedMilliseconds().Format("F2")} ms.");
                     else
-                        Logger.LogInfo($"[{nameof(CompositeForeground)}] Applied compositor of type {info.Type.Format()} in {sw.GetElapsedMilliseconds().Format("F2")} ms.");
+                        Logger.DevkitServer.LogInfo(nameof(CartographyCompositing), $"Applied compositor of type {info.Type.Format()} in {sw.GetElapsedMilliseconds().Format("F2")} ms.");
                 }
                 else
                 {
                     if (info.Plugin != null)
-                        info.Plugin.LogDebug($"Did not use compositor of type {info.Type.Format()} after {sw.GetElapsedMilliseconds().Format("F2")} ms.");
+                        info.Plugin.LogDebug(nameof(CartographyCompositing), $"Did not use compositor of type {info.Type.Format()} after {sw.GetElapsedMilliseconds().Format("F2")} ms.");
                     else
-                        Logger.LogDebug($"[{nameof(CompositeForeground)}] Did not use compositor of type {info.Type.Format()} after {sw.GetElapsedMilliseconds().Format("F2")} ms.");
+                        Logger.DevkitServer.LogDebug(nameof(CartographyCompositing), $"Did not use compositor of type {info.Type.Format()} after {sw.GetElapsedMilliseconds().Format("F2")} ms.");
                 }
             }
             catch (Exception ex)
             {
                 if (info.Plugin != null)
                 {
-                    info.Plugin.LogError($"Exception thrown while applying compositor of type {info.Type.Format()}.");
-                    info.Plugin.LogError(ex);
+                    info.Plugin.LogError(nameof(CartographyCompositing), ex, $"Exception thrown while applying compositor of type {info.Type.Format()}.");
                 }
                 else
                 {
-                    Logger.LogError($"Exception thrown while applying compositor of type {info.Type.Format()}.", method: info.Type.Name);
-                    Logger.LogError(ex, method: info.Type.Name);
+                    Logger.DevkitServer.LogError(nameof(CartographyCompositing), ex, $"Exception thrown while applying compositor of type {info.Type.Format()}.");
                 }
             }
         }
@@ -152,7 +150,7 @@ internal static class CartographyCompositing
             texture.ReadPixels(new Rect(0, 0, data.ImageSize.x, data.ImageSize.y), 0, 0, false);
             RenderTexture.active = active;
             RenderTexture.ReleaseTemporary(renderTexture.Value);
-            Logger.LogDebug("Released compositing render texture.");
+            Logger.DevkitServer.LogDebug(nameof(CartographyCompositing), "Released compositing render texture.");
         }
         else didAnything = false;
 

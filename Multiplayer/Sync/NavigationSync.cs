@@ -1,10 +1,10 @@
-﻿using System.Globalization;
-using DevkitServer.Configuration;
+﻿using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
 using DevkitServer.Util.Encoding;
 using SDG.NetPak;
+using System.Globalization;
 #if CLIENT
 using DevkitServer.API.UI.Extensions;
 using DevkitServer.Core.UI.Extensions;
@@ -21,8 +21,6 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
 {
     private const float GraphDelay = 0.75f;
     private const float GraphSendDelay = 0.25f;
-
-    private const string Source = "NAVIGATION SYNC";
 
     private const int MaxPacketSize = (int)(NetFactory.MaxPacketSize * 0.2f);
 
@@ -56,20 +54,13 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
 #endif
 
     private readonly List<NetId> _graphSyncQueue = new List<NetId>(4);
-    private readonly List<NetId> _dataSyncQueue = new List<NetId>(4);
     private List<PacketInfo>? _packets;
 
-    private readonly struct PacketInfo
+    private readonly struct PacketInfo(int packetId, byte[] data, NetId nav)
     {
-        public readonly int PacketId;
-        public readonly byte[] Data;
-        public readonly NetId Nav;
-        public PacketInfo(int packetId, byte[] data, NetId nav)
-        {
-            PacketId = packetId;
-            Data = data;
-            Nav = nav;
-        }
+        public readonly int PacketId = packetId;
+        public readonly byte[] Data = data;
+        public readonly NetId Nav = nav;
     }
 
     protected override void Init() { }
@@ -84,19 +75,19 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
     {
         if (!HasAuthority || IsOwner)
         {
-            Logger.LogWarning("Received navigation data from non-authority tile sync.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Received navigation data from non-authority tile sync.");
             return;
         }
 
         byte hdrSize = data[offset];
         if (hdrSize != PacketHeaderSize)
         {
-            Logger.LogWarning($"Possibly out of date packet header: {hdrSize.Format()}B.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Possibly out of date packet header: {hdrSize.Format()}B.");
         }
 
         int packetId = BitConverter.ToInt32(data, offset + 1);
         int len = BitConverter.ToUInt16(data, offset + 1 + sizeof(int));
-        Logger.LogDebug($"[{Source}] Packet received: #{packetId.Format()}, len: {len.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Packet received: #{packetId.Format()}, len: {len.Format()}.");
         offset += hdrSize;
         if (packetId == 0)
         {
@@ -104,7 +95,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             hdrSize = data[offset];
             if (hdrSize != HeaderSize)
             {
-                Logger.LogWarning($"Possibly out of date header: {hdrSize.Format()}B.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Possibly out of date header: {hdrSize.Format()}B.");
                 return;
             }
             _bufferLen = BitConverter.ToInt64(data, offset + 1) - hdrSize;
@@ -131,19 +122,19 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             offset += hdrSize;
             len -= HeaderSize;
 
-            Logger.LogDebug($"[{Source}] Received starting packet of {_navMeshDisplay}: Len: {_bufferLen.Format()}. Packets: {_ttlPackets.Format()}. {_pendingNetId.Format()}.");
+            Logger.DevkitServer.LogDebug(Source, $"Received starting packet of {_navMeshDisplay}: Len: {_bufferLen.Format()}. Packets: {_ttlPackets.Format()}. {_pendingNetId.Format()}.");
             CreateFileStream();
         }
         else if (packetId >= _ttlPackets)
         {
-            Logger.LogWarning($"Received out of bounds packet for {_navMeshDisplay}: {(packetId + 1).Format()}/{_ttlPackets.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Received out of bounds packet for {_navMeshDisplay}: {(packetId + 1).Format()}/{_ttlPackets.Format()}.");
         }
 
         _index += len;
 
         if (_fs == null)
         {
-            Logger.LogError("Unable to append to buffer, FileStream is null.", method: Source);
+            Logger.DevkitServer.LogError(Source, "Unable to append to buffer, FileStream is null.");
             return;
         }
 
@@ -172,8 +163,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             }
             catch (Exception ex)
             {
-                Logger.LogError("Failed to write to navigation file.", method: Source);
-                Logger.LogError(ex);
+                Logger.DevkitServer.LogError(Source, ex, "Failed to write to navigation file.");
                 Interlocked.Exchange(ref _queued, 0);
             }
         }
@@ -191,7 +181,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
     {
         Interlocked.Exchange(ref _queued, 0);
 
-        Logger.LogDebug($"[{Source}] Received packet #{_packetId.Format()} for {_navMeshDisplay} @ {FormattingUtil.FormatCapacity(_index, colorize: true)}.");
+        Logger.DevkitServer.LogDebug(Source, $"Received packet #{_packetId.Format()} for {_navMeshDisplay} @ {FormattingUtil.FormatCapacity(_index, colorize: true)}.");
 
         int missingCt = 0;
         _packetMask![_packetId] = true;
@@ -252,7 +242,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             _fs!.Seek(0L, SeekOrigin.Begin);
             if (missingCt > 0)
             {
-                Logger.LogWarning($"Missing packets: {missingCt}/{_ttlPackets} ({missingCt / _ttlPackets:P0}.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Missing packets: {missingCt.Format()}/{_ttlPackets.Format()} ({(missingCt / _ttlPackets).Format("P0")}).");
                 _pendingNetId = NetId.INVALID;
                 _navMeshDisplay = null;
                 _index = -1;
@@ -273,8 +263,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error writing navigation to buffer.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, "Error writing navigation to buffer.");
             Interlocked.Exchange(ref _queued, 0);
             return;
         }
@@ -287,14 +276,14 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
     {
         if (!reader.ReadUInt16(out ushort len))
         {
-            Logger.LogError("Failed to read incoming navigation data packet length.", method: Source);
+            Logger.DevkitServer.LogError(Source, "Failed to read incoming navigation data packet length.");
             return;
         }
         NetFactory.IncrementByteCount(DevkitServerMessage.MovementRelay, false, len + sizeof(ushort));
 
         if (!reader.ReadBytesPtr(len, out byte[] buffer, out int offset))
         {
-            Logger.LogError("Failed to read navigation data packet.", method: Source);
+            Logger.DevkitServer.LogError(Source, "Failed to read navigation data packet.");
             return;
         }
 
@@ -306,7 +295,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             EditorUser? user = UserManager.FromId(fromPlayer);
             if (user == null || user.NavigationSync == null)
             {
-                Logger.LogWarning($"Unable to find a player to receive navigation data on: {fromPlayer.Format()}.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Unable to find a player to receive navigation data on: {fromPlayer.Format()}.");
                 return;
             }
             sync = user.NavigationSync;
@@ -317,7 +306,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
         }
         if (sync == null)
         {
-            Logger.LogWarning("Unable to find NavigationSync for navigation data.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find NavigationSync for navigation data.");
             return;
         }
 
@@ -339,7 +328,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             sync.ReceiveNavigationData(buffer, offset + sizeof(ulong));
         }
         else
-            Logger.LogWarning($"Received tile data from non-authoritive NavigationSync: {(sync.User == null ? "server-side authority" : sync.User.Format())}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Received tile data from non-authoritive NavigationSync: {(sync.User == null ? "server-side authority" : sync.User.Format())}.");
     }
     private void TryDisposeFileStream()
     {
@@ -372,14 +361,14 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
     private void BufferData()
     {
         _index = 0;
-        NetId netId = _graphSyncQueue[_graphSyncQueue.Count - 1];
+        NetId netId = _graphSyncQueue[^1];
         _graphSyncQueue.RemoveAt(_graphSyncQueue.Count - 1);
         _pendingNetId = netId;
-        Logger.LogDebug($"[{Source}] Buffering navigation data: {netId.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Buffering navigation data: {netId.Format()}.");
         IReadOnlyList<Flag> flags = NavigationUtil.NavigationFlags;
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav) || nav >= flags.Count)
         {
-            Logger.LogWarning($" Navigation flag not found in BufferData: {netId.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $" Navigation flag not found in BufferData: {netId.Format()}.");
             return;
         }
 
@@ -404,7 +393,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
 
 
         NavigationUtil.WriteRecastGraphData(writer, flag.graph);
-        Logger.LogDebug($"[{Source}]  Buffered {FormattingUtil.FormatCapacity(_bufferLen - HeaderSize, colorize: true)}. Total packets: {_ttlPackets.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $" Buffered {FormattingUtil.FormatCapacity(_bufferLen - HeaderSize, colorize: true)}. Total packets: {_ttlPackets.Format()}.");
 
         _fs!.Flush();
         _fs.Seek(0L, SeekOrigin.Begin);
@@ -413,7 +402,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
     {
         if (_fs == null)
         {
-            Logger.LogError("Unable to apply buffer, FileStream is null.", method: Source);
+            Logger.DevkitServer.LogError(Source, "Unable to apply buffer, FileStream is null.");
             return;
         }
 
@@ -425,7 +414,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             IReadOnlyList<Flag> flags = NavigationUtil.NavigationFlags;
             if (!NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav) || nav >= flags.Count)
             {
-                Logger.LogWarning($" Navigation flag not found in ApplyBuffer: {netId.Format()}.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $" Navigation flag not found in ApplyBuffer: {netId.Format()}.");
                 return;
             }
 
@@ -453,7 +442,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             _index = -1;
             _navMeshDisplay = null;
             _packetId = -1;
-            Logger.LogInfo($"[{Source}] Synced navigation #{nav.Format()}'s nav-mesh from the server.");
+            Logger.DevkitServer.LogInfo(Source, $"Synced navigation #{nav.Format()}'s nav-mesh from the server.");
         }
         finally
         {
@@ -551,7 +540,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
             const int index = sizeof(ulong) + PacketHeaderSize;
 
             int len = _fs.Read(Buffer, index, MaxPacketSize);
-            Logger.LogDebug($"Read from file: {len.Format()} B. Index: {index.Format()} B, max: {MaxPacketSize.Format()} B.");
+            Logger.DevkitServer.LogDebug(Source, $"Read from file: {len.Format()} B. Index: {index.Format()} B, max: {MaxPacketSize.Format()} B.");
             if (len <= 0)
             {
                 _bufferLen = 0;
@@ -578,13 +567,13 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
 #endif
                 length: index + len, reliable: true);
 
-            Logger.LogDebug($"[{Source}] Sent nav data packet #{_packetId.Format()} {FormattingUtil.FormatCapacity(len, colorize: true)} ({FormattingUtil.FormatCapacity(_index, colorize: true)} / {FormattingUtil.FormatCapacity(_bufferLen, colorize: true)}).");
+            Logger.DevkitServer.LogDebug(Source, $"Sent nav data packet #{_packetId.Format()} {FormattingUtil.FormatCapacity(len, colorize: true)} ({FormattingUtil.FormatCapacity(_index, colorize: true)} / {FormattingUtil.FormatCapacity(_bufferLen, colorize: true)}).");
 
             _index += len;
             ++_packetId;
             if (_packetId == _ttlPackets)
             {
-                Logger.LogInfo($"[{Source}] Synced navigation #{(NavigationNetIdDatabase.TryGetNavigation(_pendingNetId, out byte nav) ? nav.Format() : _pendingNetId.Format())}'s nav-mesh to all clients.");
+                Logger.DevkitServer.LogInfo(Source, $"Synced navigation #{(NavigationNetIdDatabase.TryGetNavigation(_pendingNetId, out byte nav) ? nav.Format() : _pendingNetId.Format())}'s nav-mesh to all clients.");
             }
         }
     }
@@ -611,7 +600,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
 
         _graphSyncQueue.Insert(0, netId);
         _lastSent = CachedTime.RealtimeSinceStartup + Math.Max(-GraphDelay, GraphSendDelay - _graphSyncQueue.Count * GraphDelay);
-        Logger.LogDebug($"[{Source}] Requested sync for: {netId.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Requested sync for: {netId.Format()}.");
     }
 #if CLIENT
     internal void StartWaitingToUpdateLoadingBar(EditorUIExtension extension, NetId netId)

@@ -20,7 +20,7 @@ internal class LandscapeTilePatches
         if (!LandscapeUtil.SaveTransactions || Landscape.getTile(__instance.coord) == null) return;
 
         ClientEvents.InvokeOnUpdateTileSplatmapLayers(new UpdateLandscapeTileProperties(__instance, CachedTime.DeltaTime));
-        Logger.LogDebug("[CLIENT EVENTS] Tile prototypes updated: " + __instance.coord.Format() + ".");
+        Logger.DevkitServer.LogDebug("TILE PATCHES", "Tile prototypes updated: " + __instance.coord.Format() + ".");
     }
 #endif
 

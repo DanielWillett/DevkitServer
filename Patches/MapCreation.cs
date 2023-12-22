@@ -1,4 +1,5 @@
 ﻿extern alias NSJ;
+using DevkitServer.API;
 using DevkitServer.Configuration;
 using SDG.Framework.Devkit;
 using SDG.Framework.Foliage;
@@ -7,8 +8,6 @@ using SDG.Framework.Landscapes;
 using SDG.Framework.Water;
 using System.Reflection;
 using System.Text.Json;
-using DevkitServer.API;
-
 #if CLIENT
 using HarmonyLib;
 using System.Reflection.Emit;
@@ -25,17 +24,17 @@ public static class MapCreation
 
         if (level != null)
         {
-            Logger.LogInfo($"Loading existing map: {Provider.map.Colorize(MapArgb)}. Size: {level.size.Format()}. Type: {level.type.Format()}. Owner: {level.canAnalyticsTrack.Format()}.");
+            Logger.DevkitServer.LogInfo(nameof(MapCreation), $"Loading existing map: {Provider.map.Colorize(MapArgb)}. Size: {level.size.Format()}. Type: {level.type.Format()}.");
             return;
         }
 
         if (!ReadWrite.folderExists("/Extras/LevelTemplate/", true))
         {
-            Logger.LogError($"Folder missing for level creation: {"\\Extras\\LevelTemplate\\".Format(true)}!");
+            Logger.DevkitServer.LogError(nameof(MapCreation), $"Folder missing for level creation: {@"\Extras\LevelTemplate\".Format(true)}!");
             return;
         }
 
-        SystemConfig.NewLevelCreationOptions options = DevkitServerConfig.Config.NewLevelInfo ??= SystemConfig.NewLevelCreationOptions.Default;
+        DevkitServerSystemConfig.NewLevelCreationOptions options = DevkitServerConfig.Config.NewLevelInfo ??= DevkitServerSystemConfig.NewLevelCreationOptions.Default;
         CreateMap(Provider.map, options.LevelSize, options.LevelType);
     }
 #elif CLIENT
@@ -44,7 +43,7 @@ public static class MapCreation
         MethodInfo? levelAdd = typeof(Level).GetMethod("add", BindingFlags.Public | BindingFlags.Static, null, CallingConventions.Any, new Type[] { typeof(string), typeof(ELevelSize), typeof(ELevelType) }, null);
         if (levelAdd == null)
         {
-            Logger.LogWarning($"[MAP CREATION] {method.Format()} - Unable to find method: Level.add(string, ELevelSize, ELevelType).");
+            Logger.DevkitServer.LogWarning(nameof(MapCreation), $"{method.Format()} - Unable to find method: Level.add(string, ELevelSize, ELevelType).");
         }
 
         bool patched = false;
@@ -55,7 +54,7 @@ public static class MapCreation
                 CodeInstruction newInst = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(CreateMap)!);
                 ins.MoveBlocksAndLabels(newInst);
                 patched = true;
-                Logger.LogDebug($"[MAP CREATION] {method.Format()} - Replaced call to {levelAdd.Format()} with {newInst.operand.Format()}.");
+                Logger.DevkitServer.LogDebug(nameof(MapCreation), $"{method.Format()} - Replaced call to {levelAdd.Format()} with {newInst.operand.Format()}.");
                 yield return newInst;
             }
             else yield return ins;
@@ -63,7 +62,7 @@ public static class MapCreation
 
         if (!patched)
         {
-            Logger.LogWarning($"[MAP CREATION] {method.Format()} - Unable to replace call to {(levelAdd == null ? "Level.add" : levelAdd.Format())} with a better map creation implemention.");
+            Logger.DevkitServer.LogWarning(nameof(MapCreation), $"{method.Format()} - Unable to replace call to {(levelAdd == null ? "Level.add" : levelAdd.Format())} with a better map creation implemention.");
         }
     }
 #endif
@@ -84,16 +83,16 @@ public static class MapCreation
     public static void CreateMap(string mapName, ELevelSize size, ELevelType type)
     {
 #if SERVER
-        SystemConfig.NewLevelCreationOptions options = DevkitServerConfig.Config.NewLevelInfo ?? SystemConfig.NewLevelCreationOptions.Default;
+        DevkitServerSystemConfig.NewLevelCreationOptions options = DevkitServerConfig.Config.NewLevelInfo ?? DevkitServerSystemConfig.NewLevelCreationOptions.Default;
         FieldInfo? clientField = typeof(Provider).GetField("_client", BindingFlags.Static | BindingFlags.NonPublic);
         CSteamID owner = options.Owner;
 
         if (clientField == null || clientField.FieldType != typeof(CSteamID))
         {
             Level.add(mapName, size, type);
-            Logger.LogWarning($"Unable to set owner of newly created map, it will be set to: {Provider.client.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(MapCreation), $"Unable to set owner of newly created map, it will be set to: {Provider.client.Format()}.");
 
-            Logger.LogInfo($"Level created: {mapName.Colorize(MapArgb)}. Size: {size.Format()}. Type: {type.Format()}.");
+            Logger.DevkitServer.LogInfo(nameof(MapCreation), $"Level created: {mapName.Colorize(MapArgb)}. Size: {size.Format()}. Type: {type.Format()}.");
         }
         else
         {
@@ -110,12 +109,12 @@ public static class MapCreation
             Level.add(mapName, size, type);
             clientField.SetValue(null, clientOld);
 
-            Logger.LogInfo($"Level created: {mapName.Colorize(MapArgb)}. Size: {size.Format()}. Type: {type.Format()}. Owner: {owner.Format()}.");
+            Logger.DevkitServer.LogInfo(nameof(MapCreation), $"Level created: {mapName.Colorize(MapArgb)}. Size: {size.Format()}. Type: {type.Format()}. Owner: {owner.Format()}.");
         }
 #else
         Level.add(mapName, size, type);
 
-        Logger.LogInfo($"Level created: {mapName.Colorize(MapArgb)}. Size: {size.Format()}. Type: {type.Format()}. Owner: {Provider.client.Format()} ({Provider.clientName.Format(false)}).");
+        Logger.DevkitServer.LogInfo(nameof(MapCreation), $"Level created: {mapName.Colorize(MapArgb)}. Size: {size.Format()}. Type: {type.Format()}. Owner: {Provider.client.Format()} ({Provider.clientName.Format(false)}).");
 #endif
         string lvlPath = Path.Combine(ReadWrite.PATH, "Maps", mapName);
 

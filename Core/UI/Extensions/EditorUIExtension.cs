@@ -75,7 +75,7 @@ public class EditorUIExtension : ContainerUIExtension
         Container.AddChild(_loadingProgress);
         if (DevkitServerModule.IsEditing)
             UpdateAllNametags();
-        Logger.LogDebug("Shown editor extension");
+        Logger.DevkitServer.LogDebug(nameof(EditorUIExtension), "Shown editor extension");
     }
     protected override void OnHidden()
     {

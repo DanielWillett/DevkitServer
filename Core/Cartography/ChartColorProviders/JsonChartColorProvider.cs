@@ -39,9 +39,9 @@ public class JsonChartColorProvider : RaycastChartColorProvider
                     if (!File.Exists(path))
                     {
                         if (isExplicitlyDefined)
-                            Logger.LogInfo($"[{nameof(JsonChartColorProvider)}] Skipping because there is no chart data at {path.Format()}.");
+                            Logger.DevkitServer.LogInfo(nameof(JsonChartColorProvider), $"Skipping because there is no chart data at {path.Format()}.");
                         else
-                            Logger.LogDebug($"[{nameof(JsonChartColorProvider)}] Skipping because there is no chart data at {path.Format()}.");
+                            Logger.DevkitServer.LogDebug(nameof(JsonChartColorProvider), $"Skipping because there is no chart data at {path.Format()}.");
                         return false;
                     }
                 }
@@ -60,23 +60,22 @@ public class JsonChartColorProvider : RaycastChartColorProvider
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Unable to read {path.Format()} for chart data. Json parser exception. Using fallback renderer.", method: nameof(JsonChartColorProvider));
-            Logger.LogInfo($"[{nameof(JsonChartColorProvider)}] Check {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/JSON Chart Colors.md", false).Format(false)} for how to format your color provider config.");
-            Logger.LogError(ex, method: nameof(JsonChartColorProvider));
+            Logger.DevkitServer.LogError(nameof(JsonChartColorProvider), ex, $"Unable to read {path.Format()} for chart data. Json parser exception. Using fallback renderer.");
+            Logger.DevkitServer.LogInfo(nameof(JsonChartColorProvider), $"Check {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/JSON Chart Colors.md", false).Format(false)} for how to format your color provider config.");
             return false;
         }
 
         if (Data == null)
         {
-            Logger.LogWarning($"Unable to read {path.Format()} for chart data. No value available. Using fallback renderer.", method: nameof(JsonChartColorProvider));
-            Logger.LogInfo($"[{nameof(JsonChartColorProvider)}] Check {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/JSON Chart Colors.md", false).Format(false)} for how to format your color provider config.");
+            Logger.DevkitServer.LogWarning(nameof(JsonChartColorProvider), $"Unable to read {path.Format()} for chart data. No value available. Using fallback renderer.");
+            Logger.DevkitServer.LogInfo(nameof(JsonChartColorProvider), $"Check {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/JSON Chart Colors.md", false).Format(false)} for how to format your color provider config.");
             return false;
         }
 
         if (Data.HeightColorGraph is not { Length: > 0 })
         {
-            Logger.LogInfo($"[{nameof(JsonChartColorProvider)}] No terrain data is available in JSON color data at {path.Format()}. They'll be replaced by {"Washington".Colorize(DevkitServerModule.UnturnedColor)} defaults.");
-            Logger.LogInfo($"[{nameof(JsonChartColorProvider)}] Check {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/JSON Chart Colors.md", false).Format(false)} for more info on how to set up custom colors.");
+            Logger.DevkitServer.LogInfo(nameof(JsonChartColorProvider), $"No terrain data is available in JSON color data at {path.Format()}. They'll be replaced by {"Washington".Colorize(DevkitServerModule.UnturnedColor)} defaults.");
+            Logger.DevkitServer.LogInfo(nameof(JsonChartColorProvider), $"Check {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/JSON Chart Colors.md", false).Format(false)} for more info on how to set up custom colors.");
 
             Data.HeightColorGraph = JsonChartColorData.Defaults.HeightColorGraph!;
             for (int i = 0; i < Data.HeightColorGraph.Length; ++i)
@@ -114,7 +113,7 @@ public class JsonChartColorProvider : RaycastChartColorProvider
                 WaterColor: not null
             })
         {
-            Logger.LogInfo($"[{nameof(JsonChartColorProvider)}] Some values are missing from JSON color data at {path.Format()}. They'll be replaced by {"Washington".Colorize(DevkitServerModule.UnturnedColor)} defaults.");
+            Logger.DevkitServer.LogInfo(nameof(JsonChartColorProvider), $"Some values are missing from JSON color data at {path.Format()}. They'll be replaced by {"Washington".Colorize(DevkitServerModule.UnturnedColor)} defaults.");
         }
 
         HighwayColor = Data.HighwayColor.GetValueOrDefault(JsonChartColorData.Defaults.HighwayColor!.Value) with { a = 255 };

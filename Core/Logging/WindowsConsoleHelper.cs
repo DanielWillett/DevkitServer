@@ -2,7 +2,7 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace DevkitServer.API.Logging.Terminals;
+namespace DevkitServer.Core.Logging;
 internal static class WindowsConsoleHelper
 {
     internal const int StdOutputHandle = -11;
@@ -25,7 +25,7 @@ internal static class WindowsConsoleHelper
     internal static void SetUTF8CodePage()
     {
         const uint utf8 = 65001U;
-        
+
         if (!SetConsoleOutputCP(utf8))
         {
             PrintLastWin32Error("SetConsoleOutputCP");

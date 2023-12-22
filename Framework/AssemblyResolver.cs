@@ -2,11 +2,13 @@
 using DevkitServer.Plugins;
 using SDG.Framework.Modules;
 using System.Reflection;
+using DevkitServer.API.Logging;
 using Module = SDG.Framework.Modules.Module;
 
 namespace DevkitServer.Framework;
 internal class AssemblyResolver : IDisposable
 {
+    private const string Source = "ASSEMBLY RESOLVER";
     internal bool TriedToLoadUIExtensionModule { get; private set; }
     internal bool TriedToLoadLevelObjectIcons { get; private set; }
 
@@ -65,12 +67,12 @@ internal class AssemblyResolver : IDisposable
     {
         if (!DevkitServerModule.InitializedLogging)
         {
-            Console.WriteLine($"[{DateTime.UtcNow.ToString(Logger.TimeFormat)}] [DEVKIT SERVER] [INFO]  {msg}");
-            UnturnedLog.info("[DEVKIT SERVER] [INFO]  " + msg);
+            Console.WriteLine($"[{DateTime.UtcNow.ToString(LoggerExtensions.LogTimeFormat)}] [INFO]  [DEVKIT SERVER] [{Source}] {msg}");
+            UnturnedLog.info($"[INFO]  [DEVKIT SERVER] [{Source}] {msg}");
         }
         else
         {
-            Logger.LogInfo(msg.Colorize(LogColorArgb), ConsoleColor.DarkGray);
+            Logger.DevkitServer.LogInfo(Source, msg.Colorize(LogColorArgb));
         }
     }
 

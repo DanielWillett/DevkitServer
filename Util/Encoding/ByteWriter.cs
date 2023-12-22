@@ -2025,8 +2025,7 @@ public class ByteWriter
         }
         catch (ArgumentException ex)
         {
-            Logger.LogError("Failed to create writer delegate for type " + type.FullName);
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("BYTE WRITER", ex, $"Failed to create writer delegate for type {type.Format()}.");
             return null;
         }
     }

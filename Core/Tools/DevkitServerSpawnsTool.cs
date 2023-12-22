@@ -275,7 +275,7 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
         foreach (BaseSpawnpointNode node in EnumerateSpawns())
         {
             ++ct;
-            Logger.LogDebug($"{ct,3} {node.transform.position.Format()} - {node.Format()}");
+            Logger.DevkitServer.LogDebug(nameof(DevkitServerSelectionTool), $"{ct,3} {node.transform.position.Format()} - {node.Format()}");
         }
     }
 }

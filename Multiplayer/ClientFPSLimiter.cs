@@ -1,4 +1,5 @@
 ﻿#if CLIENT
+using DevkitServer.API.Logging;
 using DevkitServer.Patches;
 using DevkitServer.Players;
 using SDG.Framework.Devkit;
@@ -81,7 +82,7 @@ internal static class ClientFPSLimiter
             _isLimited = true;
             Application.targetFrameRate = ClientInfo.Info.ServerMaxClientEditFPS;
             QualitySettings.vSyncCount = 0;
-            Logger.LogDebug($"Max FPS updated: {ClientInfo.Info.ServerMaxClientEditFPS.Format()}, vSync: {0.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(ClientFPSLimiter), $"Max FPS updated: {ClientInfo.Info.ServerMaxClientEditFPS.Format()}, vSync: {0.Format()}.");
         }
         else
         {
@@ -91,7 +92,7 @@ internal static class ClientFPSLimiter
             _isLimited = false;
             Application.targetFrameRate = _oldFps;
             QualitySettings.vSyncCount = _oldVSyncCount;
-            Logger.LogDebug($"Max FPS updated: {_oldFps.Format()}, vSync: {_oldVSyncCount.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(ClientFPSLimiter), $"Max FPS updated: {_oldFps.Format()}, vSync: {_oldVSyncCount.Format()}.");
         }
     }
 }

@@ -1,5 +1,4 @@
 ﻿using Cysharp.Threading.Tasks;
-using DevkitServer.API.Logging;
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Commands.Subsystem;
 using DevkitServer.Multiplayer;
@@ -104,7 +103,7 @@ public class CommandContext : Exception
         {
             EditorUser = UserManager.FromId(CallerId.m_SteamID);
             if (EditorUser == null || !EditorUser.IsOnline)
-                Logger.LogWarning($"Unable to find EditorUser for player {Caller.playerID.steamID.Format()}.");
+                Logger.DevkitServer.LogWarning(nameof(CommandContext), $"Unable to find EditorUser for player {Caller.playerID.steamID.Format()}.");
         }
 #else
         InvokedFromConsole = console;

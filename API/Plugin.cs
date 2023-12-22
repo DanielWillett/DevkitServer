@@ -1,11 +1,13 @@
 ﻿using DevkitServer.API.Abstractions;
+using DevkitServer.API.Logging;
 using DevkitServer.Plugins;
+using DevkitServer.Core.Logging.Loggers;
 #if CLIENT
 using DevkitServer.API.UI.Extensions;
 #endif
 
 namespace DevkitServer.API;
-public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourcePlugin, IReflectionDoneListenerDevkitServerPlugin
+public abstract class Plugin : CoreLogger, IDevkitServerColorPlugin, ICachedTranslationSourcePlugin, IReflectionDoneListenerDevkitServerPlugin
 {
     public static readonly Color32 DefaultColor = new Color32(204, 153, 255, 255);
     private readonly string _defaultName;
@@ -45,7 +47,7 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
     /// <inheritdoc/>
     public abstract bool DeveloperMode { get; }
 
-    protected Plugin()
+    protected Plugin() : base("plugin")
     {
         string asmName = GetType().Assembly.GetName().Name;
         _defaultName = asmName + "/" + GetType().Name;
@@ -64,7 +66,6 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
     }
     protected virtual LocalDatDictionary DefaultLocalization => new LocalDatDictionary();
 
-
     /// <inheritdoc/>
     void IDevkitServerPlugin.Load()
     {
@@ -75,12 +76,10 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
     }
 
     /// <inheritdoc/>
-    void IDevkitServerPlugin.Unload() => Unload();
-
+    void IDevkitServerPlugin.Unload()
+        => Unload();
     void IReflectionDoneListenerDevkitServerPlugin.OnReflectionDone(PluginAssembly assembly, bool isFirstPluginInAssembly)
-    {
-        OnReflectionDone(assembly, isFirstPluginInAssembly);
-    }
+        => OnReflectionDone(assembly, isFirstPluginInAssembly);
 
     /// <summary>
     /// Called to load the plugin.
@@ -106,26 +105,6 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
         DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultLocalization, MainLocalizationDirectory);
         Translations = lcl;
     }
-
-    /// <inheritdoc/>
-    public void LogDebug(string message, ConsoleColor color = ConsoleColor.DarkGray) =>
-        Logger.LogDebug("[" + this.GetSource() + "] " + message, color);
-
-    /// <inheritdoc/>
-    public void LogInfo(string message, ConsoleColor color = ConsoleColor.DarkCyan) =>
-        Logger.LogInfo("[" + this.GetSource() + "] " + message, color);
-
-    /// <inheritdoc/>
-    public void LogWarning(string message, ConsoleColor color = ConsoleColor.Yellow) =>
-        Logger.LogWarning(message, color, method: this.GetSource());
-
-    /// <inheritdoc/>
-    public void LogError(string message, ConsoleColor color = ConsoleColor.Red) =>
-        Logger.LogError(message, color, method: this.GetSource());
-
-    /// <inheritdoc/>
-    public void LogError(Exception ex) =>
-        Logger.LogError(ex, method: this.GetSource());
 #if CLIENT
     public void RegisterUIExtension(Type implementationType, Type parentUIType, int priority)
     {
@@ -133,8 +112,21 @@ public abstract class Plugin : IDevkitServerColorPlugin, ICachedTranslationSourc
     }
 #endif
     ITranslationSource ICachedTranslationSourcePlugin.TranslationSource { get; set; } = null!;
+    public sealed override string CoreType => this.GetSource();
+    public sealed override bool IsSeverityEnabled(Severity severity, object? source) => severity == Severity.Debug && DeveloperMode || base.IsSeverityEnabled(severity, source);
+    string ILogSource.Source => string.Empty;
+    bool? ILogSource.GetExplicitVisibilitySetting(Severity severity)
+    {
+        if (severity == Severity.Debug && DeveloperMode)
+            return true;
+
+        return null;
+    }
 }
 
+/// <summary>
+/// Base class for a DevkitServer plugin with a JSON config file (with it's config data of type <typeparamref name="TConfig"/>).
+/// </summary>
 public abstract class Plugin<TConfig> : Plugin, IDevkitServerPlugin<TConfig> where TConfig : class, new()
 {
     private readonly JsonConfigurationFile<TConfig> _config;
@@ -153,14 +145,17 @@ public abstract class Plugin<TConfig> : Plugin, IDevkitServerPlugin<TConfig> whe
         ReloadConfig();
         Reload();
     }
+
     /// <summary>
     /// Reload external config files, etc.
     /// </summary>
     public virtual void Reload() { }
+
     /// <summary>
     /// Re-read <see cref="Configuration"/> from file.
     /// </summary>
     public void ReloadConfig() => _config.ReloadConfig();
+
     /// <summary>
     /// Save <see cref="Configuration"/> to file.
     /// </summary>

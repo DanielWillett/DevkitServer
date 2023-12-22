@@ -67,7 +67,7 @@ public sealed class LevelData
                 SetFilePath(Level.info, newPath);
                 if (Directory.Exists(newPath))
                 {
-                    Logger.LogDebug("Deleting existing...");
+                    Logger.DevkitServer.LogDebug(nameof(GatherLevelData), "Deleting existing...");
                     foreach (FileSystemInfo sys in new DirectoryInfo(newPath).EnumerateFileSystemInfos("*", SearchOption.TopDirectoryOnly))
                     {
                         if (sys is FileInfo file)
@@ -75,24 +75,20 @@ public sealed class LevelData
                         else if (sys is DirectoryInfo dir)
                             dir.Delete(true);
                     }
-                    Logger.LogDebug("  Done deleting existing...");
+                    Logger.DevkitServer.LogDebug(nameof(GatherLevelData), "  Done deleting existing...");
                 }
 
                 ts = new TaskCompletionSource<int>();
                 copyTask = Task.Run(async () =>
                 {
-                    Logger.LogDebug("Waiting for save...");
                     await ts.Task.ConfigureAwait(false);
                     try
                     {
-                        Logger.LogDebug("  Copying...");
                         FileUtil.CopyDirectory(oldPath, newPath, overwrite: false, skipExisting: true);
-                        Logger.LogDebug("  Done copying.");
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($"Error copying directory to avoid saving ({oldPath.Format()} -> {newPath.Format()}).", method: nameof(GatherLevelData));
-                        Logger.LogError(ex, method: nameof(GatherLevelData));
+                        Logger.DevkitServer.LogError(nameof(GatherLevelData), ex, $"Error copying directory to avoid saving ({oldPath.Format()} -> {newPath.Format()}).");
                     }
 
                 }, token);
@@ -125,11 +121,11 @@ public sealed class LevelData
 #endif
             if (copyTask is { IsCompleted: false })
             {
-                Logger.LogDebug("  Waiting for copy...");
+                Logger.DevkitServer.LogDebug(nameof(GatherLevelData), "  Waiting for copy...");
                 await copyTask.ConfigureAwait(false);
             }
 
-            Logger.LogDebug("Reading...");
+            Logger.DevkitServer.LogDebug(nameof(GatherLevelData), "Reading...");
             await Task.Run(async () =>
             {
                 try
@@ -138,10 +134,10 @@ public sealed class LevelData
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ex, method: nameof(GatherLevelData));
+                    Logger.DevkitServer.LogError(nameof(GatherLevelData), ex, "Error trying to read the level into memory.");
                 }
             }, token).ConfigureAwait(false);
-            Logger.LogDebug("  Done reading.");
+            Logger.DevkitServer.LogDebug(nameof(GatherLevelData), "  Done reading.");
         }
         finally
         {
@@ -149,7 +145,7 @@ public sealed class LevelData
         }
 
 #if DEBUG
-        Logger.LogDebug($"[EDITOR LEVEL] GatherLevelData took {stopwatch.GetElapsedMilliseconds().Format("F2")} ms.");
+        Logger.DevkitServer.LogDebug(nameof(GatherLevelData), $"GatherLevelData took {stopwatch.GetElapsedMilliseconds().Format("F2")} ms.");
 #endif
         return data;
     }

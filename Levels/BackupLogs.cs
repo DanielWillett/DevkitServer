@@ -49,7 +49,7 @@ public sealed class BackupLogs
     {
         if (!FileUtil.CheckDirectory(false, folderPath))
         {
-            Logger.LogError($"Failed to create logs directory: {folderPath.Format()}.", method: Source);
+            Logger.DevkitServer.LogError(Source, $"Failed to create logs directory: {folderPath.Format(false)}.");
             return;
         }
 
@@ -86,8 +86,7 @@ public sealed class BackupLogs
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError($"Error writing to log file: {log.Format()} of {backupLog.GetType()}.", method: Source);
-                    Logger.LogError(ex, method: Source);
+                    Logger.DevkitServer.LogError(Source, ex, $"Error writing to log file: {log.Format(false)} of {backupLog.GetType().Format()}.");
                     if (!wrote)
                     {
                         try

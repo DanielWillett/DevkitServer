@@ -32,13 +32,13 @@ public static class FormattingUtil
     /// </summary>
     /// <remarks>Does not include &lt;#ffffff&gt; colors.</remarks>
     public static Regex RemoveRichTextRegex { get; } =
-        new Regex(@"(?<!(?:\<noparse\>(?!\<\/noparse\>)).*)\<\/{0,1}(?:(?:color=\""{0,1}[#a-z]{0,9}\""{0,1})|(?:color)|(?:size=\""{0,1}\d+\""{0,1})|(?:size)|(?:alpha)|(?:alpha=#[0-f]{1,2})|(?:#.{3,8})|(?:[isub])|(?:su[pb])|(?:lowercase)|(?:uppercase)|(?:smallcaps))\>", RegexOptions.IgnoreCase);
+        new Regex("""(?<!(?:\<noparse\>(?!\<\/noparse\>)).*)\<\/{0,1}(?:(?:color=\"{0,1}[#a-z]{0,9}\"{0,1})|(?:color)|(?:size=\"{0,1}\d+\"{0,1})|(?:size)|(?:alpha)|(?:alpha=#[0-f]{1,2})|(?:#.{3,8})|(?:[isub])|(?:su[pb])|(?:lowercase)|(?:uppercase)|(?:smallcaps))\>""", RegexOptions.IgnoreCase);
 
     /// <summary>
     /// Regular expression to remove Text Mesh Pro tags.
     /// </summary>
     public static Regex RemoveTMProRichTextRegex { get; } =
-        new Regex(@"(?<!(?:\<noparse\>(?!\<\/noparse\>)).*)\<\/{0,1}(?:(?:noparse)|(?:alpha)|(?:alpha=#[0-f]{1,2})|(?:[su])|(?:su[pb])|(?:lowercase)|(?:uppercase)|(?:smallcaps))\>", RegexOptions.IgnoreCase);
+        new Regex("""(?<!(?:\<noparse\>(?!\<\/noparse\>)).*)\<\/{0,1}(?:(?:noparse)|(?:alpha)|(?:alpha=#[0-f]{1,2})|(?:[su])|(?:su[pb])|(?:lowercase)|(?:uppercase)|(?:smallcaps))\>""", RegexOptions.IgnoreCase);
     
     /// <summary>
     /// ANSI escape character for virtual terminal sequences.
@@ -67,6 +67,7 @@ public static class FormattingUtil
     {
         return RemoveTMProRichTextRegex.Replace(text, string.Empty);
     }
+
     /// <summary>
     /// Converts a <see cref="ConsoleColor"/> value to a 8-bit foreground color virtual terminal sequence.
     /// </summary>
@@ -76,6 +77,28 @@ public static class FormattingUtil
         char* chrs = stackalloc char[5];
         SetForegroundSequenceCode(chrs, 0, color, background);
         return new string(chrs, 0, 5);
+    }
+    internal static unsafe string WrapMessageWithColor(ConsoleColor color, ReadOnlySpan<char> message)
+    {
+        int l = 5 + message.Length + ForegroundResetSequence.Length;
+        char* chrs = stackalloc char[l];
+        SetForegroundSequenceCode(chrs, 0, color, false);
+        ForegroundResetSequence.AsSpan().CopyTo(new Span<char>(chrs + (l - ForegroundResetSequence.Length), ForegroundResetSequence.Length));
+        message.CopyTo(new Span<char>(chrs + 5, l - 5));
+        return new string(chrs, 0, l);
+    }
+    internal static unsafe string WrapMessageWithColor(int argb, ReadOnlySpan<char> message)
+    {
+        byte r = unchecked((byte)(argb >> 16));
+        byte g = unchecked((byte)(argb >> 8));
+        byte b = unchecked((byte)argb);
+        int l1 = 10 + (r > 9 ? r > 99 ? 3 : 2 : 1) + (g > 9 ? g > 99 ? 3 : 2 : 1) + (b > 9 ? b > 99 ? 3 : 2 : 1);
+        int l = l1 + message.Length + ForegroundResetSequence.Length;
+        char* chrs = stackalloc char[l];
+        SetForegroundSequenceString(chrs, 0, r, g, b, false);
+        ForegroundResetSequence.AsSpan().CopyTo(new Span<char>(chrs + (l - ForegroundResetSequence.Length), ForegroundResetSequence.Length));
+        message.CopyTo(new Span<char>(chrs + l1, l - l1));
+        return new string(chrs, 0, l);
     }
     private static unsafe void SetForegroundSequenceCode(char* data, int index, ConsoleColor color, bool background)
     {
@@ -114,6 +137,11 @@ public static class FormattingUtil
     /// <remarks>See <see href="https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences#extended-colors"/>.</remarks>
     public static unsafe string GetForegroundSequenceString(int argb, bool background)
     {
+        if (unchecked((byte)(argb >> 24)) == 0) // console color
+        {
+            ConsoleColor color = (ConsoleColor)argb;
+            return GetForegroundSequenceString(color, background);
+        }
         byte r = unchecked((byte)(argb >> 16));
         byte g = unchecked((byte)(argb >> 8));
         byte b = unchecked((byte)argb);
@@ -154,7 +182,7 @@ public static class FormattingUtil
     }
 
     /// <summary>
-    /// Faster version of <see cref="string.Format"/> that only formats {0}.
+    /// Faster version of <see cref="string.Format(string, object)"/> that only formats {0}.
     /// </summary>
     /// <param name="input">The string to search for matches in.</param>
     /// <param name="val">The string to replace matches with.</param>
@@ -162,7 +190,7 @@ public static class FormattingUtil
     public static string QuickFormat(string input, string? val, bool repeat = false) => QuickFormat(input, val, 0, repeat);
 
     /// <summary>
-    /// Faster version of <see cref="string.Format"/> that only formats {<paramref name="index"/>}.
+    /// Faster version of <see cref="string.Format(string, object)"/> that only formats {<paramref name="index"/>}.
     /// </summary>
     /// <param name="input">The string to search for matches in.</param>
     /// <param name="val">The string to replace matches with.</param>
@@ -192,7 +220,7 @@ public static class FormattingUtil
     }
 
     /// <summary>
-    /// Convert to <see cref="Color"/> to ARGB data.
+    /// Convert a <see cref="Color"/> to ARGB data.
     /// </summary>
     public static int ToArgb(Color color)
     {
@@ -201,8 +229,14 @@ public static class FormattingUtil
                (byte)Math.Min(255, Mathf.RoundToInt(color.g * 255)) << 8 |
                (byte)Math.Min(255, Mathf.RoundToInt(color.b * 255));
     }
+
     /// <summary>
-    /// Convert to <see cref="Color32"/> to ARGB data.
+    /// Convert to <see cref="ConsoleColor"/> to an int which will be reinterpreted as ARGB later on. This is done by making the alpha value zero.
+    /// </summary>
+    public static int ToArgbRepresentation(ConsoleColor color) => (int)color;
+
+    /// <summary>
+    /// Convert a <see cref="Color32"/> to ARGB data.
     /// </summary>
     public static int ToArgb(Color32 color)
     {
@@ -261,10 +295,10 @@ public static class FormattingUtil
     /// <summary>
     /// Effeciently removes any virtual terminal sequences from a string and returns the result as a copy.
     /// </summary>
-    public static unsafe string RemoveVirtualTerminalSequences(string orig)
+    public static unsafe string RemoveVirtualTerminalSequences(ReadOnlySpan<char> orig)
     {
         if (orig.Length < 5)
-            return orig;
+            return orig.ToString();
         bool found = false;
         int l = orig.Length;
         for (int i = 0; i < l; ++i)
@@ -276,7 +310,7 @@ public static class FormattingUtil
         }
 
         if (!found)
-            return orig;
+            return orig.ToString();
 
         // regex: \u001B\[[\d;]*m
 
@@ -1195,25 +1229,7 @@ public static class FormattingUtil
     /// Construct a reset suffix based on the current settings.
     /// </summary>
     public static string GetResetSuffix() => FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ForegroundResetSequence;
-
-    /// <summary>
-    /// Print the given bytes to the INFO log in hexadecimal (base 16) columns.
-    /// </summary>
-    /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
-    public static void PrintBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1, bool formatMessageOverhead = false)
-    {
-        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, columnCount, offset, len, formatMessageOverhead));
-    }
-
-    /// <summary>
-    /// Print the given bytes to the INFO log in decimal (base 10) columns.
-    /// </summary>
-    /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
-    public static void PrintBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1, bool formatMessageOverhead = false)
-    {
-        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, columnCount, offset, len, formatMessageOverhead));
-    }
-
+    
     /// <summary>
     /// Format the given bytes in hexadecimal (base 16) columns.
     /// </summary>
@@ -1232,24 +1248,6 @@ public static class FormattingUtil
     public static string GetBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1, bool formatMessageOverhead = false)
     {
         return BytesToString(bytes, columnCount, offset, len, "000", formatMessageOverhead);
-    }
-
-    /// <summary>
-    /// Print the given bytes to the INFO log in hexadecimal (base 16) columns.
-    /// </summary>
-    /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
-    public static unsafe void PrintBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0, bool formatMessageOverhead = false)
-    {
-        Logger.LogInfo(Environment.NewLine + GetBytesHex(bytes, len, columnCount, offset, formatMessageOverhead));
-    }
-
-    /// <summary>
-    /// Print the given bytes to the INFO log in decimal (base 10) columns.
-    /// </summary>
-    /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
-    public static unsafe void PrintBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0, bool formatMessageOverhead = false)
-    {
-        Logger.LogInfo(Environment.NewLine + GetBytesDec(bytes, len, columnCount, offset, formatMessageOverhead));
     }
 
     /// <summary>

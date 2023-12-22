@@ -10,7 +10,6 @@ using Pathfinding;
 using System.Reflection;
 using System.Reflection.Emit;
 using Progress = Pathfinding.Progress;
-
 #if CLIENT
 using DevkitServer.API.UI.Extensions;
 using DevkitServer.Core.UI.Extensions;
@@ -59,7 +58,7 @@ internal static class NavigationPatches
     [UsedImplicitly]
     private static void OnPreBakingNav(Flag __instance)
     {
-        Logger.LogDebug($"[{Source}] Baking: {__instance.point.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Baking: {__instance.point.Format()}.");
         _baking = __instance;
         _hasStartedBakingTiles = false;
         if (Provider.clients.Count > 0 && __instance.TryGetIndex(out byte nav) && NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
@@ -73,7 +72,7 @@ internal static class NavigationPatches
     [UsedImplicitly]
     private static void OnPostBakingNav(Flag __instance)
     {
-        Logger.LogDebug($"[{Source}] Done baking: {__instance.point.Format()}.");
+        Logger.DevkitServer.LogDebug(Source, $"Done baking: {__instance.point.Format()}.");
         if (Provider.clients.Count > 0 && __instance.TryGetIndex(out byte nav) && NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
         {
             SendNavBakeProgressUpdate.Invoke(Provider.GatherClientConnections(), netId, 1f, string.Empty, false);
@@ -93,31 +92,31 @@ internal static class NavigationPatches
     private static IEnumerable<CodeInstruction> TranspileBakeNavigation(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
     {
         MethodInfo? originalMethod = typeof(AstarPath).GetMethod(nameof(AstarPath.ScanSpecific),
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[] { typeof(NavGraph) },
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, [ typeof(NavGraph) ],
             null);
         if (originalMethod == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: " +
-                FormattingUtil.FormatMethod(typeof(void), typeof(AstarPath), nameof(AstarPath.ScanSpecific),
-                    new (Type type, string? name)[] { (typeof(NavGraph), "graph") }) + ".", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: " +
+                                                   FormattingUtil.FormatMethod(typeof(void), typeof(AstarPath), nameof(AstarPath.ScanSpecific),
+                                                       [ (typeof(NavGraph), "graph") ]) + ".");
         }
 
         MethodInfo? replacementMethod = typeof(AstarPath).GetMethod(nameof(AstarPath.ScanSpecific),
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[] { typeof(NavGraph), typeof(OnScanStatus) },
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, [ typeof(NavGraph), typeof(OnScanStatus) ],
             null);
         if (replacementMethod == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: " +
-                FormattingUtil.FormatMethod(typeof(void), typeof(AstarPath), nameof(AstarPath.ScanSpecific),
-                    new (Type type, string? name)[] { (typeof(NavGraph), "graph"), (typeof(OnScanStatus), "statusCallback") }) + ".", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: " +
+                                                   FormattingUtil.FormatMethod(typeof(void), typeof(AstarPath), nameof(AstarPath.ScanSpecific),
+                                                       [ (typeof(NavGraph), "graph"), (typeof(OnScanStatus), "statusCallback") ]) + ".");
         }
 
         ConstructorInfo? delegateConstructor = typeof(OnScanStatus)
             .GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-            .FirstOrDefault(x => x.GetParameters() is { Length: 2 } p && !p[0].ParameterType.IsValueType && p[1].ParameterType == typeof(nint));
+            .FirstOrDefault(x => x.GetParameters() is [ { ParameterType.IsValueType: false }, _ ] p && p[1].ParameterType == typeof(nint));
         if (delegateConstructor == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find constructor for {typeof(OnScanStatus).Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find constructor for {typeof(OnScanStatus).Format()}.");
         }
 
         List<CodeInstruction> ins = instructions.ToList();
@@ -161,7 +160,7 @@ internal static class NavigationPatches
 
         if (!patched)
         {
-            Logger.LogWarning($"{method.Format()} - Failed to add a scan handler to A* scan method.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Failed to add a scan handler to A* scan method.");
         }
 
         return ins;
@@ -201,14 +200,14 @@ internal static class NavigationPatches
 
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav))
         {
-            Logger.LogWarning($"Unknown navigvation flag NetId: {netId.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unknown navigvation flag NetId: {netId.Format()}.");
             ctx.Acknowledge(StandardErrorCode.NotFound);
             return;
         }
 
         if (!NavigationUtil.CheckSync(out _))
         {
-            Logger.LogWarning($"Unable to bake navigation NetId: {netId.Format()}. Not sync authority.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to bake navigation NetId: {netId.Format()}. Not sync authority.");
             ctx.Acknowledge(StandardErrorCode.NotSupported);
             return;
         }
@@ -217,7 +216,7 @@ internal static class NavigationPatches
 
         if (list.Count <= nav)
         {
-            Logger.LogWarning($"Unknown flag: {netId.Format()}, nav: {nav.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unknown flag: {netId.Format()}, nav: {nav.Format()}.");
             ctx.Acknowledge(StandardErrorCode.NotFound);
             return;
         }
@@ -232,12 +231,12 @@ internal static class NavigationPatches
                 string? navName = HierarchyUtil.GetNearestNode<LocationDevkitNode>(oldFlag.point)?.locationName;
                 if (navName != null)
                 {
-                    EditorMessage.SendEditorMessage(caller, TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationName", new object[] { navName, (byte)(old - 1) });
+                    EditorMessage.SendEditorMessage(caller, TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationName", [ navName, (byte)(old - 1) ]);
                     return;
                 }
             }
 
-            EditorMessage.SendEditorMessage(caller, TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationIndex", new object[] { (byte)(old - 1) });
+            EditorMessage.SendEditorMessage(caller, TranslationSource.DevkitServerMessageLocalizationSource, "AlreadyBakingNavigationIndex", [ (byte)(old - 1) ]);
             return;
         }
 
@@ -250,19 +249,19 @@ internal static class NavigationPatches
 
             try
             {
-                Logger.LogInfo($"[{Source}] Baking navigation: {netId.Format()}...");
+                Logger.DevkitServer.LogInfo(Source, $"Baking navigation: {netId.Format()}...");
                 Stopwatch sw = Stopwatch.StartNew();
 
                 flag.bakeNavigation();
 
                 sw.Stop();
-                Logger.LogInfo($"[{Source}] Done baking navigation {netId.Format()}, baking took {sw.GetElapsedMilliseconds():F2} ms.");
+                Logger.DevkitServer.LogInfo(Source, $"Done baking navigation {netId.Format()}, baking took {sw.GetElapsedMilliseconds():F2} ms.");
             }
             finally
             {
                 if (Interlocked.CompareExchange(ref BlockBake, 0, nav + 1) != nav + 1)
                 {
-                    Logger.LogWarning($"Synchronization fault when syncing navigation flag {nav.Format()}.", method: Source);
+                    Logger.DevkitServer.LogWarning(Source, $"Synchronization fault when syncing navigation flag {nav.Format()}.");
                 }
             }
 
@@ -276,11 +275,11 @@ internal static class NavigationPatches
 
     private static void OnBakeNavigationProgressUpdate(Progress progress)
     {
-        Logger.LogInfo($"[{Source}] [A* PATHFINDING] (" + progress.progress.Format("P") + ") " + progress.description.Colorize(ConsoleColor.Gray) + ".");
+        Logger.DevkitServer.LogInfo(Source, $"[A* PATHFINDING] ({progress.progress.Format("P")}) {progress.description.Colorize(ConsoleColor.Gray)}.");
 #if SERVER       
         if (Provider.clients.Count > 0 && _baking != null && _baking.TryGetIndex(out byte nav) && NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
         {
-            float progressPercentage = 0f;
+            float progressPercentage;
             if (progress.description.StartsWith("Building Tile ", StringComparison.Ordinal))
             {
                 _hasStartedBakingTiles = true;
@@ -312,14 +311,14 @@ internal static class NavigationPatches
         if (!isActive)
         {
             if (name != null)
-                Logger.LogInfo($"[{Source}] [SERVER / A* PATHFINDING] [{name.Format()} # {nav.Format()}] {"Done baking navigation".Colorize(ConsoleColor.Gray)}.");
+                Logger.DevkitServer.LogInfo(Source, $"[SERVER / A* PATHFINDING] [{name.Format()} # {nav.Format()}] {"Done baking navigation".Colorize(ConsoleColor.Gray)}.");
             else
-                Logger.LogInfo($"[{Source}] [SERVER / A* PATHFINDING] [{netId.Format()}] {"Done baking navigation".Colorize(ConsoleColor.Gray)}.");
+                Logger.DevkitServer.LogInfo(Source, $"[SERVER / A* PATHFINDING] [{netId.Format()}] {"Done baking navigation".Colorize(ConsoleColor.Gray)}.");
         }
         else if (name != null)
-            Logger.LogInfo($"[{Source}] [SERVER / A* PATHFINDING] [{name.Format()} # {nav.Format()}] {progress.Format("P")} - {desc.Colorize(ConsoleColor.Gray)}.");
+            Logger.DevkitServer.LogInfo(Source, $"[SERVER / A* PATHFINDING] [{name.Format()} # {nav.Format()}] {progress.Format("P")} - {desc.Colorize(ConsoleColor.Gray)}.");
         else
-            Logger.LogInfo($"[{Source}] [SERVER / A* PATHFINDING] [{netId.Format()}] {progress.Format("P")} - {desc.Colorize(ConsoleColor.Gray)}.");
+            Logger.DevkitServer.LogInfo(Source, $"[SERVER / A* PATHFINDING] [{netId.Format()}] {progress.Format("P")} - {desc.Colorize(ConsoleColor.Gray)}.");
 
         EditorUIExtension? editorUi = UIExtensionManager.GetInstance<EditorUIExtension>();
         if (editorUi != null)
@@ -361,13 +360,13 @@ internal static class NavigationPatches
             SendBakeNavRequest.Invoke(netId);
         else
         {
-            Logger.LogWarning($"Unable to find NetId for navigation flag: {nav.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to find NetId for navigation flag: {nav.Format()}.");
         }
     }
 #endif
     private static void OnBakeNavigationWhileAlreadyBaking()
     {
-        Logger.LogWarning(BlockBake == 0 ? "You do not have permission to bake navigation." : "Tried to bake navigation while it's already baking.", method: Source);
+        Logger.DevkitServer.LogWarning(Source, BlockBake == 0 ? "You do not have permission to bake navigation." : "Tried to bake navigation while it's already baking.");
 #if CLIENT
         int old = BlockBake;
         if (old > 0 && NavigationUtil.TryGetFlag((byte)(old - 1), out Flag oldFlag))
@@ -406,7 +405,7 @@ internal static class NavigationPatches
         MethodInfo? method = typeof(EditorEnvironmentNavigationUI).GetMethod("onDraggedWidthSlider", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentNavigationUI.onDraggedWidthSlider.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentNavigationUI.onDraggedWidthSlider.");
         }
         else
         {
@@ -416,14 +415,13 @@ internal static class NavigationPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentNavigationUI.onDraggedWidthSlider.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentNavigationUI.onDraggedWidthSlider.");
             }
         }
         method = typeof(EditorEnvironmentNavigationUI).GetMethod("onDraggedHeightSlider", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentNavigationUI.onDraggedHeightSlider.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentNavigationUI.onDraggedHeightSlider.");
         }
         else
         {
@@ -433,14 +431,13 @@ internal static class NavigationPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentNavigationUI.onDraggedHeightSlider.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentNavigationUI.onDraggedHeightSlider.");
             }
         }
         method = typeof(EditorEnvironmentNavigationUI).GetMethod("onDifficultyGUIDFieldTyped", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentNavigationUI.onDifficultyGUIDFieldTyped.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentNavigationUI.onDifficultyGUIDFieldTyped.");
         }
         else
         {
@@ -450,14 +447,13 @@ internal static class NavigationPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentNavigationUI.onDifficultyGUIDFieldTyped.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentNavigationUI.onDifficultyGUIDFieldTyped.");
             }
         }
         method = typeof(EditorEnvironmentNavigationUI).GetMethod("onMaxZombiesFieldTyped", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentNavigationUI.onMaxZombiesFieldTyped.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentNavigationUI.onMaxZombiesFieldTyped.");
         }
         else
         {
@@ -467,14 +463,13 @@ internal static class NavigationPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentNavigationUI.onMaxZombiesFieldTyped.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentNavigationUI.onMaxZombiesFieldTyped.");
             }
         }
         method = typeof(EditorEnvironmentNavigationUI).GetMethod("onMaxBossZombiesFieldTyped", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentNavigationUI.onMaxBossZombiesFieldTyped.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentNavigationUI.onMaxBossZombiesFieldTyped.");
         }
         else
         {
@@ -484,14 +479,13 @@ internal static class NavigationPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentNavigationUI.onMaxBossZombiesFieldTyped.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentNavigationUI.onMaxBossZombiesFieldTyped.");
             }
         }
         method = typeof(EditorEnvironmentNavigationUI).GetMethod("onToggledSpawnZombiesToggle", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentNavigationUI.onToggledSpawnZombiesToggle.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentNavigationUI.onToggledSpawnZombiesToggle.");
         }
         else
         {
@@ -501,14 +495,13 @@ internal static class NavigationPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentNavigationUI.onToggledSpawnZombiesToggle.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentNavigationUI.onToggledSpawnZombiesToggle.");
             }
         }
         method = typeof(EditorEnvironmentNavigationUI).GetMethod("onToggledHyperAgroToggle", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         if (method == null)
         {
-            Logger.LogWarning("Unable to find method: EditorEnvironmentNavigationUI.onToggledHyperAgroToggle.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: EditorEnvironmentNavigationUI.onToggledHyperAgroToggle.");
         }
         else
         {
@@ -518,8 +511,7 @@ internal static class NavigationPatches
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error patching EditorEnvironmentNavigationUI.onToggledHyperAgroToggle.", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, "Error patching EditorEnvironmentNavigationUI.onToggledHyperAgroToggle.");
             }
         }
     }
@@ -837,23 +829,23 @@ internal static class NavigationPatches
     [UsedImplicitly]
     private static IEnumerable<CodeInstruction> TranspileEditorNavigationUpdate(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
     {
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> ins = [..instructions];
 
         MethodInfo? select = typeof(EditorNavigation).GetMethod("select", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[] { typeof(Transform) }, null);
         if (select == null)
-            Logger.LogWarning($"{method.Format()} - Unable to find method: EditorNavigation.select.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: EditorNavigation.select.");
 
         MethodInfo? removeFlag = typeof(LevelNavigation).GetMethod("removeFlag", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[] { typeof(Transform) }, null);
         if (removeFlag == null)
-            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelNavigation.removeFlag.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: LevelNavigation.removeFlag.");
 
         MethodInfo? addFlag = typeof(LevelNavigation).GetMethod("addFlag", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[] { typeof(Vector3) }, null);
         if (addFlag == null)
-            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelNavigation.addFlag.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: LevelNavigation.addFlag.");
 
         MethodInfo? moveFlag = typeof(Flag).GetMethod("move", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[] { typeof(Vector3) }, null);
         if (moveFlag == null)
-            Logger.LogWarning($"{method.Format()} - Unable to find method: LevelNavigation.move.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: LevelNavigation.move.");
 
         bool remove = false, move = false, add = false;
 
@@ -904,15 +896,15 @@ internal static class NavigationPatches
 
         if (!remove)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to patch {removeFlag.Format()} call.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to patch {removeFlag.Format()} call.");
         }
         if (!add)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to patch {addFlag.Format()} call.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to patch {addFlag.Format()} call.");
         }
         if (!move)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to patch {moveFlag.Format()} call.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to patch {moveFlag.Format()} call.");
         }
 
         return ins;
@@ -1025,7 +1017,7 @@ internal static class NavigationPatches
             return NetId.INVALID;
         if (!NavigationNetIdDatabase.TryGetNavigationNetId(nav, out NetId netId))
         {
-            Logger.LogWarning($"Unable to find NetId for flag: {nav.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unable to find NetId for flag: {nav.Format()}.");
             return NetId.INVALID;
         }
 

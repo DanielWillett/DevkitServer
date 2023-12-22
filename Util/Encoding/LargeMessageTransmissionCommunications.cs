@@ -44,7 +44,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         if (isServer)
         {
             ActiveMessages.TryAdd(transmission.TransmissionId, transmission);
-            Logger.LogDebug($"[{Transmission.LogSource}] Registered transmission as server.");
+            Logger.DevkitServer.LogDebug(Transmission.LogSource, "Registered transmission as server.");
             return;
         }
         
@@ -99,8 +99,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
-            Logger.LogError(ex, method: Transmission.LogSource);
+            Logger.DevkitServer.LogError(Transmission.LogSource, ex, $"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.");
         }
     }
 #endif
@@ -115,9 +114,9 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 #endif
         bool lowSpeedUpload = highSpeedConnection is not { Verified: true, Client.Connected: true };
 
-        Logger.LogDebug(lowSpeedUpload
-            ? $"[{Transmission.LogSource}] Using low-speed (Steamworks) upload option."
-            : $"[{Transmission.LogSource}] Using high-speed (TCP) upload option.");
+        Logger.DevkitServer.LogDebug(Transmission.LogSource, lowSpeedUpload
+            ? "Using low-speed (Steamworks) upload option."
+            : "Using high-speed (TCP) upload option.");
 
         float startTime = CachedTime.RealtimeSinceStartup;
 
@@ -150,8 +149,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error sending transmission.", method: Transmission.LogSource);
-            Logger.LogError(ex, method: Transmission.LogSource);
+            Logger.DevkitServer.LogError(Transmission.LogSource, ex, "Error sending transmission.");
 
             if (highSpeedConnection != null)
             {
@@ -164,7 +162,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         }
 
         if (success)
-            Logger.LogDebug($"[{Transmission.LogSource}] Sent data ({Transmission.OriginalSize.Format()} B -> {Transmission.FinalSize.Format()} B) in {(CachedTime.RealtimeSinceStartup - startTime).Format("F2")} seconds.", ConsoleColor.DarkCyan);
+            Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Sent data ({Transmission.OriginalSize.Format()} B -> {Transmission.FinalSize.Format()} B) in {(CachedTime.RealtimeSinceStartup - startTime).Format("F2")} seconds.", ConsoleColor.DarkCyan);
 
         return success;
     }
@@ -182,7 +180,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 #endif
         if (!sendStartResponse.Responded || !sendStartResponse.ErrorCode.HasValue || (sendStartResponse.ErrorCode & 0xFFFF) != (int)StandardErrorCode.Success)
         {
-            Logger.LogWarning("Failed to initialize a high-speed connection.", ConsoleColor.DarkCyan, method: Transmission.LogSource);
+            Logger.DevkitServer.LogWarning(Transmission.LogSource, "Failed to initialize a high-speed connection.", ConsoleColor.DarkCyan);
 #if SERVER
             HighSpeedNetFactory.ReleaseConnection(highSpeedConnection);
 #else
@@ -198,7 +196,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         ushort protocolVersion = (ushort)((sendStartResponse.ErrorCode.Value >> 16) & 0xFFFF);
         Transmission.ProtocolVersion = protocolVersion;
 
-        Logger.LogInfo($"[{Transmission.LogSource}] Ready to upload to high-speed connection.", ConsoleColor.DarkCyan);
+        Logger.DevkitServer.LogInfo(Transmission.LogSource, "Ready to upload to high-speed connection.", ConsoleColor.DarkCyan);
 
         NetTask uploadTask = SendFullData.RequestAck(highSpeedConnection, WriteFullData, 20000);
         while (!uploadTask.IsCompleted)
@@ -208,7 +206,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                 if (pingListenerTask.Parameters.Responded)
                 {
                     uploadTask.KeepAlive();
-                    Logger.LogDebug($"[{Transmission.LogSource}] Received keep-alive from client while downloading, refreshed timeout.");
+                    Logger.DevkitServer.LogDebug(Transmission.LogSource, "Received keep-alive from client while downloading, refreshed timeout.");
                 }
 
                 pingListenerTask = new NetTask(false, pingListenerTask.RequestId, 10000);
@@ -228,8 +226,8 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             return true;
 
 
-        Logger.LogWarning($"Failed to send {FormattingUtil.FormatCapacity(Transmission.FinalContent.Count, colorize: true)} of data over a high-speed connection, trying low speed.",
-            ConsoleColor.DarkCyan, method: Transmission.LogSource);
+        Logger.DevkitServer.LogWarning(Transmission.LogSource, $"Failed to send {FormattingUtil.FormatCapacity(Transmission.FinalContent.Count, colorize: true)} of data over a high-speed connection, trying low speed.",
+            ConsoleColor.DarkCyan);
 
         if (!ReferenceEquals(Connection, highSpeedConnection))
             await Send(token, UniTask.CompletedTask, true);
@@ -264,7 +262,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
         if (!sendStartResponse.Responded || !sendStartResponse.ErrorCode.HasValue || (sendStartResponse.ErrorCode & 0xFFFF) != (int)StandardErrorCode.Success)
         {
-            Logger.LogWarning("Failed to start sending data.", ConsoleColor.DarkCyan, method: Transmission.LogSource);
+            Logger.DevkitServer.LogWarning(Transmission.LogSource, "Failed to start sending data.", ConsoleColor.DarkCyan);
             return false;
         }
 
@@ -336,14 +334,14 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
                     if (retry > 0)
                     {
-                        Logger.LogInfo($"[{Transmission.LogSource}] User failed to respond to checkup at packet {packetIndex.Format()} / {packetCount.Format()}.", ConsoleColor.DarkCyan);
+                        Logger.DevkitServer.LogInfo(Transmission.LogSource, $"User failed to respond to checkup at packet {packetIndex.Format()} / {packetCount.Format()}.", ConsoleColor.DarkCyan);
                         await Transmission.Cancel(token);
                         return false;
                     }
 #if SERVER
                     if (!Connection.IsConnected())
                     {
-                        Logger.LogInfo($"[{Transmission.LogSource}] User disconnected at packet {packetIndex.Format()} / {packetCount.Format()} before finalizing transmission.", ConsoleColor.DarkCyan);
+                        Logger.DevkitServer.LogInfo(Transmission.LogSource, $"User disconnected at packet {packetIndex.Format()} / {packetCount.Format()} before finalizing transmission.", ConsoleColor.DarkCyan);
                         await Transmission.Cancel(token);
                         return false;
                     }
@@ -354,7 +352,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
                 if (!checkupResponse.Responded)
                 {
-                    Logger.LogInfo($"[{Transmission.LogSource}] User didn't respond to checkup at packet {packetIndex.Format()} / {packetCount.Format()}.", ConsoleColor.DarkCyan);
+                    Logger.DevkitServer.LogInfo(Transmission.LogSource, $"User didn't respond to checkup at packet {packetIndex.Format()} / {packetCount.Format()}.", ConsoleColor.DarkCyan);
                     await Transmission.Cancel(token);
                     return false;
                 }
@@ -364,7 +362,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                     int misses = checkupResponse.ErrorCode!.Value;
                     if (misses < 0)
                     {
-                        Logger.LogInfo($"[{Transmission.LogSource}] User errored during checkup at packet {packetIndex.Format()} / {packetCount.Format()}.", ConsoleColor.DarkCyan);
+                        Logger.DevkitServer.LogInfo(Transmission.LogSource, $"User errored during checkup at packet {packetIndex.Format()} / {packetCount.Format()}.", ConsoleColor.DarkCyan);
                         await Transmission.Cancel(token);
                         return false;
                     }
@@ -373,13 +371,13 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                     {
                         float old = packetDelay;
                         packetDelay *= 0.75f;
-                        Logger.LogDebug($"[{Transmission.LogSource}] Packet delay decreased from {old.Format()} -> {packetDelay.Format()}.");
+                        Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Packet delay decreased from {old.Format()} -> {packetDelay.Format()}.");
                     }
                     if (misses > 0)
                     {
                         float old = packetDelay;
                         packetDelay = Math.Min(1f, packetDelay / ((float)misses / ((packetIndex - lastCheckupPacketIndex) * 2)));
-                        Logger.LogDebug($"[{Transmission.LogSource}] Packet delay increasesd from {old.Format()} -> {packetDelay.Format()} after missing {misses.Format()} / {(packetIndex - lastCheckupPacketIndex).Format()} packet(s).");
+                        Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Packet delay increasesd from {old.Format()} -> {packetDelay.Format()} after missing {misses.Format()} / {(packetIndex - lastCheckupPacketIndex).Format()} packet(s).");
                     }
 
                     nextCheckupPacketIndex += firstCheckupPosition;
@@ -393,7 +391,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             if (Connection.IsConnected())
                 continue;
 
-            Logger.LogInfo($"[{Transmission.LogSource}] User disconnected at packet {packetIndex.Format()} / {packetCount.Format()} before finalizing transmission.", ConsoleColor.DarkCyan);
+            Logger.DevkitServer.LogInfo(Transmission.LogSource, $"User disconnected at packet {packetIndex.Format()} / {packetCount.Format()} before finalizing transmission.", ConsoleColor.DarkCyan);
             await Transmission.Cancel(token);
             return false;
 #endif
@@ -404,7 +402,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 #if SERVER
         if (!Connection.IsConnected())
         {
-            Logger.LogInfo($"[{Transmission.LogSource}] User disconnected before finalizing transmission.", ConsoleColor.DarkCyan);
+            Logger.DevkitServer.LogInfo(Transmission.LogSource, "User disconnected before finalizing transmission.", ConsoleColor.DarkCyan);
             await Transmission.Cancel(token);
             return false;
         }
@@ -423,7 +421,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             if (!sendEndResponse.Responded)
             {
                 await Transmission.Cancel(token);
-                Logger.LogInfo($"[{Transmission.LogSource}] User disconnected before finalizing transmission.", ConsoleColor.DarkCyan);
+                Logger.DevkitServer.LogInfo(Transmission.LogSource, "User disconnected before finalizing transmission.", ConsoleColor.DarkCyan);
                 return false;
             }
 
@@ -463,15 +461,15 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                         break;
                     
                     if (response.ErrorCode.HasValue)
-                        Logger.LogWarning($"Recovery packet failed with error code: {response.ErrorCode.Value.Format("X8")}.", method: Transmission.LogSource);
+                        Logger.DevkitServer.LogWarning(Transmission.LogSource, $"Recovery packet failed with error code: {response.ErrorCode.Value.Format("X8")}.");
 
                     if (i == 0)
                     {
-                        Logger.LogWarning($"Retrying recovery packet {(packetIndex + 1).Format()}.", method: Transmission.LogSource);
+                        Logger.DevkitServer.LogWarning(Transmission.LogSource, $"Retrying recovery packet {(packetIndex + 1).Format()}.");
                         continue;
                     }
 
-                    Logger.LogError($"Failed retry of sending recovery packet {(packetIndex + 1).Format()}.", method: Transmission.LogSource);
+                    Logger.DevkitServer.LogError(Transmission.LogSource, $"Failed retry of sending recovery packet {(packetIndex + 1).Format()}.");
                     return false;
                 }
             }
@@ -496,7 +494,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             await UniTask.SwitchToMainThread(token);
             if (!response.Responded)
             {
-                Logger.LogInfo($"[{Transmission.LogSource}] User failed to respond to ping check #{(i + 1).Format()}.", ConsoleColor.DarkCyan);
+                Logger.DevkitServer.LogInfo(Transmission.LogSource, $"User failed to respond to ping check #{(i + 1).Format()}.", ConsoleColor.DarkCyan);
                 return -1f;
             }
 
@@ -507,14 +505,14 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             if (Connection.IsConnected())
                 continue;
 
-            Logger.LogInfo($"[{Transmission.LogSource}] User disconected during at ping check #{(i + 1).Format()}.", ConsoleColor.DarkCyan);
+            Logger.DevkitServer.LogInfo(Transmission.LogSource, $"User disconected during at ping check #{(i + 1).Format()}.", ConsoleColor.DarkCyan);
             return -1f;
 #endif
         }
 
         avgPing /= pingCt;
 
-        Logger.LogDebug($"[{Transmission.LogSource}] Average ping: {avgPing * 1000:F2} ms (n = {pingCt.Format()}, t = {pingSpacingMs.Format("0.##")} ms).");
+        Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Average ping: {avgPing * 1000:F2} ms (n = {pingCt.Format()}, t = {pingSpacingMs.Format("0.##")} ms).");
         return avgPing;
     }
 
@@ -524,14 +522,14 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         int packetIndex = reader.ReadInt32();
         if (_pendingSlowPacketCount <= 0)
         {
-            Logger.LogError($"[{Transmission.LogSource}] Received data before a start level message.");
+            Logger.DevkitServer.LogError(Transmission.LogSource, "Received data before a start level message.");
             ctx.Acknowledge(StandardErrorCode.AccessViolation);
             return;
         }
 
         if (packetIndex < 0 || packetIndex >= _pendingSlowPacketCount)
         {
-            Logger.LogError($"[{Transmission.LogSource}] Received data packet out of range of expected ({(packetIndex + 1).Format()} / {_pendingSlowPacketCount.Format()}), ignoring.");
+            Logger.DevkitServer.LogError(Transmission.LogSource, $"Received data packet out of range of expected ({(packetIndex + 1).Format()} / {_pendingSlowPacketCount.Format()}), ignoring.");
             ctx.Acknowledge(StandardErrorCode.InvalidData);
             return;
         }
@@ -541,7 +539,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
         if (_clientSlowReceiveMask[packetIndex])
         {
-            Logger.LogError($"[{Transmission.LogSource}] Packet already downloaded ({(packetIndex + 1).Format()} / {_pendingSlowPacketCount.Format()}), replacing.");
+            Logger.DevkitServer.LogError(Transmission.LogSource, $"Packet already downloaded ({(packetIndex + 1).Format()} / {_pendingSlowPacketCount.Format()}), replacing.");
         }
         else
         {
@@ -557,11 +555,11 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         {
             if (_missingSlowPackets > 0)
                 --_missingSlowPackets;
-            Logger.LogDebug($"[{Transmission.LogSource}] Recovered ({FormattingUtil.FormatCapacity(packetLength, colorize: true)}) (packet #{(packetIndex + 1).Format()}).", ConsoleColor.DarkCyan);
+            Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Recovered ({FormattingUtil.FormatCapacity(packetLength, colorize: true)}) (packet #{(packetIndex + 1).Format()}).", ConsoleColor.DarkCyan);
         }
         else
         {
-            Logger.LogDebug($"[{Transmission.LogSource}] Received ({FormattingUtil.FormatCapacity(packetLength, colorize: true)}) (packet #{(packetIndex + 1).Format()}).", ConsoleColor.DarkCyan);
+            Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Received ({FormattingUtil.FormatCapacity(packetLength, colorize: true)}) (packet #{(packetIndex + 1).Format()}).", ConsoleColor.DarkCyan);
         }
 
         ++_receivedSlowPackets;
@@ -578,8 +576,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
-                Logger.LogError(ex, method: Transmission.LogSource);
+                Logger.DevkitServer.LogError(Transmission.LogSource, ex, $"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.");
             }
         }
 
@@ -595,12 +592,12 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         {
             if (!cancelled)
             {
-                Logger.LogWarning($"Received server transmission: {Transmission.TransmissionId.Format()}, but expected client for a non-cancelling end message.", method: Transmission.LogSource);
+                Logger.DevkitServer.LogWarning(Transmission.LogSource, $"Received server transmission: {Transmission.TransmissionId.Format()}, but expected client for a non-cancelling end message.");
                 return;
             }
 
             ctx.Acknowledge();
-            Logger.LogInfo($"[{Transmission.LogSource}] Cancelled transmission by request.");
+            Logger.DevkitServer.LogInfo(Transmission.LogSource, "Cancelled transmission by request.");
             MessageContext ctx2 = ctx;
             UniTask.Create(async () =>
             {
@@ -611,7 +608,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                 }
                 catch (InvalidOperationException)
                 {
-                    Logger.LogWarning($"Received cancel message when invalid for transmission: {Transmission.TransmissionId.Format()}.", method: Transmission.LogSource);
+                    Logger.DevkitServer.LogWarning(Transmission.LogSource, $"Received cancel message when invalid for transmission: {Transmission.TransmissionId.Format()}.");
                     ctx2.Acknowledge(StandardErrorCode.NotSupported);
                     return;
                 }
@@ -624,7 +621,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         if (cancelled)
         {
             ctx.Reply(SendSlowMissedPackets, Array.Empty<int>());
-            Logger.LogInfo($"[{Transmission.LogSource}] Cancelled transmission by request.");
+            Logger.DevkitServer.LogInfo(Transmission.LogSource, "Cancelled transmission by request.");
             if (Transmission.Handler != null)
             {
                 try
@@ -633,8 +630,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError($"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
-                    Logger.LogError(ex, method: Transmission.LogSource);
+                    Logger.DevkitServer.LogError(Transmission.LogSource, ex, $"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.");
                 }
 
                 try
@@ -643,8 +639,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError($"Failed to run OnFinished(Cancelled) on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
-                    Logger.LogError(ex, method: Transmission.LogSource);
+                    Logger.DevkitServer.LogError(Transmission.LogSource, ex, $"Failed to run OnFinished(Cancelled) on handler: {Transmission.Handler.GetType().Format()}.");
                 }
             }
             Transmission.Dispose();
@@ -656,7 +651,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         {
             missingPackets = new int[_pendingSlowPacketCount];
 
-            Logger.LogDebug($"[{Transmission.LogSource}] All packets missing: * / {_pendingSlowPacketCount.Format()}.");
+            Logger.DevkitServer.LogDebug(Transmission.LogSource, $"All packets missing: * / {_pendingSlowPacketCount.Format()}.");
 
             for (int i = 0; i < _pendingSlowPacketCount; ++i)
                 missingPackets[i] = i;
@@ -679,7 +674,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                         continue;
 
                     missingPackets[--missing] = i;
-                    Logger.LogDebug($"[{Transmission.LogSource}] Packet missing: {(i + 1).Format()} / {_pendingSlowPacketCount.Format()}.");
+                    Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Packet missing: {(i + 1).Format()} / {_pendingSlowPacketCount.Format()}.");
                     break;
                 }
             }
@@ -699,13 +694,12 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError($"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
-                    Logger.LogError(ex, method: Transmission.LogSource);
+                    Logger.DevkitServer.LogError(Transmission.LogSource, ex, $"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.");
                 }
             }
 
             ctx.Reply(SendSlowMissedPackets, missingPackets);
-            Logger.LogWarning($"[{Transmission.LogSource}] Missing {missingPackets.Length.Format()} / {_pendingSlowPacketCount.Format()} ({((float)missingPackets.Length / _pendingSlowPacketCount).Format("P1")}).");
+            Logger.DevkitServer.LogWarning(Transmission.LogSource, $"Missing {missingPackets.Length.Format()} / {_pendingSlowPacketCount.Format()} ({((float)missingPackets.Length / _pendingSlowPacketCount).Format("P1")}).");
             return;
         }
 
@@ -727,8 +721,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
-                Logger.LogError(ex, method: Transmission.LogSource);
+                Logger.DevkitServer.LogError(Transmission.LogSource, ex, $"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.");
             }
         }
 
@@ -765,8 +758,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
-                Logger.LogError(ex, method: Transmission.LogSource);
+                Logger.DevkitServer.LogError(Transmission.LogSource, ex, $"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.");
             }
             try
             {
@@ -774,8 +766,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to run OnFinished(Cancelled) on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
-                Logger.LogError(ex, method: Transmission.LogSource);
+                Logger.DevkitServer.LogError(Transmission.LogSource, ex, $"Failed to run OnFinished(Cancelled) on handler: {Transmission.Handler.GetType().Format()}.");
             }
 
             return true;
@@ -789,7 +780,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             return checkupEndIndex - checkupStartIndex;
 
 
-        Logger.LogDebug($"[{Transmission.LogSource}] Received checkup: {checkupStartIndex.Format()} -> {checkupEndIndex.Format()}.");
+        Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Received checkup: {checkupStartIndex.Format()} -> {checkupEndIndex.Format()}.");
         int missing = 0;
         for (int i = checkupStartIndex; i <= checkupEndIndex; ++i)
         {
@@ -819,8 +810,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.", method: Transmission.LogSource);
-                Logger.LogError(ex, method: Transmission.LogSource);
+                Logger.DevkitServer.LogError(Transmission.LogSource, ex, $"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.");
             }
         }
 
@@ -850,7 +840,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
         ActiveMessages.Remove(Transmission.TransmissionId, out _);
 
-        Logger.LogDebug($"[{Transmission.LogSource}] Disposed.");
+        Logger.DevkitServer.LogDebug(Transmission.LogSource, "Disposed.");
     }
 
     #region Receivers
@@ -871,12 +861,12 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         
         if (ActiveMessages.TryRemove(transmission.TransmissionId, out LargeMessageTransmission old))
         {
-            Logger.LogWarning($"Received duplicate transmission: {transmission.TransmissionId.Format()}, disposing.", method: transmission.LogSource);
+            Logger.DevkitServer.LogWarning(transmission.LogSource, $"Received duplicate transmission: {transmission.TransmissionId.Format()}, disposing.");
             old.Dispose();
         }
 
         ActiveMessages[transmission.TransmissionId] = transmission;
-        Logger.LogDebug($"[{transmission.LogSource}] Started transmission as client.");
+        Logger.DevkitServer.LogDebug(transmission.LogSource, "Started transmission as client.");
         transmission.Handler?.OnStart();
 
         // ReSharper disable once ShiftExpressionZeroLeftOperand
@@ -890,14 +880,14 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
         if (!ActiveMessages.TryGetValue(guid, out LargeMessageTransmission transmission))
         {
-            Logger.LogWarning($"Received unknown transmission: {guid.Format()}.", method: "LARGE MSG");
+            Logger.DevkitServer.LogWarning("LARGE MSG", $"Received unknown transmission: {guid.Format()}.");
             ctx.Acknowledge(StandardErrorCode.NotFound);
             return;
         }
 
         if (transmission.Comms.IsServer)
         {
-            Logger.LogWarning($"Received server transmission: {guid.Format()}, but expected client.", method: transmission.LogSource);
+            Logger.DevkitServer.LogWarning(transmission.LogSource, $"Received server transmission: {guid.Format()}, but expected client.");
             ctx.Acknowledge(StandardErrorCode.AccessViolation);
             return;
         }
@@ -912,7 +902,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
         if (!ActiveMessages.TryGetValue(guid, out LargeMessageTransmission transmission))
         {
-            Logger.LogWarning($"Received unknown transmission: {guid.Format()}.", method: "LARGE MSG");
+            Logger.DevkitServer.LogWarning("LARGE MSG", $"Received unknown transmission: {guid.Format()}.");
             return;
         }
 
@@ -924,14 +914,14 @@ internal class LargeMessageTransmissionCommunications : IDisposable
     {
         if (!ActiveMessages.TryGetValue(guid, out LargeMessageTransmission transmission))
         {
-            Logger.LogWarning($"Received unknown transmission: {guid.Format()}.", method: "LARGE MSG");
+            Logger.DevkitServer.LogWarning("LARGE MSG", $"Received unknown transmission: {guid.Format()}.");
             ctx.Acknowledge(-1);
             return;
         }
 
         if (transmission.Comms.IsServer)
         {
-            Logger.LogWarning($"Received server transmission: {guid.Format()}, but expected client.", method: transmission.LogSource);
+            Logger.DevkitServer.LogWarning(transmission.LogSource, $"Received server transmission: {guid.Format()}, but expected client.");
             ctx.Acknowledge(-2);
             return;
         }
@@ -946,14 +936,14 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
         if (!ActiveMessages.TryGetValue(guid, out LargeMessageTransmission transmission))
         {
-            Logger.LogWarning($"Received unknown transmission: {guid.Format()}.", method: "LARGE MSG");
+            Logger.DevkitServer.LogWarning("LARGE MSG", $"Received unknown transmission: {guid.Format()}.");
             ctx.Acknowledge(StandardErrorCode.NotFound);
             return;
         }
 
         if (transmission.Comms.IsServer)
         {
-            Logger.LogWarning($"Received server transmission: {guid.Format()}, but expected client.", method: transmission.LogSource);
+            Logger.DevkitServer.LogWarning(transmission.LogSource, $"Received server transmission: {guid.Format()}, but expected client.");
             ctx.Acknowledge(StandardErrorCode.AccessViolation);
             return;
         }
@@ -966,26 +956,28 @@ internal class LargeMessageTransmissionCommunications : IDisposable
     {
         foreach (LargeMessageTransmission transmission in ActiveMessages.Values)
         {
-            Logger.LogDebug("== Large Message Transmission ==");
-            Logger.LogDebug($"  ID: {transmission.TransmissionId.Format()}");
-            Logger.LogDebug($"  Is Server: {transmission.Comms.IsServer.Format()}");
-            Logger.LogDebug($"  Was Cancelled: {transmission.WasCancelled.Format()}");
-            Logger.LogDebug($"  Allow; High Speed: {transmission.AllowHighSpeed.Format()}, Compression: {transmission.AllowCompression.Format()}");
-            Logger.LogDebug($"  Connection: {transmission.Connection.Format()}");
-            Logger.LogDebug($"  Compressed: {transmission.IsCompressed.Format()}, High Speed: {transmission.IsHighSpeed.Format()}");
-            Logger.LogDebug($"  Original Size: {transmission.OriginalSize.Format()} B, Final Size: {transmission.FinalSize.Format()} B");
-            Logger.LogDebug($"  Bandwidth: {transmission.Bandwidth.Format()} B");
-            Logger.LogDebug($"  Handler type: {transmission.HandlerType.Format()}");
-            Logger.LogDebug($"   Projected packet count: {transmission.LowSpeedPacketCount.Format()}");
-            Logger.LogDebug($"   Flags: {("0b" + Convert.ToString(transmission.Flags, 2)).Colorize(FormattingUtil.NumberColor)}");
+            Logger.DevkitServer.LogDebug(transmission.LogSource, "== Large Message Transmission ==");
+            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  ID: {transmission.TransmissionId.Format()}");
+            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Is Server: {transmission.Comms.IsServer.Format()}");
+            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Was Cancelled: {transmission.WasCancelled.Format()}");
+            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Allow; High Speed: {transmission.AllowHighSpeed.Format()}, Compression: {transmission.AllowCompression.Format()}");
+            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Connection: {transmission.Connection.Format()}");
+            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Compressed: {transmission.IsCompressed.Format()}, High Speed: {transmission.IsHighSpeed.Format()}");
+            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Original Size: {transmission.OriginalSize.Format()} B, Final Size: {transmission.FinalSize.Format()} B");
+            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Bandwidth: {transmission.Bandwidth.Format()} B");
+            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Handler type: {transmission.HandlerType.Format()}");
+            Logger.DevkitServer.LogDebug(transmission.LogSource, $"   Projected packet count: {transmission.LowSpeedPacketCount.Format()}");
+            Logger.DevkitServer.LogDebug(transmission.LogSource, $"   Flags: {("0b" + Convert.ToString(transmission.Flags, 2)).Colorize(FormattingUtil.NumberColor)}");
+
             if (transmission.Handler != null)
             {
-                Logger.LogDebug($"Handler ({transmission.Handler.GetType().Format()}: {Environment.NewLine}" +
-                                JsonSerializer.Serialize(transmission.Handler, transmission.HandlerType, DevkitServerConfig.SerializerSettings));
+                Logger.DevkitServer.LogDebug(transmission.LogSource, $"Handler ({transmission.Handler.GetType().Format()}: {Environment.NewLine}" +
+                                                                     JsonSerializer.Serialize(transmission.Handler, transmission.HandlerType,
+                                                                         DevkitServerConfig.SerializerSettings));
             }
 
-            Logger.LogDebug(string.Empty);
-            Logger.LogDebug(string.Empty);
+            Logger.DevkitServer.LogDebug(string.Empty, string.Empty);
+            Logger.DevkitServer.LogDebug(string.Empty, string.Empty);
         }
     }
     internal static IReadOnlyList<LargeMessageTransmission> GetReceivingMessages()

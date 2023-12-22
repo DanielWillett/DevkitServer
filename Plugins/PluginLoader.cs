@@ -14,10 +14,10 @@ using HarmonyLib;
 using SDG.Framework.Modules;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using DevkitServer.Core.Logging.Loggers;
 using Unturned.SystemEx;
 using Module = SDG.Framework.Modules.Module;
 using Type = System.Type;
-
 #if CLIENT
 using DevkitServer.API.Cartography.Compositors;
 using DevkitServer.API.UI.Extensions;
@@ -179,7 +179,7 @@ public static class PluginLoader
             if (DevkitServerModule.Module != null)
                 throw;
 
-            Logger.LogWarning($"Directories not implemented for plugin {plugin.Name}.");
+            plugin.LogWarning($"Directories not implemented for plugin {plugin.Name}.");
         }
 
         if (string.IsNullOrWhiteSpace(plugin.PermissionPrefix))
@@ -290,13 +290,13 @@ public static class PluginLoader
                 plugin.Assembly = assemblyWrapper;
                 skipAssemblyAdd:
                 OnPluginLoadedEvent.TryInvoke(plugin);
-                Logger.LogInfo("[LOAD " + plugin.GetSource() + "] Loaded " + plugin.Name.Colorize(plugin is IDevkitServerColorPlugin p ? p.Color : Plugin.DefaultColor));
+                string src = "LOAD " + plugin.GetSource();
+                plugin.LogInfo(src, "Loaded successfully.");
             }
             catch (Exception ex)
             {
                 string src = "LOAD " + plugin.GetSource();
-                Logger.LogError("Plugin failed to load: " + plugin.GetType().Format() + ".", method: src);
-                Logger.LogError(ex, method: src);
+                Logger.DevkitServer.LogError(src, ex, "Plugin failed to load: " + plugin.GetType().Format() + ".");
                 Exception? unloadEx = null;
                 try
                 {
@@ -306,10 +306,10 @@ public static class PluginLoader
                 catch (Exception ex2)
                 {
                     unloadEx = ex2;
-                    Logger.LogError("Plugin failed to unload: " + plugin.GetType().Format() + ".", method: src);
-                    Logger.LogError(ex2, method: src);
+                    Logger.DevkitServer.LogError(src, ex2, "Plugin failed to unload: " + plugin.GetType().Format() + ".");
                 }
-                throw new AggregateException("Plugin failed to load and unload: " + plugin.GetType().FullName + ".", unloadEx != null ? new Exception[] { ex, unloadEx } : new Exception[] { ex });
+
+                throw new AggregateException("Plugin failed to load and unload: " + plugin.GetType().FullName + ".", unloadEx != null ? [ ex, unloadEx ] : new Exception[] { ex });
             }
 
             if (plugin is IReflectionDoneListenerDevkitServerPlugin refl)
@@ -341,6 +341,7 @@ public static class PluginLoader
         lock (LibraryDictionary)
         {
             string fn = Path.GetFileNameWithoutExtension(dllPath);
+            string src = "LOAD " + fn.ToUpperInvariant().Format(false);
             if (!File.Exists(dllPath))
             {
                 throw new FileNotFoundException("Could not find an assembly named " + fn + ".", dllPath);
@@ -353,8 +354,7 @@ public static class PluginLoader
             }
             catch (Exception ex)
             {
-                Logger.LogError($"[LOAD {fn.ToUpperInvariant().Format(false)}] Unable to load plugin library: {dllPath.Format()}.");
-                Logger.LogError(ex);
+                Logger.DevkitServer.LogError(src, ex, $"[] Unable to load plugin library: {dllPath.Format()}.");
                 throw new ArgumentException("Failed to read assembly.", nameof(dllPath), ex);
             }
 
@@ -365,15 +365,18 @@ public static class PluginLoader
 
             LibrariesIntl.Add(lib);
             LibraryDictionary.Add(lib.Name.FullName, lib);
+
+            src = "LOAD " + asmName.Name.ToUpperInvariant().Format(false);
+
             if (lib.Assembly != null)
-                Logger.LogInfo($"[LOAD {asmName.Name.ToUpperInvariant()}] Plugin library already loaded: " + Path.GetFileName(dllPath).Format() + ".");
+                Logger.DevkitServer.LogInfo(src, $"Plugin library already loaded: {Path.GetFileName(dllPath).Format()}.");
             else
-                Logger.LogInfo($"[LOAD {asmName.Name.ToUpperInvariant()}] Discovered plugin library: " + Path.GetFileName(dllPath).Format() + ".");
+                Logger.DevkitServer.LogInfo(src, $"Discovered plugin library: {Path.GetFileName(dllPath).Format()}.");
         }
     }
     internal static string GetSource(this IDevkitServerPlugin plugin)
     {
-        Color color = plugin.GetColor();
+        Color32 color = plugin.GetColor();
         string src = plugin.Name.ToUpperInvariant().Colorize(color);
         if (plugin.DeveloperMode)
             src += " (".ColorizeNoReset(FormattingColorType.Punctuation) + "dev".ColorizeNoReset(FormattingColorType.FlowKeyword) + ")".Colorize(FormattingColorType.Punctuation);
@@ -382,7 +385,7 @@ public static class PluginLoader
     }
 
     /// <summary>
-    /// Unloads and deregisters a plugin. No unpatching will be done, that must be done through the <see cref="PluginAssembly"/> class (<seealso cref="Assemblies"/>).
+    /// Unloads and deregisters a plugin. Unpatching will only be done when the last plugin is deregistered from the assembly.
     /// </summary>
     /// <exception cref="AggregateException">Error(s) unloading the plugin.</exception>
     /// <exception cref="ArgumentNullException"/>
@@ -398,48 +401,47 @@ public static class PluginLoader
         {
             for (int i = PluginsIntl.Count - 1; i >= 0; --i)
             {
-                if (PluginsIntl[i].Equals(plugin))
+                if (!PluginsIntl[i].Equals(plugin))
+                    continue;
+
+                plugin = PluginsIntl[i];
+                PluginAdvertising.Get().RemovePlugin(plugin.MenuName);
+                PluginsIntl.RemoveAt(i);
+                Assembly asm = plugin.GetType().Assembly;
+                PluginAssembly? assemblyWrapper = null;
+                for (int j = 0; j < AssembliesIntl.Count; ++j)
                 {
-                    plugin = PluginsIntl[i];
-                    PluginAdvertising.Get().RemovePlugin(plugin.MenuName);
-                    PluginsIntl.RemoveAt(i);
-                    Assembly asm = plugin.GetType().Assembly;
-                    PluginAssembly? assemblyWrapper = null;
-                    for (int j = 0; j < AssembliesIntl.Count; ++j)
-                    {
-                        PluginAssembly assembly = AssembliesIntl[j];
-                        if (assembly.Assembly == asm)
-                        {
-                            assembly.RemovePlugin(plugin);
-                            assemblyWrapper = assembly;
-                            break;
-                        }
-                    }
+                    PluginAssembly assembly = AssembliesIntl[j];
+                    if (assembly.Assembly != asm)
+                        continue;
 
-                    string src = "UNLOAD " + plugin.GetSource();
-
-                    try
-                    {
-                        plugin.Unload();
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError("Plugin failed to unload: " + plugin.GetType().Format() + ".", method: src);
-                        Logger.LogError(ex, method: src);
-                        throw new AggregateException("Plugin failed to unload: " + plugin.GetType().FullName + ".", ex);
-                    }
-                    finally
-                    {
-                        OnPluginUnloadedEvent.TryInvoke(plugin);
-                    }
-
-                    if (assemblyWrapper is { Plugins.Count: 0 })
-                    {
-                        assemblyWrapper.Unpatch();
-                    }
-
+                    assembly.RemovePlugin(plugin);
+                    assemblyWrapper = assembly;
                     break;
                 }
+
+                string src = "UNLOAD " + plugin.GetSource();
+
+                try
+                {
+                    plugin.Unload();
+                }
+                catch (Exception ex)
+                {
+                    Logger.DevkitServer.LogError(src, ex, "Plugin failed to unload: " + plugin.GetType().Format() + ".");
+                    throw new AggregateException("Plugin failed to unload: " + plugin.GetType().FullName + ".", ex);
+                }
+                finally
+                {
+                    OnPluginUnloadedEvent.TryInvoke(plugin);
+                }
+
+                if (assemblyWrapper is { Plugins.Count: 0 })
+                {
+                    assemblyWrapper.Unpatch();
+                }
+
+                break;
             }
         }
     }
@@ -458,6 +460,7 @@ public static class PluginLoader
             foreach (string libDll in libraries)
             {
                 string fn = Path.GetFileNameWithoutExtension(libDll);
+                string src = "LOAD " + fn.ToUpperInvariant().Format(false);
                 AssemblyName asmName;
                 try
                 {
@@ -465,8 +468,7 @@ public static class PluginLoader
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError($"[LOAD {fn.ToUpperInvariant().Format(false)}] Unable to load plugin library: {libDll.Format()}.");
-                    Logger.LogError(ex);
+                    Logger.DevkitServer.LogError(src, ex, $"Unable to load plugin library: {libDll.Format()}.");
                     continue;
                 }
 
@@ -474,10 +476,11 @@ public static class PluginLoader
 
                 LibrariesIntl.Add(lib);
                 LibraryDictionary.Add(lib.Name.FullName, lib);
+                src = "LOAD " + asmName.Name.ToUpperInvariant().Format(false);
                 if (lib.Assembly != null)
-                    Logger.LogInfo($"[LOAD {asmName.Name.ToUpperInvariant()}] Plugin library already loaded: " + Path.GetFileName(libDll).Format() + ".");
+                    Logger.DevkitServer.LogInfo(src, $"Plugin library already loaded: {Path.GetFileName(libDll).Format()}.");
                 else
-                    Logger.LogInfo($"[LOAD {asmName.Name.ToUpperInvariant()}] Discovered plugin library: " + Path.GetFileName(libDll).Format() + ".");
+                    Logger.DevkitServer.LogInfo(src, $"Discovered plugin library: {Path.GetFileName(libDll).Format()}.");
             }
         }
 
@@ -500,7 +503,7 @@ public static class PluginLoader
                     string src = "LOAD " + assembly.GetName().Name.ToUpperInvariant();
                     if (type.IsAbstract || type.IsIgnored())
                     {
-                        Logger.LogInfo($"[{src}] Skipped loading {type.Format()}.");
+                        Logger.DevkitServer.LogInfo(src, $"Skipped loading {type.Format()}.");
                         continue;
                     }
 
@@ -510,9 +513,8 @@ public static class PluginLoader
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError("Failed to load assembly:" + pluginDll.Format() + ".", method: src);
-                        Logger.LogError(" Plugin failed to load: " + type.Format() + ".", method: src);
-                        Logger.LogError(ex, method: src);
+                        Logger.DevkitServer.LogError(src, "Failed to load assembly:" + pluginDll.Format() + ".");
+                        Logger.DevkitServer.LogError(src, ex, " Plugin failed to load: " + type.Format() + ".");
                         pluginsTemp.RemoveAll(x => x.GetType().Assembly == assembly);
                         break;
                     }
@@ -520,7 +522,7 @@ public static class PluginLoader
 
                 if (pluginsTemp.Count > 0)
                 {
-                    Logger.LogInfo($"[LOAD PLUGINS] Found {pluginsTemp.Count.Format()} plugin{(pluginsTemp.Count == 1 ? string.Empty : "s")} " +
+                    Logger.DevkitServer.LogInfo("LoadPlugins", $"Found {pluginsTemp.Count.Format()} plugin{(pluginsTemp.Count == 1 ? string.Empty : "s")} " +
                                    $"from {Path.GetFileName(pluginDll).Format()} ({assembly.GetName().Version.Format()})");
                     PluginAssembly? info = AssembliesIntl.Find(x => x.Assembly == assembly);
                     if (info == null)
@@ -537,7 +539,7 @@ public static class PluginLoader
                 }
                 else
                 {
-                    Logger.LogInfo("[LOAD PLUGINS] Found no plugins from " + Path.GetFileName(pluginDll).Format() + " (" + assembly.GetName().Version.Format() + ")");
+                    Logger.DevkitServer.LogInfo("LoadPlugins", "Found no plugins from " + Path.GetFileName(pluginDll).Format() + " (" + assembly.GetName().Version.Format() + ")");
                 }
             }
 
@@ -552,13 +554,13 @@ public static class PluginLoader
                     for (int j = i + 1; j < PluginsIntl.Count; ++j)
                     {
                         IDevkitServerPlugin plugin2 = PluginsIntl[j];
-                        if (plugin2.PermissionPrefix.Equals(plugin.PermissionPrefix, StringComparison.InvariantCultureIgnoreCase))
-                        {
-                            plugin2.PermissionPrefix = "_" + plugin2.PermissionPrefix;
-                            plugin2.LogWarning("Conflicting permission prefix with " + plugin.Format() +
-                                              " (" + plugin.PermissionPrefix.Format() + "). Overriding to " + plugin2.PermissionPrefix.Format() + ".");
-                            dup = true;
-                        }
+                        if (!plugin2.PermissionPrefix.Equals(plugin.PermissionPrefix, StringComparison.InvariantCultureIgnoreCase))
+                            continue;
+
+                        plugin2.PermissionPrefix = "_" + plugin2.PermissionPrefix;
+                        plugin2.LogWarning("Conflicting permission prefix with " + plugin.Format() +
+                                           " (" + plugin.PermissionPrefix.Format() + "). Overriding to " + plugin2.PermissionPrefix.Format() + ".");
+                        dup = true;
                     }
                 }
             }
@@ -578,12 +580,11 @@ public static class PluginLoader
                     InitPlugin(plugin);
                     plugin.Load();
                     OnPluginLoadedEvent.TryInvoke(plugin);
-                    Logger.LogInfo($"[{src}] Loaded successfully.");
+                    plugin.LogInfo(src, "Loaded successfully.");
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError("Plugin failed to load: " + plugin.GetType().Format() + ".", method: src);
-                    Logger.LogError(ex, method: src);
+                    Logger.DevkitServer.LogError(src, ex, $"Plugin failed to load: {plugin.GetType().Format()}.");
                     for (int j = i; j >= 0; --j)
                     {
                         IDevkitServerPlugin plugin2 = pluginsTemp[j];
@@ -593,17 +594,16 @@ public static class PluginLoader
                             {
                                 plugin2.Unload();
                                 OnPluginUnloadedEvent.TryInvoke(plugin2);
-                                Logger.LogInfo($"[{src}]  Unloaded {plugin2.GetType().Format()}.");
+                                Logger.DevkitServer.LogInfo(src, $" Unloaded {plugin2.GetType().Format()}.");
                             }
                             catch (Exception ex2)
                             {
-                                Logger.LogError($" Plugin failed to unload: {plugin2.GetType().Format()}.", method: src);
-                                Logger.LogError(ex2, method: src);
+                                Logger.DevkitServer.LogError(src, ex2, $" Plugin failed to unload: {plugin2.GetType().Format()}.");
                             }
                         }
                     }
                     pluginsTemp.Clear();
-                    Logger.LogError("Failed to load assembly: " + plugin.Assembly.Assembly.GetName().Name.Format() + ".", method: src);
+                    Logger.DevkitServer.LogError(src, "Failed to load assembly: " + plugin.Assembly.Assembly.GetName().Name.Format() + ".");
                     break;
                 }
             }
@@ -640,7 +640,7 @@ public static class PluginLoader
             advertisingFramework.RemovePlugins(advertisingFramework.GetPluginNames().Where(x => !x.Equals(devkitServer, StringComparison.Ordinal)));
             advertisingFramework.AddPlugins(PluginsIntl.OrderBy(x => x.Name).Select(x => x.MenuName).Where(x => !string.IsNullOrEmpty(x)));
 
-            Logger.LogInfo($"Advertised plugins: {string.Join(", ", advertisingFramework.GetPluginNames())}.");
+            Logger.DevkitServer.LogDebug("LoadPlugins", $"Advertised plugins: {string.Join(", ", advertisingFramework.GetPluginNames())}.");
 
             CommandHandler.InitImpl();
         }
@@ -855,8 +855,7 @@ public static class PluginLoader
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError($"Failed to enable module: {module.config.Name.Format(false)}.", method: src);
-                    Logger.LogError(ex, method: src);
+                    Logger.DevkitServer.LogError(src, ex, $"Failed to enable module: {module.config.Name.Format(false)}.");
                 }
             }
 
@@ -878,14 +877,14 @@ public static class PluginLoader
 
                         AssembliesIntl.Add(assembly);
                         primaryModuleAssembly = assembly;
-                        Logger.LogDebug($"[{src}] Discovered nexus DLL in module {module.config.Name.Format(false)}: {type.Assembly.FullName.Format()}.");
+                        Logger.DevkitServer.LogDebug(src, $"Discovered nexus DLL in module {module.config.Name.Format(false)}: {type.Assembly.FullName.Format()}.");
                     }
                 }
             }
 
             if (primaryModuleAssembly == null)
             {
-                Logger.LogWarning($"Unable to find assemblies for module plugin: {module.config.Name.Format(false)}.", method: src);
+                Logger.DevkitServer.LogWarning(src, $"Unable to find assemblies for module plugin: {module.config.Name.Format(false)}.");
                 newPlugin.Assembly = new PluginAssembly();
                 newPlugin.Assembly.AddPlugin(newPlugin);
             }
@@ -900,12 +899,12 @@ public static class PluginLoader
                 InitPlugin(newPlugin);
                 ((IDevkitServerPlugin)newPlugin).Load();
                 OnPluginLoadedEvent.TryInvoke(newPlugin);
-                Logger.LogInfo($"[{src}] Loaded successfully.");
+                Logger.DevkitServer.LogInfo(src, "Loaded successfully.");
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Module plugin failed to load: {module.config.Name.Format(false)}.", method: src);
-                Logger.LogError($"Failed to load module plugin assembly: {(primaryModuleAssembly?.Assembly.GetName().Name).Format()}.", method: src);
+                Logger.DevkitServer.LogError(src, $"Failed to load module plugin assembly: {(primaryModuleAssembly?.Assembly.GetName().Name).Format()}.");
+                Logger.DevkitServer.LogError(src, $" Module plugin failed to load: {module.config.Name.Format(false)}.");
                 throw new Exception($"Failed to create a plugin for {module.config.Name}.", ex);
             }
 
@@ -941,18 +940,18 @@ public class PluginLibrary
 
             if (!System.IO.File.Exists(File))
             {
-                Logger.LogError($"[LOAD {Name.Name.ToUpperInvariant()}] Failed to load assembly file at {File.Format()}: file missing.");
+                Logger.DevkitServer.LogError("LOAD " + Name.Name.ToUpperInvariant().Format(false), $"Failed to load assembly file at {File.Format()}: file missing.");
             }
 
             try
             {
-                Assembly asm = Assembly.Load(File);
+                Assembly asm = Assembly.LoadFrom(File);
 
                 Interlocked.CompareExchange(ref _assembly, asm, null);
             }
             catch
             {
-                Logger.LogError($"[LOAD {Name.Name.ToUpperInvariant()}] Failed to load assembly file at {File.Format()}.");
+                Logger.DevkitServer.LogError("LOAD " + Name.Name.ToUpperInvariant().Format(false), $"Failed to load assembly file at {File.Format()}.");
                 throw;
             }
 
@@ -960,7 +959,7 @@ public class PluginLibrary
         }
     }
 }
-public class PluginAssembly
+public class PluginAssembly : CoreLogger
 {
     private readonly List<IDevkitServerPlugin> _plugins;
     private readonly List<NetInvokerInfo> _netCalls;
@@ -988,7 +987,7 @@ public class PluginAssembly
 #if CLIENT
     public IReadOnlyList<CartographyCompositorInfo> CartographyCompositors { get; }
 #endif
-    public PluginAssembly(Assembly assembly, string file, bool autoPatch = true)
+    public PluginAssembly(Assembly assembly, string file, bool autoPatch = true) : base(assembly.GetName().Name.ToUpperInvariant())
     {
         _plugins = new List<IDevkitServerPlugin>(0);
         _netCalls = new List<NetInvokerInfo>(0);
@@ -1015,7 +1014,7 @@ public class PluginAssembly
         Patcher = autoPatch ? new Harmony(PatchesMain.HarmonyId + ".assembly." + assembly.GetName().Name.ToLowerInvariant().Replace('_', '.').Replace(' ', '.')) : null;
         File = string.IsNullOrEmpty(file) ? null : file;
     }
-    internal PluginAssembly()
+    internal PluginAssembly() : base("unknown assembly")
     {
         _plugins = new List<IDevkitServerPlugin>(1);
         _netCalls = new List<NetInvokerInfo>(0);
@@ -1046,13 +1045,11 @@ public class PluginAssembly
         plugin.Assembly = this;
         _plugins.Add(plugin);
     }
-
     internal void RemovePlugin(IDevkitServerPlugin plugin) => _plugins.Remove(plugin);
-
     internal void ReflectAndPatch()
     {
         ThreadUtil.assertIsGameThread();
-        string src = "INIT " + Assembly.GetName().Name.ToUpperInvariant() + " (DLL)";
+        const string src = nameof(ReflectAndPatch);
 
         if (!HasReflected)
         {
@@ -1087,23 +1084,11 @@ public class PluginAssembly
                 {
                     RuntimeHelpers.RunClassConstructor(type.TypeHandle);
                     CreateDirectoryAttribute.CreateInType(type);
-                    if (Plugins.Count == 1)
-                        Plugins[0].LogDebug($"Initialized static module {type.Format()}.");
-                    else
-                        Logger.LogDebug($"[{src}] Initialized static module {type.Format()}.");
+                    this.LogDebug(src, $"Initialized static module {type.Format()}.");
                 }
                 catch (Exception ex)
                 {
-                    if (Plugins.Count == 1)
-                    {
-                        Plugins[0].LogError($"Error while initializing static module {type.Format()}.");
-                        Plugins[0].LogError(ex);
-                    }
-                    else
-                    {
-                        Logger.LogError($"Error while initializing static module {type.Format()}.", method: src);
-                        Logger.LogError(ex, method: src);
-                    }
+                    this.LogError(src, ex, $"Error while initializing static module {type.Format()}.");
                     break;
                 }
             }
@@ -1121,8 +1106,7 @@ public class PluginAssembly
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError($"Error creating custom net message listener {type.Format()}.", method: src);
-                    Logger.LogError(ex, method: src);
+                    this.LogError(src, ex, $"Error creating custom net message listener {type.Format()}.");
                 }
             }
 
@@ -1134,7 +1118,7 @@ public class PluginAssembly
                 IDevkitServerPlugin? plugin = PluginLoader.FindPluginForMember(type);
                 if (plugin == null)
                 {
-                    LogError($"Unable to link {type.Format()} to a plugin. Use the {typeof(PluginIdentifierAttribute).Format()} to link a " +
+                    this.LogError(src, $"Unable to link {type.Format()} to a plugin. Use the {typeof(PluginIdentifierAttribute).Format()} to link a " +
                              $"chart color provider to a plugin when multiple plugins are loaded from an assembly.");
                     continue;
                 }
@@ -1142,7 +1126,7 @@ public class PluginAssembly
                 ConstructorInfo? ctor = type.GetConstructor(Array.Empty<Type>());
                 if (ctor == null)
                 {
-                    LogError($"Chart color provider {type.Format()} must have a parameterless constructor.");
+                    this.LogError(src, $"Chart color provider {type.Format()} must have a parameterless constructor.");
                     continue;
                 }
                 
@@ -1157,7 +1141,7 @@ public class PluginAssembly
                 IDevkitServerPlugin? plugin = PluginLoader.FindPluginForMember(type);
                 if (plugin == null)
                 {
-                    LogError($"Unable to link {type.Format()} to a plugin. Use the {typeof(PluginIdentifierAttribute).Format()} to link a " +
+                    this.LogError(src, $"Unable to link {type.Format()} to a plugin. Use the {typeof(PluginIdentifierAttribute).Format()} to link a " +
                              $"cartography compositor to a plugin when multiple plugins are loaded from an assembly.");
                     continue;
                 }
@@ -1165,7 +1149,7 @@ public class PluginAssembly
                 ConstructorInfo? ctor = type.GetConstructor(Array.Empty<Type>());
                 if (ctor == null)
                 {
-                    LogError($"Cartography compositor {type.Format()} must have a parameterless constructor.");
+                    this.LogError(src, $"Cartography compositor {type.Format()} must have a parameterless constructor.");
                     continue;
                 }
 
@@ -1179,8 +1163,7 @@ public class PluginAssembly
                 }
                 catch (Exception ex)
                 {
-                    LogError($"Error checking for 'SupportsSatellite' and 'SupportsChart' on cartography compositor {type.Format()}.");
-                    LogError(ex);
+                    this.LogError(src, ex, $"Error checking for 'SupportsSatellite' and 'SupportsChart' on cartography compositor {type.Format()}.");
                 }
                 
                 _cartographyCompositors.Add(new CartographyCompositorInfo(type, plugin, type.GetPriority(), supportsSatellite, supportsChart));
@@ -1196,23 +1179,11 @@ public class PluginAssembly
             try
             {
                 Patcher.PatchAll(Assembly);
-                if (Plugins.Count == 1)
-                    Plugins[0].LogInfo($"Applied all patches in {Assembly.Location.Format()}.");
-                else
-                    Logger.LogInfo($"[{src}] Applied all patches in {Assembly.Location.Format()}.");
+                this.LogInfo(src, $"Applied all patches in {Assembly.Location.Format()}.");
             }
             catch (Exception ex)
             {
-                if (Plugins.Count == 1)
-                {
-                    Plugins[0].LogError($"Error while patching in assembly at {Assembly.Location.Format()}.");
-                    Plugins[0].LogError(ex);
-                }
-                else
-                {
-                    Logger.LogError($"Error while patching in assembly at {Assembly.Location.Format()}.", method: src);
-                    Logger.LogError(ex, method: src);
-                }
+                this.LogError(src, ex, $"Error while patching in assembly at {Assembly.Location.Format()}.");
             }
         }
     }
@@ -1227,58 +1198,19 @@ public class PluginAssembly
         try
         {
             Patcher.UnpatchAll(HarmonyId);
-            if (Plugins.Count == 1)
-                Plugins[0].LogInfo($"Removed all patches in {Assembly.Location.Format()}.");
-            else
-                Logger.LogInfo($"[{src}] Removed all patches in {Assembly.Location.Format()}.");
+            this.LogInfo(src, $"Removed all patches in {Assembly.Location.Format()}.");
         }
         catch (Exception ex)
         {
-            if (Plugins.Count == 1)
-            {
-                Plugins[0].LogError($"Error while unpatching in assembly at {Assembly.Location.Format()}.");
-                Plugins[0].LogError(ex);
-            }
-            else
-            {
-                Logger.LogError($"Error while unpatching in assembly at {Assembly.Location.Format()}.", method: src);
-                Logger.LogError(ex, method: src);
-            }
+            this.LogError(src, ex, $"Error while unpatching in assembly at {Assembly.Location.Format()}.");
         }
     }
-    public void LogDebug(string message, ConsoleColor color = ConsoleColor.DarkGray)
+    public sealed override string CoreType => Plugins.Count == 1 ? Plugins[0].GetSource() : base.CoreType;
+    public sealed override bool IsSeverityEnabled(Severity severity, object? source)
     {
-        if (Plugins.Count == 1)
-            Plugins[0].LogDebug(message, color);
-        else
-            Logger.LogDebug("[" + Assembly.GetName().Name.ToUpperInvariant() + " (DLL)] " + message, color);
-    }
-    public void LogInfo(string message, ConsoleColor color = ConsoleColor.DarkCyan)
-    {
-        if (Plugins.Count == 1)
-            Plugins[0].LogInfo(message, color);
-        else
-            Logger.LogInfo("[" + Assembly.GetName().Name.ToUpperInvariant() + " (DLL)] " + message, color);
-    }
-    public void LogWarning(string message, ConsoleColor color = ConsoleColor.Yellow, [CallerMemberName] string method = "")
-    {
-        if (Plugins.Count == 1)
-            Plugins[0].LogWarning(message, color);
-        else
-            Logger.LogWarning("[" + Assembly.GetName().Name.ToUpperInvariant() + " (DLL)] " + message, color, method);
-    }
-    public void LogError(string message, ConsoleColor color = ConsoleColor.Red, [CallerMemberName] string method = "")
-    {
-        if (Plugins.Count == 1)
-            Plugins[0].LogError(message, color);
-        else
-            Logger.LogError("[" + Assembly.GetName().Name.ToUpperInvariant() + " (DLL)] " + message, color, method);
-    }
-    public void LogError(Exception ex, [CallerMemberName] string method = "")
-    {
-        if (Plugins.Count == 1)
-            Plugins[0].LogError(ex);
-        else
-            Logger.LogError(ex, method: method);
+        if (Plugins.Count == 1 && severity == Severity.Debug && Plugins[0].DeveloperMode)
+            return true;
+
+        return base.IsSeverityEnabled(severity, source);
     }
 }

@@ -110,7 +110,7 @@ public static class UserManager
     internal static void OnAccepted(SteamPlayer steamPlayer)
     {
         EditorLevel.PendingToReceiveActions.Remove(steamPlayer.transportConnection);
-        Logger.LogInfo($"{steamPlayer.playerID.steamID.Format()} ({steamPlayer.playerID.playerName.Format(false)}) accepted.");
+        Logger.DevkitServer.LogInfo("USERS", $"{steamPlayer.playerID.steamID.Format()} ({steamPlayer.playerID.playerName.Format(false)}) accepted.");
     }
     internal static bool AddUser(SteamPlayer pl)
     {
@@ -127,7 +127,7 @@ public static class UserManager
                 EditorUser u = UsersIntl[j];
                 if (u.SteamId.m_SteamID == user.SteamId.m_SteamID)
                 {
-                    Logger.LogWarning("User {" + user.SteamId.m_SteamID.Format() + "} was already online.", method: "USERS");
+                    Logger.DevkitServer.LogWarning("USERS", "User {" + user.SteamId.m_SteamID.Format() + "} was already online.");
                     RemoveUser(u);
                     UsersIntl[j] = user;
                     added = true;
@@ -157,9 +157,9 @@ public static class UserManager
             user.Init();
             EventOnUserConnected.TryInvoke(user);
 #if SERVER
-            Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + user.Connection.Format() + ".");
+            Logger.DevkitServer.LogInfo("USERS", "Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + user.Connection.Format() + ".");
 #else
-            Logger.LogInfo("[USERS] Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + (user.Connection != null ? "Current Session" : "Remote Session") + ".");
+            Logger.DevkitServer.LogInfo("USERS", "Player added: " + user.DisplayName.Format() + " {" + user.SteamId.m_SteamID.Format() + "} @ " + (user.Connection != null ? "Current Session" : "Remote Session") + ".");
 #endif
             return true;
 
@@ -182,7 +182,7 @@ public static class UserManager
 
             if (Users.Count > 0)
             {
-                Logger.LogWarning("Unable to properly remove all users.", method: "USERS");
+                Logger.DevkitServer.LogWarning("USERS", "Unable to properly remove all users.");
                 UsersIntl.Clear();
             }
         }
@@ -214,7 +214,7 @@ public static class UserManager
 #endif
         user.IsOnline = false;
         user.Player = null;
-        Logger.LogInfo("[USERS] Player removed: " + user.DisplayName + " {" + user.SteamId.m_SteamID + "}.");
+        Logger.DevkitServer.LogInfo("USERS", "Player removed: " + user.DisplayName + " {" + user.SteamId.m_SteamID + "}.");
         Object.Destroy(user);
     }
 

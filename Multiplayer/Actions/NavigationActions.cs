@@ -9,6 +9,7 @@ using DevkitServer.Core.Permissions;
 namespace DevkitServer.Multiplayer.Actions;
 public sealed class NavigationActions
 {
+    internal const string Source = "NAVIGATION ACTIONS";
     public EditorActions EditorActions { get; }
     internal NavigationActions(EditorActions actions)
     {
@@ -148,7 +149,7 @@ public sealed class SetNavigationSizeAction : IReplacableAction, IInstanceIdActi
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return;
         }
 
@@ -160,7 +161,7 @@ public sealed class SetNavigationSizeAction : IReplacableAction, IInstanceIdActi
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out _))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return false;
         }
 
@@ -203,7 +204,7 @@ public sealed class SetNavigationDifficultyAction : IReplacableAction, IInstance
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return;
         }
 
@@ -215,7 +216,7 @@ public sealed class SetNavigationDifficultyAction : IReplacableAction, IInstance
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out _))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return false;
         }
 
@@ -258,7 +259,7 @@ public sealed class SetNavigationMaximumZombiesAction : IReplacableAction, IInst
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return;
         }
 
@@ -270,7 +271,7 @@ public sealed class SetNavigationMaximumZombiesAction : IReplacableAction, IInst
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out _))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return false;
         }
 
@@ -313,7 +314,7 @@ public sealed class SetNavigationMaximumBossZombiesAction : IReplacableAction, I
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return;
         }
 
@@ -325,7 +326,7 @@ public sealed class SetNavigationMaximumBossZombiesAction : IReplacableAction, I
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out _))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return false;
         }
 
@@ -368,7 +369,7 @@ public sealed class SetNavigationShouldSpawnZombiesAction : IReplacableAction, I
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return;
         }
 
@@ -380,7 +381,7 @@ public sealed class SetNavigationShouldSpawnZombiesAction : IReplacableAction, I
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out _))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return false;
         }
 
@@ -423,7 +424,7 @@ public sealed class SetNavigationInfiniteAgroDistanceAction : IReplacableAction,
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return;
         }
 
@@ -435,7 +436,7 @@ public sealed class SetNavigationInfiniteAgroDistanceAction : IReplacableAction,
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out _))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return false;
         }
 
@@ -469,7 +470,7 @@ public sealed class MoveNavigationAction : IAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return;
         }
 
@@ -481,7 +482,7 @@ public sealed class MoveNavigationAction : IAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out _))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return false;
         }
 
@@ -514,7 +515,7 @@ public sealed class DeleteNavigationAction : IAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out byte nav))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return;
         }
 
@@ -526,7 +527,7 @@ public sealed class DeleteNavigationAction : IAction, IInstanceIdAction
         NetId netId = new NetId(InstanceId);
         if (!NavigationNetIdDatabase.TryGetNavigation(netId, out _))
         {
-            Logger.LogWarning($"Unknown navigation flag with NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogWarning(NavigationActions.Source, $"Unknown navigation flag with NetId: {netId.Format()}.");
             return false;
         }
 

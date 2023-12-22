@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using System.Reflection.Emit;
+using DevkitServer.API;
 using DevkitServer.API.Abstractions;
 
 namespace DevkitServer.Util;
@@ -115,7 +116,7 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
             wrapper.IsCancellable = DynamicCancellableFalseMethodProvider.Cancellable;
             @delegate = (TDelegate)DynamicCancellableFalseMethodProvider.Method.CreateDelegate(typeof(TDelegate), wrapper);
         }
-        Logger.LogDebug($"Created cached event try-invoker for {wrapper.DeclaringType.Format()}.{wrapper.Name.Colorize(ConsoleColor.White)} ({@delegate.Method.Format()}).");
+        Logger.DevkitServer.LogDebug("CachedMulticastEvent", $"Created cached event try-invoker for {wrapper.DeclaringType.Format()}.{wrapper.Name.Colorize(ConsoleColor.White)} ({@delegate.Method.Format()}).");
         return @delegate;
     }
     private static DynamicMethod GenerateDynamicMethod(Type wrapperType, bool defaultShouldAllowValue, out bool cancellable)
@@ -125,8 +126,7 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         MethodInfo invoke = type.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
         if (invoke.ReturnType != typeof(void))
             throw new InvalidOperationException("Can't make a multicast event out of a non-void-returning delegate.");
-        MethodInfo logErrorText = typeof(Logger).GetMethod(nameof(Logger.LogError), new Type[] { typeof(string), typeof(ConsoleColor), typeof(string) })!;
-        MethodInfo logErrorEx = typeof(Logger).GetMethod(nameof(Logger.LogError), new Type[] { typeof(Exception), typeof(bool), typeof(string) })!;
+        MethodInfo logError = Accessor.LogErrorException;
 
         MethodInfo getDeclaringType = wrapperType.GetProperty(nameof(DeclaringType), BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy)!.GetMethod!;
         MethodInfo getTypeName = typeof(Type).GetProperty(nameof(Type.Name), BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)!.GetMethod!;
@@ -199,25 +199,19 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
             il.Emit(OpCodes.Leave_S, incrLbl);
 
         il.BeginCatchBlock(typeof(Exception));
-        
-        // string method = this.DeclaringType.Name.ToUpperInvariant()
+
+        // LogErrorException(ex, this.ErrorMessage, ConsoleColor.Red, method: method);
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(getErrorMessage.GetCallRuntime(), getErrorMessage);
+
+        PatchUtil.LoadConstantI4(il, (int)ConsoleColor.Red);
+
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(getDeclaringType.GetCallRuntime(), getDeclaringType);
         il.Emit(OpCodes.Callvirt, getTypeName);
         il.Emit(toUpperInvariant.GetCallRuntime(), toUpperInvariant);
-        il.Emit(OpCodes.Stloc_2);
 
-        // Logger.LogError(this.ErrorMessage, method: method);
-        il.Emit(OpCodes.Ldarg_0);
-        il.Emit(getErrorMessage.GetCallRuntime(), getErrorMessage);
-        PatchUtil.LoadConstantI4(il, (int)ConsoleColor.Red);
-        il.Emit(OpCodes.Ldloc_2);
-        il.Emit(logErrorText.GetCallRuntime(), logErrorText);
-
-        // Logger.LogError(ex, method: method);
-        il.Emit(OpCodes.Ldc_I4_1);
-        il.Emit(OpCodes.Ldloc_2);
-        il.Emit(logErrorEx.GetCallRuntime(), logErrorEx);
+        il.Emit(logError.GetCallRuntime(), logError);
 
         if (!DevkitServerModule.MonoLoaded)
             il.Emit(OpCodes.Leave_S, incrLbl);

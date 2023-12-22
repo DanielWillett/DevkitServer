@@ -39,6 +39,7 @@
         <Using Include="UnityEngine" />
         <Using Include="DevkitServer.Util" Condition="'$(AssemblyName)' != 'DevkitServer.Resources' And '$(AssemblyName)' != 'DevkitServer.Launcher'"/>
         <Using Include="JetBrains.Annotations" />
+        <Using Include="DevkitServer.API.Logging" />
         <Using Include="UnityEngine.Object">
             <Alias>Object</Alias>
         </Using>

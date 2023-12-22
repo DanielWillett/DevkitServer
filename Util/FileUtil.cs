@@ -54,26 +54,25 @@ public static class FileUtil
             if (Directory.Exists(path))
             {
                 if (member == null)
-                    Logger.LogDebug($"[CHECK DIR] Directory checked: {path.Format(false)}.");
+                    Logger.DevkitServer.LogDebug("CHECK DIR", $"Directory checked: {path.Format(false)}.");
                 else
-                    Logger.LogDebug($"[CHECK DIR] Directory checked: {path.Format(false)} from {member.Format()}.");
+                    Logger.DevkitServer.LogDebug("CHECK DIR", $"Directory checked: {path.Format(false)} from {member.Format()}.");
                 return true;
             }
 
             Directory.CreateDirectory(path);
             if (member == null)
-                Logger.LogInfo($"[CHECK DIR] Directory created: {path.Format(false)}.");
+                Logger.DevkitServer.LogInfo("CHECK DIR", $"Directory created: {path.Format(false)}.");
             else
-                Logger.LogInfo($"[CHECK DIR] Directory created: {path.Format(false)} from {member.Format()}.");
+                Logger.DevkitServer.LogInfo("CHECK DIR", $"Directory created: {path.Format(false)} from {member.Format()}.");
             return true;
         }
         catch (Exception ex)
         {
             if (member == null)
-                Logger.LogError($"Unable to create directory: {path.Format(false)}.", method: "CHECK DIR");
+                Logger.DevkitServer.LogError("CHECK DIR", ex, $"Unable to create directory: {path.Format(false)}.");
             else
-                Logger.LogError($"Unable to create directory: {path.Format(false)} from {member.Format()}.", method: "CHECK DIR");
-            Logger.LogError(ex);
+                Logger.DevkitServer.LogError("CHECK DIR", ex, $"Unable to create directory: {path.Format(false)} from {member.Format()}.");
             if (fault)
                 DevkitServerModule.Fault();
             return false;
@@ -322,12 +321,11 @@ public static class FileUtil
         }
         catch (ArgumentException ex)
         {
-            Logger.LogWarning($"Failed to get drive info ({ex.Message}).");
+            Logger.DevkitServer.LogWarning(nameof(TryGetFreeSpaceOnDrive), $"Failed to get drive info ({ex.Message}).");
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Failed to get drive info.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogWarning(nameof(TryGetFreeSpaceOnDrive), ex, "Failed to get drive info.");
         }
 
         bytesFree = 0;

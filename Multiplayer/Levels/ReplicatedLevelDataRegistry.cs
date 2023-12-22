@@ -1,8 +1,8 @@
-﻿using DevkitServer.Levels;
+﻿using DevkitServer.API;
+using DevkitServer.Levels;
+using DevkitServer.Plugins;
 using DevkitServer.Util.Encoding;
 using System.Reflection;
-using DevkitServer.Plugins;
-using DevkitServer.API;
 
 namespace DevkitServer.Multiplayer.Levels;
 
@@ -47,18 +47,18 @@ public static class ReplicatedLevelDataRegistry
                 if (ctor == null)
                 {
                     if (plugin == null)
-                        Logger.LogWarning($"Missing default constructor for type {type.Format()} (with data {dataType.Format()}).", method: Source);
+                        Logger.DevkitServer.LogWarning(Source, $"Missing default constructor for type {type.Format()} (with data {dataType.Format()}).");
                     else
-                        plugin.LogWarning($"Missing default constructor for type {type.Format()} (with data {dataType.Format()}).", method: Source);
+                        plugin.LogWarning(Source, $"Missing default constructor for type {type.Format()} (with data {dataType.Format()}).");
                     continue;
                 }
 
                 if (RegisteredTypes.ContainsKey(dataType))
                 {
                     if (plugin == null)
-                        Logger.LogWarning($"Duplicate data type in data source {type.Format()} (with data {dataType.Format()}) skipped.", method: Source);
+                        Logger.DevkitServer.LogWarning(Source, $"Duplicate data type in data source {type.Format()} (with data {dataType.Format()}) skipped.");
                     else
-                        plugin.LogWarning($"Duplicate data type in data source {type.Format()} (with data {dataType.Format()}) skipped.", method: Source);
+                        plugin.LogWarning(Source, $"Duplicate data type in data source {type.Format()} (with data {dataType.Format()}) skipped.");
                     continue;
                 }
 
@@ -73,22 +73,20 @@ public static class ReplicatedLevelDataRegistry
                     ++ct;
 
                     if (plugin == null)
-                        Logger.LogDebug($"[{Source}] Regestered {type.Format()} (with data {dataType.Format()}) as replicated level data.");
+                        Logger.DevkitServer.LogDebug(Source, $"Regestered {type.Format()} (with data {dataType.Format()}) as replicated level data.");
                     else
-                        plugin.LogDebug($"[{Source}] Regestered {type.Format()} (with data {dataType.Format()}) as replicated level data.");
+                        plugin.LogDebug(Source, $"Regestered {type.Format()} (with data {dataType.Format()}) as replicated level data.");
                 }
                 catch (Exception ex)
                 {
 
                     if (plugin == null)
                     {
-                        Logger.LogWarning($"Error creating instance of {type.Format()} (with data {dataType.Format()}). Type skipped.", method: Source);
-                        Logger.LogError(ex, method: Source);
+                        Logger.DevkitServer.LogWarning(Source, ex, $"Error creating instance of {type.Format()} (with data {dataType.Format()}). Type skipped.");
                     }
                     else
                     {
-                        plugin.LogWarning($"Error creating instance of {type.Format()} (with data {dataType.Format()}). Type skipped.", method: Source);
-                        plugin.LogError(ex, method: Source);
+                        plugin.LogWarning(Source, ex, $"Error creating instance of {type.Format()} (with data {dataType.Format()}). Type skipped.");
                     }
 
                     if (instance is IDisposable disp)
@@ -97,9 +95,9 @@ public static class ReplicatedLevelDataRegistry
             }
 
             if (plugin == null)
-                Logger.LogInfo($"[{Source}] Regestered {ct.Format()} replicated level data sources.");
+                Logger.DevkitServer.LogInfo(Source, $"Regestered {ct.Format()} replicated level data sources.");
             else
-                plugin.LogInfo($"[{Source}] Regestered {ct.Format()} replicated level data sources.");
+                plugin.LogInfo(Source, $"Regestered {ct.Format()} replicated level data sources.");
         }
     }
 #if CLIENT
@@ -126,15 +124,9 @@ public static class ReplicatedLevelDataRegistry
                 catch (Exception ex)
                 {
                     if (srcInfo.Assembly != null)
-                    {
-                        srcInfo.Assembly.LogError($"Error running LoadData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).", method: Source);
-                        srcInfo.Assembly.LogError(ex, method: Source);
-                    }
+                        srcInfo.Assembly.LogError(Source, ex, $"Error running LoadData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).");
                     else
-                    {
-                        Logger.LogError($"Error running LoadData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).", method: Source);
-                        Logger.LogError(ex, method: Source);
-                    }
+                        Logger.DevkitServer.LogError(Source, ex, $"Error running LoadData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).");
                 }
             }
         }
@@ -155,15 +147,9 @@ public static class ReplicatedLevelDataRegistry
                 catch (Exception ex)
                 {
                     if (srcInfo.Assembly != null)
-                    {
-                        srcInfo.Assembly.LogError($"Error running SaveData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).", method: Source);
-                        srcInfo.Assembly.LogError(ex, method: Source);
-                    }
+                        srcInfo.Assembly.LogError(Source, ex, $"Error running SaveData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).");
                     else
-                    {
-                        Logger.LogError($"Error running SaveData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).", method: Source);
-                        Logger.LogError(ex, method: Source);
-                    }
+                        Logger.DevkitServer.LogError(Source, ex, $"Error running SaveData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).");
                 }
             }
         }
@@ -191,7 +177,7 @@ public static class ReplicatedLevelDataRegistry
                 Type? type = reader.ReadType(out bool wasPassedNull);
                 if (wasPassedNull)
                 {
-                    Logger.LogDebug($"[{Source}] Skipped replicated level data at index {i.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"Skipped replicated level data at index {i.Format()}.");
                     continue;
                 }
 
@@ -200,7 +186,7 @@ public static class ReplicatedLevelDataRegistry
                 {
                     if (tempReader != null)
                     {
-                        Logger.LogDebug($"[{Source}] Unrecognized replicated level data type at index {i.Format()}.");
+                        Logger.DevkitServer.LogDebug(Source, $"[{Source}] Unrecognized replicated level data type at index {i.Format()}.");
                         continue;
                     }
 
@@ -209,7 +195,7 @@ public static class ReplicatedLevelDataRegistry
                     string? typeInfo = reader.ReadTypeInfo();
                     reader.Goto(oldPos);
 
-                    Logger.LogWarning($"Unrecognized replicated level data type: {typeInfo.Format(true)} at index {i.Format()}.", method: Source);
+                    Logger.DevkitServer.LogWarning(Source, $"Unrecognized replicated level data type: {typeInfo.Format(true)} at index {i.Format()}.");
                     continue;
                 }
 
@@ -228,13 +214,13 @@ public static class ReplicatedLevelDataRegistry
                         {
                             int bytesSkipped = reader.Position - expectedPosition;
                             reader.Skip(bytesSkipped);
-                            Logger.LogWarning($"Replicated level data of type {type.Format()} read {bytesSkipped.Format()} B less than were written {versionString}.", method: Source);
+                            Logger.DevkitServer.LogWarning(Source, $"Replicated level data of type {type.Format()} read {bytesSkipped.Format()} B less than were written {versionString}.");
                         }
                         else if (reader.Position > expectedPosition)
                         {
                             int bytesSkipped = expectedPosition - reader.Position;
                             reader.Goto(expectedPosition);
-                            Logger.LogWarning($"Replicated level data of type {type.Format()} read {bytesSkipped.Format()} B more than were written {versionString}.", method: Source);
+                            Logger.DevkitServer.LogWarning(Source, $"Replicated level data of type {type.Format()} read {bytesSkipped.Format()} B more than were written {versionString}.");
                         }
                     }
                 }
@@ -249,24 +235,24 @@ public static class ReplicatedLevelDataRegistry
                         if (tempReader.Position < byteCt)
                         {
                             int bytesSkipped = tempReader.Position - byteCt;
-                            Logger.LogWarning($"Replicated level data of type {type.Format()} read {bytesSkipped.Format()} B less from the stream than were written {versionString}.", method: Source);
+                            Logger.DevkitServer.LogWarning(Source, $"Replicated level data of type {type.Format()} read {bytesSkipped.Format()} B less from the stream than were written {versionString}.");
                         }
                         else if (tempReader.Position > byteCt)
                         {
                             int bytesSkipped = byteCt - tempReader.Position;
-                            Logger.LogWarning($"Replicated level data of type {type.Format()} read {bytesSkipped.Format()} B more from the stream than were written {versionString}.", method: Source);
+                            Logger.DevkitServer.LogWarning(Source, $"Replicated level data of type {type.Format()} read {bytesSkipped.Format()} B more from the stream than were written {versionString}.");
                         }
                     }
                 }
 
                 if (replicatedData == null)
                 {
-                    Logger.LogWarning($"Failed to read replicated level data: {type.Format()}. This may not be an issue, but be on the lookout for things not being synced properly.", method: Source);
+                    Logger.DevkitServer.LogWarning(Source, $"Failed to read replicated level data: {type.Format()}. This may not be an issue, but be on the lookout for things not being synced properly.");
                     continue;
                 }
 
                 data.ReplicatedLevelData.Add(replicatedData);
-                Logger.LogDebug($"[{Source}] Read {byteCt.Format()} B of data for data {type.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Read {byteCt.Format()} B of data for data {type.Format()}.");
             }
         }
     }
@@ -312,7 +298,7 @@ public static class ReplicatedLevelDataRegistry
     {
         if (!RegisteredTypes.TryGetValue(type, out ReplicatedLevelDataSourceInfo srcInfo))
         {
-            Logger.LogWarning($"Unregistered replicated level data type: {type.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Unregistered replicated level data type: {type.Format()}.");
             return null;
         }
 
@@ -323,15 +309,9 @@ public static class ReplicatedLevelDataRegistry
         catch (Exception ex)
         {
             if (srcInfo.Assembly != null)
-            {
-                srcInfo.Assembly.LogError($"Error running ReadData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).", method: Source);
-                srcInfo.Assembly.LogError(ex, method: Source);
-            }
+                srcInfo.Assembly.LogError(Source, ex, $"Error running ReadData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).");
             else
-            {
-                Logger.LogError($"Error running ReadData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).", method: Source);
-                Logger.LogError(ex, method: Source);
-            }
+                Logger.DevkitServer.LogError(Source, ex, $"Error running ReadData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).");
 
             return null;
         }
@@ -351,13 +331,11 @@ public static class ReplicatedLevelDataRegistry
         {
             if (srcInfo.Assembly != null)
             {
-                srcInfo.Assembly.LogError($"Error running WriteData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).", method: Source);
-                srcInfo.Assembly.LogError(ex, method: Source);
+                srcInfo.Assembly.LogError(Source, ex, $"Error running WriteData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).");
             }
             else
             {
-                Logger.LogError($"Error running WriteData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, $"Error running WriteData on {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}).");
             }
         }
         int size = writer.Count - (pos + sizeof(int) + sizeof(ushort));
@@ -369,9 +347,9 @@ public static class ReplicatedLevelDataRegistry
         }
 #if DEBUG
         if (srcInfo.Assembly != null)
-            srcInfo.Assembly.LogDebug($"[{Source}] Wrote data from {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}): {FormattingUtil.FormatCapacity(size, colorize: true)}.");
+            srcInfo.Assembly.LogDebug(Source, $"Wrote data from {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}): {FormattingUtil.FormatCapacity(size, colorize: true)}.");
         else
-            Logger.LogDebug($"[{Source}] Wrote data from {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}): {FormattingUtil.FormatCapacity(size, colorize: true)}.");
+            Logger.DevkitServer.LogDebug(Source, $"Wrote data from {srcInfo.Type.Format()} (with data {srcInfo.DataType.Format()}): {FormattingUtil.FormatCapacity(size, colorize: true)}.");
 #endif
     }
 
@@ -501,14 +479,14 @@ public readonly struct ReplicatedLevelDataSourceInfo
         ioMethod = ioMethod == null ? null : Accessor.GetImplementedMethod(type, ioMethod);
         if (ioMethod == null)
         {
-            Logger.LogError($"Load method not implemented in {type.Format()} (with data {dataType.Format()}).", method: ReplicatedLevelDataRegistry.Source);
+            Logger.DevkitServer.LogError(ReplicatedLevelDataRegistry.Source, $"Load method not implemented in {type.Format()} (with data {dataType.Format()}).");
         }
 #elif SERVER
         MethodInfo? ioMethod = interfaceType.GetMethod(nameof(IReplicatedLevelDataSource<object>.SaveData), BindingFlags.Public | BindingFlags.Instance);
         ioMethod = ioMethod == null ? null : Accessor.GetImplementedMethod(type, ioMethod);
         if (ioMethod == null)
         {
-            Logger.LogError($"Save method not implemented in {type.Format()} (with data {dataType.Format()}).", method: ReplicatedLevelDataRegistry.Source);
+            Logger.DevkitServer.LogError(ReplicatedLevelDataRegistry.Source, $"Save method not implemented in {type.Format()} (with data {dataType.Format()}).");
         }
 #endif
 
@@ -516,14 +494,14 @@ public readonly struct ReplicatedLevelDataSourceInfo
         writeMethod = writeMethod == null ? null : Accessor.GetImplementedMethod(type, writeMethod);
         if (writeMethod == null)
         {
-            Logger.LogError($"WriteData method not implemented in {type.Format()} (with data {dataType.Format()}).", method: ReplicatedLevelDataRegistry.Source);
+            Logger.DevkitServer.LogError(ReplicatedLevelDataRegistry.Source, $"WriteData method not implemented in {type.Format()} (with data {dataType.Format()}).");
         }
 
         MethodInfo? readMethod = interfaceType.GetMethod(nameof(IReplicatedLevelDataSource<object>.ReadData), BindingFlags.Public | BindingFlags.Instance);
         readMethod = readMethod == null ? null : Accessor.GetImplementedMethod(type, readMethod);
         if (readMethod == null)
         {
-            Logger.LogError($"WriteData method not implemented in {type.Format()} (with data {dataType.Format()}).", method: ReplicatedLevelDataRegistry.Source);
+            Logger.DevkitServer.LogError(ReplicatedLevelDataRegistry.Source, $"WriteData method not implemented in {type.Format()} (with data {dataType.Format()}).");
         }
 
         if (readMethod == null || writeMethod == null || ioMethod == null)

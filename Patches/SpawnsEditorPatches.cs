@@ -1,11 +1,11 @@
 ﻿#if CLIENT
+using DevkitServer.API;
 using DevkitServer.Core.Tools;
 using DevkitServer.Players;
 using HarmonyLib;
+using SDG.Framework.Devkit;
 using System.Reflection;
 using System.Reflection.Emit;
-using SDG.Framework.Devkit;
-using DevkitServer.API;
 
 namespace DevkitServer.Patches;
 
@@ -28,12 +28,12 @@ internal static class SpawnsEditorPatches
                 bool patch = true;
                 if (openMethod == null)
                 {
-                    Logger.LogWarning($"Method not found: {FormattingUtil.FormatMethod(typeof(void), type, "open", arguments: Type.EmptyTypes, isStatic: true)}.", method: Source);
+                    Logger.DevkitServer.LogWarning(Source, $"Method not found: {FormattingUtil.FormatMethod(typeof(void), type, "open", arguments: Type.EmptyTypes, isStatic: true)}.");
                     patch = false;
                 }
                 if (closeMethod == null)
                 {
-                    Logger.LogWarning($"Method not found: {FormattingUtil.FormatMethod(typeof(void), type, "close", arguments: Type.EmptyTypes, isStatic: true)}.", method: Source);
+                    Logger.DevkitServer.LogWarning(Source, $"Method not found: {FormattingUtil.FormatMethod(typeof(void), type, "close", arguments: Type.EmptyTypes, isStatic: true)}.");
                     patch = false;
                 }
 
@@ -47,14 +47,13 @@ internal static class SpawnsEditorPatches
             MethodInfo? clickMethod = typeof(EditorLevelUI).GetMethod("onClickedPlayersButton", BindingFlags.NonPublic | BindingFlags.Instance);
             if (clickMethod == null)
             {
-                Logger.LogWarning($"Method not found: {FormattingUtil.FormatMethod(typeof(void), typeof(EditorLevelUI), "onClickedPlayersButton", namedArguments: new (Type, string?)[] { (typeof(ISleekElement), "button") })}.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, $"Method not found: {FormattingUtil.FormatMethod(typeof(void), typeof(EditorLevelUI), "onClickedPlayersButton", namedArguments: [ (typeof(ISleekElement), "button") ])}.");
             }
             else PatchesMain.Patcher.Patch(clickMethod, transpiler: new HarmonyMethod(Accessor.GetMethod(TranspileOnClickedPlayersButton)));
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Failed to patch patches for spawn editors.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogWarning(Source, ex, "Failed to patch patches for spawn editors.");
             DevkitServerModule.Fault();
         }
     }
@@ -88,7 +87,7 @@ internal static class SpawnsEditorPatches
                 node.Spawnpoint.type = EditorSpawns.selectedAnimal;
                 node.Color = table.color;
 
-                Logger.LogDebug($"Spawn table updated for {node.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Spawn table updated for {node.Format()}.");
                 SpawnUtil.EventOnAnimalSpawnTableChanged.TryInvoke(node.Spawnpoint, node.Index);
             }
         }
@@ -109,7 +108,7 @@ internal static class SpawnsEditorPatches
                 node.Spawnpoint.type = EditorSpawns.selectedVehicle;
                 node.Color = table.color;
 
-                Logger.LogDebug($"Spawn table updated for {node.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Spawn table updated for {node.Format()}.");
                 SpawnUtil.EventOnVehicleSpawnTableChanged.TryInvoke(node.Spawnpoint, node.Index);
             }
         }
@@ -130,7 +129,7 @@ internal static class SpawnsEditorPatches
                 node.Spawnpoint.type = EditorSpawns.selectedItem;
                 node.Color = table.color;
 
-                Logger.LogDebug($"Spawn table updated for {node.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Spawn table updated for {node.Format()}.");
                 SpawnUtil.EventOnItemSpawnTableChanged.TryInvoke(node.Spawnpoint, node.Region);
             }
         }
@@ -151,7 +150,7 @@ internal static class SpawnsEditorPatches
                 node.Spawnpoint.type = EditorSpawns.selectedZombie;
                 node.Color = table.color;
 
-                Logger.LogDebug($"Spawn table updated for {node.Format()}.");
+                Logger.DevkitServer.LogDebug(Source, $"Spawn table updated for {node.Format()}.");
                 SpawnUtil.EventOnZombieSpawnTableChanged.TryInvoke(node.Spawnpoint, node.Region);
             }
         }
@@ -206,12 +205,12 @@ internal static class SpawnsEditorPatches
     }
     private static IEnumerable<CodeInstruction> TranspileOnClickedPlayersButton(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> ins = [..instructions];
 
         MethodInfo? open = typeof(EditorLevelPlayersUI).GetMethod("open", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
         if (open == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find method: EditorLevelPlayersUI.open", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: EditorLevelPlayersUI.open");
             DevkitServerModule.Fault();
         }
 
@@ -223,14 +222,14 @@ internal static class SpawnsEditorPatches
 
             CodeInstruction instruction = ins[i];
             ins.RemoveAt(i);
-            ins.Insert(ins[ins.Count - 1].opcode == OpCodes.Ret ? ins.Count - 1 : ins.Count, instruction);
+            ins.Insert(ins[^1].opcode == OpCodes.Ret ? ins.Count - 1 : ins.Count, instruction);
             patched = true;
             break;
         }
 
         if (!patched)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to move call to open.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to move call to open.");
             DevkitServerModule.Fault();
         }
 
@@ -256,48 +255,50 @@ internal static class SpawnsEditorPatches
 
         if (spawnType == SpawnType.None)
         {
-            Logger.LogWarning($"{method.Format()} - Unknown or null spawn UI type: {declaringType.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unknown or null spawn UI type: {declaringType.Format()}.");
         }
 
         MethodInfo? setIsSpawning = typeof(EditorSpawns).GetProperty(nameof(EditorSpawns.isSpawning),
             BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetSetMethod(true);
         if (setIsSpawning == null)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to find property setter: EditorSpawns.isSpawning.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find property setter: EditorSpawns.isSpawning.");
             DevkitServerModule.Fault();
         }
 
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> ins = [..instructions];
         bool patched = false;
         for (int i = 0; i < ins.Count; ++i)
         {
-            if (spawnType != SpawnType.None && setIsSpawning != null && PatchUtil.MatchPattern(ins, i,
+            if (spawnType == SpawnType.None || setIsSpawning == null || !PatchUtil.MatchPattern(ins, i,
                     x => x.LoadsConstant(),
                     x => x.Calls(setIsSpawning)))
             {
-                if (!ins[i].LoadsConstant(0))
-                {
-                    CodeInstruction newInst = PatchUtil.LoadConstantI4((int)spawnType);
-                    ins[i].MoveBlocksAndLabels(newInst);
-                    ins[i] = newInst;
-                    ins[i + 1] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(Open)!);
-                    Logger.LogDebug($"[{Source}] {method.Format()} - Patched open spawn menu.");
-                }
-                else
-                {
-                    CodeInstruction newInst = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(Close)!);
-                    ins[i].MoveBlocksAndLabels(newInst);
-                    ins[i] = newInst;
-                    ins.RemoveAt(i + 1);
-                    Logger.LogDebug($"[{Source}] {method.Format()} - Patched close spawn menu.");
-                }
-                patched = true;
-                break;
+                continue;
             }
+
+            if (!ins[i].LoadsConstant(0))
+            {
+                CodeInstruction newInst = PatchUtil.LoadConstantI4((int)spawnType);
+                ins[i].MoveBlocksAndLabels(newInst);
+                ins[i] = newInst;
+                ins[i + 1] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(Open)!);
+                Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Patched open spawn menu.");
+            }
+            else
+            {
+                CodeInstruction newInst = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(Close)!);
+                ins[i].MoveBlocksAndLabels(newInst);
+                ins[i] = newInst;
+                ins.RemoveAt(i + 1);
+                Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Patched close spawn menu.");
+            }
+            patched = true;
+            break;
         }
         if (!patched)
         {
-            Logger.LogWarning($"{method.Format()} - Unable to patch open/close spawn menu.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to patch open/close spawn menu.");
             DevkitServerModule.Fault();
         }
 
@@ -309,17 +310,17 @@ internal static class SpawnsEditorPatches
             tool.Type = type;
         else
             UserInput.ActiveTool = new DevkitServerSpawnsTool { Type = type };
-        Logger.LogDebug($"Activated {type.Format()} spawn tool.");
+        Logger.DevkitServer.LogDebug(Source, $"Activated {type.Format()} spawn tool.");
     }
     private static void Close()
     {
         if (UserInput.ActiveTool is not DevkitServerSpawnsTool tool)
         {
-            Logger.LogDebug("Spawn tool already deactivated.");
+            Logger.DevkitServer.LogDebug(Source, "Spawn tool already deactivated.");
             return;
         }
 
-        Logger.LogDebug($"Deactivated {tool.Type.Format()} spawn tool.");
+        Logger.DevkitServer.LogDebug(Source, $"Deactivated {tool.Type.Format()} spawn tool.");
         UserInput.ActiveTool = null;
     }
 }

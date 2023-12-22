@@ -1,11 +1,13 @@
 ﻿using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer.Networking;
-using DevkitServer.Players;
 #if CLIENT
 using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
+#endif
+#if SERVER
+using DevkitServer.Players;
 #endif
 
 namespace DevkitServer.API.UI;
@@ -38,17 +40,17 @@ public static class EditorMessage
         FieldInfo? messageBox = typeof(EditorUI).GetField("messageBox", BindingFlags.Static | BindingFlags.NonPublic);
         if (messageBox == null)
         {
-            Logger.LogWarning("Unable to find field: EditorUI.messageBox.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find field: EditorUI.messageBox.");
         }
         FieldInfo? customText = typeof(EditorMessage).GetField(nameof(_customText), BindingFlags.Static | BindingFlags.NonPublic);
         if (customText == null)
         {
-            Logger.LogWarning("Unable to find field: UIMessage._customText.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find field: UIMessage._customText.");
         }
         MethodInfo? setText = typeof(ISleekLabel).GetProperty(nameof(ISleekLabel.Text), BindingFlags.Instance | BindingFlags.Public)?.SetMethod;
         if (setText == null)
         {
-            Logger.LogWarning("Unable to find method: ISleekLabel.text.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, "Unable to find method: ISleekLabel.text.");
         }
         List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
         for (int i = 0; i < ins.Count; ++i)
@@ -80,7 +82,7 @@ public static class EditorMessage
 
                 instr.labels.Clear();
                 instr.labels.Add(lbl);
-                Logger.LogDebug($"[{Source}] Added custom message check to " + method.Format() + ".");
+                Logger.DevkitServer.LogDebug(Source, $"Added custom message check to {method.Format()}.");
             }
 
             yield return instr;
@@ -130,9 +132,7 @@ public static class EditorMessage
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error setting EditorUI message:", method: Source);
-            Logger.LogInfo($"[{Source}] \"{message}\".");
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, $"Error setting EditorUI message: {message.Format(false)}");
             return false;
         }
         finally
@@ -178,8 +178,7 @@ public static class EditorMessage
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error setting EditorUI message.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, "Error setting EditorUI message.");
             return false;
         }
         finally

@@ -1,7 +1,6 @@
-﻿using SDG.NetPak;
-
-using DevkitServer.Multiplayer.Networking;
+﻿using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Plugins;
+using SDG.NetPak;
 
 namespace DevkitServer.API.Multiplayer;
 
@@ -49,22 +48,22 @@ public interface ICustomNetMessageListener
 
         if (!reader.ReadUInt16(out ushort len))
         {
-            Assembly.LogWarning("Received invalid message, can't read length"
+            Assembly.LogWarning("Invoke " + GetType().Name, "Received invalid message, can't read length"
 #if SERVER
                               + $" from {connection.Format()}"
 #endif
-                              + "."
-                , method: "Invoke " + GetType().Name);
+                                                          + "."
+                );
             return;
         }
         if (!reader.ReadBytesPtr(len, out byte[] buffer, out int offset))
         {
-            Assembly.LogWarning($"Received invalid message, can't read bytes of length {len.Format()} B"
+            Assembly.LogWarning("Invoke " + GetType().Name, $"Received invalid message, can't read bytes of length {len.Format()} B"
 #if SERVER
                                 + $" from {connection.Format()}"
 #endif
                                 + $". Expected length <= {reader.RemainingSegmentLength.Format()}."
-                , method: "Invoke " + GetType().Name);
+                );
             return;
         }
 
@@ -78,8 +77,7 @@ public interface ICustomNetMessageListener
         }
         catch (Exception ex)
         {
-            Assembly.LogError($"Error invoking {GetType().Format()}.{nameof(OnInvoked).Colorize(FormattingColorType.Method)}.", method: "Invoke " + GetType().Name);
-            Assembly.LogError(ex, method: "Invoke " + GetType().Name);
+            Assembly.LogError("Invoke " + GetType().Name, ex, $"Error invoking {GetType().Format()}.{nameof(OnInvoked).Colorize(FormattingColorType.Method)}.");
         }
     }
 }

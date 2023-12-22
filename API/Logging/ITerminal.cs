@@ -1,4 +1,4 @@
-﻿namespace DevkitServer.API.Logging.Terminals;
+﻿namespace DevkitServer.API.Logging;
 
 /// <summary>
 /// Represents a command line interface.
@@ -23,7 +23,7 @@ public interface ITerminal
     /// <summary>
     /// Write or queue a write for command line data.
     /// </summary>
-    void Write(string input, ConsoleColor color, bool save, Severity severity);
+    void Write(ReadOnlySpan<char> input, ConsoleColor? color, bool saveToUnturnedLog, Severity severity);
 
     /// <summary>
     /// Called on start.
@@ -36,8 +36,8 @@ public interface ITerminal
     void Close();
 }
 
-public delegate void TerminalPreReadDelegate(string inputMessage, ref bool shouldHandle);
-public delegate void TerminalPostReadDelegate(string inputMessage);
+public delegate void TerminalPreReadDelegate(ReadOnlySpan<char> inputMessage, ref bool shouldHandle);
+public delegate void TerminalPostReadDelegate(ReadOnlySpan<char> inputMessage);
 
-public delegate void TerminalPreWriteDelegate(ref string outputMessage, ref ConsoleColor color);
-public delegate void TerminalPostWriteDelegate(string outputMessage, ConsoleColor color);
+public delegate void TerminalPreWriteDelegate(ref ReadOnlySpan<char> outputMessage, ref ConsoleColor? color, Severity severity);
+public delegate void TerminalPostWriteDelegate(ReadOnlySpan<char> outputMessage, ConsoleColor? color, Severity severity);

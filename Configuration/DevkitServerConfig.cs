@@ -1,16 +1,16 @@
 ﻿using DevkitServer.API;
 using DevkitServer.API.Permissions;
+using DevkitServer.Configuration.Converters;
+using DevkitServer.Util.Encoding;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using DevkitServer.Configuration.Converters;
-using DevkitServer.Util.Encoding;
 #if CLIENT
-using System.Globalization;
 using DevkitServer.Multiplayer;
 #endif
 
 namespace DevkitServer.Configuration;
+
 [EarlyTypeInit(-1)]
 public class DevkitServerConfig
 {
@@ -20,7 +20,7 @@ public class DevkitServerConfig
     private static readonly JavaScriptEncoder Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
 
     private static readonly JsonConverter[] Converters =
-    {
+    [
         new QuaternionJsonConverter(),
         new Vector4JsonConverter(),
         new Vector3JsonConverter(),
@@ -34,7 +34,7 @@ public class DevkitServerConfig
         new PermissionGroupConverter(),
         new AssetReferenceJsonConverterFactory(),
         new TimeSpanConverter()
-    };
+    ];
 
     public static readonly JsonSerializerOptions SerializerSettings = new JsonSerializerOptions
     {
@@ -114,12 +114,12 @@ public class DevkitServerConfig
     [CreateDirectory]
     public static readonly string CommandLocalizationFilePath = Path.Combine(LocalizationFilePath, "Commands");
 
-    private static SystemConfig? _config;
-    public static SystemConfig Config
+    private static DevkitServerSystemConfig? _config;
+    public static DevkitServerSystemConfig Config
     {
         get
         {
-            SystemConfig? cfg = _config;
+            DevkitServerSystemConfig? cfg = _config;
             if (cfg != null)
                 return cfg;
 
@@ -141,7 +141,7 @@ public class DevkitServerConfig
 #endif
     public static void ResetToDefaults()
     {
-        (_config ??= new SystemConfig()).SetDefaults();
+        (_config ??= new DevkitServerSystemConfig()).SetDefaults();
         Save();
     }
     public static void Reload()
@@ -163,10 +163,10 @@ public class DevkitServerConfig
             if (Path.GetDirectoryName(path) is { } dir)
                 System.IO.Directory.CreateDirectory(dir);
             using FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
-            SystemConfig? config = _config;
+            DevkitServerSystemConfig? config = _config;
             if (config == null)
             {
-                config = new SystemConfig();
+                config = new DevkitServerSystemConfig();
                 config.SetDefaults();
             }
             Utf8JsonWriter writer = new Utf8JsonWriter(fs, WriterOptions);
@@ -175,12 +175,19 @@ public class DevkitServerConfig
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error writing config file: \"" + ConfigFilePath + "\".", method: Source);
-            Logger.LogError(ex, method: Source);
+            if (DevkitServerModule.InitializedLogging)
+            {
+                Logger.DevkitServer.LogError(Source, ex, $"Error writing config file: {ConfigFilePath.Format()}.");
+            }
+            else
+            {
+                CommandWindow.LogError($"[{Source}] Error writing config file: \"{ConfigFilePath}\".");
+                CommandWindow.LogError(ex);
+            }
         }
     }
 
-    private static SystemConfig Read()
+    private static DevkitServerSystemConfig Read()
     {
         ThreadUtil.assertIsGameThread();
 
@@ -204,7 +211,7 @@ public class DevkitServerConfig
                         File.Copy(modulePath, path, false);
 
                         if (DevkitServerModule.InitializedLogging)
-                            Logger.LogInfo($"[{Source}] Copied default config file from: \"{modulePath}\".");
+                            Logger.DevkitServer.LogInfo(Source, $"Copied default config file from: {modulePath.Format()}.");
                         else
                             CommandWindow.Log($"[{Source}] Copied default config file from: \"{modulePath}\".");
                     }
@@ -214,12 +221,11 @@ public class DevkitServerConfig
             {
                 if (DevkitServerModule.InitializedLogging)
                 {
-                    Logger.LogError("Error copying default config file: \"" + ConfigFilePath + "\".", method: Source);
-                    Logger.LogError(ex, method: Source);
+                    Logger.DevkitServer.LogError(Source, ex, $"Error copying default config file: {ConfigFilePath.Format()}.");
                 }
                 else
                 {
-                    CommandWindow.LogError("Error copying default config file: \"" + ConfigFilePath + "\".");
+                    CommandWindow.LogError($"[{Source}] Error copying default config file: \"" + ConfigFilePath + "\".");
                     CommandWindow.LogError(ex);
                 }
             }
@@ -233,7 +239,7 @@ public class DevkitServerConfig
                 if (bytes.Length > 0)
                 {
                     Utf8JsonReader reader = new Utf8JsonReader(bytes, ReaderOptions);
-                    return JsonSerializer.Deserialize<SystemConfig>(ref reader, SerializerSettings) ?? throw new JsonException("Failed to read SystemConfig: returned null.");
+                    return JsonSerializer.Deserialize<DevkitServerSystemConfig>(ref reader, SerializerSettings) ?? throw new JsonException("Failed to read SystemConfig: returned null.");
                 }
             }
         }
@@ -241,12 +247,11 @@ public class DevkitServerConfig
         {
             if (DevkitServerModule.InitializedLogging)
             {
-                Logger.LogError("Error reading config file: \"" + ConfigFilePath + "\".", method: Source);
-                Logger.LogError(ex, method: Source);
+                Logger.DevkitServer.LogError(Source, ex, $"Error reading config file: {ConfigFilePath.Format()}.");
             }
             else
             {
-                CommandWindow.LogError("Error reading config file: \"" + ConfigFilePath + "\".");
+                CommandWindow.LogError($"[{Source}] Error reading config file: \"{ConfigFilePath}\".");
                 CommandWindow.LogError(ex);
             }
 
@@ -274,26 +279,25 @@ public class DevkitServerConfig
             {
                 if (DevkitServerModule.InitializedLogging)
                 {
-                    Logger.LogError("Error backing up config file from: \"" + ConfigFilePath + "\".", method: Source);
-                    Logger.LogError(ex2, method: Source);
+                    Logger.DevkitServer.LogError(Source, ex2, $"Error backing up config file from: {ConfigFilePath.Format()}.");
                 }
                 else
                 {
-                    CommandWindow.LogError("Error backing up config file from: \"" + ConfigFilePath + "\".");
+                    CommandWindow.LogError($"[{Source}] Error backing up config file from: \"{ConfigFilePath}\".");
                     CommandWindow.LogError(ex);
                 }
             }
 #if SERVER
             if (DevkitServerModule.InitializedLogging)
-                Logger.LogWarning("Server startup halted... fix the config errors or retart the server to use a clean config.", method: Source);
+                Logger.DevkitServer.LogWarning(Source, "Server startup halted... fix the config errors or retart the server to use a clean config.");
             else
-                CommandWindow.LogWarning("Server startup halted... fix the config errors or retart the server to use a clean config.");
+                CommandWindow.LogWarning($"[{Source}] Server startup halted... fix the config errors or retart the server to use a clean config.");
 
             DevkitServerModule.Fault();
 #endif
         }
 
-        SystemConfig config = new SystemConfig();
+        DevkitServerSystemConfig config = new DevkitServerSystemConfig();
         config.SetDefaults();
         return config;
     }
@@ -302,6 +306,7 @@ public class DevkitServerConfig
     /// </summary>
     public static void ClearTempFolder()
     {
+        Logger.DevkitServer.LogDebug(nameof(ClearTempFolder), "Clearing temporary folders.");
         try
         {
             string tempFolder = TempFolder;
@@ -311,15 +316,19 @@ public class DevkitServerConfig
                 return;
             }
             DirectoryInfo dir = new DirectoryInfo(tempFolder);
-            TryDeleteRecursive(dir, false);
+            TryDeleteRecursive(dir, false, true);
+            string dsPath = Directory;
+            foreach (string folder in System.IO.Directory.EnumerateDirectories(dsPath, "Temp_*", SearchOption.TopDirectoryOnly))
+            {
+                TryDeleteRecursive(new DirectoryInfo(folder), true, true);
+            }
         }
         catch (Exception ex)
         {
-            Logger.LogError("Error clearing temp folder.", method: Source);
-            Logger.LogError(ex, method: Source);
+            Logger.DevkitServer.LogError(Source, ex, "Error clearing temp folder.");
         }
     }
-    private static bool TryDeleteRecursive(DirectoryInfo dir, bool del)
+    private static bool TryDeleteRecursive(DirectoryInfo dir, bool del, bool root)
     {
         try
         {
@@ -328,37 +337,43 @@ public class DevkitServerConfig
             {
                 if (entry is DirectoryInfo dir2)
                 {
-                    anyFail |= TryDeleteRecursive(dir2, true);
+                    anyFail |= TryDeleteRecursive(dir2, true, false);
+                    if (root)
+                        Logger.DevkitServer.LogDebug(nameof(ClearTempFolder), $"Removed temporary folder: {Path.GetRelativePath(TempFolder, dir2.FullName).Format(false)}.");
                 }
                 else if (entry is FileInfo file)
                 {
                     try
                     {
                         file.Delete();
+                        if (root)
+                            Logger.DevkitServer.LogDebug(nameof(ClearTempFolder), $"Removed temporary file: {Path.GetRelativePath(TempFolder, file.FullName).Format(false)}.");
                     }
                     catch (Exception ex)
                     {
-                        Logger.LogError($" • Error deleting file: {file.FullName.Format(true)}.", method: Source);
-                        Logger.LogError($"   + {ex.GetType().Format()} - {ex.Message.Format(false)}{(ex.Message.EndsWith(".") ? string.Empty : ".")}", method: Source);
+                        Logger.DevkitServer.LogError(Source, $" • Error deleting file: {file.FullName.Format(true)}.");
+                        Logger.DevkitServer.LogError(Source, $"   + {ex.GetType().Format()} - {ex.Message.Format(false)}{(ex.Message.EndsWith(".") ? string.Empty : ".")}");
                         anyFail = true;
                     }
                 }
             }
 
             if (!anyFail && del)
+            {
                 dir.Delete(false);
+            }
             
             return anyFail;
         }
         catch (Exception ex)
         {
-            Logger.LogError($" • Error deleting folder: {dir.FullName.Format(true)}.", method: Source);
-            Logger.LogError($"   + {ex.GetType().Format()} - {ex.Message.Format(false)}{(ex.Message.EndsWith(".") ? string.Empty : ".")}", method: Source);
+            Logger.DevkitServer.LogError(Source, $" • Error deleting folder: {dir.FullName.Format(true)}.");
+            Logger.DevkitServer.LogError(Source, $"   + {ex.GetType().Format()} - {ex.Message.Format(false)}{(ex.Message.EndsWith(".") ? string.Empty : ".")}");
             return true;
         }
     }
 }
-public class SystemConfig : SchemaConfiguration
+public class DevkitServerSystemConfig : SchemaConfiguration
 {
 #if SERVER
     protected override string GetSchemaURI() => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/server_config_schema.json", true);
@@ -367,11 +382,11 @@ public class SystemConfig : SchemaConfiguration
 #endif
 
 #nullable disable
-    [JsonPropertyName("extended_visual_ansi_support")]
-    public bool ConsoleExtendedVisualANSISupport { get; set; }
+    [JsonPropertyName("terminal_full_rgb_support")]
+    public bool ConsoleFullRGBSupport { get; set; }
 
-    [JsonPropertyName("visual_ansi_support")]
-    public bool ConsoleVisualANSISupport { get; set; }
+    [JsonPropertyName("terminal_virtual_sequence_support")]
+    public bool ConsoleVirtualSequenceSupport { get; set; }
 
     [JsonPropertyName("walmart_pc_support")]
     public bool RemoveCosmeticImprovements { get; set; }
@@ -379,12 +394,18 @@ public class SystemConfig : SchemaConfiguration
     [JsonPropertyName("ansi_log")]
     public bool ANSILog { get; set; }
 
+    [JsonPropertyName("debug_logging")]
+    public bool DebugLogging { get; set; }
+
 #if CLIENT
     [JsonPropertyName("enable_object_ui_extension")]
     public bool EnableObjectUIExtension { get; set; }
 
     [JsonPropertyName("enable_better_map_creation")]
     public bool EnableBetterLevelCreation { get; set; }
+
+    [JsonPropertyName("disable_terminal")]
+    public bool DisableTerminal { get; set; }
 
     /// <summary>
     /// Key used to toggle the Live Editor checkbox.
@@ -444,10 +465,12 @@ public class SystemConfig : SchemaConfiguration
 #endif
     public void SetDefaults()
     {
-        ConsoleExtendedVisualANSISupport = true;
-        ConsoleVisualANSISupport = true;
+        ConsoleFullRGBSupport = true;
+        ConsoleVirtualSequenceSupport = true;
         RemoveCosmeticImprovements = false;
+        DebugLogging = false;
 #if CLIENT
+        DisableTerminal = false;
         EnableObjectUIExtension = true;
         EnableBetterLevelCreation = true;
         LevelObjectEditKeybind = KeyCode.F8;

@@ -28,8 +28,8 @@ public static class HierarchyItemTypeIdentifierEx
             pluginSource = PluginLoader.FindPluginForAssembly(caller);
             if (pluginSource == null)
             {
-                Logger.LogError("Unable to link " + type.Format() + " to a plugin. Use the " + typeof(PluginIdentifierAttribute).Format() +
-                                 " to link a hierarchy item identifier factory to a plugin when multiple plugins are loaded from an assembly.", method: Source);
+                Logger.DevkitServer.LogError(Source, "Unable to link " + type.Format() + " to a plugin. Use the " + typeof(PluginIdentifierAttribute).Format() +
+                                                     " to link a hierarchy item identifier factory to a plugin when multiple plugins are loaded from an assembly.");
                 return false;
             }
         }
@@ -65,21 +65,21 @@ public static class HierarchyItemTypeIdentifierEx
             IDevkitServerPlugin? pluginSource = PluginLoader.FindPluginForMember(type);
 
             if (pluginSource != null)
-                pluginSource.LogInfo($"Registered hierarchy item identifier factory: {type.Format()}.");
+                pluginSource.LogInfo(Source, $"Registered hierarchy item identifier factory: {type.Format()}.");
             else if (type.Assembly == Accessor.DevkitServer)
-                Logger.LogInfo($"Registered hierarchy item identifier factory: {type.Format()}.");
+                Logger.DevkitServer.LogInfo(Source, $"Registered hierarchy item identifier factory: {type.Format()}.");
             else
-                Logger.LogInfo($"Registered hierarchy item identifier factory: {type.Format()} from {type.Assembly}.");
+                Logger.DevkitServer.LogInfo(Source, $"Registered hierarchy item identifier factory: {type.Format()} from {type.Assembly}.");
 
             if (removed.HasValue)
             {
                 Type removedType = removed.Value.Type;
                 if (removed.Value.Plugin != null)
-                    removed.Value.Plugin.LogDebug($" + Deregistered duplicate hierarchy item identifier factory: {removedType.Format()}.");
+                    removed.Value.Plugin.LogDebug(Source, $" + Deregistered duplicate hierarchy item identifier factory: {removedType.Format()}.");
                 else if (removedType.Assembly == Accessor.DevkitServer)
-                    Logger.LogDebug($" + Deregistered duplicate hierarchy item identifier factory: {removedType.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $" + Deregistered duplicate hierarchy item identifier factory: {removedType.Format()}.");
                 else
-                    Logger.LogDebug($" + Deregistered duplicate hierarchy item identifier factory: {removedType.Format()} from {removedType.Assembly.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $" + Deregistered duplicate hierarchy item identifier factory: {removedType.Format()} from {removedType.Assembly.Format()}.");
             }
         }
     }
@@ -101,11 +101,11 @@ public static class HierarchyItemTypeIdentifierEx
 
                 Type removedType = info.Type;
                 if (info.Plugin != null)
-                    info.Plugin.LogInfo($"Deregistered hierarchy item identifier factory: {removedType.Format()}.");
+                    info.Plugin.LogInfo(Source, $"Deregistered hierarchy item identifier factory: {removedType.Format()}.");
                 else if (removedType.Assembly == Accessor.DevkitServer)
-                    Logger.LogDebug($"Deregistered hierarchy item identifier factory: {removedType.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"Deregistered hierarchy item identifier factory: {removedType.Format()}.");
                 else
-                    Logger.LogDebug($"Deregistered hierarchy item identifier factory: {removedType.Format()} from {removedType.Assembly.Format()}.");
+                    Logger.DevkitServer.LogDebug(Source, $"Deregistered hierarchy item identifier factory: {removedType.Format()} from {removedType.Assembly.Format()}.");
             }
         }
 
@@ -166,12 +166,9 @@ public static class HierarchyItemTypeIdentifierEx
                     else
                     {
                         if (type.Assembly == Accessor.DevkitServer)
-                            Logger.LogError($"Error in hierarchy item identifier factory: {type.Format()}.");
+                            Logger.DevkitServer.LogError(Source, ex, $"Error in hierarchy item identifier factory: {type.Format()}.");
                         else
-                            Logger.LogError(
-                                $"Error in hierarchy item identifier factory: {type.Format()} from {type.Assembly.Format()}.");
-
-                        Logger.LogError(ex);
+                            Logger.DevkitServer.LogError(Source, ex, $"Error in hierarchy item identifier factory: {type.Format()} from {type.Assembly.Format()}.");
                     }
                 }
             }
@@ -222,7 +219,7 @@ public static class HierarchyItemTypeIdentifierEx
         };
         if (val == null)
         {
-            Logger.LogWarning($"Failed to read identifier type: {type2?.Format() ?? type.Format()}.", method: Source);
+            Logger.DevkitServer.LogWarning(Source, $"Failed to read identifier type: {type2?.Format() ?? type.Format()}.");
             return null;
         }
 
@@ -242,15 +239,15 @@ public static class HierarchyItemTypeIdentifierEx
             ConstructorInfo? ctor = type.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
             if (ctor == null)
             {
-                Logger.LogError($"Unable to instantiate hierarchy item identifier factory {type.Format()} because it does not have a default constructor.", method: Source);
+                Logger.DevkitServer.LogError(Source, $"Unable to instantiate hierarchy item identifier factory {type.Format()} because it does not have a default constructor.");
                 continue;
             }
 
             IDevkitServerPlugin? pluginSource = PluginLoader.FindPluginForMember(type);
             if (pluginSource == null)
             {
-                Logger.LogError("Unable to link " + type.Format() + " to a plugin. Use the " + typeof(PluginIdentifierAttribute).Format() +
-                                " to link a hierarchy item identifier factory to a plugin when multiple plugins are loaded from an assembly.", method: Source);
+                Logger.DevkitServer.LogError(Source, "Unable to link " + type.Format() + " to a plugin. Use the " + typeof(PluginIdentifierAttribute).Format() +
+                                                     " to link a hierarchy item identifier factory to a plugin when multiple plugins are loaded from an assembly.");
             }
 
             IHierarchyItemTypeIdentifierFactory factory = (IHierarchyItemTypeIdentifierFactory)Activator.CreateInstance(type, true);
@@ -463,7 +460,7 @@ public sealed class NodeItemTypeIdentifier : IHierarchyItemTypeIdentifier
             if (reader.Stream == null && !reader.HasFailed)
             {
                 reader.Goto(pos);
-                Logger.LogWarning($"Node type not found: {reader.ReadTypeInfo().Format()}.");
+                Logger.DevkitServer.LogWarning(nameof(NodeItemTypeIdentifier), $"Node type not found: {reader.ReadTypeInfo().Format()}.");
             }
             if (reader.ThrowOnError)
                 throw new Exception("Node type not found.");
@@ -481,7 +478,7 @@ public sealed class NodeItemTypeIdentifier : IHierarchyItemTypeIdentifier
             if (reader.Stream == null && !reader.HasFailed)
             {
                 reader.Goto(pos);
-                Logger.LogWarning($"Node type not found: {reader.ReadTypeInfo().Format()}.");
+                Logger.DevkitServer.LogWarning(nameof(NodeItemTypeIdentifier), $"Node type not found: {reader.ReadTypeInfo().Format()}.");
             }
 
             if (reader.ThrowOnError)
@@ -496,7 +493,7 @@ public sealed class NodeItemTypeIdentifier : IHierarchyItemTypeIdentifier
     {
         if (nodeType == null)
         {
-            Logger.LogWarning($"Unknown node type: {((object?)null).Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(NodeItemTypeIdentifier), $"Unknown node type: {((object?)null).Format()}.");
             return null;
         }
         if (typeof(AirdropDevkitNode).IsAssignableFrom(nodeType))
@@ -515,10 +512,10 @@ public sealed class NodeItemTypeIdentifier : IHierarchyItemTypeIdentifier
                      Accessor.AssemblyCSharp.GetType("SDG.Framework.Devkit." + nodeType.Name + "SystemV2", false, true) ??
                      Accessor.AssemblyCSharp.GetType("SDG.Framework.Devkit." + nodeType.Name + "System", false, true);
             if (t == null || !typeof(TempNodeSystemBase).IsAssignableFrom(t))
-                Logger.LogWarning($"Unknown node type: {nodeType.Format()}.");
+                Logger.DevkitServer.LogWarning(nameof(NodeItemTypeIdentifier), $"Unknown node type: {nodeType.Format()}.");
             else
             {
-                Logger.LogWarning($"Dynamically found system ({t.Format()}) from node: {nodeType.Format()}. This should be added to the cached list for performance.");
+                Logger.DevkitServer.LogWarning(nameof(NodeItemTypeIdentifier), $"Dynamically found system ({t.Format()}) from node: {nodeType.Format()}. This should be added to the cached list for performance.");
                 MethodInfo? getter = t.GetMethod("Get", BindingFlags.Static | BindingFlags.Public | BindingFlags.IgnoreCase);
                 if (getter == null || !getter.IsStatic || !t.IsAssignableFrom(getter.ReturnType) || getter.GetParameters().Length != 0)
                 {
@@ -529,7 +526,7 @@ public sealed class NodeItemTypeIdentifier : IHierarchyItemTypeIdentifier
                         getter = instanceProperty?.GetGetMethod();
                         if (instanceProperty == null || getter == null || !getter.IsStatic || !t.IsAssignableFrom(getter.ReturnType))
                         {
-                            Logger.LogError($"Unable to get instance of node system: {t}.");
+                            Logger.DevkitServer.LogError(nameof(NodeItemTypeIdentifier), $"Unable to get instance of node system: {t}.");
                             return null;
                         }
 
@@ -542,8 +539,7 @@ public sealed class NodeItemTypeIdentifier : IHierarchyItemTypeIdentifier
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error getting node system for {nodeType.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(nameof(NodeItemTypeIdentifier), ex, $"Error getting node system for {nodeType.Format()}.");
         }
 
         return null;
@@ -629,7 +625,7 @@ public sealed class VolumeItemTypeIdentifier : IHierarchyItemTypeIdentifier
             if (reader.Stream == null && !reader.HasFailed)
             {
                 reader.Goto(pos);
-                Logger.LogWarning($"Node type not found: {reader.ReadTypeInfo().Format()}.");
+                Logger.DevkitServer.LogWarning(nameof(VolumeItemTypeIdentifier), $"Node type not found: {reader.ReadTypeInfo().Format()}.");
             }
             if (reader.ThrowOnError)
                 throw new Exception("Node type not found.");
@@ -645,7 +641,7 @@ public sealed class VolumeItemTypeIdentifier : IHierarchyItemTypeIdentifier
             if (reader.Stream == null && !reader.HasFailed)
             {
                 reader.Goto(pos);
-                Logger.LogWarning($"Node type not found: {reader.ReadTypeInfo().Format()}.");
+                Logger.DevkitServer.LogWarning(nameof(VolumeItemTypeIdentifier), $"Node type not found: {reader.ReadTypeInfo().Format()}.");
             }
 
             if (reader.ThrowOnError)
@@ -659,7 +655,7 @@ public sealed class VolumeItemTypeIdentifier : IHierarchyItemTypeIdentifier
     {
         if (manager == null)
         {
-            Logger.LogWarning($"Unknown volume manager type: {((object?)null).Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(VolumeItemTypeIdentifier), $"Unknown volume manager type: {((object?)null).Format()}.");
             return null;
         }
 
@@ -727,7 +723,7 @@ public sealed class VolumeItemTypeIdentifier : IHierarchyItemTypeIdentifier
                 Type gen = gens[i];
                 if (typeof(VolumeBase).IsAssignableFrom(gen) && gen != typeof(VolumeBase))
                 {
-                    Logger.LogInfo($"Dynamically found volume ({gen.Format()}) from manager: {manager.GetType().Format()}. This should be added to the cached list for performance.");
+                    Logger.DevkitServer.LogInfo(nameof(VolumeItemTypeIdentifier), $"Dynamically found volume ({gen.Format()}) from manager: {manager.GetType().Format()}. This should be added to the cached list for performance.");
                     return gen;
                 }
             }
@@ -739,7 +735,7 @@ public sealed class VolumeItemTypeIdentifier : IHierarchyItemTypeIdentifier
         if (type != null && type.IsGenericType && type.GetGenericTypeDefinition() == typeof(VolumeManager<,>))
         {
             type = type.GetGenericArguments()[0];
-            Logger.LogInfo($"Dynamically found volume ({type.Format()}) from manager: {manager.GetType().Format()}. This should be added to the cached list for performance.");
+            Logger.DevkitServer.LogInfo(nameof(VolumeItemTypeIdentifier), $"Dynamically found volume ({type.Format()}) from manager: {manager.GetType().Format()}. This should be added to the cached list for performance.");
             return type;
         }
 
@@ -756,7 +752,7 @@ public sealed class VolumeItemTypeIdentifier : IHierarchyItemTypeIdentifier
     {
         if (nodeType == null)
         {
-            Logger.LogWarning($"Unknown volume type: {((object?)null).Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(VolumeItemTypeIdentifier), $"Unknown volume type: {((object?)null).Format()}.");
             return null;
         }
         if (typeof(AmbianceVolume).IsAssignableFrom(nodeType))
@@ -820,10 +816,10 @@ public sealed class VolumeItemTypeIdentifier : IHierarchyItemTypeIdentifier
                      Accessor.AssemblyCSharp.GetType("SDG.Framework.Devkit." + nodeType.Name + "ManagerV2", false, true) ??
                      Accessor.AssemblyCSharp.GetType("SDG.Framework.Devkit." + nodeType.Name + "Manager", false, true);
             if (t == null || !typeof(VolumeManagerBase).IsAssignableFrom(t))
-                Logger.LogWarning($"Unknown volume type: {nodeType.Format()}.");
+                Logger.DevkitServer.LogWarning(nameof(VolumeItemTypeIdentifier), $"Unknown volume type: {nodeType.Format()}.");
             else
             {
-                Logger.LogInfo($"Dynamically found manager ({t.Format()}) from volume: {nodeType.Format()}. This should be added to the cached list for performance.");
+                Logger.DevkitServer.LogInfo(nameof(VolumeItemTypeIdentifier), $"Dynamically found manager ({t.Format()}) from volume: {nodeType.Format()}. This should be added to the cached list for performance.");
                 MethodInfo? getter = t.GetMethod("Get", BindingFlags.Static | BindingFlags.Public | BindingFlags.IgnoreCase);
                 if (getter == null || !getter.IsStatic || !t.IsAssignableFrom(getter.ReturnType) || getter.GetParameters().Length != 0)
                 {
@@ -834,7 +830,7 @@ public sealed class VolumeItemTypeIdentifier : IHierarchyItemTypeIdentifier
                         getter = instanceProperty?.GetGetMethod();
                         if (instanceProperty == null || getter == null || !getter.IsStatic || !t.IsAssignableFrom(getter.ReturnType))
                         {
-                            Logger.LogError($"Unable to get instance of volume manager: {t}.");
+                            Logger.DevkitServer.LogError(nameof(VolumeItemTypeIdentifier), $"Unable to get instance of volume manager: {t}.");
                             return null;
                         }
 
@@ -847,8 +843,7 @@ public sealed class VolumeItemTypeIdentifier : IHierarchyItemTypeIdentifier
         }
         catch (Exception ex)
         {
-            Logger.LogError($"Error getting volume manager for {nodeType.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError(nameof(VolumeItemTypeIdentifier), ex, $"Error getting volume manager for {nodeType.Format()}.");
         }
 
         return null;

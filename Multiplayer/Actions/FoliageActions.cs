@@ -12,6 +12,7 @@ using DevkitServer.Players;
 namespace DevkitServer.Multiplayer.Actions;
 public sealed class FoliageActions
 {
+    internal const string Source = "FOLIAGE ACTIONS";
     public EditorActions EditorActions { get; }
     internal FoliageActions(EditorActions actions)
     {
@@ -93,7 +94,7 @@ public sealed class FoliageActions
         }
         else
         {
-            Logger.LogWarning("Unknown region for object " + properties.LevelObject.asset?.FriendlyName.Format() + " #" + properties.LevelObject.instanceID + ".");
+            Logger.DevkitServer.LogWarning(Source, "Unknown region for object " + properties.LevelObject.asset?.FriendlyName.Format() + " #" + properties.LevelObject.instanceID + ".");
         }
     }
 #endif
@@ -128,7 +129,7 @@ public sealed class AddFoliageToSurfaceAction : IServersideAction, IAssetAction
     {
         if (ExecuteAddFoliage == null)
         {
-            Logger.LogWarning("Unable to add foliage asset: " + FoliageAsset.Format() + ", reflection failure on load.");
+            Logger.DevkitServer.LogWarning(FoliageActions.Source, "Unable to add foliage asset: " + FoliageAsset.Format() + ", reflection failure on load.");
             return;
         }
         if (FoliageAsset.Find() is { } asset)
@@ -141,7 +142,7 @@ public sealed class AddFoliageToSurfaceAction : IServersideAction, IAssetAction
                 LevelObject obj = ObjectManager.getObject(x, y, (ushort)(region.Count - 1));
                 if (obj == null || obj.asset.GUID != objAsset.obj.GUID)
                 {
-                    Logger.LogWarning($"Unable to find object placed by {Instigator.Format()} in add foliage action.");
+                    Logger.DevkitServer.LogWarning(FoliageActions.Source, $"Unable to find object placed by {Instigator.Format()} in add foliage action.");
                     return;
                 }
                 if (!NetId.IsNull())
@@ -158,7 +159,7 @@ public sealed class AddFoliageToSurfaceAction : IServersideAction, IAssetAction
         }
         else
         {
-            Logger.LogWarning("Unknown foliage asset: " + FoliageAsset.Format() + ".");
+            Logger.DevkitServer.LogWarning(FoliageActions.Source, "Unknown foliage asset: " + FoliageAsset.Format() + ".");
         }
     }
 #if SERVER
@@ -250,12 +251,12 @@ public sealed class RemoveFoliageInstancesAction : IAction, ICoordinatesAction, 
 
         if (tile == null)
         {
-            Logger.LogWarning("Unknown foliage tile: (" + CoordinateX.Format() + ", " + CoordinateY.Format() + ").");
+            Logger.DevkitServer.LogWarning(FoliageActions.Source, "Unknown foliage tile: (" + CoordinateX.Format() + ", " + CoordinateY.Format() + ").");
             return;
         }
         if (!tile.instances.TryGetValue(FoliageAsset, out FoliageInstanceList list))
         {
-            Logger.LogWarning("Tile missing foliage " + (FoliageAsset.Find()?.FriendlyName ?? "NULL") + ": (" + CoordinateX.Format() + ", " + CoordinateY.Format() + ").");
+            Logger.DevkitServer.LogWarning(FoliageActions.Source, "Tile missing foliage " + (FoliageAsset.Find()?.FriendlyName ?? "NULL") + ": (" + CoordinateX.Format() + ", " + CoordinateY.Format() + ").");
             return;
         }
         bool hierarchyIsDirty = false;
@@ -270,21 +271,21 @@ public sealed class RemoveFoliageInstancesAction : IAction, ICoordinatesAction, 
             List<bool> boolList = list.clearWhenBaked[index1];
             for (int index2 = matrix.Count - 1; index2 >= 0; --index2)
             {
-                if (!boolList[index2] || AllowRemoveBaked)
-                {
-                    Vector3 position = matrix[index2].GetPosition();
-                    float sqrMagnitude = (position - BrushPosition).sqrMagnitude;
-                    if (sqrMagnitude < sqrBrushRadius)
-                    {
-                        bool outOfFalloff = sqrMagnitude < sqrBrushFalloffRadius;
-                        if (outOfFalloff && sampleCount > 0)
-                        {
-                            tile.removeInstance(list, index1, index2);
-                            --sampleCount;
-                            hierarchyIsDirty = true;
-                        }
-                    }
-                }
+                if (boolList[index2] && !AllowRemoveBaked)
+                    continue;
+
+                Vector3 position = matrix[index2].GetPosition();
+                float sqrMagnitude = (position - BrushPosition).sqrMagnitude;
+                if (!(sqrMagnitude < sqrBrushRadius))
+                    continue;
+
+                bool outOfFalloff = sqrMagnitude < sqrBrushFalloffRadius;
+                if (!outOfFalloff || sampleCount <= 0)
+                    continue;
+
+                tile.removeInstance(list, index1, index2);
+                --sampleCount;
+                hierarchyIsDirty = true;
             }
         }
         if (hierarchyIsDirty)
@@ -332,24 +333,24 @@ public sealed class RemoveResourceSpawnpointAction : IAction, IAssetAction
             for (int i = 0; i < region.Count; ++i)
             {
                 ResourceSpawnpoint sp = region[i];
-                if (sp.point.IsNearlyEqual(pos))
-                {
-                    if (sp.asset.GUID == FoliageAsset.GUID)
-                    {
-                        sp.destroy();
-                        region.RemoveAt(i);
-                        return;
-                    }
+                if (!sp.point.IsNearlyEqual(pos))
+                    continue;
 
-                    Logger.LogWarning("Found matching position but different GUID: " + (FoliageAsset.Find()?.FriendlyName ?? FoliageAsset.ToString()).Format() + " vs " + sp.asset.FriendlyName.Format() + ".");
+                if (sp.asset.GUID == FoliageAsset.GUID)
+                {
+                    sp.destroy();
+                    region.RemoveAt(i);
+                    return;
                 }
+
+                Logger.DevkitServer.LogWarning(FoliageActions.Source, "Found matching position but different GUID: " + (FoliageAsset.Find()?.FriendlyName ?? FoliageAsset.ToString()).Format() + " vs " + sp.asset.FriendlyName.Format() + ".");
             }
 
-            Logger.LogWarning("Resource not found: " + (FoliageAsset.Find()?.FriendlyName ?? FoliageAsset.ToString()).Format() + " at " + ResourcePosition.Format() + ".");
+            Logger.DevkitServer.LogWarning(FoliageActions.Source, "Resource not found: " + (FoliageAsset.Find()?.FriendlyName ?? FoliageAsset.ToString()).Format() + " at " + ResourcePosition.Format() + ".");
         }
         else
         {
-            Logger.LogWarning("Resource out of bounds: " + (FoliageAsset.Find()?.FriendlyName ?? FoliageAsset.ToString()).Format() + " at " + ResourcePosition.Format() + ".");
+            Logger.DevkitServer.LogWarning(FoliageActions.Source, "Resource out of bounds: " + (FoliageAsset.Find()?.FriendlyName ?? FoliageAsset.ToString()).Format() + " at " + ResourcePosition.Format() + ".");
         }
     }
 #if SERVER

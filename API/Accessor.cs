@@ -8,7 +8,6 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
-using DevkitServer.Plugins;
 
 namespace DevkitServer.API;
 
@@ -39,6 +38,7 @@ public static class Accessor
     private static MethodInfo? _logInfo;
     private static MethodInfo? _logWarning;
     private static MethodInfo? _logError;
+    private static MethodInfo? _logFatal;
     private static MethodInfo? _logException;
     private static MethodInfo? _getKeyDown;
     private static MethodInfo? _getKeyUp;
@@ -105,7 +105,7 @@ public static class Accessor
                 throw new Exception($"Unable to create instance setter for {typeof(TInstance).FullName}.{fieldName}, you must pass structs ({typeof(TInstance).Name}) as a boxed object.");
 
             if (LogErrorMessages)
-                Logger.LogError($"Unable to create instance setter for {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}, you must pass structs ({typeof(TInstance).Format()}) as a boxed object.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to create instance setter for {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}, you must pass structs ({typeof(TInstance).Format()}) as a boxed object.");
             return null;
         }
 
@@ -116,7 +116,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Unable to find matching field: {typeof(TInstance).FullName}.{fieldName}.");
             if (LogErrorMessages)
-                Logger.LogError($"Unable to find matching property {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to find matching property {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             return null;
         }
 
@@ -165,7 +165,7 @@ public static class Accessor
             InstanceSetter<TInstance, TValue> setter = (InstanceSetter<TInstance, TValue>)method.CreateDelegate(typeof(InstanceSetter<TInstance, TValue>));
 
             if (LogDebugMessages || LogILTraceMessages)
-                Logger.LogDebug($"[{source}] Created dynamic method instance setter for {field.Format()}.");
+                Logger.DevkitServer.LogDebug(source, $"Created dynamic method instance setter for {field.Format()}.");
 
             return setter;
         }
@@ -174,10 +174,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Error generating instance getter for {field.DeclaringType!.FullName}.{fieldName}.", ex);
             if (LogErrorMessages)
-            {
-                Logger.LogError($"Error generating instance getter for {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
-                Logger.LogError(ex, method: source);
-            }
+                Logger.DevkitServer.LogError(source, ex, $"Error generating instance getter for {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             return null;
         }
     }
@@ -201,7 +198,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Unable to find matching field: {typeof(TInstance).FullName}.{fieldName}.");
             if (LogErrorMessages)
-                Logger.LogError($"Unable to find matching property {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to find matching property {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             return null;
         }
 
@@ -226,7 +223,7 @@ public static class Accessor
             InstanceGetter<TInstance, TValue> getter = (InstanceGetter<TInstance, TValue>)method.CreateDelegate(typeof(InstanceGetter<TInstance, TValue>));
 
             if (LogDebugMessages || LogILTraceMessages)
-                Logger.LogDebug($"[{source}] Created dynamic method instance getter for {field.Format()}.");
+                Logger.DevkitServer.LogDebug(source, $"Created dynamic method instance getter for {field.Format()}.");
 
             return getter;
         }
@@ -237,8 +234,7 @@ public static class Accessor
 
             if (LogErrorMessages)
             {
-                Logger.LogError($"Error generating instance getter for {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
-                Logger.LogError(ex, method: source);
+                Logger.DevkitServer.LogError(source, ex, $"Error generating instance getter for {typeof(TInstance).Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             }
             return null;
         }
@@ -267,7 +263,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Error generating instance setter for <unknown>.{fieldName}. Declaring type not found.");
             if (LogErrorMessages)
-                Logger.LogError($"Error generating instance setter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
+                Logger.DevkitServer.LogError(source, $"Error generating instance setter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
             return null;
         }
         FieldInfo? field = declaringType.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
@@ -277,7 +273,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Unable to find matching field: {declaringType.FullName}.{fieldName}.");
             if (LogErrorMessages)
-                Logger.LogError($"Unable to find matching property {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to find matching property {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             return null;
         }
 
@@ -386,7 +382,7 @@ public static class Accessor
             InstanceSetter<object, TValue> setter = (InstanceSetter<object, TValue>)method.CreateDelegate(typeof(InstanceSetter<object, TValue>));
             
             if (LogDebugMessages || LogILTraceMessages)
-                Logger.LogDebug($"[{source}] Created dynamic method instance setter for {field.Format()}.");
+                Logger.DevkitServer.LogDebug(source, $"Created dynamic method instance setter for {field.Format()}.");
 
             return setter;
         }
@@ -396,8 +392,7 @@ public static class Accessor
                 throw new Exception($"Error generating instance setter for {declaringType.FullName}.{fieldName}.", ex);
             if (LogErrorMessages)
             {
-                Logger.LogError($"Error generating instance setter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
-                Logger.LogError(ex, method: source);
+                Logger.DevkitServer.LogError(source, ex, $"Error generating instance setter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             }
             return null;
         }
@@ -420,7 +415,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Error generating instance getter for <unknown>.{fieldName}. Declaring type not found.");
             if (LogErrorMessages)
-                Logger.LogError($"Error generating instance getter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
+                Logger.DevkitServer.LogError(source, $"Error generating instance getter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
             return null;
         }
         FieldInfo? field = declaringType.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
@@ -430,7 +425,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Unable to find matching field: {declaringType.FullName}.{fieldName}.");
             if (LogErrorMessages)
-                Logger.LogError($"Unable to find matching property {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to find matching property {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             return null;
         }
 
@@ -484,7 +479,7 @@ public static class Accessor
             InstanceGetter<object, TValue> getter = (InstanceGetter<object, TValue>)method.CreateDelegate(typeof(InstanceGetter<object, TValue>));
 
             if (LogDebugMessages || LogILTraceMessages)
-                Logger.LogDebug($"[{source}] Created dynamic method instance getter for {field.Format()}.");
+                Logger.DevkitServer.LogDebug(source, $"Created dynamic method instance getter for {field.Format()}.");
 
             return getter;
         }
@@ -494,8 +489,7 @@ public static class Accessor
                 throw new Exception($"Error generating instance getter for {declaringType.FullName}.{fieldName}.", ex);
             if (LogErrorMessages)
             {
-                Logger.LogError($"Error generating instance getter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
-                Logger.LogError(ex, method: source);
+                Logger.DevkitServer.LogError(source, ex, $"Error generating instance getter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             }
             return null;
         }
@@ -519,7 +513,7 @@ public static class Accessor
                 throw new Exception($"Unable to create instance setter for {typeof(TInstance).FullName}.{propertyName}, you must pass structs ({typeof(TInstance).Name}) as a boxed object.");
 
             if (LogErrorMessages)
-                Logger.LogError($"Unable to create instance setter for {typeof(TInstance).Format()}.{propertyName.Colorize(FormattingColorType.Property)}, you must pass structs ({typeof(TInstance).Format()}) as a boxed object.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to create instance setter for {typeof(TInstance).Format()}.{propertyName.Colorize(FormattingColorType.Property)}, you must pass structs ({typeof(TInstance).Format()}) as a boxed object.");
             return null;
         }
 
@@ -535,7 +529,7 @@ public static class Accessor
                 if (throwOnError)
                     throw new Exception($"Unable to find matching property: {typeof(TInstance).FullName}.{propertyName} with a setter.");
                 if (LogErrorMessages)
-                    Logger.LogError($"Unable to find matching property {typeof(TInstance).Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a setter.", method: source);
+                    Logger.DevkitServer.LogError(source, $"Unable to find matching property {typeof(TInstance).Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a setter.");
                 return null;
             }
         }
@@ -567,7 +561,7 @@ public static class Accessor
                 if (throwOnError)
                     throw new Exception($"Unable to find matching property: {typeof(TInstance).FullName}.{propertyName} with a getter.");
                 if (LogErrorMessages)
-                    Logger.LogError($"Unable to find matching property {typeof(TInstance).Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a getter.", method: source);
+                    Logger.DevkitServer.LogError(source, $"Unable to find matching property {typeof(TInstance).Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a getter.");
                 return null;
             }
         }
@@ -601,7 +595,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Error generating instance setter for <unknown>.{propertyName}. Declaring type not found.");
             if (LogErrorMessages)
-                Logger.LogError($"Error generating instance setter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
+                Logger.DevkitServer.LogError(source, $"Error generating instance setter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
             return null;
         }
         PropertyInfo? property = declaringType.GetProperty(propertyName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
@@ -616,7 +610,7 @@ public static class Accessor
                 if (throwOnError)
                     throw new Exception($"Unable to find matching property: {declaringType.FullName}.{propertyName} with a setter.");
                 if (LogErrorMessages)
-                    Logger.LogError($"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a setter.", method: source);
+                    Logger.DevkitServer.LogError(source, $"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a setter.");
                 return null;
             }
         }
@@ -644,7 +638,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Error generating instance getter for <unknown>.{propertyName}. Declaring type not found.");
             if (LogErrorMessages)
-                Logger.LogError($"Error generating instance getter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
+                Logger.DevkitServer.LogError(source, $"Error generating instance getter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
             return null;
         }
 
@@ -660,7 +654,7 @@ public static class Accessor
                 if (throwOnError)
                     throw new Exception($"Unable to find matching property: {declaringType.FullName}.{propertyName} with a getter.");
                 if (LogErrorMessages)
-                    Logger.LogError($"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a getter.", method: source);
+                    Logger.DevkitServer.LogError(source, $"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a getter.");
                 return null;
             }
         }
@@ -709,7 +703,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Error generating static setter for <unknown>.{fieldName}. Declaring type not found.");
             if (LogErrorMessages)
-                Logger.LogError($"Error generating static setter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
+                Logger.DevkitServer.LogError(source, $"Error generating static setter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
             return null;
         }
         FieldInfo? field = declaringType.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
@@ -719,7 +713,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Unable to find matching field: {declaringType.FullName}.{fieldName}.");
             if (LogErrorMessages)
-                Logger.LogError($"Unable to find matching field {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to find matching field {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             return null;
         }
 
@@ -765,7 +759,7 @@ public static class Accessor
             StaticSetter<TValue> setter = (StaticSetter<TValue>)method.CreateDelegate(typeof(StaticSetter<TValue>));
 
             if (LogDebugMessages || LogErrorMessages)
-                Logger.LogDebug($"[{source}] Created dynamic method static setter for {field.Format()}.");
+                Logger.DevkitServer.LogDebug(source, $"Created dynamic method static setter for {field.Format()}.");
 
             return setter;
         }
@@ -775,8 +769,7 @@ public static class Accessor
                 throw new Exception($"Error generating static setter for {declaringType.FullName}.{fieldName}.", ex);
             if (LogErrorMessages)
             {
-                Logger.LogError($"Error generating static setter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
-                Logger.LogError(ex, method: source);
+                Logger.DevkitServer.LogError(source, ex, $"Error generating static setter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             }
             return null;
         }
@@ -799,7 +792,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Error generating static getter for <unknown>.{fieldName}. Declaring type not found.");
             if (LogErrorMessages)
-                Logger.LogError($"Error generating static getter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
+                Logger.DevkitServer.LogError(source, $"Error generating static getter for <unknown>.{fieldName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
             return null;
         }
         FieldInfo? field = declaringType.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
@@ -809,7 +802,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Unable to find matching field: {declaringType.FullName}.{fieldName}.");
             if (LogErrorMessages)
-                Logger.LogError($"Unable to find matching property {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to find matching property {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             return null;
         }
 
@@ -831,7 +824,7 @@ public static class Accessor
             StaticGetter<TValue> getter = (StaticGetter<TValue>)method.CreateDelegate(typeof(StaticGetter<TValue>));
 
             if (LogDebugMessages || LogILTraceMessages)
-                Logger.LogDebug($"[{source}] Created dynamic method static getter for {field.Format()}.");
+                Logger.DevkitServer.LogDebug(source, $"Created dynamic method static getter for {field.Format()}.");
 
             return getter;
         }
@@ -841,8 +834,7 @@ public static class Accessor
                 throw new Exception($"Error generating static getter for {declaringType.FullName}.{fieldName}.", ex);
             if (LogErrorMessages)
             {
-                Logger.LogError($"Error generating static getter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.", method: source);
-                Logger.LogError(ex, method: source);
+                Logger.DevkitServer.LogError(source, ex, $"Error generating static getter for {declaringType.Format()}.{fieldName.Colorize(FormattingColorType.Property)}.");
             }
             return null;
         }
@@ -898,7 +890,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Error generating static setter for <unknown>.{propertyName}. Declaring type not found.");
             if (LogErrorMessages)
-                Logger.LogError($"Error generating static setter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
+                Logger.DevkitServer.LogError(source, $"Error generating static setter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
             return null;
         }
         PropertyInfo? property = declaringType.GetProperty(propertyName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
@@ -909,7 +901,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Unable to find matching property: {declaringType.FullName}.{propertyName} with a setter.");
             if (LogErrorMessages)
-                Logger.LogError($"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a setter.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a setter.");
             return null;
         }
 
@@ -936,7 +928,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Error generating static getter for <unknown>.{propertyName}. Declaring type not found.");
             if (LogErrorMessages)
-                Logger.LogError($"Error generating static getter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.", method: source);
+                Logger.DevkitServer.LogError(source, $"Error generating static getter for <unknown>.{propertyName.Colorize(FormattingColorType.Property)}. Declaring type not found.");
             return null;
         }
         PropertyInfo? property = declaringType.GetProperty(propertyName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
@@ -947,7 +939,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Unable to find matching property: {declaringType.FullName}.{propertyName} with a getter.");
             if (LogErrorMessages)
-                Logger.LogError($"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a getter.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to find matching property {declaringType.Format()}.{propertyName.Colorize(FormattingColorType.Property)} with a getter.");
             return null;
         }
 
@@ -997,7 +989,7 @@ public static class Accessor
                     throw new Exception($"Unable to find matching instance method: {typeof(TInstance).FullName}.{methodName}.");
 
                 if (LogErrorMessages)
-                    Logger.LogError($"Unable to find matching instance method: {FormattingUtil.FormatMethod(null, typeof(TInstance), methodName, null, parameters, null, isStatic: false)}.", method: source);
+                    Logger.DevkitServer.LogError(source, $"Unable to find matching instance method: {FormattingUtil.FormatMethod(null, typeof(TInstance), methodName, null, parameters, null, isStatic: false)}.");
                 return null;
             }
         }
@@ -1054,7 +1046,7 @@ public static class Accessor
                     throw new Exception($"Unable to find matching instance method: {typeof(TInstance).FullName}.{methodName}.");
 
                 if (LogErrorMessages)
-                    Logger.LogError($"Unable to find matching instance method: {FormattingUtil.FormatMethod<TDelegate>(methodName, declTypeOverride: typeof(TInstance))}.", method: source);
+                    Logger.DevkitServer.LogError(source, $"Unable to find matching instance method: {FormattingUtil.FormatMethod<TDelegate>(methodName, declTypeOverride: typeof(TInstance))}.");
                 return null;
             }
         }
@@ -1082,7 +1074,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception("Unable to find instance method.");
             if (LogErrorMessages)
-                Logger.LogError("Unable to find instance method.", method: source);
+                Logger.DevkitServer.LogError(source, "Unable to find instance method.");
             return null;
         }
 
@@ -1097,7 +1089,7 @@ public static class Accessor
                 throw new ArgumentException($"Method {method.DeclaringType.FullName}.{method.Name} can not have more than {maxArgs} arguments!", nameof(method));
 
             if (LogErrorMessages)
-                Logger.LogError($"Method {method.Format()} can not have more than {maxArgs.Format()} arguments!", method: source);
+                Logger.DevkitServer.LogError(source, $"Method {method.Format()} can not have more than {maxArgs.Format()} arguments!");
             return null;
         }
 
@@ -1143,7 +1135,7 @@ public static class Accessor
             if (throwOnError)
                 throw new Exception($"Unable to find instance method for delegate: {delegateType.FullName}.");
             if (LogErrorMessages)
-                Logger.LogError($"Unable to find matching instance method: {FormattingUtil.FormatMethod(delegateType, "<unknown-name>", isStatic: false)}.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to find matching instance method: {FormattingUtil.FormatMethod(delegateType, "<unknown-name>", isStatic: false)}.");
             return null;
         }
 
@@ -1169,7 +1161,7 @@ public static class Accessor
                 throw new Exception($"Unable to create instance caller for {instance.FullName}.{method.Name}: incompatable delegate type: {delegateType.FullName}.");
 
             if (LogErrorMessages)
-                Logger.LogError($"Unable to create instance caller for {method.Format()}: incompatable delegate type: {delegateType.Format()}.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to create instance caller for {method.Format()}: incompatable delegate type: {delegateType.Format()}.");
             return null;
         }
 
@@ -1194,15 +1186,15 @@ public static class Accessor
                 {
                     Delegate basicDelegate = method.CreateDelegate(delegateType);
                     if (LogDebugMessages || LogILTraceMessages)
-                        Logger.LogDebug($"[{source}] Created instance delegate caller for {method.Format()} of type {delegateType.Format()}.");
+                        Logger.DevkitServer.LogDebug(source, $"Created instance delegate caller for {method.Format()} of type {delegateType.Format()}.");
                     return basicDelegate;
                 }
                 catch (Exception ex)
                 {
                     if (LogDebugMessages || LogILTraceMessages)
                     {
-                        Logger.LogDebug($"[{source}] Unable to create basic delegate binding instance caller for {method.Format()}.");
-                        Logger.LogDebug($"[{source}] {ex.GetType().Format()} - {ex.Message.Format(false)}");
+                        Logger.DevkitServer.LogDebug(source, $"Unable to create basic delegate binding instance caller for {method.Format()}.");
+                        Logger.DevkitServer.LogDebug(source, $"{ex.GetType().Format()} - {ex.Message.Format(false)}");
                     }
                 }
             }
@@ -1214,7 +1206,7 @@ public static class Accessor
                 throw new Exception($"Unable to create instance caller for {instance}.{method.Name} (non-readonly), you must pass structs ({instance.FullName}) as a boxed object (in {delegateType.FullName}).");
 
             if (LogErrorMessages)
-                Logger.LogError($"Unable to create instance caller for {method.Format()} (non-{"readonly".Colorize(FormattingColorType.Keyword)}), you must pass structs ({instance.Format()}) as a boxed object (in {delegateType.Format()}).", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to create instance caller for {method.Format()} (non-{"readonly".Colorize(FormattingColorType.Keyword)}), you must pass structs ({instance.Format()}) as a boxed object (in {delegateType.Format()}).");
             return null;
         }
 
@@ -1241,15 +1233,15 @@ public static class Accessor
                     object d2 = FormatterServices.GetUninitializedObject(delegateType);
                     delegateType.GetConstructors()[0].Invoke(d2, new object[] { null!, ptr });
                     if (LogDebugMessages || LogILTraceMessages)
-                        Logger.LogDebug($"[{source}] Created instance delegate caller for {method.Format()} (using unsafe type binding) of type {delegateType.Format()}.");
+                        Logger.DevkitServer.LogDebug(source, $"Created instance delegate caller for {method.Format()} (using unsafe type binding) of type {delegateType.Format()}.");
                     return (Delegate)d2;
                 }
                 catch (Exception ex)
                 {
                     if (LogDebugMessages || LogILTraceMessages)
                     {
-                        Logger.LogDebug($"[{source}] Unable to create unsafely binded delegate binding instance caller for {method.Format()}.");
-                        Logger.LogDebug($"[{source}] {ex.GetType().Format()} - {ex.Message.Format(false)}");
+                        Logger.DevkitServer.LogDebug(source, $"Unable to create unsafely binded delegate binding instance caller for {method.Format()}.");
+                        Logger.DevkitServer.LogDebug(source, $"{ex.GetType().Format()} - {ex.Message.Format(false)}");
                     }
                 }
 #line default
@@ -1284,8 +1276,8 @@ public static class Accessor
 
         for (int i = 0; i < p.Length; ++i)
         {
-            generator.EmitParameter(source, i + 1, $"Invalid argument type passed to instance caller for {instance.FullName}.{method.Name} at parameter {i.ToString(CultureInfo.InvariantCulture)} ({p[i].Name}). " +
-                                                   $"Expected {p[i].ParameterType.FullName}.", false, type: parameterTypes[i + 1], p[i].ParameterType);
+            generator.EmitParameter(LogILTraceMessages ? source : null, i + 1, $"Invalid argument type passed to instance caller for {instance.FullName}.{method.Name} at parameter {i.ToString(CultureInfo.InvariantCulture)} ({p[i].Name}). " +
+                                                                               $"Expected {p[i].ParameterType.FullName}.", false, type: parameterTypes[i + 1], p[i].ParameterType);
         }
 
         generator.Emit(shouldCallvirt ? OpCodes.Callvirt : OpCodes.Call, method);
@@ -1316,7 +1308,7 @@ public static class Accessor
         {
             Delegate dynamicDelegate = dynMethod.CreateDelegate(delegateType);
             if (LogDebugMessages || LogILTraceMessages)
-                Logger.LogDebug($"[{source}] Created dynamic instance caller for {method.Format()} of type {delegateType.Format()}.");
+                Logger.DevkitServer.LogDebug(source, $"Created dynamic instance caller for {method.Format()} of type {delegateType.Format()}.");
             return dynamicDelegate;
         }
         catch (Exception ex)
@@ -1326,8 +1318,7 @@ public static class Accessor
 
             if (LogErrorMessages)
             {
-                Logger.LogError($"Unable to create instance caller for {method.Format()}.", method: source);
-                Logger.LogError(ex);
+                Logger.DevkitServer.LogError(source, ex, $"Unable to create instance caller for {method.Format()}.");
             }
             return null;
         }
@@ -1369,7 +1360,7 @@ public static class Accessor
                 if (throwOnError)
                     throw new Exception($"Unable to find matching static method: {typeof(TDeclaringType).FullName}.{methodName}.");
 
-                Logger.LogError($"Unable to find matching static method: {FormattingUtil.FormatMethod(null, typeof(TDeclaringType), methodName, null, parameters, null, isStatic: true)}.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to find matching static method: {FormattingUtil.FormatMethod(null, typeof(TDeclaringType), methodName, null, parameters, null, isStatic: true)}.");
                 return null;
             }
         }
@@ -1416,7 +1407,7 @@ public static class Accessor
                 if (throwOnError)
                     throw new Exception($"Unable to find matching static method: {typeof(TDeclaringType).FullName}.{methodName}.");
 
-                Logger.LogError($"Unable to find matching static method: {FormattingUtil.FormatMethod<TDelegate>(methodName, declTypeOverride: typeof(TDeclaringType), isStatic: true)}.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to find matching static method: {FormattingUtil.FormatMethod<TDelegate>(methodName, declTypeOverride: typeof(TDeclaringType), isStatic: true)}.");
                 return null;
             }
         }
@@ -1442,7 +1433,7 @@ public static class Accessor
         {
             if (throwOnError)
                 throw new Exception("Unable to find static method.");
-            Logger.LogError("Unable to find static method.", method: source);
+            Logger.DevkitServer.LogError(source, "Unable to find static method.");
             return null;
         }
 
@@ -1456,7 +1447,7 @@ public static class Accessor
             if (throwOnError)
                 throw new ArgumentException("Method can not have more than " + maxArgs + " arguments!", nameof(method));
 
-            Logger.LogError("Method " + method.Format() + " can not have more than " + maxArgs.Format() + " arguments!", method: source);
+            Logger.DevkitServer.LogError(source, $"Method {method.Format()} can not have more than {maxArgs.Format()} arguments!");
             return null;
         }
 
@@ -1501,7 +1492,7 @@ public static class Accessor
                 throw new Exception($"Unable to find static method for delegate: {delegateType.Name}.");
 
             if (LogErrorMessages)
-                Logger.LogError($"Unable to find matching static method: {FormattingUtil.FormatMethod(delegateType, "<unknown-name>", isStatic: true)}.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to find matching static method: {FormattingUtil.FormatMethod(delegateType, "<unknown-name>", isStatic: true)}.");
             return null;
         }
 
@@ -1517,7 +1508,7 @@ public static class Accessor
                 throw new Exception("Unable to create static caller for " + (method.DeclaringType?.FullName ?? "<unknown-type>") + "." + (method.Name ?? "<unknown-name>") + $": incompatable delegate type: {delegateType.FullName}.");
 
             if (LogErrorMessages)
-                Logger.LogError($"Unable to create static caller for {method.Format()}: incompatable delegate type: {delegateType.Format()}.", method: source);
+                Logger.DevkitServer.LogError(source, $"Unable to create static caller for {method.Format()}: incompatable delegate type: {delegateType.Format()}.");
             return null;
         }
 
@@ -1539,15 +1530,15 @@ public static class Accessor
                 {
                     Delegate basicDelegate = method.CreateDelegate(delegateType);
                     if (LogDebugMessages || LogILTraceMessages)
-                        Logger.LogDebug($"[{source}] Created static delegate caller for {method.Format()} of type {delegateType.Format()}.");
+                        Logger.DevkitServer.LogDebug(source, $"Created static delegate caller for {method.Format()} of type {delegateType.Format()}.");
                     return basicDelegate;
                 }
                 catch (Exception ex)
                 {
                     if (LogDebugMessages || LogILTraceMessages)
                     {
-                        Logger.LogDebug($"[{source}] Unable to create basic delegate binding static caller for {method.DeclaringType?.FullName ?? "<unknown-type>"}.{method.Name}.");
-                        Logger.LogDebug($"[{source}] {ex.GetType().Format()} - {ex.Message.Format(false)}");
+                        Logger.DevkitServer.LogDebug(source, $"Unable to create basic delegate binding static caller for {method.DeclaringType?.FullName ?? "<unknown-type>"}.{method.Name}.");
+                        Logger.DevkitServer.LogDebug(source, $"{ex.GetType().Format()} - {ex.Message.Format(false)}");
                     }
                 }
             }
@@ -1575,15 +1566,15 @@ public static class Accessor
                     object d2 = FormatterServices.GetUninitializedObject(delegateType);
                     delegateType.GetConstructors()[0].Invoke(d2, new object[] { null!, ptr });
                     if (LogDebugMessages || LogILTraceMessages)
-                        Logger.LogDebug($"[{source}] Created static delegate caller for {method.Format()} (using unsafe type binding) of type {delegateType.Format()}.");
+                        Logger.DevkitServer.LogDebug(source, $"Created static delegate caller for {method.Format()} (using unsafe type binding) of type {delegateType.Format()}.");
                     return (Delegate)d2;
                 }
                 catch (Exception ex)
                 {
                     if (LogDebugMessages || LogILTraceMessages)
                     {
-                        Logger.LogDebug($"[{source}] Unable to create unsafely binded delegate binding static caller for {method.DeclaringType?.Name ?? "<unknown-type>"}.{method.Name}.");
-                        Logger.LogDebug($"[{source}] {ex.GetType().Format()} - {ex.Message.Format()}");
+                        Logger.DevkitServer.LogDebug(source, $"Unable to create unsafely binded delegate binding static caller for {method.DeclaringType?.Name ?? "<unknown-type>"}.{method.Name}.");
+                        Logger.DevkitServer.LogDebug(source, $"{ex.GetType().Format()} - {ex.Message.Format()}");
                     }
                 }
 #line default
@@ -1605,8 +1596,8 @@ public static class Accessor
         IOpCodeEmitter generator = CreateEmitter(dynMethod, source);
 
         for (int i = 0; i < p.Length; ++i)
-            generator.EmitParameter(source, i, $"Invalid argument type passed to static caller for {method.DeclaringType?.Name ?? "<unknown-type>"}.{method.Name} at parameter {i.ToString(CultureInfo.InvariantCulture)} ({p[i].Name}). " +
-                                               $"Expected {p[i].ParameterType.FullName}.", false, type: parameterTypes[i], p[i].ParameterType);
+            generator.EmitParameter(LogILTraceMessages ? source : null, i, $"Invalid argument type passed to static caller for {method.DeclaringType?.Name ?? "<unknown-type>"}.{method.Name} at parameter {i.ToString(CultureInfo.InvariantCulture)} ({p[i].Name}). " +
+                                                                           $"Expected {p[i].ParameterType.FullName}.", false, type: parameterTypes[i], p[i].ParameterType);
 
         generator.Emit(OpCodes.Call, method);
         if (method.ReturnType != typeof(void) && delegateReturnType == typeof(void))
@@ -1637,7 +1628,7 @@ public static class Accessor
         {
             Delegate dynamicDelegate = dynMethod.CreateDelegate(delegateType);
             if (LogDebugMessages)
-                Logger.LogDebug($"[{source}] Created dynamic static caller for {method.Format()} of type {delegateType.Format()}.");
+                Logger.DevkitServer.LogDebug(source, $"Created dynamic static caller for {method.Format()} of type {delegateType.Format()}.");
             return dynamicDelegate;
         }
         catch (Exception ex)
@@ -1646,10 +1637,8 @@ public static class Accessor
                 throw new Exception($"Unable to create static caller for {method.DeclaringType?.FullName ?? "<unknown-type>"}.{method.Name}.", ex);
 
             if (LogErrorMessages)
-            {
-                Logger.LogError($"Unable to create static caller for {method.Format()}.", method: source);
-                Logger.LogError(ex);
-            }
+                Logger.DevkitServer.LogError(source, ex, $"Unable to create static caller for {method.Format()}.");
+            
             return null;
         }
     }
@@ -1694,9 +1683,9 @@ public static class Accessor
                 yield return new CodeInstruction(OpCodes.Or);
                 yield return new CodeInstruction(OpCodes.Not);
                 if (__method != null)
-                    Logger.LogDebug("[Accessor.AddIsEditorCall] Inserted editor call to " + __method.Format() + ".");
+                    Logger.DevkitServer.LogDebug("Accessor.AddIsEditorCall", $"Inserted editor call to {__method.Format()}.");
                 else
-                    Logger.LogDebug("[Accessor.AddIsEditorCall] Inserted editor call to unknown method.");
+                    Logger.DevkitServer.LogDebug("Accessor.AddIsEditorCall", "Inserted editor call to unknown method.");
             }
             else
                 yield return instr;
@@ -1709,7 +1698,7 @@ public static class Accessor
     {
         if (method == null)
         {
-            Logger.LogError("Error adding function stepthrough to method, not found.", method: "Accessor.AddFunctionStepthrough");
+            Logger.DevkitServer.LogError("Accessor.AddFunctionStepthrough", "Error adding function stepthrough to method, not found.");
             return false;
         }
         try
@@ -1717,13 +1706,12 @@ public static class Accessor
             PatchesMain.Patcher.Patch(method,
                 transpiler: new HarmonyMethod(typeof(Accessor).GetMethod(nameof(AddFunctionStepthroughTranspiler),
                     BindingFlags.NonPublic | BindingFlags.Static)));
-            Logger.LogInfo($"[Accessor.AddFunctionStepthrough] Added stepthrough to: {method.Format()}.");
+            Logger.DevkitServer.LogInfo("Accessor.AddFunctionStepthrough", $"Added stepthrough to: {method.Format()}.");
             return true;
         }
         catch (Exception ex)
         {
-            Logger.LogError($"[Accessor.AddFunctionStepthrough] Error adding function stepthrough to {method.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("Accessor.AddFunctionStepthrough", ex, $"Error adding function stepthrough to {method.Format()}.");
             return false;
         }
     }
@@ -1734,7 +1722,7 @@ public static class Accessor
     {
         if (method == null)
         {
-            Logger.LogError("Error adding function IO logging to method, not found.", method: "Accessor.AddFunctionIOLogging");
+            Logger.DevkitServer.LogError("Accessor.AddFunctionIOLogging", "Error adding function IO logging to method, not found.");
             return false;
         }
         try
@@ -1742,13 +1730,12 @@ public static class Accessor
             PatchesMain.Patcher.Patch(method,
                 transpiler: new HarmonyMethod(typeof(Accessor).GetMethod(nameof(AddFunctionIOTranspiler),
                     BindingFlags.NonPublic | BindingFlags.Static)));
-            Logger.LogInfo($"[Accessor.AddFunctionIOLogging] Added function IO logging to: {method.Format()}.");
+            Logger.DevkitServer.LogInfo("Accessor.AddFunctionIOLogging", $"Added function IO logging to: {method.Format()}.");
             return true;
         }
         catch (Exception ex)
         {
-            Logger.LogError($"[Accessor.AddFunctionIOLogging] Error adding function IO logging to {method.Format()}.");
-            Logger.LogError(ex);
+            Logger.DevkitServer.LogError("Accessor.AddFunctionIOLogging", ex, $"Error adding function IO logging to {method.Format()}.");
             return false;
         }
     }
@@ -1774,7 +1761,7 @@ public static class Accessor
     }
     private static IEnumerable<CodeInstruction> AddFunctionStepthroughTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
-        List<CodeInstruction> ins = new List<CodeInstruction>(instructions);
+        List<CodeInstruction> ins = [..instructions];
         AddFunctionStepthrough(ins, method);
         return ins;
     }
@@ -2088,12 +2075,12 @@ public static class Accessor
         string msg = context + $" Can't load type: {ex.TypeName}.";
         if (ex.InnerException != null)
             msg += "(" + ex.InnerException.GetType().Name + " | " + ex.InnerException.Message + ")";
-        Logger.LogDebug("[" + source + "] " + msg);
+        Logger.DevkitServer.LogDebug(source, msg);
     }
     private static void LogFileNotFoundException(FileNotFoundException ex, string source, string context)
     {
         string msg = context + $" Missing assembly: {ex.FileName}.";
-        Logger.LogDebug("[" + source + "] " + msg);
+        Logger.DevkitServer.LogDebug(source, msg);
     }
 #pragma warning disable CS0419
 
@@ -2198,7 +2185,7 @@ public static class Accessor
                 Type[] p2 = new Type[parameters.Count + 1];
                 for (int i = 1; i < p2.Length - 1; ++i)
                     p2[i] = parameters[i].ParameterType;
-                p2[p2.Length - 1] = returnType;
+                p2[^1] = returnType;
                 return FuncTypes[parameters.Count].MakeGenericType(p2);
             }
             else
@@ -2221,7 +2208,7 @@ public static class Accessor
                 p2[0] = instanceType;
                 for (int i = 1; i < p2.Length - 1; ++i)
                     p2[i] = parameters[i - 1].ParameterType;
-                p2[p2.Length - 1] = returnType;
+                p2[^1] = returnType;
                 return FuncTypes[parameters.Count].MakeGenericType(p2);
             }
             else
@@ -2303,14 +2290,14 @@ public static class Accessor
         bool removeNulls = false;
         try
         {
-            types = new List<Type?>(assembly.GetTypes());
+            types = [..assembly.GetTypes()];
         }
         catch (FileNotFoundException ex)
         {
             if (LogDebugMessages)
                 LogFileNotFoundException(ex, "Accessor.GetTypesSafe", $"Unable to get any types from assembly {assembly.FullName.Format()}.");
 
-            return new List<Type>(0);
+            return [];
         }
         catch (ReflectionTypeLoadException ex)
         {
@@ -2324,7 +2311,7 @@ public static class Accessor
                     LogTypeLoadException(tle, "Accessor.GetTypesSafe", "Skipped type.");
                 }
             }
-            types = ex.Types == null ? new List<Type?>(0) : new List<Type?>(ex.Types);
+            types = ex.Types == null ? [] : [..ex.Types];
             removeNulls = true;
         }
 
@@ -2565,8 +2552,8 @@ public static class Accessor
     {
         MethodBase a => a.IsStatic,
         FieldInfo a => a.IsStatic,
-        PropertyInfo a => a.GetGetMethod(true) is { } getter ? getter.IsStatic : a.GetSetMethod(true) is { } setter && setter.IsStatic,
-        EventInfo a => a.GetAddMethod(true) is { } adder ? adder.IsStatic : a.GetRemoveMethod(true) is { } remover ? remover.IsStatic : a.GetRaiseMethod(true) is { } raiser && raiser.IsStatic,
+        PropertyInfo a => a.GetGetMethod(true) is { } getter ? getter.IsStatic : a.GetSetMethod(true) is { IsStatic: true },
+        EventInfo a => a.GetAddMethod(true) is { } adder ? adder.IsStatic : a.GetRemoveMethod(true) is { } remover ? remover.IsStatic : a.GetRaiseMethod(true) is { IsStatic: true },
         Type a => (a.Attributes & (TypeAttributes.Abstract | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit | TypeAttributes.Class)) != 0,
         _ => throw new ArgumentException($"Member type {member.GetType().Name} is not static-able.", nameof(member))
     };
@@ -2740,6 +2727,14 @@ public static class Accessor
         }
     }
 
+    private static void ReflectionLogDebug(string message, ConsoleColor color) => Logger.DevkitServer.AddLog(Logger.Terminal, null, Severity.Debug, message, null, (int)color);
+    private static void ReflectionLogInfo(string message, ConsoleColor color) => Logger.DevkitServer.AddLog(Logger.Terminal, null, Severity.Info, message, null, (int)color);
+    private static void ReflectionLogWarning(string message, ConsoleColor color, string source) => Logger.DevkitServer.AddLog(Logger.Terminal, null, Severity.Warning, message, null, (int)color);
+    private static void ReflectionLogError(string message, ConsoleColor color, string source) => Logger.DevkitServer.AddLog(Logger.Terminal, source, Severity.Error, message, null, (int)color);
+    private static void ReflectionLogErrorException(Exception ex, string message, ConsoleColor color, string source) => Logger.DevkitServer.AddLog(Logger.Terminal, source, Severity.Error, message, ex, (int)color);
+    private static void ReflectionLogFatal(string message, ConsoleColor color, string source) => Logger.DevkitServer.AddLog(Logger.Terminal, source, Severity.Fatal, message, null, (int)color);
+    private static void ReflectionLogException(Exception ex, string source) => Logger.DevkitServer.AddLog(Logger.Terminal, source, Severity.Error, null, ex, LoggerExtensions.DefaultErrorColor);
+
     /// <summary>
     /// Unturned primary assembly.
     /// </summary>
@@ -2782,40 +2777,40 @@ public static class Accessor
         typeof(DevkitServerModule).GetProperty(nameof(DevkitServerModule.IsEditing), BindingFlags.Static | BindingFlags.Public)
             ?.GetMethod ?? throw new MemberAccessException("Unable to find DevkitServerModule.IsEditing.");
 
-    /// <summary><see cref="Logger.LogDebug"/>.</summary>
+    /// <summary>Logs a debug message with no source. Signature: (string message, ConsoleColor color).</summary>
     /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
-    public static MethodInfo LogDebug => _logDebug ??=
-        typeof(Logger).GetMethod(nameof(Logger.LogDebug), BindingFlags.Public | BindingFlags.Static)
-        ?? throw new MemberAccessException("Unable to find Logger.LogDebug.");
+    public static MethodInfo LogDebug => _logDebug ??= GetMethod(ReflectionLogDebug) ?? throw new MemberAccessException("Unable to find method.");
 
-    /// <summary><see cref="Logger.LogInfo"/>.</summary>
+    /// <summary>Logs an info message with no source. Signature: (string message, ConsoleColor color).</summary>
     /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
-    public static MethodInfo LogInfo => _logInfo ??=
-        typeof(Logger).GetMethod(nameof(Logger.LogInfo), BindingFlags.Public | BindingFlags.Static)
-        ?? throw new MemberAccessException("Unable to find Logger.LogInfo.");
+    public static MethodInfo LogInfo => _logInfo ??= GetMethod(ReflectionLogInfo) ?? throw new MemberAccessException("Unable to find method.");
 
-    /// <summary><see cref="Logger.LogWarning"/>.</summary>
+    /// <summary>Logs a warning message with no source. Signature: (string message, ConsoleColor color, string source).</summary>
     /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
-    public static MethodInfo LogWarning => _logWarning ??=
-        typeof(Logger).GetMethod(nameof(Logger.LogWarning), BindingFlags.Public | BindingFlags.Static)
-        ?? throw new MemberAccessException("Unable to find Logger.LogWarning.");
+    public static MethodInfo LogWarning => _logWarning ??= GetMethod(ReflectionLogWarning) ?? throw new MemberAccessException("Unable to find method.");
 
-    /// <summary><see cref="Logger.LogError(string, ConsoleColor, string)"/>.</summary>
+    /// <summary>Logs an error message with no source. Signature: (string message, ConsoleColor color, string source).</summary>
     /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
-    public static MethodInfo LogError => _logError ??=
-        typeof(Logger).GetMethod(nameof(Logger.LogError), BindingFlags.Public | BindingFlags.Static)
-        ?? throw new MemberAccessException("Unable to find Logger.LogError (text).");
+    public static MethodInfo LogError => _logError ??= GetMethod(ReflectionLogError) ?? throw new MemberAccessException("Unable to find method.");
 
-    /// <summary><see cref="Logger.LogError(Exception, bool, string)"/>.</summary>
+    /// <summary>Logs a fatal message with no source. Signature: (string message, ConsoleColor color, string source).</summary>
     /// <remarks>Lazily cached.</remarks>
     /// <exception cref="MemberAccessException"/>
-    public static MethodInfo LogException => _logException ??=
-        typeof(Logger).GetMethod(nameof(Logger.LogError), BindingFlags.Public | BindingFlags.Static)
-        ?? throw new MemberAccessException("Unable to find Logger.LogError (exception).");
+    public static MethodInfo LogFatal => _logFatal ??= GetMethod(ReflectionLogFatal) ?? throw new MemberAccessException("Unable to find method.");
+
+    /// <summary>Logs an exception with no source. Signature: (Exception ex, string source).</summary>
+    /// <remarks>Lazily cached.</remarks>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo LogException => _logException ??= GetMethod(ReflectionLogException) ?? throw new MemberAccessException("Unable to find method.");
+
+    /// <summary>Logs an exception with no source. Signature: (Exception ex, string message, ConsoleColor color, string source).</summary>
+    /// <remarks>Lazily cached.</remarks>
+    /// <exception cref="MemberAccessException"/>
+    public static MethodInfo LogErrorException => _logException ??= GetMethod(ReflectionLogErrorException) ?? throw new MemberAccessException("Unable to find method.");
 
     /// <summary><see cref="CachedTime.RealtimeSinceStartup"/>.</summary>
     /// <remarks>Lazily cached.</remarks>

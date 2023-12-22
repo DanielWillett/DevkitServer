@@ -9,7 +9,7 @@ internal sealed class DirtyManagerState
     {
         DirtyManagerState state = new DirtyManagerState();
         state.States.AddRange(DirtyManager.dirty);
-        Logger.LogDebug($"Backed up states of {state.States.Count.Format()} {typeof(IDirtyable).Format()}(s).");
+        Logger.DevkitServer.LogDebug(nameof(DirtyManagerState), $"Backed up states of {state.States.Count.Format()} {typeof(IDirtyable).Format()}(s).");
         return state;
     }
 
@@ -18,7 +18,7 @@ internal sealed class DirtyManagerState
         foreach (IDirtyable dirty in States)
         {
             dirty.isDirty = true;
-            Logger.LogDebug($"Recovered dirty state of {dirty.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(DirtyManagerState), $"Recovered dirty state of {dirty.Format()}.");
             if (!DirtyManager.dirty.Contains(dirty))
                 DirtyManager.markDirty(dirty);
         }

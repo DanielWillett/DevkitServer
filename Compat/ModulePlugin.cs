@@ -1,4 +1,6 @@
 ﻿using DevkitServer.API;
+using DevkitServer.API.Logging;
+using DevkitServer.Core.Logging.Loggers;
 using DevkitServer.Plugins;
 using SDG.Framework.Modules;
 
@@ -9,7 +11,7 @@ namespace DevkitServer.Compat;
 /// </summary>
 [LoadPriority(int.MinValue)]
 [Ignore]
-public class ModulePlugin : IDevkitServerColorPlugin
+public class ModulePlugin : CoreLogger, IDevkitServerColorPlugin
 {
     /// <summary>
     /// Underlying module.
@@ -49,7 +51,7 @@ public class ModulePlugin : IDevkitServerColorPlugin
     /// <summary>
     /// Create a new plugin based on a foreign module.
     /// </summary>
-    public ModulePlugin(Module module)
+    public ModulePlugin(Module module) : base(module.config.Name)
     {
         Module = module;
         Name = Module.config.Name;
@@ -99,23 +101,5 @@ public class ModulePlugin : IDevkitServerColorPlugin
     /// <inheritdoc/>
     void IDevkitServerPlugin.Unload() { }
 
-    /// <inheritdoc/>
-    public void LogDebug(string message, ConsoleColor color = ConsoleColor.DarkGray) =>
-        Logger.LogDebug("[" + this.GetSource() + "] " + message, color);
-
-    /// <inheritdoc/>
-    public void LogInfo(string message, ConsoleColor color = ConsoleColor.DarkCyan) =>
-        Logger.LogInfo("[" + this.GetSource() + "] " + message, color);
-
-    /// <inheritdoc/>
-    public void LogWarning(string message, ConsoleColor color = ConsoleColor.Yellow) =>
-        Logger.LogWarning(message, color, method: this.GetSource());
-
-    /// <inheritdoc/>
-    public void LogError(string message, ConsoleColor color = ConsoleColor.Red) =>
-        Logger.LogError(message, color, method: this.GetSource());
-
-    /// <inheritdoc/>
-    public void LogError(Exception ex) =>
-        Logger.LogError(ex, method: this.GetSource());
+    string ILogSource.Source => string.Empty;
 }

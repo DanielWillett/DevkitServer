@@ -73,7 +73,7 @@ public static class MovementUtil
                 MainCameraRegion = r;
                 EventOnMainCameraRegionUpdated.TryInvoke(r2, r, MainCameraIsInRegion);
                 if (RegionDebug.RegionsEnabled)
-                    Logger.LogDebug($"Region updated: {r2.Format()} -> {r.Format()}.");
+                    Logger.DevkitServer.LogDebug(nameof(RegionDebug), $"Region updated: {r2.Format()} -> {r.Format()}.");
             }
         }
         
