@@ -5,9 +5,42 @@ namespace DevkitServer.API.Cartography;
 /// <summary>
 /// Tools for converting between map image coordinates and world coordinates.
 /// </summary>
+[EarlyTypeInit]
 public static class CartographyTool
 {
+    private static readonly Func<object>? CallGetObjectState = Accessor.GenerateStaticCaller<Level, Func<object>>("GetObjectState", allowUnsafeTypeBinding: true);
+    private static readonly Action<object>? CallRestorePreCaptureState = Accessor.GenerateStaticCaller<Level, Action<object>>("RestorePreCaptureState", allowUnsafeTypeBinding: false);
+
     private static CartographyData? _lvl;
+
+    /// <summary>
+    /// Calls <see cref="Level.GetObjectState"/> which saves the visability of objects, resources, etc then makes them all visible.
+    /// </summary>
+    /// <remarks>Load the state with <see cref="RestorePreCaptureState"/>.</remarks>
+    /// <returns>A visibility state, or <see langword="null"/> in the case of a reflection failure.</returns>
+    public static object? SavePreCaptureState() => CallGetObjectState?.Invoke();
+
+    /// <summary>
+    /// Calls <see cref="Level.RestorePreCaptureState"/> which restores the visability of objects, resources, etc.
+    /// </summary>
+    /// <remarks>Save the state with <see cref="SavePreCaptureState"/>.</remarks>
+    /// <returns><see langword="true"/> if the capture state was valid and there wasn't a reflection failure, otherwise <see langword="false"/>.</returns>
+    /// <exception cref="ArgumentException"><paramref name="preCaptureState"/> was not of type <see cref="Level.PreCaptureObjectState"/>.</exception>
+    public static bool RestorePreCaptureState(object? preCaptureState)
+    {
+        if (preCaptureState == null || CallRestorePreCaptureState == null)
+            return false;
+
+        try
+        {
+            CallRestorePreCaptureState(preCaptureState);
+        }
+        catch (InvalidCastException ex)
+        {
+            throw new ArgumentException("State must be of type Level.PreCaptureObjectState.", nameof(preCaptureState), ex);
+        }
+        return true;
+    }
 
     /// <summary>
     /// Width of the Map.png and Chart.png images.

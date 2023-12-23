@@ -164,8 +164,25 @@ internal static class CommandTests
         sw.Stop();
         ctx.ReplyString($"Vanilla time: {sw.GetElapsedMilliseconds():F2}.");
     }
-
 #if CLIENT
+    private static async UniTask satellite(CommandContext ctx, CancellationToken token)
+    {
+        Stopwatch sw = Stopwatch.StartNew();
+        await SatelliteCartography.CaptureSatellite(outputFile: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Map.png"), token: token);
+        sw.Stop();
+        ctx.ReplyString($"DevkitServer time: {sw.GetElapsedMilliseconds():F2}.");
+
+        if (!ctx.HasArg(0))
+            return;
+        
+        await UniTask.NextFrame(cancellationToken: token);
+        await UniTask.NextFrame(cancellationToken: token);
+
+        sw.Restart();
+        Level.CaptureChartImage();
+        sw.Stop();
+        ctx.ReplyString($"Vanilla time: {sw.GetElapsedMilliseconds():F2}.");
+    }
     private static void grab(CommandContext ctx)
     {
         if (ctx.HasArgsExact(0))

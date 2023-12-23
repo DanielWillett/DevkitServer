@@ -15,12 +15,8 @@ namespace DevkitServer.API.Cartography;
 /// <summary>
 /// Contains replacement rendering code for charts implementing custom color providers and compositors/post-processors.
 /// </summary>
-[EarlyTypeInit]
 public static class ChartCartography
 {
-    private static readonly Func<object>? CallGetObjectState = Accessor.GenerateStaticCaller<Level, Func<object>>("GetObjectState", allowUnsafeTypeBinding: true);
-    private static readonly Action<object>? RestorePreCaptureState = Accessor.GenerateStaticCaller<Level, Action<object>>("RestorePreCaptureState", allowUnsafeTypeBinding: true);
-
     private static readonly ChartColorProviderInfo[] DefaultChartColorProviders =
     [
         new ChartColorProviderInfo(typeof(BundledStripChartColorProvider), null!, -2),
@@ -65,12 +61,10 @@ public static class ChartCartography
             return null;
         }
 
-        if (CallGetObjectState == null || RestorePreCaptureState == null)
-        {
+        object? captureState = CartographyTool.SavePreCaptureState();
+        if (captureState == null)
             Logger.DevkitServer.LogWarning(nameof(ChartCartography), "Failed to save/load pre-capture state during chart capture. Check for updates or report this as a bug.");
-        }
 
-        object? captureState = CallGetObjectState?.Invoke();
         Stopwatch sw = new Stopwatch();
         try
         {
@@ -136,7 +130,7 @@ public static class ChartCartography
 #endif
 
         if (captureState != null)
-            RestorePreCaptureState?.Invoke(captureState);
+            CartographyTool.RestorePreCaptureState(captureState);
 
         outputTexture.Apply(false);
 
