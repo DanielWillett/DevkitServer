@@ -1,5 +1,4 @@
-﻿using System.ComponentModel;
-using DevkitServer.Configuration;
+﻿using DevkitServer.Configuration;
 using DevkitServer.Core.Logging;
 using DevkitServer.Core.Logging.Loggers;
 using DevkitServer.Core.Logging.Terminals;
@@ -15,7 +14,7 @@ public static class Logger
     internal static IDevkitServerLogger DevkitServer { get; set; } = new CoreLogger("DEVKIT SERVER");
     internal static IDevkitServerLogger Unturned { get; set; } = new CoreLogger("UNTURNED");
     public static StackTraceCleaner StackCleaner { get; set; }
-    internal static bool Debug => DevkitServerConfig.Config.DebugLogging;
+    internal static bool Debug => DevkitServerModule.Module is null || DevkitServerConfig.Config.DebugLogging;
     static Logger()
     {
         StackCleaner = StackTraceCleaner.Default;

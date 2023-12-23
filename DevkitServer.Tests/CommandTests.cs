@@ -7,6 +7,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using DevkitServer.Core.Logging.Loggers;
 
 namespace DevkitServer.Tests;
 
@@ -235,13 +236,13 @@ public class CommandTests
 #endif
     }
     [API.Ignore]
-    private class TestCommand : IExecutableCommand
+    private class TestCommand : CoreLogger, IExecutableCommand
     {
         public CommandExecutionMode Mode { get; }
         public string CommandName { get; }
         public IList<string> Aliases { get; }
         public int Priority { get; }
-        public TestCommand(int priority, string name, params string[] aliases)
+        public TestCommand(int priority, string name, params string[] aliases) : base("DS.TEST")
         {
             Priority = priority;
             CommandName = name;
@@ -261,5 +262,6 @@ public class CommandTests
 #endif
             ) => throw new NotImplementedException();
         public override string ToString() => CommandName + " (" + string.Join("|", Aliases) + ") Priority: " + Priority;
+        public string Source => "TEST COMMAND";
     }
 }

@@ -70,12 +70,12 @@ public class DevkitServerConfig
 #if CLIENT
     internal static string? SeverFolderIntl;
     [CreateDirectory]
-    public static readonly string Directory = Path.Combine(UnturnedPaths.RootDirectory.FullName, "DevkitServer");
+    public static readonly string Directory = Path.Combine(DevkitServerModule.UnturnedLoaded ? UnturnedPaths.RootDirectory.FullName : Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "DevkitServer");
     public static readonly string ConfigFilePath = Path.Combine(Directory, "client_config.json");
     public static string ServerFolder => SeverFolderIntl ??= Path.Combine(Directory, "Temp_" + FileUtil.GetServerUniqueFileName());
 #else
     [CreateDirectory]
-    public static readonly string Directory = Path.Combine(UnturnedPaths.RootDirectory.FullName, "Servers", Provider.serverID, "DevkitServer");
+    public static readonly string Directory = DevkitServerModule.UnturnedLoaded ? Path.Combine(UnturnedPaths.RootDirectory.FullName, "Servers", Provider.serverID, "DevkitServer") : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "DevkitServer");
 
     public static readonly string ConfigFilePath = Path.Combine(Directory, "server_config.json");
     public static readonly string PermissionGroupsPath = Path.Combine(Directory, "permission_groups.json");

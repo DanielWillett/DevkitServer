@@ -1,18 +1,18 @@
 ﻿#define PRINT_BYTES
 using DevkitServer.API;
+using DevkitServer.Core.Logging.Loggers;
 using DevkitServer.Models;
+using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SDG.Framework.Devkit;
 using SDG.Framework.Foliage;
 using SDG.Framework.Landscapes;
+using StackCleaner;
 using System;
 using System.Globalization;
 using System.IO;
-using DevkitServer.API.Abstractions;
-using DevkitServer.Multiplayer.Networking;
-using StackCleaner;
 
 namespace DevkitServer.Tests;
 
@@ -37,13 +37,14 @@ public class ByteEncoderTests
 #endif
         try
         {
+            IDevkitServerLogger logger = new CoreLogger(nameof(ByteEncoderTests));
             if (writer.Stream != null)
             {
-                Logger.LogInfo("Writer is in stream mode.");
+                logger.LogInfo(nameof(TryPrint), "Writer is in stream mode.");
                 return;
             }
             byte[] bytes = writer.ToArray();
-            FormattingUtil.PrintBytesDec(bytes, columnCount: 16);
+            logger.LogDebug(nameof(TryPrint), Environment.NewLine + FormattingUtil.GetBytesDec(bytes, columnCount: 16));
         }
         catch (Exception ex)
         {

@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using DevkitServer.API;
 using DevkitServer.API.Permissions;
+using DevkitServer.Core.Logging.Loggers;
 using DevkitServer.Plugins;
 using DevkitServer.Util.Encoding;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -12,12 +13,17 @@ namespace DevkitServer.Tests;
 [TestClass]
 public class PermissionTests
 {
+    private static IDevkitServerLogger _logger;
+    
     private const string LongPluginId = "testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest";
     [ClassInitialize]
     public static void Setup(TestContext context)
     {
         try
         {
+            Logger.InitLogger();
+            _logger = new CoreLogger(nameof(PermissionTests));
+
             TestHelpers.SetupMainThread();
             TestHelpers.SetupFormatProvider();
 
@@ -79,7 +85,7 @@ public class PermissionTests
         {
             PermissionLeaf leaf = PermissionLeaf.Parse(leafStr);
 
-            Logger.LogInfo(leaf.Format());
+            _logger.LogInfo(nameof(FailParseBasicPermissionLeaf), leaf.Format());
         });
     }
 
@@ -123,7 +129,7 @@ public class PermissionTests
     public void ParseBasicPermissionBranch(string branchStr)
     {
         PermissionBranch branch = PermissionBranch.Parse(branchStr);
-        Logger.LogInfo($"{branchStr.Format()} -> {branch.Format()} (lvl {branch.WildcardLevel.Format()}).");
+        _logger.LogInfo(nameof(ParseBasicPermissionBranch), $"{branchStr.Format()} -> {branch.Format()} (lvl {branch.WildcardLevel.Format()}).");
 
         if (branchStr.Length > 0 && branchStr[0] == '+')
             branchStr = branchStr[1..];
@@ -147,7 +153,7 @@ public class PermissionTests
         {
             PermissionBranch branch = PermissionBranch.Parse(branchStr);
 
-            Logger.LogInfo(branch.Format());
+            _logger.LogInfo(nameof(FailParseBasicPermissionBranch), branch.Format());
         });
     }
 
@@ -211,7 +217,7 @@ public class PermissionTests
     public void TestLeafIO(string leafStr)
     {
         PermissionLeaf leaf = PermissionLeaf.Parse(leafStr);
-        Logger.LogInfo(leaf.Format());
+        _logger.LogInfo(nameof(TestLeafIO), leaf.Format());
         Assert.IsTrue(leaf.Valid);
 
         ByteWriter writer = new ByteWriter(64);
@@ -220,7 +226,7 @@ public class PermissionTests
         PermissionLeaf.Write(writer, leaf);
 
         reader.LoadNew(writer.ToArray());
-        FormattingUtil.PrintBytesDec(reader.InternalBuffer!, 8);
+        _logger.LogDebug(nameof(TestLeafIO), Environment.NewLine + FormattingUtil.GetBytesDec(reader.InternalBuffer!, 8));
 
         Assert.AreEqual(leaf, PermissionLeaf.Read(reader));
     }
@@ -271,7 +277,7 @@ public class PermissionTests
     public void TestBranchIO(string branchStr)
     {
         PermissionBranch branch = PermissionBranch.Parse(branchStr);
-        Logger.LogInfo(branch.Format());
+        _logger.LogInfo(nameof(TestBranchIO), branch.Format());
         Assert.IsTrue(branch.Valid);
 
         ByteWriter writer = new ByteWriter(64);
@@ -280,13 +286,13 @@ public class PermissionTests
         PermissionBranch.Write(writer, branch);
 
         reader.LoadNew(writer.ToArray());
-        FormattingUtil.PrintBytesDec(reader.InternalBuffer!, 8);
+        _logger.LogDebug(nameof(TestBranchIO), Environment.NewLine + FormattingUtil.GetBytesDec(reader.InternalBuffer!, 8));
 
         Assert.AreEqual(branch, PermissionBranch.Read(reader));
     }
 
     [API.Ignore]
-    private class TestPlugin : IDevkitServerPlugin
+    private class TestPlugin : CoreLogger, IDevkitServerPlugin
     {
         public string PermissionPrefix { get; set; }
         public string Name { get; }
@@ -297,7 +303,7 @@ public class PermissionTests
         public PluginAssembly Assembly { get; set; } = null!;
         public Local Translations => throw new NotImplementedException();
         public bool DeveloperMode => true;
-        public TestPlugin(string permissionPrefix, string name)
+        public TestPlugin(string permissionPrefix, string name) : base(name)
         {
             PermissionPrefix = permissionPrefix;
             Name = name;
@@ -325,5 +331,7 @@ public class PermissionTests
         }
         public void Load() { }
         public void Unload() { }
+
+        public string Source => string.Empty;
     }
 }
