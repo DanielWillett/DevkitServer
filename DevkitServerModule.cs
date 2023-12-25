@@ -65,12 +65,12 @@ public sealed class DevkitServerModule : IModuleNexus
     private static IReadOnlyList<string>? _searchLocations;
     private static string? _commitIdShort;
     internal static AssemblyResolver AssemblyResolver = null!;
-    private static int? mainThreadId;
+    private static int? _mainThreadId;
 
     internal static NetCall ClientAskSave = new NetCall(DevkitServerNetCall.AskSave);
     public static string CommitId => _commitIdShort ??= DevkitServer.CommitId.Commit.Length > 7 ? DevkitServer.CommitId.Commit.Substring(0, 7) : DevkitServer.CommitId.Commit;
     public static string LongCommitId => DevkitServer.CommitId.Commit;
-    public Assembly Assembly { get; } = Assembly.GetExecutingAssembly();
+    public Assembly Assembly { [MethodImpl(MethodImplOptions.NoInlining)] get; } = Assembly.GetExecutingAssembly();
     internal static string HelpMessage => CommandLocalization.format("Help");
     public static GameObject GameObjectHost { get; private set; } = null!;
     public static DevkitServerModuleComponent ComponentHost { get; private set; } = null!;
@@ -85,8 +85,8 @@ public sealed class DevkitServerModule : IModuleNexus
     {
         get
         {
-            mainThreadId ??= ThreadUtil.gameThread.ManagedThreadId;
-            return Environment.CurrentManagedThreadId == mainThreadId;
+            _mainThreadId ??= ThreadUtil.gameThread.ManagedThreadId;
+            return Environment.CurrentManagedThreadId == _mainThreadId;
         }
     }
 
@@ -96,6 +96,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static bool MonoLoaded { get; }
     public static bool UnityLoaded { get; }
     public static bool UnturnedLoaded { get; }
+    public static bool DevkitServerLoaded => Module != null;
     public static bool InitializedLogging { get; private set; }
     public static bool InitializedPluginLoader { get; internal set; }
     public static string AssemblyPath => _asmPath ??= Accessor.DevkitServer.Location;

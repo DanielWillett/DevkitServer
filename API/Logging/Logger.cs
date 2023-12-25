@@ -10,15 +10,16 @@ using LoadingException = (System.DateTime Timestamp, System.Exception Exception,
 namespace DevkitServer.API.Logging;
 public static class Logger
 {
+    private static bool _hasDsInited;
     public static object LogSync { get; } = new object();
     internal static IDevkitServerLogger DevkitServer { get; set; } = new CoreLogger("DEVKIT SERVER");
     internal static IDevkitServerLogger Unturned { get; set; } = new CoreLogger("UNTURNED");
     public static StackTraceCleaner StackCleaner { get; set; }
-    internal static bool Debug => DevkitServerModule.Module is null || DevkitServerConfig.Config.DebugLogging;
+    internal static bool Debug => !_hasDsInited || DevkitServerConfig.Config.DebugLogging;
     static Logger()
     {
         StackCleaner = StackTraceCleaner.Default;
-        Terminal = new ExternalLoggingTerminal();
+        Terminal = DevkitServerModule.UnturnedLoaded ? new BackgroundLoggingTerminal() : new ExternalLoggingTerminal();
     }
 
 #nullable disable
@@ -129,6 +130,7 @@ public static class Logger
     {
         ANSIFileLogger.OpenANSILog();
         DevkitServerSystemConfig config = DevkitServerConfig.Config;
+        _hasDsInited = true;
 
         StackCleanerConfiguration stackConfig = new StackCleanerConfiguration
         {

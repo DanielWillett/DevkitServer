@@ -65,15 +65,7 @@ internal class AssemblyResolver : IDisposable
 
     internal static void Log(string msg)
     {
-        if (!DevkitServerModule.InitializedLogging)
-        {
-            Console.WriteLine($"[{DateTime.UtcNow.ToString(LoggerExtensions.LogTimeFormat)}] [INFO]  [DEVKIT SERVER] [{Source}] {msg}");
-            UnturnedLog.info($"[INFO]  [DEVKIT SERVER] [{Source}] {msg}");
-        }
-        else
-        {
-            Logger.DevkitServer.LogInfo(Source, msg.Colorize(LogColorArgb));
-        }
+        Logger.DevkitServer.LogInfo(Source, msg.Colorize(LogColorArgb));
     }
 
     public void Dispose()

@@ -43,14 +43,9 @@ public static class CartographyTool
     }
 
     /// <summary>
-    /// Width of the Map.png and Chart.png images.
+    /// Size of the Map.png and Chart.png images in pixels.
     /// </summary>
-    public static int ImageWidth => (_lvl ??= new CartographyData()).IntlMapImageWidth;
-
-    /// <summary>
-    /// Height of the Map.png and Chart.png images.
-    /// </summary>
-    public static int ImageHeight => (_lvl ??= new CartographyData()).IntlMapImageHeight;
+    public static Vector2Int ImageSize => (_lvl ??= new CartographyData()).IntlMapImageSize;
 
     /// <summary>
     /// Is the map position/size based on <see cref="ELevelSize"/> instead of a <see cref="CartographyVolume"/>?
@@ -129,7 +124,7 @@ public static class CartographyTool
     {
         _lvl ??= new CartographyData();
 
-        Vector3 n = new Vector3((worldPos.x / _lvl.IntlCaptureSize.x + 0.5f) * _lvl.IntlMapImageWidth, 0f, (worldPos.z / _lvl.IntlCaptureSize.y + 0.5f) * _lvl.IntlMapImageHeight);
+        Vector3 n = new Vector3((worldPos.x / _lvl.IntlCaptureSize.x + 0.5f) * _lvl.IntlMapImageSize.x, 0f, (worldPos.z / _lvl.IntlCaptureSize.y + 0.5f) * _lvl.IntlMapImageSize.y);
         return _lvl.IntlTransformMatrixInverse.MultiplyPoint3x4(n);
     }
 
@@ -140,18 +135,116 @@ public static class CartographyTool
     {
         _lvl ??= new CartographyData();
 
-        Vector3 n = new Vector3((mapPos.x / _lvl.IntlMapImageWidth - 0.5f) * _lvl.IntlCaptureSize.x, (mapPos.y / _lvl.IntlMapImageHeight - 0.5f) * _lvl.IntlCaptureSize.y, 0f);
+        Vector3 n = new Vector3((mapPos.x / _lvl.IntlMapImageSize.x - 0.5f) * _lvl.IntlCaptureSize.x, (mapPos.y / _lvl.IntlMapImageSize.y - 0.5f) * _lvl.IntlCaptureSize.y, 0f);
         return _lvl.IntlTransformMatrix.MultiplyPoint3x4(n);
     }
 
-    internal static void Reset() => (_lvl ??= new CartographyData()).Calculate();
+    /// <summary>
+    /// Considering <see cref="SystemInfo.maxTextureSize"/>, returns the desirable size for a satellite or chart image.
+    /// </summary>
+    /// <param name="wasSizeOutOfBounds">Was the return value of this function clamped?</param>
+    public static Vector2Int GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds)
+    {
+        Vector2Int imgSize = ImageSize;
+
+        int maxTextureSize = DevkitServerUtility.MaxTextureDimensionSize;
+
+        if (imgSize.x > maxTextureSize || imgSize.y > maxTextureSize)
+        {
+            double aspect = (double)imgSize.x / imgSize.y;
+            double x, y;
+            if (imgSize.x <= imgSize.y)
+            {
+                x = aspect * maxTextureSize;
+                y = x / aspect;
+            }
+            else
+            {
+                y = maxTextureSize / aspect;
+                x = aspect * y;
+            }
+
+            imgSize.x = (int)Math.Round(x);
+            imgSize.y = (int)Math.Round(y);
+            wasSizeOutOfBounds = true;
+        }
+        else
+            wasSizeOutOfBounds = false;
+
+        return imgSize;
+    }
+
+    /// <summary>
+    /// Considering <see cref="SystemInfo.maxTextureSize"/>, returns the desirable size for a satellite or chart image with extra info for satellite supersampling.
+    /// </summary>
+    /// <param name="superSampleSize">Used for satellite renders, returns the size for the supersampled texture (which will usually be double the return value) before it's scaled down.</param>
+    /// <param name="wasSizeOutOfBounds">Was the return value of this function and <paramref name="superSampleSize"/> clamped?</param>
+    /// <param name="wasSuperSampleOutOfBounds">Was <paramref name="wasSuperSampleOutOfBounds"/> clamped?</param>
+    public static Vector2Int GetImageSizeCheckMaxTextureSize(out Vector2Int superSampleSize, out bool wasSizeOutOfBounds, out bool wasSuperSampleOutOfBounds)
+    {
+        Vector2Int imgSize = ImageSize;
+
+        int superSampleX = imgSize.x * 2, superSampleY = imgSize.y * 2;
+
+        int maxTextureSize = DevkitServerUtility.MaxTextureDimensionSize;
+
+        if (imgSize.x > maxTextureSize || imgSize.y > maxTextureSize)
+        {
+            double aspect = (double)imgSize.x / imgSize.y;
+            double x, y;
+            if (imgSize.x <= imgSize.y)
+            {
+                x = aspect * maxTextureSize;
+                y = x / aspect;
+            }
+            else
+            {
+                y = maxTextureSize / aspect;
+                x = aspect * y;
+            }
+
+            imgSize.x = superSampleX = (int)Math.Round(x);
+            imgSize.y = superSampleY = (int)Math.Round(y);
+            wasSizeOutOfBounds = wasSuperSampleOutOfBounds = true;
+        }
+        else if (superSampleX > maxTextureSize || superSampleY > maxTextureSize)
+        {
+            double aspect = (double)superSampleX / superSampleY;
+            double x, y;
+            if (superSampleX <= superSampleY)
+            {
+                x = aspect * maxTextureSize;
+                y = x / aspect;
+            }
+            else
+            {
+                y = maxTextureSize / aspect;
+                x = aspect * y;
+            }
+
+            superSampleX = (int)Math.Round(x);
+            superSampleY = (int)Math.Round(y);
+            wasSuperSampleOutOfBounds = true;
+            wasSizeOutOfBounds = false;
+        }
+        else
+        {
+            wasSuperSampleOutOfBounds = false;
+            wasSizeOutOfBounds = false;
+        }
+
+        superSampleSize = new Vector2Int(superSampleX, superSampleY);
+        return imgSize;
+    }
+
+    // todo call this when a cartography volume is updated (moved, added, deleted, etc).
+    internal static void Reset() => _lvl = null;
     private sealed class CartographyData
     {
         public bool IntlLegacyMapping;
         public Matrix4x4 IntlTransformMatrix;
         public Matrix4x4 IntlTransformMatrixInverse;
-        public int IntlMapImageWidth;
-        public int IntlMapImageHeight;
+        public Vector2Int IntlMapImageSize;
         public Vector2 IntlCaptureSize;
         public Vector2 IntlDistanceScale; // mult = map to world, div = world to map
         public Bounds IntlCaptureBounds;
@@ -172,11 +265,10 @@ public static class CartographyTool
                 IntlTransformMatrixInverse = IntlTransformMatrix.inverse;
                 IntlCaptureBounds = vol.CalculateWorldBounds();
                 Vector3 size = vol.CalculateLocalBounds().size;
-                IntlMapImageWidth = Mathf.CeilToInt(size.x);
-                IntlMapImageHeight = Mathf.CeilToInt(size.z);
+                IntlMapImageSize = new Vector2Int(Mathf.CeilToInt(size.x), Mathf.CeilToInt(size.z));
                 size = IntlCaptureBounds.size;
                 IntlCaptureSize = new Vector2(size.x, size.z);
-                IntlDistanceScale = new Vector2(IntlCaptureSize.x / IntlMapImageWidth, IntlCaptureSize.y / IntlMapImageHeight);
+                IntlDistanceScale = new Vector2(IntlCaptureSize.x / IntlMapImageSize.x, IntlCaptureSize.y / IntlMapImageSize.y);
             }
             else
             {
@@ -185,8 +277,7 @@ public static class CartographyTool
                 IntlTransformMatrixInverse = IntlTransformMatrix.inverse;
                 ushort s = Level.size;
                 float w = s - Level.border * 2f;
-                IntlMapImageWidth = s;
-                IntlMapImageHeight = s;
+                IntlMapImageSize = new Vector2Int(s, s);
                 IntlCaptureSize = new Vector2(w, w);
                 IntlDistanceScale = new Vector2(w / s, w / s);
                 float minHeight = WaterVolumeManager.worldSeaLevel;

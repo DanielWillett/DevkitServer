@@ -7,24 +7,19 @@ using ILogger = NuGet.Common.ILogger;
 namespace DevkitServer.Launcher;
 internal class DevkitServerLauncherLogger : ILogger
 {
-    private const string TimeFormat = "yyyy-MM-dd hh:mm:ss";
+    private const string TimeFormat = "hh:mm:ss";
     public bool ShouldLogDebug { get; set; }
     private static string GetPrefix(LogLevel lvl) => GetPrefix(lvl, DateTime.UtcNow);
     private static string GetPrefix(LogLevel lvl, DateTime time) => "[" + time.ToString(TimeFormat) +
-                                                                    "] [DEVKITSERVER.LAUNCHER] [" + lvl switch
+                                                                    "] [" + lvl switch
                                                                     {
-                                                                        LogLevel.Debug => "DEBUG",
-                                                                        LogLevel.Error => "ERROR",
+                                                                        LogLevel.Debug => "DBG",
+                                                                        LogLevel.Error => "ERR",
                                                                         LogLevel.Minimal => "MIN",
-                                                                        LogLevel.Verbose => "VRBSE",
-                                                                        LogLevel.Warning => "WARN",
-                                                                        _ => "INFO"
-                                                                    } + "]" + lvl switch
-                                                                    {
-                                                                        LogLevel.Debug or LogLevel.Error or LogLevel.Verbose => " ",
-                                                                        LogLevel.Minimal => "   ",
-                                                                        _ => "  "
-                                                                    };
+                                                                        LogLevel.Verbose => "VRB",
+                                                                        LogLevel.Warning => "WRN",
+                                                                        _ => "INF"
+                                                                    } + "] [DEVKIT SERVER] [LAUNCHER] ";
     public void Log(LogLevel level, string data)
     {
         if (level <= LogLevel.Debug && !ShouldLogDebug)

@@ -653,7 +653,7 @@ public static class LoggerExtensions
         }
         catch (Exception ex)
         {
-            Logger.DevkitServer.LogWarning(nameof(ClientUnpatchUnturnedLogs), ex, "Failed to patch vanilla logs.");
+            Logger.DevkitServer.LogWarning(nameof(ClientPatchUnturnedLogs), ex, "Failed to patch vanilla logs.");
         }
     }
     internal static void ClientUnpatchUnturnedLogs()
@@ -675,23 +675,23 @@ public static class LoggerExtensions
             return;
         line = RemoveDateFromLine(line).ToString();
         string msg2 = line;
-        if (msg2.IndexOf("[DEVKITSERVER.LAUNCHER]", StringComparison.Ordinal) != -1)
+        if (msg2.IndexOf("[DEVKIT SERVER] [LAUNCHER]", StringComparison.Ordinal) != -1)
         {
             ConsoleColor color = ConsoleColor.DarkCyan;
             Severity severity = Severity.Info;
-            if (msg2.IndexOf("[INFO]", StringComparison.Ordinal) == -1)
+            if (msg2.IndexOf("[INF]", StringComparison.Ordinal) == -1)
             {
-                if (msg2.IndexOf("[DEBUG]", StringComparison.Ordinal) != -1)
+                if (msg2.IndexOf("[DBG]", StringComparison.Ordinal) != -1)
                 {
                     color = ConsoleColor.DarkGray;
                     severity = Severity.Debug;
                 }
-                else if (msg2.IndexOf("[WARN]", StringComparison.Ordinal) != -1)
+                else if (msg2.IndexOf("[WRN]", StringComparison.Ordinal) != -1)
                 {
                     color = ConsoleColor.Yellow;
                     severity = Severity.Warning;
                 }
-                else if (msg2.IndexOf("[ERROR]", StringComparison.Ordinal) != -1)
+                else if (msg2.IndexOf("[ERR]", StringComparison.Ordinal) != -1)
                 {
                     color = ConsoleColor.Red;
                     severity = Severity.Error;
@@ -706,7 +706,7 @@ public static class LoggerExtensions
             return;
         }
 
-        Logger.Terminal.Write("[" + DateTime.UtcNow.ToString(LogTimeFormat) + "] [LOG]   [UNTURNED] " + msg2, ConsoleColor.DarkGray, false, Severity.Info);
+        Logger.Terminal.Write("[" + DateTime.UtcNow.ToString(LogTimeFormat) + "] [LOG] [UNTURNED]      " + msg2, ConsoleColor.DarkGray, false, Severity.Info);
     }
 #endif
 }

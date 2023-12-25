@@ -1,5 +1,4 @@
-﻿extern alias NSJ;
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using DevkitServer.API.Cartography.ChartColorProviders;
 using DevkitServer.Core.Cartography;
 using DevkitServer.Core.Cartography.ChartColorProviders;
@@ -24,7 +23,12 @@ public static class ChartCartography
     ];
 
     /// <summary>
-    /// Captures a chart render of <paramref name="level"/> (<see cref="Level.info"/> by default) and exports it to <paramref name="outputFile"/> (Level Path/Chart.png by default).
+    /// The quality of charts when rendered to a JPEG image.
+    /// </summary>
+    public static int JpegQuality { get; set; } = 85;
+
+    /// <summary>
+    /// Captures a chart render of <paramref name="level"/> (<see cref="Level.info"/> by default) and exports it to <paramref name="outputFile"/> (Level Path/Chart.png by default). Supports PNG or JPEG depending on the extension of <paramref name="outputFile"/>.
     /// </summary>
     /// <remarks>This technically works on the server build but has limited functionality (no compositing). Passing a custom level info does not affect measurements so only do so if they represent the same level.</remarks>
     /// <returns>The path of the output file created, or <see langword="null"/> if the chart was not rendered.</returns>
@@ -33,25 +37,56 @@ public static class ChartCartography
         await UniTask.SwitchToMainThread(token);
         await UniTask.WaitForEndOfFrame(DevkitServerModule.ComponentHost, token);
 
-        return CaptureChartIntl(level, outputFile);
+        level ??= Level.info;
+
+        if (outputFile != null)
+        {
+            if (!Path.GetExtension(outputFile).Equals(".png", StringComparison.OrdinalIgnoreCase)
+                && !Path.GetExtension(outputFile).Equals(".jpg", StringComparison.OrdinalIgnoreCase)
+                && !Path.GetExtension(outputFile).Equals(".jpeg", StringComparison.OrdinalIgnoreCase))
+            {
+                outputFile += ".png";
+            }
+        }
+        else
+            outputFile = Path.Combine(level.path, "Chart.png");
+
+        Texture2D? texture = CaptureChartSync(level, outputFile);
+
+        if (texture == null)
+            return null;
+
+        await FileUtil.EncodeAndSaveTexture(texture, outputFile, JpegQuality, token);
+#if DEBUG
+        ThreadUtil.assertIsGameThread();
+#endif
+        await UniTask.SwitchToMainThread(token);
+        Object.DestroyImmediate(texture);
+
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, false, true);
+
+        return outputFile;
     }
-    private static unsafe string? CaptureChartIntl(LevelInfo? level = null, string? outputFile = null)
+    private static unsafe Texture2D? CaptureChartSync(LevelInfo level, string outputFile)
     {
         // must be ran at the end of frame
 
-        int imgX = CartographyTool.ImageWidth;
-        int imgY = CartographyTool.ImageHeight;
+        Vector2Int imgSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds);
+
+        if (wasSizeOutOfBounds)
+        {
+            Logger.DevkitServer.LogWarning(nameof(ChartCartography), $"Render size was clamped to {imgSize.Format()} because " +
+                                                                   $"it was more than the max texture size of this system " +
+                                                                   $"(which is {DevkitServerUtility.MaxTextureDimensionSize.Format()}).");
+        }
 
         Bounds captureBounds = CartographyTool.CaptureBounds;
 
-        level ??= Level.info;
-        outputFile ??= Path.Combine(level.path, "Chart.png");
-
         LevelCartographyConfigData? configData = LevelCartographyConfigData.ReadFromLevel(level);
 
-        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, new Vector2Int(imgX, imgY), captureBounds.size, captureBounds.center, true);
+        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, true);
 
-        byte[] outputRGB24Image = new byte[imgX * imgY * 3];
+        byte[] outputRGB24Image = new byte[imgSize.x * imgSize.y * 3];
 
         IChartColorProvider? colorProvider = GetChartColorProvider(in data, configData, out ChartColorProviderInfo providerInfo);
 
@@ -104,7 +139,7 @@ public static class ChartCartography
                 disp.Dispose();
         }
 
-        Texture2D outputTexture = new Texture2D(imgX, imgY, TextureFormat.RGB24, 1, false)
+        Texture2D outputTexture = new Texture2D(imgSize.x, imgSize.y, TextureFormat.RGB24, 1, false)
         {
             name = "Chart",
             hideFlags = HideFlags.HideAndDontSave,
@@ -134,14 +169,7 @@ public static class ChartCartography
 
         outputTexture.Apply(false);
 
-        byte[] encoded = Path.GetExtension(outputFile).Equals(".png", StringComparison.OrdinalIgnoreCase) ? outputTexture.EncodeToPNG() : outputTexture.EncodeToJPG();
-
-        File.WriteAllBytes(outputFile, encoded);
-        Object.DestroyImmediate(outputTexture);
-
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, false, true);
-
-        return outputFile;
+        return outputTexture;
     }
 
     private static unsafe void CaptureBackgroundUsingJobs(RaycastChartColorProvider colorProvider, byte* outputRgb24Image, in CartographyCaptureData data, ChartColorProviderInfo providerInfo)

@@ -1,5 +1,4 @@
-﻿using DevkitServer.API.Logging;
-using DevkitServer.Core.Commands.Subsystem;
+﻿using DevkitServer.Core.Commands.Subsystem;
 using System.Collections.Concurrent;
 
 namespace DevkitServer.Core.Logging.Terminals;

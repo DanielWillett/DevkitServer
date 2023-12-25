@@ -14,6 +14,8 @@ using DevkitServer.Players;
 namespace DevkitServer.Util;
 public static class DevkitServerUtility
 {
+    private static int? _maxTextureSize;
+    public static int MaxTextureDimensionSize => _maxTextureSize ??= Math.Min(16384, SystemInfo.maxTextureSize);
     [Pure]
     public static Bounds InflateBounds(in Bounds bounds)
     {

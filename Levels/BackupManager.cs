@@ -262,16 +262,19 @@ public sealed class BackupManager : MonoBehaviour
             {
                 path = GetBackupPath(timestamp);
                 await ZipAndClear(path, await saveTask.ConfigureAwait(false), maxBackups, maxBackupSizeMegabytes);
+                saveTask = null!;
             }
             catch (OperationCanceledException)
             {
                 path = null!;
                 Logger.DevkitServer.LogError(Source, $"Cancelled backing up level {Level.info.name.Colorize(DevkitServerModule.UnturnedColor)}.");
+                GC.Collect();
             }
             catch (Exception ex)
             {
                 path = null!;
                 Logger.DevkitServer.LogError(Source, ex, $"Error backing up level {Level.info.name.Colorize(DevkitServerModule.UnturnedColor)}.");
+                GC.Collect();
             }
             finally
             {
@@ -286,6 +289,7 @@ public sealed class BackupManager : MonoBehaviour
 
             timer.Stop();
             Logger.DevkitServer.LogInfo(Source, $"Backed up to {path.Format()} in {timer.GetElapsedMilliseconds().Format("F2")} ms.");
+            GC.Collect();
         });
     }
     private async Task ZipAndClear(string path, LevelData save, int maxBackups, double maxBackupSizeMegabytes)

@@ -25,6 +25,7 @@ public class DevkitServerAutoUpdateComponent : MonoBehaviour
     public static event Action<DevkitServerAutoUpdateComponent>? OnAutoUpdaterInitialized;
     public float CheckTimer { get; set; } = 120f;
     public float ShutdownTimer { get; set; } = 120f;
+    public bool IsInitialized { get; private set; }
     public static bool DebugLog
     {
         get
@@ -80,7 +81,9 @@ public class DevkitServerAutoUpdateComponent : MonoBehaviour
     private IEnumerator CheckForUpdates()
     {
         _logger.LogInformation("Initialized DevkitServer auto-updater.");
+
         OnAutoUpdaterInitialized?.Invoke(this);
+        IsInitialized = true;
 
         while (true)
         {
@@ -106,7 +109,17 @@ public class DevkitServerAutoUpdateComponent : MonoBehaviour
 
                 if (getIndexRequest.responseCode is 200 or 304 && getIndexRequest.downloadHandler?.data is { Length: > 0 })
                 {
-                    NuGetIndex? index = IOUtility.jsonDeserializer.deserialize<NuGetIndex>(getIndexRequest.downloadHandler.data, 0);
+                    NuGetIndex? index;
+                    try
+                    {
+                        index = IOUtility.jsonDeserializer.deserialize<NuGetIndex>(getIndexRequest.downloadHandler.data, 0);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError("Error deserializing NuGet index from text:" + Environment.NewLine + getIndexRequest.downloadHandler.text);
+                        _logger.LogError(Environment.NewLine + ex);
+                        continue;
+                    }
 
                     if (index?.Resources == null || (index.Version == null ? null : NuGetVersion.Parse(index.Version)) is not { Major: 3 })
                     {
@@ -178,7 +191,17 @@ public class DevkitServerAutoUpdateComponent : MonoBehaviour
                 goto main;
             }
 
-            NuGetVersionsResponse? versions = IOUtility.jsonDeserializer.deserialize<NuGetVersionsResponse>(getResxVersionsRequest.downloadHandler.data, 0);
+            NuGetVersionsResponse? versions;
+            try
+            {
+                versions = IOUtility.jsonDeserializer.deserialize<NuGetVersionsResponse>(getResxVersionsRequest.downloadHandler.data, 0);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error deserializing resource package versions from text:" + Environment.NewLine + getResxVersionsRequest.downloadHandler.text);
+                _logger.LogError(Environment.NewLine + ex);
+                continue;
+            }
 
             if (versions?.Versions == null)
             {
@@ -203,7 +226,16 @@ public class DevkitServerAutoUpdateComponent : MonoBehaviour
                 goto check;
             }
 
-            versions = IOUtility.jsonDeserializer.deserialize<NuGetVersionsResponse>(getMainVersionsRequest.downloadHandler.data, 0);
+            try
+            {
+                versions = IOUtility.jsonDeserializer.deserialize<NuGetVersionsResponse>(getMainVersionsRequest.downloadHandler.data, 0);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error deserializing main package versions from text:" + Environment.NewLine + getMainVersionsRequest.downloadHandler.text);
+                _logger.LogError(Environment.NewLine + ex);
+                continue;
+            }
 
             if (versions?.Versions == null)
             {
@@ -322,6 +354,7 @@ public class DevkitServerAutoUpdateComponent : MonoBehaviour
                 }
 
                 Destroy(this);
+                IsInitialized = false;
                 yield break;
             }
         }

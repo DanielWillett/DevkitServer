@@ -137,6 +137,14 @@ internal static class CommandTests
 {
     public static readonly Action<CommandContext>[] Commands;
     public static readonly Func<CommandContext, CancellationToken, UniTask>[] AsyncCommands;
+    private static void memusage(CommandContext ctx)
+    {
+        long memBefore = GC.GetTotalMemory(false);
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, true, true);
+        long memAfter = GC.GetTotalMemory(false);
+
+        ctx.ReplyString($"Managed memory usage after GC: {FormattingUtil.FormatCapacity(memAfter, 4, colorize: true)} (before: {FormattingUtil.FormatCapacity(memBefore, 4, colorize: true)}).");
+    }
     private static void printtransmissions(CommandContext ctx)
     {
 #if CLIENT
@@ -179,7 +187,7 @@ internal static class CommandTests
         await UniTask.NextFrame(cancellationToken: token);
 
         sw.Restart();
-        Level.CaptureChartImage();
+        Level.CaptureSatelliteImage();
         sw.Stop();
         ctx.ReplyString($"Vanilla time: {sw.GetElapsedMilliseconds():F2}.");
     }

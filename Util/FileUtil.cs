@@ -1,6 +1,11 @@
-﻿using SDG.Framework.Modules;
+﻿using System.Diagnostics;
+using SDG.Framework.Modules;
 using System.Globalization;
 using System.Reflection;
+using Cysharp.Threading.Tasks;
+using DevkitServer.Core.Cartography.Jobs;
+using Unity.Collections;
+using Unity.Jobs;
 #if CLIENT
 using DevkitServer.Multiplayer.Networking;
 #endif
@@ -330,5 +335,71 @@ public static class FileUtil
 
         bytesFree = 0;
         return false;
+    }
+
+    /// <summary>
+    /// Asynchronously encodes an image and writes it to disk in either PNG or JPEG, depending on the extension of <paramref name="outputFile"/>.
+    /// </summary>
+    public static async UniTask EncodeAndSaveTexture(Texture2D texture, string outputFile, int jpegQuality = 85, CancellationToken token = default)
+    {
+        await UniTask.SwitchToMainThread(token);
+
+#if DEBUG
+        Stopwatch sw = Stopwatch.StartNew();
+#endif
+        byte[] rawData = texture.GetRawTextureData();
+        string extension = Path.GetExtension(outputFile);
+        EncodeImageJob encodeJob = new EncodeImageJob
+        {
+            // using Allocator.Persistant because this job takes more than 4 frames sometimes (TempJob throws a warning).
+            InputTexture = new NativeArray<byte>(rawData, Allocator.Persistent),
+            GraphicsFormat = texture.graphicsFormat,
+            OutputPNG = new NativeArray<byte>(rawData.Length, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
+            Size = new Vector2Int(texture.width, texture.height),
+            OutputSize = new NativeArray<int>(1, Allocator.Persistent, NativeArrayOptions.UninitializedMemory),
+            UseJpeg = extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase)
+                      || extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase),
+            JpegQuality = jpegQuality
+        };
+        if (!encodeJob.UseJpeg && !extension.Equals(".png", StringComparison.OrdinalIgnoreCase))
+            outputFile += ".png";
+
+        JobHandle handle = encodeJob.Schedule();
+#if DEBUG
+        sw.Stop();
+        Logger.DevkitServer.LogDebug(nameof(EncodeImageJob), $"Setup encode: {sw.GetElapsedMilliseconds().Format("0.##")} ms.");
+
+        sw.Restart();
+#endif
+        await handle;
+
+#if DEBUG
+        sw.Stop();
+        Logger.DevkitServer.LogDebug(nameof(EncodeImageJob), $"Await encode: {sw.GetElapsedMilliseconds().Format("0.##")} ms.");
+
+        sw.Restart();
+#endif
+        byte[] pngData = new byte[encodeJob.OutputSize[0]];
+        NativeArray<byte>.Copy(encodeJob.OutputPNG, pngData, pngData.Length);
+        encodeJob.InputTexture.Dispose();
+        encodeJob.OutputPNG.Dispose();
+        encodeJob.OutputSize.Dispose();
+#if DEBUG
+        sw.Stop();
+        Logger.DevkitServer.LogDebug(nameof(EncodeImageJob), $"Cleanup encode: {sw.GetElapsedMilliseconds().Format("0.##")} ms.");
+
+        sw.Restart();
+#endif
+        string? dir = Path.GetDirectoryName(outputFile);
+
+        if (dir != null)
+            Directory.CreateDirectory(dir);
+
+        await File.WriteAllBytesAsync(outputFile, pngData, token).ConfigureAwait(false);
+#if DEBUG
+        sw.Stop();
+        Logger.DevkitServer.LogDebug(nameof(EncodeImageJob), $"Write: {sw.GetElapsedMilliseconds().Format("0.##")} ms.");
+#endif
+        await UniTask.SwitchToMainThread(token);
     }
 }
