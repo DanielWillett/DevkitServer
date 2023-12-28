@@ -398,6 +398,9 @@ public class DevkitServerSystemConfig : SchemaConfiguration
     public bool DebugLogging { get; set; }
 
 #if CLIENT
+    [JsonPropertyName("use_vanilla_cartography_in_singleplayer")]
+    public bool UseVanillaCartographyInSingleplayer { get; set; }
+
     [JsonPropertyName("enable_object_ui_extension")]
     public bool EnableObjectUIExtension { get; set; }
 
@@ -471,6 +474,7 @@ public class DevkitServerSystemConfig : SchemaConfiguration
         DebugLogging = false;
 #if CLIENT
         DisableTerminal = false;
+        UseVanillaCartographyInSingleplayer = false;
         EnableObjectUIExtension = true;
         EnableBetterLevelCreation = true;
         LevelObjectEditKeybind = KeyCode.F8;

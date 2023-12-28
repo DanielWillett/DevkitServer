@@ -36,6 +36,13 @@
   "walmart_pc_support": false,
 
   /*
+   *  Falls back to the vanilla chart and map functions when in singleplayer edit mode.
+   *
+   *  To keep clients from disconnecting while rendering it's required in multiplayer mode.
+   */
+  "use_vanilla_cartography_in_singleplayer": false,
+
+  /*
    *  Enables a preview window for your selected object in the Object Editor.
    *
    *  Disable if you're seeing crashes or lag when editing objects.

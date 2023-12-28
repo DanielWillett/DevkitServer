@@ -1,5 +1,4 @@
-﻿using DevkitServer.API.Logging;
-using DevkitServer.API.Storage;
+﻿using DevkitServer.API.Storage;
 using DevkitServer.Configuration;
 using System.Diagnostics;
 using System.Globalization;
@@ -7,6 +6,9 @@ using System.IO.Compression;
 using Backup = (string Path, System.DateTime UtcTimestamp);
 using CompressionLevel = System.IO.Compression.CompressionLevel;
 using Level = SDG.Unturned.Level;
+#if CLIENT
+using DevkitServer.Core.UI.Extensions;
+#endif
 
 namespace DevkitServer.Levels;
 
@@ -38,7 +40,12 @@ public sealed class BackupManager : MonoBehaviour
     /// Log tracker for the next backup.
     /// </summary>
     public BackupLogs Logs => _logs;
-    
+
+    /// <summary>
+    /// Is a backup currently processing?
+    /// </summary>
+    public bool IsBackingUp { get; private set; }
+
 
     [UsedImplicitly]
     private void Start()
@@ -238,6 +245,10 @@ public sealed class BackupManager : MonoBehaviour
         DateTimeOffset timestamp;
         Task<LevelData> saveTask;
         BackupLock.Wait();
+        IsBackingUp = true;
+#if CLIENT
+        EditorPauseUIExtension.OnLevelDataGatherStateUpdated();
+#endif
         try
         {
             _lastSave = CachedTime.RealtimeSinceStartup;
@@ -253,6 +264,10 @@ public sealed class BackupManager : MonoBehaviour
         catch
         {
             BackupLock.Release();
+            IsBackingUp = false;
+#if CLIENT
+            EditorPauseUIExtension.OnLevelDataGatherStateUpdated();
+#endif
             throw;
         }
         Task.Run(async () =>
@@ -278,6 +293,10 @@ public sealed class BackupManager : MonoBehaviour
             }
             finally
             {
+                IsBackingUp = false;
+#if CLIENT
+                EditorPauseUIExtension.OnLevelDataGatherStateUpdated();
+#endif
                 BackupLock.Release();
             }
             if (saveLogs)

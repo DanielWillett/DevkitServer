@@ -5,6 +5,9 @@ using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Util.Encoding;
 using System.Diagnostics;
+#if CLIENT
+using DevkitServer.Core.UI.Extensions;
+#endif
 
 namespace DevkitServer.Levels;
 
@@ -19,6 +22,11 @@ public sealed class LevelData
     internal static bool ShouldActivateSaveLockOnLevelSave = true;
 
     private static readonly InstanceSetter<LevelInfo, string> SetFilePath = Accessor.GenerateInstancePropertySetter<LevelInfo, string>("path", throwOnError: true)!;
+
+    /// <summary>
+    /// If <see cref="LevelData"/> is currently being gathered. Part of this gathering will happen on another thread.
+    /// </summary>
+    public static bool IsGathering { get; private set; }
 
     private string? _lclPath;
     public uint Version { get; private set; }
@@ -47,12 +55,17 @@ public sealed class LevelData
 #endif
         CancellationToken token = default)
     {
-        if (!DevkitServerModule.IsMainThread)
-            await UniTask.SwitchToMainThread(token);
+        await UniTask.SwitchToMainThread(token);
+
 #if DEBUG
         Stopwatch stopwatch = Stopwatch.StartNew();
 #endif
+
         SaveLock.Wait(token); // this is not async to prevent deadlocks (makes sense ik)
+        IsGathering = true;
+#if CLIENT
+        EditorPauseUIExtension.OnLevelDataGatherStateUpdated();
+#endif
         LevelData data;
         try
         {
@@ -141,10 +154,15 @@ public sealed class LevelData
         }
         finally
         {
+            IsGathering = false;
+#if CLIENT
+            DevkitServerUtility.QueueOnMainThread(EditorPauseUIExtension.OnLevelDataGatherStateUpdated);
+#endif
             SaveLock.Release();
         }
 
 #if DEBUG
+        stopwatch.Stop();
         Logger.DevkitServer.LogDebug(nameof(GatherLevelData), $"GatherLevelData took {stopwatch.GetElapsedMilliseconds().Format("F2")} ms.");
 #endif
         return data;

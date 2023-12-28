@@ -130,7 +130,12 @@ public sealed class DevkitServerModule : IModuleNexus
         { "ObjectIconEditorOffsetAssetHint", "Goto offset" },
         { "ObjectIconEditorOffsetAssetButton", "Go" },
         { "VersionKickMessage", "This server is running version {0} of DevkitServer, whereas you are running incompatible version {1}."},
-        { "WorkshopSubmitMenuExistingModIdLabel", "Override Mod ID" }
+        { "WorkshopSubmitMenuExistingModIdLabel", "Override Mod ID" },
+        { "RenderingChartInProgress", "Rendering chart..." },
+        { "RenderingSatelliteInProgress", "Rendering map..." },
+        { "SaveInProgressWillFreeze", "Saving... (saving again will freeze until done)" },
+        { "BackingUpInProgress", "Backing up..." },
+        { "BackupAndSaveButton", "Backup And Save" }
     };
     public static Local CommandLocalization { get; private set; } = null!;
 

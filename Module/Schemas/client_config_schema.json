@@ -29,6 +29,10 @@
       "description": "Removes cosmetic improvements.",
       "type": "boolean"
     },
+    "use_vanilla_cartography_in_singleplayer": {
+      "description": "Falls back to the vanilla chart and map functions when in singleplayer edit mode.",
+      "type": "boolean"
+    },
     "enable_object_ui_extension": {
       "description": "Enables a preview window for your selected object in the Object Editor.",
       "type": "boolean"

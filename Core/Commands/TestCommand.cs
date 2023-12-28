@@ -145,6 +145,22 @@ internal static class CommandTests
 
         ctx.ReplyString($"Managed memory usage after GC: {FormattingUtil.FormatCapacity(memAfter, 4, colorize: true)} (before: {FormattingUtil.FormatCapacity(memBefore, 4, colorize: true)}).");
     }
+    private static void dumpplayers(CommandContext ctx)
+    {
+        Resources.Load<GameObject>("Characters/Player_Dedicated").DumpGameObject(severity: Severity.Info);
+
+        Logger.DevkitServer.LogDebug((string?)null!, default(ReadOnlySpan<char>));
+        Resources.Load<GameObject>("Characters/Player_Server").DumpGameObject(severity: Severity.Info);
+
+        Logger.DevkitServer.LogDebug((string?)null!, default(ReadOnlySpan<char>));
+        Resources.Load<GameObject>("Characters/Player_Client").DumpGameObject(severity: Severity.Info);
+
+        Logger.DevkitServer.LogDebug((string?)null!, default(ReadOnlySpan<char>));
+        Resources.Load<GameObject>("Edit/Editor").DumpGameObject(severity: Severity.Info);
+
+        Logger.DevkitServer.LogDebug((string?)null!, default(ReadOnlySpan<char>));
+        Resources.Load<GameObject>("Edit/Mapper").DumpGameObject(severity: Severity.Info);
+    }
     private static void printtransmissions(CommandContext ctx)
     {
 #if CLIENT
