@@ -453,6 +453,7 @@ internal static class PatchesMain
     }
     
     private static bool _shouldContinueToLaunch;
+    private static bool _hasRulesSub;
     [HarmonyPatch(typeof(Provider), nameof(Provider.launch))]
     [HarmonyPrefix]
     [UsedImplicitly]
@@ -461,14 +462,23 @@ internal static class PatchesMain
         if (_shouldContinueToLaunch)
             return true;
 
-        if (Provider.CurrentServerAdvertisement == null)
+        if (Provider.CurrentServerConnectParameters == null)
         {
-            Logger.DevkitServer.LogWarning(Source, "Unable to find Provider.CurrentServerAdvertisement. This could be caused by using a P2P or fake IP connection, if so please create an issue on GitHub.");
-            return true;
+            Logger.DevkitServer.LogWarning(Source, "Unable to find Provider.CurrentServerConnectParameters. This could be caused by using a P2P or fake IP connection, if so please create an issue on GitHub.");
+            Level.exit();
+            return false;
         }
 
-        Provider.provider.matchmakingService.refreshRules(Provider.CurrentServerAdvertisement.ip, Provider.CurrentServerAdvertisement.queryPort);
-        Provider.provider.matchmakingService.onRulesQueryRefreshed += RulesReady;
+        if (Provider.CurrentServerAdvertisement != null)
+        {
+            if (!_hasRulesSub)
+            {
+                _hasRulesSub = true;
+                Provider.provider.matchmakingService.onRulesQueryRefreshed += RulesReady;
+            }
+
+            Provider.provider.matchmakingService.refreshRules(Provider.CurrentServerAdvertisement.ip, Provider.CurrentServerAdvertisement.queryPort);
+        }
         return false;
     }
     private static void ProceedWithLaunch()
@@ -505,7 +515,11 @@ internal static class PatchesMain
     }
     private static void RulesReady(Dictionary<string, string> rulesmap)
     {
-        Provider.provider.matchmakingService.onRulesQueryRefreshed -= RulesReady;
+        if (_hasRulesSub)
+        {
+            _hasRulesSub = false;
+            Provider.provider.matchmakingService.onRulesQueryRefreshed -= RulesReady;
+        }
         if (rulesmap.TryGetValue(DevkitServerModule.ServerRule, out string val))
         {
             if (!Version.TryParse(val, out Version version) || !DevkitServerModule.IsCompatibleWith(version))
