@@ -36,16 +36,26 @@ public abstract class Plugin : CoreLogger, IDevkitServerColorPlugin, ICachedTran
     public string CommandLocalizationDirectory { get; }
 
     /// <inheritdoc/>
-    public PluginAssembly Assembly { get; set; } = null!;
-
-    /// <inheritdoc/>
     public Local Translations { get; private set; }
 
     /// <inheritdoc/>
-    public string PermissionPrefix { get; set; }
+    public abstract bool DeveloperMode { get; }
 
     /// <inheritdoc/>
-    public abstract bool DeveloperMode { get; }
+    PluginAssembly IDevkitServerPlugin.Assembly { get; set; } = null!;
+
+    /// <inheritdoc/>
+    string IDevkitServerPlugin.PermissionPrefix { get; set; }
+
+    /// <summary>
+    /// Information about the assembly containing the plugin.
+    /// </summary>
+    public PluginAssembly Assembly => ((IDevkitServerPlugin)this).Assembly;
+
+    /// <summary>
+    /// Must be unique among all loaded plugins. Can not contain a period.
+    /// </summary>
+    public string PermissionPrefix => ((IDevkitServerPlugin)this).PermissionPrefix;
 
     protected Plugin() : base("plugin")
     {
@@ -58,11 +68,11 @@ public abstract class Plugin : CoreLogger, IDevkitServerColorPlugin, ICachedTran
         CommandLocalizationDirectory = Path.Combine(LocalizationDirectory, "Commands");
         MainLocalizationDirectory = Path.Combine(LocalizationDirectory, "Main");
         Translations = Localization.tryRead(MainLocalizationDirectory, false);
-        PermissionPrefix = name.ToLowerInvariant().Replace('.', '-');
+        ((IDevkitServerPlugin)this).PermissionPrefix = name.ToLowerInvariant().Replace('.', '-');
         if (GetType().TryGetAttributeSafe(out PermissionPrefixAttribute prefixAttr, true) && !string.IsNullOrWhiteSpace(prefixAttr.Prefix))
-            PermissionPrefix = prefixAttr.Prefix;
+            ((IDevkitServerPlugin)this).PermissionPrefix = prefixAttr.Prefix;
         else if (GetType().Assembly.TryGetAttributeSafe(out prefixAttr, true) && !string.IsNullOrWhiteSpace(prefixAttr.Prefix))
-            PermissionPrefix = prefixAttr.Prefix;
+            ((IDevkitServerPlugin)this).PermissionPrefix = prefixAttr.Prefix;
     }
     protected virtual LocalDatDictionary DefaultLocalization => new LocalDatDictionary();
 

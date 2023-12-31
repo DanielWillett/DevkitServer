@@ -10,6 +10,7 @@ public interface IDevkitServerPlugin : IDevkitServerSourceLogger
     /// Must be unique among all loaded plugins. Can not contain a period.
     /// </summary>
     string PermissionPrefix { get; set; }
+
     /// <summary>
     /// The name of the plugin used for display and data path.
     /// </summary>

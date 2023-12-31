@@ -24,7 +24,7 @@
     <Description>Module for Unturned that enables multi-user map editing.</Description>
     <PackageProjectUrl>https://github.com/DanielWillett/DevkitServer</PackageProjectUrl>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageTags>unturned, module, map, editor, multiplayer</PackageTags>
+    <PackageTags>unturned;module;map;editor;multiplayer;devkitserver</PackageTags>
     <PackageReleaseNotes>https://github.com/DanielWillett/DevkitServer/releases</PackageReleaseNotes>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
