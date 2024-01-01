@@ -102,4 +102,7 @@ public sealed class BackupConfiguration : SchemaConfiguration
 
     [JsonPropertyName("save_backup_logs")]
     public bool SaveBackupLogs { get; set; }
+
+    [JsonPropertyName("save_level_on_backup")]
+    public bool SaveOnBackup { get; set; }
 }

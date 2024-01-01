@@ -1,5 +1,6 @@
 ﻿#if CLIENT
 using DevkitServer.API;
+using DevkitServer.API.Devkit.Spawns;
 using DevkitServer.Core.Tools;
 using DevkitServer.Players;
 using HarmonyLib;
@@ -67,7 +68,7 @@ internal static class SpawnsEditorPatches
         {
             if (selection.transform.TryGetComponent(out PlayerSpawnpointNode node))
             {
-                node.Spawnpoint.SetIsAlternate(state);
+                node.Spawnpoint.SetIsAlternateLocal(state);
             }
         }
     }

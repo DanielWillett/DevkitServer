@@ -105,5 +105,10 @@
    *
    *  Default: true
    */
-  "save_backup_logs": true
+  "save_backup_logs": true,
+
+  /*
+   *  Also save the world when an automatic backup runs.
+   */
+  "save_level_on_backup": false
 }

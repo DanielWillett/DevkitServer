@@ -1,4 +1,5 @@
 ﻿#if CLIENT
+using DevkitServer.API.Devkit;
 using DevkitServer.Configuration;
 using DevkitServer.Players;
 using SDG.Framework.Devkit;
@@ -173,6 +174,15 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                         DevkitTransactionManager.beginTransaction("Transform");
                         foreach (DevkitSelection selection in DevkitSelectionManager.selection)
                             DevkitTransactionManager.recordTransaction(new DevkitServerTransformedItem(selection.transform));
+                        DevkitTransactionManager.endTransaction();
+                    }
+                    else
+                    {
+                        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+                        {
+                            if (selection.gameObject.TryGetComponent(out IDevkitSelectionTransformableHandler transformable))
+                                transformable.transformSelection();
+                        }
                     }
                 }
                 else
@@ -208,6 +218,8 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                 Handles.snapRotationIntervalDegrees = DevkitSelectionToolOptions.instance != null ? DevkitSelectionToolOptions.instance.snapRotation : 1.0f;
                 Handles.wantsToSnap = InputEx.GetKey(ControlsSettings.snap);
                 Handles.MouseMove(ray);
+                if (DevkitSelectionManager.selection.Count > 0)
+                    OnTempMoved();
             }
             else if (InputEx.GetKeyDown(KeyCode.E))
             {
@@ -286,9 +298,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         LateInputTick();
 
         if (DevkitSelectionManager.selection.Count == 0)
-        {
             return;
-        }
 
         if (HandleMode == SelectionTool.ESelectionMode.POSITION)
             Handles.SetPreferredMode(_wantsBoundsEditor ? TransformHandles.EMode.PositionBounds : TransformHandles.EMode.Position);
@@ -334,22 +344,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         
         if (InputEx.GetKeyDown(KeyCode.V) && IntlCopyBuffer.Count > 0)
         {
-            DevkitSelectionManager.clear();
-            if (!DevkitServerModule.IsEditing)
-                DevkitTransactionManager.beginTransaction("Paste");
-            foreach (GameObject go in IntlCopyBuffer)
-            {
-                if (go == null)
-                    continue;
-                IDevkitSelectionCopyableHandler? handler = go.GetComponent<IDevkitSelectionCopyableHandler>();
-                GameObject copy = handler == null ? Object.Instantiate(go) : handler.copySelection();
-                if (!DevkitServerModule.IsEditing)
-                    DevkitTransactionUtility.recordInstantiation(copy);
-                else copy.SetActive(true);
-                DevkitSelectionManager.add(new DevkitSelection(copy, null));
-            }
-            if (!DevkitServerModule.IsEditing)
-                DevkitTransactionManager.endTransaction();
+            Paste(IntlCopyBuffer);
         }
         else if (InputEx.GetKeyDown(KeyCode.Delete))
         {
@@ -358,14 +353,14 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                 DevkitTransactionManager.beginTransaction("Delete");
 
                 foreach (DevkitSelection selection in DevkitSelectionManager.selection)
-                    DevkitTransactionUtility.recordDestruction(selection.gameObject);
+                    Delete(selection);
 
                 DevkitTransactionManager.endTransaction();
             }
             else
             {
                 foreach (DevkitSelection selection in DevkitSelectionManager.selection)
-                    Object.Destroy(selection.gameObject);
+                    Delete(selection);
             }
 
             DevkitSelectionManager.clear();
@@ -482,11 +477,49 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
     protected abstract IEnumerable<GameObject> EnumerateAreaSelectableObjects();
     protected virtual void EarlyInputTick() { }
     protected virtual void LateInputTick() { }
+    protected virtual void OnTempMoved() { }
     protected virtual void OnMiddleClickPicked(in RaycastHit hit) { }
     protected virtual void OnGLRender()
     {
         if (IsAreaSelecting)
             DevkitServerGLUtility.DrawSelectBox(BeginAreaSelect, EndAreaSelect);
+    }
+    protected virtual void Delete(DevkitSelection selection)
+    {
+        bool destroy = true;
+
+        if (selection.gameObject.TryGetComponent(out IDevkitSelectionDeletableHandler deletable))
+            deletable.Delete(ref destroy);
+
+        if (!destroy)
+            return;
+
+        if (!DevkitServerModule.IsEditing)
+            DevkitTransactionUtility.recordDestruction(selection.gameObject);
+        else
+            Object.Destroy(selection.gameObject);
+    }
+    protected virtual void Paste(IReadOnlyList<GameObject> copyBuffer)
+    {
+        DevkitSelectionManager.clear();
+        
+        if (!DevkitServerModule.IsEditing)
+            DevkitTransactionManager.beginTransaction("Paste");
+
+        foreach (GameObject go in IntlCopyBuffer)
+        {
+            if (go == null)
+                continue;
+            IDevkitSelectionCopyableHandler? handler = go.GetComponent<IDevkitSelectionCopyableHandler>();
+            GameObject copy = handler == null ? Object.Instantiate(go) : handler.copySelection();
+            if (!DevkitServerModule.IsEditing)
+                DevkitTransactionUtility.recordInstantiation(copy);
+            else copy.SetActive(true);
+            DevkitSelectionManager.add(new DevkitSelection(copy, null));
+        }
+        
+        if (!DevkitServerModule.IsEditing)
+            DevkitTransactionManager.endTransaction();
     }
     public void SimulateHandleMovement(Vector3 newPosition, Quaternion newRotation, Vector3 newScale, bool hasRotation, bool hasScale)
     {

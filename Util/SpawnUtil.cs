@@ -2,10 +2,9 @@
 using DevkitServer.Models;
 using DevkitServer.Util.Region;
 using DevkitServer.API;
-
 #if CLIENT
 using DevkitServer.Core;
-using DevkitServer.Core.Tools;
+using DevkitServer.API.Devkit.Spawns;
 #endif
 
 namespace DevkitServer.Util;
@@ -308,9 +307,10 @@ public static class SpawnUtil
     /// <summary>
     /// Locally sets the <see cref="PlayerSpawnpoint.isAlt"/> backing field to <paramref name="isAlternate"/>.
     /// </summary>
+    /// <remarks>Non-replicating.</remarks>
     /// <exception cref="MemberAccessException">Reflection failure.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void SetIsAlternate(this PlayerSpawnpoint spawn, bool isAlternate)
+    public static void SetIsAlternateLocal(this PlayerSpawnpoint spawn, bool isAlternate)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -330,7 +330,7 @@ public static class SpawnUtil
         SetPlayerSpawnpointIsAlternate.Invoke(spawn, isAlternate);
         if (index >= 0)
         {
-            Logger.DevkitServer.LogDebug(nameof(SetIsAlternate), $"Player spawnpoint updated: {(oldIsAlternate ? "Alternate" : "Primary")} -> {(isAlternate ? "Alternate" : "Primary")}");
+            Logger.DevkitServer.LogDebug(nameof(SetIsAlternateLocal), $"Player spawnpoint updated: {(oldIsAlternate ? "Alternate" : "Primary")} -> {(isAlternate ? "Alternate" : "Primary")}");
             EventOnPlayerSpawnpointIsAlternateChanged.TryInvoke(spawn, index, isAlternate);
         }
     }
@@ -658,9 +658,16 @@ public static class SpawnUtil
     /// <summary>
     /// Locally removes an <see cref="AnimalSpawnpoint"/> from the list and destroyes the node.
     /// </summary>
+    /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static bool RemoveAnimalSpawn(AnimalSpawnpoint spawn) => RemoveAnimalSpawn(spawn, true);
-    internal static bool RemoveAnimalSpawn(AnimalSpawnpoint spawn, bool destroyNode)
+    public static bool RemoveAnimalSpawnLocal(AnimalSpawnpoint spawn) => RemoveAnimalSpawnLocal(spawn, true);
+
+    /// <summary>
+    /// Locally removes an <see cref="AnimalSpawnpoint"/> from the list and destroyes the node.
+    /// </summary>
+    /// <remarks>Non-replicating.</remarks>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    internal static bool RemoveAnimalSpawnLocal(AnimalSpawnpoint spawn, bool destroyNode)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -700,10 +707,10 @@ public static class SpawnUtil
             EventOnAnimalSpawnpointRemoved.TryInvoke(spawn, index);
 
             EventOnAnimalSpawnpointIndexUpdated.TryInvoke(changed, oldIndex, index);
-            Logger.DevkitServer.LogDebug(nameof(RemoveAnimalSpawn), $"Animal spawnpoint index updated after replacing other removed spawnpoint on add: {oldIndex.Format()} -> {index.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(RemoveAnimalSpawnLocal), $"Animal spawnpoint index updated after replacing other removed spawnpoint on add: {oldIndex.Format()} -> {index.Format()}.");
         }
 
-        Logger.DevkitServer.LogDebug(nameof(RemoveAnimalSpawn), $"Animal spawnpoint removed: {index.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(RemoveAnimalSpawnLocal), $"Animal spawnpoint removed: {index.Format()}.");
 
         if (destroyNode && spawn.node != null)
         {
@@ -719,9 +726,16 @@ public static class SpawnUtil
     /// <summary>
     /// Locally removes a <see cref="VehicleSpawnpoint"/> from the list and destroyes the node.
     /// </summary>
+    /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static bool RemoveVehicleSpawn(VehicleSpawnpoint spawn) => RemoveVehicleSpawn(spawn, true);
-    internal static bool RemoveVehicleSpawn(VehicleSpawnpoint spawn, bool destroyNode)
+    public static bool RemoveVehicleSpawnLocal(VehicleSpawnpoint spawn) => RemoveVehicleSpawnLocal(spawn, true);
+
+    /// <summary>
+    /// Locally removes a <see cref="VehicleSpawnpoint"/> from the list and destroyes the node.
+    /// </summary>
+    /// <remarks>Non-replicating.</remarks>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    internal static bool RemoveVehicleSpawnLocal(VehicleSpawnpoint spawn, bool destroyNode)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -761,10 +775,10 @@ public static class SpawnUtil
             EventOnVehicleSpawnpointRemoved.TryInvoke(spawn, index);
 
             EventOnVehicleSpawnpointIndexUpdated.TryInvoke(changed, oldIndex, index);
-            Logger.DevkitServer.LogDebug(nameof(RemoveVehicleSpawn), $"Vehicle spawnpoint index updated after replacing other removed spawnpoint on add: {oldIndex.Format()} -> {index.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(RemoveVehicleSpawnLocal), $"Vehicle spawnpoint index updated after replacing other removed spawnpoint on add: {oldIndex.Format()} -> {index.Format()}.");
         }
 
-        Logger.DevkitServer.LogDebug(nameof(RemoveVehicleSpawn), $"Vehicle spawnpoint removed: {index.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(RemoveVehicleSpawnLocal), $"Vehicle spawnpoint removed: {index.Format()}.");
 
         if (destroyNode && spawn.node != null)
         {
@@ -780,9 +794,16 @@ public static class SpawnUtil
     /// <summary>
     /// Locally removes a <see cref="PlayerSpawnpoint"/> from the list and destroyes the node.
     /// </summary>
+    /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static bool RemovePlayerSpawn(PlayerSpawnpoint spawn) => RemovePlayerSpawn(spawn, true);
-    internal static bool RemovePlayerSpawn(PlayerSpawnpoint spawn, bool destroyNode)
+    public static bool RemovePlayerSpawnLocal(PlayerSpawnpoint spawn) => RemovePlayerSpawnLocal(spawn, true);
+
+    /// <summary>
+    /// Locally removes a <see cref="PlayerSpawnpoint"/> from the list and destroyes the node.
+    /// </summary>
+    /// <remarks>Non-replicating.</remarks>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    internal static bool RemovePlayerSpawnLocal(PlayerSpawnpoint spawn, bool destroyNode)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -822,10 +843,10 @@ public static class SpawnUtil
             EventOnPlayerSpawnpointRemoved.TryInvoke(spawn, index);
 
             EventOnPlayerSpawnpointIndexUpdated.TryInvoke(changed, oldIndex, index);
-            Logger.DevkitServer.LogDebug(nameof(RemovePlayerSpawn), $"Player spawnpoint index updated after replacing other removed spawnpoint on add: {oldIndex.Format()} -> {index.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(RemovePlayerSpawnLocal), $"Player spawnpoint index updated after replacing other removed spawnpoint on add: {oldIndex.Format()} -> {index.Format()}.");
         }
 
-        Logger.DevkitServer.LogDebug(nameof(RemovePlayerSpawn), $"Player spawnpoint removed: {index.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(RemovePlayerSpawnLocal), $"Player spawnpoint removed: {index.Format()}.");
         
         if (destroyNode && spawn.node != null)
         {
@@ -841,9 +862,16 @@ public static class SpawnUtil
     /// <summary>
     /// Locally removes an <see cref="ItemSpawnpoint"/> from the list and destroyes the node.
     /// </summary>
+    /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static bool RemoveItemSpawn(ItemSpawnpoint spawn) => RemoveItemSpawn(spawn, true);
-    internal static bool RemoveItemSpawn(ItemSpawnpoint spawn, bool destroyNode)
+    public static bool RemoveItemSpawnLocal(ItemSpawnpoint spawn) => RemoveItemSpawnLocal(spawn, true);
+
+    /// <summary>
+    /// Locally removes an <see cref="ItemSpawnpoint"/> from the list and destroyes the node.
+    /// </summary>
+    /// <remarks>Non-replicating.</remarks>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    internal static bool RemoveItemSpawnLocal(ItemSpawnpoint spawn, bool destroyNode)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -878,10 +906,10 @@ public static class SpawnUtil
                 EventOnItemSpawnpointRemoved.TryInvoke(spawn, newRegion);
 
                 EventOnItemSpawnpointRegionUpdated.TryInvoke(changed, oldRegion, newRegion);
-                Logger.DevkitServer.LogDebug(nameof(RemoveItemSpawn), $"Item spawnpoint index updated after replacing other removed spawnpoint on add: {oldRegion.Format()} -> {newRegion.Format()}.");
+                Logger.DevkitServer.LogDebug(nameof(RemoveItemSpawnLocal), $"Item spawnpoint index updated after replacing other removed spawnpoint on add: {oldRegion.Format()} -> {newRegion.Format()}.");
             }
 
-            Logger.DevkitServer.LogDebug(nameof(RemoveItemSpawn), $"Item spawnpoint removed: {newRegion.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(RemoveItemSpawnLocal), $"Item spawnpoint removed: {newRegion.Format()}.");
 
             if (destroyNode && spawn.node != null)
             {
@@ -910,9 +938,16 @@ public static class SpawnUtil
     /// <summary>
     /// Locally removes a <see cref="ZombieSpawnpoint"/> from the list and destroyes the node.
     /// </summary>
+    /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static bool RemoveZombieSpawn(ZombieSpawnpoint spawn) => RemoveZombieSpawn(spawn, true);
-    internal static bool RemoveZombieSpawn(ZombieSpawnpoint spawn, bool destroyNode)
+    public static bool RemoveZombieSpawnLocal(ZombieSpawnpoint spawn) => RemoveZombieSpawnLocal(spawn, true);
+
+    /// <summary>
+    /// Locally removes a <see cref="ZombieSpawnpoint"/> from the list and destroyes the node.
+    /// </summary>
+    /// <remarks>Non-replicating.</remarks>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    internal static bool RemoveZombieSpawnLocal(ZombieSpawnpoint spawn, bool destroyNode)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -947,10 +982,10 @@ public static class SpawnUtil
                 EventOnZombieSpawnpointRemoved.TryInvoke(spawn, newRegion);
 
                 EventOnZombieSpawnpointRegionUpdated.TryInvoke(changed, oldRegion, newRegion);
-                Logger.DevkitServer.LogDebug(nameof(RemoveZombieSpawn), $"Zombie spawnpoint index updated after replacing other removed spawnpoint on add: {oldRegion.Format()} -> {newRegion.Format()}.");
+                Logger.DevkitServer.LogDebug(nameof(RemoveZombieSpawnLocal), $"Zombie spawnpoint index updated after replacing other removed spawnpoint on add: {oldRegion.Format()} -> {newRegion.Format()}.");
             }
 
-            Logger.DevkitServer.LogDebug(nameof(RemoveZombieSpawn), $"Zombie spawnpoint removed: {newRegion.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(RemoveZombieSpawnLocal), $"Zombie spawnpoint removed: {newRegion.Format()}.");
 
             if (destroyNode && spawn.node != null)
             {
@@ -979,8 +1014,10 @@ public static class SpawnUtil
     /// <summary>
     /// Add an <see cref="AnimalSpawnpoint"/> to <see cref="LevelAnimals"/> if it isn't already added and adds any necessary component to it.
     /// </summary>
+    /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void AddAnimalSpawn(AnimalSpawnpoint spawn)
+    /// <exception cref="InvalidOperationException">Too many spawns in the world (65535).</exception>
+    public static void AddAnimalSpawnLocal(AnimalSpawnpoint spawn)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -993,6 +1030,8 @@ public static class SpawnUtil
         if (added)
         {
             index = LevelAnimals.spawns.Count;
+            if (index >= ushort.MaxValue)
+                throw new InvalidOperationException($"There can not be more than {ushort.MaxValue} animal spawns in the world.");
             LevelAnimals.spawns.Add(spawn);
         }
 #if CLIENT
@@ -1009,17 +1048,18 @@ public static class SpawnUtil
         if (added)
         {
             EventOnAnimalSpawnpointAdded.TryInvoke(spawn, index);
-            Logger.DevkitServer.LogDebug(nameof(AddAnimalSpawn), "Animal spawnpoint added.");
+            Logger.DevkitServer.LogDebug(nameof(AddAnimalSpawnLocal), "Animal spawnpoint added.");
         }
         else
-            Logger.DevkitServer.LogDebug(nameof(AddAnimalSpawn), "Animal spawnpoint already added.");
+            Logger.DevkitServer.LogDebug(nameof(AddAnimalSpawnLocal), "Animal spawnpoint already added.");
     }
 
     /// <summary>
     /// Add a <see cref="VehicleSpawnpoint"/> to <see cref="LevelVehicles"/> if it isn't already added and adds any necessary component to it.
     /// </summary>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void AddVehicleSpawn(VehicleSpawnpoint spawn)
+    /// <exception cref="InvalidOperationException">Too many spawns in the world (65535).</exception>
+    public static void AddVehicleSpawnLocal(VehicleSpawnpoint spawn)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -1032,6 +1072,8 @@ public static class SpawnUtil
         if (added)
         {
             index = LevelVehicles.spawns.Count;
+            if (index >= ushort.MaxValue)
+                throw new InvalidOperationException($"There can not be more than {ushort.MaxValue} vehicle spawns in the world.");
             LevelVehicles.spawns.Add(spawn);
         }
 #if CLIENT
@@ -1048,17 +1090,19 @@ public static class SpawnUtil
         if (added)
         {
             EventOnVehicleSpawnpointAdded.TryInvoke(spawn, index);
-            Logger.DevkitServer.LogDebug(nameof(AddVehicleSpawn), "Vehicle spawnpoint added.");
+            Logger.DevkitServer.LogDebug(nameof(AddVehicleSpawnLocal), "Vehicle spawnpoint added.");
         }
         else
-            Logger.DevkitServer.LogDebug(nameof(AddVehicleSpawn), "Vehicle spawnpoint already added.");
+            Logger.DevkitServer.LogDebug(nameof(AddVehicleSpawnLocal), "Vehicle spawnpoint already added.");
     }
 
     /// <summary>
     /// Add a <see cref="PlayerSpawnpoint"/> to <see cref="LevelPlayers"/> if it isn't already added and adds any necessary component to it.
     /// </summary>
+    /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void AddPlayerSpawn(PlayerSpawnpoint spawn)
+    /// <exception cref="InvalidOperationException">Too many spawns in the world (255).</exception>
+    public static void AddPlayerSpawnLocal(PlayerSpawnpoint spawn)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -1071,6 +1115,8 @@ public static class SpawnUtil
         if (added)
         {
             index = LevelPlayers.spawns.Count;
+            if (index >= byte.MaxValue)
+                throw new InvalidOperationException($"There can not be more than {byte.MaxValue} player spawns in the world.");
             LevelPlayers.spawns.Add(spawn);
         }
 #if CLIENT
@@ -1087,18 +1133,19 @@ public static class SpawnUtil
         if (added)
         {
             EventOnPlayerSpawnpointAdded.TryInvoke(spawn, index);
-            Logger.DevkitServer.LogDebug(nameof(AddPlayerSpawn), "Player spawnpoint added.");
+            Logger.DevkitServer.LogDebug(nameof(AddPlayerSpawnLocal), "Player spawnpoint added.");
         }
         else
-            Logger.DevkitServer.LogDebug(nameof(AddPlayerSpawn), "Player spawnpoint already added.");
+            Logger.DevkitServer.LogDebug(nameof(AddPlayerSpawnLocal), "Player spawnpoint already added.");
     }
 
     /// <summary>
     /// Add an <see cref="ItemSpawnpoint"/> to <see cref="LevelItems"/> if it isn't already added and adds any necessary component to it.
     /// </summary>
-    /// <remarks>Region is calculated from <see cref="ItemSpawnpoint.point"/>. If it's out of bounds the editor node will be destroyed and nothing will be added.</remarks>
+    /// <remarks>Non-replicating. Region is calculated from <see cref="ItemSpawnpoint.point"/>. If it's out of bounds the editor node will be destroyed and nothing will be added.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void AddItemSpawn(ItemSpawnpoint spawn)
+    /// <exception cref="InvalidOperationException">Too many spawns in that region (65535).</exception>
+    public static void AddItemSpawnLocal(ItemSpawnpoint spawn)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -1165,7 +1212,7 @@ public static class SpawnUtil
                 }
 #endif
                 region.RemoveAt(region.Count - 1);
-                Logger.DevkitServer.LogDebug(nameof(AddItemSpawn), $"Item spawnpoint region updated after replacing other removed spawnpoint on add: {changedOldRegion.Value.Format()} -> {changedNewRegion.Value.Format()}.");
+                Logger.DevkitServer.LogDebug(nameof(AddItemSpawnLocal), $"Item spawnpoint region updated after replacing other removed spawnpoint on add: {changedOldRegion.Value.Format()} -> {changedNewRegion.Value.Format()}.");
             }
             alreadyExists = false;
             regionChanged = true;
@@ -1176,6 +1223,8 @@ public static class SpawnUtil
         {
             List<ItemSpawnpoint> region = LevelItems.spawns[x2, y2];
             index2 = region.Count;
+            if (index2 >= ushort.MaxValue)
+                throw new InvalidOperationException($"There can not be more than {ushort.MaxValue} item spawns in a region ({x2}, {y2}).");
             region.Add(spawn);
         }
 
@@ -1200,21 +1249,22 @@ public static class SpawnUtil
             if (changed != null)
                 EventOnItemSpawnpointRegionUpdated.TryInvoke(changed, changedOldRegion!.Value, changedNewRegion!.Value);
 
-            Logger.DevkitServer.LogDebug(nameof(AddItemSpawn), $"Item spawnpoint region updated on add: {oldRegion.Format()} -> {regionId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(AddItemSpawnLocal), $"Item spawnpoint region updated on add: {oldRegion.Format()} -> {regionId.Format()}.");
         }
         else if (!alreadyExists)
         {
             EventOnItemSpawnpointAdded.TryInvoke(spawn, regionId);
-            Logger.DevkitServer.LogDebug(nameof(AddItemSpawn), $"Item spawnpoint added: {regionId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(AddItemSpawnLocal), $"Item spawnpoint added: {regionId.Format()}.");
         }
     }
 
     /// <summary>
     /// Add a <see cref="ZombieSpawnpoint"/> to <see cref="LevelZombies"/> if it isn't already added and adds any necessary component to it.
     /// </summary>
-    /// <remarks>Region is calculated from <see cref="ItemSpawnpoint.point"/>. If it's out of bounds the editor node will be destroyed and nothing will be added.</remarks>
+    /// <remarks>Non-replicating. Region is calculated from <see cref="ZombieSpawnpoint.point"/>. If it's out of bounds the editor node will be destroyed and nothing will be added.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void AddZombieSpawn(ZombieSpawnpoint spawn)
+    /// <exception cref="InvalidOperationException">Too many spawns in that region (65535).</exception>
+    public static void AddZombieSpawnLocal(ZombieSpawnpoint spawn)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -1281,7 +1331,7 @@ public static class SpawnUtil
                 }
 #endif
                 region.RemoveAt(region.Count - 1);
-                Logger.DevkitServer.LogDebug(nameof(AddZombieSpawn), $"Zombie spawnpoint region updated after replacing other removed spawnpoint on add: {changedOldRegion.Value.Format()} -> {changedNewRegion.Value.Format()}.");
+                Logger.DevkitServer.LogDebug(nameof(AddZombieSpawnLocal), $"Zombie spawnpoint region updated after replacing other removed spawnpoint on add: {changedOldRegion.Value.Format()} -> {changedNewRegion.Value.Format()}.");
             }
             alreadyExists = false;
             regionChanged = true;
@@ -1292,6 +1342,8 @@ public static class SpawnUtil
         {
             List<ZombieSpawnpoint> region = LevelZombies.spawns[x2, y2];
             index2 = region.Count;
+            if (index2 >= ushort.MaxValue)
+                throw new InvalidOperationException($"There can not be more than {ushort.MaxValue} zombie spawns in a region ({x2}, {y2}).");
             region.Add(spawn);
         }
 
@@ -1316,21 +1368,22 @@ public static class SpawnUtil
             if (changed != null)
                 EventOnZombieSpawnpointRegionUpdated.TryInvoke(changed, changedOldRegion!.Value, changedNewRegion!.Value);
 
-            Logger.DevkitServer.LogDebug(nameof(AddZombieSpawn), $"Zombie spawnpoint region updated on add: {oldRegion.Format()} -> {regionId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(AddZombieSpawnLocal), $"Zombie spawnpoint region updated on add: {oldRegion.Format()} -> {regionId.Format()}.");
         }
         else if (!alreadyExists)
         {
             EventOnZombieSpawnpointAdded.TryInvoke(spawn, regionId);
-            Logger.DevkitServer.LogDebug(nameof(AddZombieSpawn), $"Zombie spawnpoint added: {regionId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(AddZombieSpawnLocal), $"Zombie spawnpoint added: {regionId.Format()}.");
         }
     }
 
     /// <summary>
     /// Locally moves the spawnpoint to <paramref name="position"/>. Calls local events.
     /// </summary>
+    /// <remarks>Non-replicating.</remarks>
     /// <exception cref="MissingMemberException">Reflection failure.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void MoveSpawnpoint(AnimalSpawnpoint point, Vector3 position)
+    public static void MoveSpawnpointLocal(AnimalSpawnpoint point, Vector3 position)
     {
         if (SetAnimalSpawnpointPoint == null)
             throw new MissingMemberException("Instance setter for AnimalSpawnpoint.point is not valid.");
@@ -1353,7 +1406,7 @@ public static class SpawnUtil
         }
 
         EventOnAnimalSpawnpointMoved.TryInvoke(point, oldPosition, position);
-        Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Animal spawnpoint moved: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
+        Logger.DevkitServer.LogDebug(nameof(MoveSpawnpointLocal), $"Animal spawnpoint moved: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
     }
 
     /// <summary>
@@ -1361,7 +1414,7 @@ public static class SpawnUtil
     /// </summary>
     /// <exception cref="MissingMemberException">Reflection failure.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void MoveSpawnpoint(VehicleSpawnpoint point, Vector3 position)
+    public static void MoveSpawnpointLocal(VehicleSpawnpoint point, Vector3 position)
     {
         if (SetVehicleSpawnpointPoint == null)
             throw new MissingMemberException("Instance setter for VehicleSpawnpoint.point is not valid.");
@@ -1384,7 +1437,7 @@ public static class SpawnUtil
         }
 
         EventOnVehicleSpawnpointMoved.TryInvoke(point, oldPosition, position, point.angle, point.angle);
-        Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Vehicle spawnpoint moved: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
+        Logger.DevkitServer.LogDebug(nameof(MoveSpawnpointLocal), $"Vehicle spawnpoint moved: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
     }
 
     /// <summary>
@@ -1392,7 +1445,7 @@ public static class SpawnUtil
     /// </summary>
     /// <exception cref="MissingMemberException">Reflection failure.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void MoveSpawnpoint(PlayerSpawnpoint point, Vector3 position)
+    public static void MoveSpawnpointLocal(PlayerSpawnpoint point, Vector3 position)
     {
         if (SetPlayerSpawnpointPoint == null)
             throw new MissingMemberException("Instance setter for PlayerSpawnpoint.point is not valid.");
@@ -1415,7 +1468,7 @@ public static class SpawnUtil
         }
 
         EventOnPlayerSpawnpointMoved.TryInvoke(point, oldPosition, position, point.angle, point.angle);
-        Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Player spawnpoint moved: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
+        Logger.DevkitServer.LogDebug(nameof(MoveSpawnpointLocal), $"Player spawnpoint moved: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
     }
 
     /// <summary>
@@ -1424,7 +1477,7 @@ public static class SpawnUtil
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="position"/> is not a valid position in the region grid.</exception>
     /// <exception cref="MissingMemberException">Reflection failure.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void MoveSpawnpoint(ItemSpawnpoint point, Vector3 position, out RegionIdentifier region)
+    public static void MoveSpawnpointLocal(ItemSpawnpoint point, Vector3 position, out RegionIdentifier region)
     {
         if (SetItemSpawnpointPoint == null)
             throw new MissingMemberException("Instance setter for ItemSpawnpoint.point is not valid.");
@@ -1469,7 +1522,7 @@ public static class SpawnUtil
                     }
 #endif
                     region.RemoveAt(region.Count - 1);
-                    Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Item spawnpoint region updated after replacing other removed spawnpoint on move: {changedOldRegion.Value.Format()} -> {newRegion.Format()}.");
+                    Logger.DevkitServer.LogDebug(nameof(MoveSpawnpointLocal), $"Item spawnpoint region updated after replacing other removed spawnpoint on move: {changedOldRegion.Value.Format()} -> {newRegion.Format()}.");
                 }
             }
             removedFrom = newRegion;
@@ -1508,12 +1561,12 @@ public static class SpawnUtil
 
             EventOnItemSpawnpointMoved.TryInvoke(point, region, oldPosition, position);
 
-            Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Item spawnpoint moved: {removedFrom.Value.Format()} -> {region.Format()}, pos: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
+            Logger.DevkitServer.LogDebug(nameof(MoveSpawnpointLocal), $"Item spawnpoint moved: {removedFrom.Value.Format()} -> {region.Format()}, pos: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
         }
         else
         {
             EventOnItemSpawnpointAdded.TryInvoke(point, region);
-            Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Item spawnpoint added on move: {region.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(MoveSpawnpointLocal), $"Item spawnpoint added on move: {region.Format()}.");
         }
     }
 
@@ -1523,7 +1576,7 @@ public static class SpawnUtil
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="position"/> is not a valid position in the region grid.</exception>
     /// <exception cref="MissingMemberException">Reflection failure.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void MoveSpawnpoint(ZombieSpawnpoint point, Vector3 position, out RegionIdentifier region)
+    public static void MoveSpawnpointLocal(ZombieSpawnpoint point, Vector3 position, out RegionIdentifier region)
     {
         if (SetZombieSpawnpointPoint == null)
             throw new MissingMemberException("Instance setter for ZombieSpawnpoint.point is not valid.");
@@ -1568,7 +1621,7 @@ public static class SpawnUtil
                     }
 #endif
                     region.RemoveAt(region.Count - 1);
-                    Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Zombie spawnpoint region updated after replacing other removed spawnpoint on move: {changedOldRegion.Value.Format()} -> {newRegion.Format()}.");
+                    Logger.DevkitServer.LogDebug(nameof(MoveSpawnpointLocal), $"Zombie spawnpoint region updated after replacing other removed spawnpoint on move: {changedOldRegion.Value.Format()} -> {newRegion.Format()}.");
                 }
             }
             removedFrom = newRegion;
@@ -1607,12 +1660,12 @@ public static class SpawnUtil
 
             EventOnZombieSpawnpointMoved.TryInvoke(point, region, oldPosition, position);
 
-            Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Zombie spawnpoint moved: {removedFrom.Value.Format()} -> {region.Format()}, pos: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
+            Logger.DevkitServer.LogDebug(nameof(MoveSpawnpointLocal), $"Zombie spawnpoint moved: {removedFrom.Value.Format()} -> {region.Format()}, pos: {oldPosition.Format("F0")} -> {position.Format("F0")}.");
         }
         else
         {
             EventOnZombieSpawnpointAdded.TryInvoke(point, region);
-            Logger.DevkitServer.LogDebug(nameof(MoveSpawnpoint), $"Zombie spawnpoint added on move: {region.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(MoveSpawnpointLocal), $"Zombie spawnpoint added on move: {region.Format()}.");
         }
     }
 
@@ -1621,7 +1674,7 @@ public static class SpawnUtil
     /// </summary>
     /// <exception cref="MissingMemberException">Reflection failure.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void RotateSpawnpoint(VehicleSpawnpoint point, float yaw)
+    public static void RotateSpawnpointLocal(VehicleSpawnpoint point, float yaw)
     {
         if (SetVehicleSpawnpointAngle == null)
             throw new MissingMemberException("Instance setter for VehicleSpawnpoint.angle is not valid.");
@@ -1644,7 +1697,7 @@ public static class SpawnUtil
         }
 
         EventOnVehicleSpawnpointMoved.TryInvoke(point, point.point, point.point, oldYaw, yaw);
-        Logger.DevkitServer.LogDebug(nameof(RotateSpawnpoint), $"Vehicle spawnpoint rotated: {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
+        Logger.DevkitServer.LogDebug(nameof(RotateSpawnpointLocal), $"Vehicle spawnpoint rotated: {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
     }
 
     /// <summary>
@@ -1652,7 +1705,7 @@ public static class SpawnUtil
     /// </summary>
     /// <exception cref="MissingMemberException">Reflection failure.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void RotateSpawnpoint(PlayerSpawnpoint point, float yaw)
+    public static void RotateSpawnpointLocal(PlayerSpawnpoint point, float yaw)
     {
         if (SetPlayerSpawnpointAngle == null)
             throw new MissingMemberException("Instance setter for PlayerSpawnpoint.angle is not valid.");
@@ -1675,7 +1728,7 @@ public static class SpawnUtil
         }
 
         EventOnPlayerSpawnpointMoved.TryInvoke(point, point.point, point.point, oldYaw, yaw);
-        Logger.DevkitServer.LogDebug(nameof(RotateSpawnpoint), $"Player spawnpoint rotated: {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
+        Logger.DevkitServer.LogDebug(nameof(RotateSpawnpointLocal), $"Player spawnpoint rotated: {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
     }
 
     /// <summary>
@@ -1683,7 +1736,7 @@ public static class SpawnUtil
     /// </summary>
     /// <exception cref="MissingMemberException">Reflection failure.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void TransformSpawnpoint(VehicleSpawnpoint point, Vector3 position, float yaw)
+    public static void TransformSpawnpointLocal(VehicleSpawnpoint point, Vector3 position, float yaw)
     {
         if (SetVehicleSpawnpointPoint == null)
             throw new MissingMemberException("Instance setter for VehicleSpawnpoint.point is not valid.");
@@ -1717,7 +1770,7 @@ public static class SpawnUtil
         }
 
         EventOnVehicleSpawnpointMoved.TryInvoke(point, oldPosition, position, oldYaw, yaw);
-        Logger.DevkitServer.LogDebug(nameof(TransformSpawnpoint), $"Vehicle spawnpoint transformed: {oldPosition.Format("F0")} -> {position.Format("F0")}, {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
+        Logger.DevkitServer.LogDebug(nameof(TransformSpawnpointLocal), $"Vehicle spawnpoint transformed: {oldPosition.Format("F0")} -> {position.Format("F0")}, {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
     }
 
     /// <summary>
@@ -1725,7 +1778,7 @@ public static class SpawnUtil
     /// </summary>
     /// <exception cref="MissingMemberException">Reflection failure.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void TransformSpawnpoint(PlayerSpawnpoint point, Vector3 position, float yaw)
+    public static void TransformSpawnpointLocal(PlayerSpawnpoint point, Vector3 position, float yaw)
     {
         if (SetPlayerSpawnpointPoint == null)
             throw new MissingMemberException("Instance setter for PlayerSpawnpoint.point is not valid.");
@@ -1759,7 +1812,7 @@ public static class SpawnUtil
         }
 
         EventOnPlayerSpawnpointMoved.TryInvoke(point, oldPosition, position, oldYaw, yaw);
-        Logger.DevkitServer.LogDebug(nameof(TransformSpawnpoint), $"Player spawnpoint transformed: {oldPosition.Format("F0")} -> {position.Format("F0")}, {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
+        Logger.DevkitServer.LogDebug(nameof(TransformSpawnpointLocal), $"Player spawnpoint transformed: {oldPosition.Format("F0")} -> {position.Format("F0")}, {oldYaw.Format("F0")}° -> {yaw.Format("F0")}°.");
     }
 
     internal static void SetPoint(this AnimalSpawnpoint spawn, Vector3 point) => SetAnimalSpawnpointPoint?.Invoke(spawn, point);

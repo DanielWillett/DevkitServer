@@ -15,6 +15,6 @@ internal class EditorLevelPlayersUIExtension : BaseEditorSpawnsUIExtension<Playe
             AlternateToggle.PositionOffset_Y = -40;
     }
     protected override void OnRegionUpdated(RegionCoord oldRegion, RegionCoord newRegion, bool isInRegion) { }
-    protected override Vector3 GetPosition(PlayerSpawnpoint spawn) => spawn.point;
+    protected override Vector3 GetPosition(PlayerSpawnpoint spawn) => spawn.node.position;
 }
 #endif

@@ -52,7 +52,7 @@ internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<Zomb
     }
 
     private static string GetText(ZombieSpawnpoint point) => LevelZombies.tables.Count > point.type ? LevelZombies.tables[point.type].name : point.type + " - Null";
-    protected override Vector3 GetPosition(ZombieSpawnpoint spawn) => spawn.point;
+    protected override Vector3 GetPosition(ZombieSpawnpoint spawn) => spawn.node.position;
     protected override bool ShouldShow(ZombieSpawnpoint spawn)
     {
         Vector3 lclPos = MainCamera.instance.transform.position;
@@ -68,7 +68,7 @@ internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<Zomb
     {
         RemoveLabel(point);
     }
-    private void OnSpawnMoved(ZombieSpawnpoint point, RegionIdentifier region, Vector3 fromPosition, Vector3 toPosition)
+    internal void OnSpawnMoved(ZombieSpawnpoint point, RegionIdentifier region, Vector3 fromPosition, Vector3 toPosition)
     {
         UpdateLabel(point);
     }

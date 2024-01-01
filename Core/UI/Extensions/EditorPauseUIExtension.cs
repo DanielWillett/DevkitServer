@@ -54,7 +54,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
         {
             _chartingLabel = Glazier.Get().CreateLabel();
             _chartingLabel.CopyTransformFrom(_chartButton);
-            _chartingLabel.PositionOffset_X -= _chartButton.SizeOffset_X + 10;
+            _chartingLabel.PositionOffset_X -= _chartButton.SizeOffset_X * 2 + 10;
             _chartingLabel.TextAlignment = TextAnchor.MiddleRight;
             _chartingLabel.SizeOffset_X = 300;
             _chartingLabel.SizeOffset_Y = 30;
@@ -69,7 +69,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
         {
             _satelliteLabel = Glazier.Get().CreateLabel();
             _satelliteLabel.CopyTransformFrom(_mapButton);
-            _satelliteLabel.PositionOffset_X -= _mapButton.SizeOffset_X + 10;
+            _satelliteLabel.PositionOffset_X -= _mapButton.SizeOffset_X * 2 + 10;
             _satelliteLabel.TextAlignment = TextAnchor.MiddleRight;
             _satelliteLabel.SizeOffset_X = 300;
             _satelliteLabel.SizeOffset_Y = 30;
@@ -86,7 +86,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
         {
             _savingLabel = Glazier.Get().CreateLabel();
             _savingLabel.CopyTransformFrom(_saveButton);
-            _savingLabel.PositionOffset_X -= _saveButton.SizeOffset_X + 10;
+            _savingLabel.PositionOffset_X -= _saveButton.SizeOffset_X * 2 + 10;
             _savingLabel.TextAlignment = TextAnchor.MiddleRight;
             _savingLabel.SizeOffset_X = 450;
             _savingLabel.SizeOffset_Y = 30;

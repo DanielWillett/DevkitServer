@@ -3,7 +3,7 @@ using SDG.Framework.Devkit.Interactable;
 using SDG.Framework.Devkit.Transactions;
 
 namespace DevkitServer.Core.Tools;
-public class DevkitServerTransformedItem : IDevkitTransaction
+public class DevkitServerTransformedItem(Transform transform) : IDevkitTransaction
 {
     private bool _posChanged;
     private bool _rotChanged;
@@ -15,7 +15,7 @@ public class DevkitServerTransformedItem : IDevkitTransaction
     private Quaternion _beginRotation;
     private Vector3 _beginScale;
     bool IDevkitTransaction.delta => _posChanged || _rotChanged || _scaleChanged;
-    public Transform Transform { get; }
+    public Transform Transform { get; } = transform;
     public void undo()
     {
         Reun(_endPosition, _endRotation, _endScale, _beginPosition, _beginRotation, _beginScale);
@@ -63,9 +63,5 @@ public class DevkitServerTransformedItem : IDevkitTransaction
     }
 
     public void forget() { }
-    public DevkitServerTransformedItem(Transform transform)
-    {
-        Transform = transform;
-    }
 }
 #endif

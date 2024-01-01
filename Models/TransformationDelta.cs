@@ -20,8 +20,9 @@ public readonly struct TransformationDelta
             OriginalPosition = reader.ReadVector3();
         else OriginalPosition = default;
         if ((flags & TransformFlags.Rotation) != 0)
-            OriginalRotation = reader.ReadQuaternion();
+            OriginalRotation = (flags & TransformFlags.YawOnly) == 0 ? reader.ReadQuaternion() : new Quaternion(0f, reader.ReadFloat(), 0f, 0f);
         else OriginalRotation = Quaternion.identity;
+
     }
     public TransformationDelta(ByteReader reader, bool halfPrecision = false)
     {
@@ -35,14 +36,28 @@ public readonly struct TransformationDelta
             OriginalPosition = halfPrecision ? reader.ReadHalfPrecisionVector3() : reader.ReadVector3();
         else
             OriginalPosition = Vector3.zero;
-        if ((flags & TransformFlags.Rotation) != 0)
-            Rotation = halfPrecision ? reader.ReadHalfPrecisionQuaternion() : reader.ReadQuaternion();
+        if ((flags & TransformFlags.YawOnly) == 0)
+        {
+            if ((flags & TransformFlags.Rotation) != 0)
+                Rotation = halfPrecision ? reader.ReadHalfPrecisionQuaternion() : reader.ReadQuaternion();
+            else
+                Rotation = Quaternion.identity;
+            if ((flags & TransformFlags.OriginalRotation) != 0)
+                OriginalRotation = halfPrecision ? reader.ReadHalfPrecisionQuaternion() : reader.ReadQuaternion();
+            else
+                OriginalRotation = Quaternion.identity;
+        }
         else
-            Rotation = Quaternion.identity;
-        if ((flags & TransformFlags.OriginalRotation) != 0)
-            OriginalRotation = halfPrecision ? reader.ReadHalfPrecisionQuaternion() : reader.ReadQuaternion();
-        else
-            OriginalRotation = Quaternion.identity;
+        {
+            if ((flags & TransformFlags.Rotation) != 0)
+                Rotation = new Quaternion(0f, halfPrecision ? reader.ReadHalfPrecisionQuaternion() : reader.ReadQuaternion(), 0f, 0f);
+            else
+                Rotation = Quaternion.identity;
+            if ((flags & TransformFlags.OriginalRotation) != 0)
+                OriginalRotation = new Quaternion(0f, halfPrecision ? reader.ReadHalfPrecisionFloat() : reader.ReadFloat(), 0f, 0f);
+            else
+                OriginalRotation = Quaternion.identity;
+        }
     }
     public TransformationDelta(TransformFlags flags, Vector3 position, Quaternion rotation, Vector3 originalPosition, Quaternion originalRotation)
     {
@@ -52,6 +67,14 @@ public readonly struct TransformationDelta
         OriginalPosition = originalPosition;
         OriginalRotation = originalRotation;
     }
+    public TransformationDelta(TransformFlags flags, Vector3 position, float yaw, Vector3 originalPosition, float originalYaw)
+    {
+        Flags = flags | TransformFlags.YawOnly;
+        Position = position;
+        OriginalPosition = originalPosition;
+        Rotation = new Quaternion(0f, yaw, 0f, 0f);
+        OriginalRotation = new Quaternion(0f, originalYaw, 0f, 0f);
+    }
 
     [Flags]
     public enum TransformFlags : byte
@@ -60,6 +83,7 @@ public readonly struct TransformationDelta
         Rotation = 2,
         OriginalPosition = 4,
         OriginalRotation = 8,
+        YawOnly = 16
         AllNew = Position | Rotation,
         AllOriginal = OriginalPosition | OriginalRotation,
         All = AllNew | AllOriginal
@@ -71,10 +95,20 @@ public readonly struct TransformationDelta
             writer.Write(Position);
         if ((Flags & TransformFlags.OriginalPosition) != 0)
             writer.Write(OriginalPosition);
-        if ((Flags & TransformFlags.Rotation) != 0)
-            writer.Write(Rotation);
-        if ((Flags & TransformFlags.OriginalRotation) != 0)
-            writer.Write(OriginalRotation);
+        if ((Flags & TransformFlags.YawOnly) != 0)
+        {
+            if ((Flags & TransformFlags.Rotation) != 0)
+                writer.Write(Rotation.y);
+            if ((Flags & TransformFlags.OriginalRotation) != 0)
+                writer.Write(OriginalRotation.y);
+        }
+        else
+        {
+            if ((Flags & TransformFlags.Rotation) != 0)
+                writer.Write(Rotation);
+            if ((Flags & TransformFlags.OriginalRotation) != 0)
+                writer.Write(OriginalRotation);
+        }
     }
     public int CalculateSize(bool halfPrecision = false)
     {
@@ -84,9 +118,9 @@ public readonly struct TransformationDelta
         if ((Flags & TransformFlags.OriginalPosition) != 0)
             size += 12;
         if ((Flags & TransformFlags.Rotation) != 0)
-            size += 16;
+            size += (Flags & TransformFlags.YawOnly) != 0 ? 4 : 16;
         if ((Flags & TransformFlags.OriginalRotation) != 0)
-            size += 16;
+            size += (Flags & TransformFlags.YawOnly) != 0 ? 4 : 16;
         if (halfPrecision) size /= 2;
         return size + 1;
     }
@@ -96,7 +130,7 @@ public readonly struct TransformationDelta
         if ((flags & TransformFlags.Position) != 0)
             size += 12;
         if ((flags & TransformFlags.Rotation) != 0)
-            size += 16;
+            size += (Flags & TransformFlags.YawOnly) != 0 ? 4 : 16;
         if (halfPrecision) size /= 2;
         return size;
     }
@@ -108,16 +142,31 @@ public readonly struct TransformationDelta
         if ((Flags & TransformFlags.OriginalPosition) != 0)
             writer.WriteHalfPrecision(OriginalPosition);
         if ((Flags & TransformFlags.Rotation) != 0)
-            writer.WriteHalfPrecision(Rotation);
+        {
+            if ((Flags & TransformFlags.YawOnly) == 0)
+                writer.WriteHalfPrecision(Rotation);
+            else
+                writer.WriteHalfPrecision(Rotation.y);
+        }
         if ((Flags & TransformFlags.OriginalRotation) != 0)
-            writer.WriteHalfPrecision(OriginalRotation);
+        {
+            if ((Flags & TransformFlags.YawOnly) == 0)
+                writer.WriteHalfPrecision(OriginalRotation);
+            else
+                writer.WriteHalfPrecision(OriginalRotation.y);
+        }
     }
     public void WritePartial(ByteWriter writer, TransformFlags flags)
     {
         if ((flags & TransformFlags.OriginalPosition) != 0)
             writer.Write(OriginalPosition);
         if ((flags & TransformFlags.OriginalRotation) != 0)
-            writer.Write(OriginalRotation);
+        {
+            if ((Flags & TransformFlags.YawOnly) == 0)
+                writer.Write(OriginalRotation);
+            else
+                writer.Write(OriginalRotation.y);
+        }
     }
     public void ApplyTo(Transform transform, bool additive)
     {
@@ -128,12 +177,23 @@ public readonly struct TransformationDelta
         }
         else
         {
-            if ((Flags & TransformFlags.Position) != 0)
-                transform.SetPositionAndRotation(additive ? OriginalPosition + Position : Position, additive ? OriginalRotation * Rotation * LevelObjectUtil.DefaultObjectRotation : Rotation);
+            Quaternion rotation;
+            if ((Flags & TransformFlags.YawOnly) == 0)
+            {
+                rotation = additive ? OriginalRotation * Rotation * LevelObjectUtil.DefaultObjectRotation : Rotation;
+            }
             else
-                transform.rotation = additive ? OriginalRotation * Rotation * LevelObjectUtil.DefaultObjectRotation : Rotation;
+            {
+                rotation = additive
+                    ? Quaternion.Euler(0f, OriginalRotation.y, 0f) * Quaternion.Euler(0f, Rotation.y, 0f) * LevelObjectUtil.DefaultObjectRotation
+                    : Quaternion.Euler(0f, Rotation.y, 0f);
+            }
+            if ((Flags & TransformFlags.Position) != 0)
+                transform.SetPositionAndRotation(additive ? OriginalPosition + Position : Position, rotation);
+            else
+                transform.rotation = rotation;
         }
     }
 
-    public override string ToString() => $"Moved: {Flags.Format()} (pos: {Position.Format()}, rot: {Rotation.eulerAngles.Format()}) from (pos: {OriginalRotation.Format()}, rot: {OriginalRotation.eulerAngles.Format()}).";
+    public override string ToString() => $"Moved: {Flags.Format()} (pos: {Position.Format()}, rot: {((Flags & TransformFlags.YawOnly) == 0 ? Rotation.eulerAngles.Format() : Rotation.y.Format())}) from (pos: {OriginalRotation.Format()}, rot: {OriginalRotation.eulerAngles.Format()}).";
 }

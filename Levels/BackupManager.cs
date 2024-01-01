@@ -59,7 +59,7 @@ public sealed class BackupManager : MonoBehaviour
                 !TryGetLatestBackup(Level.info.name, out _, out DateTime utcTimestamp) ||
                 DateTime.UtcNow - utcTimestamp > config.BackupOnStartupCooldown)
             {
-                Backup(config.MaxBackups, config.MaxBackupSizeMegabytes, config.SaveBackupLogs);
+                Backup(config.MaxBackups, config.MaxBackupSizeMegabytes, config.SaveBackupLogs, config.SaveOnBackup);
             }
             else
             {
@@ -231,12 +231,17 @@ public sealed class BackupManager : MonoBehaviour
     /// <summary>
     /// Start a backup (compression will be done on another thread, fire and forget).
     /// </summary>
-    public void Backup() => Backup(BackupConfiguration.Config.MaxBackups, BackupConfiguration.Config.MaxBackupSizeMegabytes, BackupConfiguration.Config.SaveBackupLogs);
+    public void Backup() => Backup(BackupConfiguration.Config.MaxBackups, BackupConfiguration.Config.MaxBackupSizeMegabytes, BackupConfiguration.Config.SaveBackupLogs, BackupConfiguration.Config.SaveOnBackup);
+
+    /// <summary>
+    /// Start a backup specifying whether or not to save the level as well (compression will be done on another thread, fire and forget).
+    /// </summary>
+    public void Backup(bool saveOnBackup) => Backup(BackupConfiguration.Config.MaxBackups, BackupConfiguration.Config.MaxBackupSizeMegabytes, BackupConfiguration.Config.SaveBackupLogs, saveOnBackup);
 
     /// <summary>
     /// Run a backup with the configured deletion settings (compression will be done on another thread, fire and forget).
     /// </summary>
-    public void Backup(int maxBackups, double maxBackupSizeMegabytes, bool saveLogs)
+    public void Backup(int maxBackups, double maxBackupSizeMegabytes, bool saveLogs, bool saveOnBackup)
     {
         ThreadUtil.assertIsGameThread();
 
@@ -255,7 +260,7 @@ public sealed class BackupManager : MonoBehaviour
             Logger.DevkitServer.LogInfo(Source, $"Backing up {Level.info.name.Format(false)}...");
             timestamp = DateTimeOffset.UtcNow;
 
-            saveTask = LevelData.GatherLevelData(true, token: DevkitServerModule.UnloadToken);
+            saveTask = LevelData.GatherLevelData(!saveOnBackup, token: DevkitServerModule.UnloadToken);
 
             oldLogs = Interlocked.Exchange(ref _logs, new BackupLogs());
             if (Provider.clients.Count == 0)
@@ -542,6 +547,7 @@ public sealed class BackupManager : MonoBehaviour
         int maxBackups = config.MaxBackups;
         double maxSizeMb = config.MaxBackupSizeMegabytes;
         bool configSaveLogs = config.SaveBackupLogs;
+        bool configSaveOnBackup = config.SaveOnBackup;
         while (DevkitServerModule.IsAuthorityEditor)
         {
             Logger.DevkitServer.LogInfo(Source, $"Next Backup: {DateTime.Now.AddSeconds(interval).ToString("G").Format(false)} (LOCAL).");
@@ -552,7 +558,7 @@ public sealed class BackupManager : MonoBehaviour
             if (!configSkipInactive || PlayerHasJoinedSinceLastBackup)
             {
                 if (CachedTime.RealtimeSinceStartup - _lastSave > 5f)
-                    Backup(maxBackups, maxSizeMb, configSaveLogs);
+                    Backup(maxBackups, maxSizeMb, configSaveLogs, configSaveOnBackup);
                 else
                     Logger.DevkitServer.LogInfo(Source, $"Backup {DateTime.Now.ToString(FileNameDateFormat).Format(false)} (LOCAL) skipped because the level was very recently backed up.");
             }
@@ -571,6 +577,7 @@ public sealed class BackupManager : MonoBehaviour
         int maxBackups = config.MaxBackups;
         double maxSizeMb = config.MaxBackupSizeMegabytes;
         bool configSaveLogs = config.SaveBackupLogs;
+        bool configSaveOnBackup = config.SaveOnBackup;
         ScheduleInterval configScheduleInterval = config.BackupScheduleInterval;
         if (configSchedule == null)
         {
@@ -595,7 +602,7 @@ public sealed class BackupManager : MonoBehaviour
             if (!configSkipInactive || PlayerHasJoinedSinceLastBackup)
             {
                 if (CachedTime.RealtimeSinceStartup - _lastSave > 5f)
-                    Backup(maxBackups, maxSizeMb, configSaveLogs);
+                    Backup(maxBackups, maxSizeMb, configSaveLogs, configSaveOnBackup);
                 else
                     Logger.DevkitServer.LogInfo(Source, $"Backup {DateTime.Now.ToString(FileNameDateFormat).Format(false)} (LOCAL) skipped because the level was very recently backed up.");
             }

@@ -52,7 +52,7 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSp
     }
 
     private static string GetText(ItemSpawnpoint point) => LevelItems.tables.Count > point.type ? LevelItems.tables[point.type].name : point.type + " - Null";
-    protected override Vector3 GetPosition(ItemSpawnpoint spawn) => spawn.point;
+    protected override Vector3 GetPosition(ItemSpawnpoint spawn) => spawn.node.position;
     protected override bool ShouldShow(ItemSpawnpoint spawn)
     {
         Vector3 lclPos = MainCamera.instance.transform.position;
@@ -68,7 +68,7 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSp
     {
         RemoveLabel(point);
     }
-    private void OnSpawnMoved(ItemSpawnpoint point, RegionIdentifier region, Vector3 fromPosition, Vector3 toPosition)
+    internal void OnSpawnMoved(ItemSpawnpoint point, RegionIdentifier region, Vector3 fromPosition, Vector3 toPosition)
     {
         UpdateLabel(point);
     }

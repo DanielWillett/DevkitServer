@@ -823,3 +823,47 @@ public readonly struct SetNavigationInfiniteAgroDistanceProperties
         DeltaTime = deltaTime;
     }
 }
+
+public delegate void MoveSpawnFinal(in MoveSpawnFinalProperties properties);
+public readonly struct MoveSpawnFinalProperties
+{
+    public readonly NetId SpawnNetId;
+    public readonly TransformationDelta Transformation;
+    public readonly bool UseRotation;
+    public readonly float DeltaTime;
+    public MoveSpawnFinalProperties(NetId spawnNetId, TransformationDelta transformation, bool useRotation, float deltaTime)
+    {
+        SpawnNetId = spawnNetId;
+        Transformation = transformation;
+        UseRotation = useRotation;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void MoveSpawnsFinal(in MoveSpawnsFinalProperties properties);
+public readonly struct MoveSpawnsFinalProperties
+{
+    public readonly NetId[] SpawnNetIds;
+    public readonly TransformationDelta[] Transformations;
+    public readonly bool UseRotation;
+    public readonly float DeltaTime;
+    public MoveSpawnsFinalProperties(NetId[] spawnNetIds, TransformationDelta[] transformations, bool useRotation, float deltaTime)
+    {
+        SpawnNetIds = spawnNetIds;
+        Transformations = transformations;
+        UseRotation = useRotation;
+        DeltaTime = deltaTime;
+    }
+}
+
+public delegate void DeleteSpawns(in DeleteSpawnsProperties properties);
+public readonly struct DeleteSpawnsProperties
+{
+    public readonly NetId[] SpawnNetIds;
+    public readonly float DeltaTime;
+    public DeleteSpawnsProperties(NetId[] spawnNetIds, float deltaTime)
+    {
+        SpawnNetIds = spawnNetIds;
+        DeltaTime = deltaTime;
+    }
+}
