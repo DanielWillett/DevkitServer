@@ -369,6 +369,9 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
 #if CLIENT
     public void LoadData(RoadNetIdReplicatedLevelData data)
     {
+        RoadAssignments.Clear();
+        VertexAssignments.Clear();
+
         NetId[] netIds = data.NetIds;
         RoadVertexIdentifier[] verticies = data.VertexIndexes;
         int roadCount = data.RoadCount;

@@ -285,6 +285,9 @@ public static class PermissionManager
 
         bool v = leaf.Valid;
 
+        if (!v && !checkForSuperuser)
+            return false;
+
 #if SERVER
         IReadOnlyList<PermissionBranch> branches = UserPermissions.GetPermissions(user);
 #else

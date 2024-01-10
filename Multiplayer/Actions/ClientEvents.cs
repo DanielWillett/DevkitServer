@@ -4,7 +4,7 @@
 namespace DevkitServer.Multiplayer.Actions;
 
 /// <summary>
-/// Contains client-side events for cancelling and invoking actions during multiplayer editing.
+/// Contains client-side events for cancelling and invoking actions during only multiplayer editing.
 /// </summary>
 [EarlyTypeInit]
 public static class ClientEvents
@@ -22,6 +22,10 @@ public static class ClientEvents
     internal static CachedMulticastEvent<RequestInstantiateRoad> EventOnRequestInstantiateRoad = new CachedMulticastEvent<RequestInstantiateRoad>(typeof(ClientEvents), nameof(OnRequestInstantiateRoad));
     internal static CachedMulticastEvent<RequestInstantiateRoadVertex> EventOnRequestInstantiateRoadVertex = new CachedMulticastEvent<RequestInstantiateRoadVertex>(typeof(ClientEvents), nameof(OnRequestInstantiateRoadVertex));
     internal static CachedMulticastEvent<RequestInstantiateNavigation> EventOnRequestInstantiateNavigation = new CachedMulticastEvent<RequestInstantiateNavigation>(typeof(ClientEvents), nameof(OnRequestInstantiateNavigation));
+    internal static CachedMulticastEvent<RequestInstantiateSpawnpoint> EventOnRequestInstantiateSpawnpoint = new CachedMulticastEvent<RequestInstantiateSpawnpoint>(typeof(ClientEvents), nameof(OnRequestInstantiateSpawnpoint));
+    internal static CachedMulticastEvent<RequestInstantiateSpawnTable> EventOnRequestInstantiateSpawnTable = new CachedMulticastEvent<RequestInstantiateSpawnTable>(typeof(ClientEvents), nameof(OnRequestInstantiateSpawnTable));
+    internal static CachedMulticastEvent<RequestInstantiateSpawnTier> EventOnRequestInstantiateSpawnTier = new CachedMulticastEvent<RequestInstantiateSpawnTier>(typeof(ClientEvents), nameof(OnRequestInstantiateSpawnTier));
+    internal static CachedMulticastEvent<RequestInstantiateSpawnTierAsset> EventOnRequestInstantiateSpawnTierAsset = new CachedMulticastEvent<RequestInstantiateSpawnTierAsset>(typeof(ClientEvents), nameof(OnRequestInstantiateSpawnTierAsset));
 
     public static event EditHeightmapRequest OnEditHeightmapPermissionDenied
     {
@@ -79,6 +83,26 @@ public static class ClientEvents
     {
         add => EventOnRequestInstantiateNavigation.Add(value);
         remove => EventOnRequestInstantiateNavigation.Remove(value);
+    }
+    public static event RequestInstantiateSpawnpoint OnRequestInstantiateSpawnpoint
+    {
+        add => EventOnRequestInstantiateSpawnpoint.Add(value);
+        remove => EventOnRequestInstantiateSpawnpoint.Remove(value);
+    }
+    public static event RequestInstantiateSpawnTable OnRequestInstantiateSpawnTable
+    {
+        add => EventOnRequestInstantiateSpawnTable.Add(value);
+        remove => EventOnRequestInstantiateSpawnTable.Remove(value);
+    }
+    public static event RequestInstantiateSpawnTier OnRequestInstantiateSpawnTier
+    {
+        add => EventOnRequestInstantiateSpawnTier.Add(value);
+        remove => EventOnRequestInstantiateSpawnTier.Remove(value);
+    }
+    public static event RequestInstantiateSpawnTierAsset OnRequestInstantiateSpawnTierAsset
+    {
+        add => EventOnRequestInstantiateSpawnTierAsset.Add(value);
+        remove => EventOnRequestInstantiateSpawnTierAsset.Remove(value);
     }
 
     public static event PaintRamp? OnPaintRamp;
@@ -153,6 +177,46 @@ public static class ClientEvents
     public static event SetNavigationInfiniteAgroDistance? OnSetNavigationInfiniteAgroDistance;
     public static event SetNavigationInfiniteAgroDistanceRequested? OnSetNavigationInfiniteAgroDistanceRequested;
     public static event RequestInstantiateNavigationRequested? OnRequestInstantiateNavigationRequested;
+    public static event SetSpawnpointType? OnSetSpawnpointType;
+    public static event SetSpawnpointTypeRequested? OnSetSpawnpointTypeRequested;
+    public static event SetSpawnpointsType? OnSetSpawnpointsType;
+    public static event SetSpawnTableColor? OnSetSpawnTableColor;
+    public static event SetSpawnTableColorRequested? OnSetSpawnTableColorRequested;
+    public static event SetSpawnTableSpawnAssetId? OnSetSpawnTableSpawnAssetId;
+    public static event SetSpawnTableSpawnAssetIdRequested? OnSetSpawnTableSpawnAssetIdRequested;
+    public static event SetSpawnTableName? OnSetSpawnTableName;
+    public static event SetSpawnTableNameRequested? OnSetSpawnTableNameRequested;
+    public static event SetSpawnTableTierChance? OnSetSpawnTableTierChance;
+    public static event SetSpawnTableTierChanceRequested? OnSetSpawnTableTierChanceRequested;
+    public static event SetSpawnTableTierName? OnSetSpawnTableTierName;
+    public static event SetSpawnTableTierNameRequested? OnSetSpawnTableTierNameRequested;
+    public static event DeleteSpawnTableTier? OnDeleteSpawnTableTier;
+    public static event DeleteSpawnTableTierRequested? OnDeleteSpawnTableTierRequested;
+    public static event SetSpawnTableTierAsset? OnSetSpawnTableTierAsset;
+    public static event SetSpawnTableTierAssetRequested? OnSetSpawnTableTierAssetRequested;
+    public static event DeleteSpawnTableTierAsset? OnDeleteSpawnTableTierAsset;
+    public static event DeleteSpawnTableTierAssetRequested? OnDeleteSpawnTableTierAssetRequested;
+    public static event SetZombieSpawnTableDifficultyAsset? OnSetZombieSpawnTableDifficultyAsset;
+    public static event SetZombieSpawnTableDifficultyAssetRequested? OnSetZombieSpawnTableDifficultyAssetRequested;
+    public static event SetZombieSpawnTableIsMega? OnSetZombieSpawnTableIsMega;
+    public static event SetZombieSpawnTableIsMegaRequested? OnSetZombieSpawnTableIsMegaRequested;
+    public static event SetZombieSpawnTableHealth? OnSetZombieSpawnTableHealth;
+    public static event SetZombieSpawnTableHealthRequested? OnSetZombieSpawnTableHealthRequested;
+    public static event SetZombieSpawnTableDamage? OnSetZombieSpawnTableDamage;
+    public static event SetZombieSpawnTableDamageRequested? OnSetZombieSpawnTableDamageRequested;
+    public static event SetZombieSpawnTableLootIndex? OnSetZombieSpawnTableLootIndex;
+    public static event SetZombieSpawnTableLootIndexRequested? OnSetZombieSpawnTableLootIndexRequested;
+    public static event SetZombieSpawnTableXP? OnSetZombieSpawnTableXP;
+    public static event SetZombieSpawnTableXPRequested? OnSetZombieSpawnTableXPRequested;
+    public static event SetZombieSpawnTableRegen? OnSetZombieSpawnTableRegen;
+    public static event SetZombieSpawnTableRegenRequested? OnSetZombieSpawnTableRegenRequested;
+    public static event RequestInstantiateSpawnpointRequested? OnRequestInstantiateSpawnpointRequested;
+    public static event RequestInstantiateSpawnTableRequested? OnRequestInstantiateSpawnTableRequested;
+    public static event RequestInstantiateSpawnTierRequested? OnRequestInstantiateSpawnTierRequested;
+    public static event RequestInstantiateSpawnTierAssetRequested? OnRequestInstantiateSpawnTierAssetRequested;
+    public static event SetPlayerSpawnpointIsAlternate? OnSetPlayerSpawnpointIsAlternate;
+    public static event SetPlayerSpawnpointIsAlternateRequested? OnSetPlayerSpawnpointIsAlternateRequested;
+    public static event SetPlayerSpawnpointsIsAlternate? OnSetPlayerSpawnpointsIsAlternate;
 
     public static bool ListeningOnEditHeightmapPermissionDenied => !EventOnEditHeightmapPermissionDenied.IsEmpty;
     public static bool ListeningOnEditSplatmapPermissionDenied => !EventOnEditSplatmapPermissionDenied.IsEmpty;
@@ -237,7 +301,47 @@ public static class ClientEvents
     public static bool ListeningOnSetNavigationInfiniteAgroDistance => OnSetNavigationInfiniteAgroDistance != null;
     public static bool ListeningOnSetNavigationInfiniteAgroDistanceRequested => OnSetNavigationInfiniteAgroDistanceRequested != null;
     public static bool ListeningOnRequestInstantiateNavigationRequested => OnRequestInstantiateNavigationRequested != null;
-    
+    public static bool ListeningOnSetSpawnpointType => OnSetSpawnpointType != null;
+    public static bool ListeningOnSetSpawnpointTypeRequested => OnSetSpawnpointTypeRequested != null;
+    public static bool ListeningOnSetSpawnpointsType => OnSetSpawnpointsType != null;
+    public static bool ListeningOnSetSpawnTableColor => OnSetSpawnTableColor != null;
+    public static bool ListeningOnSetSpawnTableColorRequested => OnSetSpawnTableColorRequested != null;
+    public static bool ListeningOnSetSpawnTableSpawnAssetId => OnSetSpawnTableSpawnAssetId != null;
+    public static bool ListeningOnSetSpawnTableSpawnAssetIdRequested => OnSetSpawnTableSpawnAssetIdRequested != null;
+    public static bool ListeningOnSetSpawnTableName => OnSetSpawnTableName != null;
+    public static bool ListeningOnSetSpawnTableNameRequested => OnSetSpawnTableNameRequested != null;
+    public static bool ListeningOnSetSpawnTableTierChance => OnSetSpawnTableTierChance != null;
+    public static bool ListeningOnSetSpawnTableTierChanceRequested => OnSetSpawnTableTierChanceRequested != null;
+    public static bool ListeningOnSetSpawnTableTierName => OnSetSpawnTableTierName != null;
+    public static bool ListeningOnSetSpawnTableTierNameRequested => OnSetSpawnTableTierNameRequested != null;
+    public static bool ListeningOnDeleteSpawnTableTier => OnDeleteSpawnTableTier != null;
+    public static bool ListeningOnDeleteSpawnTableTierRequested => OnDeleteSpawnTableTierRequested != null;
+    public static bool ListeningOnSetSpawnTableTierAsset => OnSetSpawnTableTierAsset != null;
+    public static bool ListeningOnSetSpawnTableTierAssetRequested => OnSetSpawnTableTierAssetRequested != null;
+    public static bool ListeningOnDeleteSpawnTableTierAsset => OnDeleteSpawnTableTierAsset != null;
+    public static bool ListeningOnDeleteSpawnTableTierAssetRequested => OnDeleteSpawnTableTierAssetRequested != null;
+    public static bool ListeningOnSetZombieSpawnTableDifficultyAsset => OnSetZombieSpawnTableDifficultyAsset != null;
+    public static bool ListeningOnSetZombieSpawnTableDifficultyAssetRequested => OnSetZombieSpawnTableDifficultyAssetRequested != null;
+    public static bool ListeningOnSetZombieSpawnTableIsMega => OnSetZombieSpawnTableIsMega != null;
+    public static bool ListeningOnSetZombieSpawnTableIsMegaRequested => OnSetZombieSpawnTableIsMegaRequested != null;
+    public static bool ListeningOnSetZombieSpawnTableHealth => OnSetZombieSpawnTableHealth != null;
+    public static bool ListeningOnSetZombieSpawnTableHealthRequested => OnSetZombieSpawnTableHealthRequested != null;
+    public static bool ListeningOnSetZombieSpawnTableDamage => OnSetZombieSpawnTableDamage != null;
+    public static bool ListeningOnSetZombieSpawnTableDamageRequested => OnSetZombieSpawnTableDamageRequested != null;
+    public static bool ListeningOnSetZombieSpawnTableLootIndex => OnSetZombieSpawnTableLootIndex != null;
+    public static bool ListeningOnSetZombieSpawnTableLootIndexRequested => OnSetZombieSpawnTableLootIndexRequested != null;
+    public static bool ListeningOnSetZombieSpawnTableXP => OnSetZombieSpawnTableXP != null;
+    public static bool ListeningOnSetZombieSpawnTableXPRequested => OnSetZombieSpawnTableXPRequested != null;
+    public static bool ListeningOnSetZombieSpawnTableRegen => OnSetZombieSpawnTableRegen != null;
+    public static bool ListeningOnSetZombieSpawnTableRegenRequested => OnSetZombieSpawnTableRegenRequested != null;
+    public static bool ListeningOnRequestInstantiateSpawnpointRequested => OnRequestInstantiateSpawnpointRequested != null;
+    public static bool ListeningOnRequestInstantiateSpawnTableRequested => OnRequestInstantiateSpawnTableRequested != null;
+    public static bool ListeningOnRequestInstantiateSpawnTierRequested => OnRequestInstantiateSpawnTierRequested != null;
+    public static bool ListeningOnRequestInstantiateSpawnTierAssetRequested => OnRequestInstantiateSpawnTierAssetRequested != null;
+    public static bool ListeningOnSetPlayerSpawnpointIsAlternate => OnSetPlayerSpawnpointIsAlternate != null;
+    public static bool ListeningOnSetPlayerSpawnpointIsAlternateRequested => OnSetPlayerSpawnpointIsAlternateRequested != null;
+    public static bool ListeningOnSetPlayerSpawnpointsIsAlternate => OnSetPlayerSpawnpointsIsAlternate != null;
+
     internal static void InvokeOnPaintRamp(in PaintRampProperties properties) => OnPaintRamp?.Invoke(in properties);
     internal static void InvokeOnAdjustHeightmap(in AdjustHeightmapProperties properties) => OnAdjustHeightmap?.Invoke(in properties);
     internal static void InvokeOnFlattenHeightmap(in FlattenHeightmapProperties properties) => OnFlattenHeightmap?.Invoke(in properties);
@@ -310,6 +414,46 @@ public static class ClientEvents
     internal static void InvokeOnSetNavigationInfiniteAgroDistance(in SetNavigationInfiniteAgroDistanceProperties properties) => OnSetNavigationInfiniteAgroDistance?.Invoke(in properties);
     internal static void InvokeOnSetNavigationInfiniteAgroDistanceRequested(in SetNavigationInfiniteAgroDistanceProperties properties, ref bool shouldAllow) => OnSetNavigationInfiniteAgroDistanceRequested?.Invoke(in properties, ref shouldAllow);
     internal static void InvokeOnRequestInstantiateNavigationRequested(in RequestInstantiateNavigationProperties properties, ref bool shouldAllow) => OnRequestInstantiateNavigationRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetSpawnpointType(in SetSpawnpointTypeProperties properties) => OnSetSpawnpointType?.Invoke(in properties);
+    internal static void InvokeOnSetSpawnpointTypeRequested(in SetSpawnpointTypeProperties properties, ref bool shouldAllow) => OnSetSpawnpointTypeRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetSpawnpointsType(in SetSpawnpointsTypeProperties properties) => OnSetSpawnpointsType?.Invoke(in properties);
+    internal static void InvokeOnSetSpawnTableColor(in SetSpawnTableColorProperties properties) => OnSetSpawnTableColor?.Invoke(in properties);
+    internal static void InvokeOnSetSpawnTableColorRequested(in SetSpawnTableColorProperties properties, ref bool shouldAllow) => OnSetSpawnTableColorRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetSpawnTableSpawnAssetId(in SetSpawnTableSpawnAssetIdProperties properties) => OnSetSpawnTableSpawnAssetId?.Invoke(in properties);
+    internal static void InvokeOnSetSpawnTableSpawnAssetIdRequested(in SetSpawnTableSpawnAssetIdProperties properties, ref bool shouldAllow) => OnSetSpawnTableSpawnAssetIdRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetSpawnTableName(in SetSpawnTableNameProperties properties) => OnSetSpawnTableName?.Invoke(in properties);
+    internal static void InvokeOnSetSpawnTableNameRequested(in SetSpawnTableNameProperties properties, ref bool shouldAllow) => OnSetSpawnTableNameRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetSpawnTableTierChance(in SetSpawnTableTierChanceProperties properties) => OnSetSpawnTableTierChance?.Invoke(in properties);
+    internal static void InvokeOnSetSpawnTableTierChanceRequested(in SetSpawnTableTierChanceProperties properties, ref bool shouldAllow) => OnSetSpawnTableTierChanceRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetSpawnTableTierName(in SetSpawnTableTierNameProperties properties) => OnSetSpawnTableTierName?.Invoke(in properties);
+    internal static void InvokeOnSetSpawnTableTierNameRequested(in SetSpawnTableTierNameProperties properties, ref bool shouldAllow) => OnSetSpawnTableTierNameRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnDeleteSpawnTableTier(in DeleteSpawnTableTierProperties properties) => OnDeleteSpawnTableTier?.Invoke(in properties);
+    internal static void InvokeOnDeleteSpawnTableTierRequested(in DeleteSpawnTableTierProperties properties, ref bool shouldAllow) => OnDeleteSpawnTableTierRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetSpawnTableTierAsset(in SetSpawnTableTierAssetProperties properties) => OnSetSpawnTableTierAsset?.Invoke(in properties);
+    internal static void InvokeOnSetSpawnTableTierAssetRequested(in SetSpawnTableTierAssetProperties properties, ref bool shouldAllow) => OnSetSpawnTableTierAssetRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnDeleteSpawnTableTierAsset(in DeleteSpawnTableTierAssetProperties properties) => OnDeleteSpawnTableTierAsset?.Invoke(in properties);
+    internal static void InvokeOnDeleteSpawnTableTierAssetRequested(in DeleteSpawnTableTierAssetProperties properties, ref bool shouldAllow) => OnDeleteSpawnTableTierAssetRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetZombieSpawnTableDifficultyAsset(in SetZombieSpawnTableDifficultyAssetProperties properties) => OnSetZombieSpawnTableDifficultyAsset?.Invoke(in properties);
+    internal static void InvokeOnSetZombieSpawnTableDifficultyAssetRequested(in SetZombieSpawnTableDifficultyAssetProperties properties, ref bool shouldAllow) => OnSetZombieSpawnTableDifficultyAssetRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetZombieSpawnTableIsMega(in SetZombieSpawnTableIsMegaProperties properties) => OnSetZombieSpawnTableIsMega?.Invoke(in properties);
+    internal static void InvokeOnSetZombieSpawnTableIsMegaRequested(in SetZombieSpawnTableIsMegaProperties properties, ref bool shouldAllow) => OnSetZombieSpawnTableIsMegaRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetZombieSpawnTableHealth(in SetZombieSpawnTableHealthProperties properties) => OnSetZombieSpawnTableHealth?.Invoke(in properties);
+    internal static void InvokeOnSetZombieSpawnTableHealthRequested(in SetZombieSpawnTableHealthProperties properties, ref bool shouldAllow) => OnSetZombieSpawnTableHealthRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetZombieSpawnTableDamage(in SetZombieSpawnTableDamageProperties properties) => OnSetZombieSpawnTableDamage?.Invoke(in properties);
+    internal static void InvokeOnSetZombieSpawnTableDamageRequested(in SetZombieSpawnTableDamageProperties properties, ref bool shouldAllow) => OnSetZombieSpawnTableDamageRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetZombieSpawnTableLootIndex(in SetZombieSpawnTableLootIndexProperties properties) => OnSetZombieSpawnTableLootIndex?.Invoke(in properties);
+    internal static void InvokeOnSetZombieSpawnTableLootIndexRequested(in SetZombieSpawnTableLootIndexProperties properties, ref bool shouldAllow) => OnSetZombieSpawnTableLootIndexRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetZombieSpawnTableXP(in SetZombieSpawnTableXPProperties properties) => OnSetZombieSpawnTableXP?.Invoke(in properties);
+    internal static void InvokeOnSetZombieSpawnTableXPRequested(in SetZombieSpawnTableXPProperties properties, ref bool shouldAllow) => OnSetZombieSpawnTableXPRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetZombieSpawnTableRegen(in SetZombieSpawnTableRegenProperties properties) => OnSetZombieSpawnTableRegen?.Invoke(in properties);
+    internal static void InvokeOnSetZombieSpawnTableRegenRequested(in SetZombieSpawnTableRegenProperties properties, ref bool shouldAllow) => OnSetZombieSpawnTableRegenRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnRequestInstantiateSpawnpointRequested(in RequestInstantiateSpawnpointProperties properties, ref bool shouldAllow) => OnRequestInstantiateSpawnpointRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnRequestInstantiateSpawnTableRequested(in RequestInstantiateSpawnTableProperties properties, ref bool shouldAllow) => OnRequestInstantiateSpawnTableRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnRequestInstantiateSpawnTierRequested(in RequestInstantiateSpawnTierProperties properties, ref bool shouldAllow) => OnRequestInstantiateSpawnTierRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnRequestInstantiateSpawnTierAssetRequested(in RequestInstantiateSpawnTierAssetProperties properties, ref bool shouldAllow) => OnRequestInstantiateSpawnTierAssetRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetPlayerSpawnpointIsAlternate(in SetPlayerSpawnpointIsAlternateProperties properties) => OnSetPlayerSpawnpointIsAlternate?.Invoke(in properties);
+    internal static void InvokeOnSetPlayerSpawnpointIsAlternateRequested(in SetPlayerSpawnpointIsAlternateProperties properties, ref bool shouldAllow) => OnSetPlayerSpawnpointIsAlternateRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetPlayerSpawnpointsIsAlternate(in SetPlayerSpawnpointsIsAlternateProperties properties) => OnSetPlayerSpawnpointsIsAlternate?.Invoke(in properties);
 }
 
 public delegate void TryInstantiateHierarchyObject(ref InstantiateHierarchyObjectProperties properties, ref bool shouldAllow);

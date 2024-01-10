@@ -9,7 +9,12 @@ internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<Zomb
 {
     private const float DistanceMax = 60f;
     private const int RegionDistance = 2;
-    public EditorSpawnsZombiesUIExtension() : base(new Vector3(0f, 2.5f, 0f), 20f, DistanceMax)
+    protected override bool IsVisible
+    {
+        get => LevelVisibility.zombiesVisible;
+        set => LevelVisibility.zombiesVisible = value;
+    }
+    public EditorSpawnsZombiesUIExtension() : base(new Vector3(0f, 2.125f, 0f), 20f, DistanceMax)
     {
         SpawnUtil.OnZombieSpawnpointAdded += OnSpawnAdded;
         SpawnUtil.OnZombieSpawnpointRemoved += OnSpawnRemoved;
@@ -17,7 +22,6 @@ internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<Zomb
         SpawnUtil.OnZombieSpawnTableChanged += OnSpawnTableChanged;
         SpawnTableUtil.OnZombieSpawnTableNameUpdated += OnNameUpdated;
     }
-
     private void OnNameUpdated(ZombieTable table, int index)
     {
         foreach (ZombieSpawnpoint spawnpoint in SpawnUtil.EnumerateZombieSpawns(MovementUtil.MainCameraRegion, RegionDistance))
@@ -44,13 +48,11 @@ internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<Zomb
         base.OnShown();
         OnRegionUpdated(default, MovementUtil.MainCameraRegion, MovementUtil.MainCameraIsInRegion);
     }
-
     protected override void OnHidden()
     {
         ClearLabels();
         base.OnHidden();
     }
-
     private static string GetText(ZombieSpawnpoint point) => LevelZombies.tables.Count > point.type ? LevelZombies.tables[point.type].name : point.type + " - Null";
     protected override Vector3 GetPosition(ZombieSpawnpoint spawn) => spawn.node.position;
     protected override bool ShouldShow(ZombieSpawnpoint spawn)
@@ -58,8 +60,6 @@ internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<Zomb
         Vector3 lclPos = MainCamera.instance.transform.position;
         return (lclPos - spawn.point).sqrMagnitude < DistanceMax * DistanceMax && LevelZombies.tables.Count > spawn.type;
     }
-
-
     private void OnSpawnAdded(ZombieSpawnpoint point, RegionIdentifier region)
     {
         CreateLabel(point, GetText(point));

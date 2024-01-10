@@ -173,7 +173,7 @@ internal static class CommandTests
     private static async UniTask chartify(CommandContext ctx, CancellationToken token)
     {
         Stopwatch sw = Stopwatch.StartNew();
-        await ChartCartography.CaptureChart(outputFile: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Chart.png"), token: token);
+        await ChartCartography.CaptureChart(outputFile: Path.Combine(FileUtil.DesktopOrCurrentDir, "Chart.png"), token: token);
         sw.Stop();
         ctx.ReplyString($"DevkitServer time: {sw.GetElapsedMilliseconds():F2}.");
 
@@ -192,7 +192,7 @@ internal static class CommandTests
     private static async UniTask satellite(CommandContext ctx, CancellationToken token)
     {
         Stopwatch sw = Stopwatch.StartNew();
-        await SatelliteCartography.CaptureSatellite(outputFile: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Map.png"), token: token);
+        await SatelliteCartography.CaptureSatellite(outputFile: Path.Combine(FileUtil.DesktopOrCurrentDir, "Map.png"), token: token);
         sw.Stop();
         ctx.ReplyString($"DevkitServer time: {sw.GetElapsedMilliseconds():F2}.");
 

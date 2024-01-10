@@ -8,7 +8,11 @@ internal class EditorLevelPlayersUIExtension : BaseEditorSpawnsUIExtension<Playe
 {
     [ExistingMember("altToggle", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected ISleekToggle? AlternateToggle;
-
+    protected override bool IsVisible
+    {
+        get => LevelVisibility.playersVisible;
+        set => LevelVisibility.playersVisible = value;
+    }
     public EditorLevelPlayersUIExtension() : base(new Vector3(0f, 3f, 0f), 20f, 120f)
     {
         if (AlternateToggle != null)

@@ -1,4 +1,6 @@
-﻿using SDG.Framework.Devkit.Interactable;
+﻿using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Levels;
+using SDG.Framework.Devkit.Interactable;
 
 namespace DevkitServer.API.Devkit.Spawns;
 
@@ -23,19 +25,21 @@ public class AnimalSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTrans
     {
         return SpawnUtil.RemoveAnimalSpawnLocal(Spawnpoint, false);
     }
-
     protected override void Transform()
     {
         SpawnUtil.MoveSpawnpointLocal(Spawnpoint, transform.position);
     }
-
+    protected override NetId64 GetNetId()
+    {
+        SpawnsNetIdDatabase.TryGetAnimalSpawnNetId(Index, out NetId64 netId);
+        return netId;
+    }
     public override string Format(ITerminalFormatProvider provider)
     {
         if (LevelAnimals.tables.Count > Spawnpoint.type)
             return "Animal Spawnpoint".Colorize(SpawnpointColor) + $" ({LevelAnimals.tables[Spawnpoint.type].name.Format(false)})";
         return "Animal Spawnpoint".Colorize(SpawnpointColor);
     }
-
     public override string ToString()
     {
         if (LevelAnimals.tables.Count > Spawnpoint.type)

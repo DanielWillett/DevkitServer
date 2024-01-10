@@ -1,4 +1,5 @@
 ﻿#if CLIENT
+using DevkitServer.API.Devkit;
 using HighlightingSystem;
 using SDG.Framework.Utilities;
 
@@ -10,12 +11,19 @@ public class HighlighterUtil
         ThreadUtil.assertIsGameThread();
 
         Highlighter highlighter = transform.gameObject.GetOrAddComponent<Highlighter>();
+
+        if (transform.TryGetComponent(out IDevkitHighlightHandler handler))
+            handler.OnHighlight(highlighter);
+
         highlighter.ConstantOn(color, Mathf.Max(0, fade));
     }
     
     public static void Unhighlight(Transform transform, float fade = 0.25f)
     {
         ThreadUtil.assertIsGameThread();
+
+        if (transform == null)
+            return;
 
         if (fade <= 0f)
             HighlighterTool.unhighlight(transform);
@@ -24,7 +32,7 @@ public class HighlighterUtil
             highlighter.ConstantOff(fade);
             TimeUtility.InvokeAfterDelay(() =>
             {
-                if (transform.gameObject.TryGetComponent(out Highlighter highlighter) && !highlighter.constant)
+                if (transform != null && transform.gameObject.TryGetComponent(out Highlighter highlighter) && !highlighter.constant)
                     Object.DestroyImmediate(highlighter);
             }, fade);
         }

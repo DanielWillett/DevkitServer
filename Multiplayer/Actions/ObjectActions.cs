@@ -47,7 +47,7 @@ public sealed class ObjectActions
     {
         EditorActions.QueueAction(new DeleteLevelObjectsAction
         {
-            NetIds = properties.NetIds,
+            NetIds = properties.NetIds.ToArray(),
             DeltaTime = properties.DeltaTime
         }, true);
     }
@@ -55,7 +55,7 @@ public sealed class ObjectActions
     {
         EditorActions.QueueAction(new MoveLevelObjectsFinalAction
         {
-            Transformations = properties.Transformations,
+            Transformations = properties.Transformations.ToArray(),
             UseScale = properties.UseScale,
             DeltaTime = properties.DeltaTime
         }, true);
@@ -64,7 +64,7 @@ public sealed class ObjectActions
     {
         EditorActions.QueueAction(new UpdateObjectsCustomMaterialPaletteOverrideAction
         {
-            NetIds = properties.NetIds,
+            NetIds = properties.NetIds.ToArray(),
             Value = properties.Material,
             DeltaTime = properties.DeltaTime
         });
@@ -73,7 +73,7 @@ public sealed class ObjectActions
     {
         EditorActions.QueueAction(new UpdateObjectsMaterialIndexOverrideAction
         {
-            NetIds = properties.NetIds,
+            NetIds = properties.NetIds.ToArray(),
             Value = properties.Index,
             DeltaTime = properties.DeltaTime
         });
@@ -125,7 +125,7 @@ public sealed class DeleteLevelObjectsAction : IAction
     private Transform?[]? _objects;
     public bool CheckCanApply()
     {
-        if (default(PermissionLeaf).Has(Instigator.m_SteamID, false))
+        if (default(PermissionLeaf).Has(Instigator.m_SteamID))
             return true;
         _objects = new Transform[NetIds.Length];
         for (int i = 0; i < NetIds.Length; ++i)

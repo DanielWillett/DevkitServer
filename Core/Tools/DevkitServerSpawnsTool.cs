@@ -29,6 +29,7 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
             IsSpawnTypeSelected = value is SpawnType.Animal or SpawnType.Item or SpawnType.Player or SpawnType.Vehicle or SpawnType.Zombie;
             CanAreaSelect = IsSpawnTypeSelected;
             CanRotate = value is SpawnType.Player or SpawnType.Vehicle;
+            CanMiddleClickPick = value is not SpawnType.Player;
         }
     }
 
@@ -36,6 +37,7 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
     {
         CanTranslate = true;
         CanScale = false;
+        RootSelections = true;
         Type = SpawnType.None;
     }
 
@@ -47,16 +49,16 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
         switch (node)
         {
             case AnimalSpawnpointNode animal:
-                SpawnTableUtil.SelectAnimalTable(animal.Spawnpoint.type);
+                SpawnTableUtil.SelectAnimalTable(animal.Spawnpoint.type, true, true);
                 break;
             case VehicleSpawnpointNode vehicle:
-                SpawnTableUtil.SelectVehicleTable(vehicle.Spawnpoint.type);
+                SpawnTableUtil.SelectVehicleTable(vehicle.Spawnpoint.type, true, true);
                 break;
             case ItemSpawnpointNode item:
-                SpawnTableUtil.SelectItemTable(item.Spawnpoint.type);
+                SpawnTableUtil.SelectItemTable(item.Spawnpoint.type, true, true);
                 break;
             case ZombieSpawnpointNode zombie:
-                SpawnTableUtil.SelectItemTable(zombie.Spawnpoint.type);
+                SpawnTableUtil.SelectZombieTable(zombie.Spawnpoint.type, true, true);
                 break;
         }
     }

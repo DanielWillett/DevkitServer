@@ -244,7 +244,7 @@ internal static class SelectionToolPatches
             }
             
             if (ClientEvents.ListeningOnMoveHierarchyObjectsFinal)
-                ClientEvents.InvokeOnMoveHierarchyObjectsFinal(new MoveHierarchyObjectsFinalProperties(transformations.ToArrayFast(), hasScale, dt));
+                ClientEvents.InvokeOnMoveHierarchyObjectsFinal(new MoveHierarchyObjectsFinalProperties(transformations.ToSpan(), hasScale, dt));
         }
         finally
         {
@@ -408,7 +408,7 @@ internal static class SelectionToolPatches
                 }
             }
             if (ClientEvents.ListeningOnMoveHierarchyObjectsFinal)
-                ClientEvents.InvokeOnMoveHierarchyObjectsFinal(new MoveHierarchyObjectsFinalProperties(transformations.ToArrayFast(), globalUseScale, dt));
+                ClientEvents.InvokeOnMoveHierarchyObjectsFinal(new MoveHierarchyObjectsFinalProperties(transformations.ToSpan(), globalUseScale, dt));
         }
         finally
         {

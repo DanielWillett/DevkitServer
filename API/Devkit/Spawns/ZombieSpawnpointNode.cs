@@ -1,4 +1,6 @@
-﻿using SDG.Framework.Devkit.Interactable;
+﻿using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Levels;
+using SDG.Framework.Devkit.Interactable;
 
 namespace DevkitServer.API.Devkit.Spawns;
 
@@ -25,13 +27,17 @@ public class ZombieSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionTran
     {
         SpawnUtil.MoveSpawnpointLocal(Spawnpoint, transform.position, out _);
     }
+    protected override NetId64 GetNetId()
+    {
+        SpawnsNetIdDatabase.TryGetZombieSpawnNetId(Region, out NetId64 netId);
+        return netId;
+    }
     public override string Format(ITerminalFormatProvider provider)
     {
         if (LevelZombies.tables.Count > Spawnpoint.type)
             return "Zombie Spawnpoint".Colorize(SpawnpointColor) + $" ({LevelZombies.tables[Spawnpoint.type].name.Format(false)})";
         return "Zombie Spawnpoint".Colorize(SpawnpointColor);
     }
-
     public override string ToString()
     {
         if (LevelZombies.tables.Count > Spawnpoint.type)

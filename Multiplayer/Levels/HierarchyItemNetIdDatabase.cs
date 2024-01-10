@@ -201,6 +201,8 @@ public sealed class HierarchyItemNetIdDatabase : IReplicatedLevelDataSource<Hier
 #if CLIENT
     public void LoadData(HierarchyItemNetIdReplicatedLevelData data)
     {
+        HierarchyItemAssignments.Clear();
+        
         NetId[] netIds = data.NetIds;
         uint[] items = data.InstanceIds;
         for (int i = 0; i < items.Length; ++i)

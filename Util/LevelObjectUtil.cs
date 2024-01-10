@@ -522,7 +522,10 @@ public static class LevelObjectUtil
         if (DevkitServerModule.IsEditing && LevelObjectNetIdDatabase.TryGetObjectNetId(levelObject, out NetId netId))
         {
             if (CheckMovePermission(levelObject.instanceID))
-                ClientEvents.InvokeOnUpdateObjectsMaterialIndexOverride(new UpdateObjectsMaterialIndexOverrideProperties(new NetId[] { netId }, materialIndexOverride, CachedTime.DeltaTime));
+            {
+                ReadOnlySpan<NetId> n = stackalloc NetId[] { netId };
+                ClientEvents.InvokeOnUpdateObjectsMaterialIndexOverride(new UpdateObjectsMaterialIndexOverrideProperties(n, materialIndexOverride, CachedTime.DeltaTime));
+            }
             else
                 throw new NoPermissionsException(VanillaPermissions.MoveUnownedObjects);
         }
@@ -561,7 +564,10 @@ public static class LevelObjectUtil
         if (DevkitServerModule.IsEditing && LevelObjectNetIdDatabase.TryGetObjectNetId(levelObject, out NetId netId))
         {
             if (CheckMovePermission(levelObject.instanceID))
-                ClientEvents.InvokeOnUpdateObjectsCustomMaterialPaletteOverride(new UpdateObjectsCustomMaterialPaletteOverrideProperties(new NetId[] { netId }, customMaterialPaletteOverride, CachedTime.DeltaTime));
+            {
+                ReadOnlySpan<NetId> n = stackalloc NetId[] { netId };
+                ClientEvents.InvokeOnUpdateObjectsCustomMaterialPaletteOverride(new UpdateObjectsCustomMaterialPaletteOverrideProperties(n, customMaterialPaletteOverride, CachedTime.DeltaTime));
+            }
             else
                 throw new NoPermissionsException(VanillaPermissions.MoveUnownedObjects);
         }

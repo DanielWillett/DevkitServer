@@ -502,7 +502,7 @@ internal static class LevelObjectPatches
             void Flush()
             {
                 if (ClientEvents.ListeningOnMoveLevelObjectsFinal)
-                    ClientEvents.InvokeOnMoveLevelObjectsFinal(new MoveLevelObjectsFinalProperties(transformations.ToArrayFast(), globalUseScale, dt));
+                    ClientEvents.InvokeOnMoveLevelObjectsFinal(new MoveLevelObjectsFinalProperties(transformations.ToSpan(), globalUseScale, dt));
 
                 transformations.Clear();
                 globalUseScale = false;
@@ -535,37 +535,39 @@ internal static class LevelObjectPatches
 
         bool midClick = InputEx.GetKeyDown(KeyCode.Mouse2);
 
-        if ((!DevkitServerConfig.Config.RemoveCosmeticImprovements || midClick) && EditorInteractEx.TryGetWorldHit(out RaycastHit hit) && (hit.transform.CompareTag("Large") || hit.transform.CompareTag("Medium") ||
-                hit.transform.CompareTag("Small") || hit.transform.CompareTag("Barricade") ||
-                hit.transform.CompareTag("Structure")) &&
-            LevelObjectUtil.TryFindObjectOrBuildable(hit.transform, out LevelObject? @object, out LevelBuildableObject? buildable, true))
+        if ((!DevkitServerConfig.Config.RemoveCosmeticImprovements || midClick) && EditorInteractEx.TryGetWorldHit(out RaycastHit hit)
+            && hit.transform.tag is "Large" or "Medium" or "Small" or "Barricade" or "Structure"
+            && LevelObjectUtil.TryFindObjectOrBuildable(hit.transform, out LevelObject? @object, out LevelBuildableObject? buildable, true))
         {
             Asset? asset = @object?.asset ?? (Asset?)buildable?.asset;
+
+            Transform? transform = @object?.GetTransform() ?? buildable?.transform;
 
             if (midClick)
                 LevelObjectUtil.SelectObjectType(asset);
 
-            if (DevkitServerConfig.Config.RemoveCosmeticImprovements)
+            if (!DevkitServerConfig.Config.RemoveCosmeticImprovements && transform != null)
+            {
+                // object hover highlights
+                bool dif = _hover != transform;
+                if (_hover is not null && dif)
+                {
+                    if (_hover != null && !LevelObjectUtil.IsSelected(_hover))
+                        HighlighterUtil.Unhighlight(_hover, fade);
+
+                    _hover = null;
+                }
+
+                if (dif)
+                {
+                    if (!LevelObjectUtil.IsSelected(transform))
+                        HighlighterUtil.Highlight(transform, Color.black, fade);
+
+                    _hover = transform;
+                }
+
                 return;
-            // object hover highlights
-            bool dif = _hover != hit.transform;
-            if (_hover is not null && dif)
-            {
-                if (_hover != null && !LevelObjectUtil.IsSelected(_hover))
-                    HighlighterUtil.Unhighlight(_hover, fade);
-                
-                _hover = null;
             }
-
-            if (dif)
-            {
-                if (!LevelObjectUtil.IsSelected(hit.transform))
-                    HighlighterUtil.Highlight(hit.transform, Color.black, fade);
-                
-                _hover = hit.transform;
-            }
-
-            return;
         }
         
         if (_hover != null)
@@ -573,7 +575,7 @@ internal static class LevelObjectPatches
             if (!LevelObjectUtil.IsSelected(_hover))
                 HighlighterUtil.Unhighlight(_hover, fade);
 
-            _hover = null!;
+            _hover = null;
         }
     }
     private static void OnInstantiate(Vector3 position, Quaternion rotation, Vector3 scale, ObjectAsset objectAsset, ItemAsset buildableAsset)
@@ -658,7 +660,7 @@ internal static class LevelObjectPatches
             void Flush()
             {
                 if (ClientEvents.ListeningOnDeleteLevelObjects)
-                    ClientEvents.InvokeOnDeleteLevelObjects(new DeleteLevelObjectsProperties(netIds.ToArrayFast(), dt));
+                    ClientEvents.InvokeOnDeleteLevelObjects(new DeleteLevelObjectsProperties(netIds.ToSpan(), dt));
 
                 if (ClientEvents.ListeningOnDeleteLevelObject)
                 {
@@ -797,7 +799,10 @@ internal static class LevelObjectPatches
         float dt = CachedTime.DeltaTime;
 
         if (ClientEvents.ListeningOnMoveLevelObjectsFinal)
-            ClientEvents.InvokeOnMoveLevelObjectsFinal(new MoveLevelObjectsFinalProperties(new FinalTransformation[] { transformation }, useScale, dt));
+        {
+            ReadOnlySpan<FinalTransformation> t = stackalloc FinalTransformation[] { transformation };
+            ClientEvents.InvokeOnMoveLevelObjectsFinal(new MoveLevelObjectsFinalProperties(t, useScale, dt));
+        }
 
         if (ClientEvents.ListeningOnMoveLevelObjectFinal)
             ClientEvents.InvokeOnMoveLevelObjectFinal(new MoveLevelObjectFinalProperties(transformation, useScale, dt));
@@ -898,7 +903,7 @@ internal static class LevelObjectPatches
             void Flush()
             {
                 if (ClientEvents.ListeningOnUpdateObjectsCustomMaterialPaletteOverride)
-                    ClientEvents.InvokeOnUpdateObjectsCustomMaterialPaletteOverride(new UpdateObjectsCustomMaterialPaletteOverrideProperties(netIds.ToArrayFast(), value, CachedTime.DeltaTime));
+                    ClientEvents.InvokeOnUpdateObjectsCustomMaterialPaletteOverride(new UpdateObjectsCustomMaterialPaletteOverrideProperties(netIds.ToSpan(), value, CachedTime.DeltaTime));
 
                 netIds.Clear();
             }
@@ -999,7 +1004,7 @@ internal static class LevelObjectPatches
             void Flush()
             {
                 if (ClientEvents.ListeningOnUpdateObjectsMaterialIndexOverride)
-                    ClientEvents.InvokeOnUpdateObjectsMaterialIndexOverride(new UpdateObjectsMaterialIndexOverrideProperties(netIds.ToArrayFast(), value, CachedTime.DeltaTime));
+                    ClientEvents.InvokeOnUpdateObjectsMaterialIndexOverride(new UpdateObjectsMaterialIndexOverrideProperties(netIds.ToSpan(), value, CachedTime.DeltaTime));
 
                 netIds.Clear();
             }

@@ -151,6 +151,8 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
     public void LoadData(NavigationNetIdReplicatedLevelData data)
     {
         int ct = Math.Min(NetIds.Length, data.NetIds.Length);
+        if (ct < NetIds.Length)
+            Array.Clear(NetIds, ct, NetIds.Length - ct);
         for (int i = 0; i < ct; ++i)
             NetIds[i] = new NetId(data.NetIds[i]);
 

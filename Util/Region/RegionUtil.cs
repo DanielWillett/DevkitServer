@@ -1,5 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-using SDG.Framework.Foliage;
+﻿using SDG.Framework.Foliage;
 using SDG.Framework.Landscapes;
 
 namespace DevkitServer.Util.Region;
@@ -9,7 +8,6 @@ public static class RegionUtil
     /// Gets the region of a position, or throws an error if it's out of range. Pass an argument name when the name is not 'position'.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException"/>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void AssertGetRegion(Vector3 position, out byte x, out byte y, string argumentName)
     {
         if (!Regions.tryGetCoordinate(position, out x, out y))
@@ -19,7 +17,6 @@ public static class RegionUtil
     /// Gets the region of a position, or throws an error if it's out of range.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException"/>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void AssertGetRegion(Vector3 position, out byte x, out byte y)
     {
         if (!Regions.tryGetCoordinate(position, out x, out y))
@@ -162,6 +159,8 @@ public static class RegionUtil
             action(coord);
         }
     }
+    public static void ForEachTile(LandscapeCoord center, LandscapeCoordAction action)
+        => ForEachTile(center.x, center.y, action);
     public static void ForEachTile(Vector3 center, LandscapeCoordAction action)
     {
         LandscapeCoord coord = new LandscapeCoord(center);
@@ -188,6 +187,8 @@ public static class RegionUtil
                 break;
         }
     }
+    public static void ForEachTile(LandscapeCoord center, LandscapeCoordActionWhile action)
+        => ForEachTile(center.x, center.y, action);
     public static void ForEachTile(Vector3 center, LandscapeCoordActionWhile action)
     {
         LandscapeCoord coord = new LandscapeCoord(center);
@@ -213,6 +214,8 @@ public static class RegionUtil
             action(coord);
         }
     }
+    public static void ForEachHeightmapCoord(HeightmapCoord center, HeightmapCoordAction action)
+        => ForEachHeightmapCoord(center.x, center.y, action);
     public static void ForEachHeightmapCoord(Vector3 center, HeightmapCoordAction action)
     {
         HeightmapCoord coord = new HeightmapCoord(new LandscapeCoord(center), center);
@@ -240,6 +243,8 @@ public static class RegionUtil
                 break;
         }
     }
+    public static void ForEachHeightmapCoord(HeightmapCoord center, HeightmapCoordActionWhile action)
+        => ForEachHeightmapCoord(center.x, center.y, action);
     public static void ForEachHeightmapCoord(Vector3 center, HeightmapCoordActionWhile action)
     {
         HeightmapCoord coord = new HeightmapCoord(new LandscapeCoord(center), center);
@@ -265,6 +270,8 @@ public static class RegionUtil
             action(coord);
         }
     }
+    public static void ForEachSplatmapCoord(SplatmapCoord center, SplatmapCoordAction action)
+        => ForEachSplatmapCoord(center.x, center.y, action);
     public static void ForEachSplatmapCoord(Vector3 center, SplatmapCoordAction action)
     {
         SplatmapCoord coord = new SplatmapCoord(new LandscapeCoord(center), center);
@@ -292,6 +299,8 @@ public static class RegionUtil
                 break;
         }
     }
+    public static void ForEachSplatmapCoord(SplatmapCoord center, SplatmapCoordActionWhile action)
+        => ForEachSplatmapCoord(center.x, center.y, action);
     public static void ForEachSplatmapCoord(Vector3 center, SplatmapCoordActionWhile action)
     {
         SplatmapCoord coord = new SplatmapCoord(new LandscapeCoord(center), center);
@@ -316,6 +325,8 @@ public static class RegionUtil
             action(coord);
         }
     }
+    public static void ForEachFoliageTile(FoliageCoord center, FoliageCoordAction action)
+        => ForEachFoliageTile(center.x, center.y, action);
     public static void ForEachFoliageTile(Vector3 center, FoliageCoordAction action)
     {
         FoliageCoord coord = new FoliageCoord(center);
@@ -342,6 +353,8 @@ public static class RegionUtil
                 break;
         }
     }
+    public static void ForEachFoliageTile(FoliageCoord center, FoliageCoordActionWhile action)
+        => ForEachFoliageTile(center.x, center.y, action);
     public static void ForEachFoliageTile(Vector3 center, FoliageCoordActionWhile action)
     {
         FoliageCoord coord = new FoliageCoord(center);

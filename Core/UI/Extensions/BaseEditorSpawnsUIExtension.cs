@@ -9,6 +9,8 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
 {
     private bool _subbed;
     private bool _update;
+    private bool _wasVisibleBeforeOpened;
+    private bool _wasVisibleLastUpdate;
 
     protected readonly Vector3 Offset;
     protected readonly float DistanceCurveMin;
@@ -27,6 +29,7 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
     [ExistingMember("rotationSlider", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     protected ISleekSlider? RotationSlider;
     protected override SleekWindow Parent => EditorUI.window;
+    protected abstract bool IsVisible { get; set; }
     protected BaseEditorSpawnsUIExtension(Vector3 offset, float distanceCurveMin, float distanceCurveMax)
     {
         Offset = offset;
@@ -43,9 +46,11 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
         if (RotationSlider != null)
             RotationSlider.IsVisible = false;
     }
-
     protected override void OnShown()
     {
+        _wasVisibleBeforeOpened = IsVisible;
+        if (!IsVisible)
+            IsVisible = true;
         if (!_subbed)
         {
             MovementUtil.OnMainCameraTransformUpdated += OnUpdated;
@@ -54,9 +59,11 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
             _subbed = true;
         }
     }
-
     protected override void OnHidden()
     {
+        if (IsVisible != _wasVisibleBeforeOpened)
+            IsVisible = _wasVisibleBeforeOpened;
+        _wasVisibleBeforeOpened = false;
         if (_subbed)
         {
             MovementUtil.OnMainCameraTransformUpdated -= OnUpdated;
@@ -67,7 +74,6 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
 
         _update = false;
     }
-
     protected virtual bool ShouldShow(T spawn) => true;
     protected abstract void OnRegionUpdated(RegionCoord oldRegion, RegionCoord newRegion, bool isInRegion);
     private void OnUpdated(TransformUpdateTracker tracker, Vector3 oldPosition, Vector3 newPosition, Quaternion oldRotation, Quaternion newRotation)
@@ -76,13 +82,21 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
     }
     private void OnLateUpdate()
     {
+        if (_wasVisibleLastUpdate != IsVisible)
+        {
+            if (IsVisible)
+                OnRegionUpdated(default, MovementUtil.MainCameraRegion, MovementUtil.MainCameraIsInRegion);
+            else
+                ClearLabels();
+
+            _wasVisibleLastUpdate = IsVisible;
+        }
         if (_update)
         {
             UpdateAllLabels();
             _update = false;
         }
     }
-
     protected override void OnDestroyed()
     {
         if (_subbed)
@@ -93,7 +107,6 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
             _subbed = false;
         }
     }
-
     protected abstract Vector3 GetPosition(T spawn);
     protected int CreateLabel(T spawn, string text)
     {

@@ -12,15 +12,7 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
     public string ErrorMessage { get; set; }
     public string Name { get; }
     public Type DeclaringType { get; }
-    public bool IsEmpty
-    {
-        get
-        {
-            lock (this)
-                return _delegates.Length == 0;
-        }
-    }
-
+    public bool IsEmpty => _delegates.Length == 0;
     public TDelegate TryInvoke { get; }
     public bool IsCancellable { get; private set; }
     public bool DefaultShouldAllow { get; }
@@ -165,6 +157,17 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         Label loopStartLabel = il.DefineLabel();
         Label incrLbl = il.DefineLabel();
         Label checkLbl = il.DefineLabel();
+        Label rtnlbl = il.DefineLabel();
+
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldfld, field);
+        il.Emit(OpCodes.Ldlen);
+        il.Emit(OpCodes.Conv_I4);
+        il.Emit(OpCodes.Ldc_I4_0);
+        il.Emit(OpCodes.Beq, rtnlbl);
+
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, Accessor.GetMethod(new Action<object>(Monitor.Enter))!);
 
         // TDelegate[] delegates = this._delegates;
         il.Emit(OpCodes.Ldarg_0);
@@ -192,7 +195,9 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
             // if (!shouldAllow) return;
             PatchUtil.EmitArgument(il, shouldAllowIndex + 1, false, true);
             il.Emit(defaultShouldAllowValue ? OpCodes.Brtrue_S : OpCodes.Brfalse_S, incrLbl);
-            il.Emit(OpCodes.Ret);
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Call, Accessor.GetMethod(new Action<object>(Monitor.Exit))!);
+            il.Emit(OpCodes.Br, rtnlbl);
         }
 
         if (!DevkitServerModule.MonoLoaded)
@@ -232,6 +237,9 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         il.Emit(OpCodes.Ldlen);
         il.Emit(OpCodes.Conv_I4);
         il.Emit(OpCodes.Blt, loopStartLabel);
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, Accessor.GetMethod(new Action<object>(Monitor.Exit))!);
+        il.MarkLabel(rtnlbl);
         il.Emit(OpCodes.Ret);
 
         return method;

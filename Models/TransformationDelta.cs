@@ -50,7 +50,7 @@ public readonly struct TransformationDelta
         else
         {
             if ((flags & TransformFlags.Rotation) != 0)
-                Rotation = new Quaternion(0f, halfPrecision ? reader.ReadHalfPrecisionQuaternion() : reader.ReadQuaternion(), 0f, 0f);
+                Rotation = new Quaternion(0f, halfPrecision ? reader.ReadHalfPrecisionFloat() : reader.ReadFloat(), 0f, 0f);
             else
                 Rotation = Quaternion.identity;
             if ((flags & TransformFlags.OriginalRotation) != 0)
@@ -83,7 +83,7 @@ public readonly struct TransformationDelta
         Rotation = 2,
         OriginalPosition = 4,
         OriginalRotation = 8,
-        YawOnly = 16
+        YawOnly = 16,
         AllNew = Position | Rotation,
         AllOriginal = OriginalPosition | OriginalRotation,
         All = AllNew | AllOriginal
@@ -124,7 +124,7 @@ public readonly struct TransformationDelta
         if (halfPrecision) size /= 2;
         return size + 1;
     }
-    public static int CalculatePartialSize(TransformFlags flags, bool halfPrecision = false)
+    public int CalculatePartialSize(TransformFlags flags, bool halfPrecision = false)
     {
         int size = 0;
         if ((flags & TransformFlags.Position) != 0)

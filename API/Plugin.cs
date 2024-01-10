@@ -45,7 +45,7 @@ public abstract class Plugin : CoreLogger, IDevkitServerColorPlugin, ICachedTran
     PluginAssembly IDevkitServerPlugin.Assembly { get; set; } = null!;
 
     /// <inheritdoc/>
-    string IDevkitServerPlugin.PermissionPrefix { get; set; }
+    string IDevkitServerPlugin.PermissionPrefix { get; set; } = null!;
 
     /// <summary>
     /// Information about the assembly containing the plugin.
@@ -74,6 +74,11 @@ public abstract class Plugin : CoreLogger, IDevkitServerColorPlugin, ICachedTran
         else if (GetType().Assembly.TryGetAttributeSafe(out prefixAttr, true) && !string.IsNullOrWhiteSpace(prefixAttr.Prefix))
             ((IDevkitServerPlugin)this).PermissionPrefix = prefixAttr.Prefix;
     }
+    
+    /// <summary>
+    /// The default values for your primary localization file. This will contain shared local keys that aren't tied to a specific command or UI.
+    /// </summary>
+    /// <remarks>This is only ever queried once so there is no performance penalty to using an expression definition instead of a backing field.</remarks>
     protected virtual LocalDatDictionary DefaultLocalization => new LocalDatDictionary();
 
     /// <inheritdoc/>
@@ -140,12 +145,28 @@ public abstract class Plugin : CoreLogger, IDevkitServerColorPlugin, ICachedTran
 public abstract class Plugin<TConfig> : Plugin, IDevkitServerPlugin<TConfig> where TConfig : class, new()
 {
     private readonly JsonConfigurationFile<TConfig> _config;
+
+    /// <summary>
+    /// Configuration instance of a plugin with the config <typeparamref name="TConfig"/>.
+    /// </summary>
     public TConfig Configuration => _config.Configuration;
+
+    /// <summary>
+    /// Path to the config file relative to the plugin's data directory.
+    /// </summary>
+    /// <remarks>Will not be used if the path isn't under the plugin's data directory.</remarks>
     public virtual string RelativeMainConfigFileName => "config_main.json";
     protected Plugin()
     {
         // ReSharper disable once VirtualMemberCallInConstructor (Reason: expecting literal string override)
-        _config = new JsonConfigurationFile<TConfig>(Path.Combine(DataDirectory, RelativeMainConfigFileName)) { Faultable = true };
+        string path = RelativeMainConfigFileName;
+        if (!FileUtil.IsChildOf(DataDirectory, path))
+        {
+            this.LogWarning($"Main config directory {path.Format()} is not valid. Must be a child of {DataDirectory.Format()}.");
+            path = "config_main.json";
+        }
+
+        _config = new JsonConfigurationFile<TConfig>(Path.Combine(DataDirectory, path)) { Faultable = true };
 
         _config.ReloadConfig();
     }

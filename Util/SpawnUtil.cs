@@ -2,9 +2,9 @@
 using DevkitServer.Models;
 using DevkitServer.Util.Region;
 using DevkitServer.API;
+using DevkitServer.API.Devkit.Spawns;
 #if CLIENT
 using DevkitServer.Core;
-using DevkitServer.API.Devkit.Spawns;
 #endif
 
 namespace DevkitServer.Util;
@@ -34,6 +34,9 @@ public delegate void PlayerSpawnpointIsAlternateArgs(PlayerSpawnpoint point, int
 /// </summary>
 public static class SpawnUtil
 {
+    public const int MaxUpdateSpawnTypeCount = 32;
+    public const int MaxUpdateSpawnIsAlternateCount = 32;
+
     internal static readonly CachedMulticastEvent<AnimalSpawnpointMoved> EventOnAnimalSpawnpointMoved = new CachedMulticastEvent<AnimalSpawnpointMoved>(typeof(SpawnUtil), nameof(OnAnimalSpawnpointMoved));
     internal static readonly CachedMulticastEvent<VehicleSpawnpointMoved> EventOnVehicleSpawnpointMoved = new CachedMulticastEvent<VehicleSpawnpointMoved>(typeof(SpawnUtil), nameof(OnVehicleSpawnpointMoved));
     internal static readonly CachedMulticastEvent<PlayerSpawnpointMoved> EventOnPlayerSpawnpointMoved = new CachedMulticastEvent<PlayerSpawnpointMoved>(typeof(SpawnUtil), nameof(OnPlayerSpawnpointMoved));
@@ -656,6 +659,73 @@ public static class SpawnUtil
     }
 
     /// <summary>
+    /// Locally removes a spawnpoint from the list and destroyes the node.
+    /// </summary>
+    /// <remarks>Non-replicating.</remarks>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    public static bool RemoveSpawnLocal(SpawnType spawnType, int index) => RemoveSpawnLocal(spawnType, index, true);
+
+    /// <summary>
+    /// Locally removes a spawnpoint from the list and destroyes the node.
+    /// </summary>
+    /// <remarks>Non-replicating.</remarks>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    internal static bool RemoveSpawnLocal(SpawnType spawnType, int index, bool destroyNode)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (!CheckSpawnpointSafe(spawnType, index))
+            return false;
+
+        switch (spawnType)
+        {
+            case SpawnType.Animal:
+                RemoveAnimalSpawnLocal(LevelAnimals.spawns[index], destroyNode);
+                break;
+            case SpawnType.Vehicle:
+                RemoveVehicleSpawnLocal(LevelVehicles.spawns[index], destroyNode);
+                break;
+            case SpawnType.Player:
+                RemovePlayerSpawnLocal(LevelPlayers.spawns[index], destroyNode);
+                break;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Locally removes a spawnpoint from the list and destroyes the node.
+    /// </summary>
+    /// <remarks>Non-replicating.</remarks>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    public static bool RemoveSpawnLocal(SpawnType spawnType, RegionIdentifier region) => RemoveSpawnLocal(spawnType, region, true);
+
+    /// <summary>
+    /// Locally removes a spawnpoint from the list and destroyes the node.
+    /// </summary>
+    /// <remarks>Non-replicating.</remarks>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    internal static bool RemoveSpawnLocal(SpawnType spawnType, RegionIdentifier region, bool destroyNode)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (!CheckSpawnpointSafe(spawnType, region))
+            return false;
+
+        switch (spawnType)
+        {
+            case SpawnType.Item:
+                RemoveItemSpawnLocal(LevelItems.spawns[region.X, region.Y][region.Index], destroyNode);
+                break;
+            case SpawnType.Zombie:
+                RemoveZombieSpawnLocal(LevelZombies.spawns[region.X, region.Y][region.Index], destroyNode);
+                break;
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Locally removes an <see cref="AnimalSpawnpoint"/> from the list and destroyes the node.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
@@ -663,7 +733,7 @@ public static class SpawnUtil
     public static bool RemoveAnimalSpawnLocal(AnimalSpawnpoint spawn) => RemoveAnimalSpawnLocal(spawn, true);
 
     /// <summary>
-    /// Locally removes an <see cref="AnimalSpawnpoint"/> from the list and destroyes the node.
+    /// Locally removes an <see cref="AnimalSpawnpoint"/> from the list.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -675,13 +745,8 @@ public static class SpawnUtil
         if (index == -1)
         {
             if (destroyNode && spawn.node != null)
-            {
-#if CLIENT
-                if (spawn.node.TryGetComponent(out AnimalSpawnpointNode node))
-                    node.IgnoreDestroy = true;
-#endif
                 Object.Destroy(spawn.node.gameObject);
-            }
+
             return false;
         }
 
@@ -713,13 +778,8 @@ public static class SpawnUtil
         Logger.DevkitServer.LogDebug(nameof(RemoveAnimalSpawnLocal), $"Animal spawnpoint removed: {index.Format()}.");
 
         if (destroyNode && spawn.node != null)
-        {
-#if CLIENT
-            if (spawn.node.TryGetComponent(out AnimalSpawnpointNode node))
-                node.IgnoreDestroy = true;
-#endif
             Object.Destroy(spawn.node.gameObject);
-        }
+        
         return true;
     }
 
@@ -731,7 +791,7 @@ public static class SpawnUtil
     public static bool RemoveVehicleSpawnLocal(VehicleSpawnpoint spawn) => RemoveVehicleSpawnLocal(spawn, true);
 
     /// <summary>
-    /// Locally removes a <see cref="VehicleSpawnpoint"/> from the list and destroyes the node.
+    /// Locally removes a <see cref="VehicleSpawnpoint"/> from the list.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -743,13 +803,8 @@ public static class SpawnUtil
         if (index == -1)
         {
             if (destroyNode && spawn.node != null)
-            {
-#if CLIENT
-                if (spawn.node.TryGetComponent(out VehicleSpawnpointNode node))
-                    node.IgnoreDestroy = true;
-#endif
                 Object.Destroy(spawn.node.gameObject);
-            }
+            
             return false;
         }
 
@@ -781,13 +836,8 @@ public static class SpawnUtil
         Logger.DevkitServer.LogDebug(nameof(RemoveVehicleSpawnLocal), $"Vehicle spawnpoint removed: {index.Format()}.");
 
         if (destroyNode && spawn.node != null)
-        {
-#if CLIENT
-            if (spawn.node.TryGetComponent(out VehicleSpawnpointNode node))
-                node.IgnoreDestroy = true;
-#endif
             Object.Destroy(spawn.node.gameObject);
-        }
+        
         return true;
     }
 
@@ -799,7 +849,7 @@ public static class SpawnUtil
     public static bool RemovePlayerSpawnLocal(PlayerSpawnpoint spawn) => RemovePlayerSpawnLocal(spawn, true);
 
     /// <summary>
-    /// Locally removes a <see cref="PlayerSpawnpoint"/> from the list and destroyes the node.
+    /// Locally removes a <see cref="PlayerSpawnpoint"/> from the list.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -811,13 +861,8 @@ public static class SpawnUtil
         if (index == -1)
         {
             if (destroyNode && spawn.node != null)
-            {
-#if CLIENT
-                if (spawn.node.TryGetComponent(out PlayerSpawnpointNode node))
-                    node.IgnoreDestroy = true;
-#endif
                 Object.Destroy(spawn.node.gameObject);
-            }
+            
             return false;
         }
 
@@ -849,13 +894,8 @@ public static class SpawnUtil
         Logger.DevkitServer.LogDebug(nameof(RemovePlayerSpawnLocal), $"Player spawnpoint removed: {index.Format()}.");
         
         if (destroyNode && spawn.node != null)
-        {
-#if CLIENT
-            if (spawn.node.TryGetComponent(out PlayerSpawnpointNode node))
-                node.IgnoreDestroy = true;
-#endif
             Object.Destroy(spawn.node.gameObject);
-        }
+        
         return true;
     }
 
@@ -867,7 +907,7 @@ public static class SpawnUtil
     public static bool RemoveItemSpawnLocal(ItemSpawnpoint spawn) => RemoveItemSpawnLocal(spawn, true);
 
     /// <summary>
-    /// Locally removes an <see cref="ItemSpawnpoint"/> from the list and destroyes the node.
+    /// Locally removes an <see cref="ItemSpawnpoint"/> from the list.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -912,26 +952,15 @@ public static class SpawnUtil
             Logger.DevkitServer.LogDebug(nameof(RemoveItemSpawnLocal), $"Item spawnpoint removed: {newRegion.Format()}.");
 
             if (destroyNode && spawn.node != null)
-            {
-#if CLIENT
-                if (spawn.node.TryGetComponent(out ItemSpawnpointNode node))
-                    node.IgnoreDestroy = true;
-#endif
                 Object.Destroy(spawn.node.gameObject);
-            }
+            
             removed = true;
             return false;
         });
 
         if (!removed && destroyNode && spawn.node != null)
-        {
-#if CLIENT
-            if (spawn.node.TryGetComponent(out ItemSpawnpointNode node))
-                node.IgnoreDestroy = true;
-#endif
             Object.Destroy(spawn.node.gameObject);
-        }
-
+        
         return removed;
     }
 
@@ -943,7 +972,7 @@ public static class SpawnUtil
     public static bool RemoveZombieSpawnLocal(ZombieSpawnpoint spawn) => RemoveZombieSpawnLocal(spawn, true);
 
     /// <summary>
-    /// Locally removes a <see cref="ZombieSpawnpoint"/> from the list and destroyes the node.
+    /// Locally removes a <see cref="ZombieSpawnpoint"/> from the list.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -988,25 +1017,14 @@ public static class SpawnUtil
             Logger.DevkitServer.LogDebug(nameof(RemoveZombieSpawnLocal), $"Zombie spawnpoint removed: {newRegion.Format()}.");
 
             if (destroyNode && spawn.node != null)
-            {
-#if CLIENT
-                if (spawn.node.TryGetComponent(out ZombieSpawnpointNode node))
-                    node.IgnoreDestroy = true;
-#endif
                 Object.Destroy(spawn.node.gameObject);
-            }
+            
             removed = true;
             return false;
         });
 
         if (!removed && destroyNode && spawn.node != null)
-        {
-#if CLIENT
-            if (spawn.node.TryGetComponent(out ZombieSpawnpointNode node))
-                node.IgnoreDestroy = true;
-#endif
             Object.Destroy(spawn.node.gameObject);
-        }
 
         return removed;
     }
@@ -1181,13 +1199,7 @@ public static class SpawnUtil
                 goto setNode;
 
             if (spawn.node != null)
-            {
-#if CLIENT
-                if (spawn.node.TryGetComponent(out ItemSpawnpointNode node))
-                    node.IgnoreDestroy = true;
-#endif
                 Object.Destroy(spawn.node.gameObject);
-            }
 
             return;
         }
@@ -1300,13 +1312,7 @@ public static class SpawnUtil
                 goto setNode;
 
             if (spawn.node != null)
-            {
-#if CLIENT
-                if (spawn.node.TryGetComponent(out ZombieSpawnpointNode node))
-                    node.IgnoreDestroy = true;
-#endif
                 Object.Destroy(spawn.node.gameObject);
-            }
 
             return;
         }
@@ -1832,4 +1838,35 @@ public static class SpawnUtil
             renderer.material.shader = SharedResources.LogicShader;
     }
 #endif
+
+    /// <summary>
+    /// Checks to make sure <paramref name="index"/> is in range of the corresponding internal spawn list.
+    /// </summary>
+    /// <param name="useUnsafeComparison">Converts <paramref name="index"/> to a <see cref="RegionIdentifier"/> when <paramref name="spawnType"/> is a region spawn.</param>
+    public static bool CheckSpawnpointSafe(SpawnType spawnType, int index, bool useUnsafeComparison = false)
+    {
+        return spawnType switch
+        {
+            SpawnType.Animal => index >= 0 && LevelAnimals.spawns.Count > index,
+            SpawnType.Vehicle => index >= 0 && LevelVehicles.spawns.Count > index,
+            SpawnType.Player => index >= 0 && LevelPlayers.spawns.Count > index,
+            SpawnType.Item or SpawnType.Zombie => useUnsafeComparison && CheckSpawnpointSafe(spawnType, RegionIdentifier.CreateUnsafe(index), false),
+            _ => false
+        };
+    }
+
+    /// <summary>
+    /// Checks to make sure <paramref name="region"/> is in range of the corresponding internal spawn region lists.
+    /// </summary>
+    /// <param name="useUnsafeComparison">Converts <paramref name="region"/> to an <see cref="int"/> when <paramref name="spawnType"/> is an index spawn.</param>
+    public static bool CheckSpawnpointSafe(SpawnType spawnType, RegionIdentifier region, bool useUnsafeComparison = false)
+    {
+        return spawnType switch
+        {
+            SpawnType.Zombie => region.CheckSafe() && LevelZombies.spawns[region.X, region.Y].Count > region.Index,
+            SpawnType.Item => region.CheckSafe() && LevelZombies.spawns[region.X, region.Y].Count > region.Index,
+            SpawnType.Animal or SpawnType.Vehicle or SpawnType.Player => useUnsafeComparison && CheckSpawnpointSafe(spawnType, region.Raw, false),
+            _ => false
+        };
+    }
 }

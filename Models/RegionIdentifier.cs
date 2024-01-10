@@ -34,10 +34,11 @@ public readonly struct RegionIdentifier : IEquatable<RegionIdentifier>, ICompara
     public RegionIdentifier(RegionCoord coord, int index) : this((coord.x << 24) | (coord.y << 16) | (ushort)index) { }
     public RegionIdentifier(byte x, byte y, ushort index) : this((x << 24) | (y << 16) | index) { }
     public RegionIdentifier(int x, int y, int index) : this(((byte)x << 24) | ((byte)y << 16) | (ushort)index) { }
-    internal static unsafe RegionIdentifier CreateUnsafe(int raw) => *(RegionIdentifier*)&raw;
+    public static unsafe RegionIdentifier CreateUnsafe(int raw) => *(RegionIdentifier*)&raw;
+    public bool CheckSafe() => Regions.checkSafe(X, Y);
     public bool IsSameRegionAs(RegionIdentifier other) => (other._data & unchecked((int)0xFFFF0000)) == (_data & unchecked((int)0xFFFF0000));
     public bool IsSameRegionAs(byte x, byte y) => X == x && Y == y;
-    public override bool Equals(object other) => other is RegionIdentifier id && Equals(id);
+    public override bool Equals(object? other) => other is RegionIdentifier id && Equals(id);
     public bool Equals(RegionIdentifier other) => other._data == _data;
     public override int GetHashCode() => _data;
     public static bool operator ==(RegionIdentifier left, RegionIdentifier right) => left._data == right._data;

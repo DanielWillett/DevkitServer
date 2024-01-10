@@ -20,6 +20,23 @@ namespace DevkitServer.Util;
 /// </summary>
 public static class FileUtil
 {
+    /// <summary>
+    /// Returns the desktop on machines that support it, otherwise returns <see cref="Environment.CurrentDirectory"/>.
+    /// </summary>
+    public static string DesktopOrCurrentDir
+    {
+        get
+        {
+            try
+            {
+                return Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            }
+            catch
+            {
+                return Environment.CurrentDirectory;
+            }
+        }
+    }
 #if SERVER
     [Pure]
     public static string GetUserSavedataLocation(ulong s64, string path, int characterId = 0)

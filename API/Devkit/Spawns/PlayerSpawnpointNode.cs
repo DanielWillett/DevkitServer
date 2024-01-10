@@ -1,4 +1,6 @@
-﻿using SDG.Framework.Devkit.Interactable;
+﻿using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Levels;
+using SDG.Framework.Devkit.Interactable;
 
 namespace DevkitServer.API.Devkit.Spawns;
 
@@ -24,7 +26,6 @@ public class PlayerSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDevk
         collider.size = new Vector3(2.25f, 2f, 0.35f);
         collider.center = new Vector3(0f, 1f, 0f);
     }
-
     protected override bool Add()
     {
         SpawnUtil.AddPlayerSpawnLocal(Spawnpoint);
@@ -38,6 +39,11 @@ public class PlayerSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDevk
     {
         SpawnUtil.TransformSpawnpointLocal(Spawnpoint, transform.position, transform.eulerAngles.y);
     }
+    protected override NetId64 GetNetId()
+    {
+        SpawnsNetIdDatabase.TryGetPlayerSpawnNetId(Index, out NetId64 netId);
+        return netId;
+    }
     protected override void Init()
     {
         Transform arrow = transform.Find("Arrow");
@@ -47,7 +53,6 @@ public class PlayerSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDevk
     {
         return Spawnpoint.isAlt ? "Player Spawnpoint".Colorize(SpawnpointColor) + " (Alternate)" : "Player Spawnpoint".Colorize(SpawnpointColor);
     }
-
     public override string ToString()
     {
         return Spawnpoint.isAlt ? "Player Spawnpoint (Alternate)" : "Player Spawnpoint";

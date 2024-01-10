@@ -3,6 +3,7 @@ using DevkitServer.Models;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using DevkitServer.Multiplayer.Actions;
 
 // ReSharper disable AssignNullToNotNullAttribute
 
@@ -141,6 +142,7 @@ public class ByteReader
             { typeof(char[]), GetMethod(nameof(ReadCharArray)) },
             { typeof(string[]), GetMethod(nameof(ReadStringArray)) },
             { typeof(NetId), GetMethod(nameof(ReadNetId)) },
+            { typeof(NetId64), GetMethod(nameof(ReadNetId64)) }
         };
 
         _nullableReaders ??= new Dictionary<Type, MethodInfo>(44)
@@ -189,7 +191,8 @@ public class ByteReader
             { typeof(decimal[]), GetMethod(nameof(ReadNullableDecimalArray)) },
             { typeof(char[]), GetMethod(nameof(ReadNullableCharArray)) },
             { typeof(string[]), GetMethod(nameof(ReadNullableStringArray)) },
-            { typeof(NetId?), GetMethod(nameof(ReadNullableNetId)) }
+            { typeof(NetId?), GetMethod(nameof(ReadNullableNetId)) },
+            { typeof(NetId64?), GetMethod(nameof(ReadNullableNetId64)) }
         };
 
         MethodInfo GetMethod(string name) => typeof(ByteReader).GetMethod(name, BindingFlags.Instance | BindingFlags.Public)
@@ -642,6 +645,20 @@ public class ByteReader
     {
         if (!ReadBool()) return null;
         return new NetId(ReadUInt32());
+    }
+
+    /// <summary>
+    /// Reads a <see cref="NetId64"/> (<see cref="ulong"/>) from the buffer.
+    /// </summary>
+    public NetId64 ReadNetId64() => !EnsureMoreLength(sizeof(ulong)) ? default : new NetId64(Read<ulong>());
+
+    /// <summary>
+    /// Reads a <see cref="NetId64?"/> (<see cref="ulong?"/>) from the buffer.
+    /// </summary>
+    public NetId64? ReadNullableNetId64()
+    {
+        if (!ReadBool()) return null;
+        return new NetId64(ReadUInt64());
     }
 
     /// <summary>

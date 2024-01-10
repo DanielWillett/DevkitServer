@@ -275,16 +275,27 @@ internal static class PatchesMain
 
         ThreadUtil.assertIsGameThread();
 
-        if (LevelData.ShouldActivateSaveLockOnLevelSave)
+        bool locked = LevelData.ShouldActivateSaveLockOnLevelSave;
+        if (locked)
             LevelData.SaveLock.Wait();
 
-        Logger.DevkitServer.LogInfo(nameof(OnLevelSaving), "Saving editor data.");
-        LandscapeUtil.DeleteUnusedTileData();
+        try
+        {
+            Logger.DevkitServer.LogInfo(nameof(OnLevelSaving), "Saving editor data.");
+            LandscapeUtil.DeleteUnusedTileData();
+        }
+        catch
+        {
+            if (locked)
+                LevelData.SaveLock.Release();
+            
+            throw;
+        }
         return true;
     }
-    private static void OnLevelSavedFinalizer()
+    private static void OnLevelSavedFinalizer(bool __runOriginal)
     {
-        if (LevelData.ShouldActivateSaveLockOnLevelSave)
+        if (__runOriginal && LevelData.ShouldActivateSaveLockOnLevelSave)
             LevelData.SaveLock.Release();
     }
 #if CLIENT

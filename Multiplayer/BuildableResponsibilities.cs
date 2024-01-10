@@ -299,6 +299,9 @@ public sealed class BuildableResponsibilities : IReplicatedLevelDataSource<Build
                     else
                         localData2.Add(serverData[i] == client);
                 }
+
+                if (serverData.Count < localData2.Count)
+                    localData2.RemoveRange(serverData.Count, localData2.Count - serverData.Count);
             }
         }
     }

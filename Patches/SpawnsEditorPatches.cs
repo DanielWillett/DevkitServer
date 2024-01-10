@@ -1,10 +1,15 @@
 ﻿#if CLIENT
 using DevkitServer.API;
 using DevkitServer.API.Devkit.Spawns;
+using DevkitServer.API.Permissions;
+using DevkitServer.API.UI;
+using DevkitServer.Core.Permissions;
 using DevkitServer.Core.Tools;
+using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Players;
 using HarmonyLib;
 using SDG.Framework.Devkit;
+using SDG.Framework.Utilities;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -14,6 +19,11 @@ namespace DevkitServer.Patches;
 internal static class SpawnsEditorPatches
 {
     private const string Source = "SPAWN PATCHES";
+    
+    private static readonly StaticGetter<ISleekButton[]>? GetAnimalTableButtons = Accessor.GenerateStaticGetter<EditorSpawnsAnimalsUI, ISleekButton[]>("tableButtons", throwOnError: false);
+    private static readonly StaticGetter<ISleekButton[]>? GetVehicleTableButtons = Accessor.GenerateStaticGetter<EditorSpawnsVehiclesUI, ISleekButton[]>("tableButtons", throwOnError: false);
+    private static readonly StaticGetter<ISleekButton[]>? GetItemTableButtons = Accessor.GenerateStaticGetter<EditorSpawnsItemsUI, ISleekButton[]>("tableButtons", throwOnError: false);
+    private static readonly StaticGetter<ISleekButton[]>? GetZombieTableButtons = Accessor.GenerateStaticGetter<EditorSpawnsZombiesUI, ISleekButton[]>("tableButtons", throwOnError: false);
 
     internal static void ManualPatches()
     {
@@ -21,7 +31,7 @@ internal static class SpawnsEditorPatches
         {
             HarmonyMethod transpiler = new HarmonyMethod(Accessor.GetMethod(TranspileOpenAndCloseMethods));
 
-            Type[] types = { typeof(EditorSpawnsItemsUI), typeof(EditorSpawnsVehiclesUI), typeof(EditorSpawnsAnimalsUI), typeof(EditorSpawnsZombiesUI), typeof(EditorLevelPlayersUI) };
+            Type[] types = [ typeof(EditorSpawnsItemsUI), typeof(EditorSpawnsVehiclesUI), typeof(EditorSpawnsAnimalsUI), typeof(EditorSpawnsZombiesUI), typeof(EditorLevelPlayersUI) ];
             foreach (Type type in types)
             {
                 MethodInfo? openMethod = type.GetMethod("open", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static, null, CallingConventions.Any, Type.EmptyTypes, null);
@@ -38,19 +48,19 @@ internal static class SpawnsEditorPatches
                     patch = false;
                 }
 
-                if (patch)
-                {
-                    PatchesMain.Patcher.Patch(openMethod, transpiler: transpiler);
-                    PatchesMain.Patcher.Patch(closeMethod, transpiler: transpiler);
-                }
+                if (!patch)
+                    continue;
+
+                PatchesMain.Patcher.Patch(openMethod, transpiler: transpiler);
+                PatchesMain.Patcher.Patch(closeMethod, transpiler: transpiler);
             }
 
             MethodInfo? clickMethod = typeof(EditorLevelUI).GetMethod("onClickedPlayersButton", BindingFlags.NonPublic | BindingFlags.Instance);
+
             if (clickMethod == null)
-            {
                 Logger.DevkitServer.LogWarning(Source, $"Method not found: {FormattingUtil.FormatMethod(typeof(void), typeof(EditorLevelUI), "onClickedPlayersButton", namedArguments: [ (typeof(ISleekElement), "button") ])}.");
-            }
-            else PatchesMain.Patcher.Patch(clickMethod, transpiler: new HarmonyMethod(Accessor.GetMethod(TranspileOnClickedPlayersButton)));
+            else
+                PatchesMain.Patcher.Patch(clickMethod, transpiler: new HarmonyMethod(Accessor.GetMethod(TranspileOnClickedPlayersButton)));
         }
         catch (Exception ex)
         {
@@ -64,109 +74,132 @@ internal static class SpawnsEditorPatches
     [UsedImplicitly]
     private static void OnPlayerToggledAlt(ISleekToggle toggle, bool state)
     {
-        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+        if (DevkitServerModule.IsEditing && !VanillaPermissions.SpawnsPlayerEdit.Has())
         {
-            if (selection.transform.TryGetComponent(out PlayerSpawnpointNode node))
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnsPlayerEdit);
+            return;
+        }
+
+        bool batchListening = ClientEvents.ListeningOnSetPlayerSpawnpointsIsAlternate;
+        bool singleListening = ClientEvents.ListeningOnSetPlayerSpawnpointIsAlternate || ClientEvents.ListeningOnSetPlayerSpawnpointIsAlternateRequested;
+
+        if (!DevkitServerModule.IsEditing || !batchListening && !singleListening)
+        {
+            foreach (DevkitSelection selection in DevkitSelectionManager.selection)
             {
-                node.Spawnpoint.SetIsAlternateLocal(state);
+                if (selection.transform.TryGetComponent(out PlayerSpawnpointNode node) || node.Spawnpoint.isAlt == state)
+                    node.Spawnpoint.SetIsAlternateLocal(state);
             }
+
+            return;
+        }
+
+        float dt = CachedTime.DeltaTime;
+
+        SetPlayerSpawnpointIsAlternateProperties singleProperties = default;
+        List<NetId64>? toUpdate = batchListening ? ListPool<NetId64>.claim() : null;
+        try
+        {
+            foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+            {
+                if (!selection.gameObject.TryGetComponent(out PlayerSpawnpointNode node) || node.Spawnpoint.isAlt == state)
+                    continue;
+
+                if (singleListening)
+                {
+                    bool shouldAllow = true;
+                    singleProperties = new SetPlayerSpawnpointIsAlternateProperties(node.NetId, state, dt);
+                    ClientEvents.InvokeOnSetPlayerSpawnpointIsAlternateRequested(in singleProperties, ref shouldAllow);
+                    if (!shouldAllow)
+                        continue;
+                }
+
+                node.Spawnpoint.SetIsAlternateLocal(state);
+
+                if (singleListening)
+                    ClientEvents.InvokeOnSetPlayerSpawnpointIsAlternate(in singleProperties);
+
+                if (!batchListening)
+                    continue;
+
+                toUpdate!.Add(node.NetId);
+                if (toUpdate.Count >= SpawnUtil.MaxUpdateSpawnIsAlternateCount)
+                    Flush(toUpdate, dt, state);
+            }
+
+            if (batchListening)
+                Flush(toUpdate!, dt, state);
+
+            static void Flush(List<NetId64> toUpdate, float dt, bool state)
+            {
+                SetPlayerSpawnpointsIsAlternateProperties properties = new SetPlayerSpawnpointsIsAlternateProperties(toUpdate.ToSpan(), state, dt);
+
+                ClientEvents.InvokeOnSetPlayerSpawnpointsIsAlternate(in properties);
+
+                toUpdate.Clear();
+            }
+        }
+        finally
+        {
+            if (batchListening)
+                ListPool<NetId64>.release(toUpdate);
         }
     }
 
     [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onClickedTableButton")]
-    [HarmonyPostfix]
+    [HarmonyPrefix]
     [UsedImplicitly]
-    private static void OnAnimalSelectionChanged(ISleekElement button)
+    private static bool OnAnimalSelectionChanged(ISleekElement button)
     {
-        if (EditorSpawns.selectedAnimal >= LevelAnimals.tables.Count)
-            return;
-        AnimalTable table = LevelAnimals.tables[EditorSpawns.selectedAnimal];
-        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
-        {
-            if (selection.transform.TryGetComponent(out AnimalSpawnpointNode node))
-            {
-                node.Spawnpoint.type = EditorSpawns.selectedAnimal;
-                node.Color = table.color;
-
-                Logger.DevkitServer.LogDebug(Source, $"Spawn table updated for {node.Format()}.");
-                SpawnUtil.EventOnAnimalSpawnTableChanged.TryInvoke(node.Spawnpoint, node.Index);
-            }
-        }
+        if (GetAnimalTableButtons == null)
+            return true;
+        int index = Array.IndexOf(GetAnimalTableButtons(), (ISleekButton)button);
+        if (index == -1)
+            return true;
+        SpawnTableUtil.SelectAnimalTable(index, true, true);
+        return false;
     }
 
     [HarmonyPatch(typeof(EditorSpawnsVehiclesUI), "onClickedTableButton")]
-    [HarmonyPostfix]
+    [HarmonyPrefix]
     [UsedImplicitly]
-    private static void OnVehicleSelectionChanged(ISleekElement button)
+    private static bool OnVehicleSelectionChanged(ISleekElement button)
     {
-        if (EditorSpawns.selectedVehicle >= LevelVehicles.tables.Count)
-            return;
-        VehicleTable table = LevelVehicles.tables[EditorSpawns.selectedVehicle];
-        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
-        {
-            if (selection.transform.TryGetComponent(out VehicleSpawnpointNode node))
-            {
-                node.Spawnpoint.type = EditorSpawns.selectedVehicle;
-                node.Color = table.color;
-
-                Logger.DevkitServer.LogDebug(Source, $"Spawn table updated for {node.Format()}.");
-                SpawnUtil.EventOnVehicleSpawnTableChanged.TryInvoke(node.Spawnpoint, node.Index);
-            }
-        }
+        if (GetVehicleTableButtons == null)
+            return true;
+        int index = Array.IndexOf(GetVehicleTableButtons(), (ISleekButton)button);
+        if (index == -1)
+            return true;
+        SpawnTableUtil.SelectVehicleTable(index, true, true);
+        return false;
     }
 
     [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onClickedTableButton")]
-    [HarmonyPostfix]
+    [HarmonyPrefix]
     [UsedImplicitly]
-    private static void OnItemSelectionChanged(ISleekElement button)
+    private static bool OnItemSelectionChanged(ISleekElement button)
     {
-        if (EditorSpawns.selectedItem >= LevelItems.tables.Count)
-            return;
-        ItemTable table = LevelItems.tables[EditorSpawns.selectedItem];
-        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
-        {
-            if (selection.transform.TryGetComponent(out ItemSpawnpointNode node))
-            {
-                node.Spawnpoint.type = EditorSpawns.selectedItem;
-                node.Color = table.color;
-
-                Logger.DevkitServer.LogDebug(Source, $"Spawn table updated for {node.Format()}.");
-                SpawnUtil.EventOnItemSpawnTableChanged.TryInvoke(node.Spawnpoint, node.Region);
-            }
-        }
+        if (GetItemTableButtons == null)
+            return true;
+        int index = Array.IndexOf(GetItemTableButtons(), (ISleekButton)button);
+        if (index == -1)
+            return true;
+        SpawnTableUtil.SelectItemTable(index, true, true);
+        return false;
     }
 
     [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onClickedTableButton")]
-    [HarmonyPostfix]
+    [HarmonyPrefix]
     [UsedImplicitly]
-    private static void OnZombieSelectionChanged(ISleekElement button)
+    private static bool OnZombieSelectionChanged(ISleekElement button)
     {
-        if (EditorSpawns.selectedZombie >= LevelZombies.tables.Count)
-            return;
-        ZombieTable table = LevelZombies.tables[EditorSpawns.selectedZombie];
-        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
-        {
-            if (selection.transform.TryGetComponent(out ZombieSpawnpointNode node))
-            {
-                node.Spawnpoint.type = EditorSpawns.selectedZombie;
-                node.Color = table.color;
-
-                Logger.DevkitServer.LogDebug(Source, $"Spawn table updated for {node.Format()}.");
-                SpawnUtil.EventOnZombieSpawnTableChanged.TryInvoke(node.Spawnpoint, node.Region);
-            }
-        }
-    }
-
-    [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onTypedTableNameField")]
-    [HarmonyPostfix]
-    [UsedImplicitly]
-    [HarmonyPriority(-1)]
-    private static void OnItemNameUpdated(ISleekField field, string state)
-    {
-        if (EditorSpawns.selectedItem >= LevelItems.tables.Count)
-            return;
-
-        SpawnTableUtil.EventOnItemSpawnTableNameUpdated.TryInvoke(LevelItems.tables[EditorSpawns.selectedItem], EditorSpawns.selectedItem);
+        if (GetZombieTableButtons == null)
+            return true;
+        int index = Array.IndexOf(GetZombieTableButtons(), (ISleekButton)button);
+        if (index == -1)
+            return true;
+        SpawnTableUtil.SelectZombieTable(index, true, true);
+        return false;
     }
 
     [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onTypedNameField")]
@@ -178,19 +211,7 @@ internal static class SpawnsEditorPatches
         if (EditorSpawns.selectedAnimal >= LevelAnimals.tables.Count)
             return;
 
-        SpawnTableUtil.EventOnAnimalSpawnTableNameUpdated.TryInvoke(LevelAnimals.tables[EditorSpawns.selectedAnimal], EditorSpawns.selectedAnimal);
-    }
-
-    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onTypedNameField")]
-    [HarmonyPostfix]
-    [UsedImplicitly]
-    [HarmonyPriority(-1)]
-    private static void OnZombieNameUpdated(ISleekField field, string state)
-    {
-        if (EditorSpawns.selectedZombie >= LevelZombies.tables.Count)
-            return;
-
-        SpawnTableUtil.EventOnZombieSpawnTableNameUpdated.TryInvoke(LevelZombies.tables[EditorSpawns.selectedZombie], EditorSpawns.selectedZombie);
+        LevelAnimals.tables[EditorSpawns.selectedAnimal].SetSpawnTableNameLocal(state);
     }
 
     [HarmonyPatch(typeof(EditorSpawnsVehiclesUI), "onTypedNameField")]
@@ -202,7 +223,31 @@ internal static class SpawnsEditorPatches
         if (EditorSpawns.selectedVehicle >= LevelVehicles.tables.Count)
             return;
 
-        SpawnTableUtil.EventOnVehicleSpawnTableNameUpdated.TryInvoke(LevelVehicles.tables[EditorSpawns.selectedVehicle], EditorSpawns.selectedVehicle);
+        LevelVehicles.tables[EditorSpawns.selectedVehicle].SetSpawnTableNameLocal(state);
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onTypedTableNameField")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static void OnItemNameUpdated(ISleekField field, string state)
+    {
+        if (EditorSpawns.selectedItem >= LevelItems.tables.Count)
+            return;
+
+        LevelItems.tables[EditorSpawns.selectedItem].SetSpawnTableNameLocal(state);
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onTypedNameField")]
+    [HarmonyPostfix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static void OnZombieNameUpdated(ISleekField field, string state)
+    {
+        if (EditorSpawns.selectedZombie >= LevelZombies.tables.Count)
+            return;
+
+        LevelZombies.tables[EditorSpawns.selectedZombie].SetSpawnTableNameLocal(state);
     }
     private static IEnumerable<CodeInstruction> TranspileOnClickedPlayersButton(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {

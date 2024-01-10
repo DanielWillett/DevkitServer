@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyTitle>DevkitServer</AssemblyTitle>
     <Product>DevkitServer</Product>
-    <Copyright>Copyright ©  2023</Copyright>
+    <Copyright>Copyright ©  2024</Copyright>
     <LangVersion>preview</LangVersion>
     <Nullable>enable</Nullable>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

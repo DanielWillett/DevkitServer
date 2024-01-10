@@ -876,6 +876,17 @@ public static class DevkitServerUtility
     public static T[] ToArrayFast<T>(this List<T> list) => list.Count == 0 ? Array.Empty<T>() : list.ToArray();
 
     /// <summary>
+    /// Converts a list to a <see cref="ReadOnlySpan{T}"/> without copying the data.
+    /// </summary>
+    public static ReadOnlySpan<T> ToSpan<T>(this List<T> list)
+    {
+        if (list.Count == 0)
+            return default;
+
+        return Accessor.TryGetUnderlyingArray(list, out T[] underlying) ? underlying.AsSpan(0, list.Count) : list.ToArrayFast();
+    }
+
+    /// <summary>
     /// Increases the capacity of a list if it is less than <paramref name="capacity"/>.
     /// </summary>
     public static void IncreaseCapacity<T>(this List<T> list, int capacity)

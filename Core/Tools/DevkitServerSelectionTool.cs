@@ -28,7 +28,9 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
     private bool _canRotate = true;
     private bool _canTranslate = true;
     private bool _handleModeDirty;
-    private Transform? _hoverHighlight;
+    private bool _justCancelledDragging;
+    private bool _hasLetGoOfCtrlSinceCopyTransform = true;
+    private GameObject? _hoverHighlight;
     public IReadOnlyList<GameObject> CopyBuffer { get; }
     public TransformHandles Handles { get; } = new TransformHandles();
     public bool IsAreaSelecting { get; private set; }
@@ -36,6 +38,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
     public bool CanAreaSelect { get; set; } = true;
     public bool CanMiddleClickPick { get; set; } = true;
     public bool HighlightHover { get; set; } = true;
+    public bool RootSelections { get; set; } = true;
     public bool HasReferenceTransform { get; private set; }
     public Vector3 HandlePosition { get; private set; }
     public Vector3 ReferencePosition { get; private set; }
@@ -45,14 +48,13 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
     public Quaternion HandleRotation { get; private set; }
     public bool CanTranslate
     {
-        get => _canRotate;
+        get => _canTranslate;
         set
         {
             _handleModeDirty |= value != _canTranslate;
             _canTranslate = value;
         }
     }
-
     public bool CanRotate
     {
         get => _canRotate;
@@ -62,7 +64,6 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
             _canRotate = value;
         }
     }
-
     public bool CanScale
     {
         get => _canScale;
@@ -97,19 +98,27 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
 
         EarlyInputTick();
 
+        bool ctrl = InputUtil.IsHoldingControl();
+        if (!ctrl)
+        {
+            _hasLetGoOfCtrlSinceCopyTransform = true;
+        }
+
         if (!flying && Glazier.Get().ShouldGameProcessInput)
         {
+            // handle mode change keybinds
+
             if (_handleModeDirty)
             {
-                if (!CanScale && _handleMode == SelectionTool.ESelectionMode.SCALE)
+                if (!(CanScale || DevkitSelectionManager.selection.Count > 1) && _handleMode == SelectionTool.ESelectionMode.SCALE)
                     _handleMode = SelectionTool.ESelectionMode.POSITION;
-                else if (!CanRotate && _handleMode == SelectionTool.ESelectionMode.ROTATION)
+                else if (!(CanRotate || DevkitSelectionManager.selection.Count > 1) && _handleMode == SelectionTool.ESelectionMode.ROTATION)
                     _handleMode = SelectionTool.ESelectionMode.POSITION;
                 if (!CanTranslate && _handleMode == SelectionTool.ESelectionMode.POSITION)
                 {
-                    if (CanRotate)
+                    if (CanRotate || DevkitSelectionManager.selection.Count > 1)
                         _handleMode = SelectionTool.ESelectionMode.ROTATION;
-                    else if (CanScale)
+                    else if (CanScale || DevkitSelectionManager.selection.Count > 1)
                         _handleMode = SelectionTool.ESelectionMode.SCALE;
                 }
 
@@ -126,12 +135,12 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                 else
                     _wantsBoundsEditor = !_wantsBoundsEditor;
             }
-            else if (InputEx.GetKeyDown(KeyCode.W) && CanRotate)
+            else if (InputEx.GetKeyDown(KeyCode.W) && (CanRotate || DevkitSelectionManager.selection.Count > 1))
             {
                 _handleMode = SelectionTool.ESelectionMode.ROTATION;
                 _wantsBoundsEditor = false;
             }
-            else if (InputEx.GetKeyDown(KeyCode.R) && CanScale)
+            else if (InputEx.GetKeyDown(KeyCode.R) && (CanScale || DevkitSelectionManager.selection.Count > 1))
             {
                 if (_handleMode != SelectionTool.ESelectionMode.SCALE)
                 {
@@ -142,13 +151,21 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                     _wantsBoundsEditor = !_wantsBoundsEditor;
             }
 
+            if (_handleMode == SelectionTool.ESelectionMode.SCALE && !CanScale && (CanTranslate || CanRotate))
+                _wantsBoundsEditor = true;
+
+            // handle hover check
+
             Ray ray = EditorInteractEx.Ray;
             bool isOverHandles = DevkitSelectionManager.selection.Count > 0 && Handles.Raycast(ray);
+
             if (DevkitSelectionManager.selection.Count > 0)
                 Handles.Render(ray);
 
             if (InputEx.GetKeyDown(KeyCode.Mouse0))
             {
+                // selecting an item by clicking
+
                 RaycastHit hit = default;
                 if (!isOverHandles)
                 {
@@ -160,8 +177,8 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                             hit = default;
                     }
                 }
-                PendingClickSelection = new DevkitSelection(hit.transform == null ? null : hit.transform.gameObject, hit.collider);
-                if (PendingClickSelection.collider != null)
+                PendingClickSelection = new DevkitSelection(hit.transform != null ? RootSelections ? hit.transform.root.gameObject : hit.transform.gameObject : null, hit.collider);
+                if (PendingClickSelection.gameObject != null)
                     DevkitSelectionManager.data.point = PendingClickSelection.gameObject.transform.position;
                 
                 IsDraggingHandles = isOverHandles;
@@ -171,18 +188,9 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                     Handles.MouseDown(ray);
                     if (!DevkitServerModule.IsEditing)
                     {
-                        DevkitTransactionManager.beginTransaction("Transform");
+                        DevkitTransactionManager.beginTransaction("Transform(" + DevkitSelectionManager.selection.Count + ")");
                         foreach (DevkitSelection selection in DevkitSelectionManager.selection)
                             DevkitTransactionManager.recordTransaction(new DevkitServerTransformedItem(selection.transform));
-                        DevkitTransactionManager.endTransaction();
-                    }
-                    else
-                    {
-                        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
-                        {
-                            if (selection.gameObject.TryGetComponent(out IDevkitSelectionTransformableHandler transformable))
-                                transformable.transformSelection();
-                        }
                     }
                 }
                 else
@@ -195,6 +203,8 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
             }
             else if (!isOverHandles && CanMiddleClickPick && InputEx.GetKeyDown(KeyCode.Mouse2))
             {
+                // middle click picking
+
                 TryRaycastSelectableItems(in ray, out RaycastHit hit);
                 if (hit.transform != null)
                     OnMiddleClickPicked(in hit);
@@ -207,7 +217,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                 CheckHover(in hit);
             }
 
-            if (!IsDraggingHandles && !IsAreaSelecting && CanAreaSelect && InputEx.GetKey(KeyCode.Mouse0) && CachedTime.RealtimeSinceStartup - AreaSelectStartTime > 0.1f)
+            if (!_justCancelledDragging && !IsDraggingHandles && !IsAreaSelecting && CanAreaSelect && InputEx.GetKey(KeyCode.Mouse0) && CachedTime.RealtimeSinceStartup - AreaSelectStartTime > 0.1f)
             {
                 BeginAreaSelecting();
             }
@@ -235,7 +245,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
 
             if (IsAreaSelecting)
             {
-                if (CanAreaSelect && !(InputEx.GetKeyDown(KeyCode.Escape) || InputEx.GetKeyDown(KeyCode.Mouse1)))
+                if (CanAreaSelect && !InputEx.ConsumeKeyDown(KeyCode.Escape))
                 {
                     EndAreaSelect = MainCamera.instance.ScreenToViewportPoint(Input.mousePosition);
 
@@ -252,33 +262,51 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                         if (objViewPos.z > 0f && objViewPos.x > topLeft.x && objViewPos.x < bottomRight.x && objViewPos.y > topLeft.y && objViewPos.y < bottomRight.y)
                         {
                             if (TempAreaSelection.Add(selection))
+                            {
+                                _handleModeDirty = true;
                                 DevkitSelectionManager.add(selection);
+                            }
                         }
                         else if (TempAreaSelection.Remove(selection))
+                        {
+                            _handleModeDirty = true;
                             DevkitSelectionManager.remove(selection);
+                        }
                     }
                 }
                 else
                 {
+                    _justCancelledDragging = true;
                     IsAreaSelecting = false;
                     foreach (DevkitSelection selection in TempAreaSelection)
                         DevkitSelectionManager.remove(selection);
                     TempAreaSelection.Clear();
+                    _handleModeDirty = true;
                 }
             }
 
             if (InputEx.GetKeyUp(KeyCode.Mouse0))
             {
+                _justCancelledDragging = false;
                 if (IsDraggingHandles)
                     EndDragHandles(true);
                 else if (IsAreaSelecting)
                     IsAreaSelecting = false;
                 else
+                {
+                    // for Ctrl + B -> Ctrl + N
+                    if (!_hasLetGoOfCtrlSinceCopyTransform && ctrl)
+                        DevkitSelectionManager.clear();
+
                     DevkitSelectionManager.select(PendingClickSelection);
+                    _handleModeDirty = true;
+                }
             }
-            else if (IsDraggingHandles && (InputEx.GetKeyDown(KeyCode.Mouse1) || InputEx.GetKeyDown(KeyCode.Escape)))
+            else if (IsDraggingHandles && InputEx.ConsumeKeyDown(KeyCode.Escape))
             {
                 EndDragHandles(false);
+                _justCancelledDragging = true;
+                BeginAreaSelect = MainCamera.instance.ScreenToViewportPoint(Input.mousePosition);
             }
         }
         else
@@ -290,7 +318,8 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
 
             if (_hoverHighlight != null)
             {
-                HighlighterUtil.Unhighlight(_hoverHighlight, 0.1f);
+                if (!IsSelected(_hoverHighlight))
+                    HighlighterUtil.Unhighlight(_hoverHighlight.transform, 0.1f);
                 _hoverHighlight = null;
             }
         }
@@ -317,12 +346,14 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         {
             if (selection.gameObject == null)
                 continue;
+
             handlePosition += selection.gameObject.transform.position;
-            if (!globalSpace)
-            {
-                handleRotation = selection.gameObject.transform.rotation;
-                globalSpace = true;
-            }
+
+            if (globalSpace)
+                continue;
+
+            handleRotation = selection.gameObject.transform.rotation;
+            globalSpace = true;
         }
 
         handlePosition /= DevkitSelectionManager.selection.Count;
@@ -350,7 +381,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         {
             if (!DevkitServerModule.IsEditing)
             {
-                DevkitTransactionManager.beginTransaction("Delete");
+                DevkitTransactionManager.beginTransaction("Delete(" + DevkitSelectionManager.selection.Count + ")");
 
                 foreach (DevkitSelection selection in DevkitSelectionManager.selection)
                     Delete(selection);
@@ -364,6 +395,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
             }
 
             DevkitSelectionManager.clear();
+            _handleModeDirty = true;
         }
         else if (InputEx.GetKeyDown(KeyCode.B))
         {
@@ -372,6 +404,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
             ReferenceRotation = handleRotation;
             ReferenceScale = Vector3.one;
             HasReferenceScale = false;
+            _hasLetGoOfCtrlSinceCopyTransform = !ctrl;
             if (DevkitSelectionManager.selection.Count == 1)
             {
                 DevkitSelection selection = DevkitSelectionManager.selection.EnumerateFirst();
@@ -396,8 +429,11 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         // start area selecting
         IsAreaSelecting = true;
         TempAreaSelection.Clear();
-        if (!InputEx.GetKey(KeyCode.LeftShift) && !InputEx.GetKey(KeyCode.LeftControl))
-            DevkitSelectionManager.clear();
+        if (InputEx.GetKey(KeyCode.LeftShift) || InputUtil.IsHoldingControl())
+            return;
+
+        DevkitSelectionManager.clear();
+        _handleModeDirty = true;
     }
     protected void EndDragHandles(bool apply)
     {
@@ -431,12 +467,13 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         Handles.OnTranslatedAndRotated += OnHandlesTranslatedAndRotated;
         Handles.OnTransformed += OnHandleTransformed;
         DevkitSelectionManager.clear();
+        _handleModeDirty = true;
     }
     void IDevkitTool.dequip()
     {
         if (_hoverHighlight != null)
         {
-            HighlighterUtil.Unhighlight(_hoverHighlight, 0.1f);
+            HighlighterUtil.Unhighlight(_hoverHighlight.transform, 0.1f);
             _hoverHighlight = null;
         }
         GLRenderer.render -= OnGLRenderIntl;
@@ -444,34 +481,54 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         Handles.OnTranslatedAndRotated -= OnHandlesTranslatedAndRotated;
         Handles.OnTransformed -= OnHandleTransformed;
         DevkitSelectionManager.clear();
+        _handleModeDirty = true;
         HasReferenceTransform = false;
     }
     private void CheckHover(in RaycastHit hit)
     {
-        if (!DevkitServerConfig.Config.RemoveCosmeticImprovements && HighlightHover && hit.transform != null)
+        if (!DevkitServerConfig.Config.RemoveCosmeticImprovements && HighlightHover && hit.colliderInstanceID != 0)
         {
-            bool dif = _hoverHighlight != hit.transform;
-            if (_hoverHighlight is not null && dif)
+            Collider? c = hit.collider;
+            if (c != null)
             {
-                if (_hoverHighlight != null && !LevelObjectUtil.IsSelected(_hoverHighlight))
-                    HighlighterUtil.Unhighlight(_hoverHighlight, 0.1f);
+                GameObject hitGo = c.transform.root.gameObject;
+                bool dif = _hoverHighlight != hitGo;
+                if (_hoverHighlight is not null && dif)
+                {
+                    if (_hoverHighlight != null && !IsSelected(_hoverHighlight))
+                        HighlighterUtil.Unhighlight(_hoverHighlight.transform, 0.1f);
 
-                _hoverHighlight = null;
-            }
+                    _hoverHighlight = null;
+                }
 
-            if (dif)
-            {
-                if (!LevelObjectUtil.IsSelected(hit.transform))
-                    HighlighterUtil.Highlight(hit.transform, Color.black, 0.1f);
+                if (dif)
+                {
+                    if (!IsSelected(hitGo))
+                        HighlighterUtil.Highlight(hitGo.transform, Color.black, 0.1f);
 
-                _hoverHighlight = hit.transform;
+                    _hoverHighlight = hitGo;
+                }
+
+                return;
             }
         }
-        else if (_hoverHighlight != null)
+
+        if (_hoverHighlight == null)
+            return;
+
+        if (!IsSelected(_hoverHighlight))
+            HighlighterUtil.Unhighlight(_hoverHighlight.transform, 0.1f);
+        _hoverHighlight = null;
+    }
+    private static bool IsSelected(GameObject gameObject)
+    {
+        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
         {
-            HighlighterUtil.Unhighlight(_hoverHighlight, 0.1f);
-            _hoverHighlight = null;
+            if (selection.gameObject == gameObject)
+                return true;
         }
+
+        return false;
     }
     public abstract void RequestInstantiation(Vector3 position, Quaternion rotation, Vector3 scale);
     protected abstract IEnumerable<GameObject> EnumerateAreaSelectableObjects();
@@ -504,7 +561,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         DevkitSelectionManager.clear();
         
         if (!DevkitServerModule.IsEditing)
-            DevkitTransactionManager.beginTransaction("Paste");
+            DevkitTransactionManager.beginTransaction("Paste(" + IntlCopyBuffer.Count + ")");
 
         foreach (GameObject go in IntlCopyBuffer)
         {
@@ -520,12 +577,13 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         
         if (!DevkitServerModule.IsEditing)
             DevkitTransactionManager.endTransaction();
+        _handleModeDirty = true;
     }
     public void SimulateHandleMovement(Vector3 newPosition, Quaternion newRotation, Vector3 newScale, bool hasRotation, bool hasScale)
     {
         if (!DevkitServerModule.IsEditing)
         {
-            DevkitTransactionManager.beginTransaction("Transform");
+            DevkitTransactionManager.beginTransaction("Transform(" + DevkitSelectionManager.selection.Count + ")");
             foreach (DevkitSelection selection in DevkitSelectionManager.selection)
             {
                 if (selection.gameObject != null)
@@ -587,44 +645,49 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
             selection.relativeToPivot = worldToPivot * selection.localToWorld;
         }
     }
-    private static void OnHandlesTranslatedAndRotated(Vector3 worldPositionDelta, Quaternion worldRotationDelta, Vector3 pivotPosition, bool modifyRotation)
+    private void OnHandlesTranslatedAndRotated(Vector3 worldPositionDelta, Quaternion worldRotationDelta, Vector3 pivotPosition, bool modifyRotation)
     {
+        if (!modifyRotation && !CanTranslate)
+            return;
         foreach (DevkitSelection selection in DevkitSelectionManager.selection)
         {
             if (selection.gameObject == null)
                 continue;
 
-            Vector3 newPosition;
-            if (modifyRotation)
+            Vector3 newPosition = selection.preTransformPosition;
+            if (CanTranslate)
             {
-                newPosition = selection.preTransformPosition - pivotPosition;
-                newPosition = newPosition.IsNearlyZero()
-                    ? (selection.preTransformPosition + worldPositionDelta)
-                    : (pivotPosition + worldRotationDelta * newPosition + worldPositionDelta);
+                if (modifyRotation)
+                {
+                    newPosition = selection.preTransformPosition - pivotPosition;
+                    newPosition = newPosition.IsNearlyZero()
+                        ? (selection.preTransformPosition + worldPositionDelta)
+                        : (pivotPosition + worldRotationDelta * newPosition + worldPositionDelta);
+                }
+                else
+                    newPosition = selection.preTransformPosition + worldPositionDelta;
             }
-            else
-                newPosition = selection.preTransformPosition + worldPositionDelta;
 
             if (selection.gameObject.TryGetComponent(out ITransformedHandler handler))
             {
                 handler.OnTransformed(selection.preTransformPosition, selection.preTransformRotation,
                     default, newPosition, worldRotationDelta * selection.preTransformRotation, default,
-                    modifyRotation, false);
+                    modifyRotation && CanRotate, false);
             }
             else
             {
-                bool samePos = newPosition.IsNearlyEqual(selection.gameObject.transform.position);
+                bool samePos = !CanTranslate || newPosition.IsNearlyEqual(selection.gameObject.transform.position);
 
-                if (modifyRotation && !samePos)
+                if (modifyRotation && CanRotate && !samePos)
                     selection.gameObject.transform.SetPositionAndRotation(newPosition, worldRotationDelta * selection.preTransformRotation);
-                else if (modifyRotation)
+                else if (modifyRotation && CanRotate)
                     selection.gameObject.transform.rotation = worldRotationDelta * selection.preTransformRotation;
                 else if (!samePos)
                     selection.gameObject.transform.position = newPosition;
             }
         }
     }
-    private static void OnHandleTransformed(Matrix4x4 pivotToWorld)
+    private void OnHandleTransformed(Matrix4x4 pivotToWorld)
     {
         foreach (DevkitSelection selection in DevkitSelectionManager.selection)
         {
@@ -635,13 +698,24 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
             if (selection.gameObject.TryGetComponent(out ITransformedHandler handler))
             {
                 handler.OnTransformed(selection.preTransformPosition, selection.preTransformRotation,
-                    selection.preTransformLocalScale, matrix.GetPosition(), matrix.GetRotation(), matrix.lossyScale,
-                    true, true);
+                    selection.preTransformLocalScale, CanTranslate ? matrix.GetPosition() : selection.preTransformPosition,
+                    CanRotate ? matrix.GetRotation() : selection.preTransformRotation,
+                    CanScale ? matrix.lossyScale : selection.preTransformLocalScale, CanRotate, CanScale);
             }
             else
             {
-                selection.gameObject.transform.SetPositionAndRotation(matrix.GetPosition(), matrix.GetRotation().GetRoundedIfNearlyAxisAligned());
-                selection.gameObject.transform.SetLocalScale_RoundIfNearlyEqualToOne(matrix.lossyScale);
+                if (CanRotate)
+                {
+                    if (CanTranslate)
+                        selection.gameObject.transform.SetPositionAndRotation(matrix.GetPosition(), matrix.GetRotation().GetRoundedIfNearlyAxisAligned());
+                    else
+                        selection.gameObject.transform.rotation = matrix.GetRotation().GetRoundedIfNearlyAxisAligned();
+                }
+                else if (CanTranslate)
+                    selection.gameObject.transform.position = matrix.GetPosition();
+
+                if (CanScale)
+                    selection.gameObject.transform.SetLocalScale_RoundIfNearlyEqualToOne(matrix.lossyScale);
             }
         }
     }

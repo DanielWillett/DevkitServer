@@ -1,4 +1,6 @@
-﻿using SDG.Framework.Devkit.Interactable;
+﻿using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Levels;
+using SDG.Framework.Devkit.Interactable;
 
 namespace DevkitServer.API.Devkit.Spawns;
 
@@ -21,10 +23,14 @@ public class ItemSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionTransf
     {
         return SpawnUtil.RemoveItemSpawnLocal(Spawnpoint, false);
     }
-
     protected override void Transform()
     {
         SpawnUtil.MoveSpawnpointLocal(Spawnpoint, transform.position, out _);
+    }
+    protected override NetId64 GetNetId()
+    {
+        SpawnsNetIdDatabase.TryGetItemSpawnNetId(Region, out NetId64 netId);
+        return netId;
     }
     public override string Format(ITerminalFormatProvider provider)
     {
@@ -32,7 +38,6 @@ public class ItemSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionTransf
             return "Item Spawnpoint".Colorize(SpawnpointColor) + $" ({LevelItems.tables[Spawnpoint.type].name.Format(false)})";
         return "Item Spawnpoint".Colorize(SpawnpointColor);
     }
-
     public override string ToString()
     {
         if (LevelItems.tables.Count > Spawnpoint.type)

@@ -1,4 +1,6 @@
-﻿using SDG.Framework.Devkit.Interactable;
+﻿using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Levels;
+using SDG.Framework.Devkit.Interactable;
 
 namespace DevkitServer.API.Devkit.Spawns;
 
@@ -17,7 +19,6 @@ public class VehicleSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDev
             base.Color = value;
         }
     }
-
     protected override void SetupCollider()
     {
         BoxCollider collider = transform.GetOrAddComponent<BoxCollider>();
@@ -38,19 +39,22 @@ public class VehicleSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDev
     {
         SpawnUtil.TransformSpawnpointLocal(Spawnpoint, transform.position, transform.eulerAngles.y);
     }
+    protected override NetId64 GetNetId()
+    {
+        SpawnsNetIdDatabase.TryGetVehicleSpawnNetId(Index, out NetId64 netId);
+        return netId;
+    }
     protected override void Init()
     {
         Transform arrow = transform.Find("Arrow");
         ArrowRenderer = arrow == null ? null : arrow.GetComponent<Renderer>();
     }
-
     public override string Format(ITerminalFormatProvider provider)
     {
         if (LevelVehicles.tables.Count > Spawnpoint.type)
             return "Vehicle Spawnpoint".Colorize(SpawnpointColor) + $" ({LevelVehicles.tables[Spawnpoint.type].name.Format(false)})";
         return "Vehicle Spawnpoint".Colorize(SpawnpointColor);
     }
-
     public override string ToString()
     {
         if (LevelVehicles.tables.Count > Spawnpoint.type)

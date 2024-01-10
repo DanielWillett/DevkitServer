@@ -46,7 +46,7 @@ public sealed class HierarchyActions
         EditorActions.QueueAction(new DeleteHierarchyItemsAction
         {
             DeltaTime = properties.DeltaTime,
-            NetIds = properties.NetIds
+            NetIds = properties.NetIds.ToArray()
         });
     }
     private static void OnRequestInstantiateHierarchyObject(in InstantiateHierarchyObjectProperties properties)
@@ -58,7 +58,7 @@ public sealed class HierarchyActions
         EditorActions.QueueAction(new MovedHierarchyObjectsAction
         {
             DeltaTime = properties.DeltaTime,
-            Transformations = properties.Transformations,
+            Transformations = properties.Transformations.ToArray(),
             UseScale = properties.UseScale
         });
     }

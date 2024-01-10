@@ -107,6 +107,15 @@ public readonly struct RoadTangentHandleIdentifier : IEquatable<RoadTangentHandl
         _data = data;
         _handle = handle;
     }
+
+    /// <returns>
+    /// An identifier for the vertex of this handle.
+    /// </returns>
+    public RoadVertexIdentifier GetVertexIdentifier() => new RoadVertexIdentifier(_data);
+
+    /// <returns>
+    /// The opposite handle to this one.
+    /// </returns>
     public RoadTangentHandleIdentifier OtherHandle() => new RoadTangentHandleIdentifier(_data, (TangentHandle)(1 - (int)Handle));
     public bool Equals(RoadVertexIdentifier other) => other.RawData == _data;
     public bool Equals(RoadTangentHandleIdentifier other) => other._data == _data && other._handle == _handle;
@@ -116,7 +125,7 @@ public readonly struct RoadTangentHandleIdentifier : IEquatable<RoadTangentHandl
         int c = _data.CompareTo(other._data);
         return c == 0 ? _handle.CompareTo(other._handle) : c;
     }
-    public override bool Equals(object obj) => obj is RoadTangentHandleIdentifier id && Equals(id);
+    public override bool Equals(object? obj) => obj is RoadTangentHandleIdentifier id && Equals(id);
     public override int GetHashCode() => _data | ((int)_handle << 15);
     public static bool operator ==(RoadTangentHandleIdentifier left, RoadTangentHandleIdentifier right) => left.Equals(right);
     public static bool operator !=(RoadTangentHandleIdentifier left, RoadTangentHandleIdentifier right) => !left.Equals(right);

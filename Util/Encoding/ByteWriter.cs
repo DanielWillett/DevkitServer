@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using DevkitServer.Models;
 using DevkitServer.API;
+using DevkitServer.Multiplayer.Actions;
 
 namespace DevkitServer.Util.Encoding;
 
@@ -105,7 +106,8 @@ public class ByteWriter
             { typeof(decimal[]), GetMethod(typeof(decimal[])) },
             { typeof(char[]), GetMethod(typeof(char[])) },
             { typeof(string[]), GetMethod(typeof(string[])) },
-            { typeof(NetId), GetMethod(typeof(NetId)) }
+            { typeof(NetId), GetMethod(typeof(NetId)) },
+            { typeof(NetId64), GetMethod(typeof(NetId64)) }
         };
 
         _nullableWriters ??= new Dictionary<Type, MethodInfo>(44)
@@ -154,7 +156,8 @@ public class ByteWriter
             { typeof(decimal[]), GetNullableMethod(typeof(decimal[])) },
             { typeof(char[]), GetNullableMethod(typeof(char[])) },
             { typeof(string[]), GetNullableMethod(typeof(string[])) },
-            { typeof(NetId?), GetNullableMethod(typeof(NetId?)) }
+            { typeof(NetId?), GetNullableMethod(typeof(NetId?)) },
+            { typeof(NetId64?), GetNullableMethod(typeof(NetId64?)) }
         };
         
         return;
@@ -482,6 +485,8 @@ public class ByteWriter
     }
     public void Write(NetId n) => WriteInternal(n.id);
     public void WriteNullable(NetId? n) => WriteNullable(n?.id);
+    public void Write(NetId64 n) => WriteInternal(n.Id);
+    public void WriteNullable(NetId64? n) => WriteNullable(n?.Id);
     public void Write(byte n) => WriteInternal(n);
     public void WriteNullable(byte? n)
     {

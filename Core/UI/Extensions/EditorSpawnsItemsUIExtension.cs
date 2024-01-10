@@ -9,6 +9,11 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSp
 {
     private const float DistanceMax = 48f;
     private const int RegionDistance = 2;
+    protected override bool IsVisible
+    {
+        get => LevelVisibility.itemsVisible;
+        set => LevelVisibility.itemsVisible = value;
+    }
     public EditorSpawnsItemsUIExtension() : base(new Vector3(0f, 0.5f, 0f), 16f, DistanceMax)
     {
         SpawnUtil.OnItemSpawnpointAdded += OnSpawnAdded;
@@ -17,7 +22,6 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSp
         SpawnUtil.OnItemSpawnTableChanged += OnSpawnTableChanged;
         SpawnTableUtil.OnItemSpawnTableNameUpdated += OnNameUpdated;
     }
-
     private void OnNameUpdated(ItemTable table, int index)
     {
         foreach (ItemSpawnpoint spawnpoint in SpawnUtil.EnumerateItemSpawns(MovementUtil.MainCameraRegion, RegionDistance))
@@ -25,7 +29,6 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSp
             UpdateLabel(spawnpoint, table.name);
         }
     }
-
     protected override void OnRegionUpdated(RegionCoord oldRegion, RegionCoord newRegion, bool isInRegion)
     {
         foreach (ItemSpawnpoint spawn in new List<ItemSpawnpoint>(Labels.Keys))
@@ -44,13 +47,11 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSp
         base.OnShown();
         OnRegionUpdated(default, MovementUtil.MainCameraRegion, MovementUtil.MainCameraIsInRegion);
     }
-
     protected override void OnHidden()
     {
         ClearLabels();
         base.OnHidden();
     }
-
     private static string GetText(ItemSpawnpoint point) => LevelItems.tables.Count > point.type ? LevelItems.tables[point.type].name : point.type + " - Null";
     protected override Vector3 GetPosition(ItemSpawnpoint spawn) => spawn.node.position;
     protected override bool ShouldShow(ItemSpawnpoint spawn)
@@ -58,8 +59,6 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSp
         Vector3 lclPos = MainCamera.instance.transform.position;
         return (lclPos - spawn.point).sqrMagnitude < DistanceMax * DistanceMax && LevelItems.tables.Count > spawn.type;
     }
-
-
     private void OnSpawnAdded(ItemSpawnpoint point, RegionIdentifier region)
     {
         CreateLabel(point, GetText(point));

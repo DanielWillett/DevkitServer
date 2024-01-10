@@ -2,6 +2,7 @@
 using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Runtime.Serialization;
+using DevkitServer.Multiplayer.Actions;
 
 namespace DevkitServer.Util.Encoding;
 
@@ -28,10 +29,10 @@ public static class EncodingEx
         typeof(ulong), typeof(float), typeof(long), typeof(ushort), typeof(short), typeof(byte), typeof(int), typeof(uint), typeof(bool), typeof(char), typeof(sbyte), typeof(double),
         typeof(string), typeof(decimal), typeof(DateTime), typeof(DateTimeOffset), typeof(TimeSpan), typeof(Guid),
         typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Quaternion), typeof(Color), typeof(Color32), typeof(Bounds), typeof(Type),
-        typeof(RegionIdentifier), typeof(NetId),
+        typeof(RegionIdentifier), typeof(NetId), typeof(NetId64),
         typeof(ulong?), typeof(float?), typeof(long?), typeof(ushort?), typeof(short?), typeof(byte?), typeof(int?), typeof(uint?), typeof(bool?), typeof(char?), typeof(sbyte?),
         typeof(double?), typeof(decimal?), typeof(DateTime?), typeof(DateTimeOffset?), typeof(TimeSpan?), typeof(Guid?),
-        typeof(Vector2?), typeof(Vector3?), typeof(Vector4?), typeof(Quaternion?), typeof(Color?), typeof(Color32?), typeof(Bounds?)
+        typeof(Vector2?), typeof(Vector3?), typeof(Vector4?), typeof(Quaternion?), typeof(Color?), typeof(Color32?), typeof(Bounds?), typeof(NetId?), typeof(NetId64?)
     };
     internal static readonly Type[] ValidArrayTypes =
     {

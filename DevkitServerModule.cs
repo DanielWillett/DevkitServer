@@ -442,7 +442,7 @@ public sealed class DevkitServerModule : IModuleNexus
             AssetUtil.OnBeginLevelLoading += OnLevelStartLoading;
             LevelObjectNetIdDatabase.Init();
             HierarchyItemNetIdDatabase.Init();
-            SpawnpointNetIdDatabase.Init();
+            SpawnsNetIdDatabase.Init();
             RoadNetIdDatabase.Init();
             NavigationNetIdDatabase.Init();
             ReplicatedLevelDataRegistry.RegisterFromAssembly(Accessor.DevkitServer, null, null);
@@ -506,7 +506,7 @@ public sealed class DevkitServerModule : IModuleNexus
             Logger.DevkitServer.LogInfo("Legal", "================================================ Legal ================================================", ConsoleColor.White);
             Logger.DevkitServer.LogInfo("Legal", $" {modName} is licensed under the {"GNU General Public License v3.0".Colorize(new Color32(255, 204, 102, 255))}.", ConsoleColor.White);
             Logger.DevkitServer.LogInfo("Legal", "=======================================================================================================", ConsoleColor.White);
-            Logger.DevkitServer.LogInfo("Legal", $" {modName} - Copyright (C) {2023.Format()} - {"Daniel Willett".Colorize(nameColor)}", ConsoleColor.White);
+            Logger.DevkitServer.LogInfo("Legal", $" {modName} - Copyright (C) {2024.Format()} - {"Daniel Willett".Colorize(nameColor)}", ConsoleColor.White);
             Logger.DevkitServer.LogInfo("Legal",  " This program comes with ABSOLUTELY NO WARRANTY.", ConsoleColor.White);
             Logger.DevkitServer.LogInfo("Legal",  " This is free software, and you are welcome to redistribute it under certain conditions.", ConsoleColor.White);
             Logger.DevkitServer.LogInfo("Legal", "=======================================================================================================", ConsoleColor.White);
@@ -587,6 +587,8 @@ public sealed class DevkitServerModule : IModuleNexus
     }
     private static void OnLevelExited()
     {
+        NetId64Registry.Reset();
+        
         if (BackupManager == null)
             return;
 
@@ -914,7 +916,7 @@ public sealed class DevkitServerModule : IModuleNexus
     }
     private static void OnSaved()
     {
-        Logger.DevkitServer.LogInfo("Save Game", "Saving...");
+        Logger.DevkitServer.LogInfo("Save Game", "Saved");
     }
     private static void OnPrePreLevelLoaded(int level)
     {
@@ -1009,7 +1011,7 @@ public sealed class DevkitServerModule : IModuleNexus
         AssetUtil.OnBeginLevelLoading -= OnLevelStartLoading;
         LevelObjectNetIdDatabase.Shutdown();
         HierarchyItemNetIdDatabase.Shutdown();
-        SpawnpointNetIdDatabase.Shutdown();
+        SpawnsNetIdDatabase.Shutdown();
         RoadNetIdDatabase.Shutdown();
         NavigationNetIdDatabase.Shutdown();
         ReplicatedLevelDataRegistry.Shutdown();

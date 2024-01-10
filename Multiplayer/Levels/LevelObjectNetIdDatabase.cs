@@ -273,6 +273,9 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
 #if CLIENT
     public void LoadData(LevelObjectNetIdReplicatedLevelData data)
     {
+        BuildableAssignments.Clear();
+        LevelObjectAssignments.Clear();
+        
         NetId[] netIds = data.NetIds;
         uint[] objects = data.Objects;
         RegionIdentifier[] buildables = data.Buildables;
