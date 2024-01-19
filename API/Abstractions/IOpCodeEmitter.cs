@@ -13,7 +13,22 @@ public static class OpCodeEmitters
     /// <summary>
     /// Extension method to get a <see cref="IOpCodeEmitter"/>.
     /// </summary>
-    public static IOpCodeEmitter AsEmitter(this ILGenerator generator) => (ILGeneratorEmitter)generator;
+    /// <param name="debuggable">Shows debug logging as the method generates.</param>
+    /// <param name="addBreakpoints">Shows debug logging as the method executes.</param>
+    public static IOpCodeEmitter AsEmitter(this ILGenerator generator, bool debuggable = false, bool addBreakpoints = false)
+        => debuggable || addBreakpoints
+            ? new DebuggableEmitter((ILGeneratorEmitter)generator, null) { DebugLog = debuggable, Breakpointing = addBreakpoints }
+            : (ILGeneratorEmitter)generator;
+
+    /// <summary>
+    /// Extension method to get a <see cref="IOpCodeEmitter"/>.
+    /// </summary>
+    /// <param name="debuggable">Shows debug logging as the method generates.</param>
+    /// <param name="addBreakpoints">Shows debug logging as the method executes.</param>
+    public static IOpCodeEmitter AsEmitter(this DynamicMethod dynMethod, bool debuggable = false, bool addBreakpoints = false)
+        => debuggable || addBreakpoints
+            ? new DebuggableEmitter(dynMethod) { DebugLog = debuggable, Breakpointing = addBreakpoints }
+            : (ILGeneratorEmitter)dynMethod.GetILGenerator();
 }
 
 

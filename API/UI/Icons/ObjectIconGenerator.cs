@@ -386,7 +386,7 @@ public sealed class ObjectIconGenerator : MonoBehaviour
             RenderSettings.ambientGroundColor = _groundColor;
         }
     }
-    public struct ObjectIconMetrics
+    public readonly struct ObjectIconMetrics
     {
         public Vector3 CameraPosition { get; }
         public Vector3 ObjectPositionOffset { get; }

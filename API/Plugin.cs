@@ -11,6 +11,8 @@ public abstract class Plugin : CoreLogger, IDevkitServerColorPlugin, ICachedTran
 {
     public static readonly Color32 DefaultColor = new Color32(204, 153, 255, 255);
     private readonly string _defaultName;
+    private string? _localEnglishPath;
+    private string? _localPrimaryPath;
 
     /// <inheritdoc/>
     public virtual string Name => _defaultName;
@@ -67,7 +69,7 @@ public abstract class Plugin : CoreLogger, IDevkitServerColorPlugin, ICachedTran
         LocalizationDirectory = Path.Combine(DataDirectory, "Localization");
         CommandLocalizationDirectory = Path.Combine(LocalizationDirectory, "Commands");
         MainLocalizationDirectory = Path.Combine(LocalizationDirectory, "Main");
-        Translations = Localization.tryRead(MainLocalizationDirectory, false);
+        Translations = DevkitServerUtility.ReadLocalFromFileOrFolder(MainLocalizationDirectory, out _localPrimaryPath, out _localEnglishPath);
         ((IDevkitServerPlugin)this).PermissionPrefix = name.ToLowerInvariant().Replace('.', '-');
         if (GetType().TryGetAttributeSafe(out PermissionPrefixAttribute prefixAttr, true) && !string.IsNullOrWhiteSpace(prefixAttr.Prefix))
             ((IDevkitServerPlugin)this).PermissionPrefix = prefixAttr.Prefix;
@@ -85,7 +87,7 @@ public abstract class Plugin : CoreLogger, IDevkitServerColorPlugin, ICachedTran
     void IDevkitServerPlugin.Load()
     {
         Local lcl = Translations;
-        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultLocalization, MainLocalizationDirectory);
+        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultLocalization, MainLocalizationDirectory, _localPrimaryPath, _localEnglishPath);
         Translations = lcl;
         Load();
     }
@@ -116,8 +118,8 @@ public abstract class Plugin : CoreLogger, IDevkitServerColorPlugin, ICachedTran
     /// </summary>
     public void ReloadTranslations()
     {
-        Local lcl = Localization.tryRead(MainLocalizationDirectory, false);
-        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultLocalization, MainLocalizationDirectory);
+        Local lcl = DevkitServerUtility.ReadLocalFromFileOrFolder(MainLocalizationDirectory, out _localPrimaryPath, out _localEnglishPath);
+        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultLocalization, MainLocalizationDirectory, _localPrimaryPath, _localEnglishPath);
         Translations = lcl;
     }
 #if CLIENT

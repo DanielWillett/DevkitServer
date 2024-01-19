@@ -19,7 +19,7 @@ public static class EditorLevel
 {
     public const int DataBufferPacketSize = NetFactory.MaxPacketSize; // 60 KiB (must be slightly under ushort.MaxValue, 60 KB is a good middle ground to allow for future overhead expansion, etc).
     [UsedImplicitly]
-    private static readonly NetCall<byte[]> SendRequestLevel = new NetCall<byte[]>(DevkitServerNetCall.RequestLevel);
+    private static readonly NetCall<byte[], CSteamID> SendRequestLevel = new NetCall<byte[], CSteamID>(DevkitServerNetCall.RequestLevel);
     [UsedImplicitly]
     private static readonly NetCall<byte[]> SendPending = new NetCall<byte[]>(DevkitServerNetCall.SendPending);
     internal static List<ITransportConnection> PendingToReceiveActions = new List<ITransportConnection>(4);
@@ -28,7 +28,7 @@ public static class EditorLevel
 #endif
 #if SERVER
     [NetCall(NetCallSource.FromClient, (ushort)DevkitServerNetCall.RequestLevel)]
-    private static StandardErrorCode ReceiveLevelRequest(MessageContext ctx, byte[] passwordSHA1)
+    private static StandardErrorCode ReceiveLevelRequest(MessageContext ctx, byte[] passwordSHA1, CSteamID fallbackUser)
     {
         if (!string.IsNullOrEmpty(Provider.serverPassword) && !Hash.verifyHash(passwordSHA1, Provider.serverPasswordHash))
         {
@@ -37,16 +37,28 @@ public static class EditorLevel
             return StandardErrorCode.AccessViolation;
         }
 
-        Logger.DevkitServer.LogInfo("SEND LEVEL", $"Received level request from ({ctx.Connection.Format()}).", ConsoleColor.DarkCyan);
-        SendLevel(ctx.Connection);
+        CSteamID user = UserManager.TryGetSteamId(ctx.Connection);
+        if (user.GetEAccountType() == EAccountType.k_EAccountTypeIndividual)
+        {
+            if (user != fallbackUser)
+                return StandardErrorCode.InvalidData;
+        }
+        else
+        {
+            user = fallbackUser;
+            Logger.DevkitServer.LogWarning("SEND LEVEL", $"Unable to determine SteamID of {ctx.Connection.Format()}, " +
+                                                         $"falling back to user reported SteamID, {fallbackUser.Format()}.");
+        }
+        Logger.DevkitServer.LogInfo("SEND LEVEL", $"Received level request from ({user.Format()}|{ctx.Connection.Format()}).", ConsoleColor.DarkCyan);
+        SendLevel(ctx.Connection, user);
         return StandardErrorCode.Success;
     }
-    public static void SendLevel(ITransportConnection connection)
+    public static void SendLevel(ITransportConnection connection, CSteamID user)
     {
         PendingToReceiveActions.Add(connection);
         UniTask.Create(async () =>
         {
-            LevelData data = await LevelData.GatherLevelData(false, true);
+            LevelData data = await LevelData.GatherLevelData(false, user);
 
             await UniTask.SwitchToMainThread();
 
@@ -124,7 +136,7 @@ public static class EditorLevel
                 TemporaryEditorActions.BeginListening();
             yield return new WaitForSeconds(0.1f);
             
-            task = SendRequestLevel.RequestAck(passwordHash, 3000);
+            task = SendRequestLevel.RequestAck(passwordHash, Provider.client, 3000);
             Logger.DevkitServer.LogDebug("SEND LEVEL", "Sent level request.", ConsoleColor.DarkCyan);
             yield return task;
         }

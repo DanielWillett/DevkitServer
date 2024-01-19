@@ -1,17 +1,25 @@
 ﻿#if CLIENT
+using DevkitServer.API.Devkit.Spawns;
 using DevkitServer.API.UI.Extensions;
+using DevkitServer.API.UI.Extensions.Members;
+using DevkitServer.Models;
 
 namespace DevkitServer.Core.UI.Extensions;
 [UIExtension(typeof(EditorSpawnsVehiclesUI))]
-internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtension<VehicleSpawnpoint>
+internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtensionNormalTables<VehicleSpawnpoint>
 {
     private const float DistanceMax = 200f;
+
+    [ExistingMember("vehicleButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    // virtual properties wont patch right
+    protected ISleekButton[]? Assets2 { get; }
+    protected override ISleekButton[]? Assets => Assets2;
     protected override bool IsVisible
     {
         get => LevelVisibility.vehiclesVisible;
         set => LevelVisibility.vehiclesVisible = value;
     }
-    public EditorSpawnsVehiclesUIExtension() : base(new Vector3(0f, 2.5f, 0f), 50f, DistanceMax)
+    public EditorSpawnsVehiclesUIExtension() : base(new Vector3(0f, 2.5f, 0f), 50f, DistanceMax, SpawnType.Vehicle)
     {
         SpawnUtil.OnVehicleSpawnpointAdded += OnSpawnAdded;
         SpawnUtil.OnVehicleSpawnpointRemoved += OnSpawnRemoved;
@@ -88,6 +96,45 @@ internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtension<Veh
         SpawnUtil.OnVehicleSpawnTableChanged -= OnSpawnTableChanged;
         SpawnTableUtil.OnVehicleSpawnTableNameUpdated -= OnNameUpdated;
         base.OnDestroyed();
+    }
+
+    public override void UpdateSpawnName(int index)
+    {
+        if (!SpawnTableUtil.TryGetSelectedTier(SpawnType.Vehicle, out SpawnTierIdentifier? id) || !id.HasValue)
+            return;
+
+        VehicleSpawn spawn = LevelVehicles.tables[id.Value.TableIndex].tiers[id.Value.TierIndex].table[index];
+        Asset asset = SDG.Unturned.Assets.find(EAssetType.VEHICLE, spawn.vehicle);
+        string str = asset?.FriendlyName ?? asset?.name ?? "?";
+        UpdateSpawnName(spawn.vehicle + " " + str, index);
+    }
+    public override void UpdateTableColor()
+    {
+        VehicleTable table = LevelVehicles.tables[EditorSpawns.selectedVehicle];
+        UpdateTableColor(table.color);
+    }
+    public override void UpdateTableId()
+    {
+        VehicleTable table = LevelVehicles.tables[EditorSpawns.selectedVehicle];
+        UpdateTableId(table.tableID);
+    }
+    public override void UpdateTierName(int index)
+    {
+        VehicleTier tier = LevelVehicles.tables[EditorSpawns.selectedVehicle].tiers[index];
+
+        bool isSelected = SpawnTableUtil.TryGetSelectedTier(SpawnType.Vehicle, out SpawnTierIdentifier? id) && id.HasValue && id.Value.TierIndex == index;
+
+        UpdateTierName(tier.name, index, isSelected);
+    }
+    public override void UpdateTableName(int index, bool updateField)
+    {
+        VehicleTable table = LevelVehicles.tables[index];
+        UpdateTableName(table.name, index, EditorSpawns.selectedVehicle == index, updateField);
+    }
+    public override void UpdateTierChance(int index, bool updateSlider)
+    {
+        VehicleTier tier = LevelVehicles.tables[EditorSpawns.selectedVehicle].tiers[index];
+        UpdateTierChance(tier.chance, index, updateSlider);
     }
 }
 #endif

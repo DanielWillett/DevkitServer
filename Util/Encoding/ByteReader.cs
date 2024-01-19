@@ -142,7 +142,8 @@ public class ByteReader
             { typeof(char[]), GetMethod(nameof(ReadCharArray)) },
             { typeof(string[]), GetMethod(nameof(ReadStringArray)) },
             { typeof(NetId), GetMethod(nameof(ReadNetId)) },
-            { typeof(NetId64), GetMethod(nameof(ReadNetId64)) }
+            { typeof(NetId64), GetMethod(nameof(ReadNetId64)) },
+            { typeof(CSteamID), GetMethod(nameof(ReadCSteamID)) }
         };
 
         _nullableReaders ??= new Dictionary<Type, MethodInfo>(44)
@@ -192,7 +193,8 @@ public class ByteReader
             { typeof(char[]), GetMethod(nameof(ReadNullableCharArray)) },
             { typeof(string[]), GetMethod(nameof(ReadNullableStringArray)) },
             { typeof(NetId?), GetMethod(nameof(ReadNullableNetId)) },
-            { typeof(NetId64?), GetMethod(nameof(ReadNullableNetId64)) }
+            { typeof(NetId64?), GetMethod(nameof(ReadNullableNetId64)) },
+            { typeof(CSteamID?), GetMethod(nameof(ReadNullableCSteamID)) }
         };
 
         MethodInfo GetMethod(string name) => typeof(ByteReader).GetMethod(name, BindingFlags.Instance | BindingFlags.Public)
@@ -1277,6 +1279,42 @@ public class ByteReader
     public Color32? ReadNullableColor32()
     {
         return !ReadBool() ? null : ReadColor32();
+    }
+
+    /// <summary>
+    /// Reads a <see cref="CSteamID"/> (6 (individual) to 8 (other) bytes) from the buffer.
+    /// </summary>
+    public CSteamID ReadCSteamID()
+    {
+        byte type = ReadUInt8();
+
+        if (type == byte.MaxValue)
+            return default;
+
+        if (type != 0)
+            return new CSteamID(ReadUInt64());
+
+        EUniverse universe = (EUniverse)ReadUInt8();
+        uint acctId = ReadUInt32();
+        return new CSteamID(new AccountID_t(acctId), universe, EAccountType.k_EAccountTypeIndividual);
+    }
+
+    /// <summary>
+    /// Reads a <see cref="CSteamID?"/> (1 (null), 6 (individual), or 8 (other) bytes) from the buffer.
+    /// </summary>
+    public CSteamID? ReadNullableCSteamID()
+    {
+        byte type = ReadUInt8();
+
+        if (type == byte.MaxValue)
+            return null;
+
+        if (type != 0)
+            return new CSteamID(ReadUInt64());
+
+        EUniverse universe = (EUniverse)ReadUInt8();
+        uint acctId = ReadUInt32();
+        return new CSteamID(new AccountID_t(acctId), universe, EAccountType.k_EAccountTypeIndividual);
     }
 
     /// <summary>

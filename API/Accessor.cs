@@ -1664,7 +1664,7 @@ public static class Accessor
         }
     }
     [Pure]
-    internal static IEnumerable<CodeInstruction> AddIsEditorCall(IEnumerable<CodeInstruction> instructions, MethodBase __method)
+    internal static IEnumerable<CodeInstruction> AddIsEditorCall([InstantHandle] IEnumerable<CodeInstruction> instructions, MethodBase __method)
     {
         if (IsServerGetter == null || IsEditorGetter == null)
         {
@@ -1740,7 +1740,7 @@ public static class Accessor
         }
     }
 
-    private static IEnumerable<CodeInstruction> AddFunctionIOTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+    private static IEnumerable<CodeInstruction> AddFunctionIOTranspiler([InstantHandle] IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
         yield return new CodeInstruction(OpCodes.Ldstr, "In method: " + method.Format() + " (basic entry)");
         yield return new CodeInstruction(OpCodes.Ldc_I4, (int)ConsoleColor.Green);
@@ -1759,7 +1759,7 @@ public static class Accessor
             yield return instr;
         }
     }
-    private static IEnumerable<CodeInstruction> AddFunctionStepthroughTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase method)
+    private static IEnumerable<CodeInstruction> AddFunctionStepthroughTranspiler([InstantHandle] IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
         List<CodeInstruction> ins = [..instructions];
         AddFunctionStepthrough(ins, method);
@@ -2140,7 +2140,7 @@ public static class Accessor
     /// </summary>
     /// <returns>A method info of a passed delegate.</returns>
     [Pure]
-    public static MethodInfo? GetMethod(Delegate @delegate)
+    public static MethodInfo? GetMethod([InstantHandle] Delegate @delegate)
     {
         try
         {
@@ -2160,7 +2160,7 @@ public static class Accessor
     /// </summary>
     /// <returns>A harmony method info of a passed delegate.</returns>
     [Pure]
-    public static HarmonyMethod? GetHarmonyMethod(Delegate @delegate)
+    public static HarmonyMethod? GetHarmonyMethod([InstantHandle] Delegate @delegate)
     {
         MethodInfo? method = GetMethod(@delegate);
         return method == null ? null : new HarmonyMethod(method);
@@ -2231,7 +2231,7 @@ public static class Accessor
     /// <param name="action">Called optionally for <paramref name="type"/>, then for each base type in order from most related to least related.</param>
     /// <param name="includeParent">Call <paramref name="action"/> on <paramref name="type"/>. Overrides <paramref name="excludeSystemBase"/>.</param>
     /// <param name="excludeSystemBase">Excludes calling <paramref name="action"/> for <see cref="object"/> or <see cref="ValueType"/>.</param>
-    public static void ForEachBaseType(this Type type, ForEachBaseType action, bool includeParent = true, bool excludeSystemBase = true)
+    public static void ForEachBaseType(this Type type, [InstantHandle] ForEachBaseType action, bool includeParent = true, bool excludeSystemBase = true)
     {
         Type? type2 = type;
         if (includeParent)
@@ -2257,7 +2257,7 @@ public static class Accessor
     /// <param name="action">Called optionally for <paramref name="type"/>, then for each base type in order from most related to least related.</param>
     /// <param name="includeParent">Call <paramref name="action"/> on <paramref name="type"/>. Overrides <paramref name="excludeSystemBase"/>.</param>
     /// <param name="excludeSystemBase">Excludes calling <paramref name="action"/> for <see cref="object"/> or <see cref="ValueType"/>.</param>
-    public static void ForEachBaseType(this Type type, ForEachBaseTypeWhile action, bool includeParent = true, bool excludeSystemBase = true)
+    public static void ForEachBaseType(this Type type, [InstantHandle] ForEachBaseTypeWhile action, bool includeParent = true, bool excludeSystemBase = true)
     {
         Type? type2 = type;
         if (includeParent)
@@ -2331,7 +2331,7 @@ public static class Accessor
 
     /// <returns>Every type defined in the provided <paramref name="assmeblies"/>.</returns>
     [Pure]
-    public static List<Type> GetTypesSafe(IEnumerable<Assembly> assmeblies, bool removeIgnored = false)
+    public static List<Type> GetTypesSafe([InstantHandle] IEnumerable<Assembly> assmeblies, bool removeIgnored = false)
     {
         List<Type?> types = new List<Type?>();
         bool removeNulls = false;
@@ -2624,6 +2624,70 @@ public static class Accessor
     /// </summary>
     /// <returns><see langword="true"/> if <paramref name="actualType"/> is assignable from <typeparamref name="T"/> or if <typeparamref name="T"/> is assignable from <paramref name="actualType"/>.</returns>
     public static bool CouldBeAssignedTo<T>(this Type actualType) => actualType.CouldBeAssignedTo(typeof(T));
+
+    /// <summary>
+    /// Tries to find a lambda method that's defined in <paramref name="definingMethod"/>. Optinally define a type and parameter array to be more specific.
+    /// </summary>
+    /// <remarks>The effectiveness of this method depends on the how the compiler of the original code implements lambda methods.</remarks>
+    public static bool TryGetLambdaMethod(MethodInfo definingMethod, out MethodInfo method, Type[]? types = null, ParameterModifier[]? parameters = null)
+    {
+        method = null!;
+
+        const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance;
+
+        Type? proxyType = definingMethod.DeclaringType?.GetNestedType("<>c", flags) ?? definingMethod.DeclaringType;
+
+        if (proxyType == null)
+            return false;
+
+        if (LogDebugMessages)
+            Logger.DevkitServer.LogDebug(nameof(TryGetLambdaMethod), $"Looking for lambda match in {proxyType.Format()}.");
+
+        string methodName = "<" + definingMethod.Name + ">";
+
+        MethodInfo[] methods = proxyType.GetMethods(flags);
+
+        List<MethodBase> matches = new List<MethodBase>(3);
+        for (int i = 0; i < methods.Length; ++i)
+        {
+            if (!methods[i].Name.Contains(methodName, StringComparison.Ordinal))
+                continue;
+
+            matches.Add(methods[i]);
+        }
+
+        if (matches.Count == 0)
+        {
+            if (LogDebugMessages)
+                Logger.DevkitServer.LogDebug(nameof(TryGetLambdaMethod), "No match when binding to lambda method.");
+            return false;
+        }
+
+        if (types == null)
+        {
+            method = (matches[0] as MethodInfo)!;
+            if (matches.Count == 1)
+                return true;
+
+            if (LogDebugMessages)
+                Logger.DevkitServer.LogDebug(nameof(TryGetLambdaMethod), "Ambiguous match when binding to lambda method. Consider passing types.");
+            
+            return false;
+        }
+
+        try
+        {
+            method = (Type.DefaultBinder!.SelectMethod(flags, matches.ToArray(), types, parameters) as MethodInfo)!;
+            return method != null;
+        }
+        catch (Exception ex)
+        {
+            if (LogDebugMessages)
+                Logger.DevkitServer.LogDebug(nameof(TryGetLambdaMethod), ex, "Exception binding to methods.");
+        }
+
+        return false;
+    }
 
     private static class DelegateInfo<TDelegate> where TDelegate : Delegate
     {

@@ -1,5 +1,7 @@
 ﻿#if CLIENT
+using DevkitServer.API.Devkit.Spawns;
 using DevkitServer.API.UI.Extensions;
+using DevkitServer.API.UI.Extensions.Members;
 using DevkitServer.Models;
 using DevkitServer.Util.Region;
 
@@ -14,7 +16,50 @@ internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<Zomb
         get => LevelVisibility.zombiesVisible;
         set => LevelVisibility.zombiesVisible = value;
     }
-    public EditorSpawnsZombiesUIExtension() : base(new Vector3(0f, 2.125f, 0f), 20f, DistanceMax)
+
+    [ExistingMember("tableButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected ISleekButton[]? Tables { get; }
+
+    [ExistingMember("slotButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected ISleekButton[]? Tiers { get; }
+
+    [ExistingMember("clothButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected ISleekButton[]? Assets { get; }
+
+    [ExistingMember("selectedBox", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected readonly ISleekBox? SelectedBox;
+
+    [ExistingMember("tableNameField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected readonly ISleekField? TableNameField;
+
+    [ExistingMember("lootIDField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected readonly ISleekUInt16Field? LootIdField;
+
+    [ExistingMember("tableColorPicker", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected readonly SleekColorPicker? TableColorPicker;
+
+    [ExistingMember("megaToggle", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected readonly ISleekToggle? MegaToggle;
+
+    [ExistingMember("healthField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected readonly ISleekUInt16Field? HealthField;
+
+    [ExistingMember("damageField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected readonly ISleekUInt8Field? DamageField;
+
+    [ExistingMember("lootIndexField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected readonly ISleekUInt8Field? LootIndexField;
+
+    [ExistingMember("xpField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected readonly ISleekUInt32Field? XPField;
+
+    [ExistingMember("regenField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected readonly ISleekFloat32Field? RegenField;
+
+    [ExistingMember("difficultyGUIDField", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected readonly ISleekField? DifficultyAssetField;
+
+    public EditorSpawnsZombiesUIExtension() : base(new Vector3(0f, 2.125f, 0f), 20f, DistanceMax, SpawnType.Zombie)
     {
         SpawnUtil.OnZombieSpawnpointAdded += OnSpawnAdded;
         SpawnUtil.OnZombieSpawnpointRemoved += OnSpawnRemoved;
@@ -84,6 +129,192 @@ internal class EditorSpawnsZombiesUIExtension : BaseEditorSpawnsUIExtension<Zomb
         SpawnUtil.OnZombieSpawnTableChanged -= OnSpawnTableChanged;
         SpawnTableUtil.OnZombieSpawnTableNameUpdated -= OnNameUpdated;
         base.OnDestroyed();
+    }
+    
+    public void UpdateSpawnName(int index)
+    {
+        ISleekButton[]? assets = Assets;
+        if (assets == null)
+            return;
+
+        if (assets.Length <= index || assets[index] == null)
+        {
+            EditorSpawnsZombiesUI.updateSelection();
+            return;
+        }
+
+        if (!SpawnTableUtil.TryGetSelectedTier(SpawnType.Zombie, out SpawnTierIdentifier? id) || !id.HasValue)
+            return;
+
+        ZombieCloth cloth = LevelZombies.tables[id.Value.TableIndex].slots[id.Value.TierIndex].table[index];
+        Asset asset = SDG.Unturned.Assets.find(EAssetType.ITEM, cloth.item);
+        string name = asset?.FriendlyName ?? asset?.name ?? "?";
+        assets[index].Text = name;
+    }
+    public void UpdateTableName(int index, bool updateField)
+    {
+        ZombieTable table = LevelZombies.tables[index];
+        bool isSelected = EditorSpawns.selectedZombie == index;
+        bool fail = false;
+
+        if (isSelected)
+        {
+            ISleekBox? selectedBox = SelectedBox;
+            if (selectedBox != null)
+                selectedBox.Text = table.name;
+            else fail = true;
+            if (updateField)
+            {
+                ISleekField? tableNameField = TableNameField;
+                if (tableNameField != null)
+                    tableNameField.Text = table.name;
+                else fail = true;
+            }
+        }
+
+        ISleekButton[]? tables = Tables;
+        if (tables != null && tables.Length > index && tables[index] != null)
+            tables[index].Text = index + " " + table.name;
+        else fail = true;
+
+        if (fail)
+        {
+            if (isSelected)
+                EditorSpawnsZombiesUI.updateSelection();
+            EditorSpawnsZombiesUI.updateTables();
+        }
+    }
+    public void UpdateSlotChance(int index, bool updateSlider)
+    {
+        ZombieSlot slot = LevelZombies.tables[EditorSpawns.selectedZombie].slots[index];
+
+        ISleekButton[]? tiers = Tiers;
+
+        bool fail = false;
+        if (tiers != null)
+        {
+            if (tiers.Length > index && tiers[index] != null)
+            {
+                try
+                {
+                    ISleekElement? child = tiers[index].GetChildAtIndex(0);
+                    if (child is ISleekSlider slider)
+                    {
+                        if (updateSlider)
+                            slider.Value = slot.chance;
+                        slider.UpdateLabel(Mathf.RoundToInt(slot.chance * 100f) + "%");
+                    }
+                    else fail = true;
+                }
+                catch (ArgumentOutOfRangeException)
+                {
+                    fail = true;
+                }
+            }
+            else fail = true;
+        }
+
+        if (fail)
+            EditorSpawnsZombiesUI.updateSelection();
+    }
+    public void UpdateTableColor()
+    {
+        ZombieTable table = LevelZombies.tables[EditorSpawns.selectedZombie];
+
+        SleekColorPicker? tableColorPicker = TableColorPicker;
+
+        if (tableColorPicker != null)
+            tableColorPicker.state = table.color;
+        else
+            EditorSpawnsZombiesUI.updateSelection();
+    }
+    public void UpdateIsMega()
+    {
+        ZombieTable table = LevelZombies.tables[EditorSpawns.selectedZombie];
+
+        ISleekToggle? megaToggle = MegaToggle;
+
+        if (megaToggle != null)
+            megaToggle.Value = table.isMega;
+        else
+            EditorSpawnsZombiesUI.updateSelection();
+    }
+    public void UpdateHealth()
+    {
+        ZombieTable table = LevelZombies.tables[EditorSpawns.selectedZombie];
+
+        ISleekUInt16Field? healthField = HealthField;
+
+        if (healthField != null)
+            healthField.Value = table.health;
+        else
+            EditorSpawnsZombiesUI.updateSelection();
+    }
+    public void UpdateDamage()
+    {
+        ZombieTable table = LevelZombies.tables[EditorSpawns.selectedZombie];
+
+        ISleekUInt8Field? damageField = DamageField;
+
+        if (damageField != null)
+            damageField.Value = table.damage;
+        else
+            EditorSpawnsZombiesUI.updateSelection();
+    }
+    public void UpdateLootIndex()
+    {
+        ZombieTable table = LevelZombies.tables[EditorSpawns.selectedZombie];
+
+        ISleekUInt8Field? lootIndexField = LootIndexField;
+
+        if (lootIndexField != null)
+            lootIndexField.Value = table.lootIndex;
+        else
+            EditorSpawnsZombiesUI.updateSelection();
+    }
+    public void UpdateLootId()
+    {
+        ZombieTable table = LevelZombies.tables[EditorSpawns.selectedZombie];
+
+        ISleekUInt16Field? lootIdField = LootIdField;
+
+        if (lootIdField != null)
+            lootIdField.Value = table.lootID;
+        else
+            EditorSpawnsZombiesUI.updateSelection();
+    }
+    public void UpdateXP()
+    {
+        ZombieTable table = LevelZombies.tables[EditorSpawns.selectedZombie];
+
+        ISleekUInt32Field? xpField = XPField;
+
+        if (xpField != null)
+            xpField.Value = table.xp;
+        else
+            EditorSpawnsZombiesUI.updateSelection();
+    }
+    public void UpdateRegen()
+    {
+        ZombieTable table = LevelZombies.tables[EditorSpawns.selectedZombie];
+
+        ISleekFloat32Field? regenField = RegenField;
+
+        if (regenField != null)
+            regenField.Value = table.regen;
+        else
+            EditorSpawnsZombiesUI.updateSelection();
+    }
+    public void UpdateDifficultyAsset()
+    {
+        ZombieTable table = LevelZombies.tables[EditorSpawns.selectedZombie];
+
+        ISleekField? difficultyAssetField = DifficultyAssetField;
+
+        if (difficultyAssetField != null)
+            difficultyAssetField.Text = table.difficultyGUID;
+        else
+            EditorSpawnsZombiesUI.updateSelection();
     }
 }
 #endif

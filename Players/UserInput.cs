@@ -670,7 +670,7 @@ public class UserInput : MonoBehaviour
 
             if (t >= _pendingPacketTime)
             {
-                ApplyPacket(in _pendingPacket);
+                ApplyPacket(ref _pendingPacket);
                 _pendingPacket = default;
                 _pendingPacketTime = 0f;
             }
@@ -698,13 +698,13 @@ public class UserInput : MonoBehaviour
                     else
                     {
                         _nextPacketApplyTime += packet.DeltaTime;
-                        ApplyPacket(in packet);
+                        ApplyPacket(ref packet);
                     }
                 }
             }
         }
     }
-    private void ApplyPacket(in UserInputPacket packet)
+    private void ApplyPacket(ref UserInputPacket packet)
     {
         float t = CachedTime.RealtimeSinceStartup;
 

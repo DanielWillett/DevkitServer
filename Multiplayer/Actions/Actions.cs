@@ -17,6 +17,7 @@ public enum ActionSetting
     AutoSlopeData = 1 << 7,
     AutoFoundationData = 1 << 8,
     InstanceId = 1 << 9,
+    NetId64 = 1 << 10,
 
     Extended = 1 << 31
 }
@@ -80,6 +81,24 @@ public enum DevkitServerActionType : byte
     SetNavigationShouldSpawnZombies = 41,
     SetNavigationInfiniteAgroDistance = 42,
 
+    /* Spawn Tables */
+    DeleteSpawnTable = 43,
+    DeleteSpawnTableTier = 44,
+    DeleteSpawnTableTierAsset = 45,
+    SetSpawnTableColor = 46,
+    SetSpawnTableName = 47,
+    SetSpawnTableSpawnAsset = 48,
+    SetSpawnTableTierAsset = 49,
+    SetSpawnTableTierChances = 50,
+    SetSpawnTableTierName = 51,
+    SetZombieSpawnTableDamage = 52,
+    SetZombieSpawnTableDifficultyAsset = 53,
+    SetZombieSpawnTableHealth = 54,
+    SetZombieSpawnTableIsMega = 55,
+    SetZombieSpawnTableLootIndex = 56,
+    SetZombieSpawnTableRegen = 57,
+    SetZombieSpawnTableXP = 58,
+
     /* For future use */
     Extended = 255
 }
@@ -140,6 +159,11 @@ public interface IBrushStrengthAction
 public interface IInstanceIdAction
 {
     uint InstanceId { get; set; }
+}
+[ActionSetting(ActionSetting.NetId64)]
+public interface INetId64Action
+{
+    NetId64 NetId { get; set; }
 }
 [ActionSetting(ActionSetting.Sensitivity)]
 public interface IBrushSensitivityAction

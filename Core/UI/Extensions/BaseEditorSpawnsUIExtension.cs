@@ -1,5 +1,6 @@
 ﻿#if CLIENT
 using DevkitServer.API;
+using DevkitServer.API.Devkit.Spawns;
 using DevkitServer.API.UI.Extensions;
 using DevkitServer.API.UI.Extensions.Members;
 using DevkitServer.Configuration;
@@ -12,27 +13,31 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
     private bool _wasVisibleBeforeOpened;
     private bool _wasVisibleLastUpdate;
 
+    protected SpawnType SpawnType;
     protected readonly Vector3 Offset;
     protected readonly float DistanceCurveMin;
     protected readonly float DistanceCurveLength;
     protected readonly Dictionary<T, Label> Labels = new Dictionary<T, Label>(16);
 
     [ExistingMember("addButton", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
-    protected SleekButtonIcon? AddButton;
+    protected readonly SleekButtonIcon? AddButton;
 
     [ExistingMember("removeButton", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
-    protected SleekButtonIcon? RemoveButton;
+    protected readonly SleekButtonIcon? RemoveButton;
 
     [ExistingMember("radiusSlider", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
-    protected ISleekSlider? RadiusSlider;
+    protected readonly ISleekSlider? RadiusSlider;
 
-    [ExistingMember("rotationSlider", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
-    protected ISleekSlider? RotationSlider;
+    [ExistingMember("rotationSlider", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected readonly ISleekSlider? RotationSlider;
+
     protected override SleekWindow Parent => EditorUI.window;
     protected abstract bool IsVisible { get; set; }
-    protected BaseEditorSpawnsUIExtension(Vector3 offset, float distanceCurveMin, float distanceCurveMax)
+    protected BaseEditorSpawnsUIExtension(Vector3 offset, float distanceCurveMin, float distanceCurveMax, SpawnType spawnType)
     {
         Offset = offset;
+
+        SpawnType = spawnType;
 
         DistanceCurveMin = distanceCurveMin;
         DistanceCurveLength = distanceCurveMax - distanceCurveMin;

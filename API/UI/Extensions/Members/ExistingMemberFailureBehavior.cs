@@ -14,6 +14,13 @@ public enum ExistingMemberFailureBehavior
     /// <summary>
     /// If the member can't be found or doesn't match the expected type, the value will not be initialized (will be default/null).
     /// </summary>
-    Ignore
+    /// <remarks>Still logs a warning, use <seealso cref="IgnoreNoWarn"/> to supress warning logs.</remarks>
+    Ignore,
+
+    /// <summary>
+    /// If the member can't be found or doesn't match the expected type, the value will not be initialized (will be default/null).
+    /// </summary>
+    /// <remarks>No warning will be logged.</remarks>
+    IgnoreNoWarn
 }
 #endif

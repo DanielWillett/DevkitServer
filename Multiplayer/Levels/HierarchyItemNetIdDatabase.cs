@@ -218,7 +218,7 @@ public sealed class HierarchyItemNetIdDatabase : IReplicatedLevelDataSource<Hier
         }
     }
 #elif SERVER
-    public HierarchyItemNetIdReplicatedLevelData SaveData()
+    public HierarchyItemNetIdReplicatedLevelData SaveData(CSteamID user)
     {
         NetId[] netIds = new NetId[HierarchyItemAssignments.Count];
         uint[] items = new uint[HierarchyItemAssignments.Count];

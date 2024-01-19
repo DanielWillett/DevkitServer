@@ -135,7 +135,8 @@ public sealed class DevkitServerModule : IModuleNexus
         { "RenderingSatelliteInProgress", "Rendering map..." },
         { "SaveInProgressWillFreeze", "Saving... (saving again will freeze until done)" },
         { "BackingUpInProgress", "Backing up..." },
-        { "BackupAndSaveButton", "Backup And Save" }
+        { "BackupAndSaveButton", "Backup And Save" },
+        { "TooManyPasswordAttempts", "Too many incorrect password attempts. Try again in {0} second(s)." }
     };
     public static Local CommandLocalization { get; private set; } = null!;
 
@@ -188,6 +189,13 @@ public sealed class DevkitServerModule : IModuleNexus
         { "RecoveringMissingPackets", "{0} [ {1} / {2} ] | Recovering Missing Packets" },
         { "DownloadFailed", "Level failed to download. Try joining again." },
         { "DownloadCancelled", "Level download cancelled." }
+    };
+    private static readonly LocalDatDictionary DefaultRichPresenceLocalization = new LocalDatDictionary
+    {
+        { "Rich_Presence_Editing", "Editing with DevkitServer: {0}" },
+        { "Rich_Presence_Playing", "Playing: {0}" },
+        { "Rich_Presence_Menu", "In Menu with DevkitServer" },
+        { "Rich_Presence_Lobby", "In Lobby" },
     };
 
     public static CultureInfo CommandParseLocale { get; set; } = CultureInfo.InvariantCulture;
@@ -323,6 +331,9 @@ public sealed class DevkitServerModule : IModuleNexus
             ReloadCommandsLocalization();
             ReloadMessagesLocalization();
             ReloadLevelLoadingLocalization();
+#if CLIENT
+            ReloadRichPresenceLocalization();
+#endif
             PluginAdvertising.Get().AddPlugin(MainLocalization.format("Name"));
             _tknSrc = new CancellationTokenSource();
             Logger.DevkitServer.LogInfo("Init", "DevkitServer loading...");
@@ -932,6 +943,7 @@ public sealed class DevkitServerModule : IModuleNexus
 
         RoadNetIdDatabase.AssignExisting();
         LevelObjectNetIdDatabase.AssignExisting();
+        SpawnsNetIdDatabase.AssignExisting();
         HierarchyItemNetIdDatabase.AssignExisting();
         NavigationNetIdDatabase.AssignExisting();
 #endif
@@ -1033,31 +1045,39 @@ public sealed class DevkitServerModule : IModuleNexus
     public static void ReloadMainLocalization()
     {
         string path = Path.Combine(DevkitServerConfig.LocalizationFilePath, "Main");
-        Local lcl = Localization.tryRead(path, false);
-        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultMainLocalization, path);
+        Local lcl = DevkitServerUtility.ReadLocalFromFileOrFolder(path, out string? primaryPath, out string? englishWritePath);
+        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultMainLocalization, path, primaryPath, englishWritePath);
         MainLocalization = lcl;
     }
     public static void ReloadCommandsLocalization()
     {
         string path = Path.Combine(DevkitServerConfig.LocalizationFilePath, "Commands");
-        Local lcl = Localization.tryRead(path, false);
-        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultCommandLocalization, path);
+        Local lcl = DevkitServerUtility.ReadLocalFromFileOrFolder(path, out string? primaryPath, out string? englishWritePath);
+        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultCommandLocalization, path, primaryPath, englishWritePath);
         CommandLocalization = lcl;
     }
     public static void ReloadMessagesLocalization()
     {
         string path = Path.Combine(DevkitServerConfig.LocalizationFilePath, "Messages");
-        Local lcl = Localization.tryRead(path, false);
-        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultMessageLocalization, path);
+        Local lcl = DevkitServerUtility.ReadLocalFromFileOrFolder(path, out string? primaryPath, out string? englishWritePath);
+        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultMessageLocalization, path, primaryPath, englishWritePath);
         MessageLocalization = lcl;
     }
     public static void ReloadLevelLoadingLocalization()
     {
         string path = Path.Combine(DevkitServerConfig.LocalizationFilePath, "Level Loading");
-        Local lcl = Localization.tryRead(path, false);
-        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultLevelLoadingLocalization, path);
+        Local lcl = DevkitServerUtility.ReadLocalFromFileOrFolder(path, out string? primaryPath, out string? englishWritePath);
+        DevkitServerUtility.UpdateLocalizationFile(ref lcl, DefaultLevelLoadingLocalization, path, primaryPath, englishWritePath);
         LevelLoadingLocalization = lcl;
     }
+#if CLIENT
+    public static void ReloadRichPresenceLocalization()
+    {
+        string path = Path.Combine(DevkitServerConfig.LocalizationFilePath, "Rich Presence");
+        PatchesMain.RichPresenceLocalizationOverride = DevkitServerUtility.ReadLocalFromFileOrFolder(path, out string? primaryPath, out string? englishWritePath);
+        DevkitServerUtility.UpdateLocalizationFile(ref PatchesMain.RichPresenceLocalizationOverride, DefaultRichPresenceLocalization, path, primaryPath, englishWritePath);
+    }
+#endif
     public static bool IsCompatibleWith(Version otherVersion)
     {
         Version thisVersion = Accessor.DevkitServer.GetName().Version;

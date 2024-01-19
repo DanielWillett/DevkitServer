@@ -3,6 +3,7 @@ using DevkitServer.Levels;
 using DevkitServer.Plugins;
 using DevkitServer.Util.Encoding;
 using System.Reflection;
+using DevkitServer.Players;
 
 namespace DevkitServer.Multiplayer.Levels;
 
@@ -132,7 +133,7 @@ public static class ReplicatedLevelDataRegistry
         }
     }
 #elif SERVER
-    internal static void SaveToLevelData(LevelData data)
+    internal static void SaveToLevelData(LevelData data, CSteamID user)
     {
         lock (RegisteredTypes)
         {
@@ -141,7 +142,7 @@ public static class ReplicatedLevelDataRegistry
             {
                 try
                 {
-                    object saveData = srcInfo.Save(srcInfo.Instance);
+                    object saveData = srcInfo.Save(srcInfo.Instance, user);
                     data.ReplicatedLevelData.Add(saveData);
                 }
                 catch (Exception ex)
@@ -460,7 +461,7 @@ public readonly struct ReplicatedLevelDataSourceInfo
 #if CLIENT
     internal readonly Action<IReplicatedLevelDataSource, object> Load;
 #elif SERVER
-    internal readonly Func<IReplicatedLevelDataSource, object> Save;
+    internal readonly Func<IReplicatedLevelDataSource, CSteamID, object> Save;
 #endif
     internal readonly Action<IReplicatedLevelDataSource, ByteWriter, object> Write;
     internal readonly Func<IReplicatedLevelDataSource, ByteReader, ushort, object> Read;
@@ -514,7 +515,7 @@ public readonly struct ReplicatedLevelDataSourceInfo
 #if CLIENT
         Load = (Action<IReplicatedLevelDataSource, object>)Accessor.GenerateInstanceCaller(typeof(Action<IReplicatedLevelDataSource, object>), ioMethod, true, true)!;
 #elif SERVER
-        Save = (Func<IReplicatedLevelDataSource, object>)Accessor.GenerateInstanceCaller(typeof(Func<IReplicatedLevelDataSource, object>), ioMethod, true, true)!;
+        Save = (Func<IReplicatedLevelDataSource, CSteamID, object>)Accessor.GenerateInstanceCaller(typeof(Func<IReplicatedLevelDataSource, CSteamID, object>), ioMethod, true, true)!;
 #endif
     }
 
@@ -536,7 +537,7 @@ public readonly struct ReplicatedLevelDataSourceInfo
     /// Copy data from the active state of the game.
     /// </summary>
     /// <remarks>Serverside</remarks>
-    public object SaveData() => Save(Instance);
+    public object SaveData(EditorUser user) => Save(Instance, user);
 #endif
 
     /// <summary>
@@ -586,10 +587,10 @@ public interface IReplicatedLevelDataSource<TData> : IReplicatedLevelDataSource 
 #elif SERVER
 
     /// <summary>
-    /// Copy data from the active state of the game. There should be no references to anything that could change throughout the server's lifetime.
+    /// Copy data from the active state of the game. There should be no references to anything that could change throughout the server's lifetime in the output class.
     /// </summary>
     /// <remarks>Serverside</remarks>
-    TData SaveData();
+    TData SaveData(CSteamID user);
 
 #endif
 

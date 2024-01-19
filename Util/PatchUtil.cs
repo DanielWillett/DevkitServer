@@ -341,13 +341,12 @@ public static class PatchUtil
         for (int i = startIndex; i < instructions.Count; ++i)
         {
             List<Label>? labels = instructions[i].labels;
-            if (labels != null)
+            if (labels == null)
+                continue;
+            for (int j = 0; j < labels.Count; ++j)
             {
-                for (int j = 0; j < labels.Count; ++j)
-                {
-                    if (labels[j] == label)
-                        return i;
-                }
+                if (labels[j] == label)
+                    return i;
             }
         }
 
@@ -754,7 +753,7 @@ public static class PatchUtil
     /// </summary>
     public static CodeInstruction WithEndingInstructionNeeds(this CodeInstruction instruction, CodeInstruction other)
     {
-        TransferEndingInstructionNeeds(instruction, other);
+        TransferEndingInstructionNeeds(other, instruction);
         return instruction;
     }
 
@@ -763,7 +762,7 @@ public static class PatchUtil
     /// </summary>
     public static CodeInstruction WithStartingInstructionNeeds(this CodeInstruction instruction, CodeInstruction other)
     {
-        TransferStartingInstructionNeeds(instruction, other);
+        TransferStartingInstructionNeeds(other, instruction);
         return instruction;
     }
 
@@ -1183,6 +1182,15 @@ public static class PatchUtil
     public static OpCode GetCallRuntime(this MethodBase method)
     {
         return method.ShouldCallvirtRuntime() ? OpCodes.Callvirt : OpCodes.Call;
+    }
+
+    /// <summary>
+    /// Marks <paramref name="label"/> if it has a value.
+    /// </summary>
+    public static void TryMarkLabel(this IOpCodeEmitter emitter, Label? label)
+    {
+        if (label.HasValue)
+            emitter.MarkLabel(label.Value);
     }
 
     internal static void CheckCopiedMethodPatchOutOfDate(ref MethodInfo original, MethodBase invoker)

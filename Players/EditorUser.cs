@@ -15,7 +15,6 @@ namespace DevkitServer.Players;
 public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 {
     internal readonly List<AuthoritativeSync> IntlSyncs = new List<AuthoritativeSync>(4);
-    public ClientInfo ClientInfo { get; private set; } = null!;
 #if CLIENT
     public static EditorUser? User { get; internal set; }
 #endif
@@ -120,15 +119,10 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         Player!.player.gameObject.SetActive(false);
 #endif
 #if SERVER
-        ClientInfo = DevkitServerGamemode.GetClientInfo(this);
-        _perms = ClientInfo.Permissions.ToList();
-        _permGrps = ClientInfo.PermissionGroups.ToList();
+        _perms = PermissionManager.UserPermissions.GetPermissions(SteamId.m_SteamID, true)?.ToList() ?? [];
+        _permGrps = PermissionManager.UserPermissions.GetPermissionGroups(SteamId.m_SteamID, true)?.ToList() ?? [];
         Permissions = _perms.AsReadOnly();
         PermissionGroups = _permGrps.AsReadOnly();
-        ClientInfo.ApplyServerSettings(ClientInfo, this);
-        ClientInfo.OnClientInfoReadyEvent.TryInvoke(this, ClientInfo);
-        ClientInfo.SendClientInfo.Invoke(Connection, ClientInfo);
-        LoggerExtensions.DumpJson(ClientInfo);
         TileSync.SendAuthority(Connection);
         ObjectSync.SendAuthority(Connection);
         HierarchySync.SendAuthority(Connection);

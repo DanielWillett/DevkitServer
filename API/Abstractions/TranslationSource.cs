@@ -503,7 +503,7 @@ public sealed class FileTranslationSource : ITranslationSource
 
         try
         {
-            Local local = Localization.tryRead(directory.FullName, false);
+            Local local = DevkitServerUtility.ReadLocalFromFileOrFolder(directory.FullName, out _, out _);
             return local.Translate(key, parameters ?? Array.Empty<object>());
         }
         catch (Exception ex)

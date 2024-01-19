@@ -12,6 +12,9 @@ using SDG.Framework.Devkit;
 using SDG.Framework.Utilities;
 using System.Reflection;
 using System.Reflection.Emit;
+using DevkitServer.API.Abstractions;
+using DevkitServer.Models;
+using DevkitServer.Multiplayer.Levels;
 
 namespace DevkitServer.Patches;
 
@@ -20,10 +23,23 @@ internal static class SpawnsEditorPatches
 {
     private const string Source = "SPAWN PATCHES";
     
-    private static readonly StaticGetter<ISleekButton[]>? GetAnimalTableButtons = Accessor.GenerateStaticGetter<EditorSpawnsAnimalsUI, ISleekButton[]>("tableButtons", throwOnError: false);
-    private static readonly StaticGetter<ISleekButton[]>? GetVehicleTableButtons = Accessor.GenerateStaticGetter<EditorSpawnsVehiclesUI, ISleekButton[]>("tableButtons", throwOnError: false);
-    private static readonly StaticGetter<ISleekButton[]>? GetItemTableButtons = Accessor.GenerateStaticGetter<EditorSpawnsItemsUI, ISleekButton[]>("tableButtons", throwOnError: false);
-    private static readonly StaticGetter<ISleekButton[]>? GetZombieTableButtons = Accessor.GenerateStaticGetter<EditorSpawnsZombiesUI, ISleekButton[]>("tableButtons", throwOnError: false);
+    private static readonly StaticGetter<ISleekButton[]>? GetAnimalTableButtons
+        = Accessor.GenerateStaticGetter<EditorSpawnsAnimalsUI, ISleekButton[]>("tableButtons", throwOnError: false);
+    private static readonly StaticGetter<ISleekButton[]>? GetVehicleTableButtons
+        = Accessor.GenerateStaticGetter<EditorSpawnsVehiclesUI, ISleekButton[]>("tableButtons", throwOnError: false);
+    private static readonly StaticGetter<ISleekButton[]>? GetItemTableButtons
+        = Accessor.GenerateStaticGetter<EditorSpawnsItemsUI, ISleekButton[]>("tableButtons", throwOnError: false);
+    private static readonly StaticGetter<ISleekButton[]>? GetZombieTableButtons
+        = Accessor.GenerateStaticGetter<EditorSpawnsZombiesUI, ISleekButton[]>("tableButtons", throwOnError: false);
+    
+    private static readonly StaticGetter<ISleekButton[]>? GetAnimalTierButtons
+        = Accessor.GenerateStaticGetter<EditorSpawnsAnimalsUI, ISleekButton[]>("tierButtons", throwOnError: false);
+    private static readonly StaticGetter<ISleekButton[]>? GetVehicleTierButtons
+        = Accessor.GenerateStaticGetter<EditorSpawnsVehiclesUI, ISleekButton[]>("tierButtons", throwOnError: false);
+    private static readonly StaticGetter<ISleekButton[]>? GetItemTierButtons
+        = Accessor.GenerateStaticGetter<EditorSpawnsItemsUI, ISleekButton[]>("tierButtons", throwOnError: false);
+    private static readonly StaticGetter<ISleekButton[]>? GetZombieTierButtons
+        = Accessor.GenerateStaticGetter<EditorSpawnsZombiesUI, ISleekButton[]>("slotButtons", throwOnError: false);
 
     internal static void ManualPatches()
     {
@@ -202,53 +218,629 @@ internal static class SpawnsEditorPatches
         return false;
     }
 
+    #region Table Name
+    private static bool OnTableNameUpdated(string state, int index, SpawnType spawnType)
+    {
+        if (!SpawnTableUtil.CheckSpawnTableSafe(spawnType, index))
+        {
+            SpawnTableUtil.UpdateUITable(spawnType);
+            SpawnTableUtil.UpdateUISelection(spawnType);
+            return true;
+        }
+
+        if (DevkitServerModule.IsEditing && !VanillaPermissions.SpawnTablesEdit(spawnType).Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnTablesEdit(spawnType));
+            return false;
+        }
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            SpawnTableUtil.SetSpawnTableNameLocal(spawnType, index, state, false);
+            return true;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(spawnType, index, out NetId64 netId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnTableNameUpdated), $"Unable to find NetId for {spawnType.ToString().ToLowerInvariant()} spawn table: {index.Format()}.");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", [ "NetId Missing" ]);
+            return false;
+        }
+
+        SetSpawnTableNameProperties properties = new SetSpawnTableNameProperties(netId, spawnType, state, CachedTime.DeltaTime);
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnSetSpawnTableNameRequested(in properties, ref shouldAllow);
+        if (!shouldAllow)
+            return false;
+
+        SpawnTableUtil.SetSpawnTableNameLocal(spawnType, index, state, false);
+        ClientEvents.InvokeOnSetSpawnTableName(in properties);
+        return true;
+    }
+
     [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onTypedNameField")]
-    [HarmonyPostfix]
+    [HarmonyPrefix]
     [UsedImplicitly]
     [HarmonyPriority(-1)]
-    private static void OnAnimalNameUpdated(ISleekField field, string state)
+    private static bool OnAnimalNameUpdated(ISleekField field, string state)
     {
-        if (EditorSpawns.selectedAnimal >= LevelAnimals.tables.Count)
-            return;
+        if (!OnTableNameUpdated(state, EditorSpawns.selectedAnimal, SpawnType.Animal))
+            field.Text = LevelAnimals.tables[EditorSpawns.selectedAnimal].name;
 
-        LevelAnimals.tables[EditorSpawns.selectedAnimal].SetSpawnTableNameLocal(state);
+        return false;
     }
 
     [HarmonyPatch(typeof(EditorSpawnsVehiclesUI), "onTypedNameField")]
-    [HarmonyPostfix]
+    [HarmonyPrefix]
     [UsedImplicitly]
     [HarmonyPriority(-1)]
-    private static void OnVehicleNameUpdated(ISleekField field, string state)
+    private static bool OnVehicleNameUpdated(ISleekField field, string state)
     {
-        if (EditorSpawns.selectedVehicle >= LevelVehicles.tables.Count)
-            return;
+        if (!OnTableNameUpdated(state, EditorSpawns.selectedVehicle, SpawnType.Vehicle))
+            field.Text = LevelAnimals.tables[EditorSpawns.selectedVehicle].name;
 
-        LevelVehicles.tables[EditorSpawns.selectedVehicle].SetSpawnTableNameLocal(state);
+        return false;
     }
 
     [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onTypedTableNameField")]
-    [HarmonyPostfix]
+    [HarmonyPrefix]
     [UsedImplicitly]
     [HarmonyPriority(-1)]
-    private static void OnItemNameUpdated(ISleekField field, string state)
+    private static bool OnItemNameUpdated(ISleekField field, string state)
     {
-        if (EditorSpawns.selectedItem >= LevelItems.tables.Count)
-            return;
+        if (!OnTableNameUpdated(state, EditorSpawns.selectedItem, SpawnType.Item))
+            field.Text = LevelItems.tables[EditorSpawns.selectedItem].name;
 
-        LevelItems.tables[EditorSpawns.selectedItem].SetSpawnTableNameLocal(state);
+        return false;
     }
 
     [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onTypedNameField")]
-    [HarmonyPostfix]
+    [HarmonyPrefix]
     [UsedImplicitly]
     [HarmonyPriority(-1)]
-    private static void OnZombieNameUpdated(ISleekField field, string state)
+    private static bool OnZombieNameUpdated(ISleekField field, string state)
     {
-        if (EditorSpawns.selectedZombie >= LevelZombies.tables.Count)
-            return;
+        if (!OnTableNameUpdated(state, EditorSpawns.selectedZombie, SpawnType.Zombie))
+            field.Text = LevelZombies.tables[EditorSpawns.selectedZombie].name;
 
-        LevelZombies.tables[EditorSpawns.selectedZombie].SetSpawnTableNameLocal(state);
+        return false;
     }
+
+    #endregion
+
+    #region Color
+    private static bool OnTableColorUpdated(Color color, int index, SpawnType spawnType)
+    {
+        if (!SpawnTableUtil.CheckSpawnTableSafe(spawnType, index))
+        {
+            SpawnTableUtil.UpdateUITable(spawnType);
+            SpawnTableUtil.UpdateUISelection(spawnType);
+            return true;
+        }
+
+        if (DevkitServerModule.IsEditing && !VanillaPermissions.SpawnTablesEdit(spawnType).Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnTablesEdit(spawnType));
+            return false;
+        }
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            SpawnTableUtil.SetSpawnTableColorLocal(spawnType, index, color);
+            return true;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(spawnType, index, out NetId64 netId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnTableColorUpdated), $"Unable to find NetId for {spawnType.ToString().ToLowerInvariant()} spawn table: {index.Format()}.");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+            return false;
+        }
+
+        SetSpawnTableColorProperties properties = new SetSpawnTableColorProperties(netId, spawnType, color, CachedTime.DeltaTime);
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnSetSpawnTableColorRequested(in properties, ref shouldAllow);
+        if (!shouldAllow)
+            return false;
+
+        SpawnTableUtil.SetSpawnTableColorLocal(spawnType, index, color);
+        ClientEvents.InvokeOnSetSpawnTableColor(in properties);
+        return true;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onAnimalColorPicked")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnAnimalColorUpdated(SleekColorPicker picker, Color color)
+    {
+        if (!OnTableColorUpdated(color, EditorSpawns.selectedAnimal, SpawnType.Animal))
+            picker.state = LevelAnimals.tables[EditorSpawns.selectedAnimal].color;
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsVehiclesUI), "onVehicleColorPicked")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnVehicleColorUpdated(SleekColorPicker picker, Color color)
+    {
+        if (!OnTableColorUpdated(color, EditorSpawns.selectedVehicle, SpawnType.Vehicle))
+            picker.state = LevelVehicles.tables[EditorSpawns.selectedVehicle].color;
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onItemColorPicked")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnItemColorUpdated(SleekColorPicker picker, Color color)
+    {
+        if (!OnTableColorUpdated(color, EditorSpawns.selectedItem, SpawnType.Item))
+            picker.state = LevelItems.tables[EditorSpawns.selectedItem].color;
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onZombieColorPicked")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnZombieColorUpdated(SleekColorPicker picker, Color color)
+    {
+        if (!OnTableColorUpdated(color, EditorSpawns.selectedZombie, SpawnType.Zombie))
+            picker.state = LevelZombies.tables[EditorSpawns.selectedZombie].color;
+
+        return false;
+    }
+
+    #endregion
+
+    #region Table ID
+    private static bool OnTableIdUpdated(ushort state, int index, SpawnType spawnType)
+    {
+        if (!SpawnTableUtil.CheckSpawnTableSafe(spawnType, index))
+        {
+            SpawnTableUtil.UpdateUITable(spawnType);
+            SpawnTableUtil.UpdateUISelection(spawnType);
+            return true;
+        }
+
+        if (DevkitServerModule.IsEditing && !VanillaPermissions.SpawnTablesEdit(spawnType).Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnTablesEdit(spawnType));
+            return false;
+        }
+
+        AssetReference<SpawnAsset> reference;
+
+        if (Assets.find(EAssetType.SPAWN, state) is SpawnAsset spawnAsset)
+        {
+            reference = spawnAsset.getReferenceTo<SpawnAsset>();
+        }
+        else
+        {
+            bool alreadyNull = spawnType switch
+            {
+                SpawnType.Animal => LevelAnimals.tables[index].tableID == 0,
+                SpawnType.Vehicle => LevelVehicles.tables[index].tableID == 0,
+                SpawnType.Item => LevelItems.tables[index].tableID == 0,
+                SpawnType.Zombie => LevelZombies.tables[index].lootID == 0,
+                _ => false
+            };
+
+            if (alreadyNull)
+                return true;
+
+            reference = default;
+        }
+
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            SpawnTableUtil.SetSpawnTableSpawnAssetLocal(spawnType, index, reference);
+            return true;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(spawnType, index, out NetId64 netId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnTableColorUpdated), $"Unable to find NetId for {spawnType.ToString().ToLowerInvariant()} spawn table: {index.Format()}.");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+            return false;
+        }
+
+        SetSpawnTableSpawnAssetProperties properties = new SetSpawnTableSpawnAssetProperties(netId, spawnType, reference, CachedTime.DeltaTime);
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnSetSpawnTableSpawnAssetRequested(in properties, ref shouldAllow);
+        if (!shouldAllow)
+            return false;
+
+        SpawnTableUtil.SetSpawnTableSpawnAssetLocal(spawnType, index, reference);
+        ClientEvents.InvokeOnSetSpawnTableSpawnAsset(in properties);
+        return true;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onTableIDFieldTyped")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnAnimalColorUpdated(ISleekUInt16Field field, ushort state)
+    {
+        if (!OnTableIdUpdated(state, EditorSpawns.selectedAnimal, SpawnType.Animal))
+            field.Value = LevelAnimals.tables[EditorSpawns.selectedAnimal].tableID;
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsVehiclesUI), "onTableIDFieldTyped")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnVehicleColorUpdated(ISleekUInt16Field field, ushort state)
+    {
+        if (!OnTableIdUpdated(state, EditorSpawns.selectedVehicle, SpawnType.Vehicle))
+            field.Value = LevelVehicles.tables[EditorSpawns.selectedVehicle].tableID;
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onTableIDFieldTyped")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnItemColorUpdated(ISleekUInt16Field field, ushort state)
+    {
+        if (!OnTableIdUpdated(state, EditorSpawns.selectedItem, SpawnType.Item))
+            field.Value = LevelItems.tables[EditorSpawns.selectedItem].tableID;
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onLootIDFieldTyped")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnZombieColorUpdated(ISleekUInt16Field field, ushort state)
+    {
+        if (!OnTableIdUpdated(state, EditorSpawns.selectedZombie, SpawnType.Zombie))
+            field.Value = LevelZombies.tables[EditorSpawns.selectedZombie].lootID;
+
+        return false;
+    }
+
+    #endregion
+
+    #region Chance
+
+    private static NetId64[]? _chanceNetIds;
+    private static float[]? _oldChances;
+    private static float[]? _newChances;
+    private static bool OnChanceUpdated(float chance, int tableIndex, int tierIndex, SpawnType spawnType)
+    {
+        SpawnTierIdentifier identifier = new SpawnTierIdentifier(spawnType, (byte)tableIndex, (byte)tierIndex);
+
+        Logger.DevkitServer.LogConditional(nameof(OnChanceUpdated), $"Chance updated: {identifier.Format()}: {chance.Format("F2")}.");
+
+        if (!identifier.CheckSafe())
+        {
+            SpawnTableUtil.UpdateUITable(spawnType);
+            SpawnTableUtil.UpdateUISelection(spawnType);
+            return true;
+        }
+
+        if (DevkitServerModule.IsEditing && !VanillaPermissions.SpawnTablesEdit(spawnType).Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnTablesEdit(spawnType));
+            return false;
+        }
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            switch (spawnType)
+            {
+                case SpawnType.Animal:
+                    AnimalTable animalTable = LevelAnimals.tables[tableIndex];
+                    animalTable.updateChance(tierIndex, chance);
+                    for (int i = 0; i < animalTable.tiers.Count; ++i)
+                    {
+                        SpawnTableUtil.SetSpawnTableTierChanceLocal(
+                            new SpawnTierIdentifier(SpawnType.Animal, (byte)tableIndex, (byte)i), animalTable.tiers[i].chance,
+                            updateSlider: tierIndex != i);
+                    }
+                    break;
+                case SpawnType.Vehicle:
+                    VehicleTable vehicleTable = LevelVehicles.tables[tableIndex];
+                    vehicleTable.updateChance(tierIndex, chance);
+                    for (int i = 0; i < vehicleTable.tiers.Count; ++i)
+                    {
+                        SpawnTableUtil.SetSpawnTableTierChanceLocal(
+                            new SpawnTierIdentifier(SpawnType.Vehicle, (byte)tableIndex, (byte)i), vehicleTable.tiers[i].chance,
+                            updateSlider: tierIndex != i);
+                    }
+                    break;
+                case SpawnType.Item:
+                    ItemTable itemTable = LevelItems.tables[tableIndex];
+                    itemTable.updateChance(tierIndex, chance);
+                    for (int i = 0; i < itemTable.tiers.Count; ++i)
+                    {
+                        SpawnTableUtil.SetSpawnTableTierChanceLocal(
+                            new SpawnTierIdentifier(SpawnType.Item, (byte)tableIndex, (byte)i), itemTable.tiers[i].chance,
+                            updateSlider: tierIndex != i);
+                    }
+                    break;
+                case SpawnType.Zombie:
+                    SpawnTableUtil.SetSpawnTableTierChanceLocal(identifier, chance, updateSlider: false);
+                    break;
+            }
+            return true;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(spawnType, tableIndex, out NetId64 tableNetId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnChanceUpdated), $"Unable to find NetId for zombie spawn table: {tableIndex.Format()}.");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+            return false;
+        }
+
+        NetId64 tierNetId;
+        bool shouldAllow;
+        SetSpawnTableTierChancesProperties properties;
+        if (identifier.Type == SpawnType.Zombie)
+        {
+            _chanceNetIds ??= new NetId64[16];
+            _newChances ??= new float[16];
+
+            if (!SpawnsNetIdDatabase.TryGetSpawnTierNetId(identifier, out tierNetId))
+            {
+                Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnChanceUpdated), $"Unable to find NetId for {identifier.Format()}.");
+                EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+                return false;
+            }
+
+            _chanceNetIds[0] = tableNetId;
+            _newChances[0] = chance;
+
+            properties = new SetSpawnTableTierChancesProperties(tableNetId, new ArraySegment<NetId64>(_chanceNetIds, 0, 1),
+                SpawnType.Zombie, new ArraySegment<float>(_newChances, 0, 1), CachedTime.DeltaTime);
+
+            shouldAllow = true;
+            ClientEvents.InvokeOnSetSpawnTableTierChancesRequested(in properties, ref shouldAllow);
+            if (!shouldAllow)
+                return false;
+
+            SpawnTableUtil.SetSpawnTableTierChanceLocal(identifier, chance, false);
+            ClientEvents.InvokeOnSetSpawnTableTierChances(in properties);
+            return true;
+        }
+
+        NetId64[]? netIds = _chanceNetIds;
+        float[]? oldChances = _oldChances;
+        float[]? newChances = _newChances;
+
+        int c = 0;
+        switch (spawnType)
+        {
+            case SpawnType.Animal:
+                AnimalTable animalTable = LevelAnimals.tables[tableIndex];
+                c = Math.Min(byte.MaxValue, animalTable.tiers.Count);
+                if (netIds == null || netIds.Length < c)
+                    _chanceNetIds = netIds = new NetId64[c];
+                if (oldChances == null || oldChances.Length < c)
+                    _oldChances = oldChances = new float[c];
+                if (newChances == null || newChances.Length < c)
+                    _newChances = newChances = new float[c];
+                for (int i = 0; i < c; ++i)
+                    oldChances[i] = animalTable.tiers[i].chance;
+                animalTable.updateChance(tierIndex, chance);
+                for (int i = 0; i < c; ++i)
+                {
+                    SpawnTierIdentifier tierIdentifier = new SpawnTierIdentifier(SpawnType.Animal, (byte)tableIndex, (byte)i);
+                    if (SpawnsNetIdDatabase.TryGetSpawnTierNetId(tierIdentifier, out tierNetId))
+                    {
+                        netIds[i] = tierNetId;
+                        newChances[i] = animalTable.tiers[i].chance;
+                        continue;
+                    }
+                    Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnChanceUpdated), $"Unable to find NetId for {tierIdentifier.Format()}.");
+                    EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+                    return false;
+                }
+                break;
+                
+            case SpawnType.Vehicle:
+                VehicleTable vehicleTable = LevelVehicles.tables[tableIndex];
+                c = Math.Min(byte.MaxValue, vehicleTable.tiers.Count);
+                if (netIds == null || netIds.Length < c)
+                    _chanceNetIds = netIds = new NetId64[c];
+                if (oldChances == null || oldChances.Length < c)
+                    _oldChances = oldChances = new float[c];
+                if (newChances == null || newChances.Length < c)
+                    _newChances = newChances = new float[c];
+                for (int i = 0; i < c; ++i)
+                    oldChances[i] = vehicleTable.tiers[i].chance;
+                vehicleTable.updateChance(tierIndex, chance);
+                for (int i = 0; i < c; ++i)
+                {
+                    SpawnTierIdentifier tierIdentifier = new SpawnTierIdentifier(SpawnType.Vehicle, (byte)tableIndex, (byte)i);
+                    if (SpawnsNetIdDatabase.TryGetSpawnTierNetId(tierIdentifier, out tierNetId))
+                    {
+                        netIds[i] = tierNetId;
+                        newChances[i] = vehicleTable.tiers[i].chance;
+                        continue;
+                    }
+                    Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnChanceUpdated), $"Unable to find NetId for {tierIdentifier.Format()}.");
+                    EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+                    return false;
+                }
+                break;
+                
+            case SpawnType.Item:
+                ItemTable itemTable = LevelItems.tables[tableIndex];
+                c = Math.Min(byte.MaxValue, itemTable.tiers.Count);
+                if (netIds == null || netIds.Length < c)
+                    _chanceNetIds = netIds = new NetId64[c];
+                if (oldChances == null || oldChances.Length < c)
+                    _oldChances = oldChances = new float[c];
+                if (newChances == null || newChances.Length < c)
+                    _newChances = newChances = new float[c];
+                for (int i = 0; i < c; ++i)
+                    oldChances[i] = itemTable.tiers[i].chance;
+                itemTable.updateChance(tierIndex, chance);
+                for (int i = 0; i < c; ++i)
+                {
+                    SpawnTierIdentifier tierIdentifier = new SpawnTierIdentifier(SpawnType.Item, (byte)tableIndex, (byte)i);
+                    if (SpawnsNetIdDatabase.TryGetSpawnTierNetId(tierIdentifier, out tierNetId))
+                    {
+                        netIds[i] = tierNetId;
+                        newChances[i] = itemTable.tiers[i].chance;
+                        continue;
+                    }
+                    Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnChanceUpdated), $"Unable to find NetId for {tierIdentifier.Format()}.");
+                    EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+                    return false;
+                }
+                break;
+        }
+
+        if (c == 0)
+            return false;
+
+        properties = new SetSpawnTableTierChancesProperties(tableNetId, new ArraySegment<NetId64>(netIds!, 0, c), spawnType, new ArraySegment<float>(newChances!, 0, c), CachedTime.DeltaTime);
+        shouldAllow = true;
+        ClientEvents.InvokeOnSetSpawnTableTierChancesRequested(in properties, ref shouldAllow);
+        if (!shouldAllow)
+        {
+            // rollback changes
+            switch (spawnType)
+            {
+                case SpawnType.Animal:
+                    AnimalTable animalTable = LevelAnimals.tables[tableIndex];
+                    for (int i = 0; i < c; ++i)
+                        animalTable.tiers[i].chance = oldChances![i];
+                    break;
+
+                case SpawnType.Vehicle:
+                    VehicleTable vehicleTable = LevelVehicles.tables[tableIndex];
+                    for (int i = 0; i < c; ++i)
+                        vehicleTable.tiers[i].chance = oldChances![i];
+                    break;
+
+                case SpawnType.Item:
+                    ItemTable itemTable = LevelItems.tables[tableIndex];
+                    for (int i = 0; i < c; ++i)
+                        itemTable.tiers[i].chance = oldChances![i];
+                    break;
+            }
+            return false;
+        }
+
+        switch (spawnType)
+        {
+            case SpawnType.Animal:
+                AnimalTable animalTable = LevelAnimals.tables[tableIndex];
+                for (int i = 0; i < c; ++i)
+                {
+                    SpawnTableUtil.SetSpawnTableTierChanceLocal(
+                        new SpawnTierIdentifier(SpawnType.Animal, (byte)tableIndex, (byte)i), animalTable.tiers[i].chance,
+                        updateSlider: tierIndex != i);
+                }
+                break;
+
+            case SpawnType.Vehicle:
+                VehicleTable vehicleTable = LevelVehicles.tables[tableIndex];
+                for (int i = 0; i < c; ++i)
+                {
+                    SpawnTableUtil.SetSpawnTableTierChanceLocal(
+                        new SpawnTierIdentifier(SpawnType.Vehicle, (byte)tableIndex, (byte)i), vehicleTable.tiers[i].chance,
+                        updateSlider: tierIndex != i);
+                }
+                break;
+
+            case SpawnType.Item:
+                ItemTable itemTable = LevelItems.tables[tableIndex];
+                for (int i = 0; i < c; ++i)
+                {
+                    SpawnTableUtil.SetSpawnTableTierChanceLocal(
+                        new SpawnTierIdentifier(SpawnType.Item, (byte)tableIndex, (byte)i), itemTable.tiers[i].chance,
+                        updateSlider: tierIndex != i);
+                }
+                break;
+        }
+        ClientEvents.InvokeOnSetSpawnTableTierChances(in properties);
+        return true;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onDraggedChanceSlider")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnAnimalChanceUpdated(ISleekSlider slider, float state)
+    {
+        if (GetAnimalTierButtons == null)
+            return false;
+
+        int tierIndex = Array.IndexOf(GetAnimalTierButtons(), slider);
+
+        if (!OnChanceUpdated(state, EditorSpawns.selectedAnimal, tierIndex, SpawnType.Animal))
+            slider.Value = LevelAnimals.tables[EditorSpawns.selectedAnimal].tiers[tierIndex].chance;
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsVehiclesUI), "onDraggedChanceSlider")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnVehicleChanceUpdated(ISleekSlider slider, float state)
+    {
+        if (GetVehicleTierButtons == null)
+            return false;
+
+        int tierIndex = Array.IndexOf(GetVehicleTierButtons(), slider);
+
+        if (!OnChanceUpdated(state, EditorSpawns.selectedVehicle, tierIndex, SpawnType.Vehicle))
+            slider.Value = LevelVehicles.tables[EditorSpawns.selectedVehicle].tiers[tierIndex].chance;
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onDraggedChanceSlider")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnItemChanceUpdated(ISleekSlider slider, float state)
+    {
+        if (GetItemTierButtons == null)
+            return false;
+
+        int tierIndex = Array.IndexOf(GetItemTierButtons(), slider);
+
+        if (!OnChanceUpdated(state, EditorSpawns.selectedItem, tierIndex, SpawnType.Item))
+            slider.Value = LevelItems.tables[EditorSpawns.selectedItem].tiers[tierIndex].chance;
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onDraggedChanceSlider")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnZombieChanceUpdated(ISleekSlider slider, float state)
+    {
+        if (GetZombieTierButtons == null)
+            return false;
+
+        int tierIndex = Array.IndexOf(GetZombieTierButtons(), slider);
+
+        if (!OnChanceUpdated(state, EditorSpawns.selectedZombie, tierIndex, SpawnType.Zombie))
+            slider.Value = LevelZombies.tables[EditorSpawns.selectedZombie].slots[tierIndex].chance;
+
+        return false;
+    }
+    #endregion
+
     private static IEnumerable<CodeInstruction> TranspileOnClickedPlayersButton(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
         List<CodeInstruction> ins = [..instructions];

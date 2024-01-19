@@ -21,9 +21,22 @@
       "description": "Adds extra debug logging from DevkitServer. Helps with diagnosing problems but could lower performance.",
       "type": "boolean"
     },
+    "hide_map_name": {
+      "description": "Force connecting users to hide their current map name from steam friends list, Discord rich presence, and the server list. Note that plugins can override this behavior relatively easily.",
+      "type": "boolean"
+    },
     "walmart_pc_support": {
       "description": "Removes cosmetic improvements.",
       "type": "boolean"
+    },
+    "max_password_attempts": {
+      "description": "Maximum number of failed passwords before the connecting user gets put on a join cooldown. 0 or -1 = infinite.",
+      "type": "integer",
+      "minimum": -1
+    },
+    "wrong_password_block_expire_seconds": {
+      "description": "Number of seconds after hitting the max password attempts that it'll reset.",
+      "type": "number"
     },
     "new_level_info": {
       "description": "Options for newly created maps.",
@@ -51,7 +64,7 @@
       "type": "boolean"
     },
     "admins_are_superusers": {
-      "description": "Admins (given with the vanilla /admin command) are treated as having the '*' permission which gives them all permissions.",
+      "description": "Admins ('blue hammers', given with the vanilla /admin command) are treated as having the '*' permission which gives them all permissions.",
       "type": "boolean"
     },
     "default_permissions": {

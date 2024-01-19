@@ -845,7 +845,7 @@ public static class FormattingUtil
         }
         if (obj is IAssetReference assetReference)
         {
-            if (Assets.find(assetReference.GUID) is { } asset2)
+            if (DevkitServerModule.IsMainThread && Assets.find(assetReference.GUID) is { } asset2)
                 obj = asset2;
             else
                 return ("{" + assetReference.GUID.ToString("N") + "}").Colorize(FormatProvider.StackCleaner.Configuration.Colors!.StructColor);

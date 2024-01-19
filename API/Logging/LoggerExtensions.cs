@@ -1,4 +1,5 @@
-﻿using StackCleaner;
+﻿using System.Diagnostics;
+using StackCleaner;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
@@ -123,6 +124,114 @@ public static class LoggerExtensions
     public static void LogDebug(this IDevkitServerLogger logger, ILogSource source, Exception exception, ConsoleColor baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, null, exception, FormattingUtil.ToArgbRepresentation(baseColor));
     public static void LogDebug(this IDevkitServerLogger logger, string source, Exception exception, ReadOnlySpan<char> message, ConsoleColor baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, exception, FormattingUtil.ToArgbRepresentation(baseColor));
     public static void LogDebug(this IDevkitServerLogger logger, ILogSource source, Exception exception, ReadOnlySpan<char> message, ConsoleColor baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, exception, FormattingUtil.ToArgbRepresentation(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, string source, ReadOnlySpan<char> message) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, null, DefaultDebugColor);
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, ILogSource source, ReadOnlySpan<char> message) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, null, DefaultDebugColor);
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerSourceLogger logger, ReadOnlySpan<char> message) => logger.AddLog(Logger.Terminal, logger, Severity.Debug, message, null, DefaultDebugColor);
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerSourceLogger logger, Exception exception) => logger.AddLog(Logger.Terminal, logger, Severity.Debug, null, exception, DefaultDebugColor);
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerSourceLogger logger, Exception exception, ReadOnlySpan<char> message) => logger.AddLog(Logger.Terminal, logger, Severity.Debug, message, exception, DefaultDebugColor);
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, string source, Exception exception) => logger.AddLog(Logger.Terminal, source, Severity.Debug, null, exception, DefaultDebugColor);
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, ILogSource source, Exception exception) => logger.AddLog(Logger.Terminal, source, Severity.Debug, null, exception, DefaultDebugColor);
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, string source, Exception exception, ReadOnlySpan<char> message) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, exception, DefaultDebugColor);
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, ILogSource source, Exception exception, ReadOnlySpan<char> message) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, exception, DefaultDebugColor);
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, string source, ReadOnlySpan<char> message, Color32 baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, null, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, ILogSource source, ReadOnlySpan<char> message, Color32 baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, null, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerSourceLogger logger, ReadOnlySpan<char> message, Color32 baseColor) => logger.AddLog(Logger.Terminal, logger, Severity.Debug, message, null, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerSourceLogger logger, Exception exception, Color32 baseColor) => logger.AddLog(Logger.Terminal, logger, Severity.Debug, null, exception, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerSourceLogger logger, Exception exception, ReadOnlySpan<char> message, Color32 baseColor) => logger.AddLog(Logger.Terminal, logger, Severity.Debug, message, exception, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, string source, Exception exception, Color32 baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, null, exception, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, ILogSource source, Exception exception, Color32 baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, null, exception, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, string source, Exception exception, ReadOnlySpan<char> message, Color32 baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, exception, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, ILogSource source, Exception exception, ReadOnlySpan<char> message, Color32 baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, exception, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, string source, ReadOnlySpan<char> message, Color baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, null, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, ILogSource source, ReadOnlySpan<char> message, Color baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, null, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerSourceLogger logger, ReadOnlySpan<char> message, Color baseColor) => logger.AddLog(Logger.Terminal, logger, Severity.Debug, message, null, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerSourceLogger logger, Exception exception, Color baseColor) => logger.AddLog(Logger.Terminal, logger, Severity.Debug, null, exception, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerSourceLogger logger, Exception exception, ReadOnlySpan<char> message, Color baseColor) => logger.AddLog(Logger.Terminal, logger, Severity.Debug, message, exception, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, string source, Exception exception, Color baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, null, exception, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, ILogSource source, Exception exception, Color baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, null, exception, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, string source, Exception exception, ReadOnlySpan<char> message, Color baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, exception, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, ILogSource source, Exception exception, ReadOnlySpan<char> message, Color baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, exception, FormattingUtil.ToArgb(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, string source, ReadOnlySpan<char> message, ConsoleColor baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, null, FormattingUtil.ToArgbRepresentation(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, ILogSource source, ReadOnlySpan<char> message, ConsoleColor baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, null, FormattingUtil.ToArgbRepresentation(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerSourceLogger logger, ReadOnlySpan<char> message, ConsoleColor baseColor) => logger.AddLog(Logger.Terminal, logger, Severity.Debug, message, null, FormattingUtil.ToArgbRepresentation(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerSourceLogger logger, Exception exception, ConsoleColor baseColor) => logger.AddLog(Logger.Terminal, logger, Severity.Debug, null, exception, FormattingUtil.ToArgbRepresentation(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerSourceLogger logger, Exception exception, ReadOnlySpan<char> message, ConsoleColor baseColor) => logger.AddLog(Logger.Terminal, logger, Severity.Debug, message, exception, FormattingUtil.ToArgbRepresentation(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, string source, Exception exception, ConsoleColor baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, null, exception, FormattingUtil.ToArgbRepresentation(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, ILogSource source, Exception exception, ConsoleColor baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, null, exception, FormattingUtil.ToArgbRepresentation(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, string source, Exception exception, ReadOnlySpan<char> message, ConsoleColor baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, exception, FormattingUtil.ToArgbRepresentation(baseColor));
+    /// <summary>Only logs with the 'DEBUG' flag present.</summary>
+    [Conditional("DEBUG")]
+    public static void LogConditional(this IDevkitServerLogger logger, ILogSource source, Exception exception, ReadOnlySpan<char> message, ConsoleColor baseColor) => logger.AddLog(Logger.Terminal, source, Severity.Debug, message, exception, FormattingUtil.ToArgbRepresentation(baseColor));
     public static void LogInfo(this IDevkitServerLogger logger, string source, ReadOnlySpan<char> message) => logger.AddLog(Logger.Terminal, source, Severity.Info, message, null, DefaultInfoColor);
     public static void LogInfo(this IDevkitServerLogger logger, ILogSource source, ReadOnlySpan<char> message) => logger.AddLog(Logger.Terminal, source, Severity.Info, message, null, DefaultInfoColor);
     public static void LogInfo(this IDevkitServerSourceLogger logger, ReadOnlySpan<char> message) => logger.AddLog(Logger.Terminal, logger, Severity.Info, message, null, DefaultInfoColor);

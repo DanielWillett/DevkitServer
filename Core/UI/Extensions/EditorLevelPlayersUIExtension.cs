@@ -1,4 +1,5 @@
 ﻿#if CLIENT
+using DevkitServer.API.Devkit.Spawns;
 using DevkitServer.API.UI.Extensions;
 using DevkitServer.API.UI.Extensions.Members;
 
@@ -13,7 +14,7 @@ internal class EditorLevelPlayersUIExtension : BaseEditorSpawnsUIExtension<Playe
         get => LevelVisibility.playersVisible;
         set => LevelVisibility.playersVisible = value;
     }
-    public EditorLevelPlayersUIExtension() : base(new Vector3(0f, 3f, 0f), 20f, 120f)
+    public EditorLevelPlayersUIExtension() : base(new Vector3(0f, 3f, 0f), 20f, 120f, SpawnType.Player)
     {
         if (AlternateToggle != null)
             AlternateToggle.PositionOffset_Y = -40;

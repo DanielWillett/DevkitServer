@@ -18,10 +18,10 @@ public sealed class NetIdJsonConverter : JsonConverter<NetId>
                 throw new JsonException("Failed to parse number as a NetID (UInt32 format).");
 
             case JsonTokenType.String:
-                string str = reader.GetString()!;
+                ReadOnlySpan<char> str = reader.GetString()!;
 
                 if (str.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
-                    str = str.Substring(2);
+                    str = str[2..];
 
                 if (uint.TryParse(str, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out value))
                     return new NetId(value);
@@ -52,7 +52,7 @@ public sealed class NetIdJsonConverter : JsonConverter<NetId>
                                     str = reader.GetString()!;
 
                                     if (str.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
-                                        str = str.Substring(2);
+                                        str = str[2..];
 
                                     if (uint.TryParse(str, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out value))
                                         return new NetId(value);

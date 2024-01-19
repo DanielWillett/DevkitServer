@@ -590,7 +590,7 @@ public class CommandHandler : ICommandHandler, IDisposable
                     dir = file.CommandName;
                 string basePath = command.Plugin == null ? DevkitServerConfig.CommandLocalizationFilePath : command.Plugin.LocalizationDirectory;
                 dir = Path.Combine(basePath, dir);
-                Local lcl = Localization.tryRead(dir, false);
+                Local lcl = DevkitServerUtility.ReadLocalFromFileOrFolder(dir, out string? primaryWritePath, out string? englishWritePath);
                 LocalDatDictionary def = file.DefaultTranslations;
                 if (def == null)
                     command.LogError("No default translations provided.");
@@ -598,7 +598,7 @@ public class CommandHandler : ICommandHandler, IDisposable
                 {
                     try
                     {
-                        DevkitServerUtility.UpdateLocalizationFile(ref lcl, def, dir);
+                        DevkitServerUtility.UpdateLocalizationFile(ref lcl, def, dir, primaryWritePath, englishWritePath);
                     }
                     catch (Exception ex)
                     {

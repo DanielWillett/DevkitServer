@@ -1,5 +1,4 @@
 ﻿using DevkitServer.API;
-using DevkitServer.API.Logging;
 using DevkitServer.Core.Logging.Loggers;
 using DevkitServer.Plugins;
 using SDG.Framework.Modules;
@@ -68,15 +67,21 @@ public class ModulePlugin : CoreLogger, IDevkitServerColorPlugin
         string cmdLocalDir = Path.Combine(LocalizationDirectory, "Commands");
         CommandLocalizationDirectory = Directory.Exists(cmdLocalDir) ? cmdLocalDir : dir;
 
-        if (File.Exists(Path.Combine(LocalizationDirectory, "English.dat")) || File.Exists(Path.Combine(LocalizationDirectory, Provider.language + ".dat")))
+        if (File.Exists(Path.Combine(LocalizationDirectory, "English.dat")) || File.Exists(LocalizationDirectory + ".dat") || File.Exists(Path.Combine(LocalizationDirectory, Provider.language + ".dat")))
         {
-            Translations = Localization.tryRead(LocalizationDirectory, false);
+            Translations = DevkitServerUtility.ReadLocalFromFileOrFolder(LocalizationDirectory, out _, out _);
         }
         else if (!LocalizationDirectory.Equals(DataDirectory, StringComparison.Ordinal) &&
-                 (File.Exists(Path.Combine(DataDirectory, "English.dat")) || File.Exists(Path.Combine(DataDirectory, Provider.language + ".dat"))))
+                 (File.Exists(Path.Combine(DataDirectory, "English.dat")) || File.Exists(DataDirectory + ".dat") || File.Exists(Path.Combine(DataDirectory, Provider.language + ".dat"))))
         {
-            Translations = Localization.tryRead(DataDirectory, false);
+            Translations = DevkitServerUtility.ReadLocalFromFileOrFolder(DataDirectory, out _, out _);
             LocalizationDirectory = DataDirectory;
+        }
+        else if (!dir.Equals(DataDirectory, StringComparison.Ordinal) &&
+                 (File.Exists(Path.Combine(dir, "English.dat")) || File.Exists(Path.Combine(dir, Provider.language + ".dat"))))
+        {
+            Translations = DevkitServerUtility.ReadLocalFromFileOrFolder(dir, out _, out _);
+            LocalizationDirectory = dir;
         }
         else Translations = new Local();
     }
@@ -91,7 +96,12 @@ public class ModulePlugin : CoreLogger, IDevkitServerColorPlugin
             {
                 { "Name", Module.config.Name }
             },
-            LocalizationDirectory);
+            LocalizationDirectory, Directory.Exists(LocalizationDirectory)
+                ? Path.Combine(LocalizationDirectory, Provider.language + ".dat")
+                : LocalizationDirectory + ".dat",
+            Directory.Exists(LocalizationDirectory)
+                ? Path.Combine(LocalizationDirectory, "English.dat")
+                : LocalizationDirectory + ".dat");
 
         Translations = lcl;
         if (Translations.has("Name"))

@@ -16,8 +16,9 @@ public static class DevkitServerUtility
 {
     private static int? _maxTextureSize;
     public static int MaxTextureDimensionSize => _maxTextureSize ??= Math.Min(16384, SystemInfo.maxTextureSize);
+    public static bool LanguageIsEnglish => Provider.language.Length > 0 && Provider.language[0] == 'E' && Provider.language.Equals("English", StringComparison.Ordinal);
     [Pure]
-    public static Bounds InflateBounds(in Bounds bounds)
+    public static Bounds InflateBounds(ref Bounds bounds)
     {
         Vector3 c = bounds.center;
         Vector3 e = bounds.extents;
@@ -32,7 +33,7 @@ public static class DevkitServerUtility
     [Pure]
     public static Vector3 ToVector3(this in Vector2 v2, float y) => new Vector3(v2.x, y, v2.y);
     [Pure]
-    public static float SqrDist2D(this Vector3 v1, Vector3 v2)
+    public static float SqrDist2D(this in Vector3 v1, in Vector3 v2)
     {
         float x = v1.x - v2.x, z = v1.z - v2.z;
         return x * x + z * z;
@@ -510,11 +511,47 @@ public static class DevkitServerUtility
         }
         writer.Flush();
     }
+    public static Local ReadLocalFromFileOrFolder(string filePath, out string? primaryWritePath, out string? englishWritePath)
+    {
+        filePath = Path.GetFullPath(filePath);
+
+        if (Directory.Exists(filePath))
+        {
+            englishWritePath = Path.Combine(filePath, "English.dat");
+
+            if (!File.Exists(englishWritePath))
+                englishWritePath = null;
+
+            if (!LanguageIsEnglish)
+            {
+                primaryWritePath = Path.Combine(filePath, Provider.language + ".dat");
+                if (!File.Exists(primaryWritePath))
+                    primaryWritePath = null;
+            }
+            else
+                primaryWritePath = englishWritePath;
+
+            return Localization.tryRead(filePath, false);
+        }
+
+        string datFile = filePath + ".dat";
+        if (!File.Exists(datFile))
+        {
+            englishWritePath = null;
+            primaryWritePath = null;
+            return new Local();
+        }
+
+        englishWritePath = datFile;
+        primaryWritePath = LanguageIsEnglish ? datFile : null;
+
+        return Localization.read(datFile);
+    }
     [Pure]
     public static unsafe bool UserSteam64(this ulong s64) => ((CSteamID*)&s64)->GetEAccountType() == EAccountType.k_EAccountTypeIndividual;
     [Pure]
     public static bool UserSteam64(this CSteamID s64) => s64.GetEAccountType() == EAccountType.k_EAccountTypeIndividual;
-    public static void UpdateLocalizationFile(ref Local read, LocalDatDictionary @default, string directory)
+    public static void UpdateLocalizationFile(ref Local read, LocalDatDictionary @default, string directory, string? primaryPath, string? englishPath)
     {
         DatDictionary @new = new DatDictionary();
         DatDictionary def2 = new DatDictionary();
@@ -525,26 +562,40 @@ public static class DevkitServerUtility
         }
 
         read = new Local(@new, def2);
-        string path = Path.Combine(directory, "English.dat");
-        bool eng = Provider.language.Equals("English", StringComparison.InvariantCultureIgnoreCase);
-        if (!File.Exists(path))
+        bool eng = LanguageIsEnglish;
+        if (Directory.Exists(directory))
         {
-            WriteData(path, eng ? @new : def2);
-            if (eng) return;
+            if (englishPath != null && !File.Exists(englishPath))
+            {
+                WriteData(englishPath, eng ? @new : def2);
+                if (eng) return;
+            }
+
+            if (!eng && primaryPath != null)
+                WriteData(primaryPath, @new);
+            else if (eng && englishPath != null)
+                WriteData(englishPath, @new);
+            return;
         }
 
-        path = Path.Combine(directory, Provider.language + ".dat");
-        WriteData(path, @new);
+        if (eng && englishPath != null)
+            WriteData(englishPath, @new);
+        else if (primaryPath != null && !File.Exists(primaryPath))
+            WriteData(primaryPath, eng ? @new : def2);
     }
     private const string NullValue = "null";
     [Pure]
     public static string Translate(this Local local, string format) => local.format(format);
+
     [Pure]
     public static string Translate(this Local local, string format, object? arg0) => local.format(format, arg0 ?? NullValue);
+
     [Pure]
     public static string Translate(this Local local, string format, object? arg0, object? arg1) => local.format(format, arg0 ?? NullValue, arg1 ?? NullValue);
+
     [Pure]
     public static string Translate(this Local local, string format, object? arg0, object? arg1, object? arg2) => local.format(format, arg0 ?? NullValue, arg1 ?? NullValue, arg2 ?? NullValue);
+    
     [Pure]
     public static string Translate(this Local local, string format, params object?[] args)
     {
@@ -878,7 +929,7 @@ public static class DevkitServerUtility
     /// <summary>
     /// Converts a list to a <see cref="ReadOnlySpan{T}"/> without copying the data.
     /// </summary>
-    public static ReadOnlySpan<T> ToSpan<T>(this List<T> list)
+    public static Span<T> ToSpan<T>(this List<T> list)
     {
         if (list.Count == 0)
             return default;

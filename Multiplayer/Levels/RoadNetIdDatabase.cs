@@ -391,7 +391,7 @@ public sealed class RoadNetIdDatabase : IReplicatedLevelDataSource<RoadNetIdRepl
         }
     }
 #elif SERVER       
-    public RoadNetIdReplicatedLevelData SaveData()
+    public RoadNetIdReplicatedLevelData SaveData(CSteamID user)
     {
         RoadNetIdReplicatedLevelData data = new RoadNetIdReplicatedLevelData();
         int vertexCount = Math.Min(int.MaxValue - ushort.MaxValue, VertexAssignments.Count);

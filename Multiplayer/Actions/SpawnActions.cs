@@ -17,7 +17,7 @@ public class SpawnActions
 #if CLIENT
         if (EditorActions.IsOwner)
         {
-            
+
         }
 #endif
     }

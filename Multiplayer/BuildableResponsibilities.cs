@@ -306,7 +306,7 @@ public sealed class BuildableResponsibilities : IReplicatedLevelDataSource<Build
         }
     }
 #elif SERVER
-    public BuildableResponsibilitiesReplicatedLevelData SaveData()
+    public BuildableResponsibilitiesReplicatedLevelData SaveData(CSteamID user)
     {
         int worldSize = Regions.WORLD_SIZE;
         List<ulong>[,] data = new List<ulong>[worldSize, worldSize];

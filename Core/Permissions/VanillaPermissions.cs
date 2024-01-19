@@ -1,4 +1,5 @@
-﻿using DevkitServer.API.Permissions;
+﻿using DevkitServer.API.Devkit.Spawns;
+using DevkitServer.API.Permissions;
 
 namespace DevkitServer.Core.Permissions;
 /// <summary>
@@ -45,10 +46,12 @@ public static class VanillaPermissions
     public static readonly PermissionLeaf SpawnTablesItemEdit       = new PermissionLeaf("level.spawntables.item.edit", core: true);
     public static readonly PermissionLeaf SpawnTablesItemAdd        = new PermissionLeaf("level.spawntables.item.edit", core: true);
     public static readonly PermissionLeaf SpawnTablesItemDelete     = new PermissionLeaf("level.spawntables.item.edit", core: true);
-
+    
+    public static readonly PermissionLeaf SpawnsAnimalEdit          = new PermissionLeaf("level.spawns.animal.edit", core: true);
     public static readonly PermissionLeaf SpawnsAnimalMove          = new PermissionLeaf("level.spawns.animal.move", core: true);
     public static readonly PermissionLeaf SpawnsAnimalAdd           = new PermissionLeaf("level.spawns.animal.add", core: true);
     public static readonly PermissionLeaf SpawnsAnimalDelete        = new PermissionLeaf("level.spawns.animal.delete", core: true);
+    public static readonly PermissionLeaf SpawnsVehicleEdit         = new PermissionLeaf("level.spawns.vehicle.edit", core: true);
     public static readonly PermissionLeaf SpawnsVehicleMove         = new PermissionLeaf("level.spawns.vehicle.move", core: true);
     public static readonly PermissionLeaf SpawnsVehicleAdd          = new PermissionLeaf("level.spawns.vehicle.add", core: true);
     public static readonly PermissionLeaf SpawnsVehicleDelete       = new PermissionLeaf("level.spawns.vehicle.delete", core: true);
@@ -56,12 +59,106 @@ public static class VanillaPermissions
     public static readonly PermissionLeaf SpawnsPlayerMove          = new PermissionLeaf("level.spawns.player.move", core: true);
     public static readonly PermissionLeaf SpawnsPlayerAdd           = new PermissionLeaf("level.spawns.player.add", core: true);
     public static readonly PermissionLeaf SpawnsPlayerDelete        = new PermissionLeaf("level.spawns.player.delete", core: true);
+    public static readonly PermissionLeaf SpawnsItemEdit            = new PermissionLeaf("level.spawns.item.edit", core: true);
     public static readonly PermissionLeaf SpawnsItemMove            = new PermissionLeaf("level.spawns.item.move", core: true);
     public static readonly PermissionLeaf SpawnsItemAdd             = new PermissionLeaf("level.spawns.item.add", core: true);
     public static readonly PermissionLeaf SpawnsItemDelete          = new PermissionLeaf("level.spawns.item.delete", core: true);
+    public static readonly PermissionLeaf SpawnsZombieEdit          = new PermissionLeaf("level.spawns.zombie.edit", core: true);
     public static readonly PermissionLeaf SpawnsZombieMove          = new PermissionLeaf("level.spawns.zombie.move", core: true);
     public static readonly PermissionLeaf SpawnsZombieAdd           = new PermissionLeaf("level.spawns.zombie.add", core: true);
     public static readonly PermissionLeaf SpawnsZombieDelete        = new PermissionLeaf("level.spawns.zombie.delete", core: true);
+
+    public static ref readonly PermissionLeaf SpawnTablesEdit(SpawnType spawnType)
+    {
+        if (spawnType == SpawnType.Animal)
+            return ref SpawnTablesAnimalEdit;
+        if (spawnType == SpawnType.Vehicle)
+            return ref SpawnTablesVehicleEdit;
+        if (spawnType == SpawnType.Item)
+            return ref SpawnTablesItemEdit;
+        if (spawnType == SpawnType.Zombie)
+            return ref SpawnTablesZombieEdit;
+
+        return ref PermissionLeaf.Nil;
+    }
+    public static ref readonly PermissionLeaf SpawnTablesAdd(SpawnType spawnType)
+    {
+        if (spawnType == SpawnType.Animal)
+            return ref SpawnTablesAnimalAdd;
+        if (spawnType == SpawnType.Vehicle)
+            return ref SpawnTablesVehicleAdd;
+        if (spawnType == SpawnType.Item)
+            return ref SpawnTablesItemAdd;
+        if (spawnType == SpawnType.Zombie)
+            return ref SpawnTablesZombieAdd;
+
+        return ref PermissionLeaf.Nil;
+    }
+    public static ref readonly PermissionLeaf SpawnTablesDelete(SpawnType spawnType)
+    {
+        if (spawnType == SpawnType.Animal)
+            return ref SpawnTablesAnimalDelete;
+        if (spawnType == SpawnType.Vehicle)
+            return ref SpawnTablesVehicleDelete;
+        if (spawnType == SpawnType.Item)
+            return ref SpawnTablesItemDelete;
+        if (spawnType == SpawnType.Zombie)
+            return ref SpawnTablesZombieDelete;
+
+        return ref PermissionLeaf.Nil;
+    }
+    public static ref readonly PermissionLeaf SpawnsEdit(SpawnType spawnType)
+    {
+        if (spawnType == SpawnType.Animal)
+            return ref SpawnsAnimalEdit;
+        if (spawnType == SpawnType.Vehicle)
+            return ref SpawnsVehicleEdit;
+        if (spawnType == SpawnType.Item)
+            return ref SpawnsItemEdit;
+        if (spawnType == SpawnType.Zombie)
+            return ref SpawnsZombieEdit;
+
+        return ref PermissionLeaf.Nil;
+    }
+    public static ref readonly PermissionLeaf SpawnsMove(SpawnType spawnType)
+    {
+        if (spawnType == SpawnType.Animal)
+            return ref SpawnsAnimalMove;
+        if (spawnType == SpawnType.Vehicle)
+            return ref SpawnsVehicleMove;
+        if (spawnType == SpawnType.Item)
+            return ref SpawnsItemMove;
+        if (spawnType == SpawnType.Zombie)
+            return ref SpawnsZombieMove;
+
+        return ref PermissionLeaf.Nil;
+    }
+    public static ref readonly PermissionLeaf SpawnsAdd(SpawnType spawnType)
+    {
+        if (spawnType == SpawnType.Animal)
+            return ref SpawnsAnimalAdd;
+        if (spawnType == SpawnType.Vehicle)
+            return ref SpawnsVehicleAdd;
+        if (spawnType == SpawnType.Item)
+            return ref SpawnsItemAdd;
+        if (spawnType == SpawnType.Zombie)
+            return ref SpawnsZombieAdd;
+
+        return ref PermissionLeaf.Nil;
+    }
+    public static ref readonly PermissionLeaf SpawnsDelete(SpawnType spawnType)
+    {
+        if (spawnType == SpawnType.Animal)
+            return ref SpawnsAnimalDelete;
+        if (spawnType == SpawnType.Vehicle)
+            return ref SpawnsVehicleDelete;
+        if (spawnType == SpawnType.Item)
+            return ref SpawnsItemDelete;
+        if (spawnType == SpawnType.Zombie)
+            return ref SpawnsZombieDelete;
+
+        return ref PermissionLeaf.Nil;
+    }
 
     public static PermissionLeaf GetNodeVolumePlace(Type type)
     {

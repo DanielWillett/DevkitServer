@@ -12,10 +12,10 @@ public readonly struct NetId64(ulong id) : IEquatable<NetId64>, IComparable<NetI
     public int CompareTo(NetId64 other) => Id.CompareTo(other.Id);
     public override bool Equals(object? obj) => obj is NetId64 netId && unchecked( (long)Id == (long)netId.Id );
     public override int GetHashCode() => Id.GetHashCode();
-    public string ToString(string format, IFormatProvider formatProvider) => Id.ToString(format ?? "X8", formatProvider);
-    public string ToString(string format) => Id.ToString(format ?? "X8");
-    public string ToString(IFormatProvider formatProvider) => Id.ToString("X8", formatProvider);
-    public override string ToString() => Id.ToString("X8");
+    public string ToString(string format, IFormatProvider formatProvider) => Id.ToString(format ?? "X16", formatProvider);
+    public string ToString(string format) => Id.ToString(format ?? "X16");
+    public string ToString(IFormatProvider formatProvider) => Id.ToString("X16", formatProvider);
+    public override string ToString() => Id.ToString("X16");
     public static bool operator ==(NetId64 lhs, NetId64 rhs) => unchecked( (long)lhs.Id == (long)rhs.Id );
     public static bool operator !=(NetId64 lhs, NetId64 rhs) => unchecked( (long)lhs.Id != (long)rhs.Id );
     public static NetId64 operator +(NetId64 lhs, NetId64 rhs) => new NetId64(lhs.Id + rhs.Id);

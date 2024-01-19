@@ -2,6 +2,7 @@
 
 namespace DevkitServer.API;
 
+
 /// <summary>
 /// Define a generic priority for a member.
 /// </summary>
@@ -33,6 +34,7 @@ public sealed class IgnoreAttribute : Attribute;
 /// Identifies which plugin a member belongs to.
 /// </summary>
 [AttributeUsage(AttributeTargets.All, Inherited = false)]
+[BaseTypeRequired(typeof(IDevkitServerPlugin))]
 public class PluginIdentifierAttribute : Attribute
 {
     public Type? PluginType { get; set; }
@@ -51,6 +53,7 @@ public class PluginIdentifierAttribute : Attribute
 /// </summary>
 /// <remarks>A permission prefix is the value that goes in front of permissions for a plugin. Used in <see cref="PermissionLeaf"/> and <see cref="PermissionBranch"/>.</remarks>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Assembly, Inherited = false)]
+[BaseTypeRequired(typeof(IDevkitServerPlugin))]
 public sealed class PermissionPrefixAttribute : Attribute
 {
     /// <summary>

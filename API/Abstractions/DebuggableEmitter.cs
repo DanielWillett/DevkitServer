@@ -1,5 +1,4 @@
-﻿using DevkitServer.API.Logging;
-using HarmonyLib;
+﻿using HarmonyLib;
 using System.Diagnostics.SymbolStore;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -16,6 +15,10 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     private bool _lastWasPrefix;
     private string _prefix = string.Empty;
     private string? _logSource;
+    private StackTracker? _stackTracker;
+    private List<CodeInstruction>? _stackTrackerLog;
+    private ExceptionBlockType? _nextExceptionBlockType;
+    private Label? _nextLabel;
     string ILogSource.Source => LogSource ?? "EMIT";
     bool? ILogSource.GetExplicitVisibilitySetting(Severity severity) => true;
 
@@ -121,6 +124,18 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
             PatchUtil.LoadConstantI4(this, (int)ConsoleColor.DarkRed);
             Generator.Emit(Accessor.LogDebug.GetCallRuntime(), Accessor.LogDebug);
         }
+        if (DebugLog || Breakpointing)
+        {
+            if (IsTranspileMode)
+            {
+                _stackTracker = new StackTracker(TranspileInstructions!, Method);
+            }
+            else
+            {
+                _stackTrackerLog = new List<CodeInstruction>();
+                _stackTracker = new StackTracker(_stackTrackerLog, Method);
+            }
+        }
         _init = true;
     }
 
@@ -154,6 +169,8 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
         --LogIndent;
         if (DebugLog || Breakpointing)
         {
+            CheckInit();
+            _nextExceptionBlockType = ExceptionBlockType.BeginCatchBlock;
             Log("}");
             Log(".catch (" + exceptionType.Format() + ") {");
         }
@@ -172,7 +189,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void BeginExceptFilterBlock()
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _nextExceptionBlockType = ExceptionBlockType.BeginExceptFilterBlock;
             Log(".try (filter) {");
+        }
         ++LogIndent;
         if (IsTranspileMode)
         {
@@ -188,7 +209,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void BeginExceptionBlock()
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _nextExceptionBlockType = ExceptionBlockType.BeginExceptionBlock;
             Log(".try {");
+        }
         ++LogIndent;
         if (IsTranspileMode)
         {
@@ -204,7 +229,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void BeginFaultBlock()
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _nextExceptionBlockType = ExceptionBlockType.BeginFaultBlock;
             Log(".fault {");
+        }
         ++LogIndent;
         if (IsTranspileMode)
         {
@@ -222,6 +251,8 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
         --LogIndent;
         if (DebugLog || Breakpointing)
         {
+            CheckInit();
+            _nextExceptionBlockType = ExceptionBlockType.BeginFinallyBlock;
             Log("}");
             Log(".finally {");
         }
@@ -240,11 +271,13 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void BeginScope()
     {
         if (IsTranspileMode)
-        {
             throw new NotSupportedException("Scope blocks are not supported in Transpile mode.");
-        }
+
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
             Log(".scope {");
+        }
         ++LogIndent;
 
         Generator.BeginScope();
@@ -256,7 +289,10 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     {
         LocalBuilder lcl = Generator.DeclareLocal(localType, pinned);
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
             Log("// Declared local: # " + lcl.LocalIndex.Format() + " " + (lcl.LocalType ?? localType).Format() + " (Pinned: " + lcl.IsPinned.Format() + ")");
+        }
         return lcl;
     }
     /// <inheritdoc />
@@ -264,14 +300,21 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     {
         Label lbl = Generator.DefineLabel();
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
             Log("// Defined label: " + lbl.Format());
+        }
         return lbl;
     }
     /// <inheritdoc />
     public void Emit(OpCode opcode)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode)));
             Log(opcode, null);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode));
@@ -286,7 +329,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, byte arg)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, arg)));
             Log(opcode, arg);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, arg));
@@ -301,7 +348,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, double arg)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, arg)));
             Log(opcode, arg);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, arg));
@@ -316,7 +367,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, float arg)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, arg)));
             Log(opcode, arg);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, arg));
@@ -331,7 +386,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, int arg)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, arg)));
             Log(opcode, arg);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, arg));
@@ -346,7 +405,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, long arg)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, arg)));
             Log(opcode, arg);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, arg));
@@ -361,7 +424,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, sbyte arg)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, arg)));
             Log(opcode, arg);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, arg));
@@ -376,7 +443,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, short arg)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, arg)));
             Log(opcode, arg);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, arg));
@@ -391,7 +462,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, string str)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, str)));
             Log(opcode, str);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, str));
@@ -406,7 +481,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, ConstructorInfo con)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, con)));
             Log(opcode, con);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, con));
@@ -421,7 +500,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, Label label)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, label)));
             Log(opcode, label);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, label));
@@ -436,7 +519,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, Label[] labels)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, labels)));
             Log(opcode, labels);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, labels));
@@ -451,7 +538,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, LocalBuilder local)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, local)));
             Log(opcode, local);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, local));
@@ -466,7 +557,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, SignatureHelper signature)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, signature)));
             Log(opcode, signature);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, signature));
@@ -481,7 +576,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, FieldInfo field)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, field)));
             Log(opcode, field);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, field));
@@ -496,7 +595,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, MethodInfo meth)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, meth)));
             Log(opcode, meth);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, meth));
@@ -511,7 +614,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void Emit(OpCode opcode, Type cls)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, cls)));
             Log(opcode, cls);
+        }
         if (IsTranspileMode)
         {
             TranspileInstructions!.Insert(Index, new CodeInstruction(opcode, cls));
@@ -530,7 +637,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
             throw new NotSupportedException("EmitCall is not supported in Transpile mode.");
         }
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode, methodInfo)));
             Log(opcode, methodInfo);
+        }
 
         Generator.EmitCall(opcode, methodInfo, optionalParameterTypes);
     }
@@ -542,7 +653,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
             throw new NotSupportedException("EmitCalli is not supported in Transpile mode.");
         }
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode)));
             Log(opcode, null);
+        }
 
         Generator.EmitCalli(opcode, callingConvention, returnType, parameterTypes, optionalParameterTypes);
     }
@@ -554,7 +669,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
             throw new NotSupportedException("EmitCalli is not supported in Transpile mode.");
         }
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _stackTrackerLog?.Add(CheckBlock(new CodeInstruction(opcode)));
             Log(opcode, null);
+        }
 
         Generator.EmitCalli(opcode, unmanagedCallConv, returnType, parameterTypes);
     }
@@ -566,7 +685,10 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
             throw new NotSupportedException("EmitWriteLine is not supported in Transpile mode.");
         }
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
             Log("// Write Line: " + value.Format(true));
+        }
 
         Generator.EmitWriteLine(value);
     }
@@ -578,7 +700,10 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
             throw new NotSupportedException("EmitWriteLine is not supported in Transpile mode.");
         }
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
             Log("// Write Line: Local #" + localBuilder.LocalIndex.Format());
+        }
 
         Generator.EmitWriteLine(localBuilder);
     }
@@ -590,7 +715,10 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
             throw new NotSupportedException("EmitWriteLine is not supported in Transpile mode.");
         }
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
             Log("// Write Line: Field " + fld.Format());
+        }
 
         Generator.EmitWriteLine(fld);
     }
@@ -599,7 +727,11 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     {
         --LogIndent;
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
+            _nextExceptionBlockType = ExceptionBlockType.EndExceptionBlock;
             Log("}");
+        }
         if (IsTranspileMode)
         {
             CodeInstruction ins = GetCurrentCodeInstruction();
@@ -619,7 +751,10 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
         }
         --LogIndent;
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
             Log("}");
+        }
 
         Generator.EndScope();
     }
@@ -627,7 +762,10 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
     public void MarkLabel(Label loc)
     {
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
             Log(".label " + loc.Format() + ": @ IL" + ILOffset.ToString("X").Format(false) + ".");
+        }
         if (IsTranspileMode)
         {
             CodeInstruction ins = GetCurrentCodeInstruction();
@@ -638,6 +776,8 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
         {
             Generator.MarkLabel(loc);
         }
+
+        _nextLabel = loc;
     }
     /// <inheritdoc />
     public void MarkSequencePoint(ISymbolDocumentWriter document, int startLine, int startColumn, int endLine, int endColumn)
@@ -647,7 +787,10 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
             throw new NotSupportedException("Sequence points are not supported in Transpile mode.");
         }
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
             Log($"// Sequence Point: (line, column) Start: {startLine.Format()}, {startColumn.Format()}, End: {endLine.Format()}, {endColumn.Format()}.");
+        }
         Generator.MarkSequencePoint(document, startLine, startColumn, endLine, endColumn);
     }
     /// <inheritdoc />
@@ -658,7 +801,10 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
             throw new NotSupportedException("ThrowException is not supported in Transpile mode.");
         }
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
             Log($"// Throw Exception {excType.Format()}.");
+        }
         Generator.ThrowException(excType);
     }
     /// <inheritdoc />
@@ -669,18 +815,32 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
             throw new NotSupportedException("UsingNamespace is not supported in Transpile mode.");
         }
         if (DebugLog || Breakpointing)
+        {
+            CheckInit();
             Log($".using {usingNamespace.Format(false)};");
+        }
         Generator.UsingNamespace(usingNamespace);
     }
 
     private void Log(string txt)
     {
-        CheckInit();
         string msg;
-        if (txt.StartsWith("//"))
+        bool comment = txt.StartsWith("//");
+        if (comment)
             msg = new string(' ', LogIndent + ILOffset.ToString("X5").Length + 3) + txt.Colorize(ConsoleColor.DarkGreen);
         else
             msg = "IL" + ILOffset.ToString("X5") + " " + (LogIndent <= 0 ? string.Empty : new string(' ', LogIndent)) + txt.Colorize(ConsoleColor.DarkCyan);
+        if (_stackTracker != null)
+        {
+            if (!comment && _stackTracker.TryGetStackSizeAtIndex(!IsTranspileMode ? _stackTrackerLog!.Count - 1 : Index, out int stackSize))
+            {
+                msg = "STK " + (stackSize < 0 ? "-".Colorize(ConsoleColor.Red) : " ") + Math.Abs(stackSize).ToString("00") + " " + msg;
+            }
+            else
+            {
+                msg = "STK  -- " + msg;
+            }
+        }
         if (DebugLog)
             Logger.DevkitServer.LogDebug(this, msg);
         if (Breakpointing)
@@ -690,11 +850,35 @@ public class DebuggableEmitter : IOpCodeEmitter, ILogSource
             Generator.Emit(Accessor.LogDebug.GetCallRuntime(), Accessor.LogDebug);
         }
     }
-
+    private CodeInstruction CheckBlock(CodeInstruction codeInstruction)
+    {
+        if (_nextExceptionBlockType.HasValue)
+        {
+            codeInstruction.blocks.Add(new ExceptionBlock(_nextExceptionBlockType.Value));
+            _nextExceptionBlockType = null;
+        }
+        if (_nextLabel.HasValue)
+        {
+            codeInstruction.labels.Add(_nextLabel.Value);
+            _nextLabel = null;
+        }
+        return codeInstruction;
+    }
     private void Log(OpCode code, object? operand)
     {
         CheckInit();
         string msg = "IL" + ILOffset.ToString("X5") + " " + (LogIndent <= 0 ? string.Empty : new string(' ', LogIndent)) + new CodeInstruction(code, operand).Format();
+        if (_stackTracker != null)
+        {
+            if (_stackTracker.TryGetStackSizeAtIndex(!IsTranspileMode ? _stackTrackerLog!.Count - 1 : Index, out int stackSize))
+            {
+                msg = "STK " + (stackSize < 0 ? "-".Colorize(ConsoleColor.Red) : " ") + Math.Abs(stackSize).ToString("00") + " " + msg;
+            }
+            else
+            {
+                msg = "STK  -- " + msg;
+            }
+        }
         if (DebugLog)
             Logger.DevkitServer.LogDebug(this, msg);
         if (Breakpointing && !_lastWasPrefix)

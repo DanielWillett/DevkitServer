@@ -7,7 +7,7 @@
   "ansi_log": true,
 
   /*
-   *  Full (24-bit RGB) console color support using virtual terminal sequences (works in the Windows command prompt and most web terminals).
+   *  Full (24-bit RGB) console color support using virtual terminal sequences (works in some terminals and most web terminals).
    *
    *  If your console contains weird symbols, try setting this to false.
    */
@@ -26,9 +26,28 @@
   "debug_logging": false,
 
   /*
+   *  Force connecting users to hide their current map name from steam friends list, Discord rich presence, and the server list. Note that plugins can override this behavior relatively easily.
+   */
+  "hide_map_name": false,
+
+  /*
    *  Removes cosmetic improvements.
    */
   "walmart_pc_support": false,
+
+  /*
+   *  Maximum number of failed passwords before the connecting user gets put on a join cooldown.
+   *
+   *  0 or -1 = infinite.
+   */
+  "max_password_attempts": 4,
+
+  /*
+   *  Number of seconds after hitting the max password attempts that it'll reset.
+   *
+   *  <= 0 is the same as setting 'max_password_attempts' to 0 or -1.
+   */
+  "wrong_password_block_expire_seconds": 60,
 
   /*
    *  Options for newly created maps.
@@ -77,6 +96,11 @@
    *  [ "*" ] to give all permissions by default.
    */
   "default_permissions": [],
+
+  /*
+   *  Admins ('blue hammers', given with the vanilla /admin command) are treated as having the '*' permission which gives them all permissions.
+   */
+  "admins_are_superusers": true,
 
   /*
    *  Default permission groups a user has. For example:

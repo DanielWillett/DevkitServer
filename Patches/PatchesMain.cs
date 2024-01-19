@@ -6,10 +6,12 @@ using DevkitServer.Players;
 using HarmonyLib;
 using SDG.Framework.Landscapes;
 using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
 using DevkitServer.Levels;
+using SDG.NetPak;
 using Version = System.Version;
 
 #if CLIENT
@@ -20,7 +22,6 @@ using DevkitServer.Util.Encoding;
 #endif
 #if SERVER
 using DevkitServer.Multiplayer.Networking;
-using SDG.NetPak;
 #endif
 
 namespace DevkitServer.Patches;
@@ -31,6 +32,8 @@ internal static class PatchesMain
     public const string HarmonyId = "dw.devkitserver";
     private const string Source = "PATCHING";
     private static Harmony? _patcher;
+    internal static bool FailedRichPresencePatch = true;
+    internal static Local RichPresenceLocalizationOverride = null!;
 
     public static Harmony Patcher
     {
@@ -105,6 +108,53 @@ internal static class PatchesMain
     }
     private static void DoManualPatches()
     {
+#if SERVER
+        Type? handlerType = null;
+        try
+        {
+            handlerType = Accessor.AssemblyCSharp.GetType("SDG.Unturned.ServerMessageHandler_GetWorkshopFiles", false, false);
+            if (handlerType == null)
+                Logger.DevkitServer.LogWarning(Source, $"Type not found: {"ServerMessageHandler_GetWorkshopFiles".Colorize(FormattingColorType.Class)}. Can't hide map name from joining players.");
+            else if (handlerType.GetMethod("ReadMessage", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } method)
+                Patcher.Patch(method, transpiler: Accessor.GetHarmonyMethod(TranspileWorkshopRequest));
+            else
+                Logger.DevkitServer.LogWarning(Source, $"Method not found: {FormattingUtil.FormatMethod(typeof(void), handlerType, "ReadMessage",
+                    [(typeof(ITransportConnection), "transportConnection"), (typeof(NetPakReader), "reader")],
+                    isStatic: true)}. Can't hide map from joining players (by checking password before sending mods).");
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), handlerType, "ReadMessage",
+                [(typeof(ITransportConnection), "transportConnection"), (typeof(NetPakReader), "reader")],
+                isStatic: true)}. Can't hide map from joining players (by checking password before sending mods).");
+        }
+#elif CLIENT
+        try
+        {
+            if (typeof(Provider).GetMethod("onClientTransportReady", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } definingMethod)
+            {
+                if (Accessor.TryGetLambdaMethod(definingMethod, out MethodInfo lambdaMethod, [ typeof(NetPakWriter) ]))
+                    Patcher.Patch(lambdaMethod, transpiler: Accessor.GetHarmonyMethod(TranspileWriteWorkshopRequest));
+                else
+                {
+                    Logger.DevkitServer.LogWarning(Source, $"Lambda method not found in {definingMethod.Format()}. Can't join DevkitServer servers.");
+                    DevkitServerModule.Fault();
+                }
+            }
+            else
+            {
+                Logger.DevkitServer.LogWarning(Source, $"Method not found: {FormattingUtil.FormatMethod(typeof(void), typeof(Provider), "onClientTransportReady",
+                    arguments: Type.EmptyTypes, isStatic: true)}. Can't join DevkitServer servers.");
+                DevkitServerModule.Fault();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), typeof(Provider), "onClientTransportReady",
+                arguments: Type.EmptyTypes, isStatic: true)}. Can't join DevkitServer servers.");
+            DevkitServerModule.Fault();
+        }
+#endif
         // Level.includeHash
         try
         {
@@ -136,6 +186,24 @@ internal static class PatchesMain
                 Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), typeof(MenuWorkshopEditorUI), "onClickedAddButton",
                         [ (typeof(ISleekElement), "button") ], isStatic: true)}.");
             }
+        }
+
+        try
+        {
+            MethodInfo? method = typeof(Provider).GetMethod("updateSteamRichPresence", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+            if (method != null)
+            {
+                Patcher.Patch(method, transpiler: Accessor.GetHarmonyMethod(TranspileUpdateSteamRichPresence));
+                FailedRichPresencePatch = false;
+            }
+            else
+                Logger.DevkitServer.LogWarning(Source, $"Method not found to patch rich presence: {FormattingUtil.FormatMethod(typeof(void),
+                    typeof(Provider), "updateSteamRichPresence", arguments: Type.EmptyTypes, isStatic: true)}.");
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void),
+                typeof(Provider), "updateSteamRichPresence", arguments: Type.EmptyTypes, isStatic: true)}.");
         }
 #endif
 
@@ -204,6 +272,36 @@ internal static class PatchesMain
     }
     private static void DoManualUnpatches()
     {
+#if SERVER
+        Type? handlerType = null;
+        try
+        {
+            handlerType = Accessor.AssemblyCSharp.GetType("SDG.Unturned.ServerMessageHandler_GetWorkshopFiles", false, false);
+            if (handlerType != null && handlerType.GetMethod("ReadMessage", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } method)
+                Patcher.Unpatch(method, Accessor.GetMethod(TranspileWorkshopRequest));
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to unpatch method: {FormattingUtil.FormatMethod(typeof(void), handlerType, "ReadMessage",
+                [(typeof(ITransportConnection), "transportConnection"), (typeof(NetPakReader), "reader")],
+                isStatic: true)}.");
+        }
+#elif CLIENT
+        try
+        {
+            if (typeof(Provider).GetMethod("onClientTransportReady", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } definingMethod
+                && Accessor.TryGetLambdaMethod(definingMethod, out MethodInfo lambdaMethod, [typeof(NetPakWriter)]))
+            {
+                Patcher.Unpatch(lambdaMethod, Accessor.GetMethod(TranspileWriteWorkshopRequest));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to unpatch method: {FormattingUtil.FormatMethod(typeof(void), typeof(Provider), "onClientTransportReady",
+                arguments: Type.EmptyTypes, isStatic: true)}.");
+            DevkitServerModule.Fault();
+        }
+#endif
         // Level.includeHash
         try
         {
@@ -247,6 +345,21 @@ internal static class PatchesMain
             Logger.DevkitServer.LogWarning(Source, ex, $"Failed to unpatch method: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.");
         }
 
+        try
+        {
+            MethodInfo? method = typeof(Provider).GetMethod("updateSteamRichPresence", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+            if (method != null)
+            {
+                Patcher.Unpatch(method, Accessor.GetMethod(TranspileUpdateSteamRichPresence));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to unpatch method: {FormattingUtil.FormatMethod(typeof(void),
+                typeof(Provider), "updateSteamRichPresence", arguments: Type.EmptyTypes, isStatic: true)}.");
+        }
+        FailedRichPresencePatch = true;
+
         // LoadingUI.onClickedCancelButton
         try
         {
@@ -262,6 +375,163 @@ internal static class PatchesMain
         }
 #endif
     }
+    private const string DefaultGetWorkshopHeaderString = "Hello!";
+#if CLIENT
+    private static void WritePasswordHash(NetPakWriter writer)
+    {
+        if (string.IsNullOrEmpty(Provider.serverPassword) || Provider.serverPasswordHash.Length != 20)
+        {
+            writer.WriteBit(false);
+        }
+        else
+        {
+            writer.WriteBit(true);
+            writer.WriteBytes(Provider.serverPasswordHash);
+        }
+    }
+    private static IEnumerable<CodeInstruction> TranspileWriteWorkshopRequest(IEnumerable<CodeInstruction> instructions, MethodBase method)
+    {
+        List<CodeInstruction> t = [
+            ..instructions,
+            new CodeInstruction(method.IsStatic ? OpCodes.Ldarg_0 : OpCodes.Ldarg_1),
+            new CodeInstruction(OpCodes.Call, Accessor.GetMethod(WritePasswordHash))
+        ];
+
+        if (t.Count <= 2 || t[^3].opcode != OpCodes.Ret)
+            return t;
+
+        // move ret to end of list
+        t.Add(t[^3]);
+        t.RemoveAt(t.Count - 4);
+
+        return t;
+    }
+#endif
+#if SERVER
+    private static readonly Dictionary<uint, KeyValuePair<int, float>> PasswordTries = new Dictionary<uint, KeyValuePair<int, float>>(16);
+    private static bool ReadPasswordHash(ITransportConnection connection, NetPakReader reader)
+    {
+        Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), "Validating password hash...");
+
+        if (!connection.TryGetIPv4Address(out uint address))
+        {
+            // todo see how this works with Fake IP and server codes.
+            Provider.reject(connection, ESteamRejection.PLUGIN, "Unknown IPv4 of connecting user.");
+            return false;
+        }
+
+        byte[] source = Array.Empty<byte>();
+        int offset = 0;
+        if (!reader.ReadBit(out bool hasPassword) || hasPassword && !reader.ReadBytesPtr(20, out source, out offset))
+        {
+            Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), " Failed to read hash (likely a vanilla client connecting).");
+            
+            if (!DevkitServerModule.IsEditing)
+                return true;
+
+            Provider.reject(connection, ESteamRejection.SERVER_MODULE_DESYNC);
+            return false;
+        }
+
+        if (DevkitServerConfig.Config.PasswordAttempts > 0 && DevkitServerConfig.Config.WrongPasswordBlockExpireSeconds > 0f)
+        {
+            if (PasswordTries.TryGetValue(address, out KeyValuePair<int, float> countRecord) &&
+                countRecord.Key >= DevkitServerConfig.Config.PasswordAttempts &&
+                CachedTime.RealtimeSinceStartup - countRecord.Value < DevkitServerConfig.Config.WrongPasswordBlockExpireSeconds)
+            {
+                string expires = Mathf.CeilToInt(DevkitServerConfig.Config.WrongPasswordBlockExpireSeconds - CachedTime.RealtimeSinceStartup + countRecord.Value)
+                    .ToString(CultureInfo.InvariantCulture);
+                Provider.reject(connection, ESteamRejection.PLUGIN, DevkitServerModule.MainLocalization.Translate("TooManyPasswordAttempts", expires));
+                Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), $" Too many invalid password attempts from {address.Format()}, expires in {expires} sec.");
+                return false;
+            }
+        }
+
+        List<uint>? toRemove = null;
+        foreach (KeyValuePair<uint, KeyValuePair<int, float>> entry in PasswordTries)
+        {
+            if (CachedTime.RealtimeSinceStartup - entry.Value.Value > DevkitServerConfig.Config.WrongPasswordBlockExpireSeconds * 2)
+                (toRemove ??= new List<uint>(PasswordTries.Count)).Add(entry.Key);
+        }
+
+        if (toRemove != null)
+        {
+            foreach (uint ipAddress in toRemove)
+                PasswordTries.Remove(ipAddress);
+        }
+
+        ArraySegment<byte> hash = new ArraySegment<byte>(source, offset, source.Length == 0 ? 0 : 20);
+        byte[] existing = Provider.serverPasswordHash;
+        for (int i = 0; i < 20; ++i)
+        {
+            if (hash[i] == existing[i])
+                continue;
+
+            if (DevkitServerConfig.Config.PasswordAttempts > 0 && DevkitServerConfig.Config.WrongPasswordBlockExpireSeconds > 0f)
+            {
+                int c;
+                if (PasswordTries.TryGetValue(address, out KeyValuePair<int, float> countRecord))
+                    c = countRecord.Key + 1;
+                else
+                    c = 1;
+                PasswordTries[address] = new KeyValuePair<int, float>(c, CachedTime.RealtimeSinceStartup);
+                Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), $" Invalid password for address {address.Format()} (try {c.Format()} / {DevkitServerConfig.Config.PasswordAttempts.Format()}).");
+            }
+            else
+                Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), $" Invalid password for address {address.Format()}.");
+
+            Provider.reject(connection, ESteamRejection.WRONG_PASSWORD);
+            return false;
+        }
+
+        PasswordTries.Remove(address);
+
+        Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), " Looks good.");
+        return true;
+    }
+    private static IEnumerable<CodeInstruction> TranspileWorkshopRequest(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
+    {
+        List<CodeInstruction> ins = [..instructions];
+
+        ins.Insert(0, new CodeInstruction(OpCodes.Ldarg_0));
+        ins.Insert(1, new CodeInstruction(OpCodes.Ldarg_1));
+        ins.Insert(2, new CodeInstruction(OpCodes.Call, Accessor.GetMethod(new Action<ITransportConnection, NetPakReader>(OnConnectionPending))));
+        Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Added prefix to GetWorkshop request.");
+
+        for (int i = 3; i < ins.Count; ++i)
+        {
+            if (!ins[i].LoadsConstant(DefaultGetWorkshopHeaderString))
+                continue;
+
+            Label? lbl = PatchUtil.GetNextBranchTarget(ins, i);
+            if (!lbl.HasValue)
+            {
+                Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Failed to find label target.");
+                return ins;
+            }
+
+            i = PatchUtil.FindLabelDestinationIndex(ins, lbl.Value, i);
+            if (i == -1)
+            {
+                Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Failed to find label index.");
+                return ins;
+            }
+
+            ins.Insert(i, new CodeInstruction(OpCodes.Ldarg_0).WithStartingInstructionNeeds(ins[i]));
+            ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldarg_1));
+            ins.Insert(i + 2, new CodeInstruction(OpCodes.Call, Accessor.GetMethod(ReadPasswordHash)));
+            Label label = generator.DefineLabel();
+            ins.Insert(i + 3, new CodeInstruction(OpCodes.Brtrue, label));
+            ins.Insert(i + 4, new CodeInstruction(OpCodes.Ret));
+            ins[i + 5].labels.Add(label);
+            Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Added password check to GetWorkshop request.");
+            return ins;
+        }
+
+        Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to add password check to the workshop request.");
+        return ins;
+    }
+#endif
     private static bool OnLevelSaving()
     {
 #if CLIENT
@@ -363,6 +633,78 @@ internal static class PatchesMain
     }
 
 #if CLIENT
+    private static string GetLevelNameOrHidden()
+    {
+        if (!Level.isEditor && !Level.info.isEditable)
+            return Level.info.getLocalizedName();
+
+        if (DevkitServerConfig.Config.HideMapNameFromRichPresence || ClientInfo.Info is { ServerForcesHideMapNameFromRichPresence: true })
+            return "<hidden>";
+
+        return Level.info.getLocalizedName();
+    }
+    private static IEnumerable<CodeInstruction> TranspileUpdateSteamRichPresence(IEnumerable<CodeInstruction> instructions, MethodBase method)
+    {
+        MethodInfo? getLevelInfo = typeof(Level).GetProperty(nameof(Level.info), BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)?.GetGetMethod(true);
+        if (getLevelInfo == null)
+        {
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find property getter: Level.info.");
+            return instructions;
+        }
+        
+        MethodInfo? getLocalizedName = typeof(LevelInfo).GetMethod(nameof(LevelInfo.getLocalizedName), BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+        if (getLocalizedName == null)
+        {
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: LevelInfo.getLocalizedName.");
+            return instructions;
+        }
+        
+        FieldInfo? localizationField = typeof(Provider).GetField(nameof(Provider.localization), BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+        if (localizationField == null)
+        {
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find field: Provider.localization.");
+        }
+
+        FieldInfo? newLocalization = typeof(PatchesMain).GetField(nameof(RichPresenceLocalizationOverride), BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
+        if (newLocalization == null)
+        {
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find field: PatchesMain." + nameof(RichPresenceLocalizationOverride) + ".");
+        }
+
+        List<CodeInstruction> ins = [..instructions];
+
+        int hidden3Times = 0;
+        for (int i = 0; i < ins.Count; ++i)
+        {
+            if (PatchUtil.MatchPattern(ins, i, 
+                    x => x.Calls(getLevelInfo),
+                    x => x.Calls(getLocalizedName)
+                        ))
+            {
+                CodeInstruction newCodeIns = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(GetLevelNameOrHidden));
+                newCodeIns.WithStartingInstructionNeeds(ins[i]);
+                newCodeIns.WithEndingInstructionNeeds(ins[i + 1]);
+                ins[i] = newCodeIns;
+                ins.RemoveAt(i + 1);
+                --i;
+                ++hidden3Times;
+            }
+            else if (localizationField != null && PatchUtil.MatchPattern(ins, i,
+                    x => x.LoadsField(localizationField)
+                        ))
+            {
+                ins[i].operand = newLocalization;
+            }
+        }
+
+        if (hidden3Times < 3)
+        {
+            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Failed to patch for hiding map name. The map name may not be hidden from rich presence.");
+        }
+
+        return ins;
+    }
+
     [HarmonyPatch(typeof(EditorUI), "OnEnable")]
     [HarmonyPostfix]
     [UsedImplicitly]
@@ -465,6 +807,7 @@ internal static class PatchesMain
     
     private static bool _shouldContinueToLaunch;
     private static bool _hasRulesSub;
+
     [HarmonyPatch(typeof(Provider), nameof(Provider.launch))]
     [HarmonyPrefix]
     [UsedImplicitly]
@@ -743,9 +1086,6 @@ internal static class PatchesMain
         ctx.Acknowledge(StandardErrorCode.Success);
     }
 
-    [HarmonyPatch("ServerMessageHandler_GetWorkshopFiles", "ReadMessage", MethodType.Normal)]
-    [HarmonyPrefix]
-    [UsedImplicitly]
     private static void OnConnectionPending(ITransportConnection transportConnection, NetPakReader reader)
     {
         RemoveExpiredConnections();
@@ -1016,7 +1356,7 @@ internal static class PatchesMain
     [UsedImplicitly]
     private static IEnumerable<CodeInstruction> VehicleManagerPostLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.AddIsEditorCall(instructions, __method);
 #endif
-    #region Landscape.writeMaps
+#region Landscape.writeMaps
 
     [HarmonyPatch(typeof(Landscape), nameof(Landscape.writeHeightmap))]
     [HarmonyTranspiler]

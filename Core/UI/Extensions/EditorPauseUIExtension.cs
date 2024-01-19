@@ -26,10 +26,10 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
     private readonly SleekButtonIcon? _mapButton;
     
     [ExistingMember("exitButton", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
-    private readonly SleekButtonIcon? _exitButton;
+    private readonly SleekButtonIconConfirm? _exitButton;
     
     [ExistingMember("quitButton", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
-    private readonly SleekButtonIcon? _quitButton;
+    private readonly SleekButtonIconConfirm? _quitButton;
 
 #nullable disable
 

@@ -13,6 +13,11 @@ namespace DevkitServer.API.Permissions;
 public readonly struct PermissionLeaf : IEquatable<PermissionLeaf>, IEquatable<PermissionBranch>, ITerminalFormattable
 {
     /// <summary>
+    /// A permission that can never be met.
+    /// </summary>
+    public static readonly PermissionLeaf Nil = new PermissionLeaf();
+
+    /// <summary>
     /// Prefix for Core permissions.
     /// </summary>
     public const string CoreModulePrefix = "unturned";

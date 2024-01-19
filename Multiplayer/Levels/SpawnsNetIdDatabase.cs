@@ -1,4 +1,7 @@
-﻿using DevkitServer.API.Devkit.Spawns;
+﻿#if DEBUG
+// #define LEVEL_DATA_LOGGING
+#endif
+using DevkitServer.API.Devkit.Spawns;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Networking;
@@ -282,31 +285,31 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         SpawnNetIds[netId] = toIndex.Raw;
         Logger.DevkitServer.LogDebug(Source, $"Moved {toIndex.Type.ToString().ToLowerInvariant()} spawn asset NetId: ({netId.Format()}, {toIndex.Format()}).");
     }
-    private static void OnAnimalSpawnTierIndexUpdated(AnimalTier spawnTier, SpawnTierIdentifier fromIndex, SpawnTierIdentifier toIndex)
+    private static void OnAnimalSpawnTierIndexUpdated(AnimalTier spawnTier, SpawnTierIdentifier fromIndex, SpawnTierIdentifier toIndex, HierarchicalEventSource eventSource)
     {
         OnSpawnTierIndexUpdated(fromIndex, toIndex);
     }
-    private static void OnVehicleSpawnTierIndexUpdated(VehicleTier spawnTier, SpawnTierIdentifier fromIndex, SpawnTierIdentifier toIndex)
+    private static void OnVehicleSpawnTierIndexUpdated(VehicleTier spawnTier, SpawnTierIdentifier fromIndex, SpawnTierIdentifier toIndex, HierarchicalEventSource eventSource)
     {
         OnSpawnTierIndexUpdated(fromIndex, toIndex);
     }
-    private static void OnItemSpawnTierIndexUpdated(ItemTier spawnTier, SpawnTierIdentifier fromIndex, SpawnTierIdentifier toIndex)
+    private static void OnItemSpawnTierIndexUpdated(ItemTier spawnTier, SpawnTierIdentifier fromIndex, SpawnTierIdentifier toIndex, HierarchicalEventSource eventSource)
     {
         OnSpawnTierIndexUpdated(fromIndex, toIndex);
     }
-    private static void OnAnimalSpawnAssetIndexUpdated(AnimalSpawn spawnAsset, SpawnAssetIdentifier fromIndex, SpawnAssetIdentifier toIndex)
+    private static void OnAnimalSpawnAssetIndexUpdated(AnimalSpawn spawnAsset, SpawnAssetIdentifier fromIndex, SpawnAssetIdentifier toIndex, HierarchicalEventSource eventSource)
     {
         OnSpawnAssetIndexUpdated(fromIndex, toIndex);
     }
-    private static void OnVehicleSpawnAssetIndexUpdated(VehicleSpawn spawnAsset, SpawnAssetIdentifier fromIndex, SpawnAssetIdentifier toIndex)
+    private static void OnVehicleSpawnAssetIndexUpdated(VehicleSpawn spawnAsset, SpawnAssetIdentifier fromIndex, SpawnAssetIdentifier toIndex, HierarchicalEventSource eventSource)
     {
         OnSpawnAssetIndexUpdated(fromIndex, toIndex);
     }
-    private static void OnItemSpawnAssetIndexUpdated(ItemSpawn spawnAsset, SpawnAssetIdentifier fromIndex, SpawnAssetIdentifier toIndex)
+    private static void OnItemSpawnAssetIndexUpdated(ItemSpawn spawnAsset, SpawnAssetIdentifier fromIndex, SpawnAssetIdentifier toIndex, HierarchicalEventSource eventSource)
     {
         OnSpawnAssetIndexUpdated(fromIndex, toIndex);
     }
-    private static void OnZombieSpawnAssetIndexUpdated(ZombieCloth spawnAsset, SpawnAssetIdentifier fromIndex, SpawnAssetIdentifier toIndex)
+    private static void OnZombieSpawnAssetIndexUpdated(ZombieCloth spawnAsset, SpawnAssetIdentifier fromIndex, SpawnAssetIdentifier toIndex, HierarchicalEventSource eventSource)
     {
         OnSpawnAssetIndexUpdated(fromIndex, toIndex);
     }
@@ -494,31 +497,31 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         SpawnNetIds.Remove(netId);
         Logger.DevkitServer.LogDebug(Source, $"Removed {identifier.Type.ToString().ToLowerInvariant()} spawn asset NetId: ({netId.Format()}, # {identifier.Format()}).");
     }
-    private static void OnAnimalSpawnTierRemoved(AnimalTier spawnTier, SpawnTierIdentifier identifier)
+    private static void OnAnimalSpawnTierRemoved(AnimalTier spawnTier, SpawnTierIdentifier identifier, HierarchicalEventSource eventSource)
     {
         OnSpawnTierRemoved(identifier);
     }
-    private static void OnVehicleSpawnTierRemoved(VehicleTier spawnTier, SpawnTierIdentifier identifier)
+    private static void OnVehicleSpawnTierRemoved(VehicleTier spawnTier, SpawnTierIdentifier identifier, HierarchicalEventSource eventSource)
     {
         OnSpawnTierRemoved(identifier);
     }
-    private static void OnItemSpawnTierRemoved(ItemTier spawnTier, SpawnTierIdentifier identifier)
+    private static void OnItemSpawnTierRemoved(ItemTier spawnTier, SpawnTierIdentifier identifier, HierarchicalEventSource eventSource)
     {
         OnSpawnTierRemoved(identifier);
     }
-    private static void OnAnimalSpawnAssetRemoved(AnimalSpawn spawnAsset, SpawnAssetIdentifier identifier)
+    private static void OnAnimalSpawnAssetRemoved(AnimalSpawn spawnAsset, SpawnAssetIdentifier identifier, HierarchicalEventSource eventSource)
     {
         OnSpawnAssetRemoved(identifier);
     }
-    private static void OnVehicleSpawnAssetRemoved(VehicleSpawn spawnAsset, SpawnAssetIdentifier identifier)
+    private static void OnVehicleSpawnAssetRemoved(VehicleSpawn spawnAsset, SpawnAssetIdentifier identifier, HierarchicalEventSource eventSource)
     {
         OnSpawnAssetRemoved(identifier);
     }
-    private static void OnItemSpawnAssetRemoved(ItemSpawn spawnAsset, SpawnAssetIdentifier identifier)
+    private static void OnItemSpawnAssetRemoved(ItemSpawn spawnAsset, SpawnAssetIdentifier identifier, HierarchicalEventSource eventSource)
     {
         OnSpawnAssetRemoved(identifier);
     }
-    private static void OnZombieSpawnAssetRemoved(ZombieCloth spawnAsset, SpawnAssetIdentifier identifier)
+    private static void OnZombieSpawnAssetRemoved(ZombieCloth spawnAsset, SpawnAssetIdentifier identifier, HierarchicalEventSource eventSource)
     {
         OnSpawnAssetRemoved(identifier);
     }
@@ -747,7 +750,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         if (assignments.Remove(index, out NetId64 netId))
         {
             SpawnNetIds.Remove(netId);
+#if !LEVEL_DATA_LOGGING
             if (Level.isLoaded)
+#endif
                 Logger.DevkitServer.LogDebug(Source, $"Released {type.ToString().ToLower()} spawn NetId: {netId.Format()} ({type.Format()}, # {index.Format()}).");
         }
         else
@@ -765,7 +770,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         if (assignments.Remove(id, out NetId64 netId))
         {
             SpawnNetIds.Remove(netId);
+#if !LEVEL_DATA_LOGGING
             if (Level.isLoaded)
+#endif
                 Logger.DevkitServer.LogDebug(Source, $"Released {type.ToString().ToLower()} spawn NetId: {netId.Format()} ({type.Format()}, {id.Format()}).");
         }
         else
@@ -990,6 +997,156 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         regionIdentifier = RegionIdentifier.Invalid;
         return false;
     }
+    public static bool TryGetSpawnTable(SpawnType spawnType, NetId64 netId, out int index)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (spawnType is not SpawnType.Animal and not SpawnType.Vehicle and not SpawnType.Item and not SpawnType.Zombie)
+        {
+            index = -1;
+            return false;
+        }
+
+        if (SpawnNetIds.TryGetValue(netId, out index))
+        {
+            return spawnType switch
+            {
+                SpawnType.Animal => LevelAnimals.tables.Count,
+                SpawnType.Vehicle => LevelVehicles.tables.Count,
+                SpawnType.Item => LevelItems.tables.Count,
+                _ => LevelZombies.tables.Count
+            } > index;
+        }
+
+        index = -1;
+        return false;
+    }
+    public static bool TryGetSpawnTableTier(SpawnType spawnType, NetId64 netId, out SpawnTierIdentifier identifier)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (spawnType is not SpawnType.Animal and not SpawnType.Vehicle and not SpawnType.Item and not SpawnType.Zombie)
+        {
+            identifier = default;
+            return false;
+        }
+
+        if (SpawnNetIds.TryGetValue(netId, out int index))
+        {
+            identifier = new SpawnTierIdentifier(index);
+            return spawnType == identifier.Type && identifier.CheckSafe();
+        }
+
+        identifier = default;
+        return false;
+    }
+    public static bool TryGetSpawnTableTierAsset(SpawnType spawnType, NetId64 netId, out SpawnAssetIdentifier identifier)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (spawnType is not SpawnType.Animal and not SpawnType.Vehicle and not SpawnType.Item and not SpawnType.Zombie)
+        {
+            identifier = default;
+            return false;
+        }
+
+        if (SpawnNetIds.TryGetValue(netId, out int index))
+        {
+            identifier = new SpawnAssetIdentifier(index);
+            return spawnType == identifier.Type && identifier.CheckSafe();
+        }
+
+        identifier = default;
+        return false;
+    }
+    public static bool TryGetAnimalSpawnTable(NetId64 netId, out AnimalTable spawnTable)
+    {
+        if (TryGetSpawnTable(SpawnType.Animal, netId, out int index))
+        {
+            spawnTable = LevelAnimals.tables[index];
+            return true;
+        }
+
+        spawnTable = null!;
+        return false;
+    }
+    public static bool TryGetVehicleSpawnTable(NetId64 netId, out VehicleTable spawnTable)
+    {
+        if (TryGetSpawnTable(SpawnType.Vehicle, netId, out int index))
+        {
+            spawnTable = LevelVehicles.tables[index];
+            return true;
+        }
+
+        spawnTable = null!;
+        return false;
+    }
+    public static bool TryGetItemSpawnTable(NetId64 netId, out ItemTable spawnTable)
+    {
+        if (TryGetSpawnTable(SpawnType.Item, netId, out int index))
+        {
+            spawnTable = LevelItems.tables[index];
+            return true;
+        }
+
+        spawnTable = null!;
+        return false;
+    }
+    public static bool TryGetZombieSpawnTable(NetId64 netId, out ZombieTable spawnTable)
+    {
+        if (TryGetSpawnTable(SpawnType.Zombie, netId, out int index))
+        {
+            spawnTable = LevelZombies.tables[index];
+            return true;
+        }
+
+        spawnTable = null!;
+        return false;
+    }
+    public static bool TryGetAnimalSpawnTableTier(NetId64 netId, out AnimalTier spawnTable)
+    {
+        if (TryGetSpawnTableTier(SpawnType.Animal, netId, out SpawnTierIdentifier identifier))
+        {
+            spawnTable = LevelAnimals.tables[identifier.TableIndex].tiers[identifier.TierIndex];
+            return true;
+        }
+
+        spawnTable = null!;
+        return false;
+    }
+    public static bool TryGetVehicleSpawnTableTier(NetId64 netId, out VehicleTier spawnTable)
+    {
+        if (TryGetSpawnTableTier(SpawnType.Vehicle, netId, out SpawnTierIdentifier identifier))
+        {
+            spawnTable = LevelVehicles.tables[identifier.TableIndex].tiers[identifier.TierIndex];
+            return true;
+        }
+
+        spawnTable = null!;
+        return false;
+    }
+    public static bool TryGetItemSpawnTableTier(NetId64 netId, out ItemTier spawnTable)
+    {
+        if (TryGetSpawnTableTier(SpawnType.Item, netId, out SpawnTierIdentifier identifier))
+        {
+            spawnTable = LevelItems.tables[identifier.TableIndex].tiers[identifier.TierIndex];
+            return true;
+        }
+
+        spawnTable = null!;
+        return false;
+    }
+    public static bool TryGetAnimalSpawnTable(NetId64 netId, out int index) => TryGetSpawnTable(SpawnType.Animal, netId, out index);
+    public static bool TryGetVehicleSpawnTable(NetId64 netId, out int index) => TryGetSpawnTable(SpawnType.Vehicle, netId, out index);
+    public static bool TryGetItemSpawnTable(NetId64 netId, out int index) => TryGetSpawnTable(SpawnType.Item, netId, out index);
+    public static bool TryGetZombieSpawnTable(NetId64 netId, out int index) => TryGetSpawnTable(SpawnType.Zombie, netId, out index);
+    public static bool TryGetAnimalSpawnTableTier(NetId64 netId, out SpawnTierIdentifier identifier) => TryGetSpawnTableTier(SpawnType.Animal, netId, out identifier);
+    public static bool TryGetVehicleSpawnTableTier(NetId64 netId, out SpawnTierIdentifier identifier) => TryGetSpawnTableTier(SpawnType.Vehicle, netId, out identifier);
+    public static bool TryGetItemSpawnTableTier(NetId64 netId, out SpawnTierIdentifier identifier) => TryGetSpawnTableTier(SpawnType.Item, netId, out identifier);
+    public static bool TryGetAnimalSpawnTableTierAsset(NetId64 netId, out SpawnAssetIdentifier identifier) => TryGetSpawnTableTierAsset(SpawnType.Animal, netId, out identifier);
+    public static bool TryGetVehicleSpawnTableTierAsset(NetId64 netId, out SpawnAssetIdentifier identifier) => TryGetSpawnTableTierAsset(SpawnType.Vehicle, netId, out identifier);
+    public static bool TryGetItemSpawnTableTierAsset(NetId64 netId, out SpawnAssetIdentifier identifier) => TryGetSpawnTableTierAsset(SpawnType.Item, netId, out identifier);
+    public static bool TryGetZombieSpawnTableTierAsset(NetId64 netId, out SpawnAssetIdentifier identifier) => TryGetSpawnTableTierAsset(SpawnType.Zombie, netId, out identifier);
     public static bool TryGetSpawnTableNetId(AnimalTable spawnTable, out NetId64 netId)
     {
         ThreadUtil.assertIsGameThread();
@@ -1382,7 +1539,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
     {
         if (!netId.IsNull() && SpawnNetIds.ContainsKey(netId))
         {
+#if !LEVEL_DATA_LOGGING
             if (Level.isLoaded)
+#endif
                 Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {netId.Format()}.");
         }
         
@@ -1392,7 +1551,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
 
             if (SpawnNetIds.Remove(old))
             {
+#if !LEVEL_DATA_LOGGING
                 if (Level.isLoaded)
+#endif
                     Logger.DevkitServer.LogDebug(Source, $"Released old animal NetId pairing: {old.Format()}.");
             }
 
@@ -1405,7 +1566,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
 
             if (SpawnNetIds.Remove(old))
             {
+#if !LEVEL_DATA_LOGGING
                 if (Level.isLoaded)
+#endif
                     Logger.DevkitServer.LogDebug(Source, $"Released old player NetId pairing: {old.Format()}.");
             }
 
@@ -1418,7 +1581,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
 
             if (SpawnNetIds.Remove(old))
             {
+#if !LEVEL_DATA_LOGGING
                 if (Level.isLoaded)
+#endif
                     Logger.DevkitServer.LogDebug(Source, $"Released old vehicle NetId pairing: {old.Format()}.");
             }
 
@@ -1430,7 +1595,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         {
             SpawnNetIds[netId] = index;
 
+#if !LEVEL_DATA_LOGGING
             if (Level.isLoaded)
+#endif
                 Logger.DevkitServer.LogDebug(Source, $"Claimed new NetId: {netId.Format()} @ {typeChecked.Format()} (# {index.Format()}).");
         }
         else
@@ -1442,7 +1609,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
     {
         if (!netId.IsNull() && SpawnNetIds.ContainsKey(netId))
         {
+#if !LEVEL_DATA_LOGGING
             if (Level.isLoaded)
+#endif
                 Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {netId.Format()}.");
         }
 
@@ -1452,7 +1621,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
 
             if (SpawnNetIds.Remove(old))
             {
+#if !LEVEL_DATA_LOGGING
                 if (Level.isLoaded)
+#endif
                     Logger.DevkitServer.LogDebug(Source, $"Released old item NetId pairing: {old.Format()}.");
             }
 
@@ -1465,7 +1636,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
 
             if (SpawnNetIds.Remove(old))
             {
+#if !LEVEL_DATA_LOGGING
                 if (Level.isLoaded)
+#endif
                     Logger.DevkitServer.LogDebug(Source, $"Released old zombie NetId pairing: {old.Format()}.");
             }
 
@@ -1477,7 +1650,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         {
             SpawnNetIds[netId] = id.Raw;
 
+#if !LEVEL_DATA_LOGGING
             if (Level.isLoaded)
+#endif
                 Logger.DevkitServer.LogDebug(Source, $"Claimed new NetId: {netId.Format()} @ {typeChecked.Format()} ({id.Format()}).");
         }
         else
@@ -1489,7 +1664,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
     {
         if (!netId.IsNull() && SpawnNetIds.ContainsKey(netId))
         {
+#if !LEVEL_DATA_LOGGING
             if (Level.isLoaded)
+#endif
                 Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {netId.Format()}.");
         }
 
@@ -1497,7 +1674,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
 
         if (SpawnNetIds.Remove(old))
         {
+#if !LEVEL_DATA_LOGGING
             if (Level.isLoaded)
+#endif
                 Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {old.Format()}.");
         }
         
@@ -1506,7 +1685,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
             SpawnAssetAssignments[id] = netId;
             SpawnNetIds[netId] = id.Raw;
 
+#if !LEVEL_DATA_LOGGING
             if (Level.isLoaded)
+#endif
                 Logger.DevkitServer.LogDebug(Source, $"Claimed new NetId: {netId.Format()} @ {id.Type.Format()} ({id.Format()}).");
         }
         else
@@ -1518,7 +1699,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
     {
         if (!netId.IsNull() && SpawnNetIds.ContainsKey(netId))
         {
+#if !LEVEL_DATA_LOGGING
             if (Level.isLoaded)
+#endif
                 Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {netId.Format()}.");
         }
 
@@ -1526,7 +1709,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
 
         if (SpawnNetIds.Remove(old))
         {
+#if !LEVEL_DATA_LOGGING
             if (Level.isLoaded)
+#endif
                 Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {old.Format()}.");
         }
         
@@ -1535,7 +1720,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
             SpawnTierAssignments[id] = netId;
             SpawnNetIds[netId] = id.Raw;
 
+#if !LEVEL_DATA_LOGGING
             if (Level.isLoaded)
+#endif
                 Logger.DevkitServer.LogDebug(Source, $"Claimed new NetId: {netId.Format()} @ {id.Type.Format()} ({id.Format()}).");
         }
         else
@@ -1547,7 +1734,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
     {
         if (!netId.IsNull() && SpawnNetIds.ContainsKey(netId))
         {
+#if !LEVEL_DATA_LOGGING
             if (Level.isLoaded)
+#endif
                 Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {netId.Format()}.");
         }
 
@@ -1572,17 +1761,22 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
                 break;
         }
         
-        if (!removed.IsNull() && Level.isLoaded)
+        if (!removed.IsNull())
         {
             SpawnNetIds.Remove(removed);
-            Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {removed.Format()}.");
+#if !LEVEL_DATA_LOGGING
+            if (Level.isLoaded)
+#endif
+                Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {removed.Format()}.");
         }
         
         if (!netId.IsNull())
         {
             SpawnNetIds[netId] = index;
 
+#if !LEVEL_DATA_LOGGING
             if (Level.isLoaded)
+#endif
                 Logger.DevkitServer.LogDebug(Source, $"Claimed new NetId: {netId.Format()} @ {typeChecked.Format()} ({index.Format()}).");
         }
         else
@@ -1698,8 +1892,8 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
                 Logger.DevkitServer.LogWarning(Source, $"Received spawn asset with invalid spawn type: {asset.Type.Format()}.");
         }
     }
-#elif SERVER       
-    public SpawnsNetIdDatabaseLevelData SaveData()
+#elif SERVER
+    public SpawnsNetIdDatabaseLevelData SaveData(CSteamID user)
     {
         SpawnsNetIdDatabaseLevelData data = new SpawnsNetIdDatabaseLevelData();
 
@@ -1711,22 +1905,22 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         for (int i = 0; i < byte.MaxValue; ++i)
         {
             bool any = false;
-            if (!AnimalSpawnTables[i].IsNull())
+            if (AnimalSpawnTables[i].Id != 0)
             {
                 ++animalSpawnTableCount;
                 any = true;
             }
-            if (!VehicleSpawnTables[i].IsNull())
+            if (VehicleSpawnTables[i].Id != 0)
             {
                 ++vehicleSpawnTableCount;
                 any = true;
             }
-            if (!ItemSpawnTables[i].IsNull())
+            if (ItemSpawnTables[i].Id != 0)
             {
                 ++itemSpawnTableCount;
                 any = true;
             }
-            if (!ZombieSpawnTables[i].IsNull())
+            if (ZombieSpawnTables[i].Id != 0)
             {
                 ++zombieSpawnTableCount;
                 any = true;
@@ -1771,66 +1965,66 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         index += VehicleSpawnAssignments.Count;
 
         data.IndexItem = index;
-        foreach (KeyValuePair<RegionIdentifier, NetId64> lvlObject in ItemSpawnAssignments)
+        ItemSpawnAssignments.Values.CopyTo(netIds, index);
+        foreach (RegionIdentifier region in ItemSpawnAssignments.Keys)
         {
-            netIds[index] = lvlObject.Value;
-            indexes[index] = lvlObject.Key.Raw;
+            indexes[index] = region.Raw;
             ++index;
         }
 
         data.IndexZombie = index;
-        foreach (KeyValuePair<RegionIdentifier, NetId64> lvlObject in ZombieSpawnAssignments)
+        ZombieSpawnAssignments.Values.CopyTo(netIds, index);
+        foreach (RegionIdentifier region in ZombieSpawnAssignments.Keys)
         {
-            netIds[index] = lvlObject.Value;
-            indexes[index] = lvlObject.Key.Raw;
+            indexes[index] = region.Raw;
             ++index;
         }
 
         data.IndexAnimalTable = index;
+        AnimalSpawnTables.AsSpan(0, animalSpawnTableCount).CopyTo(netIds.AsSpan(index));
         for (int i = 0; i < animalSpawnTableCount; ++i)
         {
-            netIds[index] = AnimalSpawnTables[i];
             indexes[index] = i;
             ++index;
         }
 
         data.IndexVehicleTable = index;
+        VehicleSpawnTables.AsSpan(0, vehicleSpawnTableCount).CopyTo(netIds.AsSpan(index));
         for (int i = 0; i < vehicleSpawnTableCount; ++i)
         {
-            netIds[index] = VehicleSpawnTables[i];
             indexes[index] = i;
             ++index;
         }
 
         data.IndexItemTable = index;
+        ItemSpawnTables.AsSpan(0, itemSpawnTableCount).CopyTo(netIds.AsSpan(index));
         for (int i = 0; i < itemSpawnTableCount; ++i)
         {
-            netIds[index] = ItemSpawnTables[i];
             indexes[index] = i;
             ++index;
         }
 
         data.IndexZombieTable = index;
+        ZombieSpawnTables.AsSpan(0, zombieSpawnTableCount).CopyTo(netIds.AsSpan(index));
         for (int i = 0; i < zombieSpawnTableCount; ++i)
         {
-            netIds[index] = ZombieSpawnTables[i];
             indexes[index] = i;
             ++index;
         }
 
         data.IndexTiers = index;
-        foreach (KeyValuePair<SpawnTierIdentifier, NetId64> lvlObject in SpawnTierAssignments)
+        SpawnTierAssignments.Values.CopyTo(netIds, index);
+        foreach (SpawnTierIdentifier tier in SpawnTierAssignments.Keys)
         {
-            netIds[index] = lvlObject.Value;
-            indexes[index] = lvlObject.Key.Raw;
+            indexes[index] = tier.Raw;
             ++index;
         }
 
         data.IndexAssets = index;
-        foreach (KeyValuePair<SpawnAssetIdentifier, NetId64> lvlObject in SpawnAssetAssignments)
+        SpawnAssetAssignments.Values.CopyTo(netIds, index);
+        foreach (SpawnAssetIdentifier asset in SpawnAssetAssignments.Keys)
         {
-            netIds[index] = lvlObject.Value;
-            indexes[index] = lvlObject.Key.Raw;
+            indexes[index] = asset.Raw;
             ++index;
         }
 
@@ -1845,6 +2039,10 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
             IndexVehicle = reader.ReadInt32(),
             IndexItem = reader.ReadInt32(),
             IndexZombie = reader.ReadInt32(),
+            IndexAnimalTable = reader.ReadInt32(),
+            IndexVehicleTable = reader.ReadInt32(),
+            IndexItemTable = reader.ReadInt32(),
+            IndexZombieTable = reader.ReadInt32(),
             IndexTiers = reader.ReadInt32(),
             IndexAssets = reader.ReadInt32(),
             Count = reader.ReadInt32()
@@ -1855,9 +2053,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         int[] indexes = new int[dataCount];
 
         for (int i = 0; i < dataCount; ++i)
-            data.Indexes[i] = reader.ReadInt32();
+            indexes[i] = reader.ReadInt32();
         for (int i = 0; i < dataCount; ++i)
-            data.NetIds[i] = new NetId64(reader.ReadUInt64());
+            netIds[i] = new NetId64(reader.ReadUInt64());
 
         data.NetIds = netIds;
         data.Indexes = indexes;
@@ -1868,10 +2066,16 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
     {
         int dataCount = data.Count;
 
+        writer.ExtendBufferFor(11 * sizeof(int) + data.Indexes.Length * sizeof(int) + data.NetIds.Length * sizeof(ulong));
+
         writer.Write(data.IndexPlayer);
         writer.Write(data.IndexVehicle);
         writer.Write(data.IndexItem);
         writer.Write(data.IndexZombie);
+        writer.Write(data.IndexAnimalTable);
+        writer.Write(data.IndexVehicleTable);
+        writer.Write(data.IndexItemTable);
+        writer.Write(data.IndexZombieTable);
         writer.Write(data.IndexTiers);
         writer.Write(data.IndexAssets);
         writer.Write(dataCount);

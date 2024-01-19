@@ -87,8 +87,43 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
     {
         CopyBuffer = IntlCopyBuffer.AsReadOnly();
     }
-    protected virtual bool TryRaycastSelectableItems(in Ray ray, out RaycastHit hit)
+    private static List<RaycastHit>? _hits;
+    protected virtual void RaycastAllSelectableItems(ref Ray ray, ICollection<RaycastHit> hits) { }
+    protected virtual bool TryRaycastSelectableItems(ref Ray ray, out RaycastHit hit)
     {
+        _hits ??= new List<RaycastHit>(16);
+        try
+        {
+            RaycastAllSelectableItems(ref ray, _hits);
+            if (_hits.Count == 0)
+            {
+                hit = default;
+                return false;
+            }
+
+            Vector3 point = ray.origin;
+
+            float minDist = float.MaxValue;
+            int minDistIndex = -1;
+            for (int i = 0; i < _hits.Count; ++i)
+            {
+                float dist = (_hits[i].point - point).sqrMagnitude;
+
+                if (dist >= minDist)
+                    continue;
+
+                minDist = dist;
+                minDistIndex = i;
+            }
+
+            hit = _hits[minDistIndex];
+            return true;
+        }
+        finally
+        {
+            _hits.Clear();
+        }
+
         hit = default;
         return false;
     }
@@ -169,7 +204,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                 RaycastHit hit = default;
                 if (!isOverHandles)
                 {
-                    TryRaycastSelectableItems(in ray, out hit);
+                    TryRaycastSelectableItems(ref ray, out hit);
                     if (hit.transform != null)
                     {
                         IDevkitHierarchyItem? foundItem = hit.transform.GetComponentInParent<IDevkitHierarchyItem>();
@@ -199,22 +234,22 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                     AreaSelectStartTime = CachedTime.RealtimeSinceStartup;
                 }
                 
-                CheckHover(in hit);
+                CheckHover(ref hit);
             }
-            else if (!isOverHandles && CanMiddleClickPick && InputEx.GetKeyDown(KeyCode.Mouse2))
+            else if (CanMiddleClickPick && InputEx.GetKeyDown(KeyCode.Mouse2))
             {
                 // middle click picking
 
-                TryRaycastSelectableItems(in ray, out RaycastHit hit);
+                TryRaycastSelectableItems(ref ray, out RaycastHit hit);
                 if (hit.transform != null)
-                    OnMiddleClickPicked(in hit);
+                    OnMiddleClickPicked(ref hit);
                 
-                CheckHover(in hit);
+                CheckHover(ref hit);
             }
             else if (!DevkitServerConfig.Config.RemoveCosmeticImprovements || _hoverHighlight != null)
             {
-                TryRaycastSelectableItems(in ray, out RaycastHit hit);
-                CheckHover(in hit);
+                TryRaycastSelectableItems(ref ray, out RaycastHit hit);
+                CheckHover(ref hit);
             }
 
             if (!_justCancelledDragging && !IsDraggingHandles && !IsAreaSelecting && CanAreaSelect && InputEx.GetKey(KeyCode.Mouse0) && CachedTime.RealtimeSinceStartup - AreaSelectStartTime > 0.1f)
@@ -484,7 +519,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         _handleModeDirty = true;
         HasReferenceTransform = false;
     }
-    private void CheckHover(in RaycastHit hit)
+    private void CheckHover(ref RaycastHit hit)
     {
         if (!DevkitServerConfig.Config.RemoveCosmeticImprovements && HighlightHover && hit.colliderInstanceID != 0)
         {
@@ -535,7 +570,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
     protected virtual void EarlyInputTick() { }
     protected virtual void LateInputTick() { }
     protected virtual void OnTempMoved() { }
-    protected virtual void OnMiddleClickPicked(in RaycastHit hit) { }
+    protected virtual void OnMiddleClickPicked(ref RaycastHit hit) { }
     protected virtual void OnGLRender()
     {
         if (IsAreaSelecting)

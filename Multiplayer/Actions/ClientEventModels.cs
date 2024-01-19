@@ -696,13 +696,13 @@ public readonly ref struct SetSpawnTableColorProperties(NetId64 spawnTableId, Sp
     public readonly float DeltaTime = deltaTime;
 }
 
-public delegate void SetSpawnTableSpawnAssetId(in SetSpawnTableSpawnAssetIdProperties properties);
-public delegate void SetSpawnTableSpawnAssetIdRequested(in SetSpawnTableSpawnAssetIdProperties properties, ref bool shouldAllow);
-public readonly ref struct SetSpawnTableSpawnAssetIdProperties(NetId64 spawnTableId, SpawnType spawnType, ushort spawnAssetId, float deltaTime)
+public delegate void SetSpawnTableSpawnAsset(in SetSpawnTableSpawnAssetProperties properties);
+public delegate void SetSpawnTableSpawnAssetRequested(in SetSpawnTableSpawnAssetProperties properties, ref bool shouldAllow);
+public readonly ref struct SetSpawnTableSpawnAssetProperties(NetId64 spawnTableId, SpawnType spawnType, AssetReference<SpawnAsset> asset, float deltaTime)
 {
     public readonly NetId64 SpawnTableId = spawnTableId;
     public readonly SpawnType SpawnType = spawnType;
-    public readonly ushort SpawnAssetId = spawnAssetId;
+    public readonly AssetReference<SpawnAsset> Asset = asset;
     public readonly float DeltaTime = deltaTime;
 }
 
@@ -738,6 +738,15 @@ public readonly ref struct SetSpawnTableTierNameProperties(NetId64 spawnTableId,
     public readonly float DeltaTime = deltaTime;
 }
 
+public delegate void DeleteSpawnTable(in DeleteSpawnTableProperties properties);
+public delegate void DeleteSpawnTableRequested(in DeleteSpawnTableProperties properties, ref bool shouldAllow);
+public readonly ref struct DeleteSpawnTableProperties(NetId64 spawnTableId, SpawnType spawnType, float deltaTime)
+{
+    public readonly NetId64 SpawnTableId = spawnTableId;
+    public readonly SpawnType SpawnType = spawnType;
+    public readonly float DeltaTime = deltaTime;
+}
+
 public delegate void DeleteSpawnTableTier(in DeleteSpawnTableTierProperties properties);
 public delegate void DeleteSpawnTableTierRequested(in DeleteSpawnTableTierProperties properties, ref bool shouldAllow);
 public readonly ref struct DeleteSpawnTableTierProperties(NetId64 spawnTableId, NetId64 spawnTierId, SpawnType spawnType, float deltaTime)
@@ -757,6 +766,17 @@ public readonly ref struct SetSpawnTableTierAssetProperties(NetId64 spawnTableId
     public readonly NetId64 SpawnAssetId = spawnAssetId;
     public readonly SpawnType SpawnType = spawnType;
     public readonly AssetReference<Asset> Asset = asset;
+    public readonly float DeltaTime = deltaTime;
+}
+
+public delegate void SetSpawnTableTierChances(in SetSpawnTableTierChancesProperties properties);
+public delegate void SetSpawnTableTierChancesRequested(in SetSpawnTableTierChancesProperties properties, ref bool shouldAllow);
+public readonly ref struct SetSpawnTableTierChancesProperties(NetId64 spawnTableId, ArraySegment<NetId64> spawnTierIds, SpawnType spawnType, ArraySegment<float> chances, float deltaTime)
+{
+    public readonly NetId64 SpawnTableId = spawnTableId;
+    public readonly ArraySegment<NetId64> SpawnTierIds = spawnTierIds;
+    public readonly SpawnType SpawnType = spawnType;
+    public readonly ArraySegment<float> Chances = chances;
     public readonly float DeltaTime = deltaTime;
 }
 

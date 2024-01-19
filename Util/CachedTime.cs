@@ -1,6 +1,4 @@
-﻿using JetBrains.Annotations;
-
-namespace DevkitServer.Util;
+﻿namespace DevkitServer.Util;
 
 internal class CachedTime : MonoBehaviour
 {

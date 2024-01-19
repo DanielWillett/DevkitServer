@@ -21,6 +21,10 @@
       "description": "Adds extra debug logging from DevkitServer. Helps with diagnosing problems but could lower performance.",
       "type": "boolean"
     },
+    "hide_map_name": {
+      "description": "Hide your current map name from Steam friends list and Discord rich presence. Servers can optionally force this to true.",
+      "type": "boolean"
+    },
     "disable_terminal": {
       "description": "On Windows, disables opening the terminal window when you launch the game.",
       "type": "boolean"

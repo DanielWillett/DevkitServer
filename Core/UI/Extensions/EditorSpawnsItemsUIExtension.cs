@@ -1,20 +1,27 @@
 ﻿#if CLIENT
+using DevkitServer.API.Devkit.Spawns;
 using DevkitServer.API.UI.Extensions;
+using DevkitServer.API.UI.Extensions.Members;
 using DevkitServer.Models;
 using DevkitServer.Util.Region;
 
 namespace DevkitServer.Core.UI.Extensions;
 [UIExtension(typeof(EditorSpawnsItemsUI))]
-internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSpawnpoint>
+internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtensionNormalTables<ItemSpawnpoint>
 {
     private const float DistanceMax = 48f;
     private const int RegionDistance = 2;
+
+    [ExistingMember("itemButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    // virtual properties wont patch right
+    protected ISleekButton[]? Assets2 { get; }
+    protected override ISleekButton[]? Assets => Assets2;
     protected override bool IsVisible
     {
         get => LevelVisibility.itemsVisible;
         set => LevelVisibility.itemsVisible = value;
     }
-    public EditorSpawnsItemsUIExtension() : base(new Vector3(0f, 0.5f, 0f), 16f, DistanceMax)
+    public EditorSpawnsItemsUIExtension() : base(new Vector3(0f, 0.5f, 0f), 16f, DistanceMax, SpawnType.Item)
     {
         SpawnUtil.OnItemSpawnpointAdded += OnSpawnAdded;
         SpawnUtil.OnItemSpawnpointRemoved += OnSpawnRemoved;
@@ -26,7 +33,8 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSp
     {
         foreach (ItemSpawnpoint spawnpoint in SpawnUtil.EnumerateItemSpawns(MovementUtil.MainCameraRegion, RegionDistance))
         {
-            UpdateLabel(spawnpoint, table.name);
+            if (spawnpoint.type == index)
+                UpdateLabel(spawnpoint, table.name);
         }
     }
     protected override void OnRegionUpdated(RegionCoord oldRegion, RegionCoord newRegion, bool isInRegion)
@@ -83,6 +91,45 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtension<ItemSp
         SpawnUtil.OnItemSpawnTableChanged -= OnSpawnTableChanged;
         SpawnTableUtil.OnItemSpawnTableNameUpdated -= OnNameUpdated;
         base.OnDestroyed();
+    }
+
+    public override void UpdateSpawnName(int index)
+    {
+        if (!SpawnTableUtil.TryGetSelectedTier(SpawnType.Item, out SpawnTierIdentifier? id) || !id.HasValue)
+            return;
+
+        ItemSpawn spawn = LevelItems.tables[id.Value.TableIndex].tiers[id.Value.TierIndex].table[index];
+        Asset asset = SDG.Unturned.Assets.find(EAssetType.ITEM, spawn.item);
+        string str = asset?.FriendlyName ?? asset?.name ?? "?";
+        UpdateSpawnName(spawn.item + " " + str, index);
+    }
+    public override void UpdateTableColor()
+    {
+        ItemTable table = LevelItems.tables[EditorSpawns.selectedItem];
+        UpdateTableColor(table.color);
+    }
+    public override void UpdateTableId()
+    {
+        ItemTable table = LevelItems.tables[EditorSpawns.selectedItem];
+        UpdateTableId(table.tableID);
+    }
+    public override void UpdateTierName(int index)
+    {
+        ItemTier tier = LevelItems.tables[EditorSpawns.selectedItem].tiers[index];
+
+        bool isSelected = SpawnTableUtil.TryGetSelectedTier(SpawnType.Item, out SpawnTierIdentifier? id) && id.HasValue && id.Value.TierIndex == index;
+
+        UpdateTierName(tier.name, index, isSelected);
+    }
+    public override void UpdateTableName(int index, bool updateField)
+    {
+        ItemTable table = LevelItems.tables[index];
+        UpdateTableName(table.name, index, EditorSpawns.selectedItem == index, updateField);
+    }
+    public override void UpdateTierChance(int index, bool updateSlider)
+    {
+        ItemTier tier = LevelItems.tables[EditorSpawns.selectedItem].tiers[index];
+        UpdateTierChance(tier.chance, index, updateSlider);
     }
 }
 #endif

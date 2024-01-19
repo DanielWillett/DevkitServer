@@ -14,7 +14,6 @@ using DevkitServer.Patches;
 using DevkitServer.Plugins;
 using HarmonyLib;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
@@ -833,7 +832,13 @@ public static class UIExtensionManager
             }
             catch (Exception ex)
             {
-                (exceptions ??= new List<Exception>()).Add(ex);
+                if (member.TryGetAttributeSafe(out ExistingMemberAttribute existingMemberAttribute) && existingMemberAttribute.FailureBehavior == ExistingMemberFailureBehavior.IgnoreNoWarn)
+                {
+                    LogError($"Error initializing existing member: {member.Format()}. Ignored according to failure behavior ({"IgnoreNoWarn".Colorize(ConsoleColor.White)}).", info.Plugin, info.Assembly);
+                    LogError(ex, info.Plugin, info.Assembly);
+                }
+                else
+                    (exceptions ??= new List<Exception>()).Add(ex);
             }
         }
 
@@ -1103,10 +1108,13 @@ public static class UIExtensionManager
             (existingMethod == null || existingMethod.ReturnType == typeof(void) || existingMethod.GetParameters().Length > 0))
         {
             string msg = $"Unable to match \"{owningType.Format()}.{existingMemberAttribute.MemberName.Colorize(FormattingColorType.Property)}\" to a field, get-able property, or no-argument, non-void-returning method.";
-            if (failureMode != ExistingMemberFailureBehavior.Ignore)
+            if (failureMode is not ExistingMemberFailureBehavior.Ignore and not ExistingMemberFailureBehavior.IgnoreNoWarn)
                 throw new MemberAccessException(msg);
 
-            LogDebug(msg, info.Plugin, info.Assembly);
+            if (failureMode != ExistingMemberFailureBehavior.IgnoreNoWarn)
+                LogDebug(msg, info.Plugin, info.Assembly);
+            else
+                LogDebug(msg, info.Plugin, info.Assembly);
             return;
         }
         MemberInfo existingMember = ((MemberInfo?)existingField ?? existingProperty) ?? existingMethod!;
@@ -1122,11 +1130,14 @@ public static class UIExtensionManager
                 // setter
                 if (parameters.Length == 0 || !parameters[0].ParameterType.IsAssignableFrom(existingMemberType))
                 {
-                    string msg = $"Unable to assign existing method parameter type: \"{existingMemberType.FullName}\" to expected member type: \"{parameters[0].ParameterType.FullName}\" for existing member \"{member.Name}\".";
-                    if (failureMode != ExistingMemberFailureBehavior.Ignore)
+                    string msg = $"Unable to assign existing method parameter type: {existingMemberType.Format()} to expected member type: {parameters[0].ParameterType.Format()} for existing member {member.Format()}.";
+                    if (failureMode is not ExistingMemberFailureBehavior.Ignore and not ExistingMemberFailureBehavior.IgnoreNoWarn)
                         throw new Exception(msg);
 
-                    LogDebug(msg, info.Plugin, info.Assembly);
+                    if (failureMode != ExistingMemberFailureBehavior.IgnoreNoWarn)
+                        LogWarning(msg, info.Plugin, info.Assembly);
+                    else
+                        LogDebug(msg, info.Plugin, info.Assembly);
                     return;
                 }
             }
@@ -1135,22 +1146,28 @@ public static class UIExtensionManager
                 // getter
                 if (parameters.Length != 0 || !memberType.IsAssignableFrom(existingMemberType))
                 {
-                    string msg = $"Unable to assign existing method parameter type: \"{existingMemberType.FullName}\" to expected member type: \"{memberType.FullName}\" for existing member \"{member.Name}\".";
-                    if (failureMode != ExistingMemberFailureBehavior.Ignore)
+                    string msg = $"Unable to assign existing method parameter type: {existingMemberType.Format()} to expected member type: {memberType.Format()} for existing member {member.Format()}.";
+                    if (failureMode is not ExistingMemberFailureBehavior.Ignore and not ExistingMemberFailureBehavior.IgnoreNoWarn)
                         throw new Exception(msg);
 
-                    LogDebug(msg, info.Plugin, info.Assembly);
+                    if (failureMode != ExistingMemberFailureBehavior.IgnoreNoWarn)
+                        LogWarning(msg, info.Plugin, info.Assembly);
+                    else
+                        LogDebug(msg, info.Plugin, info.Assembly);
                     return;
                 }
             }
         }
         else if (!memberType.IsAssignableFrom(existingMemberType))
         {
-            string msg = $"Unable to assign existing member type: \"{existingMemberType.FullName}\" to expected member type: \"{memberType.FullName}\" for existing member \"{member.Name}\".";
-            if (failureMode != ExistingMemberFailureBehavior.Ignore)
+            string msg = $"Unable to assign existing member type: {existingMemberType.Format()} to expected member type: {memberType.Format()} for existing member {member.Format()}.";
+            if (failureMode is not ExistingMemberFailureBehavior.Ignore and not ExistingMemberFailureBehavior.IgnoreNoWarn)
                 throw new Exception(msg);
 
-            LogDebug(msg, info.Plugin, info.Assembly);
+            if (failureMode != ExistingMemberFailureBehavior.IgnoreNoWarn)
+                LogWarning(msg, info.Plugin, info.Assembly);
+            else
+                LogDebug(msg, info.Plugin, info.Assembly);
             return;
         }
 
@@ -1158,11 +1175,14 @@ public static class UIExtensionManager
 
         if (!existingIsStatic && info.TypeInfo.IsStaticUI)
         {
-            string msg = $"Requested instance variable ({existingMember.Name}) from static UI: {info.ParentType.Name} for existing member \"{member.Name}\".";
-            if (failureMode != ExistingMemberFailureBehavior.Ignore)
+            string msg = $"Requested instance variable ({existingMember.Format()}) from static UI: {info.ParentType.Format()} for existing member {member.Format()}.";
+            if (failureMode is not ExistingMemberFailureBehavior.Ignore and not ExistingMemberFailureBehavior.IgnoreNoWarn)
                 throw new InvalidOperationException(msg);
 
-            LogDebug(msg, info.Plugin, info.Assembly);
+            if (failureMode != ExistingMemberFailureBehavior.IgnoreNoWarn)
+                LogWarning(msg, info.Plugin, info.Assembly);
+            else
+                LogDebug(msg, info.Plugin, info.Assembly);
             return;
         }
 
@@ -1203,6 +1223,27 @@ public static class UIExtensionManager
             else
                 initialized = false;
             LogDebug($"Assumed initialized setting for existing member: {member.Format()}: {initialized.Format()}.", info.Plugin, info.Assembly);
+        }
+
+        MethodInfo? toPatch = (method ?? property?.GetGetMethod(true));
+        if (!initialized && toPatch != null && !toPatch.IsDeclaredMember())
+        {
+            if (toPatch.DeclaringType == info.ImplementationType)
+            {
+                string msg = $"Can not patch virtual methods or properties: Existing member \"{member.Format()}\".";
+                if (failureMode is not ExistingMemberFailureBehavior.Ignore
+                    and not ExistingMemberFailureBehavior.IgnoreNoWarn)
+                    throw new Exception(msg);
+
+                if (failureMode != ExistingMemberFailureBehavior.IgnoreNoWarn)
+                    LogWarning(msg, info.Plugin, info.Assembly);
+                else
+                    LogDebug(msg, info.Plugin, info.Assembly);
+                return;
+            }
+
+            // harmony's weird idk
+            member = toPatch.GetDeclaredMember();
         }
 
         if (!initialized && existingProperty != null && existingProperty.GetSetMethod(true) != null)

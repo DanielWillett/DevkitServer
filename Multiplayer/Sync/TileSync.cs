@@ -690,7 +690,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             Time = time;
             Type = type;
         }
-        public bool Overlaps(in MapInvalidation other) => !(XMax < other.XMin || YMax < other.YMin || XMin > other.XMax || YMin > other.YMax);
+        public readonly bool Overlaps(in MapInvalidation other) => !(XMax < other.XMin || YMax < other.YMin || XMin > other.XMax || YMin > other.YMax);
         public void Encapsulate(in MapInvalidation other)
         {
             if (XMin > other.XMin)
@@ -702,8 +702,8 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             if (YMax < other.YMax)
                 YMax = other.YMax;
         }
-        public bool Encapsulates(int x, int y) => XMax >= x && YMax >= y && XMin <= x && YMin <= y;
-        public bool CollidesWith2DCircle(Vector3 pos, float radius)
+        public readonly bool Encapsulates(int x, int y) => XMax >= x && YMax >= y && XMin <= x && YMin <= y;
+        public readonly bool CollidesWith2DCircle(Vector3 pos, float radius)
         {
             // https://www.jeffreythompson.org/collision-detection/circle-rect.php
 
@@ -733,6 +733,6 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
             return sqrDst <= radius;
         }
 
-        public override string ToString() => $"{{ Tile: {Tile}, Bounds: ({XMin} - {XMax}, {YMin} - {YMax}) ({Type}) }}";
+        public readonly override string ToString() => $"{{ Tile: {Tile}, Bounds: ({XMin} - {XMax}, {YMin} - {YMax}) ({Type}) }}";
     }
 }

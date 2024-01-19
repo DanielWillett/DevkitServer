@@ -29,10 +29,11 @@ public static class EncodingEx
         typeof(ulong), typeof(float), typeof(long), typeof(ushort), typeof(short), typeof(byte), typeof(int), typeof(uint), typeof(bool), typeof(char), typeof(sbyte), typeof(double),
         typeof(string), typeof(decimal), typeof(DateTime), typeof(DateTimeOffset), typeof(TimeSpan), typeof(Guid),
         typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Quaternion), typeof(Color), typeof(Color32), typeof(Bounds), typeof(Type),
-        typeof(RegionIdentifier), typeof(NetId), typeof(NetId64),
+        typeof(RegionIdentifier), typeof(NetId), typeof(NetId64), typeof(CSteamID),
         typeof(ulong?), typeof(float?), typeof(long?), typeof(ushort?), typeof(short?), typeof(byte?), typeof(int?), typeof(uint?), typeof(bool?), typeof(char?), typeof(sbyte?),
         typeof(double?), typeof(decimal?), typeof(DateTime?), typeof(DateTimeOffset?), typeof(TimeSpan?), typeof(Guid?),
-        typeof(Vector2?), typeof(Vector3?), typeof(Vector4?), typeof(Quaternion?), typeof(Color?), typeof(Color32?), typeof(Bounds?), typeof(NetId?), typeof(NetId64?)
+        typeof(Vector2?), typeof(Vector3?), typeof(Vector4?), typeof(Quaternion?), typeof(Color?), typeof(Color32?), typeof(Bounds?), typeof(NetId?), typeof(NetId64?),
+        typeof(CSteamID?)
     };
     internal static readonly Type[] ValidArrayTypes =
     {

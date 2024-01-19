@@ -83,7 +83,7 @@ public static class RegionUtil
         return new SurroundingTilesIterator(centerX, centerY, mode);
     }
 
-    public static void ForEachRegion(RegionAction action)
+    public static void ForEachRegion([InstantHandle] RegionAction action)
     {
         int worldSize = Regions.WORLD_SIZE;
         SurroundingRegionsIterator iterator = new SurroundingRegionsIterator((byte)(worldSize / 2), (byte)(worldSize / 2));
@@ -93,9 +93,9 @@ public static class RegionUtil
             action(coord);
         }
     }
-    public static void ForEachRegion(RegionCoord center, RegionAction action)
+    public static void ForEachRegion(RegionCoord center, [InstantHandle] RegionAction action)
         => ForEachRegion(center.x, center.y, action);
-    public static void ForEachRegion(byte centerX, byte centerY, RegionAction action)
+    public static void ForEachRegion(byte centerX, byte centerY, [InstantHandle] RegionAction action)
     {
         SurroundingRegionsIterator iterator = new SurroundingRegionsIterator(centerX, centerY);
         while (iterator.MoveNext())
@@ -104,14 +104,14 @@ public static class RegionUtil
             action(coord);
         }
     }
-    public static void ForEachRegion(Vector3 center, RegionAction action)
+    public static void ForEachRegion(Vector3 center, [InstantHandle] RegionAction action)
     {
         if (!Regions.tryGetCoordinate(center, out byte centerX, out byte centerY))
             centerX = centerY = (byte)(Regions.WORLD_SIZE / 2);
 
         ForEachRegion(centerX, centerY, action);
     }
-    public static void ForEachRegion(RegionActionWhile action)
+    public static void ForEachRegion([InstantHandle] RegionActionWhile action)
     {
         int worldSize = Regions.WORLD_SIZE;
         SurroundingRegionsIterator iterator = new SurroundingRegionsIterator((byte)(worldSize / 2), (byte)(worldSize / 2));
@@ -122,9 +122,9 @@ public static class RegionUtil
                 break;
         }
     }
-    public static void ForEachRegion(RegionCoord center, RegionActionWhile action)
+    public static void ForEachRegion(RegionCoord center, [InstantHandle] RegionActionWhile action)
         => ForEachRegion(center.x, center.y, action);
-    public static void ForEachRegion(byte centerX, byte centerY, RegionActionWhile action)
+    public static void ForEachRegion(byte centerX, byte centerY, [InstantHandle] RegionActionWhile action)
     {
         SurroundingRegionsIterator iterator = new SurroundingRegionsIterator(centerX, centerY);
         while (iterator.MoveNext())
@@ -134,14 +134,14 @@ public static class RegionUtil
                 break;
         }
     }
-    public static void ForEachRegion(Vector3 center, RegionActionWhile action)
+    public static void ForEachRegion(Vector3 center, [InstantHandle] RegionActionWhile action)
     {
         if (!Regions.tryGetCoordinate(center, out byte centerX, out byte centerY))
             centerX = centerY = (byte)(Regions.WORLD_SIZE / 2);
 
         ForEachRegion(centerX, centerY, action);
     }
-    public static void ForEachTile(LandscapeCoordAction action)
+    public static void ForEachTile([InstantHandle] LandscapeCoordAction action)
     {
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(0, 0, TileIteratorMode.LandscapeCoord);
         while (iterator.MoveNext())
@@ -150,7 +150,7 @@ public static class RegionUtil
             action(coord);
         }
     }
-    public static void ForEachTile(int centerX, int centerY, LandscapeCoordAction action)
+    public static void ForEachTile(int centerX, int centerY, [InstantHandle] LandscapeCoordAction action)
     {
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(centerX, centerY, TileIteratorMode.LandscapeCoord);
         while (iterator.MoveNext())
@@ -159,15 +159,15 @@ public static class RegionUtil
             action(coord);
         }
     }
-    public static void ForEachTile(LandscapeCoord center, LandscapeCoordAction action)
+    public static void ForEachTile(LandscapeCoord center, [InstantHandle] LandscapeCoordAction action)
         => ForEachTile(center.x, center.y, action);
-    public static void ForEachTile(Vector3 center, LandscapeCoordAction action)
+    public static void ForEachTile(Vector3 center, [InstantHandle] LandscapeCoordAction action)
     {
         LandscapeCoord coord = new LandscapeCoord(center);
 
         ForEachTile(coord.x, coord.y, action);
     }
-    public static void ForEachTile(LandscapeCoordActionWhile action)
+    public static void ForEachTile([InstantHandle] LandscapeCoordActionWhile action)
     {
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(0, 0, TileIteratorMode.LandscapeCoord);
         while (iterator.MoveNext())
@@ -177,7 +177,7 @@ public static class RegionUtil
                 break;
         }
     }
-    public static void ForEachTile(int centerX, int centerY, LandscapeCoordActionWhile action)
+    public static void ForEachTile(int centerX, int centerY, [InstantHandle] LandscapeCoordActionWhile action)
     {
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(centerX, centerY, TileIteratorMode.LandscapeCoord);
         while (iterator.MoveNext())
@@ -187,15 +187,15 @@ public static class RegionUtil
                 break;
         }
     }
-    public static void ForEachTile(LandscapeCoord center, LandscapeCoordActionWhile action)
+    public static void ForEachTile(LandscapeCoord center, [InstantHandle] LandscapeCoordActionWhile action)
         => ForEachTile(center.x, center.y, action);
-    public static void ForEachTile(Vector3 center, LandscapeCoordActionWhile action)
+    public static void ForEachTile(Vector3 center, [InstantHandle] LandscapeCoordActionWhile action)
     {
         LandscapeCoord coord = new LandscapeCoord(center);
 
         ForEachTile(coord.x, coord.y, action);
     }
-    public static void ForEachHeightmapCoord(HeightmapCoordAction action)
+    public static void ForEachHeightmapCoord([InstantHandle] HeightmapCoordAction action)
     {
         int maxSize = Landscape.HEIGHTMAP_RESOLUTION;
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(maxSize / 2, maxSize / 2, TileIteratorMode.HeightmapCoord);
@@ -205,7 +205,7 @@ public static class RegionUtil
             action(coord);
         }
     }
-    public static void ForEachHeightmapCoord(int centerX, int centerY, HeightmapCoordAction action)
+    public static void ForEachHeightmapCoord(int centerX, int centerY, [InstantHandle] HeightmapCoordAction action)
     {
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(centerX, centerY, TileIteratorMode.HeightmapCoord);
         while (iterator.MoveNext())
@@ -214,15 +214,15 @@ public static class RegionUtil
             action(coord);
         }
     }
-    public static void ForEachHeightmapCoord(HeightmapCoord center, HeightmapCoordAction action)
+    public static void ForEachHeightmapCoord(HeightmapCoord center, [InstantHandle] HeightmapCoordAction action)
         => ForEachHeightmapCoord(center.x, center.y, action);
-    public static void ForEachHeightmapCoord(Vector3 center, HeightmapCoordAction action)
+    public static void ForEachHeightmapCoord(Vector3 center, [InstantHandle] HeightmapCoordAction action)
     {
         HeightmapCoord coord = new HeightmapCoord(new LandscapeCoord(center), center);
 
         ForEachHeightmapCoord(coord.x, coord.y, action);
     }
-    public static void ForEachHeightmapCoord(HeightmapCoordActionWhile action)
+    public static void ForEachHeightmapCoord([InstantHandle] HeightmapCoordActionWhile action)
     {
         int maxSize = Landscape.HEIGHTMAP_RESOLUTION;
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(maxSize / 2, maxSize / 2, TileIteratorMode.HeightmapCoord);
@@ -233,7 +233,7 @@ public static class RegionUtil
                 break;
         }
     }
-    public static void ForEachHeightmapCoord(int centerX, int centerY, HeightmapCoordActionWhile action)
+    public static void ForEachHeightmapCoord(int centerX, int centerY, [InstantHandle] HeightmapCoordActionWhile action)
     {
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(centerX, centerY, TileIteratorMode.HeightmapCoord);
         while (iterator.MoveNext())
@@ -243,15 +243,15 @@ public static class RegionUtil
                 break;
         }
     }
-    public static void ForEachHeightmapCoord(HeightmapCoord center, HeightmapCoordActionWhile action)
+    public static void ForEachHeightmapCoord(HeightmapCoord center, [InstantHandle] HeightmapCoordActionWhile action)
         => ForEachHeightmapCoord(center.x, center.y, action);
-    public static void ForEachHeightmapCoord(Vector3 center, HeightmapCoordActionWhile action)
+    public static void ForEachHeightmapCoord(Vector3 center, [InstantHandle] HeightmapCoordActionWhile action)
     {
         HeightmapCoord coord = new HeightmapCoord(new LandscapeCoord(center), center);
 
         ForEachHeightmapCoord(coord.x, coord.y, action);
     }
-    public static void ForEachSplatmapCoord(SplatmapCoordAction action)
+    public static void ForEachSplatmapCoord([InstantHandle] SplatmapCoordAction action)
     {
         int maxSize = Landscape.SPLATMAP_RESOLUTION;
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(maxSize / 2, maxSize / 2, TileIteratorMode.SplatmapCoord);
@@ -261,7 +261,7 @@ public static class RegionUtil
             action(coord);
         }
     }
-    public static void ForEachSplatmapCoord(int centerX, int centerY, SplatmapCoordAction action)
+    public static void ForEachSplatmapCoord(int centerX, int centerY, [InstantHandle] SplatmapCoordAction action)
     {
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(centerX, centerY, TileIteratorMode.SplatmapCoord);
         while (iterator.MoveNext())
@@ -270,15 +270,15 @@ public static class RegionUtil
             action(coord);
         }
     }
-    public static void ForEachSplatmapCoord(SplatmapCoord center, SplatmapCoordAction action)
+    public static void ForEachSplatmapCoord(SplatmapCoord center, [InstantHandle] SplatmapCoordAction action)
         => ForEachSplatmapCoord(center.x, center.y, action);
-    public static void ForEachSplatmapCoord(Vector3 center, SplatmapCoordAction action)
+    public static void ForEachSplatmapCoord(Vector3 center, [InstantHandle] SplatmapCoordAction action)
     {
         SplatmapCoord coord = new SplatmapCoord(new LandscapeCoord(center), center);
 
         ForEachSplatmapCoord(coord.x, coord.y, action);
     }
-    public static void ForEachSplatmapCoord(SplatmapCoordActionWhile action)
+    public static void ForEachSplatmapCoord([InstantHandle] SplatmapCoordActionWhile action)
     {
         int maxSize = Landscape.SPLATMAP_RESOLUTION;
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(maxSize / 2, maxSize / 2, TileIteratorMode.SplatmapCoord);
@@ -289,7 +289,7 @@ public static class RegionUtil
                 break;
         }
     }
-    public static void ForEachSplatmapCoord(int centerX, int centerY, SplatmapCoordActionWhile action)
+    public static void ForEachSplatmapCoord(int centerX, int centerY, [InstantHandle] SplatmapCoordActionWhile action)
     {
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(centerX, centerY, TileIteratorMode.SplatmapCoord);
         while (iterator.MoveNext())
@@ -299,15 +299,15 @@ public static class RegionUtil
                 break;
         }
     }
-    public static void ForEachSplatmapCoord(SplatmapCoord center, SplatmapCoordActionWhile action)
+    public static void ForEachSplatmapCoord(SplatmapCoord center, [InstantHandle] SplatmapCoordActionWhile action)
         => ForEachSplatmapCoord(center.x, center.y, action);
-    public static void ForEachSplatmapCoord(Vector3 center, SplatmapCoordActionWhile action)
+    public static void ForEachSplatmapCoord(Vector3 center, [InstantHandle] SplatmapCoordActionWhile action)
     {
         SplatmapCoord coord = new SplatmapCoord(new LandscapeCoord(center), center);
 
         ForEachSplatmapCoord(coord.x, coord.y, action);
     }
-    public static void ForEachFoliageTile(FoliageCoordAction action)
+    public static void ForEachFoliageTile([InstantHandle] FoliageCoordAction action)
     {
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(0, 0, TileIteratorMode.FoliageCoord);
         while (iterator.MoveNext())
@@ -316,7 +316,7 @@ public static class RegionUtil
             action(coord);
         }
     }
-    public static void ForEachFoliageTile(int centerX, int centerY, FoliageCoordAction action)
+    public static void ForEachFoliageTile(int centerX, int centerY, [InstantHandle] FoliageCoordAction action)
     {
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(centerX, centerY, TileIteratorMode.FoliageCoord);
         while (iterator.MoveNext())
@@ -325,15 +325,15 @@ public static class RegionUtil
             action(coord);
         }
     }
-    public static void ForEachFoliageTile(FoliageCoord center, FoliageCoordAction action)
+    public static void ForEachFoliageTile(FoliageCoord center, [InstantHandle] FoliageCoordAction action)
         => ForEachFoliageTile(center.x, center.y, action);
-    public static void ForEachFoliageTile(Vector3 center, FoliageCoordAction action)
+    public static void ForEachFoliageTile(Vector3 center, [InstantHandle] FoliageCoordAction action)
     {
         FoliageCoord coord = new FoliageCoord(center);
 
         ForEachFoliageTile(coord.x, coord.y, action);
     }
-    public static void ForEachFoliageTile(FoliageCoordActionWhile action)
+    public static void ForEachFoliageTile([InstantHandle] FoliageCoordActionWhile action)
     {
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(0, 0, TileIteratorMode.FoliageCoord);
         while (iterator.MoveNext())
@@ -343,7 +343,7 @@ public static class RegionUtil
                 break;
         }
     }
-    public static void ForEachFoliageTile(int centerX, int centerY, FoliageCoordActionWhile action)
+    public static void ForEachFoliageTile(int centerX, int centerY, [InstantHandle] FoliageCoordActionWhile action)
     {
         SurroundingTilesIterator iterator = new SurroundingTilesIterator(centerX, centerY, TileIteratorMode.FoliageCoord);
         while (iterator.MoveNext())
@@ -353,9 +353,9 @@ public static class RegionUtil
                 break;
         }
     }
-    public static void ForEachFoliageTile(FoliageCoord center, FoliageCoordActionWhile action)
+    public static void ForEachFoliageTile(FoliageCoord center, [InstantHandle] FoliageCoordActionWhile action)
         => ForEachFoliageTile(center.x, center.y, action);
-    public static void ForEachFoliageTile(Vector3 center, FoliageCoordActionWhile action)
+    public static void ForEachFoliageTile(Vector3 center, [InstantHandle] FoliageCoordActionWhile action)
     {
         FoliageCoord coord = new FoliageCoord(center);
 

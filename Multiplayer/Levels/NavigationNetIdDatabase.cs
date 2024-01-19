@@ -167,7 +167,7 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
 
 #elif SERVER
 
-    public NavigationNetIdReplicatedLevelData SaveData()
+    public NavigationNetIdReplicatedLevelData SaveData(CSteamID user)
     {
         uint[] netIds = new uint[NetIds.Length];
 

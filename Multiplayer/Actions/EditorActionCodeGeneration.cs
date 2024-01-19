@@ -1,5 +1,6 @@
 ﻿using DevkitServer.API;
 using DevkitServer.API.Abstractions;
+using DevkitServer.API.Multiplayer;
 using DevkitServer.Util.Encoding;
 using SDG.Framework.Utilities;
 using System.Reflection;
@@ -22,7 +23,7 @@ internal static class EditorActionsCodeGeneration
     {
         List<Type> types = Accessor.GetTypesSafe(removeIgnored: true);
         int c = 0;
-        List<(Type type, ActionSettingAttribute attr, List<PropertyInfo> info)> properties = new List<(Type, ActionSettingAttribute, List<PropertyInfo>)>(48);
+        List<(Type type, ActionSettingAttribute attr, PropertyInfo[] info)> properties = new List<(Type, ActionSettingAttribute, PropertyInfo[])>(48);
         List<(Type type, ActionAttribute attr)> actions = new List<(Type, ActionAttribute)>(32);
         for (int i = 0; i < types.Count; ++i)
         {
@@ -32,7 +33,7 @@ internal static class EditorActionsCodeGeneration
                 if (!t.IsAbstract && typeof(IAction).IsAssignableFrom(t))
                 {
                     ActionAttribute[] attrs = t.GetAttributesSafe<ActionAttribute>(false);
-                   foreach (ActionAttribute actionAttr in attrs)
+                    foreach (ActionAttribute actionAttr in attrs)
                     {
                         actionAttr.Type = t;
                         if (Attributes.TryGetValue(actionAttr.ActionType, out ActionAttribute attribute))
@@ -51,7 +52,7 @@ internal static class EditorActionsCodeGeneration
             if (t.TryGetAttributeSafe(out ActionSettingAttribute settingAttr))
             {
                 PropertyInfo[] props = t.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                properties.Add((t, settingAttr, [ ..props ]));
+                properties.Add((t, settingAttr, props));
             }
         }
 
@@ -188,7 +189,7 @@ internal static class EditorActionsCodeGeneration
 
         LocalBuilder anyChanged = writeGenerator.DeclareLocal(typeof(bool));
         const float tol = 0.0001f;
-        foreach ((Type type, ActionSettingAttribute attr, List<PropertyInfo> list) in properties)
+        foreach ((Type type, ActionSettingAttribute attr, PropertyInfo[] propArray) in properties)
         {
             writeGenerator.Comment($"Type: {type.Format()}...");
             readGenerator.Comment($"Type: {type.Format()}...");
@@ -217,7 +218,7 @@ internal static class EditorActionsCodeGeneration
             List<LocalBuilder> lcls = new List<LocalBuilder>();
             Label updateValuePop = writeGenerator.DefineLabel();
             Label updateValueNoPop = writeGenerator.DefineLabel();
-            foreach (PropertyInfo property in list)
+            foreach (PropertyInfo property in propArray)
             {
                 writeGenerator.Comment($"Property: {property.Format()}, {attr.ActionSetting.Format()}.");
                 readGenerator.Comment($"Property: {property.Format()}, {attr.ActionSetting.Format()}.");
@@ -363,7 +364,7 @@ internal static class EditorActionsCodeGeneration
 
             List<ActionSetting> used = new List<ActionSetting>(1);
 
-            foreach (PropertyInfo property in list)
+            foreach (PropertyInfo property in propArray)
             {
                 PropertyInfo? settingsProperty = null;
                 if (type.IsAssignableFrom(typeof(ActionSettingsCollection)))
@@ -489,11 +490,11 @@ internal static class EditorActionsCodeGeneration
         
         Type[] interfaces = typeof(ActionSettingsCollection).GetInterfaces();
         IEnumerable<(ActionSetting, PropertyInfo)> settingsProperties = new List<(ActionSetting, PropertyInfo)>(16);
-        foreach ((Type type, ActionSettingAttribute attr, List<PropertyInfo> list) in properties)
+        foreach ((Type type, ActionSettingAttribute attr, PropertyInfo[] propArray) in properties)
         {
             if (interfaces.Contains(type))
             {
-                foreach (PropertyInfo prop in list)
+                foreach (PropertyInfo prop in propArray)
                     ((List<(ActionSetting, PropertyInfo)>)settingsProperties).Add((attr.ActionSetting, prop));
             }
         }
@@ -677,6 +678,7 @@ internal sealed class ActionSettingAttribute(ActionSetting setting) : Attribute
 }
 
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+[BaseTypeRequired(typeof(IAction))]
 internal sealed class ActionAttribute(DevkitServerActionType type, int capacity, int optionCapacity) : Attribute
 {
     public DevkitServerActionType ActionType { get; } = type;

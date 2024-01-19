@@ -33,7 +33,9 @@ public class DevkitServerConfig
         new PermissionBranchConverter(),
         new PermissionGroupConverter(),
         new AssetReferenceJsonConverterFactory(),
-        new TimeSpanConverter()
+        new TimeSpanConverter(),
+        new NetIdJsonConverter(),
+        new NetId64JsonConverter()
     ];
 
     public static readonly JsonSerializerOptions SerializerSettings = new JsonSerializerOptions
@@ -382,31 +384,70 @@ public class DevkitServerSystemConfig : SchemaConfiguration
 #endif
 
 #nullable disable
+    /// <summary>
+    /// Full (24-bit RGB) console color support using virtual terminal sequences (works in the Windows command prompt and most web terminals).
+    /// </summary>
+    /// <remarks>If your console contains weird symbols, try setting this to false.</remarks>
     [JsonPropertyName("terminal_full_rgb_support")]
     public bool ConsoleFullRGBSupport { get; set; }
 
+    /// <summary>
+    /// Basic (4-bit) console color support using virtual terminal sequences (works in most terminals).
+    /// </summary>
+    /// <remarks>If your console contains weird symbols after setting 'terminal_full_rgb_support' to false, try setting this to false.</remarks>
     [JsonPropertyName("terminal_virtual_sequence_support")]
     public bool ConsoleVirtualSequenceSupport { get; set; }
 
+    /// <summary>
+    /// Removes cosmetic improvements.
+    /// </summary>
     [JsonPropertyName("walmart_pc_support")]
     public bool RemoveCosmeticImprovements { get; set; }
 
+    /// <summary>
+    /// Add a log to Unturned/Logs that includes whatever visual ANSI codes are used to color the console.
+    /// </summary>
     [JsonPropertyName("ansi_log")]
     public bool ANSILog { get; set; }
 
+    /// <summary>
+    /// Adds extra debug logging from DevkitServer. Helps with diagnosing problems but could lower performance.
+    /// </summary>
     [JsonPropertyName("debug_logging")]
     public bool DebugLogging { get; set; }
 
+    /// <summary>
+    /// Hide your current map name from Steam friends list and Discord rich presence. When used on a server it forces all users to hide their map names.
+    /// </summary>
+    /// <remarks>Plugins can override this relatively easily when on servers.</remarks>
+    [JsonPropertyName("hide_map_name")]
+    public bool HideMapNameFromRichPresence { get; set; }
+
 #if CLIENT
+    /// <summary>
+    /// Falls back to the vanilla chart and map functions when in singleplayer edit mode.
+    /// </summary>
+    /// <remarks>To keep clients from disconnecting while rendering it's required in multiplayer mode.</remarks>
     [JsonPropertyName("use_vanilla_cartography_in_singleplayer")]
     public bool UseVanillaCartographyInSingleplayer { get; set; }
 
+    /// <summary>
+    /// Enables a preview window for your selected object in the Object Editor.
+    /// </summary>
+    /// <remarks>Disable if you're seeing crashes or lag when editing objects.</remarks>
     [JsonPropertyName("enable_object_ui_extension")]
     public bool EnableObjectUIExtension { get; set; }
 
+    /// <summary>
+    /// Enables an override for better initial map creation (adding a new map).
+    /// </summary>
+    /// <remarks>Disable if you're seeing warnings about Level.add on load, or crashes when creating maps.</remarks>
     [JsonPropertyName("enable_better_map_creation")]
     public bool EnableBetterLevelCreation { get; set; }
 
+    /// <summary>
+    /// On Windows, disables opening the terminal window when you launch the game.
+    /// </summary>
     [JsonPropertyName("disable_terminal")]
     public bool DisableTerminal { get; set; }
 
@@ -438,18 +479,48 @@ public class DevkitServerSystemConfig : SchemaConfiguration
 #endif
 
 #if SERVER
+    /// <summary>
+    /// Maximum number of failed passwords before the connecting user gets put on a join cooldown.
+    /// </summary>
+    /// <remarks>0 or -1 = infinite.</remarks>
+    [JsonPropertyName("max_password_attempts")]
+    public int PasswordAttempts { get; set; }
+
+    /// <summary>
+    /// Number of seconds after hitting the max password attempts that it'll reset.
+    /// </summary>
+    /// <remarks>&lt;= 0 is the same as setting 'max_password_attempts' to 0 or -1.</remarks>
+    [JsonPropertyName("wrong_password_block_expire_seconds")]
+    public float WrongPasswordBlockExpireSeconds { get; set; }
+
+    /// <summary>
+    /// Options for newly created maps.
+    /// </summary>
     [JsonPropertyName("new_level_info")]
     public NewLevelCreationOptions NewLevelInfo { get; set; }
 
+    /// <summary>
+    /// Not recommended, tries to read the map from your files instead of downloading it on join.
+    /// </summary>
+    /// <remarks>You will almost certainly get out of sync from the server.</remarks>
     [JsonPropertyName("disable_map_download")]
     public bool DisableMapDownload { get; set; }
 
+    /// <summary>
+    /// Admins ('blue hammers', given with the vanilla /admin command) are treated as having the '*' permission which gives them all permissions.
+    /// </summary>
     [JsonPropertyName("admins_are_superusers")]
     public bool AdminsAreSuperusers { get; set; }
 
+    /// <summary>
+    /// Default permissions a user has.
+    /// </summary>
     [JsonPropertyName("default_permissions")]
     public PermissionBranch[] DefaultUserPermissions { get; set; }
 
+    /// <summary>
+    /// Default permission groups a user has.
+    /// </summary>
     [JsonPropertyName("default_permission_groups")]
     public string[] DefaultUserPermissionGroups { get; set; }
 
@@ -494,6 +565,7 @@ public class DevkitServerSystemConfig : SchemaConfiguration
         UserSavedataLocationOverride = null;
         AdminsAreSuperusers = true;
         MaxClientEditFPS = 50;
+        PasswordAttempts = 4;
 #endif
     }
 #if SERVER

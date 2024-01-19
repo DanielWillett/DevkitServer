@@ -197,7 +197,6 @@ public sealed class RoadActions
 }
 
 [Action(DevkitServerActionType.SetRoadIsLoop, 5, 4)]
-[EarlyTypeInit]
 public sealed class SetRoadIsLoopAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadIsLoop;
@@ -250,7 +249,6 @@ public sealed class SetRoadIsLoopAction : IReplacableAction, IInstanceIdAction
     public int CalculateSize() => 5;
 }
 [Action(DevkitServerActionType.SetRoadMaterial, 5, 4)]
-[EarlyTypeInit]
 public sealed class SetRoadMaterialAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadMaterial;
@@ -304,7 +302,6 @@ public sealed class SetRoadMaterialAction : IReplacableAction, IInstanceIdAction
 }
 
 [Action(DevkitServerActionType.SetRoadVertexIgnoreTerrain, 5, 4)]
-[EarlyTypeInit]
 public sealed class SetRoadVertexIgnoreTerrainAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadVertexIgnoreTerrain;
@@ -358,7 +355,6 @@ public sealed class SetRoadVertexIgnoreTerrainAction : IReplacableAction, IInsta
 }
 
 [Action(DevkitServerActionType.SetRoadVertexVerticalOffset, 8, 4)]
-[EarlyTypeInit]
 public sealed class SetRoadVertexVerticalOffsetAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadVertexVerticalOffset;
@@ -412,7 +408,6 @@ public sealed class SetRoadVertexVerticalOffsetAction : IReplacableAction, IInst
 }
 
 [Action(DevkitServerActionType.SetRoadVertexTangentHandleMode, 5, 4)]
-[EarlyTypeInit]
 public sealed class SetRoadVertexTangentHandleModeAction : IAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadVertexTangentHandleMode;
@@ -457,7 +452,6 @@ public sealed class SetRoadVertexTangentHandleModeAction : IAction, IInstanceIdA
 }
 
 [Action(DevkitServerActionType.SetRoadMaterialWidth, 8, 4)]
-[EarlyTypeInit]
 public sealed class SetRoadMaterialWidthAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadMaterialWidth;
@@ -509,7 +503,6 @@ public sealed class SetRoadMaterialWidthAction : IReplacableAction, IInstanceIdA
 }
 
 [Action(DevkitServerActionType.SetRoadMaterialHeight, 8, 4)]
-[EarlyTypeInit]
 public sealed class SetRoadMaterialHeightAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadMaterialHeight;
@@ -561,7 +554,6 @@ public sealed class SetRoadMaterialHeightAction : IReplacableAction, IInstanceId
 }
 
 [Action(DevkitServerActionType.SetRoadMaterialDepth, 8, 4)]
-[EarlyTypeInit]
 public sealed class SetRoadMaterialDepthAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadMaterialDepth;
@@ -613,7 +605,6 @@ public sealed class SetRoadMaterialDepthAction : IReplacableAction, IInstanceIdA
 }
 
 [Action(DevkitServerActionType.SetRoadMaterialVerticalOffset, 8, 4)]
-[EarlyTypeInit]
 public sealed class SetRoadMaterialVerticalOffsetAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadMaterialVerticalOffset;
@@ -665,7 +656,6 @@ public sealed class SetRoadMaterialVerticalOffsetAction : IReplacableAction, IIn
 }
 
 [Action(DevkitServerActionType.SetRoadMaterialIsConcrete, 5, 4)]
-[EarlyTypeInit]
 public sealed class SetRoadMaterialIsConcreteAction : IReplacableAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetRoadMaterialIsConcrete;
@@ -717,7 +707,6 @@ public sealed class SetRoadMaterialIsConcreteAction : IReplacableAction, IInstan
 }
 
 [Action(DevkitServerActionType.MoveRoadVertex, 16, 4)]
-[EarlyTypeInit]
 public sealed class MoveRoadVertexAction : IAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.MoveRoadVertex;
@@ -762,7 +751,6 @@ public sealed class MoveRoadVertexAction : IAction, IInstanceIdAction
 }
 
 [Action(DevkitServerActionType.MoveRoadTangentHandle, 17, 4)]
-[EarlyTypeInit]
 public sealed class MoveRoadTangentHandleAction : IAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.MoveRoadTangentHandle;
@@ -821,7 +809,6 @@ public sealed class MoveRoadTangentHandleAction : IAction, IInstanceIdAction
 }
 
 [Action(DevkitServerActionType.DeleteRoadVertex, 4, 4)]
-[EarlyTypeInit]
 public sealed class DeleteRoadVertexAction : IAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.DeleteRoadVertex;
@@ -864,7 +851,6 @@ public sealed class DeleteRoadVertexAction : IAction, IInstanceIdAction
 }
 
 [Action(DevkitServerActionType.DeleteRoad, 4, 4)]
-[EarlyTypeInit]
 public sealed class DeleteRoadAction : IAction, IInstanceIdAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.DeleteRoad;

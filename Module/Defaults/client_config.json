@@ -26,6 +26,11 @@
   "debug_logging": false,
 
   /*
+   *  Hide your current map name from Steam friends list and Discord rich presence. Servers can optionally force this to true.
+   */
+  "hide_map_name": false,
+
+  /*
    *  On Windows, disables opening the terminal window when you launch the game.
    */
   "disable_terminal": false,

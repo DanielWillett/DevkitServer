@@ -315,7 +315,7 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
         }
     }
 #elif SERVER
-    public LevelObjectNetIdReplicatedLevelData SaveData()
+    public LevelObjectNetIdReplicatedLevelData SaveData(CSteamID user)
     {
         NetId[] netIds = new NetId[BuildableAssignments.Count + LevelObjectAssignments.Count];
         RegionIdentifier[] buildables = BuildableAssignments.Count == 0 ? Array.Empty<RegionIdentifier>() : new RegionIdentifier[BuildableAssignments.Count];

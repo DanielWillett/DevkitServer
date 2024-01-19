@@ -10,7 +10,7 @@ using SDG.Framework.Devkit;
 
 namespace DevkitServer.Core.Tools;
 /*
- * I decided to rewrite (copy) the spawns tool for a few reasons.
+ * I decided to rewrite the spawns tool for a few reasons.
  *
  * 1. The spawn tools kinda suck.
  * 2. Because of the way they're set up internally, it's going to be very challenging to network them without instability.
@@ -41,7 +41,7 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
         Type = SpawnType.None;
     }
 
-    protected override void OnMiddleClickPicked(in RaycastHit hit)
+    protected override void OnMiddleClickPicked(ref RaycastHit hit)
     {
         if (!hit.transform.TryGetComponent(out BaseSpawnpointNode node))
             return;
@@ -134,18 +134,10 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
             }
         }
     }
-    protected override bool TryRaycastSelectableItems(in Ray ray, out RaycastHit hit)
-    {
-        foreach (BaseSpawnpointNode spawn in EnumerateSpawns())
-        {
-            if (spawn.Collider != null && spawn.Collider.Raycast(ray, out hit, 8192f))
-            {
-                return true;
-            }
-        }
 
-        hit = default;
-        return false;
+    protected override bool TryRaycastSelectableItems(ref Ray ray, out RaycastHit hit)
+    {
+        return Physics.Raycast(ray, out hit, 8192f, 1 << 3, QueryTriggerInteraction.Collide);
     }
     public override void RequestInstantiation(Vector3 position, Quaternion rotation, Vector3 scale)
     {
@@ -238,17 +230,17 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
             SpawnType.Animal => new DistanceListIterator<AnimalSpawnpoint>(LevelAnimals.spawns, x => x.point, Editor.editor.transform.position, useXZAxisOnly: true)
                 .Select(x => x.node == null ? null! : x.node.gameObject)
                 .Where(x => x != null)
-                .TakeWhile(x => x.gameObject.transform.position.SqrDist2D(position) <= distance),
+                .TakeWhile(x => x.gameObject.transform.position.SqrDist2D(in position) <= distance),
 
             SpawnType.Vehicle => new DistanceListIterator<VehicleSpawnpoint>(LevelVehicles.spawns, x => x.point, Editor.editor.transform.position, useXZAxisOnly: true)
                 .Select(x => x.node == null ? null! : x.node.gameObject)
                 .Where(x => x != null)
-                .TakeWhile(x => x.gameObject.transform.position.SqrDist2D(position) <= distance),
+                .TakeWhile(x => x.gameObject.transform.position.SqrDist2D(in position) <= distance),
 
             SpawnType.Player => new DistanceListIterator<PlayerSpawnpoint>(LevelPlayers.spawns, x => x.point, Editor.editor.transform.position, useXZAxisOnly: true)
                 .Select(x => x.node == null ? null! : x.node.gameObject)
                 .Where(x => x != null)
-                .TakeWhile(x => x.gameObject.transform.position.SqrDist2D(position) <= distance),
+                .TakeWhile(x => x.gameObject.transform.position.SqrDist2D(in position) <= distance),
 
             _ => Array.Empty<GameObject>()
         };

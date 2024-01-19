@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using DevkitServer.Models;
 using DevkitServer.API;
 using DevkitServer.Multiplayer.Actions;
+using CSteamID = Steamworks.CSteamID;
 
 namespace DevkitServer.Util.Encoding;
 
@@ -107,7 +108,8 @@ public class ByteWriter
             { typeof(char[]), GetMethod(typeof(char[])) },
             { typeof(string[]), GetMethod(typeof(string[])) },
             { typeof(NetId), GetMethod(typeof(NetId)) },
-            { typeof(NetId64), GetMethod(typeof(NetId64)) }
+            { typeof(NetId64), GetMethod(typeof(NetId64)) },
+            { typeof(CSteamID), GetMethod(typeof(CSteamID)) }
         };
 
         _nullableWriters ??= new Dictionary<Type, MethodInfo>(44)
@@ -157,7 +159,8 @@ public class ByteWriter
             { typeof(char[]), GetNullableMethod(typeof(char[])) },
             { typeof(string[]), GetNullableMethod(typeof(string[])) },
             { typeof(NetId?), GetNullableMethod(typeof(NetId?)) },
-            { typeof(NetId64?), GetNullableMethod(typeof(NetId64?)) }
+            { typeof(NetId64?), GetNullableMethod(typeof(NetId64?)) },
+            { typeof(CSteamID?), GetNullableMethod(typeof(CSteamID?)) }
         };
         
         return;
@@ -1012,6 +1015,26 @@ public class ByteWriter
             Write(n.Value);
         }
         else Write(false);
+    }
+    public void Write(CSteamID n)
+    {
+        if (n.GetEAccountType() == EAccountType.k_EAccountTypeIndividual)
+        {
+            Write((ushort)((int)n.GetEUniverse() << 8));
+            Write(n.GetAccountID().m_AccountID);
+        }
+        else
+        {
+            Write((byte)1);
+            Write(n.m_SteamID);
+        }
+    }
+    public void WriteNullable(CSteamID? n)
+    {
+        if (!n.HasValue)
+            Write(byte.MaxValue);
+        else
+            Write(n.Value);
     }
     public void Write(Guid[] n) => WriteInternal(n);
     public void WriteNullable(Guid[]? n)

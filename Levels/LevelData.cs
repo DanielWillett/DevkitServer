@@ -51,7 +51,7 @@ public sealed class LevelData
     /// <param name="saveToTemp">Should the world be resaved elsewhere instead of saving to the main save directory.</param>
     public static async Task<LevelData> GatherLevelData(bool saveToTemp,
 #if SERVER
-        bool gatherReplicatedLevelData = false,
+        CSteamID replicatedLevelDataUser = default,
 #endif
         CancellationToken token = default)
     {
@@ -129,8 +129,8 @@ public sealed class LevelData
             dirtyState?.Apply();
 
 #if SERVER
-            if (gatherReplicatedLevelData)
-                ReplicatedLevelDataRegistry.SaveToLevelData(data);
+            if (replicatedLevelDataUser.GetEAccountType() == EAccountType.k_EAccountTypeIndividual)
+                ReplicatedLevelDataRegistry.SaveToLevelData(data, replicatedLevelDataUser);
 #endif
             if (copyTask is { IsCompleted: false })
             {

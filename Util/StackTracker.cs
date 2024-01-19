@@ -106,6 +106,65 @@ public class StackTracker(List<CodeInstruction> instructions, MethodBase method)
     }
 
     /// <summary>
+    /// Tries to calculate the stack size before the given instruction index.
+    /// </summary>
+    public bool TryGetStackSizeAtIndex(int startIndex, out int stackSize)
+    {
+        if (startIndex == 0)
+        {
+            stackSize = 0;
+            return true;
+        }
+
+        int stackSizeIntl = 0;
+        int lastStack = _lastStackSizeIs0;
+        if (_lastStackSizeIs0 >= startIndex || !Accessor.TryGetListVersion(instructions, out int version) || version != _listVersion)
+            lastStack = 0;
+
+        for (int i = lastStack; i < startIndex; ++i)
+        {
+            CodeInstruction current = instructions[i];
+
+            if (i > 1 && instructions[i - 1].opcode == OpCodes.Ret && current.labels.Count > 0)
+            {
+                Label lbl = current.labels[0];
+                int index = instructions.FindLastIndex(i - 2, x => x.operand is Label lbl2 && lbl2 == lbl);
+                if (index != -1 && TryGetStackSizeAtIndex(index + 1, out int stackSize2))
+                {
+                    stackSizeIntl = stackSize2;
+                }
+            }
+
+            if ((current.opcode == OpCodes.Br || current.opcode == OpCodes.Br_S) && stackSizeIntl != 0 && current.operand is Label lbl3)
+            {
+                int index = instructions.FindIndex(i, x => x.labels.Contains(lbl3));
+                if (index != -1)
+                {
+                    i = index - 1;
+                    continue;
+                }
+            }
+            
+            if (stackSizeIntl == 0)
+                _lastStackSizeIs0 = i;
+            
+            stackSizeIntl += GetStackChange(current.opcode, current.operand, method);
+            if (current.blocks.Any(x => x.blockType is ExceptionBlockType.BeginCatchBlock or ExceptionBlockType.BeginExceptFilterBlock))
+                ++stackSizeIntl;
+
+            if (i == startIndex - 1)
+            {
+                stackSize = stackSizeIntl;
+                return true;
+            }
+        }
+
+        Accessor.TryGetListVersion(instructions, out _listVersion);
+        stackSize = 0;
+        return false;
+    }
+
+    /// <summary>
     /// Returns the index of the last instruction before <paramref name="startIndex"/> which starts with a stack size of zero.
     /// </summary>
     /// <remarks>This can be useful for isolating and replicating method calls with arguments that could change over time.</remarks>
@@ -149,7 +208,7 @@ public class StackTracker(List<CodeInstruction> instructions, MethodBase method)
                 }
             }
             stackSize += GetStackChange(current.opcode, current.operand, method);
-            if (current.blocks.Any(x => x.blockType == ExceptionBlockType.BeginCatchBlock))
+            if (current.blocks.Any(x => x.blockType is ExceptionBlockType.BeginCatchBlock or ExceptionBlockType.BeginExceptFilterBlock))
                 ++stackSize;
             if (stackSize < 0)
             {
@@ -210,7 +269,7 @@ public class StackTracker(List<CodeInstruction> instructions, MethodBase method)
                 }
             }
             stackSize += GetStackChange(current.opcode, current.operand, method);
-            if (current.blocks.Any(x => x.blockType == ExceptionBlockType.BeginCatchBlock))
+            if (current.blocks.Any(x => x.blockType is ExceptionBlockType.BeginCatchBlock or ExceptionBlockType.BeginExceptFilterBlock))
                 ++stackSize;
             if (stackSize < 0)
             {

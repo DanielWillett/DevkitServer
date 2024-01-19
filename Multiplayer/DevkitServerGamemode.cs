@@ -30,12 +30,12 @@ public class DevkitServerGamemode : GameMode
 #endif
     }
 #if SERVER
-    public static ClientInfo GetClientInfo(EditorUser user)
+    public static ClientInfo GetClientInfo(CSteamID user)
     {
         return new ClientInfo
         {
-            Permissions = PermissionManager.UserPermissions.GetPermissions(user.SteamId.m_SteamID, true)?.ToArray() ?? Array.Empty<PermissionBranch>(),
-            PermissionGroups = PermissionManager.UserPermissions.GetPermissionGroups(user.SteamId.m_SteamID, true)?.ToArray() ?? Array.Empty<PermissionGroup>()
+            Permissions = PermissionManager.UserPermissions.GetPermissions(user.m_SteamID, true)?.ToArray() ?? Array.Empty<PermissionBranch>(),
+            PermissionGroups = PermissionManager.UserPermissions.GetPermissionGroups(user.m_SteamID, true)?.ToArray() ?? Array.Empty<PermissionGroup>()
         };
     }
 #endif
