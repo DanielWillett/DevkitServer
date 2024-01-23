@@ -5,6 +5,8 @@
 /// </summary>
 public enum SpawnType : byte
 {
+    // do not rename these
+
     None,
 
     /// <summary>

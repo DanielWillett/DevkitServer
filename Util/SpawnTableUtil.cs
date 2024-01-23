@@ -1,16 +1,21 @@
 ﻿using DevkitServer.API;
 using DevkitServer.API.Devkit.Spawns;
-using DevkitServer.Models;
-using DevkitServer.Util.Region;
-#if CLIENT
 using DevkitServer.API.Permissions;
-using DevkitServer.API.UI.Extensions;
 using DevkitServer.Core.Permissions;
-using DevkitServer.Core.UI.Extensions;
+using DevkitServer.Models;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Levels;
+using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Util.Region;
+#if CLIENT
+using Cysharp.Threading.Tasks;
+using DevkitServer.API.UI.Extensions;
+using DevkitServer.Core.UI.Extensions;
 using SDG.Framework.Devkit;
 using SDG.Framework.Utilities;
+#elif SERVER
+using DevkitServer.API.UI;
+using DevkitServer.Players;
 #endif
 
 namespace DevkitServer.Util;
@@ -93,6 +98,15 @@ public static class SpawnTableUtil
         = Accessor.GenerateStaticGetter<EditorSpawnsZombiesUI, byte>("selectItem", throwOnError: false);
 #endif
 
+    [UsedImplicitly]
+    private static readonly NetCall<NetId64, byte, string, ushort, Color, ulong> SendBasicSpawnTableInstantiation = new NetCall<NetId64, byte, string, ushort, Color, ulong>(DevkitServerNetCall.SendBasicSpawnTableInstantiation);
+
+    [UsedImplicitly]
+    private static readonly NetCall<NetId64, string, long, uint, float, NetId64, Guid, Color, ulong> SendZombieSpawnTableInstantiation = new NetCall<NetId64, string, long, uint, float, NetId64, Guid, Color, ulong>(DevkitServerNetCall.SendZombieSpawnTableInstantiation);
+    
+    [UsedImplicitly]
+    private static readonly NetCall<byte, string> RequestSpawnTableInstantiation = new NetCall<byte, string>(DevkitServerNetCall.RequestSpawnTableInstantiation);
+
     internal static readonly CachedMulticastEvent<AnimalSpawnTableArgs> EventOnAnimalSpawnTableNameUpdated = new CachedMulticastEvent<AnimalSpawnTableArgs>(typeof(SpawnTableUtil), nameof(OnAnimalSpawnTableNameUpdated));
     internal static readonly CachedMulticastEvent<VehicleSpawnTableArgs> EventOnVehicleSpawnTableNameUpdated = new CachedMulticastEvent<VehicleSpawnTableArgs>(typeof(SpawnTableUtil), nameof(OnVehicleSpawnTableNameUpdated));
     internal static readonly CachedMulticastEvent<ItemSpawnTableArgs> EventOnItemSpawnTableNameUpdated = new CachedMulticastEvent<ItemSpawnTableArgs>(typeof(SpawnTableUtil), nameof(OnItemSpawnTableNameUpdated));
@@ -106,6 +120,11 @@ public static class SpawnTableUtil
     internal static readonly CachedMulticastEvent<VehicleSpawnTierArgs> EventOnVehicleSpawnTierChanceUpdated = new CachedMulticastEvent<VehicleSpawnTierArgs>(typeof(SpawnTableUtil), nameof(OnVehicleSpawnTierChanceUpdated));
     internal static readonly CachedMulticastEvent<ItemSpawnTierArgs> EventOnItemSpawnTierChanceUpdated = new CachedMulticastEvent<ItemSpawnTierArgs>(typeof(SpawnTableUtil), nameof(OnItemSpawnTierChanceUpdated));
     internal static readonly CachedMulticastEvent<ZombieSpawnTierArgs> EventOnZombieSpawnTierChanceUpdated = new CachedMulticastEvent<ZombieSpawnTierArgs>(typeof(SpawnTableUtil), nameof(OnZombieSpawnTierChanceUpdated));
+    
+    internal static readonly CachedMulticastEvent<AnimalSpawnTableArgs> EventOnAnimalSpawnTableAdded = new CachedMulticastEvent<AnimalSpawnTableArgs>(typeof(SpawnTableUtil), nameof(OnAnimalSpawnTableAdded));
+    internal static readonly CachedMulticastEvent<VehicleSpawnTableArgs> EventOnVehicleSpawnTableAdded = new CachedMulticastEvent<VehicleSpawnTableArgs>(typeof(SpawnTableUtil), nameof(OnVehicleSpawnTableAdded));
+    internal static readonly CachedMulticastEvent<ItemSpawnTableArgs> EventOnItemSpawnTableAdded = new CachedMulticastEvent<ItemSpawnTableArgs>(typeof(SpawnTableUtil), nameof(OnItemSpawnTableAdded));
+    internal static readonly CachedMulticastEvent<ZombieSpawnTableArgs> EventOnZombieSpawnTableAdded = new CachedMulticastEvent<ZombieSpawnTableArgs>(typeof(SpawnTableUtil), nameof(OnZombieSpawnTableAdded));
     
     internal static readonly CachedMulticastEvent<AnimalSpawnTableArgs> EventOnAnimalSpawnTableColorUpdated = new CachedMulticastEvent<AnimalSpawnTableArgs>(typeof(SpawnTableUtil), nameof(OnAnimalSpawnTableColorUpdated));
     internal static readonly CachedMulticastEvent<VehicleSpawnTableArgs> EventOnVehicleSpawnTableColorUpdated = new CachedMulticastEvent<VehicleSpawnTableArgs>(typeof(SpawnTableUtil), nameof(OnVehicleSpawnTableColorUpdated));
@@ -216,6 +235,27 @@ public static class SpawnTableUtil
     {
         add => EventOnZombieSpawnTierChanceUpdated.Add(value);
         remove => EventOnZombieSpawnTierChanceUpdated.Remove(value);
+    }
+    
+    public static event AnimalSpawnTableArgs OnAnimalSpawnTableAdded
+    {
+        add => EventOnAnimalSpawnTableAdded.Add(value);
+        remove => EventOnAnimalSpawnTableAdded.Remove(value);
+    }
+    public static event VehicleSpawnTableArgs OnVehicleSpawnTableAdded
+    {
+        add => EventOnVehicleSpawnTableAdded.Add(value);
+        remove => EventOnVehicleSpawnTableAdded.Remove(value);
+    }
+    public static event ItemSpawnTableArgs OnItemSpawnTableAdded
+    {
+        add => EventOnItemSpawnTableAdded.Add(value);
+        remove => EventOnItemSpawnTableAdded.Remove(value);
+    }
+    public static event ZombieSpawnTableArgs OnZombieSpawnTableAdded
+    {
+        add => EventOnZombieSpawnTableAdded.Add(value);
+        remove => EventOnZombieSpawnTableAdded.Remove(value);
     }
     
     public static event AnimalSpawnTableArgs OnAnimalSpawnTableColorUpdated
@@ -1462,7 +1502,7 @@ public static class SpawnTableUtil
                             for (int j = 0; j < maxAssetCt; ++j)
                             {
                                 SpawnAssetIdentifier assetId = new SpawnAssetIdentifier(raw | (j << 24));
-                                EventOnAnimalSpawnAssetRemoved.TryInvoke(tier.table[j], assetId, HierarchicalEventSource.GrandParentObject);
+                                EventOnAnimalSpawnAssetRemoved.TryInvoke(tier.table[j], assetId, HierarchicalEventSource.GrandparentObject);
 #if DEBUG
                                 Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Animal spawn asset removed: {assetId.Format()} (parent removed).");
 #endif
@@ -1513,7 +1553,7 @@ public static class SpawnTableUtil
                             {
                                 SpawnAssetIdentifier assetId = new SpawnAssetIdentifier(raw | (j << 24));
                                 SpawnAssetIdentifier assetOldId = new SpawnAssetIdentifier(rawOld | (j << 24));
-                                EventOnAnimalSpawnAssetIndexUpdated.TryInvoke(tier.table[j], assetOldId, assetId, HierarchicalEventSource.GrandParentObject);
+                                EventOnAnimalSpawnAssetIndexUpdated.TryInvoke(tier.table[j], assetOldId, assetId, HierarchicalEventSource.GrandparentObject);
 #if DEBUG
                                 Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Animal spawn asset index updated: {assetOldId.Format()} -> {assetId.Format()} (parent updated).");
 #endif
@@ -1581,7 +1621,7 @@ public static class SpawnTableUtil
                             for (int j = 0; j < maxAssetCt; ++j)
                             {
                                 SpawnAssetIdentifier assetId = new SpawnAssetIdentifier(raw | (j << 24));
-                                EventOnVehicleSpawnAssetRemoved.TryInvoke(tier.table[j], assetId, HierarchicalEventSource.GrandParentObject);
+                                EventOnVehicleSpawnAssetRemoved.TryInvoke(tier.table[j], assetId, HierarchicalEventSource.GrandparentObject);
 #if DEBUG
                                 Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Vehicle spawn asset removed: {assetId.Format()} (parent removed).");
 #endif
@@ -1632,7 +1672,7 @@ public static class SpawnTableUtil
                             {
                                 SpawnAssetIdentifier assetId = new SpawnAssetIdentifier(raw | (j << 24));
                                 SpawnAssetIdentifier assetOldId = new SpawnAssetIdentifier(rawOld | (j << 24));
-                                EventOnVehicleSpawnAssetIndexUpdated.TryInvoke(tier.table[j], assetOldId, assetId, HierarchicalEventSource.GrandParentObject);
+                                EventOnVehicleSpawnAssetIndexUpdated.TryInvoke(tier.table[j], assetOldId, assetId, HierarchicalEventSource.GrandparentObject);
 #if DEBUG
                                 Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Vehicle spawn asset index updated: {assetOldId.Format()} -> {assetId.Format()} (parent updated).");
 #endif
@@ -1712,7 +1752,7 @@ public static class SpawnTableUtil
                             for (int j = 0; j < maxAssetCt; ++j)
                             {
                                 SpawnAssetIdentifier assetId = new SpawnAssetIdentifier(raw | (j << 24));
-                                EventOnItemSpawnAssetRemoved.TryInvoke(tier.table[j], assetId, HierarchicalEventSource.GrandParentObject);
+                                EventOnItemSpawnAssetRemoved.TryInvoke(tier.table[j], assetId, HierarchicalEventSource.GrandparentObject);
 #if DEBUG
                                 Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Item spawn asset removed: {assetId.Format()} (parent removed).");
 #endif
@@ -1763,7 +1803,7 @@ public static class SpawnTableUtil
                             {
                                 SpawnAssetIdentifier assetId = new SpawnAssetIdentifier(raw | (j << 24));
                                 SpawnAssetIdentifier assetOldId = new SpawnAssetIdentifier(rawOld | (j << 24));
-                                EventOnItemSpawnAssetIndexUpdated.TryInvoke(tier.table[j], assetOldId, assetId, HierarchicalEventSource.GrandParentObject);
+                                EventOnItemSpawnAssetIndexUpdated.TryInvoke(tier.table[j], assetOldId, assetId, HierarchicalEventSource.GrandparentObject);
 #if DEBUG
                                 Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Item spawn asset index updated: {assetOldId.Format()} -> {assetId.Format()} (parent updated).");
 #endif
@@ -1833,7 +1873,7 @@ public static class SpawnTableUtil
                             for (int j = 0; j < maxAssetCt; ++j)
                             {
                                 SpawnAssetIdentifier assetId = new SpawnAssetIdentifier(raw | (j << 24));
-                                EventOnZombieSpawnAssetRemoved.TryInvoke(tier.table[j], assetId, HierarchicalEventSource.GrandParentObject);
+                                EventOnZombieSpawnAssetRemoved.TryInvoke(tier.table[j], assetId, HierarchicalEventSource.GrandparentObject);
 #if DEBUG
                                 Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Zombie spawn asset removed: {assetId.Format()} (parent removed).");
 #endif
@@ -1882,7 +1922,7 @@ public static class SpawnTableUtil
                             {
                                 SpawnAssetIdentifier assetId = new SpawnAssetIdentifier(raw | (j << 24));
                                 SpawnAssetIdentifier assetOldId = new SpawnAssetIdentifier(rawOld | (j << 24));
-                                EventOnZombieSpawnAssetIndexUpdated.TryInvoke(tier.table[j], assetOldId, assetId, HierarchicalEventSource.GrandParentObject);
+                                EventOnZombieSpawnAssetIndexUpdated.TryInvoke(tier.table[j], assetOldId, assetId, HierarchicalEventSource.GrandparentObject);
 #if DEBUG
                                 Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Zombie spawn asset index updated: {assetOldId.Format()} -> {assetId.Format()} (parent updated).");
 #endif
@@ -3424,7 +3464,7 @@ public static class SpawnTableUtil
     }
 
     /// <summary>
-    /// Normalizes all chances so that they add up to 1 (100%).
+    /// Normalizes all chances so that they add up to 1 (100%). Doesn't apply to zombies.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <param name="index">Table index of the target table.</param>
@@ -3433,7 +3473,7 @@ public static class SpawnTableUtil
     {
         ThreadUtil.assertIsGameThread();
 
-        if (!CheckSpawnTableSafe(spawnType, index))
+        if (spawnType == SpawnType.Zombie || !CheckSpawnTableSafe(spawnType, index))
             return false;
 
         switch (spawnType)
@@ -3512,36 +3552,101 @@ public static class SpawnTableUtil
                 }
 
                 break;
-
-            case SpawnType.Zombie:
-                ZombieTable zombieTable = LevelZombies.tables[index];
-                ttl = 0f;
-                ct = Math.Min(byte.MaxValue, zombieTable.slots.Length);
-
-                for (int i = 0; i < ct; ++i)
-                    ttl += zombieTable.slots[i].chance;
-
-                if (ttl == 1f)
-                    return true;
-
-                for (int i = 0; i < ct; ++i)
-                    zombieTable.slots[i].chance /= ttl;
-
-                if (!EventOnZombieSpawnTierChanceUpdated.IsEmpty)
-                {
-                    for (int i = 0; i < ct; ++i)
-                    {
-                        EventOnZombieSpawnTierChanceUpdated.TryInvoke(zombieTable.slots[i],
-                            new SpawnTierIdentifier(spawnType, (byte)index, (byte)i), HierarchicalEventSource.ParentObject);
-                    }
-                }
-
-                break;
-
         }
 
         Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Normalized {spawnType.ToString().ToLowerInvariant()} spawn table (# {index.Format()}) chances");
         return true;
+    }
+
+    /// <summary>
+    /// Locally adds a spawn table of the provided <paramref name="spawnType"/> with the given <paramref name="name"/>.
+    /// </summary>
+    /// <remarks>Non-replicating.</remarks>
+    /// <returns>Table index of the created table.</returns>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    /// <exception cref="InvalidOperationException">Too many spawn tables of that type are already on the map.</exception>
+    public static int AddSpawnTableLocal(SpawnType spawnType, string name)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (spawnType is not SpawnType.Animal and not SpawnType.Vehicle and not SpawnType.Item and not SpawnType.Zombie)
+            return -1;
+
+        int tableCount = GetTableCountUnsafe(spawnType);
+        if (tableCount >= byte.MaxValue - 1)
+            throw new InvalidOperationException($"Too many {spawnType.ToString().ToLowerInvariant()} spawn tables ({byte.MaxValue - 1}) already exist on the map.");
+
+        int index;
+
+        switch (spawnType)
+        {
+            case SpawnType.Animal:
+                LevelAnimals.addTable(name);
+                index = LevelAnimals.tables.Count - 1;
+#if SERVER
+                if (DevkitServerModule.IsEditing)
+                {
+                    NetId64 netId = SpawnsNetIdDatabase.AddSpawnTable(spawnType, index);
+                    Logger.DevkitServer.LogDebug(nameof(AddSpawnTableLocal), $"Assigned animal spawn table NetId: {netId.Format()}.");
+                }
+#endif
+                EventOnAnimalSpawnTableAdded.TryInvoke(LevelAnimals.tables[index], index);
+                break;
+
+            case SpawnType.Vehicle:
+                LevelVehicles.addTable(name);
+                index = LevelVehicles.tables.Count - 1;
+#if SERVER
+                if (DevkitServerModule.IsEditing)
+                {
+                    NetId64 netId = SpawnsNetIdDatabase.AddSpawnTable(spawnType, index);
+                    Logger.DevkitServer.LogDebug(nameof(AddSpawnTableLocal), $"Assigned vehicle spawn table NetId: {netId.Format()}.");
+                }
+#endif
+                EventOnVehicleSpawnTableAdded.TryInvoke(LevelVehicles.tables[index], index);
+                break;
+
+            case SpawnType.Item:
+                LevelItems.addTable(name);
+                index = LevelItems.tables.Count - 1;
+#if SERVER
+                if (DevkitServerModule.IsEditing)
+                {
+                    NetId64 netId = SpawnsNetIdDatabase.AddSpawnTable(spawnType, index);
+                    Logger.DevkitServer.LogDebug(nameof(AddSpawnTableLocal), $"Assigned item spawn table NetId: {netId.Format()}.");
+                }
+#endif
+                EventOnItemSpawnTableAdded.TryInvoke(LevelItems.tables[index], index);
+                break;
+
+            default: // Zombie
+                LevelZombies.addTable(name);
+                index = LevelZombies.tables.Count - 1;
+#if SERVER
+                if (DevkitServerModule.IsEditing)
+                {
+                    NetId64 netId = SpawnsNetIdDatabase.AddSpawnTable(spawnType, index);
+                    Logger.DevkitServer.LogDebug(nameof(AddSpawnTableLocal), $"Assigned zombie spawn table NetId: {netId.Format()}.");
+                }
+#endif
+                EventOnZombieSpawnTableAdded.TryInvoke(LevelZombies.tables[index], index);
+                break;
+        }
+
+#if CLIENT
+        UpdateUITable(spawnType);
+#endif
+
+        tableCount = GetTableCountUnsafe(spawnType);
+        if (index >= tableCount)
+        {
+            Logger.DevkitServer.LogError(nameof(AddSpawnTableLocal), $"Unknown error adding {spawnType.ToString().ToLowerInvariant()} spawn table: {index.Format()} {name.Format(true)}.");
+            return -1;
+        }
+
+        Logger.DevkitServer.LogDebug(nameof(AddSpawnTableLocal), $"Added {spawnType.ToString().ToLowerInvariant()} spawn table: {index.Format()} {name.Format(true)}.");
+
+        return index;
     }
 
     internal static int GetTableCountUnsafe(SpawnType spawnType)
@@ -3555,4 +3660,403 @@ public static class SpawnTableUtil
             _ => 0
         };
     }
+    internal static int GetTierCountUnsafe(int tableIndex, SpawnType spawnType)
+    {
+        return spawnType switch
+        {
+            SpawnType.Animal => LevelAnimals.tables[tableIndex].tiers.Count,
+            SpawnType.Vehicle => LevelVehicles.tables[tableIndex].tiers.Count,
+            SpawnType.Item => LevelItems.tables[tableIndex].tiers.Count,
+            SpawnType.Zombie => LevelZombies.tables[tableIndex].slots.Length,
+            _ => 0
+        };
+    }
+    internal static int GetAssetCountUnsafe(int tableIndex, int tierIndex, SpawnType spawnType)
+    {
+        return spawnType switch
+        {
+            SpawnType.Animal => LevelAnimals.tables[tableIndex].tiers[tierIndex].table.Count,
+            SpawnType.Vehicle => LevelVehicles.tables[tableIndex].tiers[tierIndex].table.Count,
+            SpawnType.Item => LevelItems.tables[tableIndex].tiers[tierIndex].table.Count,
+            SpawnType.Zombie => LevelZombies.tables[tableIndex].slots[tierIndex].table.Count,
+            _ => 0
+        };
+    }
+#if SERVER
+    /// <summary>
+    /// Adds a spawn table of the provided <paramref name="spawnType"/> with the given <paramref name="name"/>.
+    /// </summary>
+    /// <remarks>Replicates to clients.</remarks>
+    /// <returns>Table index of the created table.</returns>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    /// <exception cref="InvalidOperationException">Too many spawn tables of that type are already on the map.</exception>
+    public static int AddSpawnTable(SpawnType spawnType, string name, EditorUser? owner = null)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return AddSpawnTable(spawnType, name, owner == null ? MessageContext.Nil : MessageContext.CreateFromCaller(owner));
+    }
+    internal static int AddSpawnTable(SpawnType spawnType, string name, MessageContext ctx)
+    {
+        DevkitServerModule.AssertIsDevkitServerClient();
+
+        ulong owner = ctx.GetCaller() is { } user ? user.SteamId.m_SteamID : 0ul;
+
+        int index = AddSpawnTableLocal(spawnType, name);
+
+        SpawnsNetIdDatabase.TryGetSpawnTableNetId(spawnType, index, out NetId64 spawnTableNetId); 
+
+        if (index == -1)
+            return -1;
+
+        PooledTransportConnectionList list = ctx.IsRequest ? DevkitServerUtility.GetAllConnections(ctx.Connection) : DevkitServerUtility.GetAllConnections();
+
+        if (spawnType == SpawnType.Zombie)
+        {
+            ZombieTable table = LevelZombies.tables[index];
+
+            long packed = (table.isMega ? 1 : default(long))
+                          | ((long)table.damage << 8)
+                          | ((long)table.health << 16)
+                          | ((long)table.lootID << 32);
+
+            Guid difficultyAsset = table.difficulty.GUID;
+
+            name = table.name ?? string.Empty;
+
+            NetId64 lootTableNetId = NetId64.Invalid;
+            if (table.lootIndex < LevelItems.tables.Count)
+                SpawnsNetIdDatabase.TryGetSpawnTableNetId(SpawnType.Item, table.lootIndex, out lootTableNetId);
+
+            if (ctx.IsRequest)
+                ctx.ReplyLayered(SendZombieSpawnTableInstantiation, spawnTableNetId, name, packed, table.xp, table.regen, lootTableNetId, difficultyAsset, table.color, owner);
+
+            SendZombieSpawnTableInstantiation.Invoke(list, spawnTableNetId, name, packed, table.xp, table.regen, lootTableNetId, difficultyAsset, table.color, owner);
+        }
+        else
+        {
+            Color color;
+            ushort tableId;
+            switch (spawnType)
+            {
+                case SpawnType.Animal:
+                    AnimalTable animalTable = LevelAnimals.tables[index];
+                    color = animalTable.color;
+                    name = animalTable.name ?? string.Empty;
+                    tableId = animalTable.tableID;
+                    break;
+                case SpawnType.Vehicle:
+                    VehicleTable vehicleTable = LevelVehicles.tables[index];
+                    color = vehicleTable.color;
+                    name = vehicleTable.name ?? string.Empty;
+                    tableId = vehicleTable.tableID;
+                    break;
+                default: // Item
+                    ItemTable itemTable = LevelItems.tables[index];
+                    color = itemTable.color;
+                    name = itemTable.name ?? string.Empty;
+                    tableId = itemTable.tableID;
+                    break;
+            }
+
+            if (ctx.IsRequest)
+                ctx.ReplyLayered(SendBasicSpawnTableInstantiation, spawnTableNetId, (byte)spawnType, name, tableId, color, owner);
+
+            SendBasicSpawnTableInstantiation.Invoke(list, spawnTableNetId, (byte)spawnType, name, tableId, color, owner);
+        }
+
+        // todo SyncIfAuthority(roadIndex);
+
+        return index;
+    }
+#elif CLIENT
+    /// <summary>
+    /// Sends a request to the server to add a spawn table with the specified <paramref name="spawnType"/> and <paramref name="name"/>.
+    /// </summary>
+    /// <remarks>Thread-safe.</remarks>
+    /// <exception cref="InvalidOperationException">Not connected to a DevkitServer server.</exception>
+    /// <returns>The index of the new table, or -1.</returns>
+    public static async UniTask<int> RequestAddSpawnTable(SpawnType spawnType, string name, CancellationToken token = default)
+    {
+        DevkitServerModule.AssertIsDevkitServerClient();
+
+        await UniTask.SwitchToMainThread(token);
+
+        bool shouldAllow = true;
+        if (ClientEvents.ListeningOnRequestInstantiateSpawnTableRequested)
+            ClientEvents.InvokeOnRequestInstantiateSpawnTableRequested(new RequestInstantiateSpawnTableProperties(spawnType, name), ref shouldAllow);
+
+        if (!shouldAllow)
+            return -1;
+
+        NetTask netTask = RequestSpawnTableInstantiation.Request(spawnType == SpawnType.Zombie ? SendZombieSpawnTableInstantiation : SendBasicSpawnTableInstantiation, (byte)spawnType, name, 10000);
+
+        if (!ClientEvents.EventOnRequestInstantiateSpawnTable.IsEmpty)
+            ClientEvents.EventOnRequestInstantiateSpawnTable.TryInvoke(new RequestInstantiateSpawnTableProperties(spawnType, name));
+
+        RequestResponse response2 = default;
+        if (token.CanBeCanceled)
+        {
+            await Task.Run(async () =>
+            {
+                response2 = await netTask;
+            }, token);
+        }
+        else
+            response2 = await netTask;
+
+        await UniTask.SwitchToMainThread(token);
+
+        RequestResponse response = response2;
+        if (!response.Responded)
+            return -1;
+
+        if (!response.TryGetParameter(0, out NetId64 netId))
+        {
+            Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTable), $"Failed to get NetId from incoming SendSpawnTableInstantiation ({spawnType.ToString().ToLowerInvariant()}).");
+            return -1;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTable(spawnType, netId, out int index))
+        {
+            Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTable), $"Failed to resolve NetId in spawn table database from incoming SendSpawnTableInstantiation ({spawnType.ToString().ToLowerInvariant()}).");
+            return -1;
+        }
+
+        if (index < GetTableCountUnsafe(spawnType))
+            return index;
+
+        Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTable), $"Failed to resolve NetId (index out of range) in spawn table database from incoming SendSpawnTableInstantiation ({spawnType.ToString().ToLowerInvariant()}).");
+        return -1;
+    }
+#endif
+
+#if SERVER
+    [NetCall(NetCallSource.FromClient, DevkitServerNetCall.RequestSpawnTableInstantiation)]
+    internal static void ReceiveSpawnTableInstantiationRequest(MessageContext ctx, byte spawnTypePacked, string name)
+    {
+        EditorUser? user = ctx.GetCaller();
+        SpawnType spawnType = (SpawnType)spawnTypePacked;
+        if (user == null || !user.IsOnline)
+        {
+            Logger.DevkitServer.LogError(nameof(ReceiveSpawnTableInstantiationRequest), $"Unable to get user from {spawnType.ToString().ToLowerInvariant()} spawn table instantiation request.");
+            ctx.Acknowledge(StandardErrorCode.NoPermissions);
+            return;
+        }
+
+        if (!VanillaPermissions.SpawnTablesAdd(spawnType).Has(user))
+        {
+            ctx.Acknowledge(StandardErrorCode.NoPermissions);
+            EditorMessage.SendNoPermissionMessage(user, VanillaPermissions.SpawnTablesAdd(spawnType));
+            return;
+        }
+
+        int index = AddSpawnTable(spawnType, name, ctx);
+
+        if (index == -1)
+        {
+            Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnTableInstantiationRequest), $"Failed to grant request for instantiation of {spawnType.ToString().ToLowerInvariant()} spawn table {name.Format(true)} from {user.SteamId.Format()}.");
+            ctx.Acknowledge(StandardErrorCode.GenericError);
+        }
+
+        Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnTableInstantiationRequest), $"Granted request for instantiation of {spawnType.ToString().ToLowerInvariant()} spawn table {name.Format(true)} #{index.Format()} from {user.SteamId.Format()}.");
+
+        ctx.Acknowledge(StandardErrorCode.Success);
+    }
+
+#elif CLIENT
+
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendBasicSpawnTableInstantiation)]
+    internal static StandardErrorCode ReceiveBasicSpawnTableInstantiation(MessageContext ctx, NetId64 netId, byte spawnTypePacked, string name, ushort tableId, Color color, ulong owner)
+    {
+        SpawnType spawnType = (SpawnType)spawnTypePacked;
+
+        if (!EditorActions.HasProcessedPendingSpawnTables)
+        {
+            EditorActions.TemporaryEditorActions?.QueueBasicSpawnTableInstantiation(netId, spawnType, tableId, name, color, owner);
+            return StandardErrorCode.Success;
+        }
+
+        try
+        {
+            int index = AddSpawnTableLocal(spawnType, name);
+
+            if (index == -1)
+                return StandardErrorCode.GenericError;
+
+            SpawnsNetIdDatabase.RegisterSpawnTable(spawnType, index, netId);
+            Logger.DevkitServer.LogDebug(nameof(ReceiveBasicSpawnTableInstantiation), $"Assigned {spawnType.ToString().ToLowerInvariant()} spawn table NetId: {netId.Format()}.");
+
+            if (netId == NetId64.Invalid)
+                return StandardErrorCode.GenericError;
+
+            switch (spawnType)
+            {
+                case SpawnType.Animal:
+                    AnimalTable animalTable = LevelAnimals.tables[index];
+                    
+                    if (!string.Equals(animalTable.name, name, StringComparison.Ordinal))
+                        SetSpawnTableNameLocal(spawnType, index, name);
+
+                    if (animalTable.color != color)
+                        SetSpawnTableColorLocal(spawnType, index, color);
+
+                    if (animalTable.tableID != tableId)
+                        SetSpawnTableSpawnAssetLocal(spawnType, index, tableId);
+
+                    int ct = Math.Min(byte.MaxValue, animalTable.tiers.Count);
+                    for (int i = 0; i < ct; ++i)
+                        RemoveSpawnTableTierLocal(new SpawnTierIdentifier(spawnType, (byte)index, (byte)i));
+
+                    break;
+
+                case SpawnType.Vehicle:
+                    VehicleTable vehicleTable = LevelVehicles.tables[index];
+                    
+                    if (!string.Equals(vehicleTable.name, name, StringComparison.Ordinal))
+                        SetSpawnTableNameLocal(spawnType, index, name);
+
+                    if (vehicleTable.color != color)
+                        SetSpawnTableColorLocal(spawnType, index, color);
+
+                    if (vehicleTable.tableID != tableId)
+                        SetSpawnTableSpawnAssetLocal(spawnType, index, tableId);
+
+                    ct = Math.Min(byte.MaxValue, vehicleTable.tiers.Count);
+                    for (int i = 0; i < ct; ++i)
+                        RemoveSpawnTableTierLocal(new SpawnTierIdentifier(spawnType, (byte)index, (byte)i));
+
+                    break;
+
+                case SpawnType.Item:
+                    ItemTable itemTable = LevelItems.tables[index];
+                    
+                    if (!string.Equals(itemTable.name, name, StringComparison.Ordinal))
+                        SetSpawnTableNameLocal(spawnType, index, name);
+
+                    if (itemTable.color != color)
+                        SetSpawnTableColorLocal(spawnType, index, color);
+
+                    if (itemTable.tableID != tableId)
+                        SetSpawnTableSpawnAssetLocal(spawnType, index, tableId);
+
+                    ct = Math.Min(byte.MaxValue, itemTable.tiers.Count);
+                    for (int i = 0; i < ct; ++i)
+                        RemoveSpawnTableTierLocal(new SpawnTierIdentifier(spawnType, (byte)index, (byte)i));
+
+                    break;
+            }
+
+            UpdateUITable(spawnType);
+
+            if (GetSelectedTable(spawnType) == index)
+                UpdateUISelection(spawnType);
+
+            (ESpawnMode a, ESpawnMode b) = spawnType switch
+            {
+                SpawnType.Animal    => (ESpawnMode.ADD_ANIMAL,  ESpawnMode.REMOVE_ANIMAL),
+                SpawnType.Vehicle   => (ESpawnMode.ADD_VEHICLE, ESpawnMode.REMOVE_VEHICLE),
+                _                   => (ESpawnMode.ADD_ITEM,    ESpawnMode.REMOVE_ITEM)
+            };
+
+            if (owner == Provider.client.m_SteamID && EditorSpawns.isSpawning && (EditorSpawns.spawnMode == a || EditorSpawns.spawnMode == b))
+                SelectTable(spawnType, index, false, false);
+
+            // todo SyncIfAuthority(spawnType, index);
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError(nameof(ReceiveBasicSpawnTableInstantiation), ex, $"Failed to initialize {spawnType.ToString().ToLowerInvariant()} spawn table: {name.Format(true)} - {netId.Format()}.");
+            return StandardErrorCode.GenericError;
+        }
+
+        return StandardErrorCode.Success;
+    }
+
+    [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendZombieSpawnTableInstantiation)]
+    internal static StandardErrorCode ReceiveZombieSpawnTableInstantiation(MessageContext ctx, NetId64 netId, string name, long packed, uint xp, float regen, NetId64 lootTableNetId, Guid difficultyAsset, Color color, ulong owner)
+    {
+        if (!EditorActions.HasProcessedPendingSpawnTables)
+        {
+            EditorActions.TemporaryEditorActions?.QueueZombieSpawnTableInstantiation(netId, name, color, owner, packed, lootTableNetId, xp, regen, difficultyAsset);
+            return StandardErrorCode.Success;
+        }
+
+        try
+        {
+            bool isMega = (packed & 1) != 0;
+            byte damage = (byte)((packed >> 8) & 0xFF);
+            ushort health = (ushort)((packed >> 16) & 0xFFFF);
+            ushort lootId = (ushort)((packed >> 32) & 0xFFFF);
+
+            int index = AddSpawnTableLocal(SpawnType.Zombie, name);
+
+            if (index == -1)
+                return StandardErrorCode.GenericError;
+
+            SpawnsNetIdDatabase.RegisterSpawnTable(SpawnType.Zombie, index, netId);
+            Logger.DevkitServer.LogDebug(nameof(ReceiveZombieSpawnTableInstantiation), $"Assigned zombie spawn table NetId: {netId.Format()}.");
+
+            if (netId == NetId64.Invalid)
+                return StandardErrorCode.GenericError;
+
+            ZombieTable zombieTable = LevelZombies.tables[index];
+
+            if (!string.Equals(zombieTable.name, name, StringComparison.Ordinal))
+                SetSpawnTableNameLocal(SpawnType.Zombie, index, name);
+
+            if (zombieTable.color != color)
+                SetSpawnTableColorLocal(SpawnType.Zombie, index, color);
+
+            if (zombieTable.lootID != lootId)
+                SetSpawnTableSpawnAssetLocal(SpawnType.Zombie, index, lootId);
+
+            if (zombieTable.isMega != isMega)
+                SetZombieSpawnTableIsMegaLocal(index, isMega);
+
+            if (zombieTable.health != health)
+                SetZombieSpawnTableHealthLocal(index, health);
+
+            if (zombieTable.damage != damage)
+                SetZombieSpawnTableHealthLocal(index, damage);
+
+            if (zombieTable.xp != xp)
+                SetZombieSpawnTableXPLocal(index, xp);
+
+            if (zombieTable.regen != regen)
+                SetZombieSpawnTableRegenLocal(index, regen);
+
+            if (zombieTable.difficulty.GUID != difficultyAsset)
+                SetZombieSpawnTableDifficultyAssetLocal(index, new AssetReference<ZombieDifficultyAsset>(difficultyAsset));
+
+            UpdateUITable(SpawnType.Zombie);
+
+            if (GetSelectedTable(SpawnType.Zombie) == index)
+                UpdateUISelection(SpawnType.Zombie);
+
+            if (owner == Provider.client.m_SteamID && EditorSpawns.isSpawning && EditorSpawns.spawnMode is ESpawnMode.ADD_ZOMBIE or ESpawnMode.REMOVE_ZOMBIE)
+                SelectZombieTable(index, false, false);
+
+            NetId64 existingLootTableNetId = NetId64.Invalid;
+            if (zombieTable.lootIndex < LevelItems.tables.Count)
+                SpawnsNetIdDatabase.TryGetSpawnTableNetId(SpawnType.Item, zombieTable.lootIndex, out existingLootTableNetId);
+
+            if (existingLootTableNetId != lootTableNetId
+                && SpawnsNetIdDatabase.TryGetSpawnTable(SpawnType.Item, lootTableNetId, out int lootIndex)
+                && lootIndex < byte.MaxValue)
+            {
+                zombieTable.lootIndex = (byte)lootIndex;
+            }
+
+            // todo SyncIfAuthority(SpawnType.Zombie, index);
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError(nameof(ReceiveBasicSpawnTableInstantiation), ex, $"Failed to initialize zombie spawn table: {name.Format(true)} - {netId.Format()}.");
+            return StandardErrorCode.GenericError;
+        }
+
+        return StandardErrorCode.Success;
+    }
+#endif
 }

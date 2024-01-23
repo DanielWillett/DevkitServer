@@ -18,10 +18,10 @@ public enum HierarchicalEventSource
     /// <summary>
     /// The object raising the event's parent's parent is on the same hierarchical level as the one that was removed.
     /// </summary>
-    GrandParentObject,
+    GrandparentObject,
 
     /// <summary>
     /// The object raising the event's parent's parent's parent is on the same hierarchical level as the one that was removed.
     /// </summary>
-    GreatGrandParentObject
+    GreatGrandparentObject
 }

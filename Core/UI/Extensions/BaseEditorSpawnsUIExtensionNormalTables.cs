@@ -7,12 +7,9 @@ namespace DevkitServer.Core.UI.Extensions;
 internal abstract class BaseEditorSpawnsUIExtensionNormalTables<T>(Vector3 offset, float distanceCurveMin, float distanceCurveMax, SpawnType spawnType)
     : BaseEditorSpawnsUIExtension<T>(offset, distanceCurveMin, distanceCurveMax, spawnType) where T : class
 {
-    [ExistingMember("tableButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
-    protected ISleekButton[]? Tables { get; }
-
-    [ExistingMember("tierButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
-    protected ISleekButton[]? Tiers { get; }
     protected abstract ISleekButton[]? Assets { get; }
+    protected abstract ISleekButton[]? Tiers { get; }
+    protected abstract ISleekButton[]? Tables { get; }
 
     [ExistingMember("selectedBox", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
     protected readonly ISleekBox? SelectedBox;
@@ -51,8 +48,7 @@ internal abstract class BaseEditorSpawnsUIExtensionNormalTables<T>(Vector3 offse
             else fail = true;
         }
 
-        ISleekButton[]? tiers = Tiers;
-        if (tiers != null)
+        if (!fail && Tiers is { } tiers)
         {
             if (tiers.Length > index && tiers[index] != null)
                 tiers[index].Text = name;
@@ -64,10 +60,8 @@ internal abstract class BaseEditorSpawnsUIExtensionNormalTables<T>(Vector3 offse
     }
     protected void UpdateTierChance(float chance, int index, bool updateSlider)
     {
-        ISleekButton[]? tiers = Tiers;
-
         bool fail = false;
-        if (tiers != null)
+        if (Tiers is { } tiers)
         {
             if (tiers.Length > index && tiers[index] != null)
             {
@@ -78,9 +72,11 @@ internal abstract class BaseEditorSpawnsUIExtensionNormalTables<T>(Vector3 offse
                     {
                         if (updateSlider)
                             slider.Value = chance;
+                        
                         slider.UpdateLabel(Mathf.RoundToInt(chance * 100f) + "%");
                     }
-                    else fail = true;
+                    else
+                        fail = true;
                 }
                 catch (ArgumentOutOfRangeException)
                 {
@@ -103,7 +99,7 @@ internal abstract class BaseEditorSpawnsUIExtensionNormalTables<T>(Vector3 offse
             if (selectedBox != null)
                 selectedBox.Text = name;
             else fail = true;
-            if (updateField)
+            if (!fail && updateField)
             {
                 ISleekField? tableNameField = TableNameField;
                 if (tableNameField != null)
@@ -112,8 +108,7 @@ internal abstract class BaseEditorSpawnsUIExtensionNormalTables<T>(Vector3 offse
             }
         }
 
-        ISleekButton[]? tables = Tables;
-        if (tables != null && tables.Length > index && tables[index] != null)
+        if (!fail && Tables is { } tables && tables.Length > index && tables[index] != null)
             tables[index].Text = index + " " + name;
         else fail = true;
 

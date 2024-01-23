@@ -44,14 +44,14 @@ public readonly struct SpawnTierIdentifier :
         if (tierIndex is > byte.MaxValue or < byte.MinValue)
             throw new ArgumentOutOfRangeException(nameof(tierIndex), $"Must be <= {byte.MaxValue} and >= {byte.MinValue}.");
         
-        _data = ((byte)type << 16) | ((byte)spawnTableIndex << 8) | (ushort)tierIndex;
+        _data = ((byte)type << 16) | ((byte)spawnTableIndex << 8) | (byte)tierIndex;
     }
     public SpawnTierIdentifier(SpawnType type, byte spawnTableIndex, byte tierIndex)
     {
         if (type is not SpawnType.Animal and not SpawnType.Vehicle and not SpawnType.Item and not SpawnType.Zombie)
             throw new ArgumentOutOfRangeException(nameof(type), "Spawn type must be 'Animal', 'Vehicle', 'Item', or 'Zombie'.");
 
-        _data = ((byte)type << 16) | (spawnTableIndex << 16) | tierIndex;
+        _data = ((byte)type << 16) | (spawnTableIndex << 8) | tierIndex;
     }
     internal SpawnTierIdentifier(int data) => _data = data;
     public SpawnAssetIdentifier GetAsset(int index)

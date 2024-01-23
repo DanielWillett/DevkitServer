@@ -60,7 +60,7 @@ public readonly struct SpawnAssetIdentifier :
         if (type is not SpawnType.Animal and not SpawnType.Vehicle and not SpawnType.Item and not SpawnType.Zombie)
             throw new ArgumentOutOfRangeException(nameof(type), "Spawn type must be 'Animal', 'Vehicle', 'Item', or 'Zombie'.");
 
-        _data = (assetIndex << 24) | ((byte)type << 16) | (spawnTableIndex << 16) | tierIndex;
+        _data = (assetIndex << 24) | ((byte)type << 16) | (spawnTableIndex << 8) | tierIndex;
     }
     internal SpawnAssetIdentifier(int data) => _data = data;
 

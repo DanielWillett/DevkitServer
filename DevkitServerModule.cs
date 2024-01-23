@@ -176,7 +176,14 @@ public sealed class DevkitServerModule : IModuleNexus
         { "AlreadyBakingNavigationIndex", "Already Baking Navigation\nNavigation # {0}" },
         { "TooManyNavigationFlags", "Too Many Navigation Flags\nMax: {0}" },
         { "TooManyRoads", "Too Many Roads\nMax: {0}" },
-        { "TooManyRoadVerticies", "Too Many Verticies\nMax: {0}" }
+        { "TooManyRoadVerticies", "Too Many Verticies\nMax: {0}" },
+        { "TooManyAnimalSpawnTables", "Too Many Animal Tables\nMax: {0}" },
+        { "TooManyVehicleSpawnTables", "Too Many Vehicle Tables\nMax: {0}" },
+        { "TooManyItemSpawnTables", "Too Many Item Tables\nMax: {0}" },
+        { "TooManyZombieSpawnTables", "Too Many Zombie Tables\nMax: {0}" },
+        { "SpawnTierNameTaken", "Name Already Taken" },
+        { "TooManySpawnTiers", "Too Many Tiers\nMax: {0}" },
+        { "TooManySpawnAssets", "Too Many Assets\nMax: {0}" }
     };
     public static Local LevelLoadingLocalization { get; private set; } = null!;
 

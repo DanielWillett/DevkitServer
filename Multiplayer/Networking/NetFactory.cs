@@ -854,6 +854,8 @@ public static class NetFactory
         Logger.DevkitServer.LogError(Source, $"Error running method {method.Format()}.");
         Logger.DevkitServer.LogError(Source, ex, $"Message: {overhead.Format()}.");
     }
+
+    private static readonly List<(NetTask, MessageContext, int?, object[]?)> _mainThreadPendingList = new List<(NetTask, MessageContext, int?, object[]?)>(8);
     private static void ParseMessage(in MessageOverhead overhead,
 #if SERVER
         ITransportConnection
@@ -864,91 +866,106 @@ public static class NetFactory
     {
         bool verified = !hs || connection is not HighSpeedConnection hsc || hsc.Verified;
         object[]? parameters = null;
-        bool one = false;
         MessageContext ctx = default;
-        if (overhead.RequestKey != default && verified)
+        List<(NetTask, MessageContext, int?, object[]?)> toInvoke = DevkitServerModule.IsMainThread ? _mainThreadPendingList : new List<(NetTask, MessageContext, int?, object[]?)>(2);
+        bool invokedAny;
+        try
         {
-            if ((overhead.Flags & MessageFlags.RequestResponse) == MessageFlags.RequestResponse)
+            if (overhead.RequestKey != default && verified)
             {
-                one = true;
-                long rk = overhead.RequestKey;
-                if (LocalListeners.TryGetValue(rk, out Listener listener) && listener.Caller.Equals(call))
+                if ((overhead.Flags & MessageFlags.RequestResponse) == MessageFlags.RequestResponse)
                 {
-                    if (listener.Task is { IsCompleted: false })
+                    long rk = overhead.RequestKey;
+                    if (LocalListeners.TryGetValue(rk, out Listener listener) && listener.Caller.Equals(call))
                     {
-                        if (!FillParameters(in overhead, ref ctx, connection, call, message, hs, ref parameters))
+                        if (listener.Task is { IsCompleted: false })
                         {
+                            if (!FillParameters(in overhead, ref ctx, connection, call, message, hs, ref parameters))
+                            {
 #if METHOD_LOGGING
-                            Logger.DevkitServer.LogDebug(Source, $"  Failed to read method: {overhead.Format()}.", ConsoleColor.DarkYellow);
+                                Logger.DevkitServer.LogDebug(Source, $"  Failed to read method: {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
-                            return;
+                                return;
+                            }
+
+#if METHOD_LOGGING
+                            Logger.DevkitServer.LogDebug(Source, "  Satisfied local listener.", ConsoleColor.DarkYellow);
+#endif
+                            toInvoke.Add((listener.Task, default, null, parameters));
                         }
 
-#if METHOD_LOGGING
-                        Logger.DevkitServer.LogDebug(Source, "  Satisfied local listener.", ConsoleColor.DarkYellow);
-#endif
-                        listener.Task.TellCompleted(parameters!, true);
+                        LocalListeners.Remove(rk, out _);
                     }
-
-                    LocalListeners.Remove(rk, out _);
                 }
-            }
-            else if ((overhead.Flags & MessageFlags.AcknowledgeResponse) == MessageFlags.AcknowledgeResponse)
-            {
-                one = true;
-                long rk = overhead.RequestKey;
-                if (LocalAckRequests.TryGetValue(rk, out Listener listener) && listener.Caller.Equals(call))
+                else if ((overhead.Flags & MessageFlags.AcknowledgeResponse) == MessageFlags.AcknowledgeResponse)
                 {
-                    if (listener.Task is { IsCompleted: false })
+                    long rk = overhead.RequestKey;
+                    if (LocalAckRequests.TryGetValue(rk, out Listener listener) && listener.Caller.Equals(call))
                     {
-                        int? errorCode = null;
-                        if (overhead.Size == sizeof(int))
+                        if (listener.Task is { IsCompleted: false })
                         {
-                            if (size >= sizeof(int))
-                                errorCode = BitConverter.ToInt32(message.Array!, message.Offset);
+                            int? errorCode = null;
+                            if (overhead.Size == sizeof(int))
+                            {
+                                if (size >= sizeof(int))
+                                    errorCode = BitConverter.ToInt32(message.Array!, message.Offset);
+                            }
+
+#if METHOD_LOGGING
+                            Logger.DevkitServer.LogDebug(Source, $"  Satisfied local acknowledgement listener {(errorCode.HasValue ? errorCode.Value.Format() : ((object?)null).Format())}.", ConsoleColor.DarkYellow);
+#endif
+                            
+                            toInvoke.Add((listener.Task, new MessageContext(connection, overhead, hs), errorCode, null));
                         }
 
-#if METHOD_LOGGING
-                        Logger.DevkitServer.LogDebug(Source, $"  Satisfied local acknowledgement listener {(errorCode.HasValue ? errorCode.Value.Format() : ((object?)null).Format())}.", ConsoleColor.DarkYellow);
-#endif
-
-                        listener.Task.TellCompleted(new MessageContext(connection, overhead, hs), true, errorCode);
+                        LocalAckRequests.Remove(rk, out _);
                     }
-
-                    LocalAckRequests.Remove(rk, out _);
                 }
             }
-        }
 
-        if (one && (overhead.Flags & MessageFlags.RunOriginalMethodOnRequest) == 0)
-        {
-            return;
-        }
-
-        NetMethodInfo[]? methods;
-        if ((overhead.Flags & MessageFlags.Guid) != 0)
-            GuidMethods.TryGetValue(overhead.MessageGuid, out methods);
-        else
-            Methods.TryGetValue(overhead.MessageId, out methods);
-
-        bool invokedAny = false;
-        if (methods != null)
-        {
-            for (int i = 0; i < methods.Length; ++i)
+            invokedAny = toInvoke.Count > 0;
+            if (!invokedAny || (overhead.Flags & MessageFlags.RunOriginalMethodOnRequest) != 0)
             {
-                NetMethodInfo netMethodInfo = methods[i];
-                if (netMethodInfo.Method is null || netMethodInfo.Attribute.HighSpeed != hs)
-                    continue;
+                NetMethodInfo[]? methods;
+                if ((overhead.Flags & MessageFlags.Guid) != 0)
+                    GuidMethods.TryGetValue(overhead.MessageGuid, out methods);
+                else
+                    Methods.TryGetValue(overhead.MessageId, out methods);
 
-                invokedAny = true;
-                if (!InvokeMethod(in overhead, ref ctx, connection, netMethodInfo, call, message, hs, parameters))
+                if (methods == null)
+                    return;
+
+                for (int i = 0; i < methods.Length; ++i)
                 {
+                    NetMethodInfo netMethodInfo = methods[i];
+                    if (netMethodInfo.Method is null || netMethodInfo.Attribute.HighSpeed != hs)
+                        continue;
+
+                    if (InvokeMethod(in overhead, ref ctx, connection, netMethodInfo, call, message, hs, parameters))
+                    {
+                        invokedAny = true;
+                        continue;
+                    }
 #if METHOD_LOGGING
                     Logger.DevkitServer.LogDebug(Source, $"  Failed to read method: {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
                     return;
                 }
             }
+            else invokedAny = true;
+
+            for (int i = 0; i < toInvoke.Count; ++i)
+            {
+                (NetTask netTask, MessageContext ctx2, int? errCode, object[]? parameters2) = toInvoke[i];
+                if (parameters2 == null)
+                    netTask.TellCompleted(in ctx2, true, errCode);
+                else
+                    netTask.TellCompleted(parameters2, true);
+            }
+        }
+        finally
+        {
+            toInvoke.Clear();
         }
 
         if (!invokedAny)

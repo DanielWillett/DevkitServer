@@ -1,5 +1,6 @@
 ﻿#if CLIENT
 using DevkitServer.API.Abstractions;
+using DevkitServer.API.Devkit.Spawns;
 using DevkitServer.API.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
@@ -28,6 +29,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     private readonly List<PendingRoadInstantiation> _roadInstantiations = new List<PendingRoadInstantiation>();
     private readonly List<PendingRoadVertexInstantiation> _roadVertexInstantiations = new List<PendingRoadVertexInstantiation>();
     private readonly List<PendingFlagInstantiation> _flagInstantiations = new List<PendingFlagInstantiation>();
+    private readonly List<PendingSpawnTableInstantiation> _spawnTableInstantiations = new List<PendingSpawnTableInstantiation>();
     private readonly List<IAction> _actions = new List<IAction>();
     public int QueueSize => _actions.Count;
     public ActionSettings Settings { get; }
@@ -78,6 +80,20 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         _flagInstantiations.Add(new PendingFlagInstantiation(netId, position, size, owner, infiniteAgroDistance, shouldSpawnZombies, maxZombies, maxBossZombies, difficultyAsset));
 #if PRINT_ACTION_SIMPLE
         Logger.DevkitServer.LogDebug(Source, $"Queued flag instantiation at {position.Format()} when the level loads.");
+#endif
+    }
+    internal void QueueBasicSpawnTableInstantiation(NetId64 netId, SpawnType spawnType, ushort tableId, string name, Color color, ulong owner)
+    {
+        _spawnTableInstantiations.Add(new PendingSpawnTableInstantiation(netId, spawnType, tableId, name, color, owner));
+#if PRINT_ACTION_SIMPLE
+        Logger.DevkitServer.LogDebug(Source, $"Queued {spawnType.ToString().ToLowerInvariant()} spawn table instantiation {name.Format(true)} when the level loads.");
+#endif
+    }
+    internal void QueueZombieSpawnTableInstantiation(NetId64 netId, string name, Color color, ulong owner, long packed, NetId64 lootTableNetId, uint xp, float regen, Guid difficultyAsset)
+    {
+        _spawnTableInstantiations.Add(new PendingZombieSpawnTableInstantiation(netId, name, color, owner, packed, lootTableNetId, xp, regen, difficultyAsset));
+#if PRINT_ACTION_SIMPLE
+        Logger.DevkitServer.LogDebug(Source, $"Queued zombie spawn table instantiation {name.Format(true)} when the level loads.");
 #endif
     }
     internal void HandleReadPackets(CSteamID user, ByteReader reader)
@@ -134,17 +150,21 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     }
     internal IEnumerator Flush()
     {
+        int c = 0;
         for (int i = 0; i < _hierarchyInstantiations.Count; i++)
         {
             PendingHierarchyInstantiation hierarchyItemInstantiation = _hierarchyInstantiations[i];
             HierarchyUtil.ReceiveHierarchyInstantiation(MessageContext.Nil, hierarchyItemInstantiation.Type, hierarchyItemInstantiation.Position, hierarchyItemInstantiation.Rotation,
                 hierarchyItemInstantiation.Scale, hierarchyItemInstantiation.Owner, hierarchyItemInstantiation.NetId);
         }
-
         EditorActions.HasProcessedPendingHierarchyObjects = true;
 
-        if (_hierarchyInstantiations.Count > 20)
+        c = _hierarchyInstantiations.Count;
+        if (c > 20)
+        {
+            c = 0;
             yield return null;
+        }
         for (int i = 0; i < _lvlObjectInstantiations.Count; i++)
         {
             PendingLevelObjectInstantiation lvlObjectInstantiation = _lvlObjectInstantiations[i];
@@ -154,8 +174,12 @@ public class TemporaryEditorActions : IActionListener, IDisposable
 
         EditorActions.HasProcessedPendingLevelObjects = true;
 
-        if (_lvlObjectInstantiations.Count > 20)
+        c += _lvlObjectInstantiations.Count;
+        if (c > 20)
+        {
+            c = 0;
             yield return null;
+        }
         for (int i = 0; i < _roadInstantiations.Count; i++)
         {
             PendingRoadInstantiation roadInstantiation = _roadInstantiations[i];
@@ -163,6 +187,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
                 roadInstantiation.Tangent1, roadInstantiation.Tangent2, roadInstantiation.Offset,
                 roadInstantiation.NetIds, roadInstantiation.Owner);
         }
+        c += _roadInstantiations.Count;
         for (int i = 0; i < _roadVertexInstantiations.Count; i++)
         {
             PendingRoadVertexInstantiation vertexInstantiation = _roadVertexInstantiations[i];
@@ -171,8 +196,12 @@ public class TemporaryEditorActions : IActionListener, IDisposable
                 vertexInstantiation.VerticalOffset, vertexInstantiation.IgnoreTerrain, vertexInstantiation.VertexNetId, vertexInstantiation.Owner);
         }
         EditorActions.HasProcessedPendingRoads = true;
-        if (_roadInstantiations.Count + _roadVertexInstantiations.Count > 50)
+        c += _roadVertexInstantiations.Count;
+        if (c > 20)
+        {
+            c = 0;
             yield return null;
+        }
         for (int i = 0; i < _flagInstantiations.Count; i++)
         {
             PendingFlagInstantiation flagInstantiation = _flagInstantiations[i];
@@ -181,6 +210,36 @@ public class TemporaryEditorActions : IActionListener, IDisposable
                 flagInstantiation.MaxBossZombies, flagInstantiation.DifficultyAsset);
         }
         EditorActions.HasProcessedPendingFlags = true;
+        c += _flagInstantiations.Count;
+        if (c > 20)
+        {
+            c = 0;
+            yield return null;
+        }
+        for (int i = 0; i < _spawnTableInstantiations.Count; i++)
+        {
+            PendingSpawnTableInstantiation spawnTableInstantiation = _spawnTableInstantiations[i];
+            if (spawnTableInstantiation is PendingZombieSpawnTableInstantiation pendingZombie)
+            {
+                SpawnTableUtil.ReceiveZombieSpawnTableInstantiation(MessageContext.Nil, pendingZombie.NetId, pendingZombie.Name,
+                    pendingZombie.Packed, pendingZombie.XP, pendingZombie.Regen, pendingZombie.LootTableNetId,
+                    pendingZombie.DifficultyAsset, pendingZombie.Color, pendingZombie.Owner);
+            }
+            else
+            {
+                SpawnTableUtil.ReceiveBasicSpawnTableInstantiation(MessageContext.Nil, spawnTableInstantiation.NetId,
+                    (byte)spawnTableInstantiation.SpawnType, spawnTableInstantiation.Name,
+                    spawnTableInstantiation.TableId, spawnTableInstantiation.Color, spawnTableInstantiation.Owner);
+            }
+        }
+
+        c += _spawnTableInstantiations.Count;
+        if (c > 20)
+        {
+            c = 0;
+            yield return null;
+        }
+        EditorActions.HasProcessedPendingSpawnTables = true;
         for (int i = 0; i < _actions.Count; ++i)
         {
             if (i % 30 == 0 && i > 0)
@@ -204,6 +263,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         EditorActions.HasProcessedPendingLevelObjects = false;
         EditorActions.HasProcessedPendingRoads = false;
         EditorActions.HasProcessedPendingFlags = false;
+        EditorActions.HasProcessedPendingSpawnTables = false;
         EventOnStartListening.TryInvoke();
     }
     public void Dispose()
@@ -268,6 +328,24 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         public readonly bool ShouldSpawnZombies = shouldSpawnZombies;
         public readonly byte MaxZombies = maxZombies;
         public readonly int MaxBossZombies = maxBossZombies;
+        public readonly Guid DifficultyAsset = difficultyAsset;
+    }
+    private class PendingSpawnTableInstantiation(NetId64 netId, SpawnType spawnType, ushort tableId, string name, Color color, ulong owner)
+    {
+        public readonly NetId64 NetId = netId;
+        public readonly SpawnType SpawnType = spawnType;
+        public readonly ushort TableId = tableId;
+        public readonly string Name = name;
+        public readonly Color Color = color;
+        public readonly ulong Owner = owner;
+    }
+    private class PendingZombieSpawnTableInstantiation(NetId64 netId, string name, Color color, ulong owner, long packed, NetId64 lootTableNetId, uint xp, float regen, Guid difficultyAsset)
+        : PendingSpawnTableInstantiation(netId, SpawnType.Zombie, 0, name, color, owner)
+    {
+        public readonly long Packed = packed;
+        public readonly NetId64 LootTableNetId = lootTableNetId;
+        public readonly uint XP = xp;
+        public readonly float Regen = regen;
         public readonly Guid DifficultyAsset = difficultyAsset;
     }
 }

@@ -268,6 +268,9 @@ public static class PermissionManager
         , bool checkForSuperuser = true)
     {
 #if CLIENT
+        if (!DevkitServerModule.IsEditing)
+            return true;
+
         ClientInfo? info = ClientInfo.Info;
         Player? pl = Player.player;
         if (checkForSuperuser && info is { ServerTreatsAdminsAsSuperuser: true } && pl != null && pl.channel.owner.isAdmin)

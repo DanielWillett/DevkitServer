@@ -298,7 +298,7 @@ public static class RoadUtil
         if (CallSelect == null)
             return false;
 
-        if (roadElement != null && SelectedRoadElement != roadElement)
+        if (roadElement != null && (GetSelection == null || SelectedRoadElement != roadElement))
             CallSelect(roadElement);
 
         return true;
@@ -408,9 +408,13 @@ public static class RoadUtil
                 SetVertexVerticalOffsetLocal(road, roadIndex, joint, 0, verticalOffset);
             }
 
-            Select(vertexTransform);
+            if (owner == Provider.client.m_SteamID && EditorRoads.isPaving)
+                Select(vertexTransform);
 
             SyncIfAuthority(roadIndex);
+
+            if (!DevkitServerConfig.RemoveCosmeticImprovements)
+                road.buildMesh();
         }
         catch (Exception ex)
         {
@@ -476,7 +480,8 @@ public static class RoadUtil
                 SetVertexVerticalOffsetLocal(road, roadIndex, joint, vertexIndex, verticalOffset);
             }
 
-            Select(vertexTransform);
+            if (owner == Provider.client.m_SteamID && EditorRoads.isPaving)
+                Select(vertexTransform);
 
             SyncIfAuthority(roadIndex);
         }
@@ -1446,6 +1451,8 @@ public static class RoadUtil
 
         byte oldSelected = EditorRoads.selected;
         EditorRoads.selected = materialIndex;
+
+        // todo add bounds checks
 
         Transform transform = LevelRoads.addRoad(firstVertexWorldPosition);
 

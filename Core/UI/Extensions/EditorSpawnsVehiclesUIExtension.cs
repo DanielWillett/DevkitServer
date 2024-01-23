@@ -10,10 +10,19 @@ internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtensionNorm
 {
     private const float DistanceMax = 200f;
 
+    // base properties wont patch right because generics share patches.
+
     [ExistingMember("vehicleButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
-    // virtual properties wont patch right
     protected ISleekButton[]? Assets2 { get; }
+
+    [ExistingMember("tableButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected ISleekButton[]? Tables2 { get; }
+
+    [ExistingMember("tierButtons", FailureBehavior = ExistingMemberFailureBehavior.IgnoreNoWarn)]
+    protected ISleekButton[]? Tiers2 { get; }
     protected override ISleekButton[]? Assets => Assets2;
+    protected override ISleekButton[]? Tables => Tables2;
+    protected override ISleekButton[]? Tiers => Tiers2;
     protected override bool IsVisible
     {
         get => LevelVisibility.vehiclesVisible;

@@ -843,6 +843,65 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
 
         return netId;
     }
+    public static NetId64 RegisterIndexSpawnpoint(SpawnType type, int index)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (type is not SpawnType.Animal and not SpawnType.Player and not SpawnType.Vehicle)
+            return NetId64.Invalid;
+        
+        NetId64 netId = NetId64Registry.GetUniqueId();
+
+        ClaimBasicSpawnpointNetId(index, type, netId);
+
+        return netId;
+    }
+    public static NetId64 RegisterRegionSpawnpoint(SpawnType type, RegionIdentifier id)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (type is not SpawnType.Item and not SpawnType.Zombie)
+            return NetId64.Invalid;
+
+        NetId64 netId = NetId64Registry.GetUniqueId();
+
+        ClaimBasicSpawnpointNetId(id, type, netId);
+
+        return netId;
+    }
+    public static NetId64 RegisterSpawnTable(SpawnType type, int index, NetId64 netId)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (type is not SpawnType.Animal and not SpawnType.Vehicle and not SpawnType.Item and not SpawnType.Zombie)
+            return NetId64.Invalid;
+
+        ClaimBasicTableNetId(index, type, netId);
+
+        return netId;
+    }
+    public static NetId64 RegisterSpawnTier(SpawnTierIdentifier identifier, NetId64 netId)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (identifier.Type is not SpawnType.Animal and not SpawnType.Vehicle and not SpawnType.Item)
+            return NetId64.Invalid;
+
+        ClaimBasicTierNetId(identifier, netId);
+
+        return netId;
+    }
+    public static NetId64 RegisterSpawnAsset(SpawnAssetIdentifier identifier, NetId64 netId)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (identifier.Type is not SpawnType.Animal and not SpawnType.Vehicle and not SpawnType.Item and not SpawnType.Zombie)
+            return NetId64.Invalid;
+
+        ClaimBasicAssetNetId(identifier, netId);
+
+        return netId;
+    }
     public static bool TryGetAnimalSpawnpoint(NetId64 netId, out int spawnIndex)
     {
         ThreadUtil.assertIsGameThread();

@@ -1071,6 +1071,8 @@ public static class UIExtensionManager
     }
     private static void TryInitializeMember(UIExtensionInfo info, MemberInfo member)
     {
+        member = member.GetDeclaredMember();
+
         if (!member.TryGetAttributeSafe(out ExistingMemberAttribute existingMemberAttribute))
         {
             if (!DevkitServerModule.AssemblyResolver.TriedToLoadUIExtensionModule)
@@ -1225,26 +1227,25 @@ public static class UIExtensionManager
             LogDebug($"Assumed initialized setting for existing member: {member.Format()}: {initialized.Format()}.", info.Plugin, info.Assembly);
         }
 
-        MethodInfo? toPatch = (method ?? property?.GetGetMethod(true));
-        if (!initialized && toPatch != null && !toPatch.IsDeclaredMember())
-        {
-            if (toPatch.DeclaringType == info.ImplementationType)
-            {
-                string msg = $"Can not patch virtual methods or properties: Existing member \"{member.Format()}\".";
-                if (failureMode is not ExistingMemberFailureBehavior.Ignore
-                    and not ExistingMemberFailureBehavior.IgnoreNoWarn)
-                    throw new Exception(msg);
+        //if (!initialized && property != null && !property.IsDeclaredMember())
+        //{
+        //    if (property.DeclaringType == info.ImplementationType)
+        //    {
+        //        string msg = $"Can not patch virtual methods or properties: Existing member \"{member.Format()}\".";
+        //        if (failureMode is not ExistingMemberFailureBehavior.Ignore
+        //            and not ExistingMemberFailureBehavior.IgnoreNoWarn)
+        //            throw new Exception(msg);
 
-                if (failureMode != ExistingMemberFailureBehavior.IgnoreNoWarn)
-                    LogWarning(msg, info.Plugin, info.Assembly);
-                else
-                    LogDebug(msg, info.Plugin, info.Assembly);
-                return;
-            }
+        //        if (failureMode != ExistingMemberFailureBehavior.IgnoreNoWarn)
+        //            LogWarning(msg, info.Plugin, info.Assembly);
+        //        else
+        //            LogDebug(msg, info.Plugin, info.Assembly);
+        //        return;
+        //    }
 
-            // harmony's weird idk
-            member = toPatch.GetDeclaredMember();
-        }
+        //    // harmony's weird idk
+        //    member = property.GetDeclaredMember();
+        //}
 
         if (!initialized && existingProperty != null && existingProperty.GetSetMethod(true) != null)
             LogWarning($"Setter on {existingProperty.Format()} can not be used to set the original value. Recommended to make the property get-only (readonly).", info.Plugin, info.Assembly);

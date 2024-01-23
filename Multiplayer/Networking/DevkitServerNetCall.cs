@@ -52,5 +52,8 @@ public enum DevkitServerNetCall : ushort
     SendLargeTransmissionCheckup = 48,
     RequestOpenHighSpeedConnection = 49,
     RequestReleaseOrTakeHighSpeedConnection = 50,
-    SendRemoteNetMessageMappings = 51
+    SendRemoteNetMessageMappings = 51,
+    SendBasicSpawnTableInstantiation = 52,
+    SendZombieSpawnTableInstantiation = 53,
+    RequestSpawnTableInstantiation = 54
 }

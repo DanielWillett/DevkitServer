@@ -68,6 +68,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     internal static bool HasProcessedPendingLevelObjects;
     internal static bool HasProcessedPendingRoads;
     internal static bool HasProcessedPendingFlags;
+    internal static bool HasProcessedPendingSpawnTables;
     /// <summary>
     /// Is the player catching up after downloading the map.
     /// </summary>
@@ -173,6 +174,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 HasProcessedPendingLevelObjects = true;
                 HasProcessedPendingFlags = true;
                 HasProcessedPendingRoads = true;
+                HasProcessedPendingSpawnTables = true;
                 if (TemporaryEditorActions != null)
                 {
                     TemporaryEditorActions.Dispose();

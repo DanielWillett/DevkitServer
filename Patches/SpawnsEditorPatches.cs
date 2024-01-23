@@ -1,20 +1,21 @@
 ﻿#if CLIENT
+using Cysharp.Threading.Tasks;
 using DevkitServer.API;
+using DevkitServer.API.Abstractions;
 using DevkitServer.API.Devkit.Spawns;
 using DevkitServer.API.Permissions;
 using DevkitServer.API.UI;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Core.Tools;
+using DevkitServer.Models;
 using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Players;
 using HarmonyLib;
 using SDG.Framework.Devkit;
 using SDG.Framework.Utilities;
 using System.Reflection;
 using System.Reflection.Emit;
-using DevkitServer.API.Abstractions;
-using DevkitServer.Models;
-using DevkitServer.Multiplayer.Levels;
 
 namespace DevkitServer.Patches;
 
@@ -40,6 +41,15 @@ internal static class SpawnsEditorPatches
         = Accessor.GenerateStaticGetter<EditorSpawnsItemsUI, ISleekButton[]>("tierButtons", throwOnError: false);
     private static readonly StaticGetter<ISleekButton[]>? GetZombieTierButtons
         = Accessor.GenerateStaticGetter<EditorSpawnsZombiesUI, ISleekButton[]>("slotButtons", throwOnError: false);
+    
+    private static readonly StaticGetter<ISleekField>? GetAnimalTableField
+        = Accessor.GenerateStaticGetter<EditorSpawnsAnimalsUI, ISleekField>("tableNameField", throwOnError: false);
+    private static readonly StaticGetter<ISleekField>? GetVehicleTableField
+        = Accessor.GenerateStaticGetter<EditorSpawnsVehiclesUI, ISleekField>("tableNameField", throwOnError: false);
+    private static readonly StaticGetter<ISleekField>? GetItemTableField
+        = Accessor.GenerateStaticGetter<EditorSpawnsItemsUI, ISleekField>("tableNameField", throwOnError: false);
+    private static readonly StaticGetter<ISleekField>? GetZombieTableField
+        = Accessor.GenerateStaticGetter<EditorSpawnsZombiesUI, ISleekField>("tableNameField", throwOnError: false);
 
     internal static void ManualPatches()
     {
@@ -223,8 +233,7 @@ internal static class SpawnsEditorPatches
     {
         if (!SpawnTableUtil.CheckSpawnTableSafe(spawnType, index))
         {
-            SpawnTableUtil.UpdateUITable(spawnType);
-            SpawnTableUtil.UpdateUISelection(spawnType);
+            // could be typing in a new name
             return true;
         }
 
@@ -521,7 +530,7 @@ internal static class SpawnsEditorPatches
     {
         SpawnTierIdentifier identifier = new SpawnTierIdentifier(spawnType, (byte)tableIndex, (byte)tierIndex);
 
-        Logger.DevkitServer.LogConditional(nameof(OnChanceUpdated), $"Chance updated: {identifier.Format()}: {chance.Format("F2")}.");
+        Logger.DevkitServer.LogConditional(nameof(OnChanceUpdated), $"Chance updated: {identifier.Format()} {chance.Format("F2")}.");
 
         if (!identifier.CheckSafe())
         {
@@ -781,9 +790,12 @@ internal static class SpawnsEditorPatches
         if (GetAnimalTierButtons == null)
             return false;
 
-        int tierIndex = Array.IndexOf(GetAnimalTierButtons(), slider);
+        if (slider.Parent is not ISleekButton button)
+            return false;
 
-        if (!OnChanceUpdated(state, EditorSpawns.selectedAnimal, tierIndex, SpawnType.Animal))
+        int tierIndex = Array.IndexOf(GetAnimalTierButtons(), button);
+
+        if (tierIndex == -1 || !OnChanceUpdated(state, EditorSpawns.selectedAnimal, tierIndex, SpawnType.Animal))
             slider.Value = LevelAnimals.tables[EditorSpawns.selectedAnimal].tiers[tierIndex].chance;
 
         return false;
@@ -798,9 +810,12 @@ internal static class SpawnsEditorPatches
         if (GetVehicleTierButtons == null)
             return false;
 
-        int tierIndex = Array.IndexOf(GetVehicleTierButtons(), slider);
+        if (slider.Parent is not ISleekButton button)
+            return false;
 
-        if (!OnChanceUpdated(state, EditorSpawns.selectedVehicle, tierIndex, SpawnType.Vehicle))
+        int tierIndex = Array.IndexOf(GetVehicleTierButtons(), button);
+
+        if (tierIndex == -1 || !OnChanceUpdated(state, EditorSpawns.selectedVehicle, tierIndex, SpawnType.Vehicle))
             slider.Value = LevelVehicles.tables[EditorSpawns.selectedVehicle].tiers[tierIndex].chance;
 
         return false;
@@ -815,9 +830,12 @@ internal static class SpawnsEditorPatches
         if (GetItemTierButtons == null)
             return false;
 
-        int tierIndex = Array.IndexOf(GetItemTierButtons(), slider);
+        if (slider.Parent is not ISleekButton button)
+            return false;
 
-        if (!OnChanceUpdated(state, EditorSpawns.selectedItem, tierIndex, SpawnType.Item))
+        int tierIndex = Array.IndexOf(GetItemTierButtons(), button);
+
+        if (tierIndex == -1 || !OnChanceUpdated(state, EditorSpawns.selectedItem, tierIndex, SpawnType.Item))
             slider.Value = LevelItems.tables[EditorSpawns.selectedItem].tiers[tierIndex].chance;
 
         return false;
@@ -832,15 +850,167 @@ internal static class SpawnsEditorPatches
         if (GetZombieTierButtons == null)
             return false;
 
-        int tierIndex = Array.IndexOf(GetZombieTierButtons(), slider);
+        if (slider.Parent is not ISleekButton button)
+            return false;
 
-        if (!OnChanceUpdated(state, EditorSpawns.selectedZombie, tierIndex, SpawnType.Zombie))
+        int tierIndex = Array.IndexOf(GetZombieTierButtons(), button);
+
+        if (tierIndex == -1 || !OnChanceUpdated(state, EditorSpawns.selectedZombie, tierIndex, SpawnType.Zombie))
             slider.Value = LevelZombies.tables[EditorSpawns.selectedZombie].slots[tierIndex].chance;
 
         return false;
     }
     #endregion
 
+    #region Add Table
+    public static void OnAddTableClicked(ISleekElement button, SpawnType spawnType, string name)
+    {
+        if (DevkitServerModule.IsEditing)
+        {
+            button.SetIsClickable(false);
+            UniTask.Create(async () =>
+            {
+                try
+                {
+                    await SpawnTableUtil.RequestAddSpawnTable(spawnType, name);
+                }
+                catch (Exception ex)
+                {
+                    Logger.DevkitServer.LogWarning(nameof(OnAddTableClicked), ex, "Failed to add table");
+                }
+                finally
+                {
+                    DevkitServerUtility.QueueOnMainThread(() =>
+                    {
+                        try
+                        {
+                            button.SetIsClickable(true);
+                        }
+                        catch
+                        {
+                            // ignored
+                        }
+                    });
+                }
+            });
+
+            return;
+        }
+
+        int spawnTableCount = SpawnTableUtil.GetTableCountUnsafe(spawnType);
+        if (spawnTableCount >= byte.MaxValue - 1)
+        {
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "TooMany" + spawnType + "SpawnTables", [ byte.MaxValue - 1 ]);
+            return;
+        }
+
+        int index = SpawnTableUtil.AddSpawnTableLocal(spawnType, name);
+
+        SpawnTableUtil.SelectTable(spawnType, index, false, false);
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onClickedAddTableButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnAddAnimalTableClicked(ISleekElement button)
+    {
+        ISleekField? field = GetAnimalTableField?.Invoke();
+
+        string? name = field?.Text;
+
+        if (name != null && LevelAnimals.tables.Any(x => x.name.Equals(name, StringComparison.InvariantCultureIgnoreCase)) && field != null)
+        {
+            field.Text = string.Empty;
+            SpawnTableUtil.DeselectAnimalTable();
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(name))
+            name = "Table " + LevelAnimals.tables.Count;
+
+        OnAddTableClicked(button, SpawnType.Animal, name);
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsVehiclesUI), "onClickedAddTableButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnAddVehicleTableClicked(ISleekElement button)
+    {
+        ISleekField? field = GetVehicleTableField?.Invoke();
+
+        string? name = field?.Text;
+
+        if (name != null && LevelVehicles.tables.Any(x => x.name.Equals(name, StringComparison.InvariantCultureIgnoreCase)) && field != null)
+        {
+            field.Text = string.Empty;
+            SpawnTableUtil.DeselectVehicleTable();
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(name))
+            name = "Table " + LevelVehicles.tables.Count;
+
+        OnAddTableClicked(button, SpawnType.Vehicle, name);
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onClickedAddTableButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnAddItemTableClicked(ISleekElement button)
+    {
+        ISleekField? field = GetItemTableField?.Invoke();
+
+        string? name = field?.Text;
+
+        if (name != null && LevelItems.tables.Any(x => x.name.Equals(name, StringComparison.InvariantCultureIgnoreCase)) && field != null)
+        {
+            field.Text = string.Empty;
+            SpawnTableUtil.DeselectItemTable();
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(name))
+            name = "Table " + LevelItems.tables.Count;
+
+        OnAddTableClicked(button, SpawnType.Item, name);
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onClickedAddTableButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnAddZombieTableClicked(ISleekElement button)
+    {
+        ISleekField? field = GetZombieTableField?.Invoke();
+
+        string? name = field?.Text;
+
+        if (name != null && LevelZombies.tables.Any(x => x.name.Equals(name, StringComparison.InvariantCultureIgnoreCase)) && field != null)
+        {
+            field.Text = string.Empty;
+            SpawnTableUtil.DeselectZombieTable();
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(name))
+            name = "Table " + LevelZombies.tables.Count;
+
+        OnAddTableClicked(button, SpawnType.Zombie, name);
+
+        return false;
+    }
+    #endregion
+
+    // todo override deleting to call event on spawnpoints
     private static IEnumerable<CodeInstruction> TranspileOnClickedPlayersButton(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
         List<CodeInstruction> ins = [..instructions];
