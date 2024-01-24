@@ -9,8 +9,6 @@ using SDG.Framework.Utilities;
 namespace DevkitServer.Multiplayer.Actions;
 public class TemporaryEditorActions : IActionListener, IDisposable
 {
-    private const string Source = "TEMP EDITOR ACTIONS";
-
     private static readonly CachedMulticastEvent<Action> EventOnStartListening = new CachedMulticastEvent<Action>(typeof(TemporaryEditorActions), nameof(OnStartListening));
     private static readonly CachedMulticastEvent<Action> EventOnStopListening = new CachedMulticastEvent<Action>(typeof(TemporaryEditorActions), nameof(OnStopListening));
     public static event Action OnStartListening
@@ -30,6 +28,8 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     private readonly List<PendingRoadVertexInstantiation> _roadVertexInstantiations = new List<PendingRoadVertexInstantiation>();
     private readonly List<PendingFlagInstantiation> _flagInstantiations = new List<PendingFlagInstantiation>();
     private readonly List<PendingSpawnTableInstantiation> _spawnTableInstantiations = new List<PendingSpawnTableInstantiation>();
+    private readonly List<PendingSpawnTierInstantiation> _spawnTierInstantiations = new List<PendingSpawnTierInstantiation>();
+    private readonly List<PendingSpawnAssetInstantiation> _spawnAssetInstantiations = new List<PendingSpawnAssetInstantiation>();
     private readonly List<IAction> _actions = new List<IAction>();
     public int QueueSize => _actions.Count;
     public ActionSettings Settings { get; }
@@ -96,6 +96,20 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         Logger.DevkitServer.LogDebug(Source, $"Queued zombie spawn table instantiation {name.Format(true)} when the level loads.");
 #endif
     }
+    internal void QueueSpawnTierInstantiation(NetId64 netId, NetId64 parentNetId, SpawnType spawnType, float chance, string name, ulong owner)
+    {
+        _spawnTierInstantiations.Add(new PendingSpawnTierInstantiation(netId, parentNetId, spawnType, chance, name, owner));
+#if PRINT_ACTION_SIMPLE
+        Logger.DevkitServer.LogDebug(Source, $"Queued {spawnType.ToString().ToLowerInvariant()} spawn table tier instantiation {name.Format(true)} when the level loads.");
+#endif
+    }
+    internal void QueueSpawnAssetInstantiation(NetId64 netId, NetId64 parentNetId, SpawnType spawnType, ushort legacyId, ulong owner)
+    {
+        _spawnAssetInstantiations.Add(new PendingSpawnAssetInstantiation(netId, parentNetId, spawnType, legacyId, owner));
+#if PRINT_ACTION_SIMPLE
+        Logger.DevkitServer.LogDebug(Source, $"Queued {spawnType.ToString().ToLowerInvariant()} spawn table tier asset instantiation {legacyId.Format(true)} when the level loads.");
+#endif
+    }
     internal void HandleReadPackets(CSteamID user, ByteReader reader)
     {
         if (!EditorActionsCodeGeneration.Init)
@@ -150,7 +164,6 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     }
     internal IEnumerator Flush()
     {
-        int c = 0;
         for (int i = 0; i < _hierarchyInstantiations.Count; i++)
         {
             PendingHierarchyInstantiation hierarchyItemInstantiation = _hierarchyInstantiations[i];
@@ -158,28 +171,28 @@ public class TemporaryEditorActions : IActionListener, IDisposable
                 hierarchyItemInstantiation.Scale, hierarchyItemInstantiation.Owner, hierarchyItemInstantiation.NetId);
         }
         EditorActions.HasProcessedPendingHierarchyObjects = true;
-
-        c = _hierarchyInstantiations.Count;
+        int c = _hierarchyInstantiations.Count;
         if (c > 20)
         {
             c = 0;
             yield return null;
         }
+
         for (int i = 0; i < _lvlObjectInstantiations.Count; i++)
         {
             PendingLevelObjectInstantiation lvlObjectInstantiation = _lvlObjectInstantiations[i];
             LevelObjectUtil.ReceiveInstantiation(MessageContext.Nil, lvlObjectInstantiation.Asset.GUID, lvlObjectInstantiation.Position, lvlObjectInstantiation.Rotation,
                 lvlObjectInstantiation.Scale, lvlObjectInstantiation.Owner, lvlObjectInstantiation.NetId);
         }
-
         EditorActions.HasProcessedPendingLevelObjects = true;
-
         c += _lvlObjectInstantiations.Count;
+
         if (c > 20)
         {
             c = 0;
             yield return null;
         }
+
         for (int i = 0; i < _roadInstantiations.Count; i++)
         {
             PendingRoadInstantiation roadInstantiation = _roadInstantiations[i];
@@ -187,6 +200,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
                 roadInstantiation.Tangent1, roadInstantiation.Tangent2, roadInstantiation.Offset,
                 roadInstantiation.NetIds, roadInstantiation.Owner);
         }
+
         c += _roadInstantiations.Count;
         for (int i = 0; i < _roadVertexInstantiations.Count; i++)
         {
@@ -197,11 +211,13 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         }
         EditorActions.HasProcessedPendingRoads = true;
         c += _roadVertexInstantiations.Count;
+
         if (c > 20)
         {
             c = 0;
             yield return null;
         }
+
         for (int i = 0; i < _flagInstantiations.Count; i++)
         {
             PendingFlagInstantiation flagInstantiation = _flagInstantiations[i];
@@ -211,6 +227,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         }
         EditorActions.HasProcessedPendingFlags = true;
         c += _flagInstantiations.Count;
+
         if (c > 20)
         {
             c = 0;
@@ -232,14 +249,46 @@ public class TemporaryEditorActions : IActionListener, IDisposable
                     spawnTableInstantiation.TableId, spawnTableInstantiation.Color, spawnTableInstantiation.Owner);
             }
         }
-
+        EditorActions.HasProcessedPendingSpawnTables = true;
         c += _spawnTableInstantiations.Count;
+
         if (c > 20)
         {
             c = 0;
             yield return null;
         }
-        EditorActions.HasProcessedPendingSpawnTables = true;
+        for (int i = 0; i < _spawnTierInstantiations.Count; i++)
+        {
+            PendingSpawnTierInstantiation spawnTierInstantiation = _spawnTierInstantiations[i];
+            SpawnTableUtil.ReceiveSpawnTierInstantiation(MessageContext.Nil, spawnTierInstantiation.NetId, spawnTierInstantiation.ParentNetId,
+                (byte)spawnTierInstantiation.SpawnType, spawnTierInstantiation.Chance, spawnTierInstantiation.Name, spawnTierInstantiation.Owner);
+        }
+
+        EditorActions.HasProcessedPendingSpawnTiers = true;
+        c += _spawnTierInstantiations.Count;
+
+        if (c > 20)
+        {
+            c = 0;
+            yield return null;
+        }
+
+        for (int i = 0; i < _spawnAssetInstantiations.Count; i++)
+        {
+            PendingSpawnAssetInstantiation spawnAssetInstantiation = _spawnAssetInstantiations[i];
+            SpawnTableUtil.ReceiveSpawnAssetInstantiation(MessageContext.Nil, spawnAssetInstantiation.NetId, spawnAssetInstantiation.ParentNetId,
+                (byte)spawnAssetInstantiation.SpawnType, spawnAssetInstantiation.LegacyId, spawnAssetInstantiation.Owner);
+        }
+
+        EditorActions.HasProcessedPendingSpawnAssets = true;
+        c += _spawnAssetInstantiations.Count;
+
+        if (c > 20)
+        {
+            // c = 0;
+            yield return null;
+        }
+
         for (int i = 0; i < _actions.Count; ++i)
         {
             if (i % 30 == 0 && i > 0)
@@ -264,6 +313,8 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         EditorActions.HasProcessedPendingRoads = false;
         EditorActions.HasProcessedPendingFlags = false;
         EditorActions.HasProcessedPendingSpawnTables = false;
+        EditorActions.HasProcessedPendingSpawnTiers = false;
+        EditorActions.HasProcessedPendingSpawnAssets = false;
         EventOnStartListening.TryInvoke();
     }
     public void Dispose()
@@ -347,6 +398,23 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         public readonly uint XP = xp;
         public readonly float Regen = regen;
         public readonly Guid DifficultyAsset = difficultyAsset;
+    }
+    private class PendingSpawnTierInstantiation(NetId64 netId, NetId64 parentNetId, SpawnType spawnType, float chance, string name, ulong owner)
+    {
+        public readonly NetId64 NetId = netId;
+        public readonly NetId64 ParentNetId = parentNetId;
+        public readonly SpawnType SpawnType = spawnType;
+        public readonly float Chance = chance;
+        public readonly string Name = name;
+        public readonly ulong Owner = owner;
+    }
+    private class PendingSpawnAssetInstantiation(NetId64 netId, NetId64 parentNetId, SpawnType spawnType, ushort legacyId, ulong owner)
+    {
+        public readonly NetId64 NetId = netId;
+        public readonly NetId64 ParentNetId = parentNetId;
+        public readonly SpawnType SpawnType = spawnType;
+        public readonly ushort LegacyId = legacyId;
+        public readonly ulong Owner = owner;
     }
 }
 #endif

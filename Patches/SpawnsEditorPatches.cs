@@ -50,6 +50,40 @@ internal static class SpawnsEditorPatches
         = Accessor.GenerateStaticGetter<EditorSpawnsItemsUI, ISleekField>("tableNameField", throwOnError: false);
     private static readonly StaticGetter<ISleekField>? GetZombieTableField
         = Accessor.GenerateStaticGetter<EditorSpawnsZombiesUI, ISleekField>("tableNameField", throwOnError: false);
+    
+    private static readonly StaticGetter<ISleekField>? GetAnimalTierField
+        = Accessor.GenerateStaticGetter<EditorSpawnsAnimalsUI, ISleekField>("tierNameField", throwOnError: false);
+    private static readonly StaticGetter<ISleekField>? GetVehicleTierField
+        = Accessor.GenerateStaticGetter<EditorSpawnsVehiclesUI, ISleekField>("tierNameField", throwOnError: false);
+    private static readonly StaticGetter<ISleekField>? GetItemTierField
+        = Accessor.GenerateStaticGetter<EditorSpawnsItemsUI, ISleekField>("tierNameField", throwOnError: false);
+
+    private static readonly StaticGetter<ISleekUInt16Field>? GetAnimalAssetField
+        = Accessor.GenerateStaticGetter<EditorSpawnsAnimalsUI, ISleekUInt16Field>("animalIDField", throwOnError: false);
+    private static readonly StaticGetter<ISleekUInt16Field>? GetVehicleAssetField
+        = Accessor.GenerateStaticGetter<EditorSpawnsVehiclesUI, ISleekUInt16Field>("vehicleIDField", throwOnError: false);
+    private static readonly StaticGetter<ISleekUInt16Field>? GetItemAssetField
+        = Accessor.GenerateStaticGetter<EditorSpawnsItemsUI, ISleekUInt16Field>("itemIDField", throwOnError: false);
+    private static readonly StaticGetter<ISleekUInt16Field>? GetZombieAssetField
+        = Accessor.GenerateStaticGetter<EditorSpawnsZombiesUI, ISleekUInt16Field>("itemIDField", throwOnError: false);
+
+    private static readonly StaticGetter<ISleekScrollView>? GetAnimalTableScrollBox
+        = Accessor.GenerateStaticGetter<EditorSpawnsAnimalsUI, ISleekScrollView>("tableScrollBox", throwOnError: false);
+    private static readonly StaticGetter<ISleekScrollView>? GetVehicleTableScrollBox
+        = Accessor.GenerateStaticGetter<EditorSpawnsVehiclesUI, ISleekScrollView>("tableScrollBox", throwOnError: false);
+    private static readonly StaticGetter<ISleekScrollView>? GetItemTableScrollBox
+        = Accessor.GenerateStaticGetter<EditorSpawnsItemsUI, ISleekScrollView>("tableScrollBox", throwOnError: false);
+    private static readonly StaticGetter<ISleekScrollView>? GetZombieTableScrollBox
+        = Accessor.GenerateStaticGetter<EditorSpawnsZombiesUI, ISleekScrollView>("tableScrollBox", throwOnError: false);
+
+    private static readonly StaticGetter<ISleekScrollView>? GetAnimalAssetScrollBox
+        = Accessor.GenerateStaticGetter<EditorSpawnsAnimalsUI, ISleekScrollView>("spawnsScrollBox", throwOnError: false);
+    private static readonly StaticGetter<ISleekScrollView>? GetVehicleAssetScrollBox
+        = Accessor.GenerateStaticGetter<EditorSpawnsVehiclesUI, ISleekScrollView>("spawnsScrollBox", throwOnError: false);
+    private static readonly StaticGetter<ISleekScrollView>? GetItemAssetScrollBox
+        = Accessor.GenerateStaticGetter<EditorSpawnsItemsUI, ISleekScrollView>("spawnsScrollBox", throwOnError: false);
+    private static readonly StaticGetter<ISleekScrollView>? GetZombieAssetScrollBox
+        = Accessor.GenerateStaticGetter<EditorSpawnsZombiesUI, ISleekScrollView>("spawnsScrollBox", throwOnError: false);
 
     internal static void ManualPatches()
     {
@@ -172,6 +206,7 @@ internal static class SpawnsEditorPatches
         }
     }
 
+    #region Select Table
     [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onClickedTableButton")]
     [HarmonyPrefix]
     [UsedImplicitly]
@@ -227,6 +262,7 @@ internal static class SpawnsEditorPatches
         SpawnTableUtil.SelectZombieTable(index, true, true);
         return false;
     }
+    #endregion
 
     #region Table Name
     private static bool OnTableNameUpdated(string state, int index, SpawnType spawnType)
@@ -588,7 +624,7 @@ internal static class SpawnsEditorPatches
 
         if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(spawnType, tableIndex, out NetId64 tableNetId))
         {
-            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnChanceUpdated), $"Unable to find NetId for zombie spawn table: {tableIndex.Format()}.");
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnChanceUpdated), $"Unable to find NetId for {spawnType.ToString().ToLowerInvariant()} spawn table: {tableIndex.Format()}.");
             EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
             return false;
         }
@@ -622,6 +658,13 @@ internal static class SpawnsEditorPatches
             SpawnTableUtil.SetSpawnTableTierChanceLocal(identifier, chance, false);
             ClientEvents.InvokeOnSetSpawnTableTierChances(in properties);
             return true;
+        }
+
+        bool rtn = true;
+        if (SpawnTableUtil.GetTierCountUnsafe(identifier.TableIndex, identifier.Type) == 1)
+        {
+            chance = 1f;
+            rtn = false;
         }
 
         NetId64[]? netIds = _chanceNetIds;
@@ -778,7 +821,7 @@ internal static class SpawnsEditorPatches
                 break;
         }
         ClientEvents.InvokeOnSetSpawnTableTierChances(in properties);
-        return true;
+        return rtn;
     }
 
     [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onDraggedChanceSlider")]
@@ -863,50 +906,50 @@ internal static class SpawnsEditorPatches
     #endregion
 
     #region Add Table
-    public static void OnAddTableClicked(ISleekElement button, SpawnType spawnType, string name)
+    private static void OnAddTableClicked(ISleekElement button, SpawnType spawnType, string name)
     {
-        if (DevkitServerModule.IsEditing)
+        if (!DevkitServerModule.IsEditing)
         {
-            button.SetIsClickable(false);
-            UniTask.Create(async () =>
+            int spawnTableCount = SpawnTableUtil.GetTableCountUnsafe(spawnType);
+            if (spawnTableCount >= byte.MaxValue - 1)
             {
-                try
-                {
-                    await SpawnTableUtil.RequestAddSpawnTable(spawnType, name);
-                }
-                catch (Exception ex)
-                {
-                    Logger.DevkitServer.LogWarning(nameof(OnAddTableClicked), ex, "Failed to add table");
-                }
-                finally
-                {
-                    DevkitServerUtility.QueueOnMainThread(() =>
-                    {
-                        try
-                        {
-                            button.SetIsClickable(true);
-                        }
-                        catch
-                        {
-                            // ignored
-                        }
-                    });
-                }
-            });
+                EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource,
+                    "TooMany" + spawnType + "SpawnTables", [byte.MaxValue - 1]);
+                return;
+            }
 
+            int index = SpawnTableUtil.AddSpawnTableLocal(spawnType, name);
+
+            SpawnTableUtil.SelectTable(spawnType, index, false, false);
             return;
         }
 
-        int spawnTableCount = SpawnTableUtil.GetTableCountUnsafe(spawnType);
-        if (spawnTableCount >= byte.MaxValue - 1)
+        button.SetIsClickable(false);
+        UniTask.Create(async () =>
         {
-            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "TooMany" + spawnType + "SpawnTables", [ byte.MaxValue - 1 ]);
-            return;
-        }
-
-        int index = SpawnTableUtil.AddSpawnTableLocal(spawnType, name);
-
-        SpawnTableUtil.SelectTable(spawnType, index, false, false);
+            try
+            {
+                await SpawnTableUtil.RequestAddSpawnTable(spawnType, name);
+            }
+            catch (Exception ex)
+            {
+                Logger.DevkitServer.LogWarning(nameof(OnAddTableClicked), ex, "Failed to add table.");
+            }
+            finally
+            {
+                DevkitServerUtility.QueueOnMainThread(() =>
+                {
+                    try
+                    {
+                        button.SetIsClickable(true);
+                    }
+                    catch
+                    {
+                        // ignored
+                    }
+                });
+            }
+        });
     }
 
     [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onClickedAddTableButton")]
@@ -1005,6 +1048,579 @@ internal static class SpawnsEditorPatches
             name = "Table " + LevelZombies.tables.Count;
 
         OnAddTableClicked(button, SpawnType.Zombie, name);
+
+        return false;
+    }
+    #endregion
+
+    #region Delete Table
+    private static bool OnRemoveTableClicked(SpawnType spawnType, int tableIndex)
+    {
+        if (!SpawnTableUtil.CheckSpawnTableSafe(spawnType, tableIndex))
+        {
+            SpawnTableUtil.DeselectTable(spawnType);
+            return false;
+        }
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            SpawnTableUtil.RemoveSpawnTableLocal(spawnType, tableIndex);
+            return true;
+        }
+
+        if (!VanillaPermissions.SpawnTablesDelete(spawnType).Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnTablesDelete(spawnType));
+            return false;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(spawnType, tableIndex, out NetId64 spawnTableNetId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnRemoveTableClicked), $"Unable to find NetId for {spawnType.ToString().ToLowerInvariant()} spawn table: {tableIndex.Format()}.");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+            return false;
+        }
+
+        DeleteSpawnTableProperties properties = new DeleteSpawnTableProperties(spawnTableNetId, spawnType, CachedTime.DeltaTime);
+
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnDeleteSpawnTableRequested(in properties, ref shouldAllow);
+        if (!shouldAllow)
+            return false;
+
+        SpawnTableUtil.RemoveSpawnTableLocal(spawnType, tableIndex);
+        ClientEvents.InvokeOnDeleteSpawnTable(in properties);
+        return true;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onClickedRemoveTableButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnRemoveAnimalTableClicked(ISleekElement button)
+    {
+        if (OnRemoveTableClicked(SpawnType.Animal, EditorSpawns.selectedAnimal))
+            GetAnimalTableScrollBox?.Invoke()?.ScrollToBottom();
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsVehiclesUI), "onClickedRemoveTableButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnRemoveVehicleTableClicked(ISleekElement button)
+    {
+        if (OnRemoveTableClicked(SpawnType.Vehicle, EditorSpawns.selectedVehicle))
+            GetVehicleTableScrollBox?.Invoke()?.ScrollToBottom();
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onClickedRemoveTableButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnRemoveItemTableClicked(ISleekElement button)
+    {
+        if (OnRemoveTableClicked(SpawnType.Item, EditorSpawns.selectedItem))
+            GetItemTableScrollBox?.Invoke()?.ScrollToBottom();
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onClickedRemoveTableButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnRemoveZombieTableClicked(ISleekElement button)
+    {
+        if (OnRemoveTableClicked(SpawnType.Zombie, EditorSpawns.selectedZombie))
+            GetZombieTableScrollBox?.Invoke()?.ScrollToBottom();
+
+        return false;
+    }
+    #endregion
+
+    #region Add Tier
+    private static void OnAddTierClicked(ISleekElement button, SpawnType spawnType, int tableIndex, string name)
+    {
+        if (!DevkitServerModule.IsEditing)
+        {
+            int spawnTierCount = SpawnTableUtil.GetTierCountUnsafe(tableIndex, spawnType);
+            if (spawnTierCount >= byte.MaxValue - 1)
+            {
+                EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource,
+                    "TooManySpawnTiers", [byte.MaxValue - 1]);
+                return;
+            }
+
+            SpawnTierIdentifier? index = SpawnTableUtil.AddSpawnTableTierLocal(spawnType, tableIndex, name);
+
+            if (index.HasValue)
+                SpawnTableUtil.TrySelectTier(index.Value);
+            return;
+        }
+
+        button.SetIsClickable(false);
+        UniTask.Create(async () =>
+        {
+            try
+            {
+                await SpawnTableUtil.RequestAddSpawnTableTier(spawnType, tableIndex, name);
+            }
+            catch (Exception ex)
+            {
+                Logger.DevkitServer.LogWarning(nameof(OnAddTierClicked), ex, "Failed to add tier.");
+            }
+            finally
+            {
+                DevkitServerUtility.QueueOnMainThread(() =>
+                {
+                    try
+                    {
+                        button.SetIsClickable(true);
+                    }
+                    catch
+                    {
+                        // ignored
+                    }
+                });
+            }
+        });
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onClickedAddTierButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnAddAnimalTierClicked(ISleekElement button)
+    {
+        if (EditorSpawns.selectedAnimal >= LevelAnimals.tables.Count)
+            return false;
+
+        ISleekField? field = GetAnimalTierField?.Invoke();
+
+        string? name = field?.Text;
+
+        AnimalTable animalTable = LevelAnimals.tables[EditorSpawns.selectedAnimal];
+        if (name != null && animalTable.tiers.Any(x => x.name.Equals(name, StringComparison.InvariantCultureIgnoreCase)) && field != null)
+        {
+            field.Text = string.Empty;
+            SpawnTableUtil.DeselectTier(SpawnType.Animal);
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(name))
+            name = "Tier " + animalTable.tiers.Count;
+
+        OnAddTierClicked(button, SpawnType.Animal, EditorSpawns.selectedAnimal, name);
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsVehiclesUI), "onClickedAddTierButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnAddVehicleTierClicked(ISleekElement button)
+    {
+        if (EditorSpawns.selectedVehicle >= LevelVehicles.tables.Count)
+            return false;
+
+        ISleekField? field = GetVehicleTierField?.Invoke();
+
+        string? name = field?.Text;
+
+        VehicleTable vehicleTable = LevelVehicles.tables[EditorSpawns.selectedVehicle];
+        if (name != null && vehicleTable.tiers.Any(x => x.name.Equals(name, StringComparison.InvariantCultureIgnoreCase)) && field != null)
+        {
+            field.Text = string.Empty;
+            SpawnTableUtil.DeselectTier(SpawnType.Vehicle);
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(name))
+            name = "Tier " + vehicleTable.tiers.Count;
+
+        OnAddTierClicked(button, SpawnType.Vehicle, EditorSpawns.selectedVehicle, name);
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onClickedAddTierButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnAddItemTierClicked(ISleekElement button)
+    {
+        if (EditorSpawns.selectedItem >= LevelItems.tables.Count)
+            return false;
+
+        ISleekField? field = GetItemTierField?.Invoke();
+
+        string? name = field?.Text;
+
+        ItemTable itemTable = LevelItems.tables[EditorSpawns.selectedItem];
+        if (name != null && itemTable.tiers.Any(x => x.name.Equals(name, StringComparison.InvariantCultureIgnoreCase)) && field != null)
+        {
+            field.Text = string.Empty;
+            SpawnTableUtil.DeselectTier(SpawnType.Item);
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(name))
+            name = "Tier " + itemTable.tiers.Count;
+
+        OnAddTierClicked(button, SpawnType.Item, EditorSpawns.selectedItem, name);
+
+        return false;
+    }
+    #endregion
+
+    #region Delete Tier
+    private static void OnRemoveTierClicked(SpawnTierIdentifier identifier)
+    {
+        if (!identifier.CheckSafe())
+        {
+            SpawnTableUtil.DeselectTier(identifier.Type);
+            return;
+        }
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            SpawnTableUtil.RemoveSpawnTableTierLocal(identifier);
+            return;
+        }
+
+        if (!VanillaPermissions.SpawnTablesEdit(identifier.Type).Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnTablesEdit(identifier.Type));
+            return;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTierNetId(identifier, out NetId64 tierNetId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnRemoveTableClicked), $"Unable to find NetId for spawn table tier: {identifier.Format()}.");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+            return;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(identifier.Type, identifier.TableIndex, out NetId64 tableNetId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnRemoveTableClicked), $"Unable to find NetId for spawn table tier: {identifier.Format()}.");
+        }
+
+        DeleteSpawnTableTierProperties properties = new DeleteSpawnTableTierProperties(tableNetId, tierNetId, identifier.Type, CachedTime.DeltaTime);
+
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnDeleteSpawnTableTierRequested(in properties, ref shouldAllow);
+        if (!shouldAllow)
+            return;
+
+        SpawnTableUtil.RemoveSpawnTableTierLocal(identifier);
+        ClientEvents.InvokeOnDeleteSpawnTableTier(in properties);
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onClickedRemoveTierButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnRemoveAnimalTierClicked(ISleekElement button)
+    {
+        if (SpawnTableUtil.TryGetSelectedTier(SpawnType.Animal, out SpawnTierIdentifier? identifier) && identifier.HasValue)
+            OnRemoveTierClicked(identifier.Value);
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsVehiclesUI), "onClickedRemoveTierButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnRemoveVehicleTierClicked(ISleekElement button)
+    {
+        if (SpawnTableUtil.TryGetSelectedTier(SpawnType.Vehicle, out SpawnTierIdentifier? identifier) && identifier.HasValue)
+            OnRemoveTierClicked(identifier.Value);
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onClickedRemoveTierButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnRemoveItemTierClicked(ISleekElement button)
+    {
+        if (SpawnTableUtil.TryGetSelectedTier(SpawnType.Item, out SpawnTierIdentifier? identifier) && identifier.HasValue)
+            OnRemoveTierClicked(identifier.Value);
+
+        return false;
+    }
+    #endregion
+
+    #region Add Asset
+    private static void OnAddAssetClicked(ISleekElement button, SpawnTierIdentifier parentTier, ushort legacyId)
+    {
+        if (!DevkitServerModule.IsEditing)
+        {
+            int spawnAssetCount = SpawnTableUtil.GetAssetCountUnsafe(parentTier.TableIndex, parentTier.TierIndex, parentTier.Type);
+            if (spawnAssetCount >= byte.MaxValue - 1)
+            {
+                EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "TooManySpawnAssets", [byte.MaxValue - 1]);
+                return;
+            }
+
+            SpawnAssetIdentifier? index = SpawnTableUtil.AddSpawnTableAssetLocal(parentTier, legacyId);
+
+            if (index.HasValue)
+                SpawnTableUtil.TrySelectTierAsset(index.Value);
+            return;
+        }
+
+        button.SetIsClickable(false);
+        UniTask.Create(async () =>
+        {
+            try
+            {
+                await SpawnTableUtil.RequestAddSpawnTableAsset(parentTier, legacyId);
+            }
+            catch (Exception ex)
+            {
+                Logger.DevkitServer.LogWarning(nameof(OnAddTierClicked), ex, "Failed to add asset.");
+            }
+            finally
+            {
+                DevkitServerUtility.QueueOnMainThread(() =>
+                {
+                    try
+                    {
+                        button.SetIsClickable(true);
+                    }
+                    catch
+                    {
+                        // ignored
+                    }
+                });
+            }
+        });
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onClickedAddAnimalButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnAddAnimalAssetClicked(ISleekElement button)
+    {
+        if (!SpawnTableUtil.TryGetSelectedTier(SpawnType.Animal, out SpawnTierIdentifier? identifier) || !identifier.HasValue)
+            return false;
+
+        ISleekUInt16Field? field = GetAnimalAssetField?.Invoke();
+
+        ushort legacyId = field?.Value ?? default;
+
+        if (legacyId != default && Assets.find(EAssetType.ANIMAL, legacyId) is not AnimalAsset)
+        {
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "SpawnAssetNotFound", [ nameof(EAssetType.ANIMAL), legacyId ]);
+            if (field != null)
+                field.Value = default;
+            return false;
+        }
+
+        OnAddAssetClicked(button, identifier.Value, legacyId);
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsVehiclesUI), "onClickedAddVehicleButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnAddVehicleAssetClicked(ISleekElement button)
+    {
+        if (!SpawnTableUtil.TryGetSelectedTier(SpawnType.Vehicle, out SpawnTierIdentifier? identifier) || !identifier.HasValue)
+            return false;
+
+        ISleekUInt16Field? field = GetVehicleAssetField?.Invoke();
+
+        ushort legacyId = field?.Value ?? default;
+
+        if (legacyId != default && Assets.find(EAssetType.VEHICLE, legacyId) is not VehicleAsset)
+        {
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "SpawnAssetNotFound", [ nameof(EAssetType.VEHICLE), legacyId ]);
+            if (field != null)
+                field.Value = default;
+            return false;
+        }
+
+        OnAddAssetClicked(button, identifier.Value, legacyId);
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onClickedAddItemButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnAddItemAssetClicked(ISleekElement button)
+    {
+        if (!SpawnTableUtil.TryGetSelectedTier(SpawnType.Item, out SpawnTierIdentifier? identifier) || !identifier.HasValue)
+            return false;
+
+        ISleekUInt16Field? field = GetItemAssetField?.Invoke();
+
+        ushort legacyId = field?.Value ?? default;
+
+        if (legacyId != default && Assets.find(EAssetType.ITEM, legacyId) is not ItemAsset)
+        {
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "SpawnAssetNotFound", [ nameof(EAssetType.ITEM), legacyId ]);
+            if (field != null)
+                field.Value = default;
+            return false;
+        }
+
+        OnAddAssetClicked(button, identifier.Value, legacyId);
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onClickedAddItemButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnAddZombieAssetClicked(ISleekElement button)
+    {
+        if (!SpawnTableUtil.TryGetSelectedTier(SpawnType.Zombie, out SpawnTierIdentifier? identifier) || !identifier.HasValue)
+            return false;
+
+        ISleekUInt16Field? field = GetZombieAssetField?.Invoke();
+
+        ushort legacyId = field?.Value ?? default;
+
+        if (legacyId != default && Assets.find(EAssetType.ITEM, legacyId) is not ItemAsset)
+        {
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "SpawnAssetNotFound", [ nameof(EAssetType.ITEM), legacyId ]);
+            if (field != null)
+                field.Value = default;
+            return false;
+        }
+
+        OnAddAssetClicked(button, identifier.Value, legacyId);
+
+        return false;
+    }
+    #endregion
+
+    #region Delete Asset
+    private static bool OnRemoveAssetClicked(SpawnAssetIdentifier identifier)
+    {
+        if (!identifier.CheckSafe())
+        {
+            SpawnTableUtil.DeselectTierAsset(identifier.Type);
+            return false;
+        }
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            SpawnTableUtil.RemoveSpawnTableTierAssetLocal(identifier);
+            return true;
+        }
+
+        if (!VanillaPermissions.SpawnTablesEdit(identifier.Type).Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnTablesEdit(identifier.Type));
+            return false;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnAssetNetId(identifier, out NetId64 assetNetId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnRemoveAssetClicked), $"Unable to find NetId for spawn table tier asset: {identifier.Format()}.");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+            return false;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTierNetId(identifier.GetTier(), out NetId64 tierNetId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnRemoveAssetClicked), $"Unable to find NetId for spawn table tier: {identifier.GetTier().Format()}.");
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(identifier.Type, identifier.TableIndex, out NetId64 tableNetId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnRemoveAssetClicked), $"Unable to find NetId for {identifier.Type.ToString().ToLowerInvariant()} spawn table: {identifier.TableIndex.Format()}.");
+        }
+
+        DeleteSpawnTableTierAssetProperties properties = new DeleteSpawnTableTierAssetProperties(tableNetId, tierNetId, assetNetId, identifier.Type, CachedTime.DeltaTime);
+
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnDeleteSpawnTableTierAssetRequested(in properties, ref shouldAllow);
+        if (!shouldAllow)
+            return false;
+
+        SpawnTableUtil.RemoveSpawnTableTierAssetLocal(identifier);
+        ClientEvents.InvokeOnDeleteSpawnTableTierAsset(in properties);
+        return true;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onClickedRemoveAnimalButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnRemoveAnimalAssetClicked(ISleekElement button)
+    {
+        if (SpawnTableUtil.TryGetSelectedTierAsset(SpawnType.Animal, out SpawnAssetIdentifier? identifier)
+            && identifier.HasValue
+            && OnRemoveAssetClicked(identifier.Value))
+        {
+            GetAnimalAssetScrollBox?.Invoke()?.ScrollToBottom();
+        }
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsVehiclesUI), "onClickedRemoveVehicleButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnRemoveVehicleAssetClicked(ISleekElement button)
+    {
+        if (SpawnTableUtil.TryGetSelectedTierAsset(SpawnType.Vehicle, out SpawnAssetIdentifier? identifier)
+            && identifier.HasValue
+            && OnRemoveAssetClicked(identifier.Value))
+        {
+            GetVehicleAssetScrollBox?.Invoke()?.ScrollToBottom();
+        }
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onClickedRemoveItemButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnRemoveItemAssetClicked(ISleekElement button)
+    {
+        if (SpawnTableUtil.TryGetSelectedTierAsset(SpawnType.Item, out SpawnAssetIdentifier? identifier)
+            && identifier.HasValue
+            && OnRemoveAssetClicked(identifier.Value))
+        {
+            GetItemAssetScrollBox?.Invoke()?.ScrollToBottom();
+        }
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onClickedRemoveItemButton")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnRemoveZombieAssetClicked(ISleekElement button)
+    {
+        if (SpawnTableUtil.TryGetSelectedTierAsset(SpawnType.Zombie, out SpawnAssetIdentifier? identifier)
+            && identifier.HasValue
+            && OnRemoveAssetClicked(identifier.Value))
+        {
+            GetZombieAssetScrollBox?.Invoke()?.ScrollToBottom();
+        }
 
         return false;
     }

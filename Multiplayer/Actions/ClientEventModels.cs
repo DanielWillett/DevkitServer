@@ -873,22 +873,21 @@ public readonly ref struct RequestInstantiateSpawnTableProperties(SpawnType spaw
 
 public delegate void RequestInstantiateSpawnTier(in RequestInstantiateSpawnTierProperties properties);
 public delegate void RequestInstantiateSpawnTierRequested(in RequestInstantiateSpawnTierProperties properties, ref bool shouldAllow);
-public readonly ref struct RequestInstantiateSpawnTierProperties(NetId64 spawnTableId, SpawnType spawnType, string name, float chance)
+public readonly ref struct RequestInstantiateSpawnTierProperties(NetId64 spawnTableId, SpawnType spawnType, string name)
 {
     public readonly NetId64 SpawnTableId = spawnTableId;
     public readonly SpawnType SpawnType = spawnType;
     public readonly string? Name = name;
-    public readonly float Chance = chance;
 }
 
 public delegate void RequestInstantiateSpawnTierAsset(in RequestInstantiateSpawnTierAssetProperties properties);
 public delegate void RequestInstantiateSpawnTierAssetRequested(in RequestInstantiateSpawnTierAssetProperties properties, ref bool shouldAllow);
-public readonly ref struct RequestInstantiateSpawnTierAssetProperties(NetId64 spawnTableId, NetId64 spawnTierId, SpawnType spawnType, AssetReference<Asset> asset)
+public readonly ref struct RequestInstantiateSpawnTierAssetProperties(NetId64 spawnTableId, NetId64 spawnTierId, SpawnType spawnType, ushort legacyId)
 {
     public readonly NetId64 SpawnTableId = spawnTableId;
     public readonly NetId64 SpawnTierId = spawnTierId;
     public readonly SpawnType SpawnType = spawnType;
-    public readonly AssetReference<Asset> Asset = asset;
+    public readonly ushort LegacyId = legacyId;
 }
 
 public delegate void SetPlayerSpawnpointIsAlternate(in SetPlayerSpawnpointIsAlternateProperties properties);

@@ -445,7 +445,7 @@ public sealed class SetSpawnTableTierNameAction : IReplacableAction, INetId64Act
     }
 }
 
-[Action(DevkitServerActionType.SetSpawnTableTierChances, 3052, 0)]
+[Action(DevkitServerActionType.SetSpawnTableTierChances, 3053, 0)]
 public sealed class SetSpawnTableTierChancesAction : IReplacableAction
 {
     public DevkitServerActionType Type => DevkitServerActionType.SetSpawnTableTierChances;
@@ -526,7 +526,7 @@ public sealed class SetSpawnTableTierChancesAction : IReplacableAction
     public void Read(ByteReader reader)
     {
         DeltaTime = reader.ReadFloat();
-
+        SpawnType = (SpawnType)reader.ReadUInt8();
         int l = reader.ReadUInt8();
         NetIds = new NetId64[l];
         Chances = new float[l];
@@ -539,7 +539,7 @@ public sealed class SetSpawnTableTierChancesAction : IReplacableAction
     public void Write(ByteWriter writer)
     {
         writer.Write(DeltaTime);
-
+        writer.Write((byte)SpawnType);
         int l = Math.Min(byte.MaxValue, Math.Min(NetIds.Length, Chances.Length));
         writer.Write((byte)l);
         for (int i = 0; i < l; ++i)
@@ -548,7 +548,7 @@ public sealed class SetSpawnTableTierChancesAction : IReplacableAction
             writer.Write(Chances[i]);
         }
     }
-    public int CalculateSize() => 5 + NetIds.Length * 12;
+    public int CalculateSize() => 6 + NetIds.Length * 12;
 
     public bool TryReplaceFrom(IReplacableAction action)
     {

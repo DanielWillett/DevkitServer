@@ -30,6 +30,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
     private bool _handleModeDirty;
     private bool _justCancelledDragging;
     private bool _hasLetGoOfCtrlSinceCopyTransform = true;
+    private bool _detectedMouseDown;
     private GameObject? _hoverHighlight;
     public IReadOnlyList<GameObject> CopyBuffer { get; }
     public TransformHandles Handles { get; } = new TransformHandles();
@@ -199,6 +200,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
 
             if (InputEx.GetKeyDown(KeyCode.Mouse0))
             {
+                _detectedMouseDown = true;
                 // selecting an item by clicking
 
                 RaycastHit hit = default;
@@ -252,7 +254,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                 CheckHover(ref hit);
             }
 
-            if (!_justCancelledDragging && !IsDraggingHandles && !IsAreaSelecting && CanAreaSelect && InputEx.GetKey(KeyCode.Mouse0) && CachedTime.RealtimeSinceStartup - AreaSelectStartTime > 0.1f)
+            if (_detectedMouseDown && !_justCancelledDragging && !IsDraggingHandles && !IsAreaSelecting && CanAreaSelect && CachedTime.RealtimeSinceStartup - AreaSelectStartTime > 0.1f && InputEx.GetKey(KeyCode.Mouse0))
             {
                 BeginAreaSelecting();
             }
@@ -322,6 +324,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
 
             if (InputEx.GetKeyUp(KeyCode.Mouse0))
             {
+                _detectedMouseDown = false;
                 _justCancelledDragging = false;
                 if (IsDraggingHandles)
                     EndDragHandles(true);
@@ -357,6 +360,8 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                     HighlighterUtil.Unhighlight(_hoverHighlight.transform, 0.1f);
                 _hoverHighlight = null;
             }
+
+            _detectedMouseDown = false;
         }
 
         LateInputTick();

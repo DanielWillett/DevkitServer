@@ -55,5 +55,9 @@ public enum DevkitServerNetCall : ushort
     SendRemoteNetMessageMappings = 51,
     SendBasicSpawnTableInstantiation = 52,
     SendZombieSpawnTableInstantiation = 53,
-    RequestSpawnTableInstantiation = 54
+    RequestSpawnTableInstantiation = 54,
+    SendSpawnTierInstantiation = 55,
+    RequestSpawnTierInstantiation = 56,
+    SendSpawnAssetInstantiation = 57,
+    RequestSpawnAssetInstantiation = 58
 }

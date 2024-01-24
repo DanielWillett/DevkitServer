@@ -183,7 +183,8 @@ public sealed class DevkitServerModule : IModuleNexus
         { "TooManyZombieSpawnTables", "Too Many Zombie Tables\nMax: {0}" },
         { "SpawnTierNameTaken", "Name Already Taken" },
         { "TooManySpawnTiers", "Too Many Tiers\nMax: {0}" },
-        { "TooManySpawnAssets", "Too Many Assets\nMax: {0}" }
+        { "TooManySpawnAssets", "Too Many Assets\nMax: {0}" },
+        { "SpawnAssetNotFound", "Asset Not Found\n[{0}] {1}" }
     };
     public static Local LevelLoadingLocalization { get; private set; } = null!;
 
