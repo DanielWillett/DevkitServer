@@ -112,7 +112,7 @@ public static class SpawnTableUtil
     private static readonly NetCall<NetId64, byte, string, ushort, Color, ulong> SendBasicSpawnTableInstantiation = new NetCall<NetId64, byte, string, ushort, Color, ulong>(DevkitServerNetCall.SendBasicSpawnTableInstantiation);
 
     [UsedImplicitly]
-    private static readonly NetCall<NetId64, string, long, uint, float, NetId64, Guid, Color, ulong> SendZombieSpawnTableInstantiation = new NetCall<NetId64, string, long, uint, float, NetId64, Guid, Color, ulong>(DevkitServerNetCall.SendZombieSpawnTableInstantiation);
+    private static readonly NetCall<NetId64, string, long, uint, float, NetId64, Guid, Color, ulong[], ulong> SendZombieSpawnTableInstantiation = new NetCall<NetId64, string, long, uint, float, NetId64, Guid, Color, ulong[], ulong>(DevkitServerNetCall.SendZombieSpawnTableInstantiation);
     
     [UsedImplicitly]
     private static readonly NetCall<byte, string> RequestSpawnTableInstantiation = new NetCall<byte, string>(DevkitServerNetCall.RequestSpawnTableInstantiation);
@@ -2991,7 +2991,7 @@ public static class SpawnTableUtil
         }
 
         EventOnSpawnTableNameUpdated.TryInvoke(spawnType, index);
-        Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Set {spawnType.ToString().ToLowerInvariant()} " +
+        Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Set {spawnType.GetLowercaseText()} " +
                                                                           $"spawn table (# {index.Format()}) name to {newName.Format()}.");
 
         return true;
@@ -3144,7 +3144,7 @@ public static class SpawnTableUtil
         }
 
         EventOnSpawnTableColorUpdated.TryInvoke(spawnType, index);
-        Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Set {spawnType.ToString().ToLowerInvariant()} " +
+        Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Set {spawnType.GetLowercaseText()} " +
                                                                     $"spawn table (# {index.Format()}) color to {newColor.Format()}.");
         return true;
     }
@@ -3394,7 +3394,7 @@ public static class SpawnTableUtil
         }
 
         EventOnSpawnTableSpawnAssetUpdated.TryInvoke(spawnType, index);
-        Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Set {spawnType.ToString().ToLowerInvariant()} " +
+        Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Set {spawnType.GetLowercaseText()} " +
                                                                           $"spawn table (# {index.Format()}) asset ID to {id.Format()}.");
         return true;
     }
@@ -4103,7 +4103,7 @@ public static class SpawnTableUtil
                 break;
         }
 
-        Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Normalized {spawnType.ToString().ToLowerInvariant()} spawn table (# {index.Format()}) chances");
+        Logger.DevkitServer.LogConditional(nameof(RemoveSpawnTableLocal), $"Normalized {spawnType.GetLowercaseText()} spawn table (# {index.Format()}) chances");
         return true;
     }
 
@@ -4124,7 +4124,7 @@ public static class SpawnTableUtil
 
         int tableCount = GetTableCountUnsafe(spawnType);
         if (tableCount >= byte.MaxValue - 1)
-            throw new InvalidOperationException($"Too many {spawnType.ToString().ToLowerInvariant()} spawn tables ({byte.MaxValue - 1}) already exist on the map.");
+            throw new InvalidOperationException($"Too many {spawnType.GetLowercaseText()} spawn tables ({byte.MaxValue - 1}) already exist on the map.");
 
         int index;
 
@@ -4143,28 +4143,6 @@ public static class SpawnTableUtil
                 AnimalTable animalTable = LevelAnimals.tables[index];
                 EventOnAnimalSpawnTableAdded.TryInvoke(animalTable, index);
                 EventOnSpawnTableAdded.TryInvoke(spawnType, index);
-
-                bool hasAssetAdded = !EventOnAnimalSpawnAssetAdded.IsEmpty || !EventOnSpawnAssetAdded.IsEmpty;
-                if (EventOnAnimalSpawnTierAdded.IsEmpty && EventOnSpawnTierAdded.IsEmpty && !hasAssetAdded)
-                    break;
-
-                for (int i = 0; i < animalTable.tiers.Count; ++i)
-                {
-                    AnimalTier tier = animalTable.tiers[i];
-                    SpawnTierIdentifier identifier = new SpawnTierIdentifier(spawnType, (byte)index, (byte)i);
-                    EventOnAnimalSpawnTierAdded.TryInvoke(tier, identifier, HierarchicalEventSource.ParentObject);
-                    EventOnSpawnTierAdded.TryInvoke(identifier, HierarchicalEventSource.ParentObject);
-                    if (!hasAssetAdded)
-                        continue;
-
-                    for (int j = 0; j < tier.table.Count; ++j)
-                    {
-                        SpawnAssetIdentifier assetIdentifier = new SpawnAssetIdentifier(spawnType, (byte)index, (byte)i, (byte)j);
-                        EventOnAnimalSpawnAssetAdded.TryInvoke(tier.table[j], assetIdentifier, HierarchicalEventSource.GrandparentObject);
-                        EventOnSpawnAssetAdded.TryInvoke(assetIdentifier, HierarchicalEventSource.GrandparentObject);
-                    }
-                }
-
                 break;
 
             case SpawnType.Vehicle:
@@ -4180,28 +4158,6 @@ public static class SpawnTableUtil
                 VehicleTable vehicleTable = LevelVehicles.tables[index];
                 EventOnVehicleSpawnTableAdded.TryInvoke(vehicleTable, index);
                 EventOnSpawnTableAdded.TryInvoke(spawnType, index);
-
-                hasAssetAdded = !EventOnVehicleSpawnAssetAdded.IsEmpty || !EventOnSpawnAssetAdded.IsEmpty;
-                if (EventOnVehicleSpawnTierAdded.IsEmpty && EventOnSpawnTierAdded.IsEmpty && !hasAssetAdded)
-                    break;
-
-                for (int i = 0; i < vehicleTable.tiers.Count; ++i)
-                {
-                    VehicleTier tier = vehicleTable.tiers[i];
-                    SpawnTierIdentifier identifier = new SpawnTierIdentifier(spawnType, (byte)index, (byte)i);
-                    EventOnVehicleSpawnTierAdded.TryInvoke(tier, identifier, HierarchicalEventSource.ParentObject);
-                    EventOnSpawnTierAdded.TryInvoke(identifier, HierarchicalEventSource.ParentObject);
-                    if (!hasAssetAdded)
-                        continue;
-
-                    for (int j = 0; j < tier.table.Count; ++j)
-                    {
-                        SpawnAssetIdentifier assetIdentifier = new SpawnAssetIdentifier(spawnType, (byte)index, (byte)i, (byte)j);
-                        EventOnVehicleSpawnAssetAdded.TryInvoke(tier.table[j], assetIdentifier, HierarchicalEventSource.GrandparentObject);
-                        EventOnSpawnAssetAdded.TryInvoke(assetIdentifier, HierarchicalEventSource.GrandparentObject);
-                    }
-                }
-
                 break;
 
             case SpawnType.Item:
@@ -4217,28 +4173,6 @@ public static class SpawnTableUtil
                 ItemTable itemTable = LevelItems.tables[index];
                 EventOnItemSpawnTableAdded.TryInvoke(itemTable, index);
                 EventOnSpawnTableAdded.TryInvoke(spawnType, index);
-
-                hasAssetAdded = !EventOnItemSpawnAssetAdded.IsEmpty || !EventOnSpawnAssetAdded.IsEmpty;
-                if (EventOnItemSpawnTierAdded.IsEmpty && EventOnSpawnTierAdded.IsEmpty && !hasAssetAdded)
-                    break;
-
-                for (int i = 0; i < itemTable.tiers.Count; ++i)
-                {
-                    ItemTier tier = itemTable.tiers[i];
-                    SpawnTierIdentifier identifier = new SpawnTierIdentifier(spawnType, (byte)index, (byte)i);
-                    EventOnItemSpawnTierAdded.TryInvoke(tier, identifier, HierarchicalEventSource.ParentObject);
-                    EventOnSpawnTierAdded.TryInvoke(identifier, HierarchicalEventSource.ParentObject);
-                    if (!hasAssetAdded)
-                        continue;
-
-                    for (int j = 0; j < tier.table.Count; ++j)
-                    {
-                        SpawnAssetIdentifier assetIdentifier = new SpawnAssetIdentifier(spawnType, (byte)index, (byte)i, (byte)j);
-                        EventOnItemSpawnAssetAdded.TryInvoke(tier.table[j], assetIdentifier, HierarchicalEventSource.GrandparentObject);
-                        EventOnSpawnAssetAdded.TryInvoke(assetIdentifier, HierarchicalEventSource.GrandparentObject);
-                    }
-                }
-
                 break;
 
             default: // Zombie
@@ -4255,9 +4189,10 @@ public static class SpawnTableUtil
                 EventOnZombieSpawnTableAdded.TryInvoke(zombieTable, index);
                 EventOnSpawnTableAdded.TryInvoke(spawnType, index);
 
-                hasAssetAdded = !EventOnZombieSpawnAssetAdded.IsEmpty || !EventOnSpawnAssetAdded.IsEmpty;
-                if (EventOnZombieSpawnTierAdded.IsEmpty && EventOnSpawnTierAdded.IsEmpty && !hasAssetAdded)
+#if CLIENT
+                if (EventOnZombieSpawnTierAdded.IsEmpty && EventOnSpawnTierAdded.IsEmpty)
                     break;
+#endif
 
                 for (int i = 0; i < zombieTable.slots.Length; ++i)
                 {
@@ -4265,15 +4200,13 @@ public static class SpawnTableUtil
                     SpawnTierIdentifier identifier = new SpawnTierIdentifier(spawnType, (byte)index, (byte)i);
                     EventOnZombieSpawnTierAdded.TryInvoke(tier, identifier, HierarchicalEventSource.ParentObject);
                     EventOnSpawnTierAdded.TryInvoke(identifier, HierarchicalEventSource.ParentObject);
-                    if (!hasAssetAdded)
+#if SERVER
+                    if (!DevkitServerModule.IsEditing)
                         continue;
 
-                    for (int j = 0; j < tier.table.Count; ++j)
-                    {
-                        SpawnAssetIdentifier assetIdentifier = new SpawnAssetIdentifier(spawnType, (byte)index, (byte)i, (byte)j);
-                        EventOnZombieSpawnAssetAdded.TryInvoke(tier.table[j], assetIdentifier, HierarchicalEventSource.GrandparentObject);
-                        EventOnSpawnAssetAdded.TryInvoke(assetIdentifier, HierarchicalEventSource.GrandparentObject);
-                    }
+                    NetId64 netId = SpawnsNetIdDatabase.AddSpawnTier(identifier);
+                    Logger.DevkitServer.LogDebug(nameof(AddSpawnTableLocal), $"Assigned zombie spawn table tier {identifier.Format()} NetId: {netId.Format()}.");
+#endif
                 }
 
                 break;
@@ -4291,11 +4224,11 @@ public static class SpawnTableUtil
         tableCount = GetTableCountUnsafe(spawnType);
         if (index >= tableCount)
         {
-            Logger.DevkitServer.LogError(nameof(AddSpawnTableLocal), $"Unknown error adding {spawnType.ToString().ToLowerInvariant()} spawn table: {index.Format()} {name.Format(true)}.");
+            Logger.DevkitServer.LogError(nameof(AddSpawnTableLocal), $"Unknown error adding {spawnType.GetLowercaseText()} spawn table: {index.Format()} {name.Format(true)}.");
             return -1;
         }
 
-        Logger.DevkitServer.LogDebug(nameof(AddSpawnTableLocal), $"Added {spawnType.ToString().ToLowerInvariant()} spawn table: {index.Format()} {name.Format(true)}.");
+        Logger.DevkitServer.LogDebug(nameof(AddSpawnTableLocal), $"Added {spawnType.GetLowercaseText()} spawn table: {index.Format()} {name.Format(true)}.");
 
         return index;
     }
@@ -4321,7 +4254,7 @@ public static class SpawnTableUtil
 
         int tierCount = GetTierCountUnsafe(spawnTableIndex, spawnType);
         if (tierCount >= byte.MaxValue - 1)
-            throw new InvalidOperationException($"Too many {spawnType.ToString().ToLowerInvariant()} spawn table tiers ({byte.MaxValue - 1}) already exist on the table.");
+            throw new InvalidOperationException($"Too many {spawnType.GetLowercaseText()} spawn table tiers ({byte.MaxValue - 1}) already exist on the table.");
 
         SpawnTierIdentifier identifier;
 
@@ -4429,11 +4362,11 @@ public static class SpawnTableUtil
 
         if (!identifier.CheckSafe())
         {
-            Logger.DevkitServer.LogError(nameof(AddSpawnTableTierLocal), $"Unknown error adding {spawnType.ToString().ToLowerInvariant()} spawn table: {identifier.Format()} {name.Format(true)}.");
+            Logger.DevkitServer.LogError(nameof(AddSpawnTableTierLocal), $"Unknown error adding {spawnType.GetLowercaseText()} spawn table: {identifier.Format()} {name.Format(true)}.");
             return null;
         }
 
-        Logger.DevkitServer.LogDebug(nameof(AddSpawnTableTierLocal), $"Added {spawnType.ToString().ToLowerInvariant()} spawn table: {identifier.Format()} {name.Format(true)}.");
+        Logger.DevkitServer.LogDebug(nameof(AddSpawnTableTierLocal), $"Added {spawnType.GetLowercaseText()} spawn table: {identifier.Format()} {name.Format(true)}.");
 
         return identifier;
     }
@@ -4463,7 +4396,7 @@ public static class SpawnTableUtil
 
         int assetCount = GetAssetCountUnsafe(tableIndex, tierIndex, spawnType);
         if (assetCount >= byte.MaxValue - 1)
-            throw new InvalidOperationException($"Too many {spawnType.ToString().ToLowerInvariant()} spawn table assets ({byte.MaxValue - 1}) already exist on the tier.");
+            throw new InvalidOperationException($"Too many {spawnType.GetLowercaseText()} spawn table assets ({byte.MaxValue - 1}) already exist on the tier.");
 
         SpawnAssetIdentifier identifier;
 
@@ -4581,11 +4514,11 @@ public static class SpawnTableUtil
 
         if (!identifier.CheckSafe())
         {
-            Logger.DevkitServer.LogError(nameof(AddSpawnTableAssetLocal), $"Unknown error adding {spawnType.ToString().ToLowerInvariant()} spawn table: {identifier.Format()} {legacyId.Format()}.");
+            Logger.DevkitServer.LogError(nameof(AddSpawnTableAssetLocal), $"Unknown error adding {spawnType.GetLowercaseText()} spawn table: {identifier.Format()} {legacyId.Format()}.");
             return null;
         }
 
-        Logger.DevkitServer.LogDebug(nameof(AddSpawnTableAssetLocal), $"Added {spawnType.ToString().ToLowerInvariant()} spawn table: {identifier.Format()} {legacyId.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(AddSpawnTableAssetLocal), $"Added {spawnType.GetLowercaseText()} spawn table: {identifier.Format()} {legacyId.Format()}.");
 
         return identifier;
     }
@@ -4677,13 +4610,21 @@ public static class SpawnTableUtil
             name = table.name ?? string.Empty;
 
             NetId64 lootTableNetId = NetId64.Invalid;
+            
             if (table.lootIndex < LevelItems.tables.Count)
                 SpawnsNetIdDatabase.TryGetSpawnTableNetId(SpawnType.Item, table.lootIndex, out lootTableNetId);
 
-            if (ctx.IsRequest)
-                ctx.ReplyLayered(SendZombieSpawnTableInstantiation, spawnTableNetId, name, packed, table.xp, table.regen, lootTableNetId, difficultyAsset, table.color, owner);
+            ulong[] netIds = new ulong[table.slots.Length];
+            for (int i = 0; i < netIds.Length; ++i)
+            {
+                SpawnsNetIdDatabase.TryGetSpawnTierNetId(new SpawnTierIdentifier(SpawnType.Zombie, (byte)index, (byte)i), out NetId64 netId);
+                netIds[i] = netId.Id;
+            }
 
-            SendZombieSpawnTableInstantiation.Invoke(list, spawnTableNetId, name, packed, table.xp, table.regen, lootTableNetId, difficultyAsset, table.color, owner);
+            if (ctx.IsRequest)
+                ctx.ReplyLayered(SendZombieSpawnTableInstantiation, spawnTableNetId, name, packed, table.xp, table.regen, lootTableNetId, difficultyAsset, table.color, netIds, owner);
+
+            SendZombieSpawnTableInstantiation.Invoke(list, spawnTableNetId, name, packed, table.xp, table.regen, lootTableNetId, difficultyAsset, table.color, netIds, owner);
         }
         else
         {
@@ -4757,7 +4698,7 @@ public static class SpawnTableUtil
 
         if (spawnTableNetId.IsNull())
         {
-            Logger.DevkitServer.LogWarning(nameof(AddSpawnTableTier), $"Unable to get {spawnType.ToString().ToLowerInvariant()} spawn table Net Id: {spawnTableIndex.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(AddSpawnTableTier), $"Unable to get {spawnType.GetLowercaseText()} spawn table Net Id: {spawnTableIndex.Format()}.");
             return identifier;
         }
 
@@ -4828,7 +4769,7 @@ public static class SpawnTableUtil
 
         if (spawnTierNetId.IsNull())
         {
-            Logger.DevkitServer.LogWarning(nameof(AddSpawnTableTier), $"Unable to get {spawnType.ToString().ToLowerInvariant()} spawn table tier Net Id: {spawnTierIdentifier.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(AddSpawnTableTier), $"Unable to get {spawnType.GetLowercaseText()} spawn table tier Net Id: {spawnTierIdentifier.Format()}.");
             return identifier;
         }
 
@@ -4910,20 +4851,20 @@ public static class SpawnTableUtil
 
         if (!response.TryGetParameter(0, out NetId64 netId))
         {
-            Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTable), $"Failed to get NetId from incoming SendSpawnTableInstantiation ({spawnType.ToString().ToLowerInvariant()}).");
+            Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTable), $"Failed to get NetId from incoming SendSpawnTableInstantiation ({spawnType.GetLowercaseText()}).");
             return -1;
         }
 
         if (!SpawnsNetIdDatabase.TryGetSpawnTable(spawnType, netId, out int index))
         {
-            Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTable), $"Failed to resolve NetId in spawn table database from incoming SendSpawnTableInstantiation ({spawnType.ToString().ToLowerInvariant()}).");
+            Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTable), $"Failed to resolve NetId in spawn table database from incoming SendSpawnTableInstantiation ({spawnType.GetLowercaseText()}).");
             return -1;
         }
 
         if (index < GetTableCountUnsafe(spawnType))
             return index;
 
-        Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTable), $"Failed to resolve NetId (index out of range) in spawn table database from incoming SendSpawnTableInstantiation ({spawnType.ToString().ToLowerInvariant()}).");
+        Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTable), $"Failed to resolve NetId (index out of range) in spawn table database from incoming SendSpawnTableInstantiation ({spawnType.GetLowercaseText()}).");
         return -1;
     }
 
@@ -4942,7 +4883,7 @@ public static class SpawnTableUtil
 
         if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(spawnType, parentTableIndex, out NetId64 spawnTableNetId))
         {
-            Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTableTier), $"Failed to get NetId of index ({spawnType.ToString().ToLowerInvariant()}, {parentTableIndex.Format()}).");
+            Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTableTier), $"Failed to get NetId of index ({spawnType.GetLowercaseText()}, {parentTableIndex.Format()}).");
             EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", [ "NetId Missing" ]);
             return null;
         }
@@ -4978,19 +4919,19 @@ public static class SpawnTableUtil
 
         if (!response.TryGetParameter(0, out NetId64 tierNetId) || !response.TryGetParameter(1, out NetId64 tableNetId))
         {
-            Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTableTier), $"Failed to get NetId from incoming SendSpawnTierInstantiation ({spawnType.ToString().ToLowerInvariant()}, {parentTableIndex.Format()}).");
+            Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTableTier), $"Failed to get NetId from incoming SendSpawnTierInstantiation ({spawnType.GetLowercaseText()}, {parentTableIndex.Format()}).");
             return null;
         }
 
         if (tableNetId.Id != spawnTableNetId.Id)
         {
-            Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTableTier), $"Received unexpected NetId from incoming SendSpawnTierInstantiation ({spawnType.ToString().ToLowerInvariant()}, {parentTableIndex.Format()}). Didn't match expected.");
+            Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTableTier), $"Received unexpected NetId from incoming SendSpawnTierInstantiation ({spawnType.GetLowercaseText()}, {parentTableIndex.Format()}). Didn't match expected.");
             return null;
         }
 
         if (!SpawnsNetIdDatabase.TryGetSpawnTableTier(spawnType, tierNetId, out SpawnTierIdentifier identifier))
         {
-            Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTableTier), $"Failed to resolve NetId in spawn table database from incoming SendSpawnTierInstantiation ({spawnType.ToString().ToLowerInvariant()}, {parentTableIndex.Format()}).");
+            Logger.DevkitServer.LogWarning(nameof(RequestAddSpawnTableTier), $"Failed to resolve NetId in spawn table database from incoming SendSpawnTierInstantiation ({spawnType.GetLowercaseText()}, {parentTableIndex.Format()}).");
             return null;
         }
 
@@ -5090,7 +5031,7 @@ public static class SpawnTableUtil
         SpawnType spawnType = (SpawnType)spawnTypePacked;
         if (user == null || !user.IsOnline)
         {
-            Logger.DevkitServer.LogError(nameof(ReceiveSpawnTableInstantiationRequest), $"Unable to get user from {spawnType.ToString().ToLowerInvariant()} spawn table instantiation request.");
+            Logger.DevkitServer.LogError(nameof(ReceiveSpawnTableInstantiationRequest), $"Unable to get user from {spawnType.GetLowercaseText()} spawn table instantiation request.");
             ctx.Acknowledge(StandardErrorCode.NoPermissions);
             return;
         }
@@ -5106,12 +5047,12 @@ public static class SpawnTableUtil
 
         if (index == -1)
         {
-            Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnTableInstantiationRequest), $"Failed to grant request for instantiation of {spawnType.ToString().ToLowerInvariant()} spawn table {name.Format(true)} from {user.SteamId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnTableInstantiationRequest), $"Failed to grant request for instantiation of {spawnType.GetLowercaseText()} spawn table {name.Format(true)} from {user.SteamId.Format()}.");
             ctx.Acknowledge(StandardErrorCode.GenericError);
             return;
         }
 
-        Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnTableInstantiationRequest), $"Granted request for instantiation of {spawnType.ToString().ToLowerInvariant()} spawn table {name.Format(true)} #{index.Format()} from {user.SteamId.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnTableInstantiationRequest), $"Granted request for instantiation of {spawnType.GetLowercaseText()} spawn table {name.Format(true)} #{index.Format()} from {user.SteamId.Format()}.");
 
         ctx.Acknowledge(StandardErrorCode.Success);
     }
@@ -5123,7 +5064,7 @@ public static class SpawnTableUtil
         SpawnType spawnType = (SpawnType)spawnTypePacked;
         if (user == null || !user.IsOnline)
         {
-            Logger.DevkitServer.LogError(nameof(ReceiveSpawnTierInstantiationRequest), $"Unable to get user from {spawnType.ToString().ToLowerInvariant()} spawn table tier instantiation request.");
+            Logger.DevkitServer.LogError(nameof(ReceiveSpawnTierInstantiationRequest), $"Unable to get user from {spawnType.GetLowercaseText()} spawn table tier instantiation request.");
             ctx.Acknowledge(StandardErrorCode.NoPermissions);
             return;
         }
@@ -5137,7 +5078,7 @@ public static class SpawnTableUtil
 
         if (!SpawnsNetIdDatabase.TryGetSpawnTable(spawnType, spawnTableNetId, out int spawnTableIndex))
         {
-            Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnTierInstantiationRequest), $"Failed to resolve NetId of {spawnType.ToString().ToLowerInvariant()} spawn table {spawnTableNetId.Format()} from {user.SteamId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnTierInstantiationRequest), $"Failed to resolve NetId of {spawnType.GetLowercaseText()} spawn table {spawnTableNetId.Format()} from {user.SteamId.Format()}.");
             ctx.Acknowledge(StandardErrorCode.NotFound);
             return;
         }
@@ -5146,12 +5087,12 @@ public static class SpawnTableUtil
 
         if (!identifier.HasValue)
         {
-            Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnTierInstantiationRequest), $"Failed to grant request for instantiation of {spawnType.ToString().ToLowerInvariant()} spawn table tier {name.Format(true)} from {user.SteamId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnTierInstantiationRequest), $"Failed to grant request for instantiation of {spawnType.GetLowercaseText()} spawn table tier {name.Format(true)} from {user.SteamId.Format()}.");
             ctx.Acknowledge(StandardErrorCode.GenericError);
             return;
         }
 
-        Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnTierInstantiationRequest), $"Granted request for instantiation of {spawnType.ToString().ToLowerInvariant()} spawn table tier {name.Format(true)} #{identifier.Value.Format()} from {user.SteamId.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnTierInstantiationRequest), $"Granted request for instantiation of {spawnType.GetLowercaseText()} spawn table tier {name.Format(true)} #{identifier.Value.Format()} from {user.SteamId.Format()}.");
 
         ctx.Acknowledge(StandardErrorCode.Success);
     }
@@ -5163,7 +5104,7 @@ public static class SpawnTableUtil
         SpawnType spawnType = (SpawnType)spawnTypePacked;
         if (user == null || !user.IsOnline)
         {
-            Logger.DevkitServer.LogError(nameof(ReceiveSpawnAssetInstantiationRequest), $"Unable to get user from {spawnType.ToString().ToLowerInvariant()} spawn table tier asset instantiation request.");
+            Logger.DevkitServer.LogError(nameof(ReceiveSpawnAssetInstantiationRequest), $"Unable to get user from {spawnType.GetLowercaseText()} spawn table tier asset instantiation request.");
             ctx.Acknowledge(StandardErrorCode.NoPermissions);
             return;
         }
@@ -5177,7 +5118,7 @@ public static class SpawnTableUtil
 
         if (!SpawnsNetIdDatabase.TryGetSpawnTableTier(spawnType, spawnTableNetId, out SpawnTierIdentifier spawnTierIdentifier))
         {
-            Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnAssetInstantiationRequest), $"Failed to resolve NetId of {spawnType.ToString().ToLowerInvariant()} spawn table tier {spawnTableNetId.Format()} from {user.SteamId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnAssetInstantiationRequest), $"Failed to resolve NetId of {spawnType.GetLowercaseText()} spawn table tier {spawnTableNetId.Format()} from {user.SteamId.Format()}.");
             ctx.Acknowledge(StandardErrorCode.NotFound);
             return;
         }
@@ -5186,12 +5127,12 @@ public static class SpawnTableUtil
 
         if (!identifier.HasValue)
         {
-            Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnAssetInstantiationRequest), $"Failed to grant request for instantiation of {spawnType.ToString().ToLowerInvariant()} spawn table tier asset {legacyId.Format()} from {user.SteamId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnAssetInstantiationRequest), $"Failed to grant request for instantiation of {spawnType.GetLowercaseText()} spawn table tier asset {legacyId.Format()} from {user.SteamId.Format()}.");
             ctx.Acknowledge(StandardErrorCode.GenericError);
             return;
         }
 
-        Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnAssetInstantiationRequest), $"Granted request for instantiation of {spawnType.ToString().ToLowerInvariant()} spawn table tier asset {legacyId.Format()} #{identifier.Value.Format()} from {user.SteamId.Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnAssetInstantiationRequest), $"Granted request for instantiation of {spawnType.GetLowercaseText()} spawn table tier asset {legacyId.Format()} #{identifier.Value.Format()} from {user.SteamId.Format()}.");
 
         ctx.Acknowledge(StandardErrorCode.Success);
     }
@@ -5217,7 +5158,7 @@ public static class SpawnTableUtil
                 return StandardErrorCode.GenericError;
 
             SpawnsNetIdDatabase.RegisterSpawnTable(spawnType, index, netId);
-            Logger.DevkitServer.LogDebug(nameof(ReceiveBasicSpawnTableInstantiation), $"Assigned {spawnType.ToString().ToLowerInvariant()} spawn table NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(ReceiveBasicSpawnTableInstantiation), $"Assigned {spawnType.GetLowercaseText()} spawn table NetId: {netId.Format()}.");
 
             if (netId == NetId64.Invalid)
                 return StandardErrorCode.GenericError;
@@ -5294,7 +5235,7 @@ public static class SpawnTableUtil
         }
         catch (Exception ex)
         {
-            Logger.DevkitServer.LogError(nameof(ReceiveBasicSpawnTableInstantiation), ex, $"Failed to initialize {spawnType.ToString().ToLowerInvariant()} spawn table: {name.Format(true)} - {netId.Format()}.");
+            Logger.DevkitServer.LogError(nameof(ReceiveBasicSpawnTableInstantiation), ex, $"Failed to initialize {spawnType.GetLowercaseText()} spawn table: {name.Format(true)} - {netId.Format()}.");
             return StandardErrorCode.GenericError;
         }
 
@@ -5302,11 +5243,11 @@ public static class SpawnTableUtil
     }
 
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendZombieSpawnTableInstantiation)]
-    internal static StandardErrorCode ReceiveZombieSpawnTableInstantiation(MessageContext ctx, NetId64 netId, string name, long packed, uint xp, float regen, NetId64 lootTableNetId, Guid difficultyAsset, Color color, ulong owner)
+    internal static StandardErrorCode ReceiveZombieSpawnTableInstantiation(MessageContext ctx, NetId64 netId, string name, long packed, uint xp, float regen, NetId64 lootTableNetId, Guid difficultyAsset, Color color, ulong[] tierNetIds, ulong owner)
     {
         if (!EditorActions.HasProcessedPendingSpawnTables)
         {
-            EditorActions.TemporaryEditorActions?.QueueZombieSpawnTableInstantiation(netId, name, color, owner, packed, lootTableNetId, xp, regen, difficultyAsset);
+            EditorActions.TemporaryEditorActions?.QueueZombieSpawnTableInstantiation(netId, name, color, owner, packed, lootTableNetId, xp, regen, difficultyAsset, tierNetIds);
             return StandardErrorCode.Success;
         }
 
@@ -5329,6 +5270,14 @@ public static class SpawnTableUtil
                 return StandardErrorCode.GenericError;
 
             ZombieTable zombieTable = LevelZombies.tables[index];
+
+            int ct = Math.Min(tierNetIds.Length, zombieTable.slots.Length);
+            for (int i = 0; i < ct; ++i)
+            {
+                NetId64 tierNetId = new NetId64(tierNetIds[i]);
+                SpawnsNetIdDatabase.RegisterSpawnTier(new SpawnTierIdentifier(SpawnType.Zombie, (byte)index, (byte)i), tierNetId);
+                Logger.DevkitServer.LogConditional(nameof(ReceiveZombieSpawnTableInstantiation), $"Assigned zombie spawn table tier {i.Format()} NetId: {tierNetId.Format()}.");
+            }
 
             if (!string.Equals(zombieTable.name, name, StringComparison.Ordinal))
                 SetSpawnTableNameLocal(SpawnType.Zombie, index, name);
@@ -5407,7 +5356,7 @@ public static class SpawnTableUtil
 
             if (!SpawnsNetIdDatabase.TryGetSpawnTable(spawnType, tableNetId, out int tableIndex) || !CheckSpawnTableSafe(spawnType, tableIndex))
             {
-                Logger.DevkitServer.LogWarning(nameof(ReceiveSpawnTierInstantiation), $"Unable to find table for NetId {tableNetId.Format()} when instantiating {spawnType.ToString().ToLowerInvariant()} tier: {name.Format(true)} - {netId.Format()}.");
+                Logger.DevkitServer.LogWarning(nameof(ReceiveSpawnTierInstantiation), $"Unable to find table for NetId {tableNetId.Format()} when instantiating {spawnType.GetLowercaseText()} tier: {name.Format(true)} - {netId.Format()}.");
                 if (isMe)
                     EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", [ "NetId Missing" ]);
                 
@@ -5422,7 +5371,7 @@ public static class SpawnTableUtil
             SpawnTierIdentifier id = identifier.Value;
 
             SpawnsNetIdDatabase.RegisterSpawnTier(id, netId);
-            Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnTierInstantiation), $"Assigned {spawnType.ToString().ToLowerInvariant()} spawn table tier NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnTierInstantiation), $"Assigned {spawnType.GetLowercaseText()} spawn table tier NetId: {netId.Format()}.");
 
             if (netId == NetId64.Invalid)
                 return StandardErrorCode.GenericError;
@@ -5490,7 +5439,7 @@ public static class SpawnTableUtil
         }
         catch (Exception ex)
         {
-            Logger.DevkitServer.LogError(nameof(ReceiveSpawnTierInstantiation), ex, $"Failed to initialize {spawnType.ToString().ToLowerInvariant()} spawn table tier: {name.Format(true)} - {netId.Format()}.");
+            Logger.DevkitServer.LogError(nameof(ReceiveSpawnTierInstantiation), ex, $"Failed to initialize {spawnType.GetLowercaseText()} spawn table tier: {name.Format(true)} - {netId.Format()}.");
             return StandardErrorCode.GenericError;
         }
 
@@ -5514,7 +5463,7 @@ public static class SpawnTableUtil
 
             if (!SpawnsNetIdDatabase.TryGetSpawnTableTier(spawnType, tierNetId, out SpawnTierIdentifier tierId) || !tierId.CheckSafe())
             {
-                Logger.DevkitServer.LogWarning(nameof(ReceiveSpawnAssetInstantiation), $"Unable to find tier for NetId {tierNetId.Format()} when instantiating {spawnType.ToString().ToLowerInvariant()} asset: {legacyId.Format()} - {netId.Format()}.");
+                Logger.DevkitServer.LogWarning(nameof(ReceiveSpawnAssetInstantiation), $"Unable to find tier for NetId {tierNetId.Format()} when instantiating {spawnType.GetLowercaseText()} asset: {legacyId.Format()} - {netId.Format()}.");
                 if (isMe)
                     EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", [ "NetId Missing" ]);
                 
@@ -5529,7 +5478,7 @@ public static class SpawnTableUtil
             SpawnAssetIdentifier id = identifier.Value;
 
             SpawnsNetIdDatabase.RegisterSpawnAsset(id, netId);
-            Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnAssetInstantiation), $"Assigned {spawnType.ToString().ToLowerInvariant()} spawn table tier asset NetId: {netId.Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnAssetInstantiation), $"Assigned {spawnType.GetLowercaseText()} spawn table tier asset NetId: {netId.Format()}.");
 
             if (netId == NetId64.Invalid)
                 return StandardErrorCode.GenericError;
@@ -5584,7 +5533,7 @@ public static class SpawnTableUtil
         }
         catch (Exception ex)
         {
-            Logger.DevkitServer.LogError(nameof(ReceiveSpawnAssetInstantiation), ex, $"Failed to initialize {spawnType.ToString().ToLowerInvariant()} spawn table tier asset: {legacyId.Format()} - {netId.Format()}.");
+            Logger.DevkitServer.LogError(nameof(ReceiveSpawnAssetInstantiation), ex, $"Failed to initialize {spawnType.GetLowercaseText()} spawn table tier asset: {legacyId.Format()} - {netId.Format()}.");
             return StandardErrorCode.GenericError;
         }
 

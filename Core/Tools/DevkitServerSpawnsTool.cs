@@ -261,18 +261,6 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
         
         return Array.Empty<GameObject>();
     }
-    protected override void EarlyInputTick()
-    {
-        if (!InputEx.GetKeyDown(KeyCode.F8))
-            return;
-        
-        int ct = 0;
-        foreach (BaseSpawnpointNode node in EnumerateSpawns())
-        {
-            ++ct;
-            Logger.DevkitServer.LogDebug(nameof(DevkitServerSelectionTool), $"{ct,3} {node.transform.position.Format()} - {node.Format()}");
-        }
-    }
     protected override void OnTempMoved()
     {
         foreach (DevkitSelection selection in DevkitSelectionManager.selection)

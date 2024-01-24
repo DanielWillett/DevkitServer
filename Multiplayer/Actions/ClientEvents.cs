@@ -221,6 +221,9 @@ public static class ClientEvents
     public static event SetPlayerSpawnpointIsAlternate? OnSetPlayerSpawnpointIsAlternate;
     public static event SetPlayerSpawnpointIsAlternateRequested? OnSetPlayerSpawnpointIsAlternateRequested;
     public static event SetPlayerSpawnpointsIsAlternate? OnSetPlayerSpawnpointsIsAlternate;
+    public static event DeleteSpawn? OnDeleteSpawn;
+    public static event DeleteSpawnRequested? OnDeleteSpawnRequested;
+    public static event DeleteSpawns? OnDeleteSpawns;
 
     public static bool ListeningOnEditHeightmapPermissionDenied => !EventOnEditHeightmapPermissionDenied.IsEmpty;
     public static bool ListeningOnEditSplatmapPermissionDenied => !EventOnEditSplatmapPermissionDenied.IsEmpty;
@@ -349,6 +352,9 @@ public static class ClientEvents
     public static bool ListeningOnSetPlayerSpawnpointIsAlternate => OnSetPlayerSpawnpointIsAlternate != null;
     public static bool ListeningOnSetPlayerSpawnpointIsAlternateRequested => OnSetPlayerSpawnpointIsAlternateRequested != null;
     public static bool ListeningOnSetPlayerSpawnpointsIsAlternate => OnSetPlayerSpawnpointsIsAlternate != null;
+    public static bool ListeningOnDeleteSpawn => OnDeleteSpawn != null;
+    public static bool ListeningOnDeleteSpawnRequested => OnDeleteSpawnRequested != null;
+    public static bool ListeningOnDeleteSpawns => OnDeleteSpawns != null;
 
     internal static void InvokeOnPaintRamp(in PaintRampProperties properties) => OnPaintRamp?.Invoke(in properties);
     internal static void InvokeOnAdjustHeightmap(in AdjustHeightmapProperties properties) => OnAdjustHeightmap?.Invoke(in properties);
@@ -466,6 +472,9 @@ public static class ClientEvents
     internal static void InvokeOnSetPlayerSpawnpointIsAlternate(in SetPlayerSpawnpointIsAlternateProperties properties) => OnSetPlayerSpawnpointIsAlternate?.Invoke(in properties);
     internal static void InvokeOnSetPlayerSpawnpointIsAlternateRequested(in SetPlayerSpawnpointIsAlternateProperties properties, ref bool shouldAllow) => OnSetPlayerSpawnpointIsAlternateRequested?.Invoke(in properties, ref shouldAllow);
     internal static void InvokeOnSetPlayerSpawnpointsIsAlternate(in SetPlayerSpawnpointsIsAlternateProperties properties) => OnSetPlayerSpawnpointsIsAlternate?.Invoke(in properties);
+    internal static void InvokeOnDeleteSpawn(in DeleteSpawnProperties properties) => OnDeleteSpawn?.Invoke(in properties);
+    internal static void InvokeOnDeleteSpawnRequested(in DeleteSpawnProperties properties, ref bool shouldAllow) => OnDeleteSpawnRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnDeleteSpawns(in DeleteSpawnsProperties properties) => OnDeleteSpawns?.Invoke(in properties);
 }
 
 public delegate void TryInstantiateHierarchyObject(ref InstantiateHierarchyObjectProperties properties, ref bool shouldAllow);

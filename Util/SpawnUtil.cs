@@ -3,6 +3,8 @@ using DevkitServer.Models;
 using DevkitServer.Util.Region;
 using DevkitServer.API;
 using DevkitServer.API.Devkit.Spawns;
+using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Levels;
 #if CLIENT
 using DevkitServer.Core;
 #endif
@@ -313,14 +315,27 @@ public static class SpawnUtil
     /// <remarks>Non-replicating.</remarks>
     /// <exception cref="MemberAccessException">Reflection failure.</exception>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    public static void SetIsAlternateLocal(this PlayerSpawnpoint spawn, bool isAlternate)
+    public static void SetPlayerIsAlternateLocal(this PlayerSpawnpoint spawn, bool isAlternate)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        SetPlayerIsAlternateLocal(LevelPlayers.spawns.IndexOf(spawn), isAlternate);
+    }
+
+    /// <summary>
+    /// Locally sets the <see cref="PlayerSpawnpoint.isAlt"/> backing field to <paramref name="isAlternate"/>.
+    /// </summary>
+    /// <remarks>Non-replicating.</remarks>
+    /// <exception cref="MemberAccessException">Reflection failure.</exception>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    public static void SetPlayerIsAlternateLocal(int playerSpawnpointIndex, bool isAlternate)
     {
         ThreadUtil.assertIsGameThread();
 
         if (SetPlayerSpawnpointIsAlternate == null)
             throw new MemberAccessException("Instance setter for PlayerSpawnpoint.isAlt is not valid.");
 
-        int index = LevelPlayers.spawns.IndexOf(spawn);
+        PlayerSpawnpoint spawn = LevelPlayers.spawns[playerSpawnpointIndex];
         bool oldIsAlternate = spawn.isAlt;
 
 #if CLIENT
@@ -331,11 +346,65 @@ public static class SpawnUtil
 #endif
 
         SetPlayerSpawnpointIsAlternate.Invoke(spawn, isAlternate);
-        if (index >= 0)
+        if (playerSpawnpointIndex >= 0)
         {
-            Logger.DevkitServer.LogDebug(nameof(SetIsAlternateLocal), $"Player spawnpoint updated: {(oldIsAlternate ? "Alternate" : "Primary")} -> {(isAlternate ? "Alternate" : "Primary")}");
-            EventOnPlayerSpawnpointIsAlternateChanged.TryInvoke(spawn, index, isAlternate);
+            Logger.DevkitServer.LogDebug(nameof(SetPlayerIsAlternateLocal), $"Player spawnpoint updated: {(oldIsAlternate ? "Alternate" : "Primary")} -> {(isAlternate ? "Alternate" : "Primary")}");
+            EventOnPlayerSpawnpointIsAlternateChanged.TryInvoke(spawn, playerSpawnpointIndex, isAlternate);
         }
+    }
+
+    /// <summary>
+    /// Sets the <see cref="PlayerSpawnpoint.isAlt"/> backing field to <paramref name="isAlternate"/>.
+    /// </summary>
+    /// <remarks>Replicates to clients.</remarks>
+    /// <exception cref="MemberAccessException">Reflection failure.</exception>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    public static bool SetPlayerIsAlternate(this PlayerSpawnpoint spawn, bool isAlternate)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        return SetPlayerIsAlternate(LevelPlayers.spawns.IndexOf(spawn), isAlternate);
+    }
+
+    /// <summary>
+    /// Sets the <see cref="PlayerSpawnpoint.isAlt"/> backing field to <paramref name="isAlternate"/>.
+    /// </summary>
+    /// <remarks>Replicates to clients.</remarks>
+    /// <exception cref="MemberAccessException">Reflection failure.</exception>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    public static bool SetPlayerIsAlternate(int playerSpawnpointIndex, bool isAlternate)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            SetPlayerIsAlternateLocal(playerSpawnpointIndex, isAlternate);
+            return true;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetPlayerSpawnNetId(playerSpawnpointIndex, out NetId64 netId))
+        {
+            Logger.DevkitServer.LogWarning(nameof(SetPlayerIsAlternate), $"Unable to find NetId of player spawn {playerSpawnpointIndex.Format()}.");
+            return false;
+        }
+
+        SetPlayerSpawnpointIsAlternateProperties properties = new SetPlayerSpawnpointIsAlternateProperties(netId, isAlternate, CachedTime.DeltaTime);
+
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnSetPlayerSpawnpointIsAlternateRequested(in properties, ref shouldAllow);
+
+        if (!shouldAllow)
+            return false;
+
+        SetPlayerIsAlternateLocal(playerSpawnpointIndex, isAlternate);
+
+        ClientEvents.InvokeOnSetPlayerSpawnpointIsAlternate(in properties);
+        if (!ClientEvents.ListeningOnSetPlayerSpawnpointsIsAlternate)
+            return true;
+
+        NetId64.OneArray[0] = netId;
+        ClientEvents.InvokeOnSetPlayerSpawnpointsIsAlternate(new SetPlayerSpawnpointsIsAlternateProperties(NetId64.OneArray, isAlternate, CachedTime.DeltaTime));
+        return true;
     }
 
     /// <summary>
@@ -694,6 +763,46 @@ public static class SpawnUtil
     }
 
     /// <summary>
+    /// Removes a spawnpoint from the list and destroyes the node.
+    /// </summary>
+    /// <remarks>Replicates to clients.</remarks>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    public static bool RemoveSpawn(SpawnType spawnType, int index)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            RemoveSpawnLocal(spawnType, index, true);
+            return true;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnNetId(spawnType, index, out NetId64 netId))
+        {
+            Logger.DevkitServer.LogWarning(nameof(RemoveSpawn), $"Unable to find NetId of {spawnType.GetLowercaseText()} spawn at {index.Format()}.");
+            return false;
+        }
+
+        DeleteSpawnProperties properties = new DeleteSpawnProperties(netId, CachedTime.DeltaTime);
+
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnDeleteSpawnRequested(in properties, ref shouldAllow);
+
+        if (!shouldAllow)
+            return false;
+
+        RemoveSpawnLocal(spawnType, index, true);
+
+        ClientEvents.InvokeOnDeleteSpawn(in properties);
+        if (!ClientEvents.ListeningOnDeleteSpawns)
+            return true;
+
+        NetId64.OneArray[0] = netId;
+        ClientEvents.InvokeOnDeleteSpawns(new DeleteSpawnsProperties(NetId64.OneArray, CachedTime.DeltaTime));
+        return true;
+    }
+
+    /// <summary>
     /// Locally removes a spawnpoint from the list and destroyes the node.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
@@ -722,6 +831,46 @@ public static class SpawnUtil
                 break;
         }
 
+        return true;
+    }
+
+    /// <summary>
+    /// Removes a spawnpoint from the list and destroyes the node.
+    /// </summary>
+    /// <remarks>Replicates to clients.</remarks>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    public static bool RemoveSpawn(SpawnType spawnType, RegionIdentifier region)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            RemoveSpawnLocal(spawnType, region, true);
+            return true;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnNetId(spawnType, region, out NetId64 netId))
+        {
+            Logger.DevkitServer.LogWarning(nameof(RemoveSpawn), $"Unable to find NetId of {spawnType.GetLowercaseText()} spawn at {region.Format()}.");
+            return false;
+        }
+
+        DeleteSpawnProperties properties = new DeleteSpawnProperties(netId, CachedTime.DeltaTime);
+
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnDeleteSpawnRequested(in properties, ref shouldAllow);
+
+        if (!shouldAllow)
+            return false;
+
+        RemoveSpawnLocal(spawnType, region, true);
+
+        ClientEvents.InvokeOnDeleteSpawn(in properties);
+        if (!ClientEvents.ListeningOnDeleteSpawns)
+            return true;
+
+        NetId64.OneArray[0] = netId;
+        ClientEvents.InvokeOnDeleteSpawns(new DeleteSpawnsProperties(NetId64.OneArray, CachedTime.DeltaTime));
         return true;
     }
 
@@ -1869,4 +2018,15 @@ public static class SpawnUtil
             _ => false
         };
     }
+
+    // avoid ToString calls for no reason, used in logs a lot
+    internal static string GetLowercaseText(this SpawnType spawnType) => spawnType switch
+    {
+        SpawnType.Animal => "animal",
+        SpawnType.Player => "player",
+        SpawnType.Vehicle => "vehicle",
+        SpawnType.Item => "item",
+        SpawnType.Zombie => "zombie",
+        _ => spawnType.ToString().ToLowerInvariant()
+    };
 }

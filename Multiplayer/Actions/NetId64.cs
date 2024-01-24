@@ -5,6 +5,8 @@
 /// </summary>
 public readonly struct NetId64(ulong id) : IEquatable<NetId64>, IComparable<NetId64>
 {
+    internal static readonly NetId64[] OneArray = new NetId64[1];
+
     public static readonly NetId64 Invalid = default;
     public readonly ulong Id = id;
     public bool IsNull() => Id == 0ul;

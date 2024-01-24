@@ -148,7 +148,7 @@ internal static class SpawnsEditorPatches
             foreach (DevkitSelection selection in DevkitSelectionManager.selection)
             {
                 if (selection.transform.TryGetComponent(out PlayerSpawnpointNode node) || node.Spawnpoint.isAlt == state)
-                    node.Spawnpoint.SetIsAlternateLocal(state);
+                    node.Spawnpoint.SetPlayerIsAlternateLocal(state);
             }
 
             return;
@@ -174,7 +174,7 @@ internal static class SpawnsEditorPatches
                         continue;
                 }
 
-                node.Spawnpoint.SetIsAlternateLocal(state);
+                node.Spawnpoint.SetPlayerIsAlternateLocal(state);
 
                 if (singleListening)
                     ClientEvents.InvokeOnSetPlayerSpawnpointIsAlternate(in singleProperties);
@@ -287,7 +287,7 @@ internal static class SpawnsEditorPatches
 
         if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(spawnType, index, out NetId64 netId))
         {
-            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnTableNameUpdated), $"Unable to find NetId for {spawnType.ToString().ToLowerInvariant()} spawn table: {index.Format()}.");
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnTableNameUpdated), $"Unable to find NetId for {spawnType.GetLowercaseText()} spawn table: {index.Format()}.");
             EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", [ "NetId Missing" ]);
             return false;
         }
@@ -353,6 +353,98 @@ internal static class SpawnsEditorPatches
 
     #endregion
 
+    #region Tier Name
+    private static bool OnTierNameUpdated(string state, SpawnTierIdentifier identifier)
+    {
+        if (!identifier.CheckSafe())
+        {
+            // could be typing in a new name
+            return true;
+        }
+
+        SpawnType spawnType = identifier.Type;
+
+        if (DevkitServerModule.IsEditing && !VanillaPermissions.SpawnTablesEdit(spawnType).Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnTablesEdit(spawnType));
+            return false;
+        }
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            SpawnTableUtil.SetSpawnTableTierNameLocal(identifier, state);
+            return true;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTierNetId(identifier, out NetId64 tierNetId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnTableNameUpdated), $"Unable to find NetId for spawn tier: {identifier.Format()}.");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", [ "NetId Missing" ]);
+            return false;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(spawnType, identifier.TableIndex, out NetId64 tableNetId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnTableNameUpdated), $"Unable to find NetId for {spawnType.GetLowercaseText()} spawn table: {identifier.TableIndex.Format()}.");
+        }
+
+        SetSpawnTableTierNameProperties properties = new SetSpawnTableTierNameProperties(tierNetId, tableNetId, spawnType, state, CachedTime.DeltaTime);
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnSetSpawnTableTierNameRequested(in properties, ref shouldAllow);
+        if (!shouldAllow)
+            return false;
+
+        SpawnTableUtil.SetSpawnTableTierNameLocal(identifier, state);
+        ClientEvents.InvokeOnSetSpawnTableTierName(in properties);
+        return true;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsAnimalsUI), "onTypedTierNameField")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnAnimalTierNameUpdated(ISleekField field, string state)
+    {
+        if (!SpawnTableUtil.TryGetSelectedTier(SpawnType.Animal, out SpawnTierIdentifier? identifier) || !identifier.HasValue)
+            return false;
+
+        if (!OnTierNameUpdated(state, identifier.Value))
+            field.Text = LevelAnimals.tables[EditorSpawns.selectedAnimal].name;
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsVehiclesUI), "onTypedTierNameField")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnVehicleTierNameUpdated(ISleekField field, string state)
+    {
+        if (!SpawnTableUtil.TryGetSelectedTier(SpawnType.Vehicle, out SpawnTierIdentifier? identifier) || !identifier.HasValue)
+            return false;
+
+        if (!OnTierNameUpdated(state, identifier.Value))
+            field.Text = LevelAnimals.tables[EditorSpawns.selectedVehicle].name;
+
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsItemsUI), "onTypedTierNameField")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnItemTierNameUpdated(ISleekField field, string state)
+    {
+        if (!SpawnTableUtil.TryGetSelectedTier(SpawnType.Item, out SpawnTierIdentifier? identifier) || !identifier.HasValue)
+            return false;
+
+        if (!OnTierNameUpdated(state, identifier.Value))
+            field.Text = LevelItems.tables[EditorSpawns.selectedItem].name;
+
+        return false;
+    }
+    #endregion
+
     #region Color
     private static bool OnTableColorUpdated(Color color, int index, SpawnType spawnType)
     {
@@ -377,7 +469,7 @@ internal static class SpawnsEditorPatches
 
         if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(spawnType, index, out NetId64 netId))
         {
-            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnTableColorUpdated), $"Unable to find NetId for {spawnType.ToString().ToLowerInvariant()} spawn table: {index.Format()}.");
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnTableColorUpdated), $"Unable to find NetId for {spawnType.GetLowercaseText()} spawn table: {index.Format()}.");
             EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
             return false;
         }
@@ -491,7 +583,7 @@ internal static class SpawnsEditorPatches
 
         if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(spawnType, index, out NetId64 netId))
         {
-            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnTableColorUpdated), $"Unable to find NetId for {spawnType.ToString().ToLowerInvariant()} spawn table: {index.Format()}.");
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnTableColorUpdated), $"Unable to find NetId for {spawnType.GetLowercaseText()} spawn table: {index.Format()}.");
             EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
             return false;
         }
@@ -624,7 +716,7 @@ internal static class SpawnsEditorPatches
 
         if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(spawnType, tableIndex, out NetId64 tableNetId))
         {
-            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnChanceUpdated), $"Unable to find NetId for {spawnType.ToString().ToLowerInvariant()} spawn table: {tableIndex.Format()}.");
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnChanceUpdated), $"Unable to find NetId for {spawnType.GetLowercaseText()} spawn table: {tableIndex.Format()}.");
             EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
             return false;
         }
@@ -644,7 +736,7 @@ internal static class SpawnsEditorPatches
                 return false;
             }
 
-            _chanceNetIds[0] = tableNetId;
+            _chanceNetIds[0] = tierNetId;
             _newChances[0] = chance;
 
             properties = new SetSpawnTableTierChancesProperties(tableNetId, new ArraySegment<NetId64>(_chanceNetIds, 0, 1),
@@ -1076,7 +1168,7 @@ internal static class SpawnsEditorPatches
 
         if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(spawnType, tableIndex, out NetId64 spawnTableNetId))
         {
-            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnRemoveTableClicked), $"Unable to find NetId for {spawnType.ToString().ToLowerInvariant()} spawn table: {tableIndex.Format()}.");
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnRemoveTableClicked), $"Unable to find NetId for {spawnType.GetLowercaseText()} spawn table: {tableIndex.Format()}.");
             EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
             return false;
         }
@@ -1546,7 +1638,7 @@ internal static class SpawnsEditorPatches
 
         if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(identifier.Type, identifier.TableIndex, out NetId64 tableNetId))
         {
-            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnRemoveAssetClicked), $"Unable to find NetId for {identifier.Type.ToString().ToLowerInvariant()} spawn table: {identifier.TableIndex.Format()}.");
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnRemoveAssetClicked), $"Unable to find NetId for {identifier.Type.GetLowercaseText()} spawn table: {identifier.TableIndex.Format()}.");
         }
 
         DeleteSpawnTableTierAssetProperties properties = new DeleteSpawnTableTierAssetProperties(tableNetId, tierNetId, assetNetId, identifier.Type, CachedTime.DeltaTime);
@@ -1626,7 +1718,387 @@ internal static class SpawnsEditorPatches
     }
     #endregion
 
-    // todo override deleting to call event on spawnpoints
+    #region ZombieTable Properties
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onToggledMegaToggle")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnZombieToggledMegaToggle(ISleekToggle toggle, bool state)
+    {
+        int index = EditorSpawns.selectedZombie;
+
+        if (!SpawnTableUtil.CheckSpawnTableSafe(SpawnType.Zombie, index))
+        {
+            EditorSpawnsZombiesUI.updateTables();
+            EditorSpawnsZombiesUI.updateSelection();
+            return false;
+        }
+
+        if (DevkitServerModule.IsEditing && !VanillaPermissions.SpawnTablesEdit(SpawnType.Zombie).Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnTablesEdit(SpawnType.Zombie));
+            toggle.Value = LevelZombies.tables[index].isMega;
+            return false;
+        }
+
+        if (state == LevelZombies.tables[index].isMega)
+            return false;
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            SpawnTableUtil.SetZombieSpawnTableIsMegaLocal(index, state);
+            return false;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(SpawnType.Zombie, index, out NetId64 netId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnZombieToggledMegaToggle), $"Unable to find NetId for zombie spawn table: {index.Format()}.");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+            toggle.Value = LevelZombies.tables[index].isMega;
+            return false;
+        }
+
+        SetZombieSpawnTableIsMegaProperties properties = new SetZombieSpawnTableIsMegaProperties(netId, state, CachedTime.DeltaTime);
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnSetZombieSpawnTableIsMegaRequested(in properties, ref shouldAllow);
+        if (!shouldAllow)
+        {
+            toggle.Value = LevelZombies.tables[index].isMega;
+            return false;
+        }
+
+        SpawnTableUtil.SetZombieSpawnTableIsMegaLocal(index, state);
+        ClientEvents.InvokeOnSetZombieSpawnTableIsMega(in properties);
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onHealthFieldTyped")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnZombieTypedHealth(ISleekUInt16Field field, ushort state)
+    {
+        int index = EditorSpawns.selectedZombie;
+
+        if (!SpawnTableUtil.CheckSpawnTableSafe(SpawnType.Zombie, index))
+        {
+            EditorSpawnsZombiesUI.updateTables();
+            EditorSpawnsZombiesUI.updateSelection();
+            return false;
+        }
+
+        if (DevkitServerModule.IsEditing && !VanillaPermissions.SpawnTablesEdit(SpawnType.Zombie).Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnTablesEdit(SpawnType.Zombie));
+            field.Value = LevelZombies.tables[index].health;
+            return false;
+        }
+
+        if (state == LevelZombies.tables[index].health)
+            return false;
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            SpawnTableUtil.SetZombieSpawnTableHealthLocal(index, state);
+            return false;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(SpawnType.Zombie, index, out NetId64 netId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnZombieTypedHealth), $"Unable to find NetId for zombie spawn table: {index.Format()}.");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+            field.Value = LevelZombies.tables[index].health;
+            return false;
+        }
+
+        SetZombieSpawnTableHealthProperties properties = new SetZombieSpawnTableHealthProperties(netId, state, CachedTime.DeltaTime);
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnSetZombieSpawnTableHealthRequested(in properties, ref shouldAllow);
+        if (!shouldAllow)
+        {
+            field.Value = LevelZombies.tables[index].health;
+            return false;
+        }
+
+        SpawnTableUtil.SetZombieSpawnTableHealthLocal(index, state);
+        ClientEvents.InvokeOnSetZombieSpawnTableHealth(in properties);
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onDamageFieldTyped")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnZombieTypedDamage(ISleekUInt8Field field, byte state)
+    {
+        int index = EditorSpawns.selectedZombie;
+
+        if (!SpawnTableUtil.CheckSpawnTableSafe(SpawnType.Zombie, index))
+        {
+            EditorSpawnsZombiesUI.updateTables();
+            EditorSpawnsZombiesUI.updateSelection();
+            return false;
+        }
+
+        if (DevkitServerModule.IsEditing && !VanillaPermissions.SpawnTablesEdit(SpawnType.Zombie).Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnTablesEdit(SpawnType.Zombie));
+            field.Value = LevelZombies.tables[index].damage;
+            return false;
+        }
+
+        if (state == LevelZombies.tables[index].damage)
+            return false;
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            SpawnTableUtil.SetZombieSpawnTableDamageLocal(index, state);
+            return false;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(SpawnType.Zombie, index, out NetId64 netId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnZombieTypedDamage), $"Unable to find NetId for zombie spawn table: {index.Format()}.");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+            field.Value = LevelZombies.tables[index].damage;
+            return false;
+        }
+
+        SetZombieSpawnTableDamageProperties properties = new SetZombieSpawnTableDamageProperties(netId, state, CachedTime.DeltaTime);
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnSetZombieSpawnTableDamageRequested(in properties, ref shouldAllow);
+        if (!shouldAllow)
+        {
+            field.Value = LevelZombies.tables[index].damage;
+            return false;
+        }
+
+        SpawnTableUtil.SetZombieSpawnTableDamageLocal(index, state);
+        ClientEvents.InvokeOnSetZombieSpawnTableDamage(in properties);
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onLootIndexFieldTyped")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnZombieTypedLootIndex(ISleekUInt8Field field, byte state)
+    {
+        int index = EditorSpawns.selectedZombie;
+
+        if (!SpawnTableUtil.CheckSpawnTableSafe(SpawnType.Zombie, index))
+        {
+            EditorSpawnsZombiesUI.updateTables();
+            EditorSpawnsZombiesUI.updateSelection();
+            return false;
+        }
+
+        if (DevkitServerModule.IsEditing && !VanillaPermissions.SpawnTablesEdit(SpawnType.Zombie).Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnTablesEdit(SpawnType.Zombie));
+            field.Value = LevelZombies.tables[index].lootIndex;
+            return false;
+        }
+
+        if (state == LevelZombies.tables[index].lootIndex)
+            return false;
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            SpawnTableUtil.SetZombieSpawnTableLootIndexLocal(index, state);
+            return false;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(SpawnType.Zombie, index, out NetId64 netId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnZombieTypedLootIndex), $"Unable to find NetId for zombie spawn table: {index.Format()}.");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+            field.Value = LevelZombies.tables[index].lootIndex;
+            return false;
+        }
+
+        NetId64 other = default;
+
+        if (state != 0)
+            SpawnsNetIdDatabase.TryGetSpawnTableNetId(SpawnType.Item, state, out other);
+
+        SetZombieSpawnTableLootIndexProperties properties = new SetZombieSpawnTableLootIndexProperties(netId, other, CachedTime.DeltaTime);
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnSetZombieSpawnTableLootIndexRequested(in properties, ref shouldAllow);
+        if (!shouldAllow)
+        {
+            field.Value = LevelZombies.tables[index].lootIndex;
+            return false;
+        }
+
+        SpawnTableUtil.SetZombieSpawnTableLootIndexLocal(index, state);
+        ClientEvents.InvokeOnSetZombieSpawnTableLootIndex(in properties);
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onXPFieldTyped")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnZombieTypedXP(ISleekUInt32Field field, uint state)
+    {
+        int index = EditorSpawns.selectedZombie;
+
+        if (!SpawnTableUtil.CheckSpawnTableSafe(SpawnType.Zombie, index))
+        {
+            EditorSpawnsZombiesUI.updateTables();
+            EditorSpawnsZombiesUI.updateSelection();
+            return false;
+        }
+
+        if (DevkitServerModule.IsEditing && !VanillaPermissions.SpawnTablesEdit(SpawnType.Zombie).Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnTablesEdit(SpawnType.Zombie));
+            field.Value = LevelZombies.tables[index].xp;
+            return false;
+        }
+
+        if (state == LevelZombies.tables[index].xp)
+            return false;
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            SpawnTableUtil.SetZombieSpawnTableXPLocal(index, state);
+            return false;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(SpawnType.Zombie, index, out NetId64 netId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnZombieTypedXP), $"Unable to find NetId for zombie spawn table: {index.Format()}.");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+            field.Value = LevelZombies.tables[index].xp;
+            return false;
+        }
+
+        SetZombieSpawnTableXPProperties properties = new SetZombieSpawnTableXPProperties(netId, state, CachedTime.DeltaTime);
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnSetZombieSpawnTableXPRequested(in properties, ref shouldAllow);
+        if (!shouldAllow)
+        {
+            field.Value = LevelZombies.tables[index].xp;
+            return false;
+        }
+
+        SpawnTableUtil.SetZombieSpawnTableXPLocal(index, state);
+        ClientEvents.InvokeOnSetZombieSpawnTableXP(in properties);
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onRegenFieldTyped")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnZombieTypedRegen(ISleekFloat32Field field, float state)
+    {
+        int index = EditorSpawns.selectedZombie;
+
+        if (!SpawnTableUtil.CheckSpawnTableSafe(SpawnType.Zombie, index))
+        {
+            EditorSpawnsZombiesUI.updateTables();
+            EditorSpawnsZombiesUI.updateSelection();
+            return false;
+        }
+
+        if (DevkitServerModule.IsEditing && !VanillaPermissions.SpawnTablesEdit(SpawnType.Zombie).Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnTablesEdit(SpawnType.Zombie));
+            field.Value = LevelZombies.tables[index].regen;
+            return false;
+        }
+
+        if (state == LevelZombies.tables[index].regen)
+            return false;
+
+        if (!DevkitServerModule.IsEditing)
+        {
+            SpawnTableUtil.SetZombieSpawnTableRegenLocal(index, state);
+            return false;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(SpawnType.Zombie, index, out NetId64 netId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnZombieTypedRegen), $"Unable to find NetId for zombie spawn table: {index.Format()}.");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+            field.Value = LevelZombies.tables[index].regen;
+            return false;
+        }
+
+        SetZombieSpawnTableRegenProperties properties = new SetZombieSpawnTableRegenProperties(netId, state, CachedTime.DeltaTime);
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnSetZombieSpawnTableRegenRequested(in properties, ref shouldAllow);
+        if (!shouldAllow)
+        {
+            field.Value = LevelZombies.tables[index].regen;
+            return false;
+        }
+
+        SpawnTableUtil.SetZombieSpawnTableRegenLocal(index, state);
+        ClientEvents.InvokeOnSetZombieSpawnTableRegen(in properties);
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EditorSpawnsZombiesUI), "onDifficultyGUIDFieldTyped")]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    [HarmonyPriority(-1)]
+    private static bool OnZombieTypedDifficultyAsset(ISleekField field, string state)
+    {
+        int index = EditorSpawns.selectedZombie;
+
+        if (!SpawnTableUtil.CheckSpawnTableSafe(SpawnType.Zombie, index))
+        {
+            EditorSpawnsZombiesUI.updateTables();
+            EditorSpawnsZombiesUI.updateSelection();
+            return false;
+        }
+
+        if (DevkitServerModule.IsEditing && !VanillaPermissions.SpawnTablesEdit(SpawnType.Zombie).Has())
+        {
+            EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnTablesEdit(SpawnType.Zombie));
+            field.Text = LevelZombies.tables[index].difficultyGUID;
+            return false;
+        }
+
+        Guid.TryParse(state, out Guid guid);
+        if (guid == LevelZombies.tables[index].difficulty.GUID)
+            return false;
+
+        AssetReference<ZombieDifficultyAsset> difficultyAsset = new AssetReference<ZombieDifficultyAsset>(guid);
+        if (!DevkitServerModule.IsEditing)
+        {
+            SpawnTableUtil.SetZombieSpawnTableDifficultyAssetLocal(index, difficultyAsset);
+            return false;
+        }
+
+        if (!SpawnsNetIdDatabase.TryGetSpawnTableNetId(SpawnType.Zombie, index, out NetId64 netId))
+        {
+            Logger.DevkitServer.LogWarning(Source + "|" + nameof(OnZombieTypedRegen), $"Unable to find NetId for zombie spawn table: {index.Format()}.");
+            EditorMessage.SendEditorMessage(TranslationSource.DevkitServerMessageLocalizationSource, "Error", ["NetId Missing"]);
+            field.Text = LevelZombies.tables[index].difficultyGUID;
+            return false;
+        }
+
+        SetZombieSpawnTableDifficultyAssetProperties properties = new SetZombieSpawnTableDifficultyAssetProperties(netId, difficultyAsset, CachedTime.DeltaTime);
+        bool shouldAllow = true;
+        ClientEvents.InvokeOnSetZombieSpawnTableDifficultyAssetRequested(in properties, ref shouldAllow);
+        if (!shouldAllow)
+        {
+            field.Text = LevelZombies.tables[index].difficultyGUID;
+            return false;
+        }
+
+        SpawnTableUtil.SetZombieSpawnTableDifficultyAssetLocal(index, difficultyAsset);
+        ClientEvents.InvokeOnSetZombieSpawnTableDifficultyAsset(in properties);
+        return false;
+    }
+    #endregion
+    
     private static IEnumerable<CodeInstruction> TranspileOnClickedPlayersButton(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
         List<CodeInstruction> ins = [..instructions];

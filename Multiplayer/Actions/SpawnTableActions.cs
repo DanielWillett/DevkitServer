@@ -252,7 +252,7 @@ public sealed class DeleteSpawnTableAction : IAction, INetId64Action
     {
         if (!SpawnsNetIdDatabase.TryGetSpawnTable(SpawnType, NetId, out int index))
         {
-            Logger.DevkitServer.LogWarning(nameof(DeleteSpawnTableAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(DeleteSpawnTableAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table with NetId: {NetId.Format()}.");
             return;
         }
 
@@ -263,7 +263,7 @@ public sealed class DeleteSpawnTableAction : IAction, INetId64Action
     {
         if (!SpawnsNetIdDatabase.TryGetSpawnTable(SpawnType, NetId, out _))
         {
-            Logger.DevkitServer.LogWarning(nameof(DeleteSpawnTableAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(DeleteSpawnTableAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table with NetId: {NetId.Format()}.");
             return false;
         }
 
@@ -300,7 +300,7 @@ public sealed class DeleteSpawnTableTierAction : IAction, INetId64Action
         }
         if (!SpawnsNetIdDatabase.TryGetSpawnTableTier(SpawnType, NetId, out SpawnTierIdentifier identifier))
         {
-            Logger.DevkitServer.LogWarning(nameof(DeleteSpawnTableTierAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table tier with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(DeleteSpawnTableTierAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table tier with NetId: {NetId.Format()}.");
             return;
         }
 
@@ -316,7 +316,7 @@ public sealed class DeleteSpawnTableTierAction : IAction, INetId64Action
         }
         if (!SpawnsNetIdDatabase.TryGetSpawnTableTier(SpawnType, NetId, out _))
         {
-            Logger.DevkitServer.LogWarning(nameof(DeleteSpawnTableTierAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table tier with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(DeleteSpawnTableTierAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table tier with NetId: {NetId.Format()}.");
             return false;
         }
 
@@ -348,7 +348,7 @@ public sealed class DeleteSpawnTableTierAssetAction : IAction, INetId64Action
     {
         if (!SpawnsNetIdDatabase.TryGetSpawnTableTierAsset(SpawnType, NetId, out SpawnAssetIdentifier identifier))
         {
-            Logger.DevkitServer.LogWarning(nameof(DeleteSpawnTableTierAssetAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table tier asset with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(DeleteSpawnTableTierAssetAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table tier asset with NetId: {NetId.Format()}.");
             return;
         }
 
@@ -359,7 +359,7 @@ public sealed class DeleteSpawnTableTierAssetAction : IAction, INetId64Action
     {
         if (!SpawnsNetIdDatabase.TryGetSpawnTableTierAsset(SpawnType, NetId, out _))
         {
-            Logger.DevkitServer.LogWarning(nameof(DeleteSpawnTableTierAssetAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table tier asset with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(DeleteSpawnTableTierAssetAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table tier asset with NetId: {NetId.Format()}.");
             return false;
         }
 
@@ -397,7 +397,7 @@ public sealed class SetSpawnTableTierNameAction : IReplacableAction, INetId64Act
         }
         if (!SpawnsNetIdDatabase.TryGetSpawnTableTier(SpawnType, NetId, out SpawnTierIdentifier identifier))
         {
-            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableTierNameAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table tier with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableTierNameAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table tier with NetId: {NetId.Format()}.");
             return;
         }
 
@@ -413,7 +413,7 @@ public sealed class SetSpawnTableTierNameAction : IReplacableAction, INetId64Act
         }
         if (!SpawnsNetIdDatabase.TryGetSpawnTableTier(SpawnType, NetId, out _))
         {
-            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableTierNameAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table tier with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableTierNameAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table tier with NetId: {NetId.Format()}.");
             return false;
         }
 
@@ -476,7 +476,7 @@ public sealed class SetSpawnTableTierChancesAction : IReplacableAction
                 identifier = tiers[i];
             else if (!SpawnsNetIdDatabase.TryGetSpawnTableTier(SpawnType, NetIds[i], out identifier))
             {
-                Logger.DevkitServer.LogWarning(nameof(SetSpawnTableTierChancesAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table tier with NetId: {NetIds[i].Format()}.");
+                Logger.DevkitServer.LogWarning(nameof(SetSpawnTableTierChancesAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table tier with NetId: {NetIds[i].Format()}.");
                 continue;
             }
 
@@ -512,7 +512,7 @@ public sealed class SetSpawnTableTierChancesAction : IReplacableAction
         {
             if (!SpawnsNetIdDatabase.TryGetSpawnTableTier(SpawnType, NetIds[i], out SpawnTierIdentifier identifier))
             {
-                Logger.DevkitServer.LogWarning(nameof(SetSpawnTableTierChancesAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table tier with NetId: {NetIds[i].Format()}.");
+                Logger.DevkitServer.LogWarning(nameof(SetSpawnTableTierChancesAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table tier with NetId: {NetIds[i].Format()}.");
                 _tiers = null;
                 return false;
             }
@@ -582,12 +582,12 @@ public sealed class SetSpawnTableTierAssetAction : IReplacableAction, INetId64Ac
     {
         if (!SpawnsNetIdDatabase.TryGetSpawnTableTierAsset(SpawnType, NetId, out SpawnAssetIdentifier identifier))
         {
-            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableTierAssetAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table tier asset with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableTierAssetAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table tier asset with NetId: {NetId.Format()}.");
             return;
         }
 
         if (!Asset.isNull && Asset.Find() == null)
-            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableTierAssetAction), $"Unknown spawn asset while setting {SpawnType.ToString().ToLowerInvariant()} spawn table asset ({Asset.GUID.Format()})");
+            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableTierAssetAction), $"Unknown spawn asset while setting {SpawnType.GetLowercaseText()} spawn table asset ({Asset.GUID.Format()})");
 
         SpawnTableUtil.SetSpawnTableTierAssetLocal(identifier, Asset);
     }
@@ -596,7 +596,7 @@ public sealed class SetSpawnTableTierAssetAction : IReplacableAction, INetId64Ac
     {
         if (!SpawnsNetIdDatabase.TryGetSpawnTableTierAsset(SpawnType, NetId, out _))
         {
-            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableTierAssetAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table tier asset with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableTierAssetAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table tier asset with NetId: {NetId.Format()}.");
             return false;
         }
 
@@ -640,12 +640,12 @@ public sealed class SetSpawnTableSpawnAssetAction : IReplacableAction, INetId64A
     {
         if (!SpawnsNetIdDatabase.TryGetSpawnTable(SpawnType, NetId, out int index))
         {
-            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableSpawnAssetAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableSpawnAssetAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table with NetId: {NetId.Format()}.");
             return;
         }
 
         if (!Asset.isNull && Asset.Find() == null)
-            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableSpawnAssetAction), $"Unknown spawn asset while setting {SpawnType.ToString().ToLowerInvariant()} spawn table asset ({Asset.GUID.Format()})");
+            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableSpawnAssetAction), $"Unknown spawn asset while setting {SpawnType.GetLowercaseText()} spawn table asset ({Asset.GUID.Format()})");
 
         SpawnTableUtil.SetSpawnTableSpawnAssetLocal(SpawnType, index, Asset);
     }
@@ -654,7 +654,7 @@ public sealed class SetSpawnTableSpawnAssetAction : IReplacableAction, INetId64A
     {
         if (!SpawnsNetIdDatabase.TryGetSpawnTable(SpawnType, NetId, out _))
         {
-            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableSpawnAssetAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableSpawnAssetAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table with NetId: {NetId.Format()}.");
             return false;
         }
         return VanillaPermissions.SpawnTablesEdit(SpawnType).Has(Instigator.m_SteamID, true);
@@ -697,7 +697,7 @@ public sealed class SetSpawnTableNameAction : IReplacableAction, INetId64Action
     {
         if (!SpawnsNetIdDatabase.TryGetSpawnTable(SpawnType, NetId, out int index))
         {
-            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableNameAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableNameAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table with NetId: {NetId.Format()}.");
             return;
         }
 
@@ -708,7 +708,7 @@ public sealed class SetSpawnTableNameAction : IReplacableAction, INetId64Action
     {
         if (!SpawnsNetIdDatabase.TryGetSpawnTable(SpawnType, NetId, out _))
         {
-            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableNameAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableNameAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table with NetId: {NetId.Format()}.");
             return false;
         }
 
@@ -753,7 +753,7 @@ public sealed class SetSpawnTableColorAction : IReplacableAction, INetId64Action
     {
         if (!SpawnsNetIdDatabase.TryGetSpawnTable(SpawnType, NetId, out int index))
         {
-            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableColorAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableColorAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table with NetId: {NetId.Format()}.");
             return;
         }
 
@@ -764,7 +764,7 @@ public sealed class SetSpawnTableColorAction : IReplacableAction, INetId64Action
     {
         if (!SpawnsNetIdDatabase.TryGetSpawnTable(SpawnType, NetId, out _))
         {
-            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableColorAction), $"Unknown {SpawnType.ToString().ToLowerInvariant()} spawn table with NetId: {NetId.Format()}.");
+            Logger.DevkitServer.LogWarning(nameof(SetSpawnTableColorAction), $"Unknown {SpawnType.GetLowercaseText()} spawn table with NetId: {NetId.Format()}.");
             return false;
         }
 
@@ -917,8 +917,8 @@ public sealed class SetZombieSpawnTableLootIndexAction : IReplacableAction, INet
         }
         if (!SpawnsNetIdDatabase.TryGetItemSpawnTable(LootTableNetId, out int itemIndex))
         {
-            Logger.DevkitServer.LogWarning(nameof(SetZombieSpawnTableLootIndexAction), $"Unknown item spawn table with NetId: {LootTableNetId.Format()} while setting zombie table loot index.");
-            return;
+            Logger.DevkitServer.LogDebug(nameof(SetZombieSpawnTableLootIndexAction), $"Unknown item spawn table with NetId: {LootTableNetId.Format()} while setting zombie table loot index.");
+            itemIndex = byte.MaxValue;
         }
 
         SpawnTableUtil.SetZombieSpawnTableLootIndexLocal(index, (byte)itemIndex);
@@ -933,8 +933,7 @@ public sealed class SetZombieSpawnTableLootIndexAction : IReplacableAction, INet
         }
         if (!SpawnsNetIdDatabase.TryGetItemSpawnTable(LootTableNetId, out int _))
         {
-            Logger.DevkitServer.LogWarning(nameof(SetZombieSpawnTableLootIndexAction), $"Unknown item spawn table with NetId: {LootTableNetId.Format()} while setting zombie table loot index.");
-            return false;
+            Logger.DevkitServer.LogDebug(nameof(SetZombieSpawnTableLootIndexAction), $"Unknown item spawn table with NetId: {LootTableNetId.Format()} while setting zombie table loot index.");
         }
 
         return VanillaPermissions.SpawnTablesZombieEdit.Has(Instigator.m_SteamID, true);

@@ -1,4 +1,5 @@
-﻿using DevkitServer.API.Abstractions;
+﻿using System.Globalization;
+using DevkitServer.API.Abstractions;
 using DevkitServer.API.Logging;
 using DevkitServer.Plugins;
 using DevkitServer.Core.Logging.Loggers;
@@ -62,10 +63,15 @@ public abstract class Plugin : CoreLogger, IDevkitServerColorPlugin, ICachedTran
     protected Plugin() : base("plugin")
     {
         string asmName = GetType().Assembly.GetName().Name;
-        _defaultName = asmName + "/" + GetType().Name;
+        _defaultName = GetType().Name;
         // ReSharper disable once VirtualMemberCallInConstructor (Reason: expecting literal string override)
         string name = Name ?? _defaultName;
-        DataDirectory = Path.Combine(PluginLoader.PluginsDirectory, asmName + "." + name);
+
+        bool isSameName = string.Compare(name, asmName, CultureInfo.InvariantCulture,
+            CompareOptions.IgnoreCase | CompareOptions.IgnoreKanaType | CompareOptions.IgnoreNonSpace | CompareOptions.IgnoreSymbols | CompareOptions.IgnoreWidth
+            ) == 0;
+
+        DataDirectory = Path.Combine(PluginLoader.PluginsDirectory, isSameName ? asmName : asmName + "." + name);
         LocalizationDirectory = Path.Combine(DataDirectory, "Localization");
         CommandLocalizationDirectory = Path.Combine(LocalizationDirectory, "Commands");
         MainLocalizationDirectory = Path.Combine(LocalizationDirectory, "Main");

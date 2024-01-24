@@ -86,12 +86,12 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     {
         _spawnTableInstantiations.Add(new PendingSpawnTableInstantiation(netId, spawnType, tableId, name, color, owner));
 #if PRINT_ACTION_SIMPLE
-        Logger.DevkitServer.LogDebug(Source, $"Queued {spawnType.ToString().ToLowerInvariant()} spawn table instantiation {name.Format(true)} when the level loads.");
+        Logger.DevkitServer.LogDebug(Source, $"Queued {spawnType.GetLowercaseText()} spawn table instantiation {name.Format(true)} when the level loads.");
 #endif
     }
-    internal void QueueZombieSpawnTableInstantiation(NetId64 netId, string name, Color color, ulong owner, long packed, NetId64 lootTableNetId, uint xp, float regen, Guid difficultyAsset)
+    internal void QueueZombieSpawnTableInstantiation(NetId64 netId, string name, Color color, ulong owner, long packed, NetId64 lootTableNetId, uint xp, float regen, Guid difficultyAsset, ulong[] tierNetIds)
     {
-        _spawnTableInstantiations.Add(new PendingZombieSpawnTableInstantiation(netId, name, color, owner, packed, lootTableNetId, xp, regen, difficultyAsset));
+        _spawnTableInstantiations.Add(new PendingZombieSpawnTableInstantiation(netId, name, color, owner, packed, lootTableNetId, xp, regen, difficultyAsset, tierNetIds));
 #if PRINT_ACTION_SIMPLE
         Logger.DevkitServer.LogDebug(Source, $"Queued zombie spawn table instantiation {name.Format(true)} when the level loads.");
 #endif
@@ -100,14 +100,14 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     {
         _spawnTierInstantiations.Add(new PendingSpawnTierInstantiation(netId, parentNetId, spawnType, chance, name, owner));
 #if PRINT_ACTION_SIMPLE
-        Logger.DevkitServer.LogDebug(Source, $"Queued {spawnType.ToString().ToLowerInvariant()} spawn table tier instantiation {name.Format(true)} when the level loads.");
+        Logger.DevkitServer.LogDebug(Source, $"Queued {spawnType.GetLowercaseText()} spawn table tier instantiation {name.Format(true)} when the level loads.");
 #endif
     }
     internal void QueueSpawnAssetInstantiation(NetId64 netId, NetId64 parentNetId, SpawnType spawnType, ushort legacyId, ulong owner)
     {
         _spawnAssetInstantiations.Add(new PendingSpawnAssetInstantiation(netId, parentNetId, spawnType, legacyId, owner));
 #if PRINT_ACTION_SIMPLE
-        Logger.DevkitServer.LogDebug(Source, $"Queued {spawnType.ToString().ToLowerInvariant()} spawn table tier asset instantiation {legacyId.Format(true)} when the level loads.");
+        Logger.DevkitServer.LogDebug(Source, $"Queued {spawnType.GetLowercaseText()} spawn table tier asset instantiation {legacyId.Format(true)} when the level loads.");
 #endif
     }
     internal void HandleReadPackets(CSteamID user, ByteReader reader)
@@ -240,7 +240,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
             {
                 SpawnTableUtil.ReceiveZombieSpawnTableInstantiation(MessageContext.Nil, pendingZombie.NetId, pendingZombie.Name,
                     pendingZombie.Packed, pendingZombie.XP, pendingZombie.Regen, pendingZombie.LootTableNetId,
-                    pendingZombie.DifficultyAsset, pendingZombie.Color, pendingZombie.Owner);
+                    pendingZombie.DifficultyAsset, pendingZombie.Color, pendingZombie.TierNetIds, pendingZombie.Owner);
             }
             else
             {
@@ -390,7 +390,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         public readonly Color Color = color;
         public readonly ulong Owner = owner;
     }
-    private class PendingZombieSpawnTableInstantiation(NetId64 netId, string name, Color color, ulong owner, long packed, NetId64 lootTableNetId, uint xp, float regen, Guid difficultyAsset)
+    private class PendingZombieSpawnTableInstantiation(NetId64 netId, string name, Color color, ulong owner, long packed, NetId64 lootTableNetId, uint xp, float regen, Guid difficultyAsset, ulong[] tierNetIds)
         : PendingSpawnTableInstantiation(netId, SpawnType.Zombie, 0, name, color, owner)
     {
         public readonly long Packed = packed;
@@ -398,6 +398,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         public readonly uint XP = xp;
         public readonly float Regen = regen;
         public readonly Guid DifficultyAsset = difficultyAsset;
+        public readonly ulong[] TierNetIds = tierNetIds;
     }
     private class PendingSpawnTierInstantiation(NetId64 netId, NetId64 parentNetId, SpawnType spawnType, float chance, string name, ulong owner)
     {
