@@ -4,12 +4,13 @@ using SDG.Framework.Devkit.Interactable;
 
 namespace DevkitServer.API.Devkit.Spawns;
 
-public class PlayerSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDevkitSelectionTransformableHandler, IDevkitSelectionCopyableHandler
+public class PlayerSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDevkitSelectionCopyableHandler
 {
     private static readonly Color32 SpawnpointColor = new Color32(204, 255, 102, 255);
     public PlayerSpawnpoint Spawnpoint { get; internal set; } = null!;
     public Renderer? ArrowRenderer { get; protected set; }
     public override bool ShouldBeVisible => LevelVisibility.playersVisible;
+    public override SpawnType SpawnType => SpawnType.Player;
     public override Color Color
     {
         set
@@ -28,20 +29,24 @@ public class PlayerSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDevk
     }
     protected override bool Add()
     {
-        SpawnUtil.AddPlayerSpawnLocal(Spawnpoint);
+        SpawnUtil.AddPlayerSpawnpointLocal(Spawnpoint);
         return true;
     }
     protected override bool Remove()
     {
-        return SpawnUtil.RemovePlayerSpawnLocal(Spawnpoint, false);
+        return SanityCheck() &&
+               SpawnUtil.RemoveSpawnLocal(SpawnType.Player, IndexIntl, false) == SpawnpointEventResult.Success;
     }
     protected override void Transform()
     {
-        SpawnUtil.TransformSpawnpointLocal(Spawnpoint, transform.position, transform.eulerAngles.y);
+        if (SanityCheck())
+            SpawnUtil.TransformSpawnpointLocal(SpawnType.Player, IndexIntl, transform.position, transform.eulerAngles.y);
     }
     protected override NetId64 GetNetId()
     {
-        SpawnsNetIdDatabase.TryGetPlayerSpawnNetId(Index, out NetId64 netId);
+        NetId64 netId = default;
+        if (SanityCheck())
+            SpawnsNetIdDatabase.TryGetSpawnNetId(SpawnType.Player, IndexIntl, out netId);
         return netId;
     }
     protected override void Init()
@@ -57,14 +62,11 @@ public class PlayerSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDevk
     {
         return Spawnpoint.isAlt ? "Player Spawnpoint (Alternate)" : "Player Spawnpoint";
     }
-    void IDevkitSelectionTransformableHandler.transformSelection()
-    {
-        SpawnUtil.TransformSpawnpointLocal(Spawnpoint, transform.position, transform.rotation.eulerAngles.y);
-    }
     GameObject IDevkitSelectionCopyableHandler.copySelection()
     {
         PlayerSpawnpoint point = new PlayerSpawnpoint(Spawnpoint.point, Spawnpoint.angle, Spawnpoint.isAlt);
-        SpawnUtil.AddPlayerSpawnLocal(point);
+        SpawnUtil.AddPlayerSpawnpointLocal(point);
         return point.node.gameObject;
     }
+    public override bool SanityCheck() => SpawnUtil.SanityCheckIndex(Spawnpoint, ref IndexIntl);
 }

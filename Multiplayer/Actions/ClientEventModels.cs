@@ -654,16 +654,18 @@ public readonly ref struct MoveSpawnsFinalProperties(ReadOnlySpan<NetId64> spawn
 
 public delegate void DeleteSpawn(in DeleteSpawnProperties properties);
 public delegate void DeleteSpawnRequested(in DeleteSpawnProperties properties, ref bool shouldAllow);
-public readonly ref struct DeleteSpawnProperties(NetId64 spawnNetId, float deltaTime)
+public readonly ref struct DeleteSpawnProperties(NetId64 spawnNetId, SpawnType spawnType, float deltaTime)
 {
     public readonly NetId64 SpawnNetId = spawnNetId;
+    public readonly SpawnType SpawnType = spawnType;
     public readonly float DeltaTime = deltaTime;
 }
 
 public delegate void DeleteSpawns(in DeleteSpawnsProperties properties);
-public readonly ref struct DeleteSpawnsProperties(ReadOnlySpan<NetId64> spawnNetIds, float deltaTime)
+public readonly ref struct DeleteSpawnsProperties(ReadOnlySpan<NetId64> spawnNetIds, SpawnType spawnType, float deltaTime)
 {
     public readonly ReadOnlySpan<NetId64> SpawnNetIds = spawnNetIds;
+    public readonly SpawnType SpawnType = spawnType;
     public readonly float DeltaTime = deltaTime;
 }
 
@@ -894,7 +896,7 @@ public delegate void SetPlayerSpawnpointIsAlternate(in SetPlayerSpawnpointIsAlte
 public delegate void SetPlayerSpawnpointIsAlternateRequested(in SetPlayerSpawnpointIsAlternateProperties properties, ref bool shouldAllow);
 public readonly ref struct SetPlayerSpawnpointIsAlternateProperties(NetId64 spawnpointId, bool isAlternate, float deltaTime)
 {
-    public readonly NetId64 SpawnTableId = spawnpointId;
+    public readonly NetId64 SpawnNetIds = spawnpointId;
     public readonly bool IsAlternate = isAlternate;
     public readonly float DeltaTime = deltaTime;
 }
@@ -902,7 +904,7 @@ public readonly ref struct SetPlayerSpawnpointIsAlternateProperties(NetId64 spaw
 public delegate void SetPlayerSpawnpointsIsAlternate(in SetPlayerSpawnpointsIsAlternateProperties properties);
 public readonly ref struct SetPlayerSpawnpointsIsAlternateProperties(ReadOnlySpan<NetId64> spawnpointId, bool isAlternate, float deltaTime)
 {
-    public readonly ReadOnlySpan<NetId64> SpawnTableId = spawnpointId;
+    public readonly ReadOnlySpan<NetId64> SpawnNetIds = spawnpointId;
     public readonly bool IsAlternate = isAlternate;
     public readonly float DeltaTime = deltaTime;
 }

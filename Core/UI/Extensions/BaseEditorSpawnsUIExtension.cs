@@ -113,9 +113,10 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
         }
     }
     protected abstract Vector3 GetPosition(T spawn);
+    protected abstract bool CheckLabelAlive(T spawn);
     protected int CreateLabel(T spawn, string text)
     {
-        if (Container == null)
+        if (Container == null || !CheckLabelAlive(spawn))
             return -1;
         ISleekLabel label = Glazier.Get().CreateLabel();
         label.PositionOffset_X = -150;
@@ -212,8 +213,22 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
     }
     internal void UpdateAllLabels()
     {
-        foreach (Label label in Labels.Values)
-            UpdateLabel(label);
+        // afaik this is the fastest way of checking for dead objects (?)
+        try
+        {
+            foreach (Label label in Labels.Values)
+                UpdateLabel(label);
+        }
+        catch (NullReferenceException)
+        {
+            foreach (Label label in Labels.Values.ToList())
+            {
+                if (!CheckLabelAlive(label.Spawn))
+                    RemoveLabel(label.Spawn);
+                else
+                    UpdateLabel(label);
+            }
+        }
     }
     protected class Label
     {

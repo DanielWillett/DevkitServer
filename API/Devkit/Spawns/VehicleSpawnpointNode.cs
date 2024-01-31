@@ -4,12 +4,13 @@ using SDG.Framework.Devkit.Interactable;
 
 namespace DevkitServer.API.Devkit.Spawns;
 
-public class VehicleSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDevkitSelectionTransformableHandler, IDevkitSelectionCopyableHandler
+public class VehicleSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDevkitSelectionCopyableHandler
 {
     private static readonly Color32 SpawnpointColor = new Color32(148, 184, 184, 255);
     public VehicleSpawnpoint Spawnpoint { get; internal set; } = null!;
     public Renderer? ArrowRenderer { get; protected set; }
     public override bool ShouldBeVisible => LevelVisibility.vehiclesVisible;
+    public override SpawnType SpawnType => SpawnType.Vehicle;
     public override Color Color
     {
         set
@@ -28,20 +29,24 @@ public class VehicleSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDev
     }
     protected override bool Add()
     {
-        SpawnUtil.AddVehicleSpawnLocal(Spawnpoint);
+        SpawnUtil.AddVehicleSpawnpointLocal(Spawnpoint);
         return true;
     }
     protected override bool Remove()
     {
-        return SpawnUtil.RemoveVehicleSpawnLocal(Spawnpoint, false);
+        return SanityCheck() &&
+               SpawnUtil.RemoveSpawnLocal(SpawnType.Vehicle, IndexIntl, false) == SpawnpointEventResult.Success;
     }
     protected override void Transform()
     {
-        SpawnUtil.TransformSpawnpointLocal(Spawnpoint, transform.position, transform.eulerAngles.y);
+        if (SanityCheck())
+            SpawnUtil.TransformSpawnpointLocal(SpawnType.Vehicle, IndexIntl, transform.position, transform.eulerAngles.y);
     }
     protected override NetId64 GetNetId()
     {
-        SpawnsNetIdDatabase.TryGetVehicleSpawnNetId(Index, out NetId64 netId);
+        NetId64 netId = default;
+        if (SanityCheck())
+            SpawnsNetIdDatabase.TryGetSpawnNetId(SpawnType.Vehicle, IndexIntl, out netId);
         return netId;
     }
     protected override void Init()
@@ -61,14 +66,11 @@ public class VehicleSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDev
             return $"Vehicle Spawnpoint ({LevelVehicles.tables[Spawnpoint.type].name})";
         return "Vehicle Spawnpoint";
     }
-    void IDevkitSelectionTransformableHandler.transformSelection()
-    {
-        SpawnUtil.TransformSpawnpointLocal(Spawnpoint, transform.position, transform.rotation.eulerAngles.y);
-    }
     GameObject IDevkitSelectionCopyableHandler.copySelection()
     {
         VehicleSpawnpoint point = new VehicleSpawnpoint(Spawnpoint.type, Spawnpoint.point, Spawnpoint.angle);
-        SpawnUtil.AddVehicleSpawnLocal(point);
+        SpawnUtil.AddVehicleSpawnpointLocal(point);
         return point.node.gameObject;
     }
+    public override bool SanityCheck() => SpawnUtil.SanityCheckIndex(Spawnpoint, ref IndexIntl);
 }

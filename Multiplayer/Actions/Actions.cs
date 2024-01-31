@@ -99,6 +99,11 @@ public enum DevkitServerActionType : byte
     SetZombieSpawnTableRegen = 57,
     SetZombieSpawnTableXP = 58,
 
+    /* Spawns */
+    SetPlayerSpawnpointsIsAlternate = 59,
+    MoveSpawnsFinal = 60,
+    DeleteSpawns = 61,
+
     /* For future use */
     Extended = 255
 }

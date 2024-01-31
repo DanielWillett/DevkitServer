@@ -75,6 +75,7 @@ internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtensionNorm
     }
     private static string GetText(VehicleSpawnpoint point) => LevelVehicles.tables.Count > point.type ? LevelVehicles.tables[point.type].name : point.type + " - Null";
     protected override Vector3 GetPosition(VehicleSpawnpoint spawn) => spawn.node.position;
+    protected override bool CheckLabelAlive(VehicleSpawnpoint spawn) => spawn.node != null;
     protected override bool ShouldShow(VehicleSpawnpoint spawn)
     {
         Vector3 lclPos = MainCamera.instance.transform.position;
@@ -92,7 +93,7 @@ internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtensionNorm
     {
         UpdateLabel(point, GetText(point));
     }
-    internal void OnSpawnMoved(VehicleSpawnpoint point, Vector3 fromPosition, Vector3 toPosition, float fromAngle, float toAngle)
+    internal void OnSpawnMoved(VehicleSpawnpoint point, int index, Vector3 fromPosition, Vector3 toPosition, float fromAngle, float toAngle)
     {
         if (fromPosition != toPosition)
             UpdateLabel(point);

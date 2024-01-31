@@ -4,11 +4,12 @@ using SDG.Framework.Devkit.Interactable;
 
 namespace DevkitServer.API.Devkit.Spawns;
 
-public class AnimalSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTransformableHandler, IDevkitSelectionCopyableHandler
+public class AnimalSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionCopyableHandler
 {
     private static readonly Color32 SpawnpointColor = new Color32(255, 204, 102, 255);
     public AnimalSpawnpoint Spawnpoint { get; internal set; } = null!;
     public override bool ShouldBeVisible => LevelVisibility.animalsVisible;
+    public override SpawnType SpawnType => SpawnType.Animal;
     protected override void SetupCollider()
     {
         BoxCollider collider = transform.GetOrAddComponent<BoxCollider>();
@@ -18,20 +19,24 @@ public class AnimalSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTrans
     }
     protected override bool Add()
     {
-        SpawnUtil.AddAnimalSpawnLocal(Spawnpoint);
+        SpawnUtil.AddAnimalSpawnpointLocal(Spawnpoint);
         return true;
     }
     protected override bool Remove()
     {
-        return SpawnUtil.RemoveAnimalSpawnLocal(Spawnpoint, false);
+        return SanityCheck() &&
+               SpawnUtil.RemoveSpawnLocal(SpawnType.Animal, IndexIntl, false) == SpawnpointEventResult.Success;
     }
     protected override void Transform()
     {
-        SpawnUtil.MoveSpawnpointLocal(Spawnpoint, transform.position);
+        if (SanityCheck())
+            SpawnUtil.MoveSpawnpointLocal(SpawnType.Animal, IndexIntl, transform.position);
     }
     protected override NetId64 GetNetId()
     {
-        SpawnsNetIdDatabase.TryGetAnimalSpawnNetId(Index, out NetId64 netId);
+        NetId64 netId = default;
+        if (SanityCheck())
+            SpawnsNetIdDatabase.TryGetSpawnNetId(SpawnType.Animal, IndexIntl, out netId);
         return netId;
     }
     public override string Format(ITerminalFormatProvider provider)
@@ -46,14 +51,11 @@ public class AnimalSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionTrans
             return $"Animal Spawnpoint ({LevelAnimals.tables[Spawnpoint.type].name})";
         return "Animal Spawnpoint";
     }
-    void IDevkitSelectionTransformableHandler.transformSelection()
-    {
-        SpawnUtil.MoveSpawnpointLocal(Spawnpoint, transform.position);
-    }
     GameObject IDevkitSelectionCopyableHandler.copySelection()
     {
         AnimalSpawnpoint point = new AnimalSpawnpoint(Spawnpoint.type, Spawnpoint.point);
-        SpawnUtil.AddAnimalSpawnLocal(point);
+        SpawnUtil.AddAnimalSpawnpointLocal(point);
         return point.node.gameObject;
     }
+    public override bool SanityCheck() => SpawnUtil.SanityCheckIndex(Spawnpoint, ref IndexIntl);
 }

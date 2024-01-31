@@ -1,5 +1,8 @@
 ﻿namespace DevkitServer.Multiplayer.Networking;
 
+/// <summary>
+/// List of all internal net calls to help keep track of duplicates.
+/// </summary>
 public enum DevkitServerNetCall : ushort
 {
     RequestLevel = 1,
@@ -59,5 +62,7 @@ public enum DevkitServerNetCall : ushort
     SendSpawnTierInstantiation = 55,
     RequestSpawnTierInstantiation = 56,
     SendSpawnAssetInstantiation = 57,
-    RequestSpawnAssetInstantiation = 58
+    RequestSpawnAssetInstantiation = 58,
+    RequestSpawnInstantiation = 59,
+    SendSpawnInstantiation = 60
 }

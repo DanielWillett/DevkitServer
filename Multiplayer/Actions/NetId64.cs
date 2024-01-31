@@ -1,8 +1,12 @@
-﻿namespace DevkitServer.Multiplayer.Actions;
+﻿using DevkitServer.Configuration.Converters;
+using System.Text.Json.Serialization;
+
+namespace DevkitServer.Multiplayer.Actions;
 
 /// <summary>
 /// 64-bit version of <see cref="NetId"/> to use with some types that have a lot of elements.
 /// </summary>
+[JsonConverter(typeof(NetId64JsonConverter))]
 public readonly struct NetId64(ulong id) : IEquatable<NetId64>, IComparable<NetId64>
 {
     internal static readonly NetId64[] OneArray = new NetId64[1];

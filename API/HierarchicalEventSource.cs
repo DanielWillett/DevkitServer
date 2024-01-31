@@ -1,4 +1,4 @@
-﻿namespace DevkitServer.API.Devkit.Spawns;
+﻿namespace DevkitServer.API;
 
 /// <summary>
 /// When events are chain-invoked for child objects in a hierarchy, defines how many generations of parent objects away the object that invoked the event is.

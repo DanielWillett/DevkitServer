@@ -1,5 +1,7 @@
 ﻿#if CLIENT
 using DevkitServer.API.Devkit;
+using DevkitServer.API.Permissions;
+using DevkitServer.API.UI;
 using DevkitServer.Configuration;
 using DevkitServer.Players;
 using SDG.Framework.Devkit;
@@ -140,6 +142,9 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
             _hasLetGoOfCtrlSinceCopyTransform = true;
         }
 
+        PermissionLeaf transformPermissionMissing = default;
+        bool hasTransformPerms = !DevkitServerModule.IsEditing || HasPermissionToTransform(out transformPermissionMissing);
+
         if (!flying && Glazier.Get().ShouldGameProcessInput)
         {
             // handle mode change keybinds
@@ -193,7 +198,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
             // handle hover check
 
             Ray ray = EditorInteractEx.Ray;
-            bool isOverHandles = DevkitSelectionManager.selection.Count > 0 && Handles.Raycast(ray);
+            bool isOverHandles = hasTransformPerms && DevkitSelectionManager.selection.Count > 0 && Handles.Raycast(ray);
 
             if (DevkitSelectionManager.selection.Count > 0)
                 Handles.Render(ray);
@@ -261,12 +266,20 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
             
             if (IsDraggingHandles)
             {
-                Handles.snapPositionInterval = DevkitSelectionToolOptions.instance != null ? DevkitSelectionToolOptions.instance.snapPosition : 1.0f;
-                Handles.snapRotationIntervalDegrees = DevkitSelectionToolOptions.instance != null ? DevkitSelectionToolOptions.instance.snapRotation : 1.0f;
-                Handles.wantsToSnap = InputEx.GetKey(ControlsSettings.snap);
-                Handles.MouseMove(ray);
-                if (DevkitSelectionManager.selection.Count > 0)
-                    OnTempMoved();
+                if (!hasTransformPerms)
+                {
+                    EndDragHandles(false);
+                    EditorMessage.SendNoPermissionMessage(transformPermissionMissing);
+                }
+                else
+                {
+                    Handles.snapPositionInterval = DevkitSelectionToolOptions.instance != null ? DevkitSelectionToolOptions.instance.snapPosition : 1.0f;
+                    Handles.snapRotationIntervalDegrees = DevkitSelectionToolOptions.instance != null ? DevkitSelectionToolOptions.instance.snapRotation : 1.0f;
+                    Handles.wantsToSnap = InputEx.GetKey(ControlsSettings.snap);
+                    Handles.MouseMove(ray);
+                    if (DevkitSelectionManager.selection.Count > 0)
+                        OnTempMoved();
+                }
             }
             else if (InputEx.GetKeyDown(KeyCode.E))
             {
@@ -274,9 +287,27 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                 if (hit.transform != null)
                 {
                     if (DevkitSelectionManager.selection.Count > 0)
-                        SimulateHandleMovement(hit.point, Quaternion.identity, Vector3.one, false, false);
+                    {
+                        if (!hasTransformPerms)
+                        {
+                            EditorMessage.SendNoPermissionMessage(transformPermissionMissing);
+                        }
+                        else
+                        {
+                            SimulateHandleMovement(hit.point, Quaternion.identity, Vector3.one, false, false);
+                        }
+                    }
                     else
-                        RequestInstantiation(hit.point, Quaternion.FromToRotation(Vector3.up, hit.normal), Vector3.one);
+                    {
+                        if (DevkitServerModule.IsEditing && !HasPermissionToInstantiate(out PermissionLeaf instantiatePermission))
+                        {
+                            EditorMessage.SendNoPermissionMessage(instantiatePermission);
+                        }
+                        else
+                        {
+                            RequestInstantiation(hit.point, Quaternion.FromToRotation(Vector3.up, hit.normal), Vector3.one);
+                        }
+                    }
                 }
             }
 
@@ -327,7 +358,15 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                 _detectedMouseDown = false;
                 _justCancelledDragging = false;
                 if (IsDraggingHandles)
-                    EndDragHandles(true);
+                {
+                    if (hasTransformPerms)
+                        EndDragHandles(true);
+                    else
+                    {
+                        EndDragHandles(false);
+                        EditorMessage.SendNoPermissionMessage(transformPermissionMissing);
+                    }
+                }
                 else if (IsAreaSelecting)
                     IsAreaSelecting = false;
                 else
@@ -408,56 +447,74 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
 
         if (InputEx.GetKeyDown(KeyCode.C))
         {
-            IntlCopyBuffer.Clear();
-            foreach (DevkitSelection selection in DevkitSelectionManager.selection)
-                IntlCopyBuffer.Add(selection.gameObject);
+            if (!DevkitServerModule.IsEditing || HasPermissionToInstantiate(out PermissionLeaf instantiatePermission))
+            {
+                IntlCopyBuffer.Clear();
+                foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+                    IntlCopyBuffer.Add(selection.gameObject);
+            }
+            else
+            {
+                EditorMessage.SendNoPermissionMessage(instantiatePermission);
+            }
         }
         
         if (InputEx.GetKeyDown(KeyCode.V) && IntlCopyBuffer.Count > 0)
         {
-            Paste(IntlCopyBuffer);
-        }
-        else if (InputEx.GetKeyDown(KeyCode.Delete))
-        {
-            if (!DevkitServerModule.IsEditing)
+            if (!DevkitServerModule.IsEditing || HasPermissionToInstantiate(out PermissionLeaf instantiatePermission))
             {
-                DevkitTransactionManager.beginTransaction("Delete(" + DevkitSelectionManager.selection.Count + ")");
-
-                foreach (DevkitSelection selection in DevkitSelectionManager.selection)
-                    Delete(selection);
-
-                DevkitTransactionManager.endTransaction();
+                Paste(IntlCopyBuffer);
             }
             else
             {
-                foreach (DevkitSelection selection in DevkitSelectionManager.selection)
-                    Delete(selection);
+                EditorMessage.SendNoPermissionMessage(instantiatePermission);
             }
+        }
+        else if (InputEx.GetKeyDown(KeyCode.Delete))
+        {
+            if (!DevkitServerModule.IsEditing || HasPermissionToDelete(out PermissionLeaf deletePermission))
+            {
+                DeleteSelection();
 
-            DevkitSelectionManager.clear();
-            _handleModeDirty = true;
+                DevkitSelectionManager.clear();
+                _handleModeDirty = true;
+            }
+            else
+            {
+                EditorMessage.SendNoPermissionMessage(deletePermission);
+            }
         }
         else if (InputEx.GetKeyDown(KeyCode.B))
         {
-            HasReferenceTransform = true;
-            ReferencePosition = handlePosition;
-            ReferenceRotation = handleRotation;
-            ReferenceScale = Vector3.one;
-            HasReferenceScale = false;
-            _hasLetGoOfCtrlSinceCopyTransform = !ctrl;
-            if (DevkitSelectionManager.selection.Count == 1)
+            if (hasTransformPerms)
             {
-                DevkitSelection selection = DevkitSelectionManager.selection.EnumerateFirst();
-                if (selection.gameObject != null)
+                HasReferenceTransform = true;
+                ReferencePosition = handlePosition;
+                ReferenceRotation = handleRotation;
+                ReferenceScale = Vector3.one;
+                HasReferenceScale = false;
+                _hasLetGoOfCtrlSinceCopyTransform = !ctrl;
+                if (DevkitSelectionManager.selection.Count == 1)
                 {
-                    ReferenceScale = selection.gameObject.transform.localScale;
-                    HasReferenceScale = true;
+                    DevkitSelection selection = DevkitSelectionManager.selection.EnumerateFirst();
+                    if (selection.gameObject != null)
+                    {
+                        ReferenceScale = selection.gameObject.transform.localScale;
+                        HasReferenceScale = true;
+                    }
                 }
+            }
+            else
+            {
+                EditorMessage.SendNoPermissionMessage(transformPermissionMissing);
             }
         }
         if (InputEx.GetKeyDown(KeyCode.N) && HasReferenceTransform)
         {
-            SimulateHandleMovement(ReferencePosition, ReferenceRotation, ReferenceScale, true, HasReferenceScale);
+            if (hasTransformPerms)
+                SimulateHandleMovement(ReferencePosition, ReferenceRotation, ReferenceScale, true, HasReferenceScale);
+            else
+                EditorMessage.SendNoPermissionMessage(transformPermissionMissing);
         }
         if (InputEx.GetKeyDown(ControlsSettings.focus))
         {
@@ -492,13 +549,14 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                 selection.gameObject.transform.localScale = selection.preTransformLocalScale;
             }
         }
-        if (!DevkitServerModule.IsEditing)
-        {
-            DevkitTransactionManager.endTransaction();
 
-            if (!apply)
-                DevkitTransactionManager.undo();
-        }
+        if (DevkitServerModule.IsEditing)
+            return;
+
+        DevkitTransactionManager.endTransaction();
+
+        if (!apply)
+            DevkitTransactionManager.undo();
     }
     void IDevkitTool.equip()
     {
@@ -659,13 +717,45 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         if (!DevkitServerModule.IsEditing)
             DevkitTransactionManager.endTransaction();
     }
-    protected static void TransformSelection()
+    protected virtual bool HasPermissionToTransform(out PermissionLeaf permission)
+    {
+        permission = default;
+        return true;
+    }
+    protected virtual bool HasPermissionToInstantiate(out PermissionLeaf permission)
+    {
+        permission = default;
+        return true;
+    }
+    protected virtual bool HasPermissionToDelete(out PermissionLeaf permission)
+    {
+        permission = default;
+        return true;
+    }
+
+    protected virtual void TransformSelection()
     {
         foreach (DevkitSelection devkitSelection in DevkitSelectionManager.selection)
         {
             if (devkitSelection.gameObject != null && devkitSelection.gameObject.TryGetComponent(out IDevkitSelectionTransformableHandler handler))
                 handler.transformSelection();
         }
+    }
+    protected virtual void DeleteSelection()
+    {
+        if (DevkitServerModule.IsEditing)
+        {
+            foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+                Delete(selection);
+            return;
+        }
+
+        DevkitTransactionManager.beginTransaction("Delete(" + DevkitSelectionManager.selection.Count + ")");
+
+        foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+            Delete(selection);
+
+        DevkitTransactionManager.endTransaction();
     }
 
     private void OnGLRenderIntl() => OnGLRender();

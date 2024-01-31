@@ -4,16 +4,17 @@ using SDG.Framework.Devkit.Interactable;
 
 namespace DevkitServer.API.Devkit.Spawns;
 
-public class ItemSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionTransformableHandler, IDevkitSelectionCopyableHandler
+public class ItemSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionCopyableHandler
 {
     private static readonly Color32 SpawnpointColor = new Color32(204, 255, 255, 255);
     public ItemSpawnpoint Spawnpoint { get; internal set; } = null!;
     public override bool ShouldBeVisible => LevelVisibility.itemsVisible;
+    public override SpawnType SpawnType => SpawnType.Item;
     protected override bool Add()
     {
         if (Regions.checkSafe(Spawnpoint.point))
         {
-            SpawnUtil.AddItemSpawnLocal(Spawnpoint);
+            SpawnUtil.AddItemSpawnpointLocal(Spawnpoint);
             return true;
         }
 
@@ -21,15 +22,19 @@ public class ItemSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionTransf
     }
     protected override bool Remove()
     {
-        return SpawnUtil.RemoveItemSpawnLocal(Spawnpoint, false);
+        return SanityCheck() &&
+               SpawnUtil.RemoveSpawnLocal(SpawnType.Item, RegionIntl, false) == SpawnpointEventResult.Success;
     }
     protected override void Transform()
     {
-        SpawnUtil.MoveSpawnpointLocal(Spawnpoint, transform.position, out _);
+        if (SanityCheck())
+            SpawnUtil.MoveSpawnpointLocal(SpawnType.Item, RegionIntl, transform.position);
     }
     protected override NetId64 GetNetId()
     {
-        SpawnsNetIdDatabase.TryGetItemSpawnNetId(Region, out NetId64 netId);
+        NetId64 netId = default;
+        if (SanityCheck())
+            SpawnsNetIdDatabase.TryGetSpawnNetId(SpawnType.Item, RegionIntl, out netId);
         return netId;
     }
     public override string Format(ITerminalFormatProvider provider)
@@ -44,14 +49,11 @@ public class ItemSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionTransf
             return $"Item Spawnpoint ({LevelItems.tables[Spawnpoint.type].name})";
         return "Item Spawnpoint";
     }
-    void IDevkitSelectionTransformableHandler.transformSelection()
-    {
-        SpawnUtil.MoveSpawnpointLocal(Spawnpoint, transform.position, out _);
-    }
     GameObject IDevkitSelectionCopyableHandler.copySelection()
     {
         ItemSpawnpoint point = new ItemSpawnpoint(Spawnpoint.type, Spawnpoint.point);
-        SpawnUtil.AddItemSpawnLocal(point);
+        SpawnUtil.AddItemSpawnpointLocal(point);
         return point.node.gameObject;
     }
+    public override bool SanityCheck() => SpawnUtil.SanityCheckRegion(Spawnpoint, ref RegionIntl);
 }

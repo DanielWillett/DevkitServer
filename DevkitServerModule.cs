@@ -184,7 +184,13 @@ public sealed class DevkitServerModule : IModuleNexus
         { "SpawnTierNameTaken", "Name Already Taken" },
         { "TooManySpawnTiers", "Too Many Tiers\nMax: {0}" },
         { "TooManySpawnAssets", "Too Many Assets\nMax: {0}" },
-        { "SpawnAssetNotFound", "Asset Not Found\n[{0}] {1}" }
+        { "SpawnAssetNotFound", "Asset Not Found\n[{0}] {1}" },
+        { "OutOfRegionBounds", "Out of Bounds" },
+        { "NoAnimalTableSelected", "No Animal Table Selected" },
+        { "NoVehicleTableSelected", "No Vehicle Table Selected" },
+        { "NoItemTableSelected", "No Item Table Selected" },
+        { "NoZombieTableSelected", "No Zombie Table Selected" },
+        { "SpawnAlreadyInstantiating", "Please Wait...\nThe server is catching up" },
     };
     public static Local LevelLoadingLocalization { get; private set; } = null!;
 

@@ -1995,7 +1995,7 @@ public static class SpawnTableUtil
                 {
                     AnimalSpawnpoint spawnpoint = LevelAnimals.spawns[i];
                     if (spawnpoint.type == index)
-                        SpawnUtil.RemoveAnimalSpawnLocal(spawnpoint, true);
+                        SpawnUtil.RemoveSpawnLocal(spawnType, i, true);
                     else if (spawnpoint.type > index)
                         --spawnpoint.type;
                 }
@@ -2111,7 +2111,7 @@ public static class SpawnTableUtil
                 {
                     VehicleSpawnpoint spawnpoint = LevelVehicles.spawns[i];
                     if (spawnpoint.type == index)
-                        SpawnUtil.RemoveVehicleSpawnLocal(spawnpoint, true);
+                        SpawnUtil.RemoveSpawnLocal(spawnType, i, true);
                     else if (spawnpoint.type > index)
                         --spawnpoint.type;
                 }
@@ -2231,7 +2231,9 @@ public static class SpawnTableUtil
                     {
                         ItemSpawnpoint spawnpoint = region[i];
                         if (spawnpoint.type == index)
-                            SpawnUtil.RemoveItemSpawnLocal(spawnpoint, true);
+                        {
+                            SpawnUtil.RemoveSpawnLocal(spawnType, new RegionIdentifier(r, i), true);
+                        }
                         else if (spawnpoint.type > index)
                             --spawnpoint.type;
                     }
@@ -2360,7 +2362,7 @@ public static class SpawnTableUtil
                     {
                         ZombieSpawnpoint spawnpoint = region[i];
                         if (spawnpoint.type == index)
-                            SpawnUtil.RemoveZombieSpawnLocal(spawnpoint, true);
+                            SpawnUtil.RemoveSpawnLocal(spawnType, i, true);
                         else if (spawnpoint.type > index)
                             --spawnpoint.type;
                     }

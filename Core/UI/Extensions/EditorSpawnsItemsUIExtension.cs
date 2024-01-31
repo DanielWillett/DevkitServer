@@ -71,6 +71,7 @@ internal class EditorSpawnsItemsUIExtension : BaseEditorSpawnsUIExtensionNormalT
     }
     private static string GetText(ItemSpawnpoint point) => LevelItems.tables.Count > point.type ? LevelItems.tables[point.type].name : point.type + " - Null";
     protected override Vector3 GetPosition(ItemSpawnpoint spawn) => spawn.node.position;
+    protected override bool CheckLabelAlive(ItemSpawnpoint spawn) => spawn.node != null;
     protected override bool ShouldShow(ItemSpawnpoint spawn)
     {
         Vector3 lclPos = MainCamera.instance.transform.position;

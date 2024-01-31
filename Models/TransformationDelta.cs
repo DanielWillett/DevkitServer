@@ -4,26 +4,42 @@ namespace DevkitServer.Models;
 
 public readonly struct TransformationDelta
 {
+    internal static readonly TransformationDelta[] OneArray = new TransformationDelta[1];
+    /// <summary>
+    /// Max size of this structure at full precision.
+    /// </summary>
     public const int Capacity = 57;
-    public const int CapacityHalfPrecision = 29;
-    public TransformFlags Flags { get; }
-    public Vector3 Position { get; }
-    public Quaternion Rotation { get; }
-    public Vector3 OriginalPosition { get; }
-    public Quaternion OriginalRotation { get; }
-    public TransformationDelta(ByteReader reader, TransformFlags flags, Vector3 position, Quaternion rotation)
-    {
-        Flags = flags;
-        Position = position;
-        Rotation = rotation;
-        if ((flags & TransformFlags.OriginalPosition) != 0)
-            OriginalPosition = reader.ReadVector3();
-        else OriginalPosition = default;
-        if ((flags & TransformFlags.Rotation) != 0)
-            OriginalRotation = (flags & TransformFlags.YawOnly) == 0 ? reader.ReadQuaternion() : new Quaternion(0f, reader.ReadFloat(), 0f, 0f);
-        else OriginalRotation = Quaternion.identity;
 
-    }
+    /// <summary>
+    /// Max size of this structure at half precision.
+    /// </summary>
+    public const int CapacityHalfPrecision = 29;
+
+    /// <summary>
+    /// Flags that define how much data is replicated.
+    /// </summary>
+    public TransformFlags Flags { get; }
+
+    /// <summary>
+    /// Either the final position or an offset from <see cref="OriginalPosition"/>.
+    /// </summary>
+    public Vector3 Position { get; }
+
+    /// <summary>
+    /// Either the final rotation or an offset from <see cref="OriginalRotation"/>.
+    /// </summary>
+    /// <remarks>When <see cref="Flags"/> has <see cref="TransformFlags.YawOnly"/>, the y component of this is the yaw.</remarks>
+    public Quaternion Rotation { get; }
+
+    /// <summary>
+    /// The original position of the transform.
+    /// </summary>
+    public Vector3 OriginalPosition { get; }
+
+    /// <summary>
+    /// The original rotation of the transform.
+    /// </summary>
+    public Quaternion OriginalRotation { get; }
     public TransformationDelta(ByteReader reader, bool halfPrecision = false)
     {
         TransformFlags flags = reader.ReadEnum<TransformFlags>();

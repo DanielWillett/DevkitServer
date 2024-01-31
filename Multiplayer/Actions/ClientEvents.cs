@@ -224,6 +224,9 @@ public static class ClientEvents
     public static event DeleteSpawn? OnDeleteSpawn;
     public static event DeleteSpawnRequested? OnDeleteSpawnRequested;
     public static event DeleteSpawns? OnDeleteSpawns;
+    public static event MoveSpawnFinalRequested? OnMoveSpawnFinalRequested;
+    public static event MoveSpawnFinal? OnMoveSpawnFinal;
+    public static event MoveSpawnsFinal? OnMoveSpawnsFinal;
 
     public static bool ListeningOnEditHeightmapPermissionDenied => !EventOnEditHeightmapPermissionDenied.IsEmpty;
     public static bool ListeningOnEditSplatmapPermissionDenied => !EventOnEditSplatmapPermissionDenied.IsEmpty;
@@ -355,6 +358,9 @@ public static class ClientEvents
     public static bool ListeningOnDeleteSpawn => OnDeleteSpawn != null;
     public static bool ListeningOnDeleteSpawnRequested => OnDeleteSpawnRequested != null;
     public static bool ListeningOnDeleteSpawns => OnDeleteSpawns != null;
+    public static bool ListeningOnMoveSpawnFinalRequested => OnMoveSpawnFinalRequested != null;
+    public static bool ListeningOnMoveSpawnFinal => OnMoveSpawnFinal != null;
+    public static bool ListeningOnMoveSpawnsFinal => OnMoveSpawnsFinal != null;
 
     internal static void InvokeOnPaintRamp(in PaintRampProperties properties) => OnPaintRamp?.Invoke(in properties);
     internal static void InvokeOnAdjustHeightmap(in AdjustHeightmapProperties properties) => OnAdjustHeightmap?.Invoke(in properties);
@@ -475,6 +481,9 @@ public static class ClientEvents
     internal static void InvokeOnDeleteSpawn(in DeleteSpawnProperties properties) => OnDeleteSpawn?.Invoke(in properties);
     internal static void InvokeOnDeleteSpawnRequested(in DeleteSpawnProperties properties, ref bool shouldAllow) => OnDeleteSpawnRequested?.Invoke(in properties, ref shouldAllow);
     internal static void InvokeOnDeleteSpawns(in DeleteSpawnsProperties properties) => OnDeleteSpawns?.Invoke(in properties);
+    internal static void InvokeOnMoveSpawnFinalRequested(in MoveSpawnFinalProperties properties, ref bool shouldAllow) => OnMoveSpawnFinalRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnMoveSpawnFinal(in MoveSpawnFinalProperties properties) => OnMoveSpawnFinal?.Invoke(in properties);
+    internal static void InvokeOnMoveSpawnsFinal(in MoveSpawnsFinalProperties properties) => OnMoveSpawnsFinal?.Invoke(in properties);
 }
 
 public delegate void TryInstantiateHierarchyObject(ref InstantiateHierarchyObjectProperties properties, ref bool shouldAllow);

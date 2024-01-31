@@ -1,6 +1,7 @@
 ﻿#if DEBUG
 // #define LEVEL_DATA_LOGGING
 #endif
+using DevkitServer.API;
 using DevkitServer.API.Devkit.Spawns;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Actions;
@@ -50,7 +51,6 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
     private SpawnsNetIdDatabase() { }
     internal static void Init()
     {
-#if SERVER
         SpawnUtil.OnAnimalSpawnpointRemoved += OnAnimalSpawnRemoved;
         SpawnUtil.OnPlayerSpawnpointRemoved += OnPlayerSpawnRemoved;
         SpawnUtil.OnVehicleSpawnpointRemoved += OnVehicleSpawnRemoved;
@@ -60,7 +60,7 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         SpawnTableUtil.OnSpawnTableRemoved += OnSpawnTableRemoved;
         SpawnTableUtil.OnSpawnTierRemoved += OnSpawnTierRemoved;
         SpawnTableUtil.OnSpawnAssetRemoved += OnSpawnAssetRemoved;
-#endif
+
         SpawnUtil.OnAnimalSpawnpointIndexUpdated += OnAnimalSpawnIndexUpdated;
         SpawnUtil.OnPlayerSpawnpointIndexUpdated += OnPlayerSpawnIndexUpdated;
         SpawnUtil.OnVehicleSpawnpointIndexUpdated += OnVehicleSpawnIndexUpdated;
@@ -74,7 +74,6 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
 
     internal static void Shutdown()
     {
-#if SERVER
         SpawnUtil.OnAnimalSpawnpointRemoved -= OnAnimalSpawnRemoved;
         SpawnUtil.OnPlayerSpawnpointRemoved -= OnPlayerSpawnRemoved;
         SpawnUtil.OnVehicleSpawnpointRemoved -= OnVehicleSpawnRemoved;
@@ -84,7 +83,7 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         SpawnTableUtil.OnSpawnTableRemoved -= OnSpawnTableRemoved;
         SpawnTableUtil.OnSpawnTierRemoved -= OnSpawnTierRemoved;
         SpawnTableUtil.OnSpawnAssetRemoved -= OnSpawnAssetRemoved;
-#endif
+
         SpawnUtil.OnAnimalSpawnpointIndexUpdated -= OnAnimalSpawnIndexUpdated;
         SpawnUtil.OnPlayerSpawnpointIndexUpdated -= OnPlayerSpawnIndexUpdated;
         SpawnUtil.OnVehicleSpawnpointIndexUpdated -= OnVehicleSpawnIndexUpdated;
@@ -307,7 +306,6 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         if (Logger.Debug)
             Logger.DevkitServer.LogDebug(Source, $"Moved zombie spawnpoint NetId: {point.point.Format()} ({netId.Format()}, {toRegion.Format()}).");
     }
-#if SERVER
     private static void OnSpawnTableRemoved(SpawnType spawnType, int index)
     {
         if (!DevkitServerModule.IsEditing)
@@ -428,7 +426,6 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         if (Logger.Debug)
             Logger.DevkitServer.LogDebug(Source, $"Removed zombie spawnpoint NetId: {point.point.Format()} ({netId.Format()}, {region.Format()}).");
     }
-#endif
     
 #if CLIENT
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendBindSpawnpoint)]
@@ -698,6 +695,26 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
 
         return netId;
     }
+    /// <exception cref="ArgumentOutOfRangeException">Spawn type must be 'Item' or 'Zombie'.</exception>
+    public static void RegisterRegionSpawnpoint(SpawnType type, RegionIdentifier id, NetId64 netId)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (type is not SpawnType.Item and not SpawnType.Zombie)
+            throw new ArgumentOutOfRangeException(nameof(type), "Spawn type must be 'Item' or 'Zombie'.");
+
+        ClaimBasicSpawnpointNetId(id, type, netId);
+    }
+    /// <exception cref="ArgumentOutOfRangeException">Spawn type must be 'Animal', 'Player', or 'Vehicle'.</exception>
+    public static void RegisterIndexSpawnpoint(SpawnType type, int index, NetId64 netId)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (type is not SpawnType.Animal and not SpawnType.Player and not SpawnType.Vehicle)
+            throw new ArgumentOutOfRangeException(nameof(type), "Spawn type must be 'Animal', 'Player', or 'Vehicle'.");
+
+        ClaimBasicSpawnpointNetId(index, type, netId);
+    }
     public static NetId64 RegisterRegionSpawnpoint(SpawnType type, RegionIdentifier id)
     {
         ThreadUtil.assertIsGameThread();
@@ -743,6 +760,36 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         ClaimBasicAssetNetId(identifier, netId);
 
         return netId;
+    }
+    public static bool TryGetSpawnpoint(SpawnType spawnType, NetId64 netId, out int spawnIndex)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (SpawnNetIds.TryGetValue(netId, out int index) && SpawnUtil.CheckSpawnpointSafe(spawnType, index))
+        {
+            spawnIndex = index;
+            return true;
+        }
+
+        spawnIndex = -1;
+        return false;
+    }
+    public static bool TryGetSpawnpoint(SpawnType spawnType, NetId64 netId, out RegionIdentifier spawnIdentifier)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (SpawnNetIds.TryGetValue(netId, out int raw))
+        {
+            RegionIdentifier id = RegionIdentifier.CreateUnsafe(raw);
+            if (SpawnUtil.CheckSpawnpointSafe(spawnType, id))
+            {
+                spawnIdentifier = id;
+                return true;
+            }
+        }
+
+        spawnIdentifier = RegionIdentifier.Invalid;
+        return false;
     }
     public static bool TryGetAnimalSpawnpoint(NetId64 netId, out int spawnIndex)
     {

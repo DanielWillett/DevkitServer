@@ -76,6 +76,7 @@ internal class EditorSpawnsAnimalsUIExtension : BaseEditorSpawnsUIExtensionNorma
     }
     private static string GetText(AnimalSpawnpoint point) => LevelAnimals.tables.Count > point.type ? LevelAnimals.tables[point.type].name : point.type + " - Null";
     protected override Vector3 GetPosition(AnimalSpawnpoint spawn) => spawn.node.position;
+    protected override bool CheckLabelAlive(AnimalSpawnpoint spawn) => spawn.node != null;
     protected override bool ShouldShow(AnimalSpawnpoint spawn)
     {
         Vector3 lclPos = MainCamera.instance.transform.position;
@@ -90,7 +91,7 @@ internal class EditorSpawnsAnimalsUIExtension : BaseEditorSpawnsUIExtensionNorma
     {
         RemoveLabel(point);
     }
-    internal void OnSpawnMoved(AnimalSpawnpoint point, Vector3 fromPosition, Vector3 toPosition)
+    internal void OnSpawnMoved(AnimalSpawnpoint point, int index, Vector3 fromPosition, Vector3 toPosition)
     {
         UpdateLabel(point);
     }

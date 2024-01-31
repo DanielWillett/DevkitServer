@@ -21,6 +21,7 @@ public abstract class BaseSpawnpointNode : MonoBehaviour, ISpawnpointNode, IDevk
     public Collider Collider { get; protected set; } = null!;
     public Renderer? Renderer { get; protected set; }
     public abstract bool ShouldBeVisible { get; }
+    public abstract SpawnType SpawnType { get; }
     public virtual Color Color
     {
         set
@@ -111,18 +112,33 @@ public abstract class BaseSpawnpointNode : MonoBehaviour, ISpawnpointNode, IDevk
     protected abstract void Transform();
     protected abstract NetId64 GetNetId();
 
+    /// <summary>
+    /// Double checks the stored index or region, just in case an external source modified it without calling the right events.
+    /// </summary>
+    /// <returns><see langword="false"/> if the spawnpoint couldn't be found in the game's records at all.</returns>
+    public abstract bool SanityCheck();
     public abstract string Format(ITerminalFormatProvider provider);
 
     void IDevkitSelectionTransformableHandler.transformSelection() => Transform();
 }
 public abstract class RegionalSpawnpointNode : BaseSpawnpointNode
 {
-    public RegionIdentifier Region { get; internal set; }
+    protected RegionIdentifier RegionIntl;
+    public RegionIdentifier Region
+    {
+        get => RegionIntl;
+        internal set => RegionIntl = value;
+    }
 }
 
 public abstract class IndexedSpawnpointNode : BaseSpawnpointNode
 {
-    public int Index { get; internal set; }
+    protected int IndexIntl;
+    public int Index
+    {
+        get => IndexIntl;
+        internal set => IndexIntl = value;
+    }
 }
 
 public interface ISpawnpointNode : ITerminalFormattable

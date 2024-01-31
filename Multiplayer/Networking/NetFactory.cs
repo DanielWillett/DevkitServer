@@ -1643,6 +1643,9 @@ public readonly struct NetInvokerInfo(FieldInfo field, BaseNetCall invoker, NetM
     public readonly NetMethodInfo[] Methods = methods;
 }
 
+/// <summary>
+/// Defines a method listener for a <see cref="NetCall"/>.
+/// </summary>
 [MeansImplicitUse]
 [AttributeUsage(AttributeTargets.Method, Inherited = false)]
 public sealed class NetCallAttribute : Attribute
@@ -1667,6 +1670,10 @@ public sealed class NetCallAttribute : Attribute
     public bool HighSpeed { get; set; }
     public bool HighSpeedAllowUnverified { get; set; }
 }
+
+/// <summary>
+/// Defines which side the message would be received from.
+/// </summary>
 public enum NetCallSource : byte
 {
     FromServer = 0,

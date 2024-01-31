@@ -927,7 +927,7 @@ public static class DevkitServerUtility
     public static T[] ToArrayFast<T>(this List<T> list) => list.Count == 0 ? Array.Empty<T>() : list.ToArray();
 
     /// <summary>
-    /// Converts a list to a <see cref="ReadOnlySpan{T}"/> without copying the data.
+    /// Converts a list to a <see cref="ReadOnlySpan{T}"/> by accessing it's underlying array. If for some reason that fails it just copies the data to a new array.
     /// </summary>
     public static Span<T> ToSpan<T>(this List<T> list)
     {

@@ -35,7 +35,12 @@ public readonly struct RegionIdentifier : IEquatable<RegionIdentifier>, ICompara
     public RegionIdentifier(byte x, byte y, ushort index) : this((x << 24) | (y << 16) | index) { }
     public RegionIdentifier(int x, int y, int index) : this(((byte)x << 24) | ((byte)y << 16) | (ushort)index) { }
     public static unsafe RegionIdentifier CreateUnsafe(int raw) => *(RegionIdentifier*)&raw;
-    public bool CheckSafe() => Regions.checkSafe(X, Y);
+    public bool CheckSafe()
+    {
+        int wrldSize = Regions.WORLD_SIZE;
+        return (byte)(_data >> 24) < wrldSize && (byte)(_data >> 16) < wrldSize;
+    }
+
     public bool IsSameRegionAs(RegionIdentifier other) => (other._data & unchecked((int)0xFFFF0000)) == (_data & unchecked((int)0xFFFF0000));
     public bool IsSameRegionAs(byte x, byte y) => X == x && Y == y;
     public override bool Equals(object? other) => other is RegionIdentifier id && Equals(id);
@@ -74,4 +79,59 @@ public readonly struct RegionIdentifier : IEquatable<RegionIdentifier>, ICompara
     {
         return new RegionIdentifier(reader.ReadInt32());
     }
+
+    /// <summary>
+    /// Get the element from a region list array (<see cref="Regions.WORLD_SIZE"/> sqr) without bounds checks.
+    /// </summary>
+    /// <remarks>Use <see cref="CheckSafe{T}"/> for bounds checks.</remarks>
+    public T FromList<T>(List<T>[,] regionList)
+    {
+        int data = _data;
+        return regionList[(data >> 24) & 0xFF, (data >> 16) & 0xFF][data & 0xFFFF];
+    }
+
+    /// <summary>
+    /// Get the list from a region list array (<see cref="Regions.WORLD_SIZE"/> sqr) without bounds checks.
+    /// </summary>
+    /// <remarks>Use <see cref="CheckSafe{T}"/> for bounds checks.</remarks>
+    public List<T> GetList<T>(List<T>[,] regionList)
+    {
+        int data = _data;
+        return regionList[(data >> 24) & 0xFF, (data >> 16) & 0xFF];
+    }
+
+    /// <summary>
+    /// Check if this <see cref="RegionIdentifier"/> exists in the given region list array (<see cref="Regions.WORLD_SIZE"/> sqr).
+    /// </summary>
+    /// <remarks>Use <see cref="FromList{T}"/> to actually get the item.</remarks>
+    public bool CheckSafe<T>(List<T>[,] regionList)
+    {
+        int wrldSize = Regions.WORLD_SIZE;
+        int data = _data;
+        int x = (data >> 24) & 0xFF,
+            y = (data >> 16) & 0xFF;
+        return x < wrldSize && y < wrldSize && (data & 0xFFFF) < regionList[x, y].Count;
+    }
+
+    /// <summary>
+    /// Check if this <see cref="RegionIdentifier"/> exists in the given region list array (<see cref="Regions.WORLD_SIZE"/> sqr) and output the element at this region and index.
+    /// </summary>
+    public bool TryFromList<T>(List<T>[,] regionList, out T element)
+    {
+        int wrldSize = Regions.WORLD_SIZE;
+        int data = _data;
+        int x = (data >> 24) & 0xFF,
+            y = (data >> 16) & 0xFF,
+            index = data & 0xFFFF;
+
+        if (x < wrldSize && y < wrldSize && index < regionList[x, y].Count)
+        {
+            element = regionList[x, y][index];
+            return true;
+        }
+
+        element = default!;
+        return false;
+    }
+
 }

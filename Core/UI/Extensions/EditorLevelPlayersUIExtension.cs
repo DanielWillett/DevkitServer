@@ -21,5 +21,6 @@ internal class EditorLevelPlayersUIExtension : BaseEditorSpawnsUIExtension<Playe
     }
     protected override void OnRegionUpdated(RegionCoord oldRegion, RegionCoord newRegion, bool isInRegion) { }
     protected override Vector3 GetPosition(PlayerSpawnpoint spawn) => spawn.node.position;
+    protected override bool CheckLabelAlive(PlayerSpawnpoint spawn) => spawn.node != null;
 }
 #endif

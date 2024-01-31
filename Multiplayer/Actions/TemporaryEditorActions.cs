@@ -1,4 +1,7 @@
 ﻿#if CLIENT
+#if DEBUG
+#define PRINT_ACTION_SIMPLE
+#endif
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Devkit.Spawns;
 using DevkitServer.API.Multiplayer;
@@ -30,16 +33,27 @@ public class TemporaryEditorActions : IActionListener, IDisposable
     private readonly List<PendingSpawnTableInstantiation> _spawnTableInstantiations = new List<PendingSpawnTableInstantiation>();
     private readonly List<PendingSpawnTierInstantiation> _spawnTierInstantiations = new List<PendingSpawnTierInstantiation>();
     private readonly List<PendingSpawnAssetInstantiation> _spawnAssetInstantiations = new List<PendingSpawnAssetInstantiation>();
+    private readonly List<PendingSpawnInstantiation> _spawnInstantiations = new List<PendingSpawnInstantiation>();
     private readonly List<IAction> _actions = new List<IAction>();
     public int QueueSize => _actions.Count;
     public ActionSettings Settings { get; }
-    internal bool NeedsToFlush => _actions.Count > 0 || _hierarchyInstantiations.Count > 0 || _lvlObjectInstantiations.Count > 0 || _roadVertexInstantiations.Count > 0 || _roadInstantiations.Count > 0 || _flagInstantiations.Count > 0;
+    internal bool NeedsToFlush => _actions.Count > 0
+                                  || _hierarchyInstantiations.Count > 0
+                                  || _lvlObjectInstantiations.Count > 0
+                                  || _roadVertexInstantiations.Count > 0
+                                  || _roadInstantiations.Count > 0
+                                  || _flagInstantiations.Count > 0
+                                  || _spawnTableInstantiations.Count > 0
+                                  || _spawnTierInstantiations.Count > 0
+                                  || _spawnAssetInstantiations.Count > 0
+                                  || _spawnInstantiations.Count > 0
+                                  ;
     private TemporaryEditorActions()
     {
         Settings = new ActionSettings(this);
         Instance = this;
 #if PRINT_ACTION_SIMPLE
-        Logger.DevkitServer.LogDebug(Source, "Initialized.");
+        Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), "Initialized.");
 #endif
     }
     internal void QueueHierarchyItemInstantiation(IHierarchyItemTypeIdentifier type, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
@@ -48,7 +62,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
 
         _hierarchyInstantiations.Add(new PendingHierarchyInstantiation(type, position, rotation, scale, owner, netId));
 #if PRINT_ACTION_SIMPLE
-        Logger.DevkitServer.LogDebug(Source, $"Queued hierarchy item instantiation for {type.Format()} when the level loads.");
+        Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), $"Queued hierarchy item instantiation for {type.Format()} from {owner.Format()} when the level loads.");
 #endif
     }
     internal void QueueLevelObjectInstantiation(Asset asset, Vector3 position, Quaternion rotation, Vector3 scale, ulong owner, NetId netId)
@@ -58,56 +72,63 @@ public class TemporaryEditorActions : IActionListener, IDisposable
 
         _lvlObjectInstantiations.Add(new PendingLevelObjectInstantiation(asset.getReferenceTo<Asset>(), position, rotation, scale, owner, netId));
 #if PRINT_ACTION_SIMPLE
-        Logger.DevkitServer.LogDebug(Source, $"Queued level object instantiation for {asset.Format()} when the level loads.");
+        Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), $"Queued level object instantiation for {asset.Format()} from {owner.Format()} when the level loads.");
 #endif
     }
     internal void QueueRoadInstantiation(long netIds, ushort flags, Vector3 position, Vector3 tangent1, Vector3 tangent2, float offset, ulong owner)
     {
         _roadInstantiations.Add(new PendingRoadInstantiation(netIds, flags, position, tangent1, tangent2, offset, owner));
 #if PRINT_ACTION_SIMPLE
-        Logger.DevkitServer.LogDebug(Source, $"Queued road instantiation at {position.Format()} when the level loads.");
+        Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), $"Queued road instantiation at {position.Format()} from {owner.Format()} when the level loads.");
 #endif
     }
     internal void QueueRoadVertexInstantiation(NetId roadNetId, Vector3 position, Vector3 tangent1, Vector3 tangent2, bool ignoreTerrain, float verticalOffset, int vertexIndex, ulong owner, NetId vertexNetId, ERoadMode mode)
     {
         _roadVertexInstantiations.Add(new PendingRoadVertexInstantiation(roadNetId, position, tangent1, tangent2, ignoreTerrain, verticalOffset, vertexIndex, owner, vertexNetId, mode));
 #if PRINT_ACTION_SIMPLE
-        Logger.DevkitServer.LogDebug(Source, $"Queued road vertex instantiation at {position.Format()} (from road {roadNetId.Format()} at #{vertexIndex}) when the level loads.");
+        Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), $"Queued road vertex instantiation at {position.Format()} (from road {roadNetId.Format()} at #{vertexIndex}) from {owner.Format()} when the level loads.");
 #endif
     }
     internal void QueueFlagInstantiation(NetId netId, Vector3 position, Vector2 size, ulong owner, bool infiniteAgroDistance, bool shouldSpawnZombies, byte maxZombies, int maxBossZombies, Guid difficultyAsset)
     {
         _flagInstantiations.Add(new PendingFlagInstantiation(netId, position, size, owner, infiniteAgroDistance, shouldSpawnZombies, maxZombies, maxBossZombies, difficultyAsset));
 #if PRINT_ACTION_SIMPLE
-        Logger.DevkitServer.LogDebug(Source, $"Queued flag instantiation at {position.Format()} when the level loads.");
+        Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), $"Queued flag instantiation at {position.Format()} from {owner.Format()} when the level loads.");
 #endif
     }
     internal void QueueBasicSpawnTableInstantiation(NetId64 netId, SpawnType spawnType, ushort tableId, string name, Color color, ulong owner)
     {
         _spawnTableInstantiations.Add(new PendingSpawnTableInstantiation(netId, spawnType, tableId, name, color, owner));
 #if PRINT_ACTION_SIMPLE
-        Logger.DevkitServer.LogDebug(Source, $"Queued {spawnType.GetLowercaseText()} spawn table instantiation {name.Format(true)} when the level loads.");
+        Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), $"Queued {spawnType.GetLowercaseText()} spawn table instantiation {name.Format(true)} from {owner.Format()} when the level loads.");
 #endif
     }
     internal void QueueZombieSpawnTableInstantiation(NetId64 netId, string name, Color color, ulong owner, long packed, NetId64 lootTableNetId, uint xp, float regen, Guid difficultyAsset, ulong[] tierNetIds)
     {
         _spawnTableInstantiations.Add(new PendingZombieSpawnTableInstantiation(netId, name, color, owner, packed, lootTableNetId, xp, regen, difficultyAsset, tierNetIds));
 #if PRINT_ACTION_SIMPLE
-        Logger.DevkitServer.LogDebug(Source, $"Queued zombie spawn table instantiation {name.Format(true)} when the level loads.");
+        Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), $"Queued zombie spawn table instantiation {name.Format(true)} from {owner.Format()} when the level loads.");
 #endif
     }
     internal void QueueSpawnTierInstantiation(NetId64 netId, NetId64 parentNetId, SpawnType spawnType, float chance, string name, ulong owner)
     {
         _spawnTierInstantiations.Add(new PendingSpawnTierInstantiation(netId, parentNetId, spawnType, chance, name, owner));
 #if PRINT_ACTION_SIMPLE
-        Logger.DevkitServer.LogDebug(Source, $"Queued {spawnType.GetLowercaseText()} spawn table tier instantiation {name.Format(true)} when the level loads.");
+        Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), $"Queued {spawnType.GetLowercaseText()} spawn table tier instantiation {name.Format(true)} from {owner.Format()} when the level loads.");
 #endif
     }
     internal void QueueSpawnAssetInstantiation(NetId64 netId, NetId64 parentNetId, SpawnType spawnType, ushort legacyId, ulong owner)
     {
         _spawnAssetInstantiations.Add(new PendingSpawnAssetInstantiation(netId, parentNetId, spawnType, legacyId, owner));
 #if PRINT_ACTION_SIMPLE
-        Logger.DevkitServer.LogDebug(Source, $"Queued {spawnType.GetLowercaseText()} spawn table tier asset instantiation {legacyId.Format(true)} when the level loads.");
+        Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), $"Queued {spawnType.GetLowercaseText()} spawn table tier asset instantiation {legacyId.Format()} from {owner.Format()} when the level loads.");
+#endif
+    }
+    internal void QueueSpawnInstantiation(NetId64 netId, NetId64 spawnTableNetId, SpawnType spawnType, Vector3 position, float yaw, byte instantiationFlags, ulong owner)
+    {
+        _spawnInstantiations.Add(new PendingSpawnInstantiation(netId, spawnTableNetId, spawnType, position, yaw, instantiationFlags, owner));
+#if PRINT_ACTION_SIMPLE
+        Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), $"Queued {spawnType.GetLowercaseText()} spawnpoint instantiation {position.Format()} ({yaw.Format()}°) from {owner.Format()} when the level loads.");
 #endif
     }
     internal void HandleReadPackets(CSteamID user, ByteReader reader)
@@ -146,7 +167,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         }
         EditorActions.ReadDataVersion = 0;
 #if PRINT_ACTION_SIMPLE
-        Logger.DevkitServer.LogDebug(Source, $"Received actions: {(_actions.Count - stInd).Format()}.");
+        Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), $"Received actions: {(_actions.Count - stInd).Format()}.");
 #endif
 
         ListPool<ActionSettingsCollection>.release(c);
@@ -158,7 +179,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
             collIndex = index;
             Settings.SetSettings(c[collIndex]);
 #if PRINT_ACTION_SIMPLE
-            Logger.DevkitServer.LogDebug(Source, $"Loading option collection: {c[collIndex].Format()}.");
+            Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), $"Loading option collection: {c[collIndex].Format()}.");
 #endif
         }
     }
@@ -285,6 +306,22 @@ public class TemporaryEditorActions : IActionListener, IDisposable
 
         if (c > 20)
         {
+            c = 0;
+            yield return null;
+        }
+
+        for (int i = 0; i < _spawnInstantiations.Count; i++)
+        {
+            PendingSpawnInstantiation spawnInstantiation = _spawnInstantiations[i];
+            SpawnUtil.ReceiveSpawnInstantiation(MessageContext.Nil, (byte)spawnInstantiation.SpawnType, spawnInstantiation.NetId, spawnInstantiation.SpawnTableNetId,
+                spawnInstantiation.Position, spawnInstantiation.Yaw, spawnInstantiation.InstantiationFlags, spawnInstantiation.Owner);
+        }
+
+        EditorActions.HasProcessedPendingSpawns = true;
+        c += _spawnInstantiations.Count;
+
+        if (c > 20)
+        {
             // c = 0;
             yield return null;
         }
@@ -315,6 +352,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         EditorActions.HasProcessedPendingSpawnTables = false;
         EditorActions.HasProcessedPendingSpawnTiers = false;
         EditorActions.HasProcessedPendingSpawnAssets = false;
+        EditorActions.HasProcessedPendingSpawns = false;
         EventOnStartListening.TryInvoke();
     }
     public void Dispose()
@@ -323,7 +361,7 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         _actions.Clear();
         Instance = null;
 #if PRINT_ACTION_SIMPLE
-        Logger.DevkitServer.LogDebug(Source, "Cleaned up.");
+        Logger.DevkitServer.LogDebug(nameof(TemporaryEditorActions), "Cleaned up.");
 #endif
     }
 
@@ -415,6 +453,16 @@ public class TemporaryEditorActions : IActionListener, IDisposable
         public readonly NetId64 ParentNetId = parentNetId;
         public readonly SpawnType SpawnType = spawnType;
         public readonly ushort LegacyId = legacyId;
+        public readonly ulong Owner = owner;
+    }
+    private class PendingSpawnInstantiation(NetId64 netId, NetId64 spawnTableNetId, SpawnType spawnType, Vector3 position, float yaw, byte instantiationFlags, ulong owner)
+    {
+        public readonly NetId64 NetId = netId;
+        public readonly NetId64 SpawnTableNetId = spawnTableNetId;
+        public readonly SpawnType SpawnType = spawnType;
+        public readonly Vector3 Position = position;
+        public readonly float Yaw = yaw;
+        public readonly byte InstantiationFlags = instantiationFlags;
         public readonly ulong Owner = owner;
     }
 }

@@ -71,6 +71,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     internal static bool HasProcessedPendingSpawnTables;
     internal static bool HasProcessedPendingSpawnTiers;
     internal static bool HasProcessedPendingSpawnAssets;
+    internal static bool HasProcessedPendingSpawns;
     /// <summary>
     /// Is the player catching up after downloading the map.
     /// </summary>
@@ -179,6 +180,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 HasProcessedPendingSpawnTables = true;
                 HasProcessedPendingSpawnTiers = true;
                 HasProcessedPendingSpawnAssets = true;
+                HasProcessedPendingSpawns = true;
                 if (TemporaryEditorActions != null)
                 {
                     TemporaryEditorActions.Dispose();
@@ -676,6 +678,11 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     }
 
 #if SERVER
+    /// <summary>
+    /// Queues an action not linked to any individual player to be executed on all clients.
+    /// </summary>
+    /// <param name="delayWithDeltaTime">Should use deltaTime to space out actions. Used for actions that get sent every frame.</param>
+    /// <returns><see langword="false"/> if <see cref="ServerActions"/> hasn't been initialized yet, otherwise <see langword="true"/>.</returns>
     public static bool QueueServerAction(IAction action, bool delayWithDeltaTime = false)
     {
         action.Instigator = Provider.server;

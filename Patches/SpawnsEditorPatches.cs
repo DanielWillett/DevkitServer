@@ -134,7 +134,23 @@ internal static class SpawnsEditorPatches
     [UsedImplicitly]
     private static void OnPlayerToggledAlt(ISleekToggle toggle, bool state)
     {
-        if (DevkitServerModule.IsEditing && !VanillaPermissions.SpawnsPlayerEdit.Has())
+        if (!DevkitServerModule.IsEditing)
+        {
+            foreach (DevkitSelection selection in DevkitSelectionManager.selection)
+            {
+                if (!selection.transform.TryGetComponent(out PlayerSpawnpointNode node) || node.Spawnpoint.isAlt == state)
+                    continue;
+
+                if (!node.SanityCheck())
+                    continue;
+
+                SpawnUtil.SetPlayerIsAlternateLocal(node.Index, state);
+            }
+
+            return;
+        }
+
+        if (!VanillaPermissions.SpawnsPlayerEdit.Has())
         {
             EditorMessage.SendNoPermissionMessage(VanillaPermissions.SpawnsPlayerEdit);
             return;
@@ -142,17 +158,6 @@ internal static class SpawnsEditorPatches
 
         bool batchListening = ClientEvents.ListeningOnSetPlayerSpawnpointsIsAlternate;
         bool singleListening = ClientEvents.ListeningOnSetPlayerSpawnpointIsAlternate || ClientEvents.ListeningOnSetPlayerSpawnpointIsAlternateRequested;
-
-        if (!DevkitServerModule.IsEditing || !batchListening && !singleListening)
-        {
-            foreach (DevkitSelection selection in DevkitSelectionManager.selection)
-            {
-                if (selection.transform.TryGetComponent(out PlayerSpawnpointNode node) || node.Spawnpoint.isAlt == state)
-                    node.Spawnpoint.SetPlayerIsAlternateLocal(state);
-            }
-
-            return;
-        }
 
         float dt = CachedTime.DeltaTime;
 
@@ -162,7 +167,7 @@ internal static class SpawnsEditorPatches
         {
             foreach (DevkitSelection selection in DevkitSelectionManager.selection)
             {
-                if (!selection.gameObject.TryGetComponent(out PlayerSpawnpointNode node) || node.Spawnpoint.isAlt == state)
+                if (!selection.gameObject.TryGetComponent(out PlayerSpawnpointNode node) || node.Spawnpoint.isAlt == state || !node.SanityCheck())
                     continue;
 
                 if (singleListening)
@@ -174,7 +179,7 @@ internal static class SpawnsEditorPatches
                         continue;
                 }
 
-                node.Spawnpoint.SetPlayerIsAlternateLocal(state);
+                SpawnUtil.SetPlayerIsAlternateLocal(node.Index, state);
 
                 if (singleListening)
                     ClientEvents.InvokeOnSetPlayerSpawnpointIsAlternate(in singleProperties);
@@ -187,8 +192,8 @@ internal static class SpawnsEditorPatches
                     Flush(toUpdate, dt, state);
             }
 
-            if (batchListening)
-                Flush(toUpdate!, dt, state);
+            if (batchListening && toUpdate!.Count > 0)
+                Flush(toUpdate, dt, state);
 
             static void Flush(List<NetId64> toUpdate, float dt, bool state)
             {
@@ -2206,17 +2211,21 @@ internal static class SpawnsEditorPatches
             tool.Type = type;
         else
             UserInput.ActiveTool = new DevkitServerSpawnsTool { Type = type };
-        Logger.DevkitServer.LogDebug(Source, $"Activated {type.Format()} spawn tool.");
+
+        if (Logger.Debug)
+            Logger.DevkitServer.LogDebug(Source, $"Activated {type.Format()} spawn tool.");
     }
     private static void Close()
     {
         if (UserInput.ActiveTool is not DevkitServerSpawnsTool tool)
         {
-            Logger.DevkitServer.LogDebug(Source, "Spawn tool already deactivated.");
+            Logger.DevkitServer.LogDebug(Source, $"Spawn tool already deactivated (in place of {UserInput.ActiveTool.Format()}).");
             return;
         }
 
-        Logger.DevkitServer.LogDebug(Source, $"Deactivated {tool.Type.Format()} spawn tool.");
+        if (Logger.Debug)
+            Logger.DevkitServer.LogDebug(Source, $"Deactivated {tool.Type.Format()} spawn tool.");
+
         UserInput.ActiveTool = null;
     }
 }
