@@ -24,7 +24,11 @@ namespace DevkitServer.Core.Tools;
 public class DevkitServerSpawnsTool : DevkitServerSelectionTool
 {
     private SpawnType _type;
-    private const byte AreaSelectRegionDistance = 1;
+    private const byte AreaSelectRegionAnimalDistance = 2;
+    private const byte AreaSelectRegionVehicleDistance = 1;
+    private const byte AreaSelectRegionPlayerDistance = 2;
+    private const byte AreaSelectRegionItemDistance = 1;
+    private const byte AreaSelectRegionZombieDistance = 1;
     private float _lastAwaitingInstantiation;
     public bool IsSpawnTypeSelected { get; private set; }
     public SpawnType Type
@@ -502,7 +506,12 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
     }
     private IEnumerable<GameObject> EnumerateDistance()
     {
-        float distance = Regions.REGION_SIZE * (AreaSelectRegionDistance + 0.5f);
+        float distance = Regions.REGION_SIZE * (Type switch
+        {
+            SpawnType.Animal => AreaSelectRegionAnimalDistance,
+            SpawnType.Player => AreaSelectRegionPlayerDistance,
+            _ => AreaSelectRegionVehicleDistance
+        } + 0.5f);
         distance *= distance;
         Vector3 position = Editor.editor.transform.position;
         return Type switch
@@ -580,13 +589,13 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
     {
         if (Type == SpawnType.Item)
         {
-            return new ListRegionsEnumerator<ItemSpawnpoint>(LevelItems.spawns, Editor.editor.area.region_x, Editor.editor.area.region_y, AreaSelectRegionDistance)
+            return new ListRegionsEnumerator<ItemSpawnpoint>(LevelItems.spawns, Editor.editor.area.region_x, Editor.editor.area.region_y, AreaSelectRegionItemDistance)
                 .Select(x => x.node == null ? null : x.node.gameObject).Where(x => x != null)!;
         }
         
         if (Type == SpawnType.Zombie)
         {
-            return new ListRegionsEnumerator<ZombieSpawnpoint>(LevelZombies.spawns, Editor.editor.area.region_x, Editor.editor.area.region_y, AreaSelectRegionDistance)
+            return new ListRegionsEnumerator<ZombieSpawnpoint>(LevelZombies.spawns, Editor.editor.area.region_x, Editor.editor.area.region_y, AreaSelectRegionZombieDistance)
                 .Select(x => x.node == null ? null : x.node.gameObject).Where(x => x != null)!;
         }
         

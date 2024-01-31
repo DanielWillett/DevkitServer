@@ -102,12 +102,12 @@ public struct DistanceListIterator<T> : IEnumerator<T>, IEnumerable<T>
     {
         float dist = v1.x - v2.x;
         dist *= dist;
-        float dist2 = v1.y - v2.y;
+        float dist2 = v1.z - v2.z;
         dist2 *= dist2;
         dist += dist2;
         if (!is2d)
         {
-            dist2 = v1.z - v2.z;
+            dist2 = v1.y - v2.y;
             dist2 *= dist2;
             dist += dist2;
         }

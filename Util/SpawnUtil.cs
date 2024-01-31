@@ -1469,7 +1469,7 @@ public static class SpawnUtil
             EventOnZombieSpawnpointAdded.TryInvoke(spawn, regionId);
             Logger.DevkitServer.LogDebug(nameof(AddZombieSpawnpointLocal), $"Zombie spawnpoint added: {regionId.Format()}.");
             if (DevkitServerModule.IsEditing)
-                SpawnsNetIdDatabase.RegisterRegionSpawnpoint(SpawnType.Item, regionId);
+                SpawnsNetIdDatabase.RegisterRegionSpawnpoint(SpawnType.Zombie, regionId);
         }
 
         return regionId;
@@ -2768,7 +2768,7 @@ public static class SpawnUtil
     /// <exception cref="InvalidOperationException">Not connected to a DevkitServer server.</exception>
     public static async UniTask<RegionIdentifier> RequestAddZombieSpawnpoint(int spawnTable, Vector3 position, CancellationToken token = default)
     {
-        return RegionIdentifier.CreateUnsafe(await RequestAddSpawnpoint(SpawnType.Item, spawnTable, position, 0f, token));
+        return RegionIdentifier.CreateUnsafe(await RequestAddSpawnpoint(SpawnType.Zombie, spawnTable, position, 0f, token));
     }
     internal static async UniTask<int> RequestAddSpawnpoint(SpawnType spawnType, int spawnTable, Vector3 position, float yaw, CancellationToken token, byte instantiateFlags = 0)
     {
