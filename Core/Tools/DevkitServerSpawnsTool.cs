@@ -78,7 +78,7 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
     {
         if (!DevkitServerModule.IsEditing)
         {
-            base.TransformSelection();
+            base.DeleteSelection();
             return;
         }
 
@@ -88,7 +88,7 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
 
         if (!listeningSingleReq && !listeningSingle && !listeningBatch)
         {
-            base.TransformSelection();
+            base.DeleteSelection();
             return;
         }
 

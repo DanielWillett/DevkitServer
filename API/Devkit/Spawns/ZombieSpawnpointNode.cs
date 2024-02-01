@@ -20,10 +20,10 @@ public class ZombieSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionCopy
 
         return false;
     }
-    protected override bool Remove()
+    protected override bool Remove(bool permanently)
     {
         return SanityCheck() &&
-               SpawnUtil.RemoveSpawnLocal(SpawnType.Zombie, RegionIntl, false) == SpawnpointEventResult.Success;
+               SpawnUtil.RemoveSpawnLocal(SpawnType.Zombie, RegionIntl, permanently) == SpawnpointEventResult.Success;
     }
     protected override void Transform()
     {
@@ -55,5 +55,12 @@ public class ZombieSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionCopy
         SpawnUtil.AddZombieSpawnpointLocal(point);
         return point.node.gameObject;
     }
-    public override bool SanityCheck() => SpawnUtil.SanityCheckRegion(Spawnpoint, ref RegionIntl);
+    public override bool SanityCheck()
+    {
+        if (SpawnUtil.SanityCheckRegion(Spawnpoint, ref RegionIntl))
+            return true;
+
+        Logger.DevkitServer.LogWarning(nameof(ZombieSpawnpointNode), $"Failed sanity check: {this.Format()}.");
+        return false;
+    }
 }

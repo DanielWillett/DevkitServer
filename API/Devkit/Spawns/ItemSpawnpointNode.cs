@@ -20,10 +20,10 @@ public class ItemSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionCopyab
 
         return false;
     }
-    protected override bool Remove()
+    protected override bool Remove(bool permanently)
     {
         return SanityCheck() &&
-               SpawnUtil.RemoveSpawnLocal(SpawnType.Item, RegionIntl, false) == SpawnpointEventResult.Success;
+               SpawnUtil.RemoveSpawnLocal(SpawnType.Item, RegionIntl, permanently) == SpawnpointEventResult.Success;
     }
     protected override void Transform()
     {
@@ -55,5 +55,12 @@ public class ItemSpawnpointNode : RegionalSpawnpointNode, IDevkitSelectionCopyab
         SpawnUtil.AddItemSpawnpointLocal(point);
         return point.node.gameObject;
     }
-    public override bool SanityCheck() => SpawnUtil.SanityCheckRegion(Spawnpoint, ref RegionIntl);
+    public override bool SanityCheck()
+    {
+        if (SpawnUtil.SanityCheckRegion(Spawnpoint, ref RegionIntl))
+            return true;
+
+        Logger.DevkitServer.LogWarning(nameof(ItemSpawnpointNode), $"Failed sanity check: {this.Format()}.");
+        return false;
+    }
 }

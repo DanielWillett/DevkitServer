@@ -233,7 +233,7 @@ public static class CommandEx
             if (!Provider.hasCheats)
                 throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandRequiresCheats");
 #else
-            if (Provider.isServer ? Provider.hasCheats : Provider.CurrentServerAdvertisement is not { hasCheats: false })
+            if (Provider.isServer ? !Provider.hasCheats : Provider.CurrentServerAdvertisement is not { hasCheats: true })
                 throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandRequiresCheats");
 #endif
         }

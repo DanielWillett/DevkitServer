@@ -22,10 +22,10 @@ public class AnimalSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionCopya
         SpawnUtil.AddAnimalSpawnpointLocal(Spawnpoint);
         return true;
     }
-    protected override bool Remove()
+    protected override bool Remove(bool permanently)
     {
         return SanityCheck() &&
-               SpawnUtil.RemoveSpawnLocal(SpawnType.Animal, IndexIntl, false) == SpawnpointEventResult.Success;
+               SpawnUtil.RemoveSpawnLocal(SpawnType.Animal, IndexIntl, permanently) == SpawnpointEventResult.Success;
     }
     protected override void Transform()
     {
@@ -57,5 +57,12 @@ public class AnimalSpawnpointNode : IndexedSpawnpointNode, IDevkitSelectionCopya
         SpawnUtil.AddAnimalSpawnpointLocal(point);
         return point.node.gameObject;
     }
-    public override bool SanityCheck() => SpawnUtil.SanityCheckIndex(Spawnpoint, ref IndexIntl);
+    public override bool SanityCheck()
+    {
+        if (SpawnUtil.SanityCheckIndex(Spawnpoint, ref IndexIntl))
+            return true;
+
+        Logger.DevkitServer.LogWarning(nameof(AnimalSpawnpointNode), $"Failed sanity check: {this.Format()}.");
+        return false;
+    }
 }

@@ -932,7 +932,7 @@ public static class SpawnUtil
         ThreadUtil.assertIsGameThread();
 
         AnimalSpawnpoint spawn = LevelAnimals.spawns[index];
-
+        AnimalSpawnpointNode node;
         if (index == LevelAnimals.spawns.Count - 1)
         {
             LevelAnimals.spawns.RemoveAt(index);
@@ -944,7 +944,7 @@ public static class SpawnUtil
             LevelAnimals.spawns[index] = LevelAnimals.spawns[oldIndex];
             AnimalSpawnpoint changed = LevelAnimals.spawns[index];
 #if CLIENT
-            if (changed.node != null && changed.node.TryGetComponent(out AnimalSpawnpointNode node))
+            if (changed.node != null && changed.node.TryGetComponent(out node))
             {
                 node.IsAdded = true;
                 node.Index = index;
@@ -960,7 +960,11 @@ public static class SpawnUtil
 
         Logger.DevkitServer.LogDebug(nameof(RemoveAnimalSpawnLocal), $"Animal spawnpoint removed: {index.Format()}.");
 
-        if (destroyNode && spawn.node != null)
+        if (spawn.node == null) return;
+
+        if (spawn.node.TryGetComponent(out node))
+            node.Index = -1;
+        if (destroyNode)
             Object.Destroy(spawn.node.gameObject);
     }
     private static void RemoveVehicleSpawnLocal(int index, bool destroyNode)
@@ -968,7 +972,7 @@ public static class SpawnUtil
         ThreadUtil.assertIsGameThread();
 
         VehicleSpawnpoint spawn = LevelVehicles.spawns[index];
-
+        VehicleSpawnpointNode node;
         if (index == LevelVehicles.spawns.Count - 1)
         {
             LevelVehicles.spawns.RemoveAt(index);
@@ -980,7 +984,7 @@ public static class SpawnUtil
             LevelVehicles.spawns[index] = LevelVehicles.spawns[oldIndex];
             VehicleSpawnpoint changed = LevelVehicles.spawns[index];
 #if CLIENT
-            if (changed.node != null && changed.node.TryGetComponent(out VehicleSpawnpointNode node))
+            if (changed.node != null && changed.node.TryGetComponent(out node))
             {
                 node.IsAdded = true;
                 node.Index = index;
@@ -996,7 +1000,11 @@ public static class SpawnUtil
 
         Logger.DevkitServer.LogDebug(nameof(RemoveVehicleSpawnLocal), $"Vehicle spawnpoint removed: {index.Format()}.");
 
-        if (destroyNode && spawn.node != null)
+        if (spawn.node == null) return;
+
+        if (spawn.node.TryGetComponent(out node))
+            node.Index = -1;
+        if (destroyNode)
             Object.Destroy(spawn.node.gameObject);
     }
     private static void RemovePlayerSpawnLocal(int index, bool destroyNode)
@@ -1004,7 +1012,7 @@ public static class SpawnUtil
         ThreadUtil.assertIsGameThread();
 
         PlayerSpawnpoint spawn = LevelPlayers.spawns[index];
-
+        PlayerSpawnpointNode node;
         if (index == LevelPlayers.spawns.Count - 1)
         {
             LevelPlayers.spawns.RemoveAt(index);
@@ -1016,7 +1024,7 @@ public static class SpawnUtil
             LevelPlayers.spawns[index] = LevelPlayers.spawns[oldIndex];
             PlayerSpawnpoint changed = LevelPlayers.spawns[index];
 #if CLIENT
-            if (changed.node != null && changed.node.TryGetComponent(out PlayerSpawnpointNode node))
+            if (changed.node != null && changed.node.TryGetComponent(out node))
             {
                 node.IsAdded = true;
                 node.Index = index;
@@ -1031,8 +1039,12 @@ public static class SpawnUtil
         }
 
         Logger.DevkitServer.LogDebug(nameof(RemovePlayerSpawnLocal), $"Player spawnpoint removed: {index.Format()}.");
-        
-        if (destroyNode && spawn.node != null)
+
+        if (spawn.node == null) return;
+
+        if (spawn.node.TryGetComponent(out node))
+            node.Index = -1;
+        if (destroyNode)
             Object.Destroy(spawn.node.gameObject);
     }
     private static void RemoveItemSpawnLocal(RegionIdentifier region, bool destroyNode)
@@ -1043,7 +1055,7 @@ public static class SpawnUtil
 
         List<ItemSpawnpoint> regionList = region.GetList(LevelItems.spawns);
         int index = region.Index;
-
+        ItemSpawnpointNode node;
         if (index == regionList.Count - 1)
         {
             regionList.RemoveAt(index);
@@ -1055,7 +1067,7 @@ public static class SpawnUtil
             regionList[index] = regionList[oldRegion.Index];
             ItemSpawnpoint changed = regionList[index];
 #if CLIENT
-            if (changed.node != null && changed.node.TryGetComponent(out ItemSpawnpointNode node))
+            if (changed.node != null && changed.node.TryGetComponent(out node))
             {
                 node.IsAdded = true;
                 node.Region = region;
@@ -1071,7 +1083,11 @@ public static class SpawnUtil
 
         Logger.DevkitServer.LogDebug(nameof(RemoveItemSpawnLocal), $"Item spawnpoint removed: {region.Format()}.");
 
-        if (destroyNode && spawn.node != null)
+        if (spawn.node == null) return;
+
+        if (spawn.node.TryGetComponent(out node))
+            node.Region = RegionIdentifier.Invalid;
+        if (destroyNode)
             Object.Destroy(spawn.node.gameObject);
     }
     private static void RemoveZombieSpawnLocal(RegionIdentifier region, bool destroyNode)
@@ -1082,7 +1098,7 @@ public static class SpawnUtil
 
         List<ZombieSpawnpoint> regionList = region.GetList(LevelZombies.spawns);
         int index = region.Index;
-
+        ZombieSpawnpointNode node;
         if (index == regionList.Count - 1)
         {
             regionList.RemoveAt(index);
@@ -1094,7 +1110,7 @@ public static class SpawnUtil
             regionList[index] = regionList[oldRegion.Index];
             ZombieSpawnpoint changed = regionList[index];
 #if CLIENT
-            if (changed.node != null && changed.node.TryGetComponent(out ZombieSpawnpointNode node))
+            if (changed.node != null && changed.node.TryGetComponent(out node))
             {
                 node.IsAdded = true;
                 node.Region = region;
@@ -1110,7 +1126,11 @@ public static class SpawnUtil
 
         Logger.DevkitServer.LogDebug(nameof(RemoveZombieSpawnLocal), $"Zombie spawnpoint removed: {region.Format()}.");
 
-        if (destroyNode && spawn.node != null)
+        if (spawn.node == null) return;
+
+        if (spawn.node.TryGetComponent(out node))
+            node.Region = RegionIdentifier.Invalid;
+        if (destroyNode)
             Object.Destroy(spawn.node.gameObject);
     }
 
@@ -2264,7 +2284,7 @@ public static class SpawnUtil
         if (spawnType is not SpawnType.Animal and not SpawnType.Player and not SpawnType.Vehicle and not SpawnType.Item and not SpawnType.Zombie)
             throw new ArgumentOutOfRangeException(nameof(spawnType), "Spawn type must be one of the following: Animal, Vehicle, Item, or Zombie.");
 
-        if (!SpawnTableUtil.CheckSpawnTableSafe(spawnType, spawnTable))
+        if (spawnType != SpawnType.Player && !SpawnTableUtil.CheckSpawnTableSafe(spawnType, spawnTable))
             throw new ArgumentOutOfRangeException(nameof(spawnTable), $"Index {spawnTable} does not point to an existing {spawnType.GetLowercaseText()} table.");
 
         switch (spawnType)
@@ -2650,7 +2670,7 @@ public static class SpawnUtil
         }
 
         int spawnTableIndex = -1;
-        if (!spawnTableNetId.IsNull() && !SpawnsNetIdDatabase.TryGetSpawnTable(spawnType, spawnTableNetId, out spawnTableIndex))
+        if (spawnType != SpawnType.Player && !spawnTableNetId.IsNull() && !SpawnsNetIdDatabase.TryGetSpawnTable(spawnType, spawnTableNetId, out spawnTableIndex))
         {
             spawnTableIndex = -1;
             Logger.DevkitServer.LogWarning(nameof(ReceiveInstantiateSpawnRequest), $"Expected {spawnType.GetLowercaseText()} table with " +

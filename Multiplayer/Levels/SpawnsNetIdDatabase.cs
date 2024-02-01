@@ -765,6 +765,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
     {
         ThreadUtil.assertIsGameThread();
 
+        if (spawnType is not SpawnType.Animal and not SpawnType.Player and not SpawnType.Vehicle)
+            throw new ArgumentOutOfRangeException(nameof(spawnType), "Spawn type must be 'Animal', 'Player', or 'Vehicle'.");
+
         if (SpawnNetIds.TryGetValue(netId, out int index) && SpawnUtil.CheckSpawnpointSafe(spawnType, index))
         {
             spawnIndex = index;
@@ -777,6 +780,9 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
     public static bool TryGetSpawnpoint(SpawnType spawnType, NetId64 netId, out RegionIdentifier spawnIdentifier)
     {
         ThreadUtil.assertIsGameThread();
+
+        if (spawnType is not SpawnType.Item and not SpawnType.Zombie)
+            throw new ArgumentOutOfRangeException(nameof(spawnType), "Spawn type must be 'Item' or 'Zombie'.");
 
         if (SpawnNetIds.TryGetValue(netId, out int raw))
         {
@@ -876,14 +882,10 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         if (SpawnNetIds.TryGetValue(netId, out int raw))
         {
             RegionIdentifier id = RegionIdentifier.CreateUnsafe(raw);
-            if (id.CheckSafe())
+            if (id.CheckSafe(LevelItems.spawns))
             {
-                List<ItemSpawnpoint> region = LevelItems.spawns[id.X, id.Y];
-                if (region.Count > id.Index)
-                {
-                    spawnpoint = region[id.Index];
-                    return true;
-                }
+                spawnpoint = id.FromList(LevelItems.spawns);
+                return true;
             }
         }
 
@@ -897,7 +899,7 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         if (SpawnNetIds.TryGetValue(netId, out int raw))
         {
             RegionIdentifier id = RegionIdentifier.CreateUnsafe(raw);
-            if (id.CheckSafe() && LevelItems.spawns[id.X, id.Y].Count > id.Index)
+            if (id.CheckSafe(LevelItems.spawns))
             {
                 regionIdentifier = id;
                 return true;
@@ -914,14 +916,10 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         if (SpawnNetIds.TryGetValue(netId, out int raw))
         {
             RegionIdentifier id = RegionIdentifier.CreateUnsafe(raw);
-            if (!id.IsInvalid)
+            if (id.CheckSafe(LevelZombies.spawns))
             {
-                List<ZombieSpawnpoint> region = LevelZombies.spawns[id.X, id.Y];
-                if (region.Count > id.Index)
-                {
-                    spawnpoint = region[id.Index];
-                    return true;
-                }
+                spawnpoint = id.FromList(LevelZombies.spawns);
+                return true;
             }
         }
 
@@ -935,7 +933,7 @@ public sealed class SpawnsNetIdDatabase : IReplicatedLevelDataSource<SpawnsNetId
         if (SpawnNetIds.TryGetValue(netId, out int raw))
         {
             RegionIdentifier id = RegionIdentifier.CreateUnsafe(raw);
-            if (id.CheckSafe() && LevelZombies.spawns[id.X, id.Y].Count > id.Index)
+            if (id.CheckSafe(LevelZombies.spawns))
             {
                 regionIdentifier = id;
                 return true;

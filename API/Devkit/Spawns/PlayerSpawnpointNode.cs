@@ -32,10 +32,10 @@ public class PlayerSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDevk
         SpawnUtil.AddPlayerSpawnpointLocal(Spawnpoint);
         return true;
     }
-    protected override bool Remove()
+    protected override bool Remove(bool permanently)
     {
         return SanityCheck() &&
-               SpawnUtil.RemoveSpawnLocal(SpawnType.Player, IndexIntl, false) == SpawnpointEventResult.Success;
+               SpawnUtil.RemoveSpawnLocal(SpawnType.Player, IndexIntl, permanently) == SpawnpointEventResult.Success;
     }
     protected override void Transform()
     {
@@ -68,5 +68,12 @@ public class PlayerSpawnpointNode : IndexedSpawnpointNode, IRotatableNode, IDevk
         SpawnUtil.AddPlayerSpawnpointLocal(point);
         return point.node.gameObject;
     }
-    public override bool SanityCheck() => SpawnUtil.SanityCheckIndex(Spawnpoint, ref IndexIntl);
+    public override bool SanityCheck()
+    {
+        if (SpawnUtil.SanityCheckIndex(Spawnpoint, ref IndexIntl))
+            return true;
+
+        Logger.DevkitServer.LogWarning(nameof(PlayerSpawnpointNode), $"Failed sanity check: {this.Format()}.");
+        return false;
+    }
 }

@@ -59,18 +59,28 @@ public abstract class BaseSpawnpointNode : MonoBehaviour, ISpawnpointNode, IDevk
     {
         Logger.DevkitServer.LogDebug(GetType().Name, $"Adding {Format(FormattingUtil.FormatProvider)}.");
         if (IsAdded)
+        {
+            Logger.DevkitServer.LogDebug(GetType().Name, $"Already added {this.Format()}.");
             return;
+        }
 
         IsAdded = Add();
     }
 
-    public void RemoveSpawnFromList()
+    public void RemoveSpawnFromList(bool permanently)
     {
         Logger.DevkitServer.LogDebug(GetType().Name, $"Removing {Format(FormattingUtil.FormatProvider)}.");
         if (!IsAdded)
+        {
+            Logger.DevkitServer.LogDebug(GetType().Name, $"Already removed {this.Format()}.");
             return;
+        }
 
-        Remove();
+        if (!Remove(permanently))
+        {
+            Logger.DevkitServer.LogWarning(GetType().Name, $"Failed to remove {this.Format()}.");
+            return;
+        }
         IsAdded = false;
     }
 #if CLIENT
@@ -87,7 +97,10 @@ public abstract class BaseSpawnpointNode : MonoBehaviour, ISpawnpointNode, IDevk
     void IDevkitSelectionDeletableHandler.Delete(ref bool destroy)
     {
         if (DevkitServerModule.IsEditing)
-            RemoveSpawnFromList();
+        {
+            RemoveSpawnFromList(true);
+            destroy = false;
+        }
         else
         {
             DevkitTransactionManager.recordTransaction(new RemoveSpawnTransaction(this));
@@ -108,7 +121,7 @@ public abstract class BaseSpawnpointNode : MonoBehaviour, ISpawnpointNode, IDevk
     }
     protected virtual void Init() { }
     protected abstract bool Add();
-    protected abstract bool Remove();
+    protected abstract bool Remove(bool permanently);
     protected abstract void Transform();
     protected abstract NetId64 GetNetId();
 
@@ -120,6 +133,12 @@ public abstract class BaseSpawnpointNode : MonoBehaviour, ISpawnpointNode, IDevk
     public abstract string Format(ITerminalFormatProvider provider);
 
     void IDevkitSelectionTransformableHandler.transformSelection() => Transform();
+#if DEBUG
+    void OnDestroy()
+    {
+        Logger.DevkitServer.LogDebug(SpawnType.ToString(), "Destroyed wtffff.");
+    }
+#endif
 }
 public abstract class RegionalSpawnpointNode : BaseSpawnpointNode
 {
