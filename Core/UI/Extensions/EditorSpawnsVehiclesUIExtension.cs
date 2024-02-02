@@ -83,7 +83,8 @@ internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtensionNorm
     }
     private void OnSpawnAdded(VehicleSpawnpoint point, int index)
     {
-        CreateLabel(point, GetText(point));
+        if (IsVisible)
+            CreateLabel(point, GetText(point));
     }
     private void OnSpawnRemoved(VehicleSpawnpoint point, int index)
     {
@@ -107,7 +108,6 @@ internal class EditorSpawnsVehiclesUIExtension : BaseEditorSpawnsUIExtensionNorm
         SpawnTableUtil.OnVehicleSpawnTableNameUpdated -= OnNameUpdated;
         base.OnDestroyed();
     }
-
     public override void UpdateSpawnName(int index)
     {
         if (!SpawnTableUtil.TryGetSelectedTier(SpawnType.Vehicle, out SpawnTierIdentifier? id) || !id.HasValue)

@@ -68,7 +68,6 @@ internal class EditorSpawnsAnimalsUIExtension : BaseEditorSpawnsUIExtensionNorma
         base.OnShown();
         OnRegionUpdated(default, MovementUtil.MainCameraRegion, MovementUtil.MainCameraIsInRegion);
     }
-
     protected override void OnHidden()
     {
         ClearLabels();
@@ -91,13 +90,13 @@ internal class EditorSpawnsAnimalsUIExtension : BaseEditorSpawnsUIExtensionNorma
     {
         RemoveLabel(point);
     }
-    internal void OnSpawnMoved(AnimalSpawnpoint point, int index, Vector3 fromPosition, Vector3 toPosition)
-    {
-        UpdateLabel(point);
-    }
     private void OnSpawnTableChanged(AnimalSpawnpoint point, int index)
     {
         UpdateLabel(point, GetText(point));
+    }
+    internal void OnSpawnMoved(AnimalSpawnpoint point, int index, Vector3 fromPosition, Vector3 toPosition)
+    {
+        UpdateLabel(point);
     }
     protected override void OnDestroyed()
     {
@@ -108,7 +107,6 @@ internal class EditorSpawnsAnimalsUIExtension : BaseEditorSpawnsUIExtensionNorma
         SpawnTableUtil.OnAnimalSpawnTableNameUpdated -= OnNameUpdated;
         base.OnDestroyed();
     }
-
     public override void UpdateSpawnName(int index)
     {
         if (!SpawnTableUtil.TryGetSelectedTier(SpawnType.Animal, out SpawnTierIdentifier? id) || !id.HasValue)

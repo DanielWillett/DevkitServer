@@ -54,7 +54,7 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
     protected override void OnShown()
     {
         _wasVisibleBeforeOpened = IsVisible;
-        if (!IsVisible)
+        if (!_wasVisibleBeforeOpened)
             IsVisible = true;
         if (!_subbed)
         {
@@ -157,7 +157,7 @@ internal abstract class BaseEditorSpawnsUIExtension<T> : ContainerUIExtension wh
 
         Labels.Clear();
     }
-    protected void UpdateLabel(T spawn, string? text = null)
+    public void UpdateLabel(T spawn, string? text = null)
     {
         if (!Labels.TryGetValue(spawn, out Label lbl))
             return;

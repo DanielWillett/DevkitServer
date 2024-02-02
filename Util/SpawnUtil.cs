@@ -1505,9 +1505,6 @@ public static class SpawnUtil
     /// <exception cref="ArgumentOutOfRangeException">Spawn type must be 'Animal', 'Vehicle', or 'Player'.</exception>
     public static SpawnpointEventResult MoveSpawnpointLocal(SpawnType spawnType, int index, Vector3 position)
     {
-        if (SetVehicleSpawnpointPoint == null)
-            throw new MissingMemberException("Instance setter for VehicleSpawnpoint.point is not valid.");
-
         if (spawnType is not SpawnType.Animal and not SpawnType.Vehicle and not SpawnType.Player)
             throw new ArgumentOutOfRangeException(nameof(spawnType), "Spawn type must be 'Animal', 'Vehicle', or 'Player'.");
 
@@ -1520,6 +1517,9 @@ public static class SpawnUtil
         switch (spawnType)
         {
             case SpawnType.Animal:
+                if (SetAnimalSpawnpointPoint == null)
+                    throw new MissingMemberException("Instance setter for AnimalSpawnpoint.point is not valid.");
+
                 AnimalSpawnpoint animalSpawnpoint = LevelAnimals.spawns[index];
                 oldPosition = animalSpawnpoint.point;
                 animalSpawnpoint.SetPoint(position);
@@ -1539,6 +1539,9 @@ public static class SpawnUtil
                 break;
 
             case SpawnType.Player:
+                if (SetPlayerSpawnpointPoint == null)
+                    throw new MissingMemberException("Instance setter for PlayerSpawnpoint.point is not valid.");
+
                 PlayerSpawnpoint playerSpawnpoint = LevelPlayers.spawns[index];
                 oldPosition = playerSpawnpoint.point;
                 playerSpawnpoint.SetPoint(position);
@@ -1558,6 +1561,9 @@ public static class SpawnUtil
                 break;
 
             default: // Vehicle
+                if (SetVehicleSpawnpointPoint == null)
+                    throw new MissingMemberException("Instance setter for VehicleSpawnpoint.point is not valid.");
+
                 VehicleSpawnpoint vehicleSpawnpoint = LevelVehicles.spawns[index];
                 oldPosition = vehicleSpawnpoint.point;
                 vehicleSpawnpoint.SetPoint(position);
@@ -1680,9 +1686,6 @@ public static class SpawnUtil
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static SpawnpointEventResult MoveSpawnpointLocal(SpawnType spawnType, ref RegionIdentifier region, Vector3 position)
     {
-        if (SetItemSpawnpointPoint == null)
-            throw new MissingMemberException("Instance setter for ItemSpawnpoint.point is not valid.");
-
         if (spawnType is not SpawnType.Item and not SpawnType.Zombie)
             throw new ArgumentOutOfRangeException(nameof(spawnType), "Spawn type must be 'Item' or 'Zombie'.");
 
@@ -1697,6 +1700,9 @@ public static class SpawnUtil
         RegionIdentifier oldRegion;
         if (spawnType == SpawnType.Item)
         {
+            if (SetItemSpawnpointPoint == null)
+                throw new MissingMemberException("Instance setter for ItemSpawnpoint.point is not valid.");
+
             ItemSpawnpoint spawn = region.FromList(LevelItems.spawns);
             List<ItemSpawnpoint> regionList = region.GetList(LevelItems.spawns);
 
@@ -1733,7 +1739,7 @@ public static class SpawnUtil
                 }
 
                 List<ItemSpawnpoint> newRegionList = LevelItems.spawns[newX, newY];
-                region = new RegionIdentifier(newX, newY, regionList.Count);
+                region = new RegionIdentifier(newX, newY, newRegionList.Count);
                 newRegionList.Add(spawn);
             }
 
@@ -1761,6 +1767,9 @@ public static class SpawnUtil
         }
         else // Zombie
         {
+            if (SetZombieSpawnpointPoint == null)
+                throw new MissingMemberException("Instance setter for ZombieSpawnpoint.point is not valid.");
+
             ZombieSpawnpoint spawn = region.FromList(LevelZombies.spawns);
             List<ZombieSpawnpoint> regionList = region.GetList(LevelZombies.spawns);
 
@@ -1797,7 +1806,7 @@ public static class SpawnUtil
                 }
 
                 List<ZombieSpawnpoint> newRegionList = LevelZombies.spawns[newX, newY];
-                region = new RegionIdentifier(newX, newY, regionList.Count);
+                region = new RegionIdentifier(newX, newY, newRegionList.Count);
                 newRegionList.Add(spawn);
             }
 
@@ -1932,6 +1941,9 @@ public static class SpawnUtil
         float oldYaw;
         if (spawnType == SpawnType.Vehicle)
         {
+            if (SetVehicleSpawnpointAngle == null)
+                throw new MissingMemberException("Instance setter for VehicleSpawnpoint.angle is not valid.");
+
             VehicleSpawnpoint vehicleSpawnpoint = LevelVehicles.spawns[index];
             oldYaw = vehicleSpawnpoint.angle;
             vehicleSpawnpoint.SetYaw(yaw);
@@ -1952,6 +1964,9 @@ public static class SpawnUtil
         }
         else // Player
         {
+            if (SetPlayerSpawnpointAngle == null)
+                throw new MissingMemberException("Instance setter for PlayerSpawnpoint.angle is not valid.");
+
             PlayerSpawnpoint playerSpawnpoint = LevelPlayers.spawns[index];
             oldYaw = playerSpawnpoint.angle;
             playerSpawnpoint.SetYaw(yaw);
@@ -2074,6 +2089,12 @@ public static class SpawnUtil
         Vector3 oldPosition;
         if (spawnType == SpawnType.Vehicle)
         {
+            if (SetVehicleSpawnpointPoint == null)
+                throw new MissingMemberException("Instance setter for VehicleSpawnpoint.point is not valid.");
+            
+            if (SetVehicleSpawnpointAngle == null)
+                throw new MissingMemberException("Instance setter for VehicleSpawnpoint.angle is not valid.");
+
             VehicleSpawnpoint vehicleSpawnpoint = LevelVehicles.spawns[index];
             oldYaw = vehicleSpawnpoint.angle;
             oldPosition = vehicleSpawnpoint.point;
@@ -2103,6 +2124,12 @@ public static class SpawnUtil
         }
         else
         {
+            if (SetPlayerSpawnpointPoint == null)
+                throw new MissingMemberException("Instance setter for PlayerSpawnpoint.point is not valid.");
+            
+            if (SetPlayerSpawnpointAngle == null)
+                throw new MissingMemberException("Instance setter for PlayerSpawnpoint.angle is not valid.");
+
             PlayerSpawnpoint playerSpawnpoint = LevelPlayers.spawns[index];
             oldYaw = playerSpawnpoint.angle;
             oldPosition = playerSpawnpoint.point;
@@ -2274,7 +2301,7 @@ public static class SpawnUtil
     /// <exception cref="InvalidOperationException">Too many spawns in that region (65535). - OR - The given poisition is not in a region.</exception>
     public static RegionIdentifier AddZombieSpawnpointLocal(int spawnTable, Vector3 position)
     {
-        return RegionIdentifier.CreateUnsafe(AddSpawnpointLocal(SpawnType.Item, spawnTable, position, 0f));
+        return RegionIdentifier.CreateUnsafe(AddSpawnpointLocal(SpawnType.Zombie, spawnTable, position, 0f));
     }
 
     internal static int AddSpawnpointLocal(SpawnType spawnType, int spawnTable, Vector3 position, float yaw, byte instantiationFlags = 0)
@@ -2327,7 +2354,9 @@ public static class SpawnUtil
     {
         if (index >= 0 && index < LevelAnimals.spawns.Count && ReferenceEquals(spawn, LevelAnimals.spawns[index]))
             return true;
-        
+
+        Logger.DevkitServer.LogInfo(nameof(AnimalSpawnpointNode), $"Didn't pass sanity check ({index.Format()}).");
+
         List<AnimalSpawnpoint> list = LevelAnimals.spawns;
         int ct = Math.Min(ushort.MaxValue, list.Count);
         for (int i = 0; i < ct; ++i)
@@ -2345,6 +2374,8 @@ public static class SpawnUtil
     {
         if (index >= 0 && index < LevelPlayers.spawns.Count && ReferenceEquals(spawn, LevelPlayers.spawns[index]))
             return true;
+
+        Logger.DevkitServer.LogInfo(nameof(PlayerSpawnpointNode), $"Didn't pass sanity check ({index.Format()}).");
         
         List<PlayerSpawnpoint> list = LevelPlayers.spawns;
         int ct = Math.Min(byte.MaxValue, list.Count);
@@ -2364,6 +2395,8 @@ public static class SpawnUtil
         if (index >= 0 && index < LevelVehicles.spawns.Count && ReferenceEquals(spawn, LevelVehicles.spawns[index]))
             return true;
 
+        Logger.DevkitServer.LogInfo(nameof(VehicleSpawnpointNode), $"Didn't pass sanity check ({index.Format()}).");
+
         List<VehicleSpawnpoint> list = LevelVehicles.spawns;
         int ct = Math.Min(ushort.MaxValue, list.Count);
         for (int i = 0; i < ct; ++i)
@@ -2381,7 +2414,9 @@ public static class SpawnUtil
     {
         if (region.TryFromList(LevelZombies.spawns, out ZombieSpawnpoint match) && ReferenceEquals(spawn, match))
             return true;
-        
+
+        Logger.DevkitServer.LogInfo(nameof(ZombieSpawnpointNode), $"Didn't pass sanity check ({region.Format()}).");
+
         foreach (RegionCoord regionCoord in RegionUtil.EnumerateRegions(spawn.point))
         {
             List<ZombieSpawnpoint> regionList = LevelZombies.spawns[regionCoord.x, regionCoord.y];
@@ -2402,7 +2437,9 @@ public static class SpawnUtil
     {
         if (region.TryFromList(LevelItems.spawns, out ItemSpawnpoint match) && ReferenceEquals(spawn, match))
             return true;
-        
+
+        Logger.DevkitServer.LogInfo(nameof(ItemSpawnpointNode), $"Didn't pass sanity check ({region.Format()}).");
+
         foreach (RegionCoord regionCoord in RegionUtil.EnumerateRegions(spawn.point))
         {
             List<ItemSpawnpoint> regionList = LevelItems.spawns[regionCoord.x, regionCoord.y];
@@ -2445,7 +2482,7 @@ public static class SpawnUtil
         return spawnType switch
         {
             SpawnType.Zombie => region.CheckSafe() && LevelZombies.spawns[region.X, region.Y].Count > region.Index,
-            SpawnType.Item => region.CheckSafe() && LevelZombies.spawns[region.X, region.Y].Count > region.Index,
+            SpawnType.Item => region.CheckSafe() && LevelItems.spawns[region.X, region.Y].Count > region.Index,
             SpawnType.Animal or SpawnType.Vehicle or SpawnType.Player => useUnsafeComparison && CheckSpawnpointSafe(spawnType, region.Raw, false),
             _ => false
         };
@@ -2746,6 +2783,7 @@ public static class SpawnUtil
     /// </summary>
     /// <remarks>Thread-safe.</remarks>
     /// <exception cref="InvalidOperationException">Not connected to a DevkitServer server.</exception>
+    /// <exception cref="NoPermissionsException">No local permissions to add that spawnpoint type.</exception>
     public static UniTask<int> RequestAddAnimalSpawnpoint(int spawnTable, Vector3 position, CancellationToken token = default)
     {
         return RequestAddSpawnpoint(SpawnType.Animal, spawnTable, position, 0f, token);
@@ -2756,6 +2794,7 @@ public static class SpawnUtil
     /// </summary>
     /// <remarks>Thread-safe.</remarks>
     /// <exception cref="InvalidOperationException">Not connected to a DevkitServer server.</exception>
+    /// <exception cref="NoPermissionsException">No local permissions to add that spawnpoint type.</exception>
     public static UniTask<int> RequestAddVehicleSpawnpoint(int spawnTable, Vector3 position, float yaw = 0f, CancellationToken token = default)
     {
         return RequestAddSpawnpoint(SpawnType.Vehicle, spawnTable, position, yaw, token);
@@ -2766,6 +2805,7 @@ public static class SpawnUtil
     /// </summary>
     /// <remarks>Thread-safe.</remarks>
     /// <exception cref="InvalidOperationException">Not connected to a DevkitServer server.</exception>
+    /// <exception cref="NoPermissionsException">No local permissions to add that spawnpoint type.</exception>
     public static UniTask<int> RequestAddPlayerSpawnpoint(Vector3 position, float yaw = 0f, bool isAlt = false, CancellationToken token = default)
     {
         return RequestAddSpawnpoint(SpawnType.Player, byte.MaxValue, position, yaw, token, isAlt ? (byte)1 : (byte)0);
@@ -2776,6 +2816,7 @@ public static class SpawnUtil
     /// </summary>
     /// <remarks>Thread-safe.</remarks>
     /// <exception cref="InvalidOperationException">Not connected to a DevkitServer server.</exception>
+    /// <exception cref="NoPermissionsException">No local permissions to add that spawnpoint type.</exception>
     public static async UniTask<RegionIdentifier> RequestAddItemSpawnpoint(int spawnTable, Vector3 position, CancellationToken token = default)
     {
         return RegionIdentifier.CreateUnsafe(await RequestAddSpawnpoint(SpawnType.Item, spawnTable, position, 0f, token));
@@ -2786,6 +2827,7 @@ public static class SpawnUtil
     /// </summary>
     /// <remarks>Thread-safe.</remarks>
     /// <exception cref="InvalidOperationException">Not connected to a DevkitServer server.</exception>
+    /// <exception cref="NoPermissionsException">No local permissions to add that spawnpoint type.</exception>
     public static async UniTask<RegionIdentifier> RequestAddZombieSpawnpoint(int spawnTable, Vector3 position, CancellationToken token = default)
     {
         return RegionIdentifier.CreateUnsafe(await RequestAddSpawnpoint(SpawnType.Zombie, spawnTable, position, 0f, token));
@@ -2795,6 +2837,9 @@ public static class SpawnUtil
         DevkitServerModule.AssertIsDevkitServerClient();
 
         await UniTask.SwitchToMainThread(token);
+
+        if (!VanillaPermissions.SpawnsAdd(spawnType).Has())
+            throw new NoPermissionsException(VanillaPermissions.SpawnsAdd(spawnType));
 
         SpawnsNetIdDatabase.TryGetSpawnTableNetId(spawnType, spawnTable, out NetId64 spawnTableNetId);
 

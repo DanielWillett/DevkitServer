@@ -115,6 +115,8 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
                         continue;
                 }
 
+                NetId64 netId = node.NetId;
+
                 bool destroy = true;
                 ((IDevkitSelectionDeletableHandler)node).Delete(ref destroy);
 
@@ -127,7 +129,7 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
                 if (!listeningBatch)
                     continue;
 
-                toUpdate!.Add(node.NetId);
+                toUpdate!.Add(netId);
 
                 if (spawnType == 0)
                     spawnType = node.SpawnType;
@@ -197,6 +199,9 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
 
                 if (selection.preTransformPosition != pos)
                     flags |= TransformationDelta.TransformFlags.Position;
+
+                if (flags == 0)
+                    continue;
 
                 float yaw = (flags & TransformationDelta.TransformFlags.Rotation) != 0 ? rot.eulerAngles.y : 0f;
 
@@ -611,20 +616,16 @@ public class DevkitServerSpawnsTool : DevkitServerSelectionTool
             switch (spawnpointNode)
             {
                 case AnimalSpawnpointNode a:
-                    UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?
-                        .OnSpawnMoved(a.Spawnpoint, default, default, default);
+                    UIExtensionManager.GetInstance<EditorSpawnsAnimalsUIExtension>()?.UpdateLabel(a.Spawnpoint);
                     break;
                 case ItemSpawnpointNode i:
-                    UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?
-                        .OnSpawnMoved(i.Spawnpoint, default, default, default);
+                    UIExtensionManager.GetInstance<EditorSpawnsItemsUIExtension>()?.UpdateLabel(i.Spawnpoint);
                     break;
                 case ZombieSpawnpointNode z:
-                    UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?
-                        .OnSpawnMoved(z.Spawnpoint, default, default, default);
+                    UIExtensionManager.GetInstance<EditorSpawnsZombiesUIExtension>()?.UpdateLabel(z.Spawnpoint);
                     break;
                 case VehicleSpawnpointNode v:
-                    UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?
-                        .OnSpawnMoved(v.Spawnpoint, default, default, default, default, default);
+                    UIExtensionManager.GetInstance<EditorSpawnsVehiclesUIExtension>()?.UpdateLabel(v.Spawnpoint);
                     break;
             }
         }

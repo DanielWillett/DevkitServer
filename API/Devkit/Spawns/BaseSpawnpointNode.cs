@@ -38,7 +38,15 @@ public abstract class BaseSpawnpointNode : MonoBehaviour, ISpawnpointNode, IDevk
             if (!DevkitServerModule.IsEditing)
                 return NetId64.Invalid;
 
-            return _netId.IsNull() ? _netId = GetNetId() : _netId;
+            NetId64 netId = _netId.IsNull() ? _netId = GetNetId() : _netId;
+
+            if (netId.Id != 0)
+                return netId;
+
+            Logger.DevkitServer.LogInfo(GetType().Name, $"Net id of {this.Format()} is zero.");
+            _netId = netId = GetNetId();
+
+            return netId;
         }
     }
 
@@ -133,12 +141,6 @@ public abstract class BaseSpawnpointNode : MonoBehaviour, ISpawnpointNode, IDevk
     public abstract string Format(ITerminalFormatProvider provider);
 
     void IDevkitSelectionTransformableHandler.transformSelection() => Transform();
-#if DEBUG
-    void OnDestroy()
-    {
-        Logger.DevkitServer.LogDebug(SpawnType.ToString(), "Destroyed wtffff.");
-    }
-#endif
 }
 public abstract class RegionalSpawnpointNode : BaseSpawnpointNode
 {
