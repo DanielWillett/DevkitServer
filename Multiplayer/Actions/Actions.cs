@@ -104,6 +104,13 @@ public enum DevkitServerActionType : byte
     MoveSpawnsFinal = 60,
     DeleteSpawns = 61,
 
+    /* Lighting */
+    SetLightingFloat = 62,
+    SetLightingByte = 63,
+    SetPreviewWeatherAsset = 64,
+    SetTimeColor = 65,
+    SetTimeSingle = 66,
+
     /* For future use */
     Extended = 255
 }

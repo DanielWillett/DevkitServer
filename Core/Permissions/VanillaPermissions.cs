@@ -33,6 +33,8 @@ public static class VanillaPermissions
     public static readonly PermissionLeaf BakeCartographyChart      = new PermissionLeaf("level.cartography.bake.chart", core: true);
     public static readonly PermissionLeaf UsePlayerController       = new PermissionLeaf("input.controller.player", core: true);
     public static readonly PermissionLeaf UseEditorController       = new PermissionLeaf("input.controller.editor", core: true);
+    
+    public static readonly PermissionLeaf EditLighting              = new PermissionLeaf("level.lighting.edit", core: true);
 
     public static readonly PermissionLeaf SpawnTablesAnimalEdit     = new PermissionLeaf("level.spawntables.animal.edit", core: true);
     public static readonly PermissionLeaf SpawnTablesAnimalAdd      = new PermissionLeaf("level.spawntables.animal.add", core: true);

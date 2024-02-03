@@ -204,6 +204,7 @@ public sealed class DevkitServerModule : IModuleNexus
         { "DownloadFailed", "Level failed to download. Try joining again." },
         { "DownloadCancelled", "Level download cancelled." }
     };
+#if CLIENT
     private static readonly LocalDatDictionary DefaultRichPresenceLocalization = new LocalDatDictionary
     {
         { "Rich_Presence_Editing", "Editing with DevkitServer: {0}" },
@@ -211,6 +212,7 @@ public sealed class DevkitServerModule : IModuleNexus
         { "Rich_Presence_Menu", "In Menu with DevkitServer" },
         { "Rich_Presence_Lobby", "In Lobby" },
     };
+#endif
 
     public static CultureInfo CommandParseLocale { get; set; } = CultureInfo.InvariantCulture;
     public static AssetOrigin BundleOrigin { get; private set; } = new AssetOrigin
@@ -653,8 +655,11 @@ public sealed class DevkitServerModule : IModuleNexus
         {
             Logger.DevkitServer.LogInfo(nameof(OnLevelLoaded), $"Level loaded: {Level.info.getLocalizedName().Format(false)}.");
 #if SERVER
-            if (DevkitServerConfig.Config.TcpSettings is { EnableHighSpeedSupport: true })
-                _ = HighSpeedServer.Instance;
+            if (IsEditing)
+            {
+                if (DevkitServerConfig.Config.TcpSettings is { EnableHighSpeedSupport: true })
+                    _ = HighSpeedServer.Instance;
+            }
 #elif CLIENT
             OptionsSettings.hints = true;
             if (Level.isEditor)
@@ -677,6 +682,7 @@ public sealed class DevkitServerModule : IModuleNexus
                 HierarchySync.CreateServersideAuthority();
                 NavigationSync.CreateServersideAuthority();
                 RoadSync.CreateServersideAuthority();
+                LightingManager.DisableWeather();
             }
             else
             {

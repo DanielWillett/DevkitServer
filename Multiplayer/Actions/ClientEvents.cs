@@ -227,6 +227,16 @@ public static class ClientEvents
     public static event MoveSpawnFinalRequested? OnMoveSpawnFinalRequested;
     public static event MoveSpawnFinal? OnMoveSpawnFinal;
     public static event MoveSpawnsFinal? OnMoveSpawnsFinal;
+    public static event SetLightingFloat? OnSetLightingFloat;
+    public static event SetLightingByte? OnSetLightingByte;
+    public static event SetPreviewWeatherAsset? OnSetPreviewWeatherAsset;
+    public static event SetTimeColor? OnSetTimeColor;
+    public static event SetTimeSingle? OnSetTimeSingle;
+    public static event SetLightingFloatRequested? OnSetLightingFloatRequested;
+    public static event SetLightingByteRequested? OnSetLightingByteRequested;
+    public static event SetPreviewWeatherAssetRequested? OnSetPreviewWeatherAssetRequested;
+    public static event SetTimeColorRequested? OnSetTimeColorRequested;
+    public static event SetTimeSingleRequested? OnSetTimeSingleRequested;
 
     public static bool ListeningOnEditHeightmapPermissionDenied => !EventOnEditHeightmapPermissionDenied.IsEmpty;
     public static bool ListeningOnEditSplatmapPermissionDenied => !EventOnEditSplatmapPermissionDenied.IsEmpty;
@@ -361,6 +371,16 @@ public static class ClientEvents
     public static bool ListeningOnMoveSpawnFinalRequested => OnMoveSpawnFinalRequested != null;
     public static bool ListeningOnMoveSpawnFinal => OnMoveSpawnFinal != null;
     public static bool ListeningOnMoveSpawnsFinal => OnMoveSpawnsFinal != null;
+    public static bool ListeningOnSetLightingFloat => OnSetLightingFloat != null;
+    public static bool ListeningOnSetLightingByte => OnSetLightingByte != null;
+    public static bool ListeningOnSetPreviewWeatherAsset => OnSetPreviewWeatherAsset != null;
+    public static bool ListeningOnSetTimeColor => OnSetTimeColor != null;
+    public static bool ListeningOnSetTimeSingle => OnSetTimeSingle != null;
+    public static bool ListeningOnSetLightingFloatRequested => OnSetLightingFloatRequested != null;
+    public static bool ListeningOnSetLightingByteRequested => OnSetLightingByteRequested != null;
+    public static bool ListeningOnSetPreviewWeatherAssetRequested => OnSetPreviewWeatherAssetRequested != null;
+    public static bool ListeningOnSetTimeColorRequested => OnSetTimeColorRequested != null;
+    public static bool ListeningOnSetTimeSingleRequested => OnSetTimeSingleRequested != null;
 
     internal static void InvokeOnPaintRamp(in PaintRampProperties properties) => OnPaintRamp?.Invoke(in properties);
     internal static void InvokeOnAdjustHeightmap(in AdjustHeightmapProperties properties) => OnAdjustHeightmap?.Invoke(in properties);
@@ -484,6 +504,16 @@ public static class ClientEvents
     internal static void InvokeOnMoveSpawnFinalRequested(in MoveSpawnFinalProperties properties, ref bool shouldAllow) => OnMoveSpawnFinalRequested?.Invoke(in properties, ref shouldAllow);
     internal static void InvokeOnMoveSpawnFinal(in MoveSpawnFinalProperties properties) => OnMoveSpawnFinal?.Invoke(in properties);
     internal static void InvokeOnMoveSpawnsFinal(in MoveSpawnsFinalProperties properties) => OnMoveSpawnsFinal?.Invoke(in properties);
+    internal static void InvokeOnSetLightingFloat(in SetLightingFloatProperties properties) => OnSetLightingFloat?.Invoke(in properties);
+    internal static void InvokeOnSetLightingFloatRequested(in SetLightingFloatProperties properties, ref bool shouldAllow) => OnSetLightingFloatRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetLightingByte(in SetLightingByteProperties properties) => OnSetLightingByte?.Invoke(in properties);
+    internal static void InvokeOnSetLightingByteRequested(in SetLightingByteProperties properties, ref bool shouldAllow) => OnSetLightingByteRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetPreviewWeatherAsset(in SetPreviewWeatherAssetProperties properties) => OnSetPreviewWeatherAsset?.Invoke(in properties);
+    internal static void InvokeOnSetPreviewWeatherAssetRequested(in SetPreviewWeatherAssetProperties properties, ref bool shouldAllow) => OnSetPreviewWeatherAssetRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetTimeColor(in SetTimeColorProperties properties) => OnSetTimeColor?.Invoke(in properties);
+    internal static void InvokeOnSetTimeColorRequested(in SetTimeColorProperties properties, ref bool shouldAllow) => OnSetTimeColorRequested?.Invoke(in properties, ref shouldAllow);
+    internal static void InvokeOnSetTimeSingle(in SetTimeSingleProperties properties) => OnSetTimeSingle?.Invoke(in properties);
+    internal static void InvokeOnSetTimeSingleRequested(in SetTimeSingleProperties properties, ref bool shouldAllow) => OnSetTimeSingleRequested?.Invoke(in properties, ref shouldAllow);
 }
 
 public delegate void TryInstantiateHierarchyObject(ref InstantiateHierarchyObjectProperties properties, ref bool shouldAllow);

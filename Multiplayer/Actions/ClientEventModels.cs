@@ -1,6 +1,7 @@
 ﻿using DevkitServer.API;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Devkit.Spawns;
+using DevkitServer.API.Lighting;
 using DevkitServer.Models;
 using SDG.Framework.Devkit;
 using SDG.Framework.Devkit.Tools;
@@ -906,5 +907,51 @@ public readonly ref struct SetPlayerSpawnpointsIsAlternateProperties(ReadOnlySpa
 {
     public readonly ReadOnlySpan<NetId64> SpawnNetIds = spawnpointId;
     public readonly bool IsAlternate = isAlternate;
+    public readonly float DeltaTime = deltaTime;
+}
+
+public delegate void SetLightingFloat(in SetLightingFloatProperties properties);
+public delegate void SetLightingFloatRequested(in SetLightingFloatProperties properties, ref bool shouldAllow);
+public readonly ref struct SetLightingFloatProperties(LightingValue valueType, float value, float deltaTime)
+{
+    public readonly LightingValue ValueType = valueType;
+    public readonly float Value = value;
+    public readonly float DeltaTime = deltaTime;
+}
+
+public delegate void SetLightingByte(in SetLightingByteProperties properties);
+public delegate void SetLightingByteRequested(in SetLightingByteProperties properties, ref bool shouldAllow);
+public readonly ref struct SetLightingByteProperties(LightingValue valueType, byte value, float deltaTime)
+{
+    public readonly LightingValue ValueType = valueType;
+    public readonly byte Value = value;
+    public readonly float DeltaTime = deltaTime;
+}
+
+public delegate void SetPreviewWeatherAsset(in SetPreviewWeatherAssetProperties properties);
+public delegate void SetPreviewWeatherAssetRequested(in SetPreviewWeatherAssetProperties properties, ref bool shouldAllow);
+public readonly ref struct SetPreviewWeatherAssetProperties(AssetReference<WeatherAssetBase> asset, float deltaTime)
+{
+    public readonly AssetReference<WeatherAssetBase> Asset = asset;
+    public readonly float DeltaTime = deltaTime;
+}
+
+public delegate void SetTimeColor(in SetTimeColorProperties properties);
+public delegate void SetTimeColorRequested(in SetTimeColorProperties properties, ref bool shouldAllow);
+public readonly ref struct SetTimeColorProperties(ELightingTime time, byte index, Color color, float deltaTime)
+{
+    public readonly ELightingTime Time = time;
+    public readonly byte Index = index;
+    public readonly Color Color = color;
+    public readonly float DeltaTime = deltaTime;
+}
+
+public delegate void SetTimeSingle(in SetTimeSingleProperties properties);
+public delegate void SetTimeSingleRequested(in SetTimeSingleProperties properties, ref bool shouldAllow);
+public readonly ref struct SetTimeSingleProperties(ELightingTime time, byte index, float value, float deltaTime)
+{
+    public readonly ELightingTime Time = time;
+    public readonly byte Index = index;
+    public readonly float Value = value;
     public readonly float DeltaTime = deltaTime;
 }

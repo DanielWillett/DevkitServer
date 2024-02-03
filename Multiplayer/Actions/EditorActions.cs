@@ -103,6 +103,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     internal SpawnTableActions SpawnTableActions { get; }
     internal RoadActions RoadActions { get; }
     internal NavigationActions NavigationActions { get; }
+    internal LightingActions LightingActions { get; }
     public int QueueSize => _pendingActions.Count;
 
     private EditorActions()
@@ -116,6 +117,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         SpawnTableActions = new SpawnTableActions(this);
         RoadActions = new RoadActions(this);
         NavigationActions = new NavigationActions(this);
+        LightingActions = new LightingActions(this);
     }
     public void Subscribe()
     {
@@ -127,6 +129,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         SpawnTableActions.Subscribe();
         RoadActions.Subscribe();
         NavigationActions.Subscribe();
+        LightingActions.Subscribe();
     }
 
     public void Unsubscribe()
@@ -139,6 +142,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         SpawnTableActions.Unsubscribe();
         RoadActions.Unsubscribe();
         NavigationActions.Unsubscribe();
+        LightingActions.Unsubscribe();
     }
 
     [UsedImplicitly]

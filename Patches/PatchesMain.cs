@@ -79,6 +79,7 @@ internal static class PatchesMain
             SpawnsEditorPatches.ManualPatches();
             RoadsPatches.OptionalPatches();
             NavigationPatches.OptionalPatches();
+            LightingPatches.DoPatching();
 #endif
             TransportPatcher.ManualPatch();
             DoManualPatches();
@@ -97,6 +98,9 @@ internal static class PatchesMain
         try
         {
             TransportPatcher.ManualUnpatch();
+#if CLIENT
+            LightingPatches.DoUnpatching();
+#endif
             DoManualUnpatches();
             Patcher.UnpatchAll(HarmonyId);
             Logger.DevkitServer.LogInfo(Source, $"Finished unpatching {"Unturned".Colorize(DevkitServerModule.UnturnedColor)}.");
