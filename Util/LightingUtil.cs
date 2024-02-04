@@ -1,10 +1,16 @@
-﻿using System.Globalization;
-using DanielWillett.ReflectionTools;
+﻿using DanielWillett.ReflectionTools;
+#if CLIENT
+using System.Globalization;
 using DevkitServer.Patches;
+#endif
 
 namespace DevkitServer.Util;
 public static class LightingUtil
 {
+#if SERVER
+    private static readonly StaticSetter<float>? SetSeaLevelUnderlyingField = Accessor.GenerateStaticSetter<LevelLighting, float>("_seaLevel");
+    private static readonly Action? UpdateLegacyWaterTransform = Accessor.GenerateStaticCaller<LevelLighting, Action>("UpdateLegacyWaterTransform");
+#endif
 #if CLIENT
     private static readonly StaticGetter<ELightingTime>? GetLightingTime = Accessor.GenerateStaticGetter<EditorEnvironmentLightingUI, ELightingTime>("selectedTime");
     private static readonly StaticSetter<ELightingTime>? SetLightingTime = Accessor.GenerateStaticSetter<EditorEnvironmentLightingUI, ELightingTime>("selectedTime");
@@ -160,6 +166,15 @@ public static class LightingUtil
     }
     public static void SetSeaLevelLocal(float seaLevel)
     {
+#if SERVER
+        // setting sea level on server throws an exception because it tries to update bubbles :/
+        if (SetSeaLevelUnderlyingField != null)
+        {
+            SetSeaLevelUnderlyingField(seaLevel);
+            UpdateLegacyWaterTransform?.Invoke();
+            return;
+        }
+#endif
         LevelLighting.seaLevel = seaLevel;
 #if CLIENT
         LightingPatches.UpdateSeaLevel();

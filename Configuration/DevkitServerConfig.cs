@@ -513,6 +513,18 @@ public class DevkitServerSystemConfig : SchemaConfiguration
     public bool AdminsAreSuperusers { get; set; }
 
     /// <summary>
+    /// When clients change the time in the lighting menu, it will update on all clients.
+    /// </summary>
+    [JsonPropertyName("sync_editor_time")]
+    public bool SyncEditorTime { get; set; }
+
+    /// <summary>
+    /// When clients change the preview weather in the lighting menu, it will update on all clients.
+    /// </summary>
+    [JsonPropertyName("sync_editor_weather")]
+    public bool SyncEditorWeather { get; set; }
+
+    /// <summary>
     /// Default permissions a user has.
     /// </summary>
     [JsonPropertyName("default_permissions")]
@@ -558,12 +570,14 @@ public class DevkitServerSystemConfig : SchemaConfiguration
         DisableMapDownload = false;
         TcpSettings = new TcpServerInfo { EnableHighSpeedSupport = false, HighSpeedPort = (ushort)(Provider.port + 2) };
         DefaultUserPermissions = Array.Empty<PermissionBranch>();
-        DefaultUserPermissionGroups = new string[]
-        {
+        DefaultUserPermissionGroups =
+        [
             "viewer"
-        };
+        ];
         UserSavedataLocationOverride = null;
         AdminsAreSuperusers = true;
+        SyncEditorTime = false;
+        SyncEditorWeather = false;
         MaxClientEditFPS = 50;
         PasswordAttempts = 4;
 #endif

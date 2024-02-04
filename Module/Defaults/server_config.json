@@ -103,6 +103,16 @@
   "admins_are_superusers": true,
 
   /*
+   *  When clients change the time in the lighting menu, it will update on all clients.
+   */
+  "sync_editor_time": false,
+
+  /*
+   *  When clients change the preview weather in the lighting menu, it will update on all clients.
+   */
+  "sync_editor_weather": false,
+
+  /*
    *  Default permission groups a user has. For example:
    *  [ "viewer" ].
    *

@@ -69,6 +69,16 @@ public sealed class ClientInfo
     public bool ServerForcesHideMapNameFromRichPresence { get; private set; }
 
     /// <summary>
+    /// If the server has 'sync_editor_time' set to true.
+    /// </summary>
+    public bool ServerSyncsEditorTime { get; private set; }
+
+    /// <summary>
+    /// If the server has 'sync_editor_weather' set to true.
+    /// </summary>
+    public bool ServerSyncsEditorWeather { get; private set; }
+
+    /// <summary>
     /// The server's max cleint FPS when doing edits that would create actions every frame.
     /// </summary>
     public int ServerMaxClientEditFPS { get; private set; }
@@ -96,9 +106,11 @@ public sealed class ClientInfo
 
         byte flag = reader.ReadUInt8();
         ServerRemovesCosmeticImprovements = (flag & 1) != 0;
-        ServerTreatsAdminsAsSuperuser = (flag & 2) == 0;
-        ServerHasHighSpeedSupport = (flag & 4) != 0;
-        ServerForcesHideMapNameFromRichPresence = (flag & 8) != 0;
+        ServerTreatsAdminsAsSuperuser = (flag & (1 << 1)) == 0;
+        ServerHasHighSpeedSupport = (flag & (1 << 2)) != 0;
+        ServerForcesHideMapNameFromRichPresence = (flag & (1 << 3)) != 0;
+        ServerSyncsEditorTime = (flag & (1 << 4)) != 0;
+        ServerSyncsEditorWeather = (flag & (1 << 5)) != 0;
 
         ServerMaxClientEditFPS = reader.ReadInt32();
     }
@@ -118,11 +130,15 @@ public sealed class ClientInfo
         if (ServerRemovesCosmeticImprovements)
             flag |= 1;
         if (!ServerTreatsAdminsAsSuperuser)
-            flag |= 2;
+            flag |= 1 << 1;
         if (ServerHasHighSpeedSupport)
-            flag |= 4;
+            flag |= 1 << 2;
         if (ServerForcesHideMapNameFromRichPresence)
-            flag |= 8;
+            flag |= 1 << 3;
+        if (ServerSyncsEditorTime)
+            flag |= 1 << 4;
+        if (ServerSyncsEditorWeather)
+            flag |= 1 << 5;
 
         writer.Write(flag);
         writer.Write(ServerMaxClientEditFPS);
@@ -136,6 +152,8 @@ public sealed class ClientInfo
         info.ServerMaxClientEditFPS = systemConfig.MaxClientEditFPS;
         info.ServerHasHighSpeedSupport = systemConfig.TcpSettings.EnableHighSpeedSupport && !Provider.configData.Server.Use_FakeIP;
         info.ServerForcesHideMapNameFromRichPresence = systemConfig.HideMapNameFromRichPresence;
+        info.ServerSyncsEditorTime = systemConfig.SyncEditorTime;
+        info.ServerSyncsEditorWeather = systemConfig.SyncEditorWeather;
     }
 #endif
 

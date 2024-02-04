@@ -2,6 +2,7 @@
 using DevkitServer.Util.Encoding;
 #if SERVER
 using DevkitServer.API.Permissions;
+using DevkitServer.Configuration;
 using DevkitServer.Core.Permissions;
 #endif
 
@@ -124,7 +125,7 @@ public sealed class SetLightingFloatAction : IReplacableAction
                 LightingUtil.SetRainFrequencyLocal(Value);
                 break;
             case LightingValue.SnowDuration:
-                LightingUtil.SetSnowFrequencyLocal(Value);
+                LightingUtil.SetSnowDurationLocal(Value);
                 break;
             case LightingValue.SnowFrequency:
                 LightingUtil.SetSnowFrequencyLocal(Value);
@@ -135,7 +136,11 @@ public sealed class SetLightingFloatAction : IReplacableAction
             case LightingValue.SnowLevel:
                 LightingUtil.SetSnowLevelLocal(Value);
                 break;
+#if SERVER
+            case LightingValue.Time when DevkitServerConfig.Config is { SyncEditorTime: true }:
+#else
             case LightingValue.Time:
+#endif
                 LightingUtil.SetTimeLocal(Value);
                 break;
             default:
@@ -146,6 +151,11 @@ public sealed class SetLightingFloatAction : IReplacableAction
 #if SERVER
     public bool CheckCanApply()
     {
+        if (DevkitServerConfig.Config is not { SyncEditorTime: true } && ValueType == LightingValue.Time)
+        {
+            Logger.DevkitServer.LogWarning(nameof(SetLightingFloatAction), $"{Instigator.Format()} tried to change remote time when 'sync_editor_time' was off.");
+            return false;
+        }
         if (ValueType is LightingValue.Azimuth
             or LightingValue.Bias
             or LightingValue.Fade
@@ -200,7 +210,11 @@ public sealed class SetLightingByteAction : IReplacableAction
     {
         switch (ValueType)
         {
+#if SERVER
+            case LightingValue.Moon when DevkitServerConfig.Config is { SyncEditorTime: true }:
+#else
             case LightingValue.Moon:
+#endif
                 LightingUtil.SetMoonCycleLocal(Value);
                 break;
             case LightingValue.HasRain:
@@ -217,6 +231,11 @@ public sealed class SetLightingByteAction : IReplacableAction
 #if SERVER
     public bool CheckCanApply()
     {
+        if (DevkitServerConfig.Config is not { SyncEditorTime: true } && ValueType == LightingValue.Moon)
+        {
+            Logger.DevkitServer.LogWarning(nameof(SetLightingByteAction), $"{Instigator.Format()} tried to change remote moon stage when 'sync_editor_time' was off.");
+            return false;
+        }
         if (ValueType is LightingValue.Moon or LightingValue.HasRain or LightingValue.HasSnow)
             return VanillaPermissions.EditLighting.Has(Instigator.m_SteamID);
 
@@ -254,11 +273,20 @@ public sealed class SetPreviewWeatherAssetAction : IReplacableAction
     }
     public void Apply()
     {
+#if SERVER
+        if (DevkitServerConfig.Config is not { SyncEditorWeather: true })
+            return;
+#endif
         LightingUtil.SetPreviewWeatherAssetLocal(Value.Find());
     }
 #if SERVER
     public bool CheckCanApply()
     {
+        if (DevkitServerConfig.Config is not { SyncEditorWeather: true })
+        {
+            Logger.DevkitServer.LogWarning(nameof(SetPreviewWeatherAssetAction), $"{Instigator.Format()} tried to change remote preview weather when 'sync_editor_weather' was off.");
+            return false;
+        }
         return VanillaPermissions.EditLighting.Has(Instigator.m_SteamID);
     }
 #endif

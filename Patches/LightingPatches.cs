@@ -7,6 +7,7 @@ using DevkitServer.Core.Permissions;
 using HarmonyLib;
 using System.Reflection;
 using DevkitServer.API.Lighting;
+using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Actions;
 
 namespace DevkitServer.Patches;
@@ -187,10 +188,11 @@ internal class LightingPatches
         }
 
         float old = LevelLighting.azimuth;
+        float azimuth = state * 360f;
         if (old == state)
             return false;
 
-        SetLightingFloatProperties properties = new SetLightingFloatProperties(LightingValue.Azimuth, state, CachedTime.DeltaTime);
+        SetLightingFloatProperties properties = new SetLightingFloatProperties(LightingValue.Azimuth, azimuth, CachedTime.DeltaTime);
 
         if (DevkitServerModule.IsEditing)
         {
@@ -203,7 +205,7 @@ internal class LightingPatches
             }
         }
 
-        LevelLighting.azimuth = state * 360f;
+        LevelLighting.azimuth = azimuth;
 
         Logger.DevkitServer.LogDebug(nameof(LightingPatches), $"Azimuth updated: {old.Format()} -> {LevelLighting.azimuth.Format()}.");
 
@@ -554,7 +556,7 @@ internal class LightingPatches
     }
     private static bool OnDraggedMoonSlider(ISleekSlider slider, float state)
     {
-        bool hasReplicationPerms = VanillaPermissions.EditLighting.Has();
+        bool hasReplicationPerms = ClientInfo.Info is not { ServerSyncsEditorTime: false } && VanillaPermissions.EditLighting.Has();
 
         byte moonCycle = (byte)(state * LevelLighting.MOON_CYCLES);
         if (moonCycle >= LevelLighting.MOON_CYCLES)
@@ -592,7 +594,7 @@ internal class LightingPatches
     }
     private static bool OnDraggedTimeSlider(ISleekSlider slider, float state)
     {
-        bool hasReplicationPerms = VanillaPermissions.EditLighting.Has();
+        bool hasReplicationPerms = ClientInfo.Info is not { ServerSyncsEditorTime: false } && VanillaPermissions.EditLighting.Has();
 
         float old = LevelLighting.time;
         if (old == state)
@@ -636,7 +638,7 @@ internal class LightingPatches
             return false;
         }
 
-        bool hasReplicationPerms = VanillaPermissions.EditLighting.Has();
+        bool hasReplicationPerms = ClientInfo.Info is not { ServerSyncsEditorTime: false } && VanillaPermissions.EditLighting.Has();
 
         LightingUtil.TryGetSelectedLightingTime(out ELightingTime oldSelection);
 
@@ -686,7 +688,7 @@ internal class LightingPatches
     }
     private static bool OnClickedPreviewWeather(ISleekElement button)
     {
-        bool hasReplicationPerms = VanillaPermissions.EditLighting.Has();
+        bool hasReplicationPerms = ClientInfo.Info is not { ServerSyncsEditorWeather: false } && VanillaPermissions.EditLighting.Has();
 
         ISleekField? guidField = GetWeatherGuidField?.Invoke();
         if (guidField == null)
@@ -843,7 +845,7 @@ internal class LightingPatches
     {
         ISleekSlider? slider = GetAzimuthSlider?.Invoke();
         if (slider != null)
-            slider.Value = LevelLighting.azimuth;
+            slider.Value = LevelLighting.azimuth / 360f;
     }
     public static void UpdateBias()
     {

@@ -67,6 +67,14 @@
       "description": "Admins ('blue hammers', given with the vanilla /admin command) are treated as having the '*' permission which gives them all permissions.",
       "type": "boolean"
     },
+    "sync_editor_time": {
+      "description": "When clients change the time in the lighting menu, it will update on all clients.",
+      "type": "boolean"
+    },
+    "sync_editor_weather": {
+      "description": "When clients change the preview weather in the lighting menu, it will update on all clients.",
+      "type": "boolean"
+    },
     "default_permissions": {
       "description": "Default individual permissions a user has.",
       "type": "array",
