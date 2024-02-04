@@ -136,7 +136,8 @@ public sealed class DevkitServerModule : IModuleNexus
         { "SaveInProgressWillFreeze", "Saving... (saving again will freeze until done)" },
         { "BackingUpInProgress", "Backing up..." },
         { "BackupAndSaveButton", "Backup And Save" },
-        { "TooManyPasswordAttempts", "Too many incorrect password attempts. Try again in {0} second(s)." }
+        { "TooManyPasswordAttempts", "Too many incorrect password attempts. Try again in {0} second(s)." },
+        { "UnknownIPv4AndSteam64", "Unknown IPv4 and Steam64 ID of connecting user - can't join a password-protected server." } 
     };
     public static Local CommandLocalization { get; private set; } = null!;
 

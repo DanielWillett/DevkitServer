@@ -3,10 +3,13 @@ using DevkitServer.Multiplayer.Networking;
 using HarmonyLib;
 using StackCleaner;
 using System.Globalization;
+using System.Net;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
 using System.Text.RegularExpressions;
+using DevkitServer.Multiplayer;
+using Unturned.SystemEx;
 using Version = System.Version;
 
 namespace DevkitServer.Util;
@@ -899,10 +902,20 @@ public static class FormattingUtil
 
             return GetColorPrefix(ToArgb(new Color32(102, 192, 244, 255))) + cs64.m_SteamID.ToString("D17") + ForegroundResetSequence;
         }
+        if (obj is IPv4Address addr1)
+        {
+            return GetColorPrefix(ToArgb(new Color32(204, 255, 102, 255))) + addr1 + GetResetSuffix();
+        }
+        if (obj is IPAddress addr2)
+        {
+            return GetColorPrefix(ToArgb(new Color32(204, 255, 102, 255))) + addr2 + GetResetSuffix();
+        }
         if (obj is ITransportConnection connection)
         {
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
                 return connection.GetAddressString(true);
+
+            CSteamID steamId = UserManager.TryGetSteamId(connection);
 
             if (connection.TryGetIPv4Address(out uint addr))
             {
@@ -924,10 +937,27 @@ public static class FormattingUtil
                     }
                 }
 
+                if (steamId.UserSteam64())
+                {
+                    str += " (".ColorizeNoReset(FormattingColorType.Punctuation) +
+                           steamId.m_SteamID.ToString(CultureInfo.InvariantCulture)
+                               .ColorizeNoReset(FormattingColorType.Number) +
+                           ")".ColorizeNoReset(FormattingColorType.Punctuation);
+                }
+
                 return str + ForegroundResetSequence;
             }
 
-            return GetColorPrefix(ToArgb(new Color32(204, 255, 102, 255))) + (connection.GetAddressString(true) ?? "<unknown address>") + ForegroundResetSequence;
+            str = GetColorPrefix(ToArgb(new Color32(204, 255, 102, 255))) + (connection.GetAddressString(true) ?? "<unknown address>") + ForegroundResetSequence;
+            if (steamId.UserSteam64())
+            {
+                str += " (".ColorizeNoReset(FormattingColorType.Punctuation) +
+                       steamId.m_SteamID.ToString(CultureInfo.InvariantCulture)
+                           .ColorizeNoReset(FormattingColorType.Number) +
+                       ")".ColorizeNoReset(FormattingColorType.Punctuation);
+            }
+
+            return str;
         }
 
         if (obj is IClientTransport)

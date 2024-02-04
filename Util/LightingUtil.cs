@@ -1,6 +1,6 @@
 ﻿using DanielWillett.ReflectionTools;
-#if CLIENT
 using System.Globalization;
+#if CLIENT
 using DevkitServer.Patches;
 #endif
 

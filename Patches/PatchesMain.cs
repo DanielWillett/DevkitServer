@@ -22,6 +22,7 @@ using DevkitServer.Util.Encoding;
 #endif
 #if SERVER
 using DevkitServer.Multiplayer.Networking;
+using Unturned.SystemEx;
 #endif
 
 namespace DevkitServer.Patches;
@@ -412,16 +413,44 @@ internal static class PatchesMain
     }
 #endif
 #if SERVER
-    private static readonly Dictionary<uint, KeyValuePair<int, float>> PasswordTries = new Dictionary<uint, KeyValuePair<int, float>>(16);
+    private static readonly Dictionary<uint, KeyValuePair<int, float>> PasswordTriesIPv4 = new Dictionary<uint, KeyValuePair<int, float>>(16);
+    private static readonly Dictionary<ulong, KeyValuePair<int, float>> PasswordTriesSteam64 = new Dictionary<ulong, KeyValuePair<int, float>>(16);
     private static bool ReadPasswordHash(ITransportConnection connection, NetPakReader reader)
     {
         Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), "Validating password hash...");
 
+        bool serverHasPassword = !string.IsNullOrEmpty(Provider.serverPassword) && Provider.serverPasswordHash.Length == 20;
+
+        IPv4Address ipv4 = IPv4Address.Zero;
+        CSteamID steam64 = CSteamID.Nil;
+
         if (!connection.TryGetIPv4Address(out uint address))
         {
-            // todo see how this works with Fake IP and server codes.
-            Provider.reject(connection, ESteamRejection.PLUGIN, "Unknown IPv4 of connecting user.");
-            return false;
+            steam64 = UserManager.TryGetSteamId(connection);
+            if (!steam64.UserSteam64())
+            {
+                Logger.DevkitServer.LogInfo(nameof(ReadPasswordHash), " Failed to get IPv4 and Steam ID of connecting user.");
+                if (serverHasPassword)
+                {
+                    Provider.reject(connection, ESteamRejection.PLUGIN, DevkitServerModule.MainLocalization.Translate("UnknownIPv4AndSteam64"));
+                    return false;
+                }
+            }
+
+            Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), $" Failed to get IPv4 but was able to get Steam ID of connecting user: {steam64.Format()}.");
+        }
+        else
+        {
+            ipv4 = new IPv4Address(address);
+
+            steam64 = UserManager.TryGetSteamId(connection);
+            if (!steam64.UserSteam64())
+            {
+                steam64 = CSteamID.Nil;
+                Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), $" Failed to get Steam ID but was able to get IPv4 of connecting user: {ipv4.Format()}.");
+            }
+            else
+                Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), $" Got SteamID and IPv4 of connecting user: {steam64.Format()}, {ipv4.Format()}.");
         }
 
         byte[] source = Array.Empty<byte>();
@@ -437,31 +466,67 @@ internal static class PatchesMain
             return false;
         }
 
+        if (!serverHasPassword)
+        {
+            Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), " Looks good (no password).");
+            return true;
+        }
+
+        if (!hasPassword)
+        {
+            Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), " Rejected (no password given).");
+            Provider.reject(connection, ESteamRejection.WRONG_PASSWORD);
+            return false;
+        }
+
         if (DevkitServerConfig.Config.PasswordAttempts > 0 && DevkitServerConfig.Config.WrongPasswordBlockExpireSeconds > 0f)
         {
-            if (PasswordTries.TryGetValue(address, out KeyValuePair<int, float> countRecord) &&
+            if (!ipv4.IsZero && PasswordTriesIPv4.TryGetValue(ipv4.value, out KeyValuePair<int, float> countRecord) &&
                 countRecord.Key >= DevkitServerConfig.Config.PasswordAttempts &&
                 CachedTime.RealtimeSinceStartup - countRecord.Value < DevkitServerConfig.Config.WrongPasswordBlockExpireSeconds)
             {
                 string expires = Mathf.CeilToInt(DevkitServerConfig.Config.WrongPasswordBlockExpireSeconds - CachedTime.RealtimeSinceStartup + countRecord.Value)
                     .ToString(CultureInfo.InvariantCulture);
                 Provider.reject(connection, ESteamRejection.PLUGIN, DevkitServerModule.MainLocalization.Translate("TooManyPasswordAttempts", expires));
-                Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), $" Too many invalid password attempts from {address.Format()}, expires in {expires} sec.");
+                Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), $" Too many invalid password attempts from {ipv4.Format()}, expires in {expires.Format()} sec.");
+                return false;
+            }
+            if (steam64.UserSteam64() && PasswordTriesSteam64.TryGetValue(steam64.m_SteamID, out countRecord) &&
+                countRecord.Key >= DevkitServerConfig.Config.PasswordAttempts &&
+                CachedTime.RealtimeSinceStartup - countRecord.Value < DevkitServerConfig.Config.WrongPasswordBlockExpireSeconds)
+            {
+                string expires = Mathf.CeilToInt(DevkitServerConfig.Config.WrongPasswordBlockExpireSeconds - CachedTime.RealtimeSinceStartup + countRecord.Value)
+                    .ToString(CultureInfo.InvariantCulture);
+                Provider.reject(connection, ESteamRejection.PLUGIN, DevkitServerModule.MainLocalization.Translate("TooManyPasswordAttempts", expires));
+                Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), $" Too many invalid password attempts from {steam64.Format()}, expires in {expires.Format()} sec.");
                 return false;
             }
         }
 
-        List<uint>? toRemove = null;
-        foreach (KeyValuePair<uint, KeyValuePair<int, float>> entry in PasswordTries)
+        List<ulong>? toRemove = null;
+        foreach (KeyValuePair<uint, KeyValuePair<int, float>> entry in PasswordTriesIPv4)
         {
             if (CachedTime.RealtimeSinceStartup - entry.Value.Value > DevkitServerConfig.Config.WrongPasswordBlockExpireSeconds * 2)
-                (toRemove ??= new List<uint>(PasswordTries.Count)).Add(entry.Key);
+                (toRemove ??= new List<ulong>(PasswordTriesIPv4.Count)).Add(entry.Key);
         }
 
         if (toRemove != null)
         {
-            foreach (uint ipAddress in toRemove)
-                PasswordTries.Remove(ipAddress);
+            foreach (ulong ipAddress in toRemove)
+                PasswordTriesIPv4.Remove((uint)ipAddress);
+            toRemove.Clear();
+        }
+        
+        foreach (KeyValuePair<ulong, KeyValuePair<int, float>> entry in PasswordTriesSteam64)
+        {
+            if (CachedTime.RealtimeSinceStartup - entry.Value.Value > DevkitServerConfig.Config.WrongPasswordBlockExpireSeconds * 2)
+                (toRemove ??= new List<ulong>(PasswordTriesSteam64.Count)).Add(entry.Key);
+        }
+
+        if (toRemove != null)
+        {
+            foreach (ulong steamId in toRemove)
+                PasswordTriesSteam64.Remove(steamId);
         }
 
         ArraySegment<byte> hash = new ArraySegment<byte>(source, offset, source.Length == 0 ? 0 : 20);
@@ -474,21 +539,36 @@ internal static class PatchesMain
             if (DevkitServerConfig.Config.PasswordAttempts > 0 && DevkitServerConfig.Config.WrongPasswordBlockExpireSeconds > 0f)
             {
                 int c;
-                if (PasswordTries.TryGetValue(address, out KeyValuePair<int, float> countRecord))
+
+                if (!ipv4.IsZero && PasswordTriesIPv4.TryGetValue(ipv4.value, out KeyValuePair<int, float> countRecord))
                     c = countRecord.Key + 1;
                 else
                     c = 1;
-                PasswordTries[address] = new KeyValuePair<int, float>(c, CachedTime.RealtimeSinceStartup);
-                Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), $" Invalid password for address {address.Format()} (try {c.Format()} / {DevkitServerConfig.Config.PasswordAttempts.Format()}).");
+
+                if (steam64.UserSteam64() && PasswordTriesSteam64.TryGetValue(steam64.m_SteamID, out countRecord))
+                    c = Math.Max(c, countRecord.Key + 1);
+                else
+                    c = Math.Max(c, 1);
+
+                if (!ipv4.IsZero)
+                    PasswordTriesIPv4[ipv4.value] = new KeyValuePair<int, float>(c, CachedTime.RealtimeSinceStartup);
+
+                if (steam64.UserSteam64())
+                    PasswordTriesSteam64[steam64.m_SteamID] = new KeyValuePair<int, float>(c, CachedTime.RealtimeSinceStartup);
+
+                Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), $" Invalid password for address {steam64.Format()} ({ipv4.Format()}), try {c.Format()} / {DevkitServerConfig.Config.PasswordAttempts.Format()}.");
             }
             else
-                Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), $" Invalid password for address {address.Format()}.");
+                Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), $" Invalid password for address {steam64.Format()} ({ipv4.Format()}).");
 
             Provider.reject(connection, ESteamRejection.WRONG_PASSWORD);
             return false;
         }
 
-        PasswordTries.Remove(address);
+        if (!ipv4.IsZero)
+            PasswordTriesIPv4.Remove(ipv4.value);
+        if (steam64.UserSteam64())
+            PasswordTriesSteam64.Remove(steam64.m_SteamID);
 
         Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), " Looks good.");
         return true;
