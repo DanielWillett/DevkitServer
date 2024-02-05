@@ -8,8 +8,8 @@ using DevkitServer.API;
 using DevkitServer.API.Multiplayer;
 using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Movement;
 using DevkitServer.Patches;
-using DevkitServer.Players;
 using DevkitServer.Plugins;
 using DevkitServer.Util.Encoding;
 using HarmonyLib;
@@ -64,7 +64,7 @@ public static class NetFactory
     private static readonly ConcurrentDictionary<Guid, BaseNetCall> GuidHighSpeedInvokers = new ConcurrentDictionary<Guid, BaseNetCall>();
 
     private static Func<PooledTransportConnectionList>? PullFromTransportConnectionListPool;
-    private static readonly NetPakWriter Writer = new NetPakWriter();
+    internal static readonly NetPakWriter Writer = new NetPakWriter();
 
     /// <summary>
     /// Offset of the net messages for received data. On the server this would be of type <see cref="EServerMessage"/>, and on the client it would be of type <see cref="EClientMessage"/>.
@@ -149,10 +149,12 @@ public static class NetFactory
 
         // vanilla callbacks
         methods[(int)DevkitServerMessage.InvokeMethod] = typeof(NetFactory).GetMethod(nameof(ReceiveMessage), BindingFlags.NonPublic | BindingFlags.Static)!;
-        methods[(int)DevkitServerMessage.MovementRelay] = typeof(UserInput).GetMethod(nameof(UserInput.ReceiveMovementRelay), BindingFlags.NonPublic | BindingFlags.Static)!;
 #if CLIENT
+        methods[(int)DevkitServerMessage.MovementRelay] = typeof(ClientUserMovement).GetMethod(nameof(ClientUserMovement.ReceiveRemoteMovementPackets), BindingFlags.NonPublic | BindingFlags.Static)!;
         methods[(int)DevkitServerMessage.SendTileData] = typeof(TileSync).GetMethod(nameof(TileSync.ReceiveTileData), BindingFlags.NonPublic | BindingFlags.Static)!;
         methods[(int)DevkitServerMessage.SendNavigationData] = typeof(NavigationSync).GetMethod(nameof(NavigationSync.ReceiveNavigationData), BindingFlags.NonPublic | BindingFlags.Static)!;
+#elif SERVER
+        methods[(int)DevkitServerMessage.MovementRelay] = typeof(ServerUserMovement).GetMethod(nameof(ServerUserMovement.ReceiveMovementPacket), BindingFlags.NonPublic | BindingFlags.Static)!;
 #endif
         methods[(int)DevkitServerMessage.ActionRelay] = typeof(EditorActions).GetMethod(nameof(EditorActions.ReceiveActionRelay), BindingFlags.NonPublic | BindingFlags.Static)!;
 
@@ -1317,11 +1319,11 @@ public static class NetFactory
     /// Send data of message type <see cref="DevkitServerMessage"/>. Writes the message type, length (unsigned int16), and the byte data using a <see cref="NetPakWriter"/>.
     /// </summary>
     /// <exception cref="ArgumentException">Length is too long (must be at most <see cref="ushort.MaxValue"/>) or a <see cref="HighSpeedConnection"/> is used with a <see cref="ICustomNetMessageListener"/>.</exception>
-    public static void SendGeneric(DevkitServerMessage message,
+    public static void SendGeneric(DevkitServerMessage message, ArraySegment<byte> bytes,
 #if SERVER
         ITransportConnection connection,
 #endif
-        byte[] bytes, int offset = 0, int length = -1, bool reliable = true)
+        bool reliable = true)
     {
         DevkitServerModule.AssertIsDevkitServerClient();
 
@@ -1329,11 +1331,9 @@ public static class NetFactory
         if ((int)message >= DevkitServerBlockSize && connection is HighSpeedConnection)
             throw new ArgumentException("Not allowed to use HighSpeedConnections with ICustomNetMessageListeners.", nameof(connection));
 #endif
-        if (length == -1)
-            length = bytes.Length - offset;
-
-        if (length > ushort.MaxValue)
-            throw new ArgumentException($"Length must be less than {ushort.MaxValue} B.", length == bytes.Length - offset ? nameof(bytes) : nameof(length));
+        
+        if (bytes.Count > ushort.MaxValue)
+            throw new ArgumentException($"Length must be less than {ushort.MaxValue} B.", nameof(bytes));
 
         DevkitServerMessage mapping = message;
         if ((int)mapping >= DevkitServerBlockSize && CustomNetMessageListeners.InverseLocalMappings.TryGetValue(mapping, out Type localMappingType))
@@ -1350,7 +1350,7 @@ public static class NetFactory
 #endif
         }
 
-        NetPakWriter writer = DevkitServerModule.IsMainThread ? Writer : new NetPakWriter { buffer = new byte[length + 8] };
+        NetPakWriter writer = DevkitServerModule.IsMainThread ? Writer : new NetPakWriter { buffer = new byte[bytes.Count + 8] };
         writer.Reset();
 
 #if CLIENT
@@ -1358,10 +1358,69 @@ public static class NetFactory
 #else
         writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)mapping));
 #endif
-        writer.WriteUInt16((ushort)length);
-        writer.WriteBytes(bytes, offset, length);
+        writer.WriteUInt16((ushort)bytes.Count);
+        writer.WriteBytes(bytes.Array, bytes.Offset, bytes.Count);
         writer.Flush();
-        IncrementByteCount(message, true, length);
+        IncrementByteCount(message, true, bytes.Count);
+#if CLIENT
+        GetPlayerTransportConnection().Send(writer.buffer, writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
+#else
+        connection.Send(writer.buffer, writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
+#endif
+    }
+
+    /// <summary>
+    /// Send data of message type <see cref="DevkitServerMessage"/>. Writes the message type and the byte data using a <see cref="NetPakWriter"/>.
+    /// </summary>
+    /// <exception cref="ArgumentException">A <see cref="HighSpeedConnection"/> is used with a <see cref="ICustomNetMessageListener"/>.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="writeAction"/> is <see langword="null"/>.</exception>
+    public static void SendGeneric(DevkitServerMessage message, Action<NetPakWriter> writeAction,
+#if SERVER
+        ITransportConnection connection,
+#endif
+        bool reliable = true)
+    {
+        DevkitServerModule.AssertIsDevkitServerClient();
+
+#if SERVER
+        if ((int)message >= DevkitServerBlockSize && connection is HighSpeedConnection)
+            throw new ArgumentException("Not allowed to use HighSpeedConnections with ICustomNetMessageListeners.", nameof(connection));
+#endif
+        
+        if (writeAction == null)
+            throw new ArgumentNullException(nameof(writeAction));
+
+        DevkitServerMessage mapping = message;
+        if ((int)mapping >= DevkitServerBlockSize && CustomNetMessageListeners.InverseLocalMappings.TryGetValue(mapping, out Type localMappingType))
+        {
+#if CLIENT
+            if (CustomNetMessageListeners.RemoteMappings.TryGetValue(localMappingType, out DevkitServerMessage remoteMapping))
+                mapping = remoteMapping;
+#elif SERVER
+            if (CustomNetMessageListeners.RemoteMappings.TryGetValue(connection, out ConcurrentDictionary<Type, DevkitServerMessage> mappings)
+                && mappings.TryGetValue(localMappingType, out DevkitServerMessage remoteMapping))
+            {
+                mapping = remoteMapping;
+            }
+#endif
+        }
+
+        NetPakWriter writer = DevkitServerModule.IsMainThread ? Writer : new NetPakWriter { buffer = new byte[128] };
+        writer.Reset();
+
+#if CLIENT
+        writer.WriteEnum((EServerMessage)(WriteBlockOffset + (int)mapping));
+#else
+        writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)mapping));
+#endif
+        int pos = writer.writeByteIndex;
+
+        writeAction(writer);
+        writer.AlignToByte();
+
+        pos = writer.writeByteIndex - pos;
+        writer.Flush();
+        IncrementByteCount(message, true, pos);
 #if CLIENT
         GetPlayerTransportConnection().Send(writer.buffer, writer.writeByteIndex, reliable ? ENetReliability.Reliable : ENetReliability.Unreliable);
 #else
@@ -1375,17 +1434,14 @@ public static class NetFactory
     /// </summary>
     /// <param name="connections">Leave <see langword="null"/> to select all online users.</param>
     /// <exception cref="ArgumentException">Length is too long (must be at most <see cref="ushort.MaxValue"/>) or a <see cref="HighSpeedConnection"/> is used with a <see cref="ICustomNetMessageListener"/>.</exception>
-    public static void SendGeneric(DevkitServerMessage message, byte[] bytes, IReadOnlyList<ITransportConnection>? connections = null, int offset = 0, int length = -1, bool reliable = true)
+    public static void SendGeneric(DevkitServerMessage message, ArraySegment<byte> bytes, IReadOnlyList<ITransportConnection>? connections = null, bool reliable = true)
     {
         ThreadUtil.assertIsGameThread();
 
         DevkitServerModule.AssertIsDevkitServerClient();
 
-        if (length == -1)
-            length = bytes.Length - offset;
-
-        if (length > ushort.MaxValue)
-            throw new ArgumentException($"Length must be less than {ushort.MaxValue} B.", length == bytes.Length - offset ? nameof(bytes) : nameof(length));
+        if (bytes.Count > ushort.MaxValue)
+            throw new ArgumentException($"Length must be less than {ushort.MaxValue} B.", nameof(bytes));
 
         if (connections != null && (int)message >= DevkitServerBlockSize)
         {
@@ -1416,7 +1472,7 @@ public static class NetFactory
                 break;
             }
         }
-        NetPakWriter writer = DevkitServerModule.IsMainThread ? Writer : new NetPakWriter { buffer = new byte[length + 8] };
+        NetPakWriter writer = DevkitServerModule.IsMainThread ? Writer : new NetPakWriter { buffer = new byte[bytes.Count + 8] };
         writer.Reset();
         int enumIndex = writer.writeByteIndex;
 #if CLIENT
@@ -1424,11 +1480,11 @@ public static class NetFactory
 #else
         writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)message));
 #endif
-        writer.WriteUInt16((ushort)length);
-        writer.WriteBytes(bytes, offset, length);
+        writer.WriteUInt16((ushort)bytes.Count);
+        writer.WriteBytes(bytes.Array, bytes.Offset, bytes.Count);
         writer.Flush();
         ENetReliability reliability = reliable ? ENetReliability.Reliable : ENetReliability.Unreliable;
-        IncrementByteCount(message, true, length * connections.Count);
+        IncrementByteCount(message, true, bytes.Count * connections.Count);
 
         if (!anyConnectionsHaveAlteredIndexes)
         {
@@ -1461,7 +1517,111 @@ public static class NetFactory
 #else
                     writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)remoteMessage));
 #endif
-                    writer.WriteUInt16((ushort)length); // this has to be rewritten because the 32 bit scratch could intersect with the enum written above.
+                    writer.WriteUInt16((ushort)bytes.Count); // this has to be rewritten because the 32 bit scratch could intersect with the enum written above.
+                    writer.AlignToByte();
+                    writer.Flush();
+                    writer.writeByteIndex = oldIndex;
+                }
+
+                connection.Send(writer.buffer, oldIndex, reliability);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Send data of message type <see cref="DevkitServerMessage"/> to multiple users. Writes the message type and the byte data using a <see cref="NetPakWriter"/>.
+    /// </summary>
+    /// <param name="connections">Leave <see langword="null"/> to select all online users.</param>
+    /// <exception cref="ArgumentException">Length is too long (must be at most <see cref="ushort.MaxValue"/>) or a <see cref="HighSpeedConnection"/> is used with a <see cref="ICustomNetMessageListener"/>.</exception>
+    public static void SendGeneric(DevkitServerMessage message, Action<NetPakWriter> writeAction, IReadOnlyList<ITransportConnection>? connections = null, bool reliable = true)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        DevkitServerModule.AssertIsDevkitServerClient();
+
+        if (writeAction == null)
+            throw new ArgumentNullException(nameof(writeAction));
+
+        if (connections != null && (int)message >= DevkitServerBlockSize)
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                if (connections[i] is HighSpeedConnection)
+                    throw new ArgumentException("Not allowed to use HighSpeedConnections with ICustomNetMessageListeners.", nameof(connections));
+            }
+        }
+
+        connections ??= Provider.GatherRemoteClientConnections();
+        if (connections.Count == 0)
+            return;
+        bool anyConnectionsHaveAlteredIndexes = false;
+        Type? localMappingType = null;
+        if ((int)message >= DevkitServerBlockSize && CustomNetMessageListeners.InverseLocalMappings.TryGetValue(message, out localMappingType))
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                if (!CustomNetMessageListeners.RemoteMappings.TryGetValue(connections[i], out ConcurrentDictionary<Type, DevkitServerMessage> mappings)
+                    || !mappings.TryGetValue(localMappingType, out DevkitServerMessage remoteMessage)
+                    || remoteMessage == message)
+                {
+                    continue;
+                }
+
+                anyConnectionsHaveAlteredIndexes = true;
+                break;
+            }
+        }
+        NetPakWriter writer = DevkitServerModule.IsMainThread ? Writer : new NetPakWriter { buffer = new byte[128] };
+        writer.Reset();
+        int enumIndex = writer.writeByteIndex;
+#if CLIENT
+        writer.WriteEnum((EServerMessage)(WriteBlockOffset + (int)message));
+#else
+        writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)message));
+#endif
+        int pos = writer.writeByteIndex;
+
+        writeAction(writer);
+        writer.AlignToByte();
+
+        pos = writer.writeByteIndex - pos;
+
+        writer.Flush();
+        ENetReliability reliability = reliable ? ENetReliability.Reliable : ENetReliability.Unreliable;
+        IncrementByteCount(message, true, pos * connections.Count);
+
+        if (!anyConnectionsHaveAlteredIndexes)
+        {
+            for (int i = 0; i < connections.Count; ++i)
+                connections[i].Send(writer.buffer, writer.writeByteIndex, reliability);
+        }
+        else
+        {
+            // apply mappings
+            int oldIndex = writer.writeByteIndex;
+            DevkitServerMessage last = message;
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection connection = connections[i];
+
+                if (!CustomNetMessageListeners.RemoteMappings.TryGetValue(connection, out ConcurrentDictionary<Type, DevkitServerMessage> mappings)
+                    || !mappings.TryGetValue(localMappingType!, out DevkitServerMessage remoteMessage)
+                    || remoteMessage == message)
+                {
+                    remoteMessage = message;
+                }
+
+                if (remoteMessage != last)
+                {
+                    last = remoteMessage;
+
+                    writer.writeByteIndex = enumIndex;
+#if CLIENT
+                    writer.WriteEnum((EServerMessage)(WriteBlockOffset + (int)remoteMessage));
+#else
+                    writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)remoteMessage));
+#endif
+                    writeAction(writer);
                     writer.AlignToByte();
                     writer.Flush();
                     writer.writeByteIndex = oldIndex;

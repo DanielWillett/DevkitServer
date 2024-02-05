@@ -47,7 +47,7 @@ public static class CustomNetMessageListeners
         if ((listener.ReceivingSide & ConnectionSide.Server) == 0)
             throw new ArgumentException($"{listener.GetType().Name} does not support sending from client build.");
 
-        NetFactory.SendGeneric(listener.LocalMessageIndex, bytes, offset, length, reliable);
+        NetFactory.SendGeneric(listener.LocalMessageIndex, new ArraySegment<byte>(bytes, offset, length), reliable);
     }
 
 #elif SERVER
@@ -61,7 +61,7 @@ public static class CustomNetMessageListeners
     /// <param name="length">Number of bytes to read from <paramref name="bytes"/>.</param>
     /// <param name="reliable">Should this message use the reliable steam networking buffer?</param>
     /// <exception cref="ArgumentException">Length is too long (must be at most <see cref="ushort.MaxValue"/>) or a <see cref="HighSpeedConnection"/> is used with a <see cref="ICustomNetMessageListener"/>.</exception>
-    public static void Invoke(this ICustomNetMessageListener listener, ITransportConnection connection, byte[] bytes, int offset = 0, int length = -1, bool reliable = true)
+    public static void Invoke(this ICustomNetMessageListener listener, ArraySegment<byte> bytes, ITransportConnection connection, bool reliable = true)
     {
         if (listener == null)
             throw new ArgumentNullException(nameof(listener));
@@ -69,7 +69,7 @@ public static class CustomNetMessageListeners
         if ((listener.ReceivingSide & ConnectionSide.Client) == 0)
             throw new ArgumentException($"{listener.GetType().Name} does not support sending from server build.");
 
-        NetFactory.SendGeneric(listener.LocalMessageIndex, connection, bytes, offset, length, reliable);
+        NetFactory.SendGeneric(listener.LocalMessageIndex, bytes, connection, reliable);
     }
     /// <summary>
     /// Invoke this message on multiple clients (<paramref name="connections"/>).
@@ -80,7 +80,7 @@ public static class CustomNetMessageListeners
     /// <param name="length">Number of bytes to read from <paramref name="bytes"/>.</param>
     /// <param name="reliable">Should this message use the reliable steam networking buffer?</param>
     /// <exception cref="ArgumentException">Length is too long (must be at most <see cref="ushort.MaxValue"/>) or a <see cref="HighSpeedConnection"/> is used with a <see cref="ICustomNetMessageListener"/>.</exception>
-    public static void Invoke(this ICustomNetMessageListener listener, byte[] bytes, IReadOnlyList<ITransportConnection>? connections = null, int offset = 0, int length = -1, bool reliable = true)
+    public static void Invoke(this ICustomNetMessageListener listener, ArraySegment<byte> bytes, IReadOnlyList<ITransportConnection>? connections = null, bool reliable = true)
     {
         if (listener == null)
             throw new ArgumentNullException(nameof(listener));
@@ -88,7 +88,7 @@ public static class CustomNetMessageListeners
         if ((listener.ReceivingSide & ConnectionSide.Client) == 0)
             throw new ArgumentException($"{listener.GetType().Name} does not support sending from server build.");
 
-        NetFactory.SendGeneric(listener.LocalMessageIndex, bytes, connections, offset, length, reliable);
+        NetFactory.SendGeneric(listener.LocalMessageIndex, bytes, connections, reliable);
     }
 #endif
 

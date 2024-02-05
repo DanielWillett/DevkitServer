@@ -518,7 +518,7 @@ public class UserInput : MonoBehaviour
     {
         if (_packets.Count < 1) return;
         HandleFlushPackets(Writer);
-        NetFactory.SendGeneric(DevkitServerMessage.MovementRelay, Writer.Buffer, 0, Writer.Count, _bufferHasStop);
+        NetFactory.SendGeneric(DevkitServerMessage.MovementRelay, Writer.ToArraySegmentAndDontFlush(), _bufferHasStop);
         Writer.Flush();
         _bufferHasStop = false;
     }

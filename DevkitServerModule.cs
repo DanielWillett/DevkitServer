@@ -32,6 +32,7 @@ using DevkitServer.API.UI;
 using DevkitServer.API.UI.Icons;
 using DevkitServer.API.UI.Extensions;
 using DevkitServer.Core.Tools;
+using DevkitServer.Multiplayer.Movement;
 using DevkitServer.Players;
 using SDG.Framework.Utilities;
 #if DEBUG
@@ -639,6 +640,7 @@ public sealed class DevkitServerModule : IModuleNexus
                 DevkitServerConfig.ClearTempFolder();
 
             ClientFPSLimiter.StopPlayingOnEditorServer();
+            ClientUserMovement.StopPlayingOnEditorServer();
         }
 #endif
         if (!IsEditing || level != Level.BUILD_INDEX_GAME)
@@ -666,7 +668,10 @@ public sealed class DevkitServerModule : IModuleNexus
             if (Level.isEditor)
                 DevkitServerSpawnsTool.CheckExistingSpawnsForNodeComponents();
             if (IsEditing)
+            {
                 ClientFPSLimiter.StartPlayingOnEditorServer();
+                ClientUserMovement.StartPlayingOnEditorServer();
+            }
 #endif
         }
         else

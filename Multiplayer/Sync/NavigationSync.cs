@@ -322,7 +322,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
                     if (sync.IsOwner || sp.playerID.steamID.m_SteamID != sync.User!.SteamId.m_SteamID)
                         list.Add(sp.transportConnection);
                 }
-                NetFactory.SendGeneric(DevkitServerMessage.SendTileData, buffer, list, length: len, reliable: true, offset: offset);
+                NetFactory.SendGeneric(DevkitServerMessage.SendTileData, new ArraySegment<byte>(buffer, offset, len), list, reliable: true);
             }
 #endif
             sync.ReceiveNavigationData(buffer, offset + sizeof(ulong));
@@ -560,12 +560,11 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
                 offset += sizeof(int);
                 UnsafeBitConverter.GetBytes(ptr, (ushort)len, offset);
             }
-
-            NetFactory.SendGeneric(DevkitServerMessage.SendNavigationData, Buffer,
+            NetFactory.SendGeneric(DevkitServerMessage.SendNavigationData, new ArraySegment<byte>(Buffer, 0, index + len),
 #if SERVER
-                null,
+                default(IReadOnlyList<ITransportConnection>),
 #endif
-                length: index + len, reliable: true);
+                reliable: true);
 
             Logger.DevkitServer.LogDebug(Source, $"Sent nav data packet #{_packetId.Format()} {FormattingUtil.FormatCapacity(len, colorize: true)} ({FormattingUtil.FormatCapacity(_index, colorize: true)} / {FormattingUtil.FormatCapacity(_bufferLen, colorize: true)}).");
 
