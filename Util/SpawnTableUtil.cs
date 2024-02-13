@@ -979,7 +979,7 @@ public static class SpawnTableUtil
         if (!Level.isEditor || !EditorSpawns.isSpawning || spawnType is not SpawnType.Animal and not SpawnType.Player and not SpawnType.Vehicle and not SpawnType.Item and not SpawnType.Zombie)
             return false;
 
-        if (UserInput.ActiveTool is DevkitServerSpawnsTool tool)
+        if (UserControl.ActiveTool is DevkitServerSpawnsTool tool)
         {
             return tool.Type == spawnType;
         }

@@ -20,7 +20,7 @@ public class EditorInteractEx
     }
 #endif
     public static bool IsFlying => GetIsFlying != null && GetIsFlying();
-    public static Ray Ray => GetScreenRay == null ? UserInput.GetLocalLookRay() : GetScreenRay();
+    public static Ray Ray => GetScreenRay == null ? UserControl.GetLocalLookRay() : GetScreenRay();
     public static bool TryGetWorldHit(out RaycastHit hit)
     {
         if (GetWorldHit == null)

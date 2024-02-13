@@ -29,7 +29,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 #else
     public IClientTransport? Connection { get; internal set; }
 #endif
-    public UserInput Input { get; private set; } = null!;
+    public UserControl Control { get; private set; } = null!;
     /// <summary>
     /// Handles movement of remote clients.
     /// </summary>
@@ -56,7 +56,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     {
         get
         {
-            Transform? aim = Input.Aim;
+            Transform? aim = Control.Aim;
             return aim == null ? Vector3.zero : aim.transform.position;
         }
     }
@@ -67,7 +67,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     {
         get
         {
-            Transform? aim = Input.Aim;
+            Transform? aim = Control.Aim;
             return aim == null ? Quaternion.identity : aim.transform.rotation;
         }
     }
@@ -78,7 +78,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     {
         get
         {
-            Transform? aim = Input.Aim;
+            Transform? aim = Control.Aim;
             return aim == null ? Vector3.forward : aim.transform.forward;
         }
     }
@@ -86,7 +86,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     /// <summary>
     /// Active controller camera look object (like player.look.aim).
     /// </summary>
-    public Transform? ControllerLook => Input.Aim;
+    public Transform? ControllerLook => Control.Aim;
     private EditorUser()
     {
         Syncs = IntlSyncs.AsReadOnly();
@@ -106,7 +106,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
 #endif
         EditorObject = IsOwner ? Editor.editor.gameObject : new GameObject("Editor {" + SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture) + "}");
         DevkitServerGamemode.SetupEditorObject(EditorObject, this);
-        Input = EditorObject.GetComponent<UserInput>();
+        Control = EditorObject.GetComponent<UserControl>();
         Movement = EditorObject.GetComponent<UserMovement>();
         Transactions = EditorObject.GetComponent<UserTransactions>();
         Actions = EditorObject.GetComponent<EditorActions>();

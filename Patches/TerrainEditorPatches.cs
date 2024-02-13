@@ -399,7 +399,7 @@ internal static class TerrainEditorPatches
             EditorMessage.SendEditorMessage(DevkitServerModule.MessageLocalization.Translate("Syncing"));
             return false;
         }
-        if (UserInput.ActiveTool is TerrainEditor editor && GetTerrainBrushWorldPosition != null)
+        if (UserControl.ActiveTool is TerrainEditor editor && GetTerrainBrushWorldPosition != null)
         {
             TileSync? sync = TileSync.GetAuthority();
             TileSync.MapInvalidation? pendingSync = sync?.Pending;
@@ -454,14 +454,14 @@ internal static class TerrainEditorPatches
     [UsedImplicitly]
     private static void OnRampConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetRampStart == null || GetRampEnd == null) return;
+        if (!DevkitServerModule.IsEditing || UserControl.ActiveTool is not TerrainEditor editor || GetRampStart == null || GetRampEnd == null) return;
 
         ClientEvents.InvokeOnPaintRamp(new PaintRampProperties(bounds, GetRampStart(editor), GetRampEnd(editor), editor.heightmapBrushRadius, editor.heightmapBrushFalloff, CachedTime.DeltaTime));
     }
     [UsedImplicitly]
     private static void OnAdjustConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
+        if (!DevkitServerModule.IsEditing || UserControl.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
 
         ClientEvents.InvokeOnAdjustHeightmap(new AdjustHeightmapProperties(bounds, GetTerrainBrushWorldPosition(editor),
             editor.heightmapBrushRadius, editor.heightmapBrushFalloff,
@@ -471,7 +471,7 @@ internal static class TerrainEditorPatches
     [UsedImplicitly]
     private static void OnFlattenConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
+        if (!DevkitServerModule.IsEditing || UserControl.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
 
         ClientEvents.InvokeOnFlattenHeightmap(new FlattenHeightmapProperties(bounds, GetTerrainBrushWorldPosition(editor), DevkitLandscapeToolHeightmapOptions.instance.flattenMethod,
             editor.heightmapBrushRadius, editor.heightmapBrushFalloff,
@@ -481,7 +481,7 @@ internal static class TerrainEditorPatches
     [UsedImplicitly]
     private static void OnSmoothConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null || GetHeightmapSmoothTarget == null) return;
+        if (!DevkitServerModule.IsEditing || UserControl.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null || GetHeightmapSmoothTarget == null) return;
 
         ClientEvents.InvokeOnSmoothHeightmap(new SmoothHeightmapProperties(bounds, GetTerrainBrushWorldPosition(editor), DevkitLandscapeToolHeightmapOptions.instance.smoothMethod,
             editor.heightmapBrushRadius, editor.heightmapBrushFalloff,
@@ -490,7 +490,7 @@ internal static class TerrainEditorPatches
     [UsedImplicitly]
     private static void OnPaintConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
+        if (!DevkitServerModule.IsEditing || UserControl.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
 
         DevkitLandscapeToolSplatmapOptions settings = DevkitLandscapeToolSplatmapOptions.instance;
 
@@ -506,7 +506,7 @@ internal static class TerrainEditorPatches
     [UsedImplicitly]
     private static void OnAutoPaintConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
+        if (!DevkitServerModule.IsEditing || UserControl.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
 
         DevkitLandscapeToolSplatmapOptions settings = DevkitLandscapeToolSplatmapOptions.instance;
 
@@ -523,7 +523,7 @@ internal static class TerrainEditorPatches
     [UsedImplicitly]
     private static void OnPaintSmoothConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
+        if (!DevkitServerModule.IsEditing || UserControl.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
 
         ClientEvents.InvokeOnSmoothSplatmap(new SmoothSplatmapProperties(bounds, GetTerrainBrushWorldPosition(editor), DevkitLandscapeToolSplatmapOptions.instance.smoothMethod, editor.splatmapBrushRadius,
             editor.splatmapBrushFalloff, editor.splatmapBrushStrength, CachedTime.DeltaTime));
@@ -531,7 +531,7 @@ internal static class TerrainEditorPatches
     [UsedImplicitly]
     private static void OnHoleConfirm(Bounds bounds)
     {
-        if (!DevkitServerModule.IsEditing || UserInput.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
+        if (!DevkitServerModule.IsEditing || UserControl.ActiveTool is not TerrainEditor editor || GetTerrainBrushWorldPosition == null) return;
 
         ClientEvents.InvokeOnPaintHoles(new PaintHolesProperties(bounds, GetTerrainBrushWorldPosition(editor), editor.splatmapBrushRadius, InputEx.GetKey(KeyCode.LeftShift), CachedTime.DeltaTime));
     }

@@ -177,10 +177,10 @@ public static class CommandEx
         if ((mode & CommandExecutionMode.RequirePlaying) == CommandExecutionMode.RequirePlaying)
         {
 #if SERVER
-            if (!Provider.isServer || (mode & CommandExecutionMode.IgnoreControlMode) != 0 || ctx.EditorUser == null || ctx.EditorUser.Input.Controller != CameraController.Player)
+            if (!Provider.isServer || (mode & CommandExecutionMode.IgnoreControlMode) != 0 || ctx.EditorUser == null || ctx.EditorUser.Control.Controller != CameraController.Player)
                 throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBePlayer");
 #else
-            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserInput.LocalController != CameraController.Player : Level.isEditor)
+            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserControl.LocalController != CameraController.Player : Level.isEditor)
                 throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBePlayer");
 #endif
         }
@@ -188,10 +188,10 @@ public static class CommandEx
         if ((mode & CommandExecutionMode.RequireEditing) == CommandExecutionMode.RequireEditing)
         {
 #if SERVER
-            if (!Provider.isServer || !DevkitServerModule.IsEditing || (mode & CommandExecutionMode.IgnoreControlMode) != 0 || ctx.EditorUser != null && ctx.EditorUser.Input.Controller != CameraController.Editor)
+            if (!Provider.isServer || !DevkitServerModule.IsEditing || (mode & CommandExecutionMode.IgnoreControlMode) != 0 || ctx.EditorUser != null && ctx.EditorUser.Control.Controller != CameraController.Editor)
                 throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeEditor");
 #else
-            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserInput.LocalController != CameraController.Editor : !Level.isEditor)
+            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserControl.LocalController != CameraController.Editor : !Level.isEditor)
                 throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeEditor");
 #endif
         }
@@ -241,10 +241,10 @@ public static class CommandEx
         if ((mode & CommandExecutionMode.PlayerControlModeOnly) == CommandExecutionMode.PlayerControlModeOnly)
         {
 #if SERVER
-            if (ctx.EditorUser == null || ctx.EditorUser.Input.Controller != CameraController.Player)
+            if (ctx.EditorUser == null || ctx.EditorUser.Control.Controller != CameraController.Player)
                 throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeEditorPlayer");
 #else
-            if (!DevkitServerModule.IsEditing || UserInput.LocalController != CameraController.Player)
+            if (!DevkitServerModule.IsEditing || UserControl.LocalController != CameraController.Player)
                 throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeEditorPlayer");
 #endif
         }
@@ -269,7 +269,7 @@ public static class CommandEx
             if (!Provider.isServer)
                 return false;
 #else
-            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserInput.LocalController != CameraController.Player : Level.isEditor)
+            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserControl.LocalController != CameraController.Player : Level.isEditor)
                 return false;
 #endif
         }
@@ -280,7 +280,7 @@ public static class CommandEx
             if (!Provider.isServer || !DevkitServerModule.IsEditing)
                 return false;
 #else
-            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserInput.LocalController != CameraController.Editor : !Level.isEditor)
+            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserControl.LocalController != CameraController.Editor : !Level.isEditor)
                 return false;
 #endif
         }

@@ -2759,7 +2759,7 @@ public static class SpawnUtil
 
             Logger.DevkitServer.LogDebug(nameof(ReceiveSpawnInstantiation), $"Assigned {spawnType.GetLowercaseText()} spawnpoint NetId: {netId.Format()}.");
 
-            if (owner == Provider.client.m_SteamID && SpawnTableUtil.IsEditingSpawns(spawnType) && UserInput.ActiveTool is DevkitServerSpawnsTool spawnsTool)
+            if (owner == Provider.client.m_SteamID && SpawnTableUtil.IsEditingSpawns(spawnType) && UserControl.ActiveTool is DevkitServerSpawnsTool spawnsTool)
             {
                 if (spawnType is SpawnType.Item or SpawnType.Zombie)
                     spawnsTool.Select(RegionIdentifier.CreateUnsafe(index), true);

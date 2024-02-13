@@ -308,7 +308,7 @@ public class UserMovement : MonoBehaviour
     /// </summary>
     public static void SetEditorTransform(Vector3 position, Quaternion rotation)
     {
-        UserInput? input = EditorUser.User?.Input;
+        UserControl? input = EditorUser.User?.Control;
         Vector3 euler = rotation.eulerAngles;
         if (input == null) // singleplayer
         {
@@ -331,7 +331,7 @@ public class UserMovement : MonoBehaviour
     private static void ReceiveTransform(MessageContext ctx, ulong player, Vector3 pos, Vector2 eulerRotation, byte teleportId)
     {
         EditorUser? user = UserManager.FromId(player);
-        if (user == null || user.Input == null)
+        if (user == null || user.Control == null)
             return;
 
         UserMovement? movement = user.Movement;

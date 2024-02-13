@@ -52,7 +52,7 @@ internal static class ClientFPSLimiter
             return;
 
         bool isEditing = false;
-        IDevkitTool? activeTool = UserInput.ActiveTool;
+        IDevkitTool? activeTool = UserControl.ActiveTool;
         switch (activeTool)
         {
             case TerrainEditor:

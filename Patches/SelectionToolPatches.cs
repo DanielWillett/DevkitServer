@@ -261,7 +261,7 @@ internal static class SelectionToolPatches
     [UsedImplicitly]
     private static void OnRequestInstantiaion(Vector3 position)
     {
-        IDevkitTool? tool = UserInput.ActiveTool;
+        IDevkitTool? tool = UserControl.ActiveTool;
         if (!DevkitServerModule.IsEditing)
         {
             if (tool is SelectionTool tool2 && CallRequestInstantiation != null)

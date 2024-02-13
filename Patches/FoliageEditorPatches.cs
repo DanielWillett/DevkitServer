@@ -239,7 +239,7 @@ internal static class FoliageEditorPatches
     private static void OnRemoveInstances(FoliageTile foliageTile, FoliageInstanceList list, float sqrBrushRadius, float sqrBrushFalloffRadius, bool allowRemoveBaked, int sampleCount, int oldSampleCount)
     {
         if (sampleCount == oldSampleCount || !DevkitServerModule.IsEditing || !InputEx.GetKey(KeyCode.Mouse0) ||
-            GetFoliageBrushWorldPosition == null || UserInput.ActiveTool is not { } tool) return;
+            GetFoliageBrushWorldPosition == null || UserControl.ActiveTool is not { } tool) return;
 
         ClientEvents.InvokeOnRemoveFoliage(new RemoveFoliageProperties(GetFoliageBrushWorldPosition(tool), foliageTile,
             list, DevkitFoliageToolOptions.instance.brushRadius, DevkitFoliageToolOptions.instance.brushFalloff,

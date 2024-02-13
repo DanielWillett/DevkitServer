@@ -2207,26 +2207,26 @@ internal static class SpawnsEditorPatches
     }
     private static void Open(SpawnType type)
     {
-        if (UserInput.ActiveTool is DevkitServerSpawnsTool tool)
+        if (UserControl.ActiveTool is DevkitServerSpawnsTool tool)
             tool.Type = type;
         else
-            UserInput.ActiveTool = new DevkitServerSpawnsTool { Type = type };
+            UserControl.ActiveTool = new DevkitServerSpawnsTool { Type = type };
 
         if (Logger.Debug)
             Logger.DevkitServer.LogDebug(Source, $"Activated {type.Format()} spawn tool.");
     }
     private static void Close()
     {
-        if (UserInput.ActiveTool is not DevkitServerSpawnsTool tool)
+        if (UserControl.ActiveTool is not DevkitServerSpawnsTool tool)
         {
-            Logger.DevkitServer.LogDebug(Source, $"Spawn tool already deactivated (in place of {UserInput.ActiveTool.Format()}).");
+            Logger.DevkitServer.LogDebug(Source, $"Spawn tool already deactivated (in place of {UserControl.ActiveTool.Format()}).");
             return;
         }
 
         if (Logger.Debug)
             Logger.DevkitServer.LogDebug(Source, $"Deactivated {tool.Type.Format()} spawn tool.");
 
-        UserInput.ActiveTool = null;
+        UserControl.ActiveTool = null;
     }
 }
 #endif

@@ -228,7 +228,7 @@ internal static class CommandTests
                     return;
                 }
             }
-            if (Physics.Raycast(UserInput.GetLocalLookRay(), out RaycastHit hit, 8192f, unchecked((int)0xFFFFFFFF), QueryTriggerInteraction.Ignore))
+            if (Physics.Raycast(UserControl.GetLocalLookRay(), out RaycastHit hit, 8192f, unchecked((int)0xFFFFFFFF), QueryTriggerInteraction.Ignore))
             {
                 string dir = Path.Combine(DevkitServerConfig.Directory, "AssetExports", "Look", hit.transform.name);
                 if (Directory.Exists(dir))

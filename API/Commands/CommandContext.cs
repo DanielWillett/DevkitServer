@@ -1228,7 +1228,7 @@ public class CommandContext : Exception
     }
     private float GetDistance(float distance)
     {
-        return distance >= 0 ? distance : ((EditorUser == null ? !Level.isEditor : EditorUser.Input.Controller == CameraController.Player) ? 4f : 16f);
+        return distance >= 0 ? distance : ((EditorUser == null ? !Level.isEditor : EditorUser.Control.Controller == CameraController.Player) ? 4f : 16f);
     }
     private Transform? GetAim()
     {
@@ -1236,7 +1236,7 @@ public class CommandContext : Exception
             return null;
 
         if (EditorUser != null)
-            return EditorUser.IsOnline ? EditorUser.Input.Aim : null;
+            return EditorUser.IsOnline ? EditorUser.Control.Aim : null;
 
         return Caller?.player != null ? Caller.player.look.aim : MainCamera.instance.transform;
     }

@@ -689,7 +689,7 @@ internal static class PatchesMain
 #if CLIENT
     private static bool EditorInteractUpdatePrefix()
     {
-        return UserInput.LocalController is CameraController.Editor or CameraController.None;
+        return UserControl.LocalController is CameraController.Editor or CameraController.None;
     }
 #endif
     private static bool IsEditorMode(PlayerCaller caller)
@@ -698,10 +698,10 @@ internal static class PatchesMain
             return false;
 #if CLIENT
         if (caller.channel.IsLocalPlayer)
-            return UserInput.LocalController == CameraController.Editor;
+            return UserControl.LocalController == CameraController.Editor;
 #endif
         EditorUser? user = UserManager.FromId(caller.player.channel.owner.playerID.steamID.m_SteamID);
-        return !(user != null && user.Input.Controller == CameraController.Player);
+        return !(user != null && user.Control.Controller == CameraController.Player);
     }
     
     private static void PostfixLevelInit(ref IEnumerator __result)
@@ -837,7 +837,7 @@ internal static class PatchesMain
             DevkitServerModule.Fault();
         }
 
-        MethodInfo getController = UserInput.GetLocalControllerMethod;
+        MethodInfo getController = UserControl.GetLocalControllerMethod;
 
         List<CodeInstruction> ins = [..instructions];
         bool patchedOutPlayerUI = false;
@@ -989,11 +989,11 @@ internal static class PatchesMain
 
     private static bool IsPlayerControlledOrNotEditing()
     {
-        return !DevkitServerModule.IsEditing || !Level.isEditor || UserInput.LocalController == CameraController.Player;
+        return !DevkitServerModule.IsEditing || !Level.isEditor || UserControl.LocalController == CameraController.Player;
     }
     private static bool IsEditorControlledOrNotEditing()
     {
-        return !DevkitServerModule.IsEditing || !Level.isEditor || UserInput.LocalController == CameraController.Editor;
+        return !DevkitServerModule.IsEditing || !Level.isEditor || UserControl.LocalController == CameraController.Editor;
     }
 
     [UsedImplicitly]

@@ -145,7 +145,7 @@ public class EditorUIExtension : ContainerUIExtension
     {
         if (Container == null)
             return;
-        GameObject? ctrl = user.Input.ControllerObject;
+        GameObject? ctrl = user.Control.ControllerObject;
         if (ctrl == null)
             return;
         Vector3 screenPos = MainCamera.instance.WorldToViewportPoint(ctrl.transform.position + Vector3.up);

@@ -41,10 +41,10 @@ internal sealed class ControlCommand : DevkitServerCommand, ICommandLocalization
             string fmt = ctx.Translate("ControllerEditor");
             if (ChangeControllerEditor.Has(ctx.CallerId.m_SteamID))
             {
-                if (ctx.EditorUser!.Input.Controller == CameraController.Editor)
+                if (ctx.EditorUser!.Control.Controller == CameraController.Editor)
                     throw ctx.Reply("AlreadySet", fmt);
 
-                ctx.EditorUser.Input.Controller = CameraController.Editor;
+                ctx.EditorUser.Control.Controller = CameraController.Editor;
                 ctx.Reply("SetController", fmt);
             }
             else throw ctx.Reply("NoPermission", fmt);
@@ -54,10 +54,10 @@ internal sealed class ControlCommand : DevkitServerCommand, ICommandLocalization
             string fmt = ctx.Translate("ControllerPlayer");
             if (ChangeControllerPlayer.Has(ctx.CallerId.m_SteamID))
             {
-                if (ctx.EditorUser!.Input.Controller == CameraController.Player)
+                if (ctx.EditorUser!.Control.Controller == CameraController.Player)
                     throw ctx.Reply("AlreadySet", fmt);
 
-                ctx.EditorUser.Input.Controller = CameraController.Player;
+                ctx.EditorUser.Control.Controller = CameraController.Player;
                 ctx.Reply("SetController", fmt);
             }
             else throw ctx.Reply("NoPermission", fmt);

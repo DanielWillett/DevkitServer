@@ -18,12 +18,12 @@ namespace DevkitServer.Players;
 #if CLIENT
 [HarmonyPatch]
 #endif
-public class UserInput : MonoBehaviour
+public class UserControl : MonoBehaviour
 {
     private const string Source = "INPUT";
-    private static readonly CachedMulticastEvent<Action<EditorUser>> EventOnUserControllerUpdated = new CachedMulticastEvent<Action<EditorUser>>(typeof(UserInput), nameof(OnUserControllerUpdated));
+    private static readonly CachedMulticastEvent<Action<EditorUser>> EventOnUserControllerUpdated = new CachedMulticastEvent<Action<EditorUser>>(typeof(UserControl), nameof(OnUserControllerUpdated));
 #if SERVER
-    private static readonly CachedMulticastEvent<UserControllerUpdateRequested> EventOnUserControllerUpdateRequested = new CachedMulticastEvent<UserControllerUpdateRequested>(typeof(UserInput), nameof(OnUserControllerUpdateRequested));
+    private static readonly CachedMulticastEvent<UserControllerUpdateRequested> EventOnUserControllerUpdateRequested = new CachedMulticastEvent<UserControllerUpdateRequested>(typeof(UserControl), nameof(OnUserControllerUpdateRequested));
 #endif
 
     [UsedImplicitly]
@@ -34,13 +34,13 @@ public class UserInput : MonoBehaviour
     private static readonly NetCall RequestInitialState = new NetCall(DevkitServerNetCall.RequestInitialState);
 #if CLIENT
     // internal static CameraController CleaningUpController;
-    internal static MethodInfo GetLocalControllerMethod = typeof(UserInput).GetProperty(nameof(LocalController), BindingFlags.Static | BindingFlags.Public)?.GetMethod!;
+    internal static MethodInfo GetLocalControllerMethod = typeof(UserControl).GetProperty(nameof(LocalController), BindingFlags.Static | BindingFlags.Public)?.GetMethod!;
     public static CameraController LocalController
     {
         get
         {
-            if (DevkitServerModule.IsEditing && EditorUser.User?.Input is not null)
-                return EditorUser.User.Input.Controller;
+            if (DevkitServerModule.IsEditing && EditorUser.User?.Control is not null)
+                return EditorUser.User.Control.Controller;
 
             return Level.isEditor ? CameraController.Editor : (Level.isLoaded || Level.isLoading ? CameraController.Player : CameraController.None);
         }
@@ -49,8 +49,8 @@ public class UserInput : MonoBehaviour
     {
         get
         {
-            if (DevkitServerModule.IsEditing && EditorUser.User?.Input is not null && EditorUser.User.Input.Aim != null)
-                return EditorUser.User.Input.Aim;
+            if (DevkitServerModule.IsEditing && EditorUser.User?.Control is not null && EditorUser.User.Control.Aim != null)
+                return EditorUser.User.Control.Aim;
 
             return Level.isEditor || !Level.isLoaded ? MainCamera.instance.transform : Player.player.look.aim;
         }
@@ -144,7 +144,7 @@ public class UserInput : MonoBehaviour
         get => GetDevkitTool?.Invoke();
         set => SetDevkitTool?.Invoke(value);
     }
-    static UserInput()
+    static UserControl()
     {
         Type? type = Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract");
         if (type == null)
@@ -361,7 +361,7 @@ public class UserInput : MonoBehaviour
     {
         EditorUser? user = UserManager.FromId(steam64);
         if (user != null)
-            user.Input.Controller = controller;
+            user.Control.Controller = controller;
 
         ctx.Acknowledge();
     }
@@ -420,7 +420,7 @@ public class UserInput : MonoBehaviour
                 return StandardErrorCode.NoPermissions;
             }
 
-            user.Input.Controller = controller;
+            user.Control.Controller = controller;
             return StandardErrorCode.Success;
         }
         
@@ -432,8 +432,8 @@ public class UserInput : MonoBehaviour
 #if CLIENT
     public static Ray GetLocalLookRay()
     {
-        if (EditorUser.User != null && EditorUser.User.Input.Aim != null)
-            return new Ray(EditorUser.User.Input.Aim.position, EditorUser.User.Input.Aim.forward);
+        if (EditorUser.User != null && EditorUser.User.Control.Aim != null)
+            return new Ray(EditorUser.User.Control.Aim.position, EditorUser.User.Control.Aim.forward);
 
         return new Ray(MainCamera.instance.transform.position, MainCamera.instance.transform.forward);
     }

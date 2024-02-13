@@ -114,7 +114,7 @@ internal static class ClientUserMovement
         if (_packets.Length > 0)
         {
             ref EditorInputPacket packet = ref _packets[_packets.Length - 1];
-            if (UserInput.LocalController != CameraController.Editor && packet.LastFrameBeforeChangingController)
+            if (UserControl.LocalController != CameraController.Editor && packet.LastFrameBeforeChangingController)
                 return;
 
             // if (position == packet.Position && rotation == packet.Rotation)
@@ -126,7 +126,7 @@ internal static class ClientUserMovement
         newPacket.Rotation = rotation;
         // newPacket.DeltaTime = (float)(_lastTime - time);
         newPacket.ClientInputFrame = frame;
-        newPacket.LastFrameBeforeChangingController = UserInput.LocalController != CameraController.Editor;
+        newPacket.LastFrameBeforeChangingController = UserControl.LocalController != CameraController.Editor;
         newPacket.LastTeleportId = LastWasTeleport ? (byte)0 : LastTeleportId;
         LastWasTeleport = false;
         NetFactory.SendGeneric(DevkitServerMessage.MovementRelay, newPacket.WriteVersioned, false);

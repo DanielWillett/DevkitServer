@@ -16,7 +16,7 @@ public class DevkitServerGamemode : GameMode
     {
         EditorActions actions = editor.AddComponent<EditorActions>();
         actions.User = user;
-        editor.AddComponent<UserInput>().User = user;
+        editor.AddComponent<UserControl>().User = user;
         editor.AddComponent<UserTransactions>().User = user;
         editor.AddComponent<TileSync>().User = user;
         editor.AddComponent<ObjectSync>().User = user;

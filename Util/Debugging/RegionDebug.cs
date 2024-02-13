@@ -89,14 +89,14 @@ internal sealed class RegionDebug : MonoBehaviour
         if (!Level.isEditor || !_tilesEnabled && !_regionsEnabled || LoadingUI.isBlocked)
             return;
 
-        Transform? ctrlTransform = !DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null ? MainCamera.instance.transform.parent : EditorUser.User.Input.ControllerObject.transform;
+        Transform? ctrlTransform = !DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Control == null || EditorUser.User.Control.ControllerObject == null ? MainCamera.instance.transform.parent : EditorUser.User.Control.ControllerObject.transform;
         if (ctrlTransform == null) return;
         float yaw = ctrlTransform.rotation.eulerAngles.y;
         yaw %= 360;
         if (yaw < 0) yaw += 360;
         float y = 80;
         Label("<b>Position</b>: " + ctrlTransform.position.ToString("F2") + ", Yaw: " + yaw.ToString("F2") + "°", ref y);
-        Transform? aim = (!DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null ? MainCamera.instance.transform : EditorUser.User.Input.Aim);
+        Transform? aim = (!DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Control == null || EditorUser.User.Control.ControllerObject == null ? MainCamera.instance.transform : EditorUser.User.Control.Aim);
         if (aim != null)
         {
             string facing;
@@ -132,7 +132,7 @@ internal sealed class RegionDebug : MonoBehaviour
     
     private static void HandleGLRender()
     {
-        if (LoadingUI.isBlocked || !Level.isLoaded || UserInput.LocalController != CameraController.Editor)
+        if (LoadingUI.isBlocked || !Level.isLoaded || UserControl.LocalController != CameraController.Editor)
             return;
 
         GLUtility.matrix = Matrix4x4.identity;
@@ -160,7 +160,7 @@ internal sealed class RegionDebug : MonoBehaviour
             _avgLineHeight = avgLineHeight = Mathf.RoundToInt(y / ((index + 1) * 4f));
             index = -1;
         }
-        Transform? ctrlTransform = !DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Input == null || EditorUser.User.Input.ControllerObject == null ? MainCamera.instance.transform.parent : EditorUser.User.Input.ControllerObject.transform;
+        Transform? ctrlTransform = !DevkitServerModule.IsEditing || EditorUser.User == null || EditorUser.User.Control == null || EditorUser.User.Control.ControllerObject == null ? MainCamera.instance.transform.parent : EditorUser.User.Control.ControllerObject.transform;
         if (_tilesEnabled)
         {
             LandscapeTile? current = ctrlTransform == null ? null : Landscape.getTile(ctrlTransform.position);

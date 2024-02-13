@@ -42,7 +42,7 @@ public static class ObjectIconPresets
     }
     internal static void UpdateEditCache(LevelObject levelObject, ObjectAsset asset)
     {
-        Transform? ctrl = UserInput.LocalAim;
+        Transform? ctrl = UserControl.LocalAim;
         if (ctrl == null)
             return;
 
