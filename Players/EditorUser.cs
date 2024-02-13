@@ -30,6 +30,10 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     public IClientTransport? Connection { get; internal set; }
 #endif
     public UserInput Input { get; private set; } = null!;
+    /// <summary>
+    /// Handles movement of remote clients.
+    /// </summary>
+    /// <remarks><see langword="null"/> on the local user.</remarks>
     public UserMovement? Movement { get; private set; }
     public UserTransactions Transactions { get; private set; } = null!;
     public EditorActions Actions { get; private set; } = null!;

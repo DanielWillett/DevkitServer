@@ -7,7 +7,7 @@ using SDG.NetPak;
 using Version = System.Version;
 
 namespace DevkitServer.Multiplayer.Movement;
-public static class ServerUserMovement
+internal static class ServerUserMovement
 {
     private static bool _init;
     private static bool _subbed;

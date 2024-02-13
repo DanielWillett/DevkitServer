@@ -9,6 +9,7 @@ internal struct EditorInputPacket
     public Vector3 Position;
     public Vector2 Rotation;
     public bool LastFrameBeforeChangingController;
+    public byte LastTeleportId;
     // public float DeltaTime;
 
     private const int PosIntBitCt = 16;
@@ -29,8 +30,8 @@ internal struct EditorInputPacket
             return false;
         if (!reader.ReadClampedFloat(RotIntBitCt, RotDecBitCt, out packet.Rotation.y))
             return false;
-        // if (!reader.ReadClampedFloat(DtIntBitCt, DtDecBitCt, out packet.DeltaTime))
-        //     return false;
+        if (!reader.ReadUInt8(out packet.LastTeleportId))
+            return false;
 
         return reader.ReadBit(out packet.LastFrameBeforeChangingController);
     }
@@ -49,7 +50,8 @@ internal struct EditorInputPacket
         writer.WriteClampedVector3(Position, PosIntBitCt, PosDecBitCt);
         writer.WriteClampedFloat(Rotation.x, RotIntBitCt, RotDecBitCt);
         writer.WriteClampedFloat(Rotation.y, RotIntBitCt, RotDecBitCt);
-        // writer.WriteClampedFloat(DeltaTime, DtIntBitCt, DtDecBitCt);
+
+        writer.WriteUInt8(LastTeleportId);
 
         writer.WriteBit(LastFrameBeforeChangingController);
     }

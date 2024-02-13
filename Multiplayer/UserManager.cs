@@ -222,7 +222,7 @@ public static class UserManager
         UsersIntl.Remove(user);
         EventOnUserDisconnected.TryInvoke(user);
 #if SERVER
-        user.Input.Save();
+        user.Movement?.Save();
 #endif
         user.IsOnline = false;
         user.Player = null;
