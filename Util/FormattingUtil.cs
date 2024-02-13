@@ -8,9 +8,11 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
 using System.Text.RegularExpressions;
-using DevkitServer.Multiplayer;
 using Unturned.SystemEx;
 using Version = System.Version;
+#if SERVER
+using DevkitServer.Multiplayer;
+#endif
 
 namespace DevkitServer.Util;
 
@@ -914,9 +916,9 @@ public static class FormattingUtil
         {
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
                 return connection.GetAddressString(true);
-
-            CSteamID steamId = UserManager.TryGetSteamId(connection);
-
+#if SERVER
+            CSteamID steamId = DevkitServerModule.IsMainThread ? UserManager.TryGetSteamId(connection) : CSteamID.Nil;
+#endif
             if (connection.TryGetIPv4Address(out uint addr))
             {
                 if (addr == 0 && connection.GetAddress() is { } ipAddress)
@@ -936,7 +938,7 @@ public static class FormattingUtil
                                port.ToString(CultureInfo.InvariantCulture);
                     }
                 }
-
+#if SERVER
                 if (steamId.UserSteam64())
                 {
                     str += " (".ColorizeNoReset(FormattingColorType.Punctuation) +
@@ -944,11 +946,12 @@ public static class FormattingUtil
                                .ColorizeNoReset(FormattingColorType.Number) +
                            ")".ColorizeNoReset(FormattingColorType.Punctuation);
                 }
-
+#endif
                 return str + ForegroundResetSequence;
             }
 
             str = GetColorPrefix(ToArgb(new Color32(204, 255, 102, 255))) + (connection.GetAddressString(true) ?? "<unknown address>") + ForegroundResetSequence;
+#if SERVER
             if (steamId.UserSteam64())
             {
                 str += " (".ColorizeNoReset(FormattingColorType.Punctuation) +
@@ -956,7 +959,7 @@ public static class FormattingUtil
                            .ColorizeNoReset(FormattingColorType.Number) +
                        ")".ColorizeNoReset(FormattingColorType.Punctuation);
             }
-
+#endif
             return str;
         }
 

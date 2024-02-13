@@ -344,7 +344,7 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
                     if (sync.IsOwner || sp.playerID.steamID.m_SteamID != sync.User!.SteamId.m_SteamID)
                         list.Add(sp.transportConnection);
                 }
-                NetFactory.SendGeneric(DevkitServerMessage.SendTileData, buffer, list, length: len, reliable: true, offset: offset);
+                NetFactory.SendGeneric(DevkitServerMessage.SendTileData, new ArraySegment<byte>(buffer, offset, len), list, reliable: true);
             }
 #endif
             sync.ReceiveTileData(buffer, offset + sizeof(ulong));
@@ -578,11 +578,11 @@ public sealed class TileSync : AuthoritativeSync<TileSync>
 
             Buffer.BlockCopy(_buffer, _index, PacketBuffer, PacketHeaderSize + sizeof(ulong), len);
 
-            NetFactory.SendGeneric(DevkitServerMessage.SendTileData, PacketBuffer,
+            NetFactory.SendGeneric(DevkitServerMessage.SendTileData, new ArraySegment<byte>(PacketBuffer, 0, PacketHeaderSize + sizeof(ulong) + len),
 #if SERVER
-                null,
+                default(IReadOnlyList<ITransportConnection>),
 #endif
-                length: PacketHeaderSize + sizeof(ulong) + len, reliable: true);
+                reliable: true);
             // DevkitServerUtility.PrintBytesHex(PacketBuffer, len: PacketHeaderSize + sizeof(ulong) + len);
             Logger.DevkitServer.LogDebug(Source, $"#{_packetId.Format()} Tile: {tile.coord.Format()} Length: {len.Format()}.");
 

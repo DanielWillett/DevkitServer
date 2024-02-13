@@ -2,6 +2,7 @@
 using DevkitServer.API;
 using DevkitServer.API.UI.Extensions;
 using DevkitServer.Multiplayer;
+using DevkitServer.Multiplayer.Movement;
 using DevkitServer.Players;
 using Version = System.Version;
 
@@ -22,7 +23,7 @@ public class EditorUIExtension : ContainerUIExtension
         {
             UserManager.OnUserConnected += OnUserConnected;
             UserManager.OnUserDisconnected += OnUserDisconnected;
-            UserInput.OnUserEditorPositionUpdated += OnUserEditorPositionUpdated;
+            UserMovement.OnUserMoved += OnUserEditorPositionUpdated;
             _subbed = true;
         }
 
@@ -83,7 +84,7 @@ public class EditorUIExtension : ContainerUIExtension
         {
             UserManager.OnUserConnected -= OnUserConnected;
             UserManager.OnUserDisconnected -= OnUserDisconnected;
-            UserInput.OnUserEditorPositionUpdated -= OnUserEditorPositionUpdated;
+            UserMovement.OnUserMoved -= OnUserEditorPositionUpdated;
             _subbed = false;
         }
         if (_testLabel != null)
@@ -158,8 +159,13 @@ public class EditorUIExtension : ContainerUIExtension
             Vector2 adjScreenPos = Container.ViewportToNormalizedPosition(screenPos);
             nametag.PositionScale_X = adjScreenPos.x;
             nametag.PositionScale_Y = adjScreenPos.y;
+
             if (!nametag.IsVisible)
                 nametag.IsVisible = true;
+
+            float magnitude = new Vector2(adjScreenPos.x - 0.5f, adjScreenPos.y - 0.5f).magnitude;
+            float t = Mathf.InverseLerp(0.0125f, 0.1f, magnitude);
+            nametag.TextColor = new SleekColor(ESleekTint.FONT, Mathf.Lerp(0.1f, 0.75f, t));
         }
     }
 

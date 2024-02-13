@@ -2,6 +2,7 @@
 using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Movement;
 using DevkitServer.Multiplayer.Sync;
 #if CLIENT
 using DevkitServer.Configuration;
@@ -29,6 +30,11 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     public IClientTransport? Connection { get; internal set; }
 #endif
     public UserInput Input { get; private set; } = null!;
+    /// <summary>
+    /// Handles movement of remote clients.
+    /// </summary>
+    /// <remarks><see langword="null"/> on the local user.</remarks>
+    public UserMovement? Movement { get; private set; }
     public UserTransactions Transactions { get; private set; } = null!;
     public EditorActions Actions { get; private set; } = null!;
     public TileSync TileSync { get; private set; } = null!;
@@ -101,6 +107,7 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
         EditorObject = IsOwner ? Editor.editor.gameObject : new GameObject("Editor {" + SteamId.m_SteamID.ToString(CultureInfo.InvariantCulture) + "}");
         DevkitServerGamemode.SetupEditorObject(EditorObject, this);
         Input = EditorObject.GetComponent<UserInput>();
+        Movement = EditorObject.GetComponent<UserMovement>();
         Transactions = EditorObject.GetComponent<UserTransactions>();
         Actions = EditorObject.GetComponent<EditorActions>();
         TileSync = EditorObject.GetComponent<TileSync>();

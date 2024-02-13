@@ -1,12 +1,12 @@
-﻿using System.Reflection;
-using System.Reflection.Emit;
-using DevkitServer.API;
-using DevkitServer.API.Abstractions;
+﻿using DevkitServer.API;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Players;
 #if SERVER
+using DevkitServer.API.Abstractions;
 using DevkitServer.Levels;
 using DevkitServer.Multiplayer.Networking;
+using System.Reflection;
+using System.Reflection.Emit;
 #endif
 #if CLIENT
 using DevkitServer.Multiplayer.Networking;
@@ -73,6 +73,14 @@ public static class UserManager
     public static EditorUser? FromConnection(ITransportConnection connection)
     {
         if (connection == null) return null;
+
+        CSteamID steamId = TryGetSteamId(connection);
+        if (steamId.UserSteam64())
+        {
+            EditorUser? user = FromId(steamId.m_SteamID);
+            if (user != null)
+                return user;
+        }
 
         lock (UsersIntl)
         {
@@ -214,7 +222,7 @@ public static class UserManager
         UsersIntl.Remove(user);
         EventOnUserDisconnected.TryInvoke(user);
 #if SERVER
-        user.Input.Save();
+        user.Movement?.Save();
 #endif
         user.IsOnline = false;
         user.Player = null;

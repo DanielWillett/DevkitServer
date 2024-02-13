@@ -563,6 +563,13 @@ public static class DevkitServerUtility
 
         read = new Local(@new, def2);
         bool eng = LanguageIsEnglish;
+
+        if (primaryPath == null || englishPath == null)
+        {
+            Directory.CreateDirectory(directory);
+            WriteData(Path.Combine(directory, "English.dat"), eng ? @new : def2);
+        }
+
         if (Directory.Exists(directory))
         {
             if (englishPath != null && !File.Exists(englishPath))

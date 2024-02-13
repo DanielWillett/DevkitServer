@@ -3,6 +3,7 @@ using DevkitServer.API.Devkit;
 using DevkitServer.API.Permissions;
 using DevkitServer.API.UI;
 using DevkitServer.Configuration;
+using DevkitServer.Multiplayer.Movement;
 using DevkitServer.Players;
 using SDG.Framework.Devkit;
 using SDG.Framework.Devkit.Interactable;
@@ -47,6 +48,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
     public Vector3 ReferencePosition { get; private set; }
     public Quaternion ReferenceRotation { get; private set; }
     public Vector3 ReferenceScale { get; private set; }
+    public bool HasReferenceRotation { get; private set; }
     public bool HasReferenceScale { get; private set; }
     public Quaternion HandleRotation { get; private set; }
     public bool CanTranslate
@@ -493,6 +495,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                 ReferenceRotation = handleRotation;
                 ReferenceScale = Vector3.one;
                 HasReferenceScale = false;
+                HasReferenceRotation = false;
                 _hasLetGoOfCtrlSinceCopyTransform = !ctrl;
                 if (DevkitSelectionManager.selection.Count == 1)
                 {
@@ -501,6 +504,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                     {
                         ReferenceScale = selection.gameObject.transform.localScale;
                         HasReferenceScale = true;
+                        HasReferenceRotation = !globalSpace;
                     }
                 }
             }
@@ -512,13 +516,13 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         if (InputEx.GetKeyDown(KeyCode.N) && HasReferenceTransform)
         {
             if (hasTransformPerms)
-                SimulateHandleMovement(ReferencePosition, ReferenceRotation, ReferenceScale, true, HasReferenceScale);
+                SimulateHandleMovement(ReferencePosition, ReferenceRotation, ReferenceScale, HasReferenceRotation, HasReferenceScale);
             else
                 EditorMessage.SendNoPermissionMessage(transformPermissionMissing);
         }
         if (InputEx.GetKeyDown(ControlsSettings.focus))
         {
-            UserInput.SetEditorTransform(HandlePosition - 15f * MainCamera.instance.transform.forward, MainCamera.instance.transform.rotation);
+            UserMovement.SetEditorTransform(HandlePosition - 15f * MainCamera.instance.transform.forward, MainCamera.instance.transform.rotation);
         }
     }
     protected void BeginAreaSelecting()

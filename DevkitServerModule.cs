@@ -32,6 +32,7 @@ using DevkitServer.API.UI;
 using DevkitServer.API.UI.Icons;
 using DevkitServer.API.UI.Extensions;
 using DevkitServer.Core.Tools;
+using DevkitServer.Multiplayer.Movement;
 using DevkitServer.Players;
 using SDG.Framework.Utilities;
 #if DEBUG
@@ -39,6 +40,7 @@ using DevkitServer.Util.Debugging;
 #endif
 #endif
 #if SERVER
+using DevkitServer.Multiplayer.Movement;
 using HighlightingSystem;
 #endif
 
@@ -626,9 +628,9 @@ public sealed class DevkitServerModule : IModuleNexus
 #endif
     private static void OnLevelLoaded(int level)
     {
-#if CLIENT
         if (level == Level.BUILD_INDEX_MENU)
         {
+#if CLIENT
             LoadingUI? loadingUI = UIAccessTools.LoadingUI;
             if (loadingUI == null)
             {
@@ -639,8 +641,9 @@ public sealed class DevkitServerModule : IModuleNexus
                 DevkitServerConfig.ClearTempFolder();
 
             ClientFPSLimiter.StopPlayingOnEditorServer();
-        }
+            ClientUserMovement.StopPlayingOnEditorServer();
 #endif
+        }
         if (!IsEditing || level != Level.BUILD_INDEX_GAME)
         {
             if (GameObjectHost.TryGetComponent(out TileSync tileSync))
@@ -660,13 +663,18 @@ public sealed class DevkitServerModule : IModuleNexus
             {
                 if (DevkitServerConfig.Config.TcpSettings is { EnableHighSpeedSupport: true })
                     _ = HighSpeedServer.Instance;
+
+                ServerUserMovement.StartPlayingOnEditorServer();
             }
 #elif CLIENT
             OptionsSettings.hints = true;
             if (Level.isEditor)
                 DevkitServerSpawnsTool.CheckExistingSpawnsForNodeComponents();
             if (IsEditing)
+            {
                 ClientFPSLimiter.StartPlayingOnEditorServer();
+                ClientUserMovement.StartPlayingOnEditorServer();
+            }
 #endif
         }
         else
@@ -1022,6 +1030,7 @@ public sealed class DevkitServerModule : IModuleNexus
         Level.onPrePreLevelLoaded -= OnPrePreLevelLoaded;
         SaveManager.onPostSave -= OnSaved;
 #if SERVER
+        ServerUserMovement.StopPlayingOnEditorServer();
         Provider.onServerConnected -= UserManager.AddUser;
         Provider.onEnemyConnected -= UserManager.OnAccepted;
         Provider.onServerDisconnected -= UserManager.RemoveUser;

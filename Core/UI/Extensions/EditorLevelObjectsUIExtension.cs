@@ -4,8 +4,8 @@ using DevkitServer.API.UI.Extensions;
 using DevkitServer.API.UI.Extensions.Members;
 using DevkitServer.API.UI.Icons;
 using DevkitServer.Configuration;
+using DevkitServer.Multiplayer.Movement;
 using DevkitServer.Patches;
-using DevkitServer.Players;
 using HarmonyLib;
 using System.Reflection;
 
@@ -289,7 +289,7 @@ internal class EditorLevelObjectsUIExtension : UIExtension
 
         ObjectIconGenerator.ObjectIconMetrics metrics = ObjectIconGenerator.GetObjectIconMetrics(asset);
         ObjectIconGenerator.GetCameraPositionAndRotation(in metrics, target.transform, out Vector3 position, out Quaternion rotation);
-        UserInput.SetEditorTransform(position, rotation);
+        UserMovement.SetEditorTransform(position, rotation);
 
         if (editing)
             ObjectIconPresets.UpdateEditCache(target, target.asset);

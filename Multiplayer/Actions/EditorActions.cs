@@ -336,9 +336,9 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 #endif
         WriteEditBuffer(Writer, 0, _pendingActions.Count);
 #if CLIENT
-        NetFactory.SendGeneric(DevkitServerMessage.ActionRelay, Writer.Buffer, 0, Writer.Count, true);
+        NetFactory.SendGeneric(DevkitServerMessage.ActionRelay, Writer.ToArraySegmentAndDontFlush(), true);
 #else
-        NetFactory.SendGeneric(DevkitServerMessage.ActionRelay, Writer.Buffer, DevkitServerUtility.GetAllConnections(), 0, Writer.Count, true);
+        NetFactory.SendGeneric(DevkitServerMessage.ActionRelay, Writer.ToArraySegmentAndDontFlush(), DevkitServerUtility.GetAllConnections(), true);
 #endif
         Writer.Flush();
     }
@@ -650,7 +650,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
             if (anyInvalid)
             {
                 WriteEditBuffer(Writer, stInd, _pendingActions.Count - stInd);
-                NetFactory.SendGeneric(DevkitServerMessage.ActionRelay, Writer.Buffer, list, 0, Writer.Count, true);
+                NetFactory.SendGeneric(DevkitServerMessage.ActionRelay, Writer.ToArraySegmentAndDontFlush(), list, true);
                 Writer.Flush();
             }
 

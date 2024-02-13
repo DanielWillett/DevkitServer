@@ -1,7 +1,9 @@
 ﻿using DevkitServer.Multiplayer.Networking;
-using System.Collections.Concurrent;
-using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Util.Encoding;
+using System.Collections.Concurrent;
+#if SERVER
+using DevkitServer.Multiplayer.Levels;
+#endif
 
 namespace DevkitServer.API.Multiplayer;
 
@@ -47,7 +49,7 @@ public static class CustomNetMessageListeners
         if ((listener.ReceivingSide & ConnectionSide.Server) == 0)
             throw new ArgumentException($"{listener.GetType().Name} does not support sending from client build.");
 
-        NetFactory.SendGeneric(listener.LocalMessageIndex, bytes, offset, length, reliable);
+        NetFactory.SendGeneric(listener.LocalMessageIndex, new ArraySegment<byte>(bytes, offset, length), reliable);
     }
 
 #elif SERVER
@@ -57,11 +59,9 @@ public static class CustomNetMessageListeners
     /// </summary>
     /// <param name="connection">User to send the data to.</param>
     /// <param name="bytes">Raw data to send.</param>
-    /// <param name="offset">What index to start reading from <paramref name="bytes"/> at.</param>
-    /// <param name="length">Number of bytes to read from <paramref name="bytes"/>.</param>
     /// <param name="reliable">Should this message use the reliable steam networking buffer?</param>
     /// <exception cref="ArgumentException">Length is too long (must be at most <see cref="ushort.MaxValue"/>) or a <see cref="HighSpeedConnection"/> is used with a <see cref="ICustomNetMessageListener"/>.</exception>
-    public static void Invoke(this ICustomNetMessageListener listener, ITransportConnection connection, byte[] bytes, int offset = 0, int length = -1, bool reliable = true)
+    public static void Invoke(this ICustomNetMessageListener listener, ArraySegment<byte> bytes, ITransportConnection connection, bool reliable = true)
     {
         if (listener == null)
             throw new ArgumentNullException(nameof(listener));
@@ -69,18 +69,16 @@ public static class CustomNetMessageListeners
         if ((listener.ReceivingSide & ConnectionSide.Client) == 0)
             throw new ArgumentException($"{listener.GetType().Name} does not support sending from server build.");
 
-        NetFactory.SendGeneric(listener.LocalMessageIndex, connection, bytes, offset, length, reliable);
+        NetFactory.SendGeneric(listener.LocalMessageIndex, bytes, connection, reliable);
     }
     /// <summary>
     /// Invoke this message on multiple clients (<paramref name="connections"/>).
     /// </summary>
     /// <param name="connections">Users to send the data to, or <see langword="null"/> to select all users.</param>
     /// <param name="bytes">Raw data to send.</param>
-    /// <param name="offset">What index to start reading from <paramref name="bytes"/> at.</param>
-    /// <param name="length">Number of bytes to read from <paramref name="bytes"/>.</param>
     /// <param name="reliable">Should this message use the reliable steam networking buffer?</param>
     /// <exception cref="ArgumentException">Length is too long (must be at most <see cref="ushort.MaxValue"/>) or a <see cref="HighSpeedConnection"/> is used with a <see cref="ICustomNetMessageListener"/>.</exception>
-    public static void Invoke(this ICustomNetMessageListener listener, byte[] bytes, IReadOnlyList<ITransportConnection>? connections = null, int offset = 0, int length = -1, bool reliable = true)
+    public static void Invoke(this ICustomNetMessageListener listener, ArraySegment<byte> bytes, IReadOnlyList<ITransportConnection>? connections = null, bool reliable = true)
     {
         if (listener == null)
             throw new ArgumentNullException(nameof(listener));
@@ -88,7 +86,7 @@ public static class CustomNetMessageListeners
         if ((listener.ReceivingSide & ConnectionSide.Client) == 0)
             throw new ArgumentException($"{listener.GetType().Name} does not support sending from server build.");
 
-        NetFactory.SendGeneric(listener.LocalMessageIndex, bytes, connections, offset, length, reliable);
+        NetFactory.SendGeneric(listener.LocalMessageIndex, bytes, connections, reliable);
     }
 #endif
 
