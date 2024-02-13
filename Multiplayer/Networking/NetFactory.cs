@@ -154,7 +154,7 @@ public static class NetFactory
         methods[(int)DevkitServerMessage.SendTileData] = typeof(TileSync).GetMethod(nameof(TileSync.ReceiveTileData), BindingFlags.NonPublic | BindingFlags.Static)!;
         methods[(int)DevkitServerMessage.SendNavigationData] = typeof(NavigationSync).GetMethod(nameof(NavigationSync.ReceiveNavigationData), BindingFlags.NonPublic | BindingFlags.Static)!;
 #elif SERVER
-        methods[(int)DevkitServerMessage.MovementRelay] = typeof(ServerUserMovement).GetMethod(nameof(ServerUserMovement.ReceiveMovementPacket), BindingFlags.NonPublic | BindingFlags.Static)!;
+        methods[(int)DevkitServerMessage.MovementRelay] = typeof(ServerUserMovement).GetMethod(nameof(ServerUserMovement.ReceiveUserMovementPacket), BindingFlags.NonPublic | BindingFlags.Static)!;
 #endif
         methods[(int)DevkitServerMessage.ActionRelay] = typeof(EditorActions).GetMethod(nameof(EditorActions.ReceiveActionRelay), BindingFlags.NonPublic | BindingFlags.Static)!;
 

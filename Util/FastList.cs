@@ -1,10 +1,10 @@
 ﻿namespace DevkitServer.Util;
-internal struct FastStructArray<T> : IEnumerable<T> where T : struct
+internal struct FastList<T> : IEnumerable<T> where T : struct
 {
-    private T[] _array;
+    private T[]? _array;
     private static T[]? _empty;
-    public FastStructArray() : this(8) { }
-    public FastStructArray(int capacity)
+    public FastList() : this(8) { }
+    public FastList(int capacity)
     {
         _array = new T[capacity];
     }
@@ -37,25 +37,28 @@ internal struct FastStructArray<T> : IEnumerable<T> where T : struct
     /// <summary>
     /// This is an unsafe reference and can change whenever you write to this array.
     /// </summary>
-    public ref T Add(T value)
+    public ref T Add(in T value)
     {
         return ref Insert(Length, value);
     }
-    public T RemoveAt(int index) => RemoveAt(ref index);
-    public T RemoveAt(ref int index)
+    public void Clear()
     {
-        if (index < 0)
+        Offset = 0;
+        Length = 0;
+    }
+    public void RemoveAt(int index) => RemoveAt(ref index);
+    public void RemoveAt(ref int index)
+    {
+        if (index < 0 || _array == null)
             throw new ArgumentOutOfRangeException(nameof(index));
 
-        T valByVal;
         if (index == Length - 1)
         {
             ref T val = ref _array[index + Offset];
-            valByVal = val;
             val = default;
             --Length;
             --index;
-            return valByVal;
+            return;
         }
 
         index += Offset;
@@ -64,7 +67,6 @@ internal struct FastStructArray<T> : IEnumerable<T> where T : struct
 
         _array ??= Empty();
         ref T val2 = ref _array[index];
-        valByVal = val2;
         val2 = default;
         if (Offset >= Length) // move all of segment to beginning of array
         {
@@ -109,18 +111,22 @@ internal struct FastStructArray<T> : IEnumerable<T> where T : struct
             index -= Offset + 1;
         }
         --Length;
-        return valByVal;
     }
 
     /// <summary>
     /// This is an unsafe reference and can change whenever you write to this array.
     /// </summary>
-    public ref T Insert(int index, T value)
+    public ref T Insert(int index, in T value)
     {
         _array ??= Empty();
+
+        if (index > Length || index < 0)
+            throw new ArgumentOutOfRangeException(nameof(index));
+
         index += Offset;
-        if (index < _array.Length)
+        if (Length + 1 <= _array.Length)
         {
+            // last element and there's room at the end of the buffer
             if (index == Length)
             {
                 ref T byRef = ref _array[index];
@@ -130,6 +136,7 @@ internal struct FastStructArray<T> : IEnumerable<T> where T : struct
             }
 
             int len;
+            // can shift buffer left, so shift the segment [0, index] left and insert at index
             if (Offset > 0 && index - Offset < Length / 2)
             {
                 len = index - Offset + 1;
@@ -138,11 +145,13 @@ internal struct FastStructArray<T> : IEnumerable<T> where T : struct
                 ref T byRef = ref _array[len];
                 byRef = value;
                 ++Length;
+                --Offset;
                 return ref byRef;
             }
 
-            len = Length + Offset - index;
-            for (int i = len; i >= 0; --i)
+            // can shift buffer right, so shift the segment (index, length) to the right and insert at index
+            len = Length - (index - Offset);
+            for (int i = len - 2; i >= 0; --i)
                 _array[i + index + 1] = _array[i + index];
             ref T byRef2 = ref _array[index];
             byRef2 = value;

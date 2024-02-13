@@ -12,14 +12,17 @@ public static class ClientUserMovement
     private static bool _subbed;
     private static uint _simulationFrame;
     private static int _frame;
-    private static double _lastTime;
-    private static FastStructArray<EditorInputPacket> _packets;
+    // private static double _lastTime;
+    private static FastList<EditorInputPacket> _packets;
     internal static void StartPlayingOnEditorServer()
     {
         if (_init)
             return;
 
+        _simulationFrame = 0;
+        _frame = 0;
         _init = true;
+        _packets.Clear();
 
         if (_subbed)
             return;
@@ -33,6 +36,9 @@ public static class ClientUserMovement
             return;
 
         _init = false;
+        _simulationFrame = 0;
+        _frame = 0;
+        _packets = default;
 
         if (!_subbed)
             return;
@@ -58,31 +64,24 @@ public static class ClientUserMovement
 
         Transform editorObject = myUser.EditorObject.transform;
         Vector3 position = editorObject.position;
-        Vector3 rotation = editorObject.eulerAngles;
-        double time = _lastTime;
-        _lastTime = Time.realtimeSinceStartupAsDouble;
+        Vector2 rotation = new Vector2(MainCamera.instance.transform.localRotation.x, editorObject.eulerAngles.y);
+        // double time = _lastTime;
+        // _lastTime = Time.realtimeSinceStartupAsDouble;
         if (_packets.Length > 0)
         {
             ref EditorInputPacket packet = ref _packets[_packets.Length - 1];
             if (UserInput.LocalController != CameraController.Editor && packet.LastFrameBeforeChangingController)
                 return;
-
-            if (MathfEx.IsNearlyEqual(packet.Rotation.x, rotation.x)
-                && MathfEx.IsNearlyEqual(packet.Rotation.y, rotation.y)
-                && MathfEx.IsNearlyEqual(packet.Position, position))
-            {
-                return;
-            }
         }
 
         EditorInputPacket newPacket = default;
         newPacket.Position = position;
         newPacket.Rotation = rotation;
-        newPacket.DeltaTime = (float)(_lastTime - time);
+        // newPacket.DeltaTime = (float)(_lastTime - time);
         newPacket.ClientInputFrame = frame;
         newPacket.LastFrameBeforeChangingController = UserInput.LocalController != CameraController.Editor;
 
-        NetFactory.SendGeneric(DevkitServerMessage.MovementRelay, newPacket.Write, false);
+        NetFactory.SendGeneric(DevkitServerMessage.MovementRelay, newPacket.WriteVersioned, false);
         _packets.Add(newPacket);
     }
     private static void ReceiveLocalPacket(in EditorInputPacket packet)
@@ -94,19 +93,24 @@ public static class ClientUserMovement
                 _packets.RemoveAt(ref i);
         }
     }
-    private static void ReceiveRemotePacket(CSteamID player, in EditorInputPacket packet)
+    private static void ReceiveRemotePacket(CSteamID userId, in EditorInputPacket packet)
     {
+        if (UserManager.FromId(userId) is not { Movement: { } movement })
+            return;
 
+        movement.ReceivePacket(in packet);
+        Logger.DevkitServer.LogConditional(nameof(ClientUserMovement), $"Received my own packet ({packet.ClientInputFrame.Format()}), dequeued. There are now {_packets.Length.Format()} packet(s) in the buffer.");
     }
     internal static void ReceiveRemoteMovementPackets(NetPakReader reader)
     {
+        int sizeStart = reader.readByteIndex;
         if (!reader.ReadUInt8(out byte playerCount))
             goto fail;
 
         ulong clientSteamId = Provider.client.m_SteamID;
         if (!reader.ReadUInt32(out uint vNum))
             goto fail;
-        Version version = new Version((int)((vNum << 24) & 0xFF), (int)((vNum << 16) & 0xFF), (int)((vNum << 8) & 0xFF), (int)(vNum & 0xFF));
+        Version version = new Version((int)((vNum >> 24) & 0xFF), (int)((vNum >> 16) & 0xFF), (int)((vNum >> 8) & 0xFF), (int)(vNum & 0xFF));
 
         for (int i = 0; i < playerCount; ++i)
         {
@@ -133,9 +137,11 @@ public static class ClientUserMovement
         }
 
 
+        NetFactory.IncrementByteCount(DevkitServerMessage.MovementRelay, false, reader.readByteIndex - sizeStart);
         return;
 
         fail:
+        NetFactory.IncrementByteCount(DevkitServerMessage.MovementRelay, false, reader.readByteIndex - sizeStart);
         Logger.DevkitServer.LogError(nameof(ReceiveRemoteMovementPackets), "Reading failed while receiving remote input packets.");
     }
 }

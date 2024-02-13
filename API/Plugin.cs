@@ -1,6 +1,5 @@
 ﻿using System.Globalization;
 using DevkitServer.API.Abstractions;
-using DevkitServer.API.Logging;
 using DevkitServer.Plugins;
 using DevkitServer.Core.Logging.Loggers;
 #if CLIENT
@@ -163,11 +162,13 @@ public abstract class Plugin<TConfig> : Plugin, IDevkitServerPlugin<TConfig> whe
     /// Path to the config file relative to the plugin's data directory.
     /// </summary>
     /// <remarks>Will not be used if the path isn't under the plugin's data directory.</remarks>
-    public virtual string RelativeMainConfigFileName => "config_main.json";
+    public virtual string RelativeMainConfigFileName => "." + Path.DirectorySeparatorChar + "config_main.json";
     protected Plugin()
     {
         // ReSharper disable once VirtualMemberCallInConstructor (Reason: expecting literal string override)
         string path = RelativeMainConfigFileName;
+        if (!Path.IsPathRooted(path))
+            path = Path.Combine(DataDirectory, path);
         if (!FileUtil.IsChildOf(DataDirectory, path))
         {
             this.LogWarning($"Main config directory {path.Format()} is not valid. Must be a child of {DataDirectory.Format()}.");

@@ -1,7 +1,9 @@
 ﻿using DevkitServer.Multiplayer.Networking;
-using System.Collections.Concurrent;
-using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Util.Encoding;
+using System.Collections.Concurrent;
+#if SERVER
+using DevkitServer.Multiplayer.Levels;
+#endif
 
 namespace DevkitServer.API.Multiplayer;
 
@@ -57,8 +59,6 @@ public static class CustomNetMessageListeners
     /// </summary>
     /// <param name="connection">User to send the data to.</param>
     /// <param name="bytes">Raw data to send.</param>
-    /// <param name="offset">What index to start reading from <paramref name="bytes"/> at.</param>
-    /// <param name="length">Number of bytes to read from <paramref name="bytes"/>.</param>
     /// <param name="reliable">Should this message use the reliable steam networking buffer?</param>
     /// <exception cref="ArgumentException">Length is too long (must be at most <see cref="ushort.MaxValue"/>) or a <see cref="HighSpeedConnection"/> is used with a <see cref="ICustomNetMessageListener"/>.</exception>
     public static void Invoke(this ICustomNetMessageListener listener, ArraySegment<byte> bytes, ITransportConnection connection, bool reliable = true)
@@ -76,8 +76,6 @@ public static class CustomNetMessageListeners
     /// </summary>
     /// <param name="connections">Users to send the data to, or <see langword="null"/> to select all users.</param>
     /// <param name="bytes">Raw data to send.</param>
-    /// <param name="offset">What index to start reading from <paramref name="bytes"/> at.</param>
-    /// <param name="length">Number of bytes to read from <paramref name="bytes"/>.</param>
     /// <param name="reliable">Should this message use the reliable steam networking buffer?</param>
     /// <exception cref="ArgumentException">Length is too long (must be at most <see cref="ushort.MaxValue"/>) or a <see cref="HighSpeedConnection"/> is used with a <see cref="ICustomNetMessageListener"/>.</exception>
     public static void Invoke(this ICustomNetMessageListener listener, ArraySegment<byte> bytes, IReadOnlyList<ITransportConnection>? connections = null, bool reliable = true)

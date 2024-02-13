@@ -917,7 +917,7 @@ public static class FormattingUtil
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None)
                 return connection.GetAddressString(true);
 #if SERVER
-            CSteamID steamId = UserManager.TryGetSteamId(connection);
+            CSteamID steamId = DevkitServerModule.IsMainThread ? UserManager.TryGetSteamId(connection) : CSteamID.Nil;
 #endif
             if (connection.TryGetIPv4Address(out uint addr))
             {

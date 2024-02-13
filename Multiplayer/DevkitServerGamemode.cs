@@ -1,4 +1,5 @@
 ﻿using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Movement;
 using DevkitServer.Players;
 using DevkitServer.Multiplayer.Sync;
 #if SERVER
@@ -22,12 +23,14 @@ public class DevkitServerGamemode : GameMode
         editor.AddComponent<HierarchySync>().User = user;
         editor.AddComponent<NavigationSync>().User = user;
         editor.AddComponent<RoadSync>().User = user;
-#if CLIENT
         bool isOwner = user.IsOwner;
+#if CLIENT
         actions.IsOwner = isOwner;
         if (!isOwner)
             editor.AddComponent<UserTPVControl>().User = user;
 #endif
+        if (!isOwner)
+            editor.AddComponent<UserMovement>().User = user;
     }
 #if SERVER
     public static ClientInfo GetClientInfo(CSteamID user)
