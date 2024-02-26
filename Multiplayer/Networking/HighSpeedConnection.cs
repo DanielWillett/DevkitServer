@@ -62,7 +62,7 @@ public class HighSpeedConnection : ITransportConnection
         _netBuffer.BufferProgressUpdated += OnBufferProgressUpdatedIntl;
     }
 
-    private void OnBufferProgressUpdatedIntl(int bytesDownloaded, int totalBytes) => BufferProgressUpdated?.Invoke(bytesDownloaded, totalBytes);
+    private void OnBufferProgressUpdatedIntl(long bytesDownloaded, long totalBytes) => BufferProgressUpdated?.Invoke(bytesDownloaded, totalBytes);
 
     public void Dispose()
     {

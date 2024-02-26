@@ -22,7 +22,7 @@ public abstract class BaseLargeMessageTransmissionClientHandler
     /// <summary>
     /// Total number of bytes expected to be sent.
     /// </summary>
-    public int TotalBytes { get; internal set; }
+    public long TotalBytes { get; internal set; }
 
     /// <summary>
     /// Time at which the download first started.
@@ -57,7 +57,7 @@ public abstract class BaseLargeMessageTransmissionClientHandler
     /// <summary>
     /// Total number of bytes that have been received
     /// </summary>
-    public int ReceivedBytes { get; internal set; }
+    public long ReceivedBytes { get; internal set; }
 
     /// <summary>
     /// Total packets expected to be sent.
@@ -92,6 +92,7 @@ public abstract class BaseLargeMessageTransmissionClientHandler
     /// <summary>
     /// Set to true whenever something is changed. You must set this to false after flushing changes or override to use this property.
     /// </summary>
+    /// <remarks>This could be set on a worker thread for high speed connections.</remarks>
     public virtual bool IsDirty { get; internal set; }
 
     /// <summary>

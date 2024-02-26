@@ -1,4 +1,4 @@
-﻿#define TIME_TRANSACTIONS
+﻿//#define TIME_TRANSACTIONS
 using DevkitServer.API;
 using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Sync;

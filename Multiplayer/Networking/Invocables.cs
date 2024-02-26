@@ -79,7 +79,7 @@ public class NetCallCustom : BaseNetCall
     public delegate void Method(MessageContext context, ByteReader reader);
     public delegate Task MethodAsync(MessageContext context, ByteReader reader);
     private readonly ByteWriter _writer;
-    private bool throwOnError;
+    private bool _throwOnError;
     internal NetCallCustom(DevkitServerNetCall method, int capacity = 0, bool highSpeed = false) : this((ushort)method, capacity, highSpeed) { }
     internal NetCallCustom(ushort method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
@@ -97,17 +97,17 @@ public class NetCallCustom : BaseNetCall
     {
         _writer = new ByteWriter(true, capacity + MessageOverhead.MaximumSize);
     }
-    internal override void SetThrowOnError(bool value) => throwOnError = value;
+    internal override void SetThrowOnError(bool value) => _throwOnError = value;
     public override bool Read(ArraySegment<byte> message, out object[] parameters)
     {
-        ByteReader reader = new ByteReader { ThrowOnError = throwOnError };
+        ByteReader reader = new ByteReader { ThrowOnError = _throwOnError };
         reader.LoadNew(message);
         parameters = [ null!, reader ];
         return true;
     }
     public bool Read(ArraySegment<byte> message, out ByteReader reader)
     {
-        reader = new ByteReader { ThrowOnError = throwOnError };
+        reader = new ByteReader { ThrowOnError = _throwOnError };
         reader.LoadNew(message);
         return true;
     }
@@ -285,6 +285,88 @@ public class NetCallCustom : BaseNetCall
             task);
         return task2;
     }
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, WriterTask task, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            lock (_writer)
+            {
+                _writer.Flush();
+                task(_writer);
+                for (int i = 0; i < connections.Count; ++i)
+                {
+                    ITransportConnection transportConnection = connections[i];
+                    MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                    _writer.ReplaceOverhead(ref overhead);
+                    transportConnection.Send(_writer.ToArray());
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, WriterTask task, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            lock (_writer)
+            {
+                _writer.Flush();
+                task(_writer);
+                for (int i = 0; i < connections.Count; ++i)
+                {
+                    ITransportConnection transportConnection = connections[i];
+                    MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                    _writer.ReplaceOverhead(ref overhead);
+                    transportConnection.Send(_writer.ToArray());
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 /// <summary> For querying only </summary>
 public abstract class NetCallRaw : BaseNetCall
@@ -427,6 +509,76 @@ public sealed class NetCall : BaseNetCall
             );
         return task;
     }
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(overhead.GetBytes());
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(overhead.GetBytes());
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 public sealed class NetCallRaw<T> : NetCallRaw
 {
@@ -624,6 +776,76 @@ public sealed class NetCallRaw<T> : NetCallRaw
     }
 
     public byte[] Write(ref MessageOverhead overhead, T arg) => _writer.Get(ref overhead, arg);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T arg, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T arg, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 /// <summary>Leave any reader or writer null to auto-fill.</summary>
 public sealed class NetCallRaw<T1, T2> : NetCallRaw
@@ -826,6 +1048,76 @@ public sealed class NetCallRaw<T1, T2> : NetCallRaw
 
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2)
         => _writer.Get(ref overhead, arg1, arg2);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 /// <summary>Leave any reader or writer null to auto-fill.</summary>
 public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
@@ -1030,6 +1322,76 @@ public sealed class NetCallRaw<T1, T2, T3> : NetCallRaw
 
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3)
         => _writer.Get(ref overhead, arg1, arg2, arg3);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 /// <summary>Leave any reader or writer null to auto-fill.</summary>
 public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
@@ -1234,6 +1596,76 @@ public sealed class NetCallRaw<T1, T2, T3, T4> : NetCallRaw
 
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
         => _writer.Get(ref overhead, arg1, arg2, arg3, arg4);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 /// <summary>Leave any reader or writer null to auto-fill.</summary>
 public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
@@ -1439,6 +1871,76 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5> : NetCallRaw
 
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
         => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 /// <summary>Leave any reader or writer null to auto-fill.</summary>
 public sealed class NetCallRaw<T1, T2, T3, T4, T5, T6> : NetCallRaw
@@ -1645,6 +2147,76 @@ public sealed class NetCallRaw<T1, T2, T3, T4, T5, T6> : NetCallRaw
 
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
         => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 public sealed class NetCall<T> : DynamicNetCall
 {
@@ -1840,6 +2412,76 @@ public sealed class NetCall<T> : DynamicNetCall
 
     public byte[] Write(ref MessageOverhead overhead, T arg)
         => _writer.Get(ref overhead, arg);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T arg, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T arg, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 public sealed class NetCall<T1, T2> : DynamicNetCall
 {
@@ -2036,6 +2678,76 @@ public sealed class NetCall<T1, T2> : DynamicNetCall
 
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2)
         => _writer.Get(ref overhead, arg1, arg2);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 public sealed class NetCall<T1, T2, T3> : DynamicNetCall
 {
@@ -2233,6 +2945,76 @@ public sealed class NetCall<T1, T2, T3> : DynamicNetCall
 
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3)
         => _writer.Get(ref overhead, arg1, arg2, arg3);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
 {
@@ -2431,6 +3213,76 @@ public sealed class NetCall<T1, T2, T3, T4> : DynamicNetCall
 
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
         => _writer.Get(ref overhead, arg1, arg2, arg3, arg4);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
 {
@@ -2630,6 +3482,76 @@ public sealed class NetCall<T1, T2, T3, T4, T5> : DynamicNetCall
 
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
         => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
 {
@@ -2830,6 +3752,76 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6> : DynamicNetCall
 
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
         => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 
 public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
@@ -3045,6 +4037,76 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7> : DynamicNetCall
 
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
         => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 
 public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
@@ -3247,6 +4309,76 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8> : DynamicNetCall
 
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
         => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
 {
@@ -3449,6 +4581,76 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9> : DynamicNetCall
 
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
         => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }
 public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNetCall
 {
@@ -3652,4 +4854,74 @@ public sealed class NetCall<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> : DynamicNe
 
     public byte[] Write(ref MessageOverhead overhead, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)
         => _writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+#if SERVER
+    public NetTask[] Request(BaseNetCall listener, IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = listener.Listen(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(RequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+    public NetTask[] RequestAck(IReadOnlyList<ITransportConnection> connections, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
+    {
+        int c = 0;
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                Logger.DevkitServer.LogError("NET INVOCABLES", $"Error sending method {Id.Format()} to null connection {i.Format()}.");
+            else ++c;
+        }
+        NetTask[] tasks = new NetTask[c];
+        for (int i = 0; i < connections.Count; ++i)
+        {
+            if (connections[i] == null)
+                continue;
+
+            tasks[i] = ListenAck(timeoutMs);
+        }
+
+        try
+        {
+            for (int i = 0; i < connections.Count; ++i)
+            {
+                ITransportConnection transportConnection = connections[i];
+                MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | (transportConnection is HighSpeedConnection ? MessageFlags.HighSpeed : MessageFlags.None), Guid, Id, 0, tasks[i].RequestId);
+                transportConnection.Send(_writer.Get(ref overhead, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError("NET INVOCABLES", ex, $"Error sending method {Id.Format()} to {connections.Count.Format()} connection(s).");
+        }
+
+        return tasks;
+    }
+#endif
 }

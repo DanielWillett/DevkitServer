@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
 using System.Text.RegularExpressions;
+using DevkitServer.Util.Encoding;
 using Unturned.SystemEx;
 using Version = System.Version;
 #if SERVER
@@ -354,11 +355,9 @@ public static class FormattingUtil
 
         return new string(outp, 0, outpInd - 1);
     }
-
-    [Pure]
-    public static string FormatCapacity(long length, int decimals = 1, bool colorize = false)
+    private static void SetSizeCodes()
     {
-        _sizeCodes ??=
+        _sizeCodes =
         [
             "B",
             "KiB",
@@ -369,18 +368,61 @@ public static class FormattingUtil
             "EiB"
         ];
 
-        if (_sizeIncrements == null)
-        {
-            _sizeIncrements = new double[_sizeCodes.Length];
-            for (int i = 0; i < _sizeCodes.Length; ++i)
-                _sizeIncrements[i] = Math.Pow(1024, i);
-        }
+        _sizeIncrements = new double[_sizeCodes.Length];
+        for (int i = 0; i < _sizeCodes.Length; ++i)
+            _sizeIncrements[i] = Math.Pow(1024, i);
+    }
 
-        string numStr;
+    /// <summary>
+    /// Counts the amount of characters that will be returned by <see cref="FormatCapacity(long,Span{char},int,bool)"/>
+    /// </summary>
+    [Pure]
+    public static int GetCapacityLength(long length, int decimals = 1)
+    {
+        if (_sizeCodes == null)
+            SetSizeCodes();
+
+        if (length == 0)
+            return 2 + decimals;
+
+        bool neg = length < 0;
+        length = Math.Abs(length);
+
+        double incr = Math.Log(length, 1024);
+        int inc;
+        if (incr % 1 > 0.8)
+            inc = (int)Math.Ceiling(incr);
+        else
+            inc = (int)Math.Floor(incr);
+
+        if (inc >= _sizeIncrements!.Length)
+            inc = _sizeIncrements.Length - 1;
+
+        double len = length / _sizeIncrements[inc];
+        if (neg) len = -len;
+
+        Span<char> format = stackalloc char[1 + DevkitServerUtility.CountDigits(decimals)];
+        format[0] = 'N';
+        decimals.TryFormat(format[1..], out _, provider: CultureInfo.InvariantCulture);
+        return (neg ? 1 : 0) + DevkitServerUtility.CountDigits((long)Math.Floor(len), commas: true) + 2 + decimals + _sizeCodes![inc].Length;
+    }
+
+    /// <summary>
+    /// Format a byte size into a display string. Use <see cref="GetCapacityLength"/> to get the length of <paramref name="output"/>.
+    /// </summary>
+    public static int FormatCapacity(long length, Span<char> output, int decimals = 1)
+    {
+        if (_sizeCodes == null)
+            SetSizeCodes();
+
+        Span<char> format = stackalloc char[1 + DevkitServerUtility.CountDigits(decimals)];
+        format[0] = 'N';
+        decimals.TryFormat(format[1..], out _, provider: CultureInfo.InvariantCulture);
+        int written;
         if (length == 0)
         {
-            numStr = 0.ToString("N" + Math.Max(0, decimals).ToString(CultureInfo.CurrentCulture));
-            return colorize ? numStr.Colorize(FormattingColorType.Number) : numStr;
+            0.TryFormat(output, out written, format, CultureInfo.CurrentCulture);
+            return written;
         }
 
         bool neg = length < 0;
@@ -393,14 +435,60 @@ public static class FormattingUtil
         else
             inc = (int)Math.Floor(incr);
 
-        if (inc >= _sizeIncrements.Length)
+        if (inc >= _sizeIncrements!.Length)
             inc = _sizeIncrements.Length - 1;
 
         double len = length / _sizeIncrements[inc];
         if (neg) len = -len;
 
-        numStr = len.ToString("N" + Math.Max(0, decimals).ToString(CultureInfo.CurrentCulture));
-        return (colorize ? numStr.ColorizeNoReset(FormattingColorType.Number) : numStr) + " " + (colorize ? _sizeCodes[inc].Colorize(FormattingColorType.Struct) : _sizeCodes[inc]);
+        len.TryFormat(output, out written, format, CultureInfo.CurrentCulture);
+        output[written] = ' ';
+        ReadOnlySpan<char> sizeCode = (ReadOnlySpan<char>)_sizeCodes![inc];
+        sizeCode.CopyTo(output[(written + 1)..]);
+        return written + 1 + sizeCode.Length;
+    }
+
+    /// <summary>
+    /// Format a byte size into a display string.
+    /// </summary>
+    /// <param name="colorize">Format the output using the current console settings.</param>
+    [Pure]
+    public static string FormatCapacity(long length, int decimals = 1, bool colorize = false)
+    {
+        if (_sizeCodes == null)
+            SetSizeCodes();
+
+        string numStr;
+        if (length == 0)
+        {
+            numStr = 0.ToString("N" + Math.Max(0, decimals).ToString(CultureInfo.CurrentCulture));
+            return numStr;
+        }
+
+        bool neg = length < 0;
+        length = Math.Abs(length);
+
+        double incr = Math.Log(length, 1024);
+        int inc;
+        if (incr % 1 > 0.8)
+            inc = (int)Math.Ceiling(incr);
+        else
+            inc = (int)Math.Floor(incr);
+
+        if (inc >= _sizeIncrements!.Length)
+            inc = _sizeIncrements.Length - 1;
+
+        double len = length / _sizeIncrements[inc];
+        if (neg) len = -len;
+
+        Span<char> format = stackalloc char[1 + DevkitServerUtility.CountDigits(decimals)];
+        format[0] = 'N';
+        decimals.TryFormat(format[1..], out _, provider: CultureInfo.InvariantCulture);
+        numStr = len.ToString(new string(format));
+        if (colorize)
+            return numStr.ColorizeNoReset(FormattingColorType.Number) + " " + _sizeCodes![inc].Colorize(FormattingColorType.Struct);
+
+        return numStr + " " + _sizeCodes![inc];
     }
 
     /// <summary>
@@ -803,6 +891,31 @@ public static class FormattingUtil
     }
 
     /// <summary>
+    /// Formats any enumerable of object for easier viewing in the console. Most common types have custom formatting.
+    /// </summary>
+    /// <remarks>Any objects implementing <see cref="ITerminalFormattable"/> will use their custom format implementation.</remarks>
+    public static string FormatList(this IEnumerable enumerable, string? format = null)
+    {
+        StringBuilder sb = new StringBuilder("[".ColorizeNoReset(FormattingColorType.Punctuation));
+        bool first = true;
+        foreach (object? obj in enumerable)
+        {
+            if (!first)
+                sb.Append(", ".ColorizeNoReset(FormattingColorType.Punctuation));
+            else
+            {
+                first = false;
+                sb.Append(' ');
+            }
+
+            sb.Append(obj.Format(format));
+        }
+
+        sb.Append((first ? "]" : " ]").Colorize(FormattingColorType.Punctuation));
+        return sb.ToString();
+    }
+
+    /// <summary>
     /// Formats any object for easier viewing in the console. Most common types have custom formatting.
     /// </summary>
     /// <remarks>Any objects implementing <see cref="ITerminalFormattable"/> will use their custom format implementation.</remarks>
@@ -1033,14 +1146,13 @@ public static class FormattingUtil
                 return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.StructColor) + str + ForegroundResetSequence;
 
             if (type.IsArray)
-            {
-                return (type.GetElementType().Format() + "[".Colorize(FormattingColorType.Punctuation) +
-                        ((Array)obj).Length.ToString(CultureInfo.InvariantCulture).Colorize(NumberColor) +
-                        "]".Colorize(FormattingColorType.Punctuation));
-            }
+                return FormatList((Array)obj, format);
 
             return GetColorPrefix(FormatProvider.StackCleaner.Configuration.Colors!.ClassColor) + str + ForegroundResetSequence;
         }
+
+        if (type is IEnumerable e)
+            return FormatList(e, format);
 
         return str;
     }
@@ -1262,60 +1374,65 @@ public static class FormattingUtil
     /// Construct a reset suffix based on the current settings.
     /// </summary>
     public static string GetResetSuffix() => FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None ? string.Empty : ForegroundResetSequence;
-    
+
     /// <summary>
     /// Format the given bytes in hexadecimal (base 16) columns.
     /// </summary>
+    /// <remarks>Recommended to use <see cref="FormatBinary(ReadOnlySpan{byte},BinaryStringFormat)"/> or <see cref="FormatBinary(ReadOnlySpan{byte},Span{char},BinaryStringFormat)"/> if it fits your use case.</remarks>
     /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static string GetBytesHex(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1, bool formatMessageOverhead = false)
     {
-        return BytesToString(bytes, columnCount, offset, len, "X2", formatMessageOverhead);
+        return FormatBinary(bytes, columnCount, offset, len, "X2", formatMessageOverhead);
     }
 
     /// <summary>
     /// Format the given bytes in decimal (base 10) columns.
     /// </summary>
+    /// <remarks>Recommended to use <see cref="FormatBinary(ReadOnlySpan{byte},BinaryStringFormat)"/> or <see cref="FormatBinary(ReadOnlySpan{byte},Span{char},BinaryStringFormat)"/> if it fits your use case.</remarks>
     /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static string GetBytesDec(byte[] bytes, int columnCount = 64, int offset = 0, int len = -1, bool formatMessageOverhead = false)
     {
-        return BytesToString(bytes, columnCount, offset, len, "000", formatMessageOverhead);
+        return FormatBinary(bytes, columnCount, offset, len, "000", formatMessageOverhead);
     }
 
     /// <summary>
     /// Format the given bytes in hexadecimal (base 16) columns.
     /// </summary>
+    /// <remarks>Recommended to use <see cref="FormatBinary(ReadOnlySpan{byte},BinaryStringFormat)"/> or <see cref="FormatBinary(ReadOnlySpan{byte},Span{char},BinaryStringFormat)"/> if it fits your use case.</remarks>
     /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static unsafe string GetBytesHex(byte* bytes, int len, int columnCount = 64, int offset = 0, bool formatMessageOverhead = false)
     {
-        return BytesToString(bytes, columnCount, offset, len, "X2", formatMessageOverhead);
+        return FormatBinary(bytes, columnCount, offset, len, "X2", formatMessageOverhead);
     }
 
     /// <summary>
     /// Format the given bytes in decimal (base 10) columns.
     /// </summary>
+    /// <remarks>Recommended to use <see cref="FormatBinary(ReadOnlySpan{byte},BinaryStringFormat)"/> or <see cref="FormatBinary(ReadOnlySpan{byte},Span{char},BinaryStringFormat)"/> if it fits your use case.</remarks>
     /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
     public static unsafe string GetBytesDec(byte* bytes, int len, int columnCount = 64, int offset = 0, bool formatMessageOverhead = false)
     {
-        return BytesToString(bytes, columnCount, offset, len, "000", formatMessageOverhead);
+        return FormatBinary(bytes, columnCount, offset, len, "000", formatMessageOverhead);
     }
 
     /// <summary>
     /// Format the given bytes in the given <paramref name="fmt"/> into columns. The format should return a fixed length string.
     /// </summary>
+    /// <remarks>Recommended to use <see cref="FormatBinary(ReadOnlySpan{byte},BinaryStringFormat)"/> or <see cref="FormatBinary(ReadOnlySpan{byte},Span{char},BinaryStringFormat)"/> if it fits your use case.</remarks>
     /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
-    public static unsafe string BytesToString(byte[] bytes, int columnCount, int offset, int len, string fmt, bool formatMessageOverhead = false)
+    public static unsafe string FormatBinary(byte[] bytes, int columnCount, int offset, int len, string fmt, bool formatMessageOverhead = false)
     {
         if (offset >= bytes.Length)
             offset = bytes.Length - 1;
         if (len < 0 || len + offset < 0 || len + offset > bytes.Length)
             len = bytes.Length - offset;
         fixed (byte* ptr = &bytes[offset])
-            return BytesToString(ptr, columnCount, offset, len, fmt, formatMessageOverhead);
+            return FormatBinary(ptr, columnCount, offset, len, fmt, formatMessageOverhead);
     }
     
     /// <summary>
@@ -1343,12 +1460,577 @@ public static class FormattingUtil
     /// </summary>
     public static Color32 MessageOverheadRespKey = new Color32(51,  255, 119, 255);
 
+    internal static void AssertValidBinaryLoggingFormat(BinaryStringFormat format, [InvokerParameterName] string parameterName)
+    {
+        if (format == 0)
+            return;
+
+        int overlapCt = 0;
+        if ((format & BinaryStringFormat.Base10) != 0)
+            ++overlapCt;
+        if ((format & BinaryStringFormat.Base16) != 0)
+            ++overlapCt;
+        if ((format & BinaryStringFormat.Base2) != 0)
+            ++overlapCt;
+
+        if (overlapCt > 1)
+            throw new ArgumentException("Binary string format must have only one of Base10, Base16, ByteCountAbsolute, ByteCountUnits, or NoLogging.", parameterName);
+
+        overlapCt = 0;
+        if ((format & BinaryStringFormat.Columns8) != 0)
+            ++overlapCt;
+        if ((format & BinaryStringFormat.Columns16) != 0)
+            ++overlapCt;
+        if ((format & BinaryStringFormat.Columns32) != 0)
+            ++overlapCt;
+        if ((format & BinaryStringFormat.Columns64) != 0)
+            ++overlapCt;
+
+        if (overlapCt > 1)
+            throw new ArgumentException("Binary string format must have only one of Rows8, Rows16, Rows32, or Rows64.", parameterName);
+
+        overlapCt = 0;
+        if ((format & BinaryStringFormat.First8) != 0)
+            ++overlapCt;
+        if ((format & BinaryStringFormat.First16) != 0)
+            ++overlapCt;
+        if ((format & BinaryStringFormat.First32) != 0)
+            ++overlapCt;
+        if ((format & BinaryStringFormat.First64) != 0)
+            ++overlapCt;
+        if ((format & BinaryStringFormat.First128) != 0)
+            ++overlapCt;
+
+        if (overlapCt > 1)
+            throw new ArgumentException("Binary string format must have only one of First8, First16, First32, First64, or First128.", parameterName);
+
+        overlapCt = 0;
+        if ((format & BinaryStringFormat.Last8) != 0)
+            ++overlapCt;
+        if ((format & BinaryStringFormat.Last16) != 0)
+            ++overlapCt;
+        if ((format & BinaryStringFormat.Last32) != 0)
+            ++overlapCt;
+        if ((format & BinaryStringFormat.Last64) != 0)
+            ++overlapCt;
+        if ((format & BinaryStringFormat.Last128) != 0)
+            ++overlapCt;
+
+        if (overlapCt > 1)
+            throw new ArgumentException("Binary string format must have only one of Last8, Last16, Last32, Last64, or Last128.", parameterName);
+    }
+    private static void GetBytesToStringMetrics(uint byteCt, BinaryStringFormat format, out int byteSize, out int columnCount, out int first, out int last)
+    {
+        byteSize = (format & BinaryStringFormat.Base10) == 0
+            ? (format & BinaryStringFormat.Base2) != 0
+                ? 8
+                : 2
+            : 3;
+
+        columnCount = (format & BinaryStringFormat.Columns8) == 0
+            ? (format & BinaryStringFormat.Columns32) == 0
+                ? (format & BinaryStringFormat.Columns16) == 0
+                    ? (format & BinaryStringFormat.Columns64) == 0
+                        ? byteSize switch
+                        {
+                            3 => 16,
+                            8 => 8,
+                            _ => 32
+                        }
+                        : 64
+                    : 16
+                : 32
+            : 8;
+
+        if ((format & BinaryStringFormat.First8) != 0)
+            first = 8;
+        else if ((format & BinaryStringFormat.First16) != 0)
+            first = 16;
+        else if ((format & BinaryStringFormat.First32) != 0)
+            first = 32;
+        else if ((format & BinaryStringFormat.First64) != 0)
+            first = 64;
+        else if ((format & BinaryStringFormat.First128) != 0)
+            first = 128;
+        else
+            first = -1;
+
+        if ((format & BinaryStringFormat.Last8) != 0)
+            last = 8;
+        else if ((format & BinaryStringFormat.Last16) != 0)
+            last = 16;
+        else if ((format & BinaryStringFormat.Last32) != 0)
+            last = 32;
+        else if ((format & BinaryStringFormat.Last64) != 0)
+            last = 64;
+        else if ((format & BinaryStringFormat.Last128) != 0)
+            last = 128;
+        else
+            last = -1;
+
+        if (last != -1 && first != -1)
+        {
+            if (last + first > byteCt)
+            {
+                last = -1; first = -1;
+            }
+        }
+        else if (last > byteCt)
+            last = -1;
+        else if (first > byteCt)
+            first = -1;
+    }
+
+    /// <summary>
+    /// Get the length of formatted binary data to write using <see cref="FormatBinary(ReadOnlySpan{byte}, Span{char},BinaryStringFormat)"/>
+    /// </summary>
+    [Pure]
+    public static int GetBinarySize(int byteCt, BinaryStringFormat format)
+    {
+        AssertValidBinaryLoggingFormat(format, nameof(format));
+        return GetBytesToStringSizeIntl((uint)byteCt, format);
+    }
+
+    /// <summary>
+    /// Convert binary data to a formatted display string.
+    /// </summary>
+    [Pure]
+    public static string FormatBinary(ReadOnlySpan<byte> bytes, BinaryStringFormat format)
+    {
+        AssertValidBinaryLoggingFormat(format, nameof(format));
+        int ct = GetBytesToStringSizeIntl((uint)bytes.Length, format);
+        Span<char> span = ct > 384 ? new char[ct] : stackalloc char[ct];
+        FormatBinary(bytes, span, format);
+        return new string(span);
+    }
+
+    /// <summary>
+    /// Convert binary data to a formatted display string and write it to a span.
+    /// </summary>
+    /// <remarks>Use <see cref="GetBinarySize"/> to get the length of the span beforehand.</remarks>
+    public static unsafe int FormatBinary(ReadOnlySpan<byte> bytes, Span<char> output, BinaryStringFormat format)
+    {
+        GetBytesToStringMetrics((uint)bytes.Length, format, out int byteSize, out int columnCount, out int first, out int last);
+
+        ReadOnlySpan<char> newLine = Environment.NewLine;
+
+        int spanOffset = 0;
+
+        int rowLblSize = 0;
+        if ((format & BinaryStringFormat.RowLabels) != 0)
+        {
+            rowLblSize = DevkitServerUtility.CountNibbles((uint)bytes.Length) + 3;
+        }
+
+        if ((format & BinaryStringFormat.ColumnLabels) != 0)
+        {
+            if ((format & BinaryStringFormat.NewLineAtBeginning) != 0)
+            {
+                newLine.CopyTo(output[spanOffset..]);
+                spanOffset += newLine.Length;
+            }
+
+            if (rowLblSize != 0)
+            {
+                for (int i = 0; i < rowLblSize; ++i)
+                    output[spanOffset + i] = ' ';
+                spanOffset += rowLblSize;
+            }
+
+            for (int i = 0; i < columnCount; ++i)
+            {
+                if (i != 0)
+                {
+                    int c = byteSize - 2 + 1;
+                    for (int j = 0; j < c; ++j)
+                        output[spanOffset + j] = ' ';
+                    spanOffset += c;
+                }
+
+                WriteByteBySize((byte)(i + 1), output[spanOffset..], 2);
+                spanOffset += 2;
+            }
+        }
+
+        uint len;
+        if (first == -1 && last == -1)
+        {
+            len = (uint)bytes.Length;
+            fixed (byte* ptr = &bytes.GetPinnableReference())
+            {
+                for (uint i = 0; i < len; ++i)
+                {
+                    if (i % columnCount == 0)
+                    {
+                        if (i != 0 || (format & BinaryStringFormat.NewLineAtBeginning) != 0 || (format & BinaryStringFormat.ColumnLabels) != 0)
+                        {
+                            newLine.CopyTo(output[spanOffset..]);
+                            spanOffset += newLine.Length;
+                        }
+
+                        if ((format & BinaryStringFormat.RowLabels) != 0)
+                        {
+                            output[spanOffset] = '0';
+                            output[spanOffset + 1] = 'x';
+                            WriteRowLabel(i, output[(spanOffset + 2)..], rowLblSize - 3);
+                            spanOffset += rowLblSize;
+                            output[spanOffset - 1] = ' ';
+                        }
+                    }
+                    else
+                    {
+                        output[spanOffset] = ' ';
+                        ++spanOffset;
+                    }
+
+                    WriteByteBySize(ptr[i], output[spanOffset..], byteSize);
+                    spanOffset += byteSize;
+                }
+            }
+
+            if (spanOffset != output.Length)
+                throw new InvalidOperationException($"Failed to correctly calculate the length of a byte-to-string sequence (expected: {output.Length}, actual: {spanOffset}).");
+
+            return spanOffset;
+        }
+
+        if (first == -1)
+            first = 0;
+        if (last == -1)
+            last = 0;
+
+        len = (uint)(first + last);
+        fixed (byte* ptr = &bytes.GetPinnableReference())
+        {
+            int columnOffset = 0;
+            for (uint i = 0; i <= len; ++i)
+            {
+                uint index;
+                if (i >= (uint)first)
+                {
+                    uint indexWithinLast = (uint)last - (i - (uint)first);
+                    index = (uint)bytes.Length - indexWithinLast - 1;
+                }
+                else
+                {
+                    index = i;
+                }
+                if (i == (uint)first)
+                {
+                    if (first != 0u || (format & BinaryStringFormat.ColumnLabels) != 0)
+                    {
+                        newLine.CopyTo(output[spanOffset..]);
+                        spanOffset += newLine.Length;
+                    }
+                    output[spanOffset] = '.';
+                    output[spanOffset + 1] = '.';
+                    output[spanOffset + 2] = '.';
+                    output[spanOffset + 3] = ' ';
+                    output[spanOffset + 4] = '(';
+                    spanOffset += 5;
+                    uint ttlLen = (uint)bytes.Length - len;
+                    if ((format & BinaryStringFormat.ByteCountUnits) != 0)
+                    {
+                        int capacityCount = FormatCapacity(ttlLen, output[spanOffset..]);
+                        output[spanOffset + capacityCount] = ')';
+                        spanOffset += capacityCount + 1;
+                    }
+                    else
+                    {
+                        ttlLen.TryFormat(output[spanOffset..], out int written, "N0", CultureInfo.InvariantCulture);
+                        spanOffset += written;
+                        output[spanOffset] = ' ';
+                        output[spanOffset + 1] = 'B';
+                        output[spanOffset + 2] = ')';
+                        spanOffset += 3;
+                    }
+                    if (last != 0 && (index + 1) % columnCount != 0)
+                    {
+                        newLine.CopyTo(output[spanOffset..]);
+                        spanOffset += newLine.Length;
+                        if ((format & BinaryStringFormat.RowLabels) != 0)
+                        {
+                            output[spanOffset] = '0';
+                            output[spanOffset + 1] = 'x';
+                            WriteRowLabel(index, output[(spanOffset + 2)..], rowLblSize - 3);
+                            spanOffset += rowLblSize;
+                            output[spanOffset - 1] = ' ';
+                        }
+                        columnOffset = (((int)index + 1) - ((int)index + 1) / columnCount * columnCount);
+                    }
+                    continue;
+                }
+
+                if (index % columnCount == 0)
+                {
+                    if (index != 0 || (format & BinaryStringFormat.NewLineAtBeginning) != 0 || (format & BinaryStringFormat.ColumnLabels) != 0)
+                    {
+                        newLine.CopyTo(output[spanOffset..]);
+                        spanOffset += newLine.Length;
+                    }
+
+                    if ((format & BinaryStringFormat.RowLabels) != 0)
+                    {
+                        output[spanOffset] = '0';
+                        output[spanOffset + 1] = 'x';
+                        WriteRowLabel(index, output[(spanOffset + 2)..], rowLblSize - 3);
+                        spanOffset += rowLblSize;
+                        output[spanOffset - 1] = ' ';
+                    }
+                }
+                else
+                {
+                    output[spanOffset] = ' ';
+                    ++spanOffset;
+                }
+
+                if (columnOffset > 0)
+                {
+                    int c = columnOffset * (byteSize + 1) - 1;
+                    for (int j = 0; j < c; ++j)
+                        output[spanOffset + j] = ' ';
+
+                    spanOffset += c;
+                    columnOffset = 0;
+                }
+
+                WriteByteBySize(ptr[index], output[spanOffset..], byteSize);
+                spanOffset += byteSize;
+            }
+        }
+
+        if (spanOffset != output.Length)
+            throw new InvalidOperationException($"Failed to correctly calculate the length of a byte-to-string sequence (expected: {output.Length}, actual: {spanOffset}). Please report this as a bug.");
+
+        return spanOffset;
+    }
+    private static int GetBytesToStringSizeIntl(uint byteCt, BinaryStringFormat format)
+    {
+        GetBytesToStringMetrics(byteCt, format, out int byteSize, out int columnCount, out int first, out int last);
+
+        int newLineLen = Environment.NewLine.Length;
+
+        int size = 0;
+
+        int rowLblSize = 0;
+        if ((format & BinaryStringFormat.RowLabels) != 0)
+        {
+            rowLblSize = DevkitServerUtility.CountNibbles(byteCt) + 3;
+        }
+
+        if ((format & BinaryStringFormat.ColumnLabels) != 0)
+        {
+            if ((format & BinaryStringFormat.NewLineAtBeginning) != 0)
+                size += newLineLen;
+
+            if (rowLblSize != 0)
+                size += rowLblSize;
+
+            size += (columnCount - 1) * (byteSize + 1) + 2;
+        }
+
+        if (first == -1 && last == -1)
+        {
+            uint remBytes = byteCt % (uint)columnCount;
+            int rowCount = (int)(remBytes == 0u ? byteCt / (uint)columnCount : (byteCt / (uint)columnCount + 1u));
+            size += (rowCount - ((format & BinaryStringFormat.NewLineAtBeginning) != 0 || (format & BinaryStringFormat.ColumnLabels) != 0 ? 0 : 1)) * newLineLen;
+            if (rowLblSize != 0)
+                size += rowCount * rowLblSize;
+
+            if (remBytes == 0)
+                size += rowCount * (columnCount - 1 + byteSize * columnCount);
+            else
+            {
+                size += (rowCount - 1) * (columnCount - 1 + byteSize * columnCount);
+                size += (int)(remBytes - 1 + byteSize * remBytes);
+            }
+
+            return size;
+        }
+
+        if (first == -1)
+            first = 0;
+        if (last == -1)
+            last = 0;
+
+        uint len = (uint)(first + last);
+
+        if ((format & BinaryStringFormat.NewLineAtBeginning) != 0 || (format & BinaryStringFormat.ColumnLabels) != 0)
+            size += newLineLen;
+
+        int firstRowCount = 0, lastRowCount = 0;
+
+        if (first != 0)
+        {
+            int firstRemBytes = first % columnCount;
+            firstRowCount = (int)(firstRemBytes == 0 ? first / (uint)columnCount : (first / (uint)columnCount + 1u));
+
+            if (firstRemBytes == 0)
+                size += firstRowCount * (columnCount - 1 + byteSize * columnCount);
+            else
+            {
+                size += (firstRowCount - 1) * (columnCount - 1 + byteSize * columnCount);
+                size += firstRemBytes - 1 + byteSize * firstRemBytes;
+            }
+            size += newLineLen;
+        }
+
+        if ((format & BinaryStringFormat.ByteCountUnits) != 0)
+            size += 6 + GetCapacityLength(byteCt - len);
+        else
+            size += 8 + DevkitServerUtility.CountDigits(byteCt - len, commas: true);
+
+        if (last != 0)
+        {
+            size += newLineLen;
+            uint index = byteCt - (uint)last;
+
+            uint lastRemBytes = index % (uint)columnCount;
+            lastRowCount = lastRemBytes == 0u ? last / columnCount : (last / columnCount + 1);
+
+            if (lastRemBytes == 0 || lastRowCount == 1)
+                size += lastRowCount * (columnCount - 1 + byteSize * columnCount);
+            else
+            {
+                size += (lastRowCount - 1) * (columnCount - 1 + byteSize * columnCount);
+                size += (int)lastRemBytes - 1 + byteSize * (int)lastRemBytes;
+            }
+
+            if (lastRowCount == 1 && lastRemBytes != 0)
+            {
+                lastRemBytes = (byteCt - (index + ((uint)columnCount - lastRemBytes))) % (uint)columnCount;
+                if (lastRemBytes != 0)
+                {
+                    size += (int)lastRemBytes - 1 + byteSize * (int)lastRemBytes + newLineLen;
+                    if (rowLblSize != 0)
+                        size += rowLblSize;
+                }
+            }
+        }
+
+        if (rowLblSize != 0)
+        {
+            size += firstRowCount * rowLblSize;
+            size += lastRowCount * rowLblSize;
+        }
+
+        if (firstRowCount > 1)
+            size += (firstRowCount - 1) * newLineLen;
+
+        if (lastRowCount > 1)
+            size += (lastRowCount - 1) * newLineLen;
+
+        return size;
+    }
+    private static void WriteRowLabel(uint rowIndex, Span<char> span, int maxNiblLength = 8)
+    {
+        uint nibl = rowIndex & 0x0F;
+        span[maxNiblLength - 1] = nibl > 9 ? (char)(nibl + 55) : (char)(nibl + 48);
+        nibl = (rowIndex & 0xF0) >> 4;
+        if (maxNiblLength == 1)
+            return;
+        span[maxNiblLength - 2] = nibl > 0 ? nibl > 9 ? (char)(nibl + 55) : (char)(nibl + 48) : '0';
+        nibl = (rowIndex & 0x0F00) >> 8;
+        if (maxNiblLength == 2)
+            return;
+        span[maxNiblLength - 3] = nibl > 0 ? nibl > 9 ? (char)(nibl + 55) : (char)(nibl + 48) : '0';
+        nibl = (rowIndex & 0xF000) >> 12;
+        if (maxNiblLength == 3)
+            return;
+        span[maxNiblLength - 4] = nibl > 0 ? nibl > 9 ? (char)(nibl + 55) : (char)(nibl + 48) : '0';
+        nibl = (rowIndex & 0x0F0000) >> 16;
+        if (maxNiblLength == 4)
+            return;
+        span[maxNiblLength - 5] = nibl > 0 ? nibl > 9 ? (char)(nibl + 55) : (char)(nibl + 48) : '0';
+        nibl = (rowIndex & 0xF00000) >> 20;
+        if (maxNiblLength == 5)
+            return;
+        span[maxNiblLength - 6] = nibl > 0 ? nibl > 9 ? (char)(nibl + 55) : (char)(nibl + 48) : '0';
+        nibl = (rowIndex & 0x0F000000) >> 24;
+        if (maxNiblLength == 6)
+            return;
+        span[maxNiblLength - 7] = nibl > 0 ? nibl > 9 ? (char)(nibl + 55) : (char)(nibl + 48) : '0';
+        nibl = (rowIndex & 0xF0000000) >> 28;
+        if (maxNiblLength == 7)
+            return;
+        span[maxNiblLength - 8] = nibl > 0 ? nibl > 9 ? (char)(nibl + 55) : (char)(nibl + 48) : '0';
+    }
+
+    /// <summary>
+    /// Writes one zero-padded byte to a span in either base 16, base 10, or base 2.
+    /// </summary>
+    /// <remarks>Base 16 will write 2 characters, base 10 will write 3 characters, and base 2 will write 8 characters.</remarks>
+    /// <returns>The amount of characters written.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Not a supported radix.</exception>
+    public static int WriteByteByRadix(byte value, Span<char> span, int radix)
+    {
+        if (radix is not 16 and not 10 and not 2)
+            throw new ArgumentOutOfRangeException(nameof(radix), "Radix should be 2, 10, or 16.");
+
+        int byteSize = radix switch
+        {
+            16 => 2,
+            10 => 3,
+            _ => 8
+        };
+        WriteByteBySize(value, span, byteSize);
+        return byteSize;
+    }
+
+    /// <summary>
+    /// Writes one zero-padded byte to a span in either base 16 (<paramref name="byteSize"/> = 2), base 10 (<paramref name="byteSize"/> = 3), or base 2 (<paramref name="byteSize"/> = 8).
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">Not a supported byte size.</exception>
+    public static void WriteByteBySize(byte value, Span<char> span, int byteSize)
+    {
+        switch (byteSize)
+        {
+            case 3:
+                span[2] = (char)(value % 10 + 48);
+                if (value > 9)
+                {
+                    span[0] = value > 99 ? (char)(value / 100 + 48) : '0';
+                    span[1] = (char)(value % 100 / 10 + 48);
+                }
+                else
+                {
+                    span[0] = '0';
+                    span[1] = '0';
+                }
+
+                break;
+
+            case 2:
+                int nibl = value % 16;
+                span[1] = nibl > 9 ? (char)(nibl + 55) : (char)(nibl + 48);
+                nibl = value / 16;
+                span[0] = nibl > 0 ? nibl > 9 ? (char)(nibl + 55) : (char)(nibl + 48) : '0';
+
+                break;
+
+            case 8:
+                span[0] = (char)(((value & 128) == 0 ? 0 : 1) + 48);
+                span[1] = (char)(((value & 64) == 0 ? 0 : 1) + 48);
+                span[2] = (char)(((value & 32) == 0 ? 0 : 1) + 48);
+                span[3] = (char)(((value & 16) == 0 ? 0 : 1) + 48);
+                span[4] = (char)(((value & 8) == 0 ? 0 : 1) + 48);
+                span[5] = (char)(((value & 4) == 0 ? 0 : 1) + 48);
+                span[6] = (char)(((value & 2) == 0 ? 0 : 1) + 48);
+                span[7] = (char)(((value & 1) == 0 ? 0 : 1) + 48);
+
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(byteSize), "Byte size should be 2 (base 16), 3 (base 10), or 8 (base 2).");
+        }
+    }
+
     /// <summary>
     /// Format the given bytes in the given <paramref name="fmt"/> into columns. The format should return a fixed length string.
     /// </summary>
+    /// <remarks>Recommended to use <see cref="FormatBinary(ReadOnlySpan{byte},BinaryStringFormat)"/> or <see cref="FormatBinary(ReadOnlySpan{byte},Span{char},BinaryStringFormat)"/> if it fits your use case.</remarks>
     /// <param name="formatMessageOverhead">Should the data be colorized as a <see cref="MessageOverhead"/>?</param>
     [Pure]
-    public static unsafe string BytesToString(byte* bytes, int columnCount, int offset, int len, string fmt, bool formatMessageOverhead = false)
+    public static unsafe string FormatBinary(byte* bytes, int columnCount, int offset, int len, string fmt, bool formatMessageOverhead = false)
     {
         if (offset >= len)
             offset = len - 1;

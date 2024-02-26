@@ -14,7 +14,7 @@ namespace DevkitServer.Util.Encoding;
 public class LargeMessageTransmission : IDisposable
 {
     private volatile int _disposed;
-    internal const ushort GlobalProtocolVersion = 0;
+    internal const ushort GlobalProtocolVersion = 1;
     private bool _hasSent;
     private bool _hasSentData;
     private bool _hasFullSent;
@@ -26,6 +26,7 @@ public class LargeMessageTransmission : IDisposable
 
     internal readonly LargeMessageTransmissionCommunications Comms;
     private Type? _handlerType;
+    private bool _isCancellable;
 
     /// <summary>
     /// Unique ID of the transmission.
@@ -43,10 +44,32 @@ public class LargeMessageTransmission : IDisposable
     public bool AllowCompression { get; set; } = true;
 
     /// <summary>
+    /// How sent or received data should be logged as binary. Must be set server-side (like in the handler) to log received data.
+    /// </summary>
+    public BinaryStringFormat LoggingType { get; set; } = BinaryStringFormat.NoLogging;
+
+    /// <summary>
+    /// Is this a cancellable transmission?
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Can not make a transmission with more than one connection cancellable (server build only).</exception>
+    public bool IsCancellable
+    {
+        get => _isCancellable;
+        set
+        {
+#if SERVER
+            if (value && Connections.Count > 1)
+                throw new InvalidOperationException("Can not make a transmission with more than one connection cancellable.");
+#endif
+            _isCancellable = value;
+        }
+    }
+
+    /// <summary>
     /// Connection to use for sending data.
     /// </summary>
 #if SERVER
-    public ITransportConnection Connection { get; }
+    public IReadOnlyList<ITransportConnection> Connections { get; }
 #elif CLIENT
     public IClientTransport Connection { get; }
 #endif
@@ -57,7 +80,7 @@ public class LargeMessageTransmission : IDisposable
     public ArraySegment<byte> Content { get; internal set; }
 
     /// <summary>
-    /// Finalized (compressed) content.
+    /// Finalized (usually compressed) content.
     /// </summary>
     public ArraySegment<byte> FinalContent { get; internal set; }
 
@@ -97,6 +120,11 @@ public class LargeMessageTransmission : IDisposable
     public int Bandwidth { get; set; }
 
     /// <summary>
+    /// The last reported amount of bytes received by the client.
+    /// </summary>
+    public int ApproximateBytesReceivedByClient => Comms.ClientHintBytesProcessed;
+
+    /// <summary>
     /// Type to use to handle data on the client.
     /// </summary>
     public Type? HandlerType
@@ -119,7 +147,7 @@ public class LargeMessageTransmission : IDisposable
     /// <summary>
     /// If the message is at a point where it can be cancelled.
     /// </summary>
-    public bool CanCancel => (!Comms.IsServer || _hasSent) && !_hasFullSent;
+    public bool CanCancel => IsCancellable && (!Comms.IsServer || _hasSent) && !_hasFullSent;
 
     /// <summary>
     /// Client handler to add custom receive event handling.
@@ -142,13 +170,15 @@ public class LargeMessageTransmission : IDisposable
             (AllowHighSpeed ? 1 : 0) |
             (AllowCompression ? 2 : 0) |
             (IsCompressed ? 4 : 0) |
-            (IsHighSpeed ? 8 : 0));
+            (IsHighSpeed ? 8 : 0) |
+            (IsCancellable ? 16 : 0));
         set
         {
             AllowHighSpeed = (value & 1) != 0;
             AllowCompression = (value & 2) != 0;
             IsCompressed = (value & 4) != 0;
             IsHighSpeed = (value & 8) != 0;
+            IsCancellable = (value & 16) != 0;
         }
     }
 
@@ -159,7 +189,7 @@ public class LargeMessageTransmission : IDisposable
     /// </summary>
     public LargeMessageTransmission(
 #if SERVER
-        ITransportConnection targetConnection,
+        IReadOnlyList<ITransportConnection> targetConnections,
 #endif
         ArraySegment<byte> content, int bandwidth = NetFactory.MaxPacketSize)
     {
@@ -167,7 +197,13 @@ public class LargeMessageTransmission : IDisposable
             throw new ArgumentOutOfRangeException(nameof(bandwidth), bandwidth, $"(0, {ushort.MaxValue}]");
 
 #if SERVER
-        Connection = targetConnection;
+        if (targetConnections.Count == 0)
+            throw new ArgumentException("No transport connections provided.", nameof(targetConnections));
+#endif
+
+#if SERVER
+        // pooled lists will be cleared later
+        Connections = targetConnections is PooledTransportConnectionList ? targetConnections.ToList() : targetConnections;
 #elif CLIENT
         Connection = NetFactory.GetPlayerTransportConnection();
 #endif
@@ -179,6 +215,11 @@ public class LargeMessageTransmission : IDisposable
         _tknSource = new CancellationTokenSource();
         Comms = new LargeMessageTransmissionCommunications(this, true);
         ProtocolVersion = -1;
+#if SERVER
+        _isCancellable = targetConnections.Count == 1;
+#else
+        _isCancellable = true;
+#endif
     }
 
     internal LargeMessageTransmission(
@@ -188,7 +229,7 @@ public class LargeMessageTransmission : IDisposable
         ByteReader reader)
     {
 #if SERVER
-        Connection = sendingConnection;
+        Connections = [ sendingConnection ];
 #elif CLIENT
         Connection = NetFactory.GetPlayerTransportConnection();
 #endif
@@ -204,6 +245,8 @@ public class LargeMessageTransmission : IDisposable
         OriginalSize = reader.ReadInt32();
         FinalSize = reader.ReadInt32();
         HandlerType = reader.ReadType();
+        //string? type = reader.ReadTypeInfo();
+        //Logger.DevkitServer.LogDebug(LogSource, $"Handler type: {type.Format()}.");
 
         if (HandlerType != null)
         {
@@ -211,7 +254,7 @@ public class LargeMessageTransmission : IDisposable
             {
                 try
                 {
-                    Handler = (BaseLargeMessageTransmissionClientHandler)Activator.CreateInstance(HandlerType);
+                    Handler = (BaseLargeMessageTransmissionClientHandler)Activator.CreateInstance(HandlerType, nonPublic: true);
                     Handler.Transmission = this;
                 }
                 catch (Exception ex)
@@ -230,16 +273,15 @@ public class LargeMessageTransmission : IDisposable
         _tknSource = new CancellationTokenSource();
         Comms = new LargeMessageTransmissionCommunications(this, false);
 
-        if (Handler != null)
+        if (Handler == null) return;
+
+        try
         {
-            try
-            {
-                Handler.IsDirty = true;
-            }
-            catch (Exception ex)
-            {
-                Logger.DevkitServer.LogError(LogSource, ex, $"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.");
-            }
+            Handler.IsDirty = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError(LogSource, ex, $"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.");
         }
     }
     internal void WriteStart(ByteWriter writer)
@@ -255,6 +297,7 @@ public class LargeMessageTransmission : IDisposable
         writer.Write(OriginalSize);
         writer.Write(FinalSize);
         writer.Write(HandlerType);
+        Logger.DevkitServer.LogDebug(LogSource, $"Handler type: {HandlerType.Format()}.");
     }
 
     internal void WriteEnd(ByteWriter writer, bool cancelled)
@@ -270,10 +313,13 @@ public class LargeMessageTransmission : IDisposable
     /// Cancels the large transmission from either side.
     /// </summary>
     /// <returns><see langword="false"/> if the message has either already sent or already been cancelled, otherwise <see langword="true"/>.</returns>
-    /// <exception cref="InvalidOperationException">Message has yet to be sent.</exception>
+    /// <exception cref="InvalidOperationException">Message has yet to be sent - OR - <see cref="IsCancellable"/> is <see langword="false"/>.</exception>
     public async UniTask<bool> Cancel(CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
+
+        if (!IsCancellable)
+            throw new InvalidOperationException("This message does not support cancellation.");
 
         if (token == _tknSource.Token)
             token = default;
@@ -316,8 +362,16 @@ public class LargeMessageTransmission : IDisposable
     /// <returns><see langword="false"/> if the message sending failed somehow, otherwise <see langword="true"/>.</returns>
     /// <exception cref="InvalidOperationException">Tried to send from the wrong side.</exception>
     /// <exception cref="OperationCanceledException"><paramref name="token"/> is cancelled.</exception>
+#if CLIENT
     public async UniTask<bool> Send(CancellationToken token = default)
+#else
+    public async UniTask<bool[]> Send(CancellationToken token = default)
+#endif
     {
+        if (LoggingType)
+        {
+            string bytes = FormattingUtil.GetBytesHex(Content.Array!, offset: Content.Offset, len: Content.Count);
+        }
         token = token == default ? _tknSource.Token : CancellationTokenSource.CreateLinkedTokenSource(token, _tknSource.Token).Token;
         token.ThrowIfCancellationRequested();
 
@@ -337,10 +391,14 @@ public class LargeMessageTransmission : IDisposable
                 Logger.DevkitServer.LogError(LogSource, ex, $"Failed to set IsDirty = true on handler: {Handler.GetType().Format()}.");
             }
         }
+#if CLIENT
         bool sent;
+#else
+        bool[] sent;
+#endif
         try
         {
-            sent = await Comms.Send(token, Finalize(token));
+            sent = await Comms.Send(token, new LargeMessageTransmissionCommunications.UniTaskWrapper(Finalize(token)));
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -349,7 +407,11 @@ public class LargeMessageTransmission : IDisposable
         catch (Exception ex)
         {
             Logger.DevkitServer.LogError(LogSource, ex, "Error sending transmission.");
+#if CLIENT
             sent = false;
+#else
+            sent = new bool[Connections.Count];
+#endif
         }
 
         _hasSentData = true;
@@ -493,6 +555,14 @@ public class LargeMessageTransmission : IDisposable
         }
 
         Comms.Dispose();
+
+        if (LoggingType == BinaryStringFormat.NoLogging || Content.Array == null || Content.Count == 0)
+            return;
+
+        int len = FormattingUtil.GetBinarySize(Content.Count, LoggingType | BinaryStringFormat.NewLineAtBeginning);
+        Span<char> data = len > 256 ? new char[len] : stackalloc char[len];
+        FormattingUtil.FormatBinary(Content, data, LoggingType);
+        Logger.DevkitServer.LogInfo(LogSource, data);
     }
     internal void OnFinalContentCompleted()
     {

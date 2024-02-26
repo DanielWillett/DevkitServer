@@ -64,5 +64,6 @@ public enum DevkitServerNetCall : ushort
     SendSpawnAssetInstantiation = 57,
     RequestSpawnAssetInstantiation = 58,
     RequestSpawnInstantiation = 59,
-    SendSpawnInstantiation = 60
+    SendSpawnInstantiation = 60,
+    SendProgressHint = 61
 }

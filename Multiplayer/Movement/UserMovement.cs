@@ -120,10 +120,12 @@ public class UserMovement : MonoBehaviour
         _lastFrame = lastPacket.ClientInputFrame;
 
         // skip interpolation on teleports
-        if (lastPacket.LastTeleportId == 0 || Packets.Length > 1 && Packets[Packets.Length - 2].LastTeleportId != lastPacket.LastTeleportId)
+        if (Packets.Length > 1 && Packets[Packets.Length - 2].LastTeleportId != lastPacket.LastTeleportId)
         {
             transform.SetPositionAndRotation(lastPacket.Position, Quaternion.Euler(lastPacket.Rotation));
             EventOnUserMoved.TryInvoke(User);
+            for (int i = 0; i < Packets.Length - 1; ++i)
+                Packets.RemoveAt(ref i);
         }
         else
         {
@@ -298,7 +300,6 @@ public class UserMovement : MonoBehaviour
             transform.SetPositionAndRotation(pos, Quaternion.Euler(new Vector3(0f, spawn.angle)));
             EventOnUserMoved?.TryInvoke(User);
         }
-
     }
 #endif
 

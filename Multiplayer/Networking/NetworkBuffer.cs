@@ -1,5 +1,5 @@
 ﻿namespace DevkitServer.Multiplayer.Networking;
-public class NetworkBuffer : IDisposable
+internal class NetworkBuffer : IDisposable
 {
     public byte[] Buffer;
     public readonly int BufferSize;
@@ -74,47 +74,44 @@ public class NetworkBuffer : IDisposable
                         offset = expSize;
                         goto next;
                     }
-                    else
-                    {
-                        // this data will complete the pending packet
-                        int ttlSize = _pendingLength + amtReceived;
-                        if (ttlSize == expSize)
-                        {
-                            fixed (byte* ptr = &_pendingData![_pendingLength])
-                                System.Buffer.MemoryCopy(bytes, ptr, amtReceived, amtReceived);
-                            BufferProgressUpdated?.Invoke(ttlSize, expSize);
-                            _onMsgReady(_pendingData);
-                            goto reset;
-                        }
-                        // continue the data for another packet
-                        if (ttlSize < expSize)
-                        {
-                            fixed (byte* ptr = &_pendingData![_pendingLength])
-                                System.Buffer.MemoryCopy(bytes, ptr, amtReceived, amtReceived);
-                            _pendingLength += amtReceived;
-                            BufferProgressUpdated?.Invoke(ttlSize, expSize);
-                            return;
-                        }
 
-                        // end off the current message, start the next one
-                        int remaining = expSize - _pendingLength;
+                    // this data will complete the pending packet
+                    int ttlSize = _pendingLength + amtReceived;
+                    if (ttlSize == expSize)
+                    {
                         fixed (byte* ptr = &_pendingData![_pendingLength])
-                            System.Buffer.MemoryCopy(bytes, ptr, remaining, remaining);
-                        BufferProgressUpdated?.Invoke(expSize, expSize);
+                            System.Buffer.MemoryCopy(bytes, ptr, amtReceived, amtReceived);
+                        BufferProgressUpdated?.Invoke(ttlSize, expSize);
                         _onMsgReady(_pendingData);
-                        _pendingData = null;
-                        PendingOverhead = default;
-                        _pendingLength = 0;
-                        GC.Collect();
-                        amtReceived -= remaining;
-                        offset = remaining;
-                        goto next;
+                        goto reset;
                     }
+                    // continue the data for another packet
+                    if (ttlSize < expSize)
+                    {
+                        fixed (byte* ptr = &_pendingData![_pendingLength])
+                            System.Buffer.MemoryCopy(bytes, ptr, amtReceived, amtReceived);
+                        _pendingLength += amtReceived;
+                        BufferProgressUpdated?.Invoke(ttlSize, expSize);
+                        return;
+                    }
+
+                    // end off the current message, start the next one
+                    int remaining = expSize - _pendingLength;
+                    fixed (byte* ptr = &_pendingData![_pendingLength])
+                        System.Buffer.MemoryCopy(bytes, ptr, remaining, remaining);
+                    BufferProgressUpdated?.Invoke(expSize, expSize);
+                    _onMsgReady(_pendingData);
+                    _pendingData = null;
+                    PendingOverhead = default;
+                    _pendingLength = 0;
+                    amtReceived -= remaining;
+                    offset = remaining;
+                    goto next;
+
                     reset:
                     _pendingData = null;
                     PendingOverhead = default;
                     _pendingLength = 0;
-                    GC.Collect();
                 }
             }
             return;
@@ -151,4 +148,4 @@ public class NetworkBuffer : IDisposable
     }
 }
 
-public delegate void NetworkBufferProgressUpdate(int bytesDownloaded, int totalBytes);
+public delegate void NetworkBufferProgressUpdate(long bytesDownloaded, long totalBytes);

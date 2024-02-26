@@ -26,6 +26,7 @@ public class ByteWriter
     private byte[] _buffer;
     private bool _streamMode;
     private Stream? _stream;
+    private int _overheadSize;
     public byte[] Buffer { get => _buffer; set => _buffer = value; }
     public Stream? Stream
     {
@@ -188,6 +189,7 @@ public class ByteWriter
         }
 
         int ttl = overhead.Length;
+        _overheadSize = ttl;
         byte* overheadBytes = stackalloc byte[ttl];
         overhead.GetBytes(overheadBytes, out _);
 
@@ -209,6 +211,61 @@ public class ByteWriter
         }
 
         _size += ttl;
+    }
+    /// <summary>The value of <paramref name="overhead"/>.<see cref="MessageOverhead.Size">Size</see> will be overwritten.</summary>
+    public unsafe void ReplaceOverhead(ref MessageOverhead overhead)
+    {
+        if (_overheadSize == 0)
+        {
+            PrependOverhead(ref overhead);
+            return;
+        }
+
+        MessageOverhead.SetSize(ref overhead, _size);
+        if (!AllowPrepending)
+            return;
+
+        if (_streamMode)
+            throw new NotSupportedException("Prepending is not supported in stream mode.");
+
+        if (_size == 0)
+        {
+            _buffer = overhead.GetBytes();
+            return;
+        }
+
+        int ttl = overhead.Length;
+
+        byte* overheadBytes = stackalloc byte[ttl];
+        overhead.GetBytes(overheadBytes, out _);
+
+        int dif = _overheadSize - ttl;
+        if (dif == 0)
+        {
+            fixed (byte* ptr = _buffer)
+                System.Buffer.MemoryCopy(overheadBytes, ptr, ttl, ttl);
+        }
+        else
+        {
+            if (dif > 0 || _size - dif <= _buffer.Length)
+            {
+                fixed (byte* ptr = _buffer)
+                {
+                    System.Buffer.MemoryCopy(ptr + _overheadSize, ptr + ttl, _buffer.Length - ttl, _size - _overheadSize);
+                    System.Buffer.MemoryCopy(overheadBytes, ptr, ttl, ttl);
+                }
+            }
+            else
+            {
+                byte[] old = _buffer;
+                _buffer = new byte[_size - dif];
+                System.Buffer.BlockCopy(old, _overheadSize, _buffer, ttl, _size - _overheadSize);
+                for (int i = 0; i < ttl; ++i)
+                    _buffer[i] = overheadBytes[i];
+            }
+        }
+
+        _size -= dif;
     }
     public byte[] ToArray()
     {
@@ -706,13 +763,12 @@ public class ByteWriter
             ns = ns.Length > nsSystem.Length ? ns.Substring(nsSystem.Length + 1) : string.Empty;
         }
 
-        if (ns.Length > 0)
-            ns += ".";
-        WriteInternal(flag);
-        string str = ns + type.Name;
+        string str = type.FullName!.Substring(type.Namespace!.Length + 1);
+
+        Write(flag);
         if (flag == 0)
             str += ", " + type.Assembly.GetName().Name;
-        Write(str);
+        Write(ns + "." + str);
     }
     public void WriteShort(string n)
     {
@@ -1348,12 +1404,14 @@ public class ByteWriter
         if (_streamMode)
         {
             _stream!.Flush();
+            _overheadSize = 0;
         }
         else if (_buffer.Length != 0)
         {
             Array.Clear(_buffer, 0, _buffer.Length);
             _size = 0;
         }
+        _overheadSize = 0;
     }
     public void Write(int[] n) => WriteInternal(n);
     public void WriteZeroCompressed(int[] n, bool @long = false)

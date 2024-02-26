@@ -47,20 +47,19 @@ public static class HighSpeedNetFactory
 
     /// <summary>Coroutine compatible. Find or create a connection for <paramref name="connection"/>. If it doesn't exist it will be created, verified.
     /// Then if <paramref name="take"/> is <see langword="true"/>, <see cref="TakeConnection"/> will be ran on it.</summary>
-    /// <param name="connection"></param>
-    /// <param name="take"></param>
     /// <exception cref="OperationCanceledException"/>
     /// <remarks>If you <paramref name="take"/> the connection or call <see cref="TakeConnection"/> on it, make sure you call <see cref="ReleaseConnection"/> when you're done.</remarks>
     public static TaskYieldInstruction TryGetOrCreateAndVerifyYield(ITransportConnection connection, bool take, CancellationToken token = default) =>
         new TaskYieldInstruction(TryGetOrCreateAndVerify(connection, take, token), token);
+
     /// <summary>Find or create a connection for <paramref name="connection"/>. If it doesn't exist it will be created, verified.
     /// Then if <paramref name="take"/> is <see langword="true"/>, <see cref="TakeConnection"/> will be ran on it.</summary>
-    /// <param name="connection"></param>
-    /// <param name="take"></param>
     /// <exception cref="OperationCanceledException"/>
     /// <remarks>If you <paramref name="take"/> the connection or call <see cref="TakeConnection"/> on it, make sure you call <see cref="ReleaseConnection"/> when you're done.</remarks>
     public static async Task<HighSpeedConnection?> TryGetOrCreateAndVerify(ITransportConnection connection, bool take, CancellationToken token = default)
     {
+        await UniTask.SwitchToMainThread(token);
+
         HighSpeedConnection? hsConn = FindHighSpeedConnection(connection);
         if (hsConn is not { Client.Connected: true })
             hsConn = null;
@@ -73,7 +72,7 @@ public static class HighSpeedNetFactory
                 RequestResponse response = await hsTask;
                 if (!response.Responded || response.ErrorCode is not (int)StandardErrorCode.Success)
                 {
-                    Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", "Failed to create high-speed connection.");
+                    Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", $"Failed to create high-speed connection for {connection.Format()}.");
                     return null;
                 }
             }
@@ -83,7 +82,7 @@ public static class HighSpeedNetFactory
             hsConn = connection.FindHighSpeedConnection();
             if (hsConn == null)
             {
-                Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", "Unable to find created high-speed connection.");
+                Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", $"Unable to find created high-speed connection for {connection.Format()}.");
                 return null;
             }
         }
@@ -101,7 +100,7 @@ public static class HighSpeedNetFactory
             }
             catch (OperationCanceledException) when (!token.IsCancellationRequested) // only for timeout token.
             {
-                Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", "Timed out trying to verify connection (5 seconds).");
+                Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", $"Timed out trying to verify connection (5 seconds) for {connection.Format()}.");
                 return null;
             }
         }
@@ -109,6 +108,92 @@ public static class HighSpeedNetFactory
         if (take)
             TakeConnection(hsConn);
         return hsConn;
+    }
+
+    /// <summary>Coroutine compatible. Find or create connections for <paramref name="connections"/>. If they don't exist they will be created, verified.
+    /// Then if <paramref name="take"/> is <see langword="true"/>, <see cref="TakeConnection"/> will be ran on them.</summary>
+    /// <exception cref="OperationCanceledException"/>
+    /// <remarks>If you <paramref name="take"/> the connections or call <see cref="TakeConnection"/> on them, make sure you call <see cref="ReleaseConnection"/> when you're done.</remarks>
+    public static TaskYieldInstruction TryGetOrCreateAndVerifyYield(IReadOnlyList<ITransportConnection> connections, bool take, CancellationToken token = default) =>
+        new TaskYieldInstruction(TryGetOrCreateAndVerify(connections, take, token), token);
+
+    /// <summary>Find or create connections for <paramref name="connections"/>. If they don't exist they will be created, verified.
+    /// Then if <paramref name="take"/> is <see langword="true"/>, <see cref="TakeConnection"/> will be ran on them.</summary>
+    /// <exception cref="OperationCanceledException"/>
+    /// <remarks>If you <paramref name="take"/> the connections or call <see cref="TakeConnection"/> on them, make sure you call <see cref="ReleaseConnection"/> when you're done.</remarks>
+    public static async Task<HighSpeedConnection?[]> TryGetOrCreateAndVerify(IReadOnlyList<ITransportConnection> connections, bool take, CancellationToken token = default)
+    {
+        if (connections.Count == 1)
+            return [ await TryGetOrCreateAndVerify(connections[0], take, token) ];
+
+        if (connections.Count == 0)
+            return Array.Empty<HighSpeedConnection>();
+        
+        UniTask[] tasks = new UniTask[connections.Count];
+        HighSpeedConnection?[] results = new HighSpeedConnection?[connections.Count];
+
+        for (int i = 0; i < connections.Count; i++)
+        {
+            ITransportConnection connection = connections[i];
+            int index = i;
+            tasks[i] = UniTask.Create(async () =>
+            {
+                await UniTask.SwitchToMainThread(token);
+                HighSpeedConnection? hsConn = FindHighSpeedConnection(connection);
+
+                if (hsConn is not { Client.Connected: true })
+                    hsConn = null;
+
+                if (hsConn == null)
+                {
+                    NetTask hsTask = TryCreate(connection, out bool failure);
+                    if (!failure)
+                    {
+                        RequestResponse response = await hsTask;
+                        if (!response.Responded || response.ErrorCode is not (int)StandardErrorCode.Success)
+                        {
+                            Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", $"Failed to create high-speed connection ({i.Format()}) for {connection.Format()}.");
+                            return;
+                        }
+                    }
+                    else return;
+
+
+                    hsConn = connection.FindHighSpeedConnection();
+                    if (hsConn == null)
+                    {
+                        Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", $"Unable to find created high-speed connection ({i.Format()}) for {connection.Format()}.");
+                        return;
+                    }
+                }
+
+                if (!hsConn.Verified)
+                {
+                    try
+                    {
+                        CancellationTokenSource tknSrc = CancellationTokenSource.CreateLinkedTokenSource(token, new CancellationTokenSource(5000).Token);
+                        while (!hsConn.Verified)
+                        {
+                            await UniTask.NextFrame(PlayerLoopTiming.Update, cancellationToken: token);
+                            tknSrc.Token.ThrowIfCancellationRequested();
+                        }
+                    }
+                    catch (OperationCanceledException) when (!token.IsCancellationRequested) // only for timeout token.
+                    {
+                        Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", $"Timed out trying to verify connection (5 seconds) ({i.Format()}) for {connection.Format()}.");
+                        return;
+                    }
+                }
+
+                if (take)
+                    TakeConnection(hsConn);
+
+                results[index] = hsConn;
+            });
+        }
+
+        await UniTask.WhenAll(tasks);
+        return results;
     }
     public static HighSpeedConnection? FindHighSpeedConnection(this ITransportConnection connection)
     {

@@ -8,6 +8,7 @@ using DevkitServer.Configuration;
 using DevkitServer.Levels;
 using DevkitServer.Patches;
 using System.Reflection;
+using DevkitServer.Core.Cartography;
 
 namespace DevkitServer.Core.UI.Extensions;
 
@@ -278,9 +279,16 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
             {
                 await UniTask.NextFrame();
 
-                string? outputPath = await ChartCartography.CaptureChart(token: Level.editing == null ? default : Level.editing.GetCancellationTokenOnDestroy());
+                CancellationToken token = Level.editing == null ? default : Level.editing.GetCancellationTokenOnDestroy();
+                string? outputPath = await ChartCartography.CaptureChart(token: token);
                 if (outputPath != null)
+                {
                     Logger.DevkitServer.LogDebug(nameof(EditorPauseUIExtension), $"Captured satellite image to {outputPath.Format()}.");
+                    if (DevkitServerModule.IsEditing)
+                    {
+                        await CartographyReplication.SendCartography(outputPath, true, token);
+                    }
+                }
                 else
                     Logger.DevkitServer.LogWarning(nameof(EditorPauseUIExtension), "Failed to capture satellite image. See above.");
             }
@@ -317,9 +325,16 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
             {
                 await UniTask.NextFrame();
 
-                string? outputPath = await SatelliteCartography.CaptureSatellite(token: Level.editing == null ? default : Level.editing.GetCancellationTokenOnDestroy());
+                CancellationToken token = Level.editing == null ? default : Level.editing.GetCancellationTokenOnDestroy();
+                string? outputPath = await SatelliteCartography.CaptureSatellite(token: token);
                 if (outputPath != null)
+                {
                     Logger.DevkitServer.LogDebug(nameof(EditorPauseUIExtension), $"Captured satellite image to {outputPath.Format()}.");
+                    if (DevkitServerModule.IsEditing)
+                    {
+                        await CartographyReplication.SendCartography(outputPath, false, token);
+                    }
+                }
                 else
                     Logger.DevkitServer.LogWarning(nameof(EditorPauseUIExtension), "Failed to capture satellite image. See above.");
             }

@@ -1137,6 +1137,137 @@ public static class DevkitServerUtility
         byte[] ipv4 = address.MapToIPv4().GetAddressBytes();
         return ((uint)ipv4[0] << 24) | ((uint)ipv4[1] << 16) | ((uint)ipv4[2] << 8) | ipv4[3];
     }
+
+    /// <summary>
+    /// Counts the minimum number of nibbles (4 bits) in a number. Ignores sign.
+    /// </summary>
+    /// <remarks><c>0xAA3D</c> has 4 nibbles.</remarks>
+    [Pure]
+    public static int CountNibbles(int num) => CountNibbles(unchecked((uint)num));
+
+    /// <summary>
+    /// Counts the minimum number of nibbles (4 bits) in a number.
+    /// </summary>
+    /// <remarks><c>0xAA3D</c> has 4 nibbles.</remarks>
+    [Pure]
+    public static int CountNibbles(uint num)
+    {
+        return num switch
+        {
+            <= 16u => 1,
+            <= 256u => 2,
+            <= 4096u => 3,
+            <= 65536u => 4,
+            <= 1048576u => 5,
+            <= 16777216u => 6,
+            <= 268435456u => 7,
+            _ => 8
+        };
+    }
+
+    /// <summary>
+    /// Counts the minimum number of nibbles (4 bits) in a number. Ignores sign.
+    /// </summary>
+    /// <remarks><c>0xAA3D</c> has 4 nibbles.</remarks>
+    [Pure]
+    public static int CountNibbles(long num) => CountNibbles(unchecked((ulong)num));
+
+    /// <summary>
+    /// Counts the minimum number of nibbles (4 bits) in a number.
+    /// </summary>
+    /// <remarks><c>0xAA3D</c> has 4 nibbles.</remarks>
+    [Pure]
+    public static int CountNibbles(ulong num)
+    {
+        return num switch
+        {
+            <= 16L => 1,
+            <= 256L => 2,
+            <= 4096L => 3,
+            <= 65536L => 4,
+            <= 1048576L => 5,
+            <= 16777216L => 6,
+            <= 268435456L => 7,
+            <= 4294967296L => 8,
+            <= 68719476736L => 9,
+            <= 1099511627776L => 10,
+            <= 17592186044416L => 11,
+            <= 281474976710656L => 12,
+            <= 4503599627370496L => 13,
+            <= 1152921504606846976L => 15,
+            _ => 16
+        };
+    }
+
+    /// <summary>
+    /// Counts the number of (base 10) digits in a number.
+    /// </summary>
+    [Pure]
+    public static int CountDigits(int num, bool commas = false) => CountDigits((uint)Math.Abs(num), commas);
+
+    /// <summary>
+    /// Counts the number of (base 10) digits in a number.
+    /// </summary>
+    [Pure]
+    public static int CountDigits(uint num, bool commas = false)
+    {
+        int c = num switch
+        {
+            <= 9 => 1,
+            <= 99 => 2,
+            <= 999 => 3,
+            <= 9999 => 4,
+            <= 99999 => 5,
+            <= 999999 => 6,
+            <= 9999999 => 7,
+            <= 99999999 => 8,
+            <= 999999999 => 9,
+            _ => 10
+        };
+        if (commas)
+            c += (c - 1) / 3;
+        return c;
+    }
+
+    /// <summary>
+    /// Counts the number of (base 10) digits in a number.
+    /// </summary>
+    [Pure]
+    public static int CountDigits(long num, bool commas = false) => CountDigits((ulong)Math.Abs(num), commas);
+
+    /// <summary>
+    /// Counts the number of (base 10) digits in a number.
+    /// </summary>
+    [Pure]
+    public static int CountDigits(ulong num, bool commas = false)
+    {
+        int c = num switch
+        {
+            <= 9 => 1,
+            <= 99 => 2,
+            <= 999 => 3,
+            <= 9999 => 4,
+            <= 99999 => 5,
+            <= 999999 => 6,
+            <= 9999999 => 7,
+            <= 99999999 => 8,
+            <= 999999999 => 9,
+            <= 9999999999 => 10,
+            <= 99999999999 => 11,
+            <= 999999999999 => 12,
+            <= 9999999999999 => 13,
+            <= 99999999999999 => 14,
+            <= 999999999999999 => 15,
+            <= 9999999999999999 => 16,
+            <= 99999999999999999 => 17,
+            <= 999999999999999999 => 18,
+            <= 9999999999999999999 => 19,
+            _ => 20
+        };
+        if (commas)
+            c += (c - 1) / 3;
+        return c;
+    }
 }
 
 public enum ScheduleInterval

@@ -1612,7 +1612,14 @@ public class CommandContext : Exception
         CancellationToken token = DevkitServerModule.UnloadToken;
         await UniTask.SwitchToMainThread(token);
 
-        this.AssertMode(Command.Mode);
+        try
+        {
+            this.AssertMode(Command.Mode);
+        }
+        catch (CommandContext)
+        {
+            return;
+        }
 
         SemaphoreSlim? waited = null;
         if (Command is ISynchronizedCommand { Semaphore: not null } sync)

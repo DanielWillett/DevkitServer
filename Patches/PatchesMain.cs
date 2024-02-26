@@ -664,14 +664,26 @@ internal static class PatchesMain
         UniTask.Create(async () =>
         {
             bool cancelled;
+            CancellationTokenSource src = new CancellationTokenSource(TimeSpan.FromSeconds(5d));
             try
             {
-                cancelled = await levelDownload.Cancel(CancellationToken.None);
+                cancelled = await levelDownload.Cancel(src.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                Logger.DevkitServer.LogInfo(levelDownload.LogSource, "Failed to cancel level download, timed out.");
+                Level.exit();
+                return;
             }
             catch (Exception ex)
             {
                 Logger.DevkitServer.LogWarning(levelDownload.LogSource, ex, "Failed to cancel level download.");
+                Level.exit();
                 return;
+            }
+            finally
+            {
+                src.Dispose();
             }
 
             Logger.DevkitServer.LogInfo(levelDownload.LogSource, !cancelled

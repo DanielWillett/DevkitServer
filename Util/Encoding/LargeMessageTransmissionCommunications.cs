@@ -14,24 +14,26 @@ internal class LargeMessageTransmissionCommunications : IDisposable
     internal static readonly NetCall<int[]> SendSlowMissedPackets = new NetCall<int[]>(DevkitServerNetCall.SendMissedLargeTransmissionPackets);
     internal static readonly NetCall<Guid, int, int> SendSlowCheckup = new NetCall<Guid, int, int>(ReceiveSlowCheckup);
     internal static readonly NetCallCustom SendFullData = new NetCallCustom(ReceiveFullData, capacity: 8388608 /* 8 MiB */);
-    internal static readonly NetCall Ping = new NetCall(ReceiveSlowPing);
+    internal static readonly NetCall Ping = new NetCall(ReceiveSlowHighSpeedPing);
+    internal static readonly NetCall<Guid, long> SendProgressHint = new NetCall<Guid, long>(ReceiveProgressHint);
 
     private static readonly ConcurrentDictionary<Guid, LargeMessageTransmission> ActiveMessages = new ConcurrentDictionary<Guid, LargeMessageTransmission>();
+
+    internal int ClientHintBytesProcessed;
 
     private readonly int _pendingSlowPacketCount;
     private int _initialMissingSlowPackets;
     private int _missingSlowPackets;
     private int _receivedSlowPackets;
     private BitArray? _clientSlowReceiveMask;
+    private DateTime _lastNeedsToSendProgressUpdate = DateTime.MinValue;
     private byte[]? _clientSlowReceiveBuffer;
-#if CLIENT
     private readonly HighSpeedConnection? _connectionSubbed;
-#endif
 
     public bool IsServer { get; }
     public LargeMessageTransmission Transmission { get; }
 #if SERVER
-    public ITransportConnection Connection { get; }
+    public IReadOnlyList<ITransportConnection> Connections { get; }
 #else
     public IClientTransport Connection { get; }
 #endif
@@ -39,7 +41,11 @@ internal class LargeMessageTransmissionCommunications : IDisposable
     {
         Transmission = transmission;
         IsServer = isServer;
+#if SERVER
+        Connections = transmission.Connections;
+#else
         Connection = transmission.Connection;
+#endif
 
         if (isServer)
         {
@@ -47,17 +53,29 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             Logger.DevkitServer.LogDebug(Transmission.LogSource, "Registered transmission as server.");
             return;
         }
-        
+
+        ClientHintBytesProcessed = 0;
         _pendingSlowPacketCount = Transmission.LowSpeedPacketCount;
         Transmission.Bandwidth = _pendingSlowPacketCount <= 1 ? Math.Min(Transmission.Bandwidth, Transmission.FinalContent.Count) : Transmission.Bandwidth;
 
-#if CLIENT
-        if (Transmission.IsHighSpeed && HighSpeedConnection.Instance is { } instance)
+        if (!isServer && Transmission.IsHighSpeed)
         {
-            _connectionSubbed = instance;
-            instance.BufferProgressUpdated += OnHighSpeedProgressUpdate;
-        }
+#if CLIENT
+            if (HighSpeedConnection.Instance is { } instance)
+            {
+                _connectionSubbed = instance;
+                instance.BufferProgressUpdated += OnHighSpeedProgressUpdate;
+            }
+#else
+            HighSpeedConnection? connection = Transmission.Connections[0].FindHighSpeedConnection();
+            if (connection != null)
+            {
+                _connectionSubbed = connection;
+                connection.BufferProgressUpdated += OnHighSpeedProgressUpdate;
+            }
 #endif
+        }
+
 
         if (Transmission.Handler == null)
             return;
@@ -85,52 +103,133 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         Transmission.Handler.IsStarted = true;
     }
 
-#if CLIENT
-    private void OnHighSpeedProgressUpdate(int bytesDownloaded, int totalBytes)
+    private void OnHighSpeedProgressUpdate(long bytesDownloaded, long totalBytes)
     {
-        if (Transmission.Handler == null)
-            return;
-        
-        Transmission.Handler.ReceivedBytes = bytesDownloaded;
-        Transmission.Handler.TotalBytes = totalBytes;
-        try
+        if (Transmission.Handler != null)
         {
-            Transmission.Handler.IsDirty = true;
-        }
-        catch (Exception ex)
-        {
-            Logger.DevkitServer.LogError(Transmission.LogSource, ex, $"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.");
-        }
-    }
-#endif
+            Transmission.Handler.ReceivedBytes = bytesDownloaded;
+            Transmission.Handler.TotalBytes = totalBytes;
 
-    internal async UniTask<bool> Send(CancellationToken token, UniTask finalize, bool forceLowSpeed = false)
-    {
-        bool forceHighSpeed = Connection is HighSpeedConnection;
-#if SERVER
-        HighSpeedConnection? highSpeedConnection = !forceLowSpeed ? await HighSpeedNetFactory.TryGetOrCreateAndVerify(Connection, true, token).AsUniTask() : null;
+            try
+            {
+                Transmission.Handler.IsDirty = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.DevkitServer.LogError(Transmission.LogSource, ex, $"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.");
+            }
+        }
+
+        lock (this)
+        {
+            DateTime now = DateTime.UtcNow;
+            if (!((now - _lastNeedsToSendProgressUpdate).TotalSeconds > 1d))
+                return;
+
+            _lastNeedsToSendProgressUpdate = now;
+        }
+
+        DevkitServerUtility.QueueOnMainThread(() =>
+        {
+#if CLIENT
+            SendProgressHint.Invoke(Transmission.TransmissionId, ClientHintBytesProcessed);
 #else
-        HighSpeedConnection? highSpeedConnection = !forceLowSpeed ? await HighSpeedNetFactory.TryGetOrCreateAndVerify(token).AsUniTask() : null;
+            SendProgressHint.Invoke(Connections[0], Transmission.TransmissionId, ClientHintBytesProcessed);
 #endif
+        }, token: Transmission.CancellationToken);
+    }
+    
+#if SERVER
+    internal async UniTask<bool[]> Send(CancellationToken token, UniTaskWrapper finalize, bool forceLowSpeed = false)
+#else
+    internal async UniTask<bool> Send(CancellationToken token, UniTaskWrapper finalize, bool forceLowSpeed = false)
+#endif
+    {
+#if SERVER
+        BitArray forceHighSpeed = new BitArray(Connections.Count);
+        for (int i = 0; i < Connections.Count; ++i)
+            forceHighSpeed[i] = Connections[i] is HighSpeedConnection;
+        
+        HighSpeedConnection?[]? highSpeedConnections = !forceLowSpeed ? await HighSpeedNetFactory.TryGetOrCreateAndVerify(Connections, true, token).AsUniTask() : null;
+
+        BitArray lowSpeedUpload = new BitArray(Connections.Count);
+        if (highSpeedConnections != null)
+        {
+            for (int i = 0; i < Connections.Count; ++i)
+            {
+                if (highSpeedConnections[i] is not { Verified: true, Client.Connected: true })
+                    lowSpeedUpload[i] = true;
+            }
+        }
+
+        if (Connections.Count > 1)
+        {
+            for (int i = 0; i < Connections.Count; ++i)
+            {
+                Logger.DevkitServer.LogDebug(Transmission.LogSource, $"(Connection {i.Format()} {Connections[i].Format()}): " + (lowSpeedUpload[i]
+                    ? "Using low-speed (Steamworks) upload option."
+                    : "Using high-speed (TCP) upload option."));
+            }
+        }
+        else
+        {
+            Logger.DevkitServer.LogDebug(Transmission.LogSource, lowSpeedUpload[0]
+                ? "Using low-speed (Steamworks) upload option."
+                : "Using high-speed (TCP) upload option.");
+        }
+#else
+        bool forceHighSpeed = Connection is HighSpeedConnection;
+        HighSpeedConnection? highSpeedConnection = !forceLowSpeed ? await HighSpeedNetFactory.TryGetOrCreateAndVerify(token).AsUniTask() : null;
+
         bool lowSpeedUpload = highSpeedConnection is not { Verified: true, Client.Connected: true };
 
         Logger.DevkitServer.LogDebug(Transmission.LogSource, lowSpeedUpload
             ? "Using low-speed (Steamworks) upload option."
             : "Using high-speed (TCP) upload option.");
+#endif
 
         float startTime = CachedTime.RealtimeSinceStartup;
-
+#if CLIENT
         bool success = false;
+#else
+        bool[]? successes = null;
+#endif
         try
         {
+#if SERVER
+            UniTask<bool>[] tasks = new UniTask<bool>[Connections.Count];
+            for (int i = 0; i < Connections.Count; ++i)
+            {
+                int index = i;
+                tasks[i] = UniTask.Create(async () =>
+                {
+                    bool success;
+                    if (forceHighSpeed[index])
+                    {
+                        HighSpeedNetFactory.TakeConnection((HighSpeedConnection)Connections[index]);
+                        if (!await HighSpeedDownload((HighSpeedConnection)Connections[index], index, token, finalize))
+                            return false;
+
+                        success = true;
+                    }
+                    else
+                    {
+                        if (lowSpeedUpload[index])
+                            success = await LowSpeedSend(token, index, finalize);
+                        else if (!(success = await HighSpeedDownload(highSpeedConnections![index]!, index, token, finalize)))
+                            return false;
+                    }
+
+                    return success;
+                });
+            }
+
+            successes = await UniTask.WhenAll(tasks);
+#else
             if (forceHighSpeed)
             {
-#if SERVER
-                HighSpeedNetFactory.TakeConnection((HighSpeedConnection)Connection);
-#else
                 HighSpeedNetFactory.TakeConnection();
-#endif
-                if (!await HighSpeedDownload((HighSpeedConnection)Connection, token, finalize))
+                if (!await HighSpeedDownload((HighSpeedConnection)Connection, 0, token, finalize))
                     return false;
 
                 success = true;
@@ -138,10 +237,11 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             else
             {
                 if (lowSpeedUpload)
-                    success = await LowSpeedSend(token, finalize);
-                else if (!(success = await HighSpeedDownload(highSpeedConnection!, token, finalize)))
+                    success = await LowSpeedSend(token, 0, finalize);
+                else if (!(success = await HighSpeedDownload(highSpeedConnection!, 0, token, finalize)))
                     return false;
             }
+#endif
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -150,31 +250,50 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         catch (Exception ex)
         {
             Logger.DevkitServer.LogError(Transmission.LogSource, ex, "Error sending transmission.");
-
+#if CLIENT
             if (highSpeedConnection != null)
-            {
-#if SERVER
-                HighSpeedNetFactory.ReleaseConnection((HighSpeedConnection)Connection);
-#else
                 HighSpeedNetFactory.ReleaseConnection();
-#endif
+#else
+            if (highSpeedConnections != null)
+            {
+                for (int i = 0; i < highSpeedConnections.Length; ++i)
+                {
+                    HighSpeedConnection? c = highSpeedConnections[i];
+                    if (c == null)
+                        continue;
+                    HighSpeedNetFactory.ReleaseConnection(c);
+                }
             }
+#endif
         }
 
+#if CLIENT
         if (success)
             Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Sent data ({Transmission.OriginalSize.Format()} B -> {Transmission.FinalSize.Format()} B) in {(CachedTime.RealtimeSinceStartup - startTime).Format("F2")} seconds.", ConsoleColor.DarkCyan);
 
         return success;
+#else
+        if (successes == null)
+            return new bool[Connections.Count];
+
+        for (int i = 0; i < Connections.Count; ++i)
+        {
+            Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Sent data ({Transmission.OriginalSize.Format()} B -> {Transmission.FinalSize.Format()} B) in {(CachedTime.RealtimeSinceStartup - startTime).Format("F2")} seconds to {Connections[i].Format()}.", ConsoleColor.DarkCyan);
+        }
+
+        return successes;
+#endif
     }
-    private async UniTask<bool> HighSpeedDownload(HighSpeedConnection highSpeedConnection, CancellationToken token, UniTask finalize)
+    // ReSharper disable once UnusedParameter.Local
+    private async UniTask<bool> HighSpeedDownload(HighSpeedConnection highSpeedConnection, int index, CancellationToken token, UniTaskWrapper finalize)
     {
-        await finalize;
+        await finalize.FinalizeTask;
 
         // listens for pings to keep the download alive if it takes too long.
         NetTask pingListenerTask = Ping.Listen(15000);
 
 #if SERVER
-        RequestResponse sendStartResponse = await SendStart.RequestAck(Connection, Transmission.WriteStart);
+        RequestResponse sendStartResponse = await SendStart.RequestAck(Connections[index], Transmission.WriteStart);
 #else
         RequestResponse sendStartResponse = await SendStart.RequestAck(Transmission.WriteStart);
 #endif
@@ -187,8 +306,13 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             HighSpeedNetFactory.ReleaseConnection();
 #endif
 
+#if SERVER
+            if (!ReferenceEquals(Connections[index], highSpeedConnection))
+                await Send(token, new UniTaskWrapper(UniTask.CompletedTask), true);
+#else
             if (!ReferenceEquals(Connection, highSpeedConnection))
-                await Send(token, UniTask.CompletedTask, true);
+                await Send(token, new UniTaskWrapper(UniTask.CompletedTask), true);
+#endif
 
             return false;
         }
@@ -206,7 +330,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                 if (pingListenerTask.Parameters.Responded)
                 {
                     uploadTask.KeepAlive();
-                    Logger.DevkitServer.LogDebug(Transmission.LogSource, "Received keep-alive from client while downloading, refreshed timeout.");
+                    Logger.DevkitServer.LogConditional(Transmission.LogSource, "Received keep-alive from client while downloading, refreshed timeout.");
                 }
 
                 pingListenerTask = new NetTask(false, pingListenerTask.RequestId, 10000);
@@ -225,22 +349,26 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         if (uploadTask.Parameters is { Responded: true, ErrorCode: (int)StandardErrorCode.Success })
             return true;
 
-
         Logger.DevkitServer.LogWarning(Transmission.LogSource, $"Failed to send {FormattingUtil.FormatCapacity(Transmission.FinalContent.Count, colorize: true)} of data over a high-speed connection, trying low speed.",
             ConsoleColor.DarkCyan);
 
+#if SERVER
+        if (!ReferenceEquals(Connections[index], highSpeedConnection))
+            await Send(token, new UniTaskWrapper(UniTask.CompletedTask), true);
+#else
         if (!ReferenceEquals(Connection, highSpeedConnection))
-            await Send(token, UniTask.CompletedTask, true);
+            await Send(token, new UniTaskWrapper(UniTask.CompletedTask), true);
+#endif
 
         return false;
 
     }
-    private async UniTask<bool> LowSpeedSend(CancellationToken token, UniTask finalize)
+    private async UniTask<bool> LowSpeedSend(CancellationToken token, int index, UniTaskWrapper finalize)
     {
         bool isLocalConnection = false;
 
 #if SERVER
-        string? ip = Connection.GetAddressString(false);
+        string? ip = Connections[index].GetAddressString(false);
 #else
         string? ip = Provider.isConnected ? Provider.CurrentServerConnectParameters.address.ToString() : "127.0.0.1";
 #endif
@@ -248,13 +376,13 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         if (ip != null && ip.Equals("127.0.0.1", StringComparison.Ordinal))
             isLocalConnection = true;
 
-        float averagePing = await PingLowSpeed(token); // todo isLocalConnection ? -1f : await PingLowSpeed(token);
+        float averagePing = await PingLowSpeed(token, index); // todo isLocalConnection ? -1f : await PingLowSpeed(token);
 
-        await finalize;
+        await finalize.FinalizeTask;
         await UniTask.SwitchToMainThread(token);
 
 #if SERVER
-        RequestResponse sendStartResponse = await SendStart.RequestAck(Connection, Transmission.WriteStart);
+        RequestResponse sendStartResponse = await SendStart.RequestAck(Connections[index], Transmission.WriteStart);
 #else
         RequestResponse sendStartResponse = await SendStart.RequestAck(Transmission.WriteStart);
 #endif
@@ -311,8 +439,11 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
             ++packetIndex;
             currentDataIndex += packetSize;
-
+#if SERVER
+            Connections[index].Send(dataBuffer, false, offset: 0, count: headerSize + packetSize);
+#else
             Connection.Send(dataBuffer, false, offset: 0, count: headerSize + packetSize);
+#endif
 
             // run checkups to see if we need to slow down our send interval
             if (packetIndex - 1 == nextCheckupPacketIndex)
@@ -323,7 +454,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                 for (int retry = 0; retry < 2; ++retry)
                 {
 #if SERVER
-                    checkupResponse = await SendSlowCheckup.RequestAck(Connection, Transmission.TransmissionId, lastCheckupPacketIndex, packetIndex - 1, timeoutMs: 15000);
+                    checkupResponse = await SendSlowCheckup.RequestAck(Connections[index], Transmission.TransmissionId, lastCheckupPacketIndex, packetIndex - 1, timeoutMs: 15000);
 #else
                     checkupResponse = await SendSlowCheckup.RequestAck(Transmission.TransmissionId, lastCheckupPacketIndex, packetIndex - 1, timeoutMs: 15000);
 #endif
@@ -339,7 +470,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                         return false;
                     }
 #if SERVER
-                    if (!Connection.IsConnected())
+                    if (!Connections[index].IsConnected())
                     {
                         Logger.DevkitServer.LogInfo(Transmission.LogSource, $"User disconnected at packet {packetIndex.Format()} / {packetCount.Format()} before finalizing transmission.", ConsoleColor.DarkCyan);
                         await Transmission.Cancel(token);
@@ -371,13 +502,13 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                     {
                         float old = packetDelay;
                         packetDelay *= 0.75f;
-                        Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Packet delay decreased from {old.Format()} -> {packetDelay.Format()}.");
+                        Logger.DevkitServer.LogConditional(Transmission.LogSource, $"Packet delay decreased from {old.Format()} -> {packetDelay.Format()}.");
                     }
                     if (misses > 0)
                     {
                         float old = packetDelay;
                         packetDelay = Math.Min(1f, packetDelay / ((float)misses / ((packetIndex - lastCheckupPacketIndex) * 2)));
-                        Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Packet delay increasesd from {old.Format()} -> {packetDelay.Format()} after missing {misses.Format()} / {(packetIndex - lastCheckupPacketIndex).Format()} packet(s).");
+                        Logger.DevkitServer.LogConditional(Transmission.LogSource, $"Packet delay increasesd from {old.Format()} -> {packetDelay.Format()} after missing {misses.Format()} / {(packetIndex - lastCheckupPacketIndex).Format()} packet(s).");
                     }
 
                     nextCheckupPacketIndex += firstCheckupPosition;
@@ -388,7 +519,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             await UniTask.Delay(TimeSpan.FromSeconds(packetDelay), true, cancellationToken: token);
 
 #if SERVER
-            if (Connection.IsConnected())
+            if (Connections[index].IsConnected())
                 continue;
 
             Logger.DevkitServer.LogInfo(Transmission.LogSource, $"User disconnected at packet {packetIndex.Format()} / {packetCount.Format()} before finalizing transmission.", ConsoleColor.DarkCyan);
@@ -400,7 +531,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         await UniTask.Delay(TimeSpan.FromSeconds(0.25), true, cancellationToken: token);
 
 #if SERVER
-        if (!Connection.IsConnected())
+        if (!Connections[index].IsConnected())
         {
             Logger.DevkitServer.LogInfo(Transmission.LogSource, "User disconnected before finalizing transmission.", ConsoleColor.DarkCyan);
             await Transmission.Cancel(token);
@@ -412,7 +543,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         while (true)
         {
 #if SERVER
-            RequestResponse sendEndResponse = await SendSlowEnd.Request(SendSlowMissedPackets, Connection, Transmission.WriteEnd);
+            RequestResponse sendEndResponse = await SendSlowEnd.Request(SendSlowMissedPackets, Connections[index], Transmission.WriteEnd);
 #else
             RequestResponse sendEndResponse = await SendSlowEnd.Request(SendSlowMissedPackets, Transmission.WriteEnd);
 #endif
@@ -453,7 +584,11 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
                 for (int retry = 0; retry < 2; ++retry)
                 {
+#if SERVER
+                    Connections[index].Send(dataBuffer, true, count: headerSize + packetSize);
+#else
                     Connection.Send(dataBuffer, true, count: headerSize + packetSize);
+#endif
                     RequestResponse response = await slowPacketListener;
                     await UniTask.SwitchToMainThread(token);
 
@@ -477,7 +612,8 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
         return true;
     }
-    private async UniTask<float> PingLowSpeed(CancellationToken token)
+    // ReSharper disable once UnusedParameter.Local
+    private async UniTask<float> PingLowSpeed(CancellationToken token, int index)
     {
         const int pingCt = 5;
         const int pingSpacingMs = 500;
@@ -487,7 +623,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         {
             float start = CachedTime.RealtimeSinceStartup;
 #if SERVER
-            RequestResponse response = await Ping.RequestAck(Connection, 2000);
+            RequestResponse response = await Ping.RequestAck(Connections[index], 2000);
 #else
             RequestResponse response = await Ping.RequestAck(2000);
 #endif
@@ -502,7 +638,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             await UniTask.Delay(TimeSpan.FromMilliseconds(pingSpacingMs), ignoreTimeScale: true, cancellationToken: token);
 
 #if SERVER
-            if (Connection.IsConnected())
+            if (Connections[index].IsConnected())
                 continue;
 
             Logger.DevkitServer.LogInfo(Transmission.LogSource, $"User disconected during at ping check #{(i + 1).Format()}.", ConsoleColor.DarkCyan);
@@ -512,7 +648,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
         avgPing /= pingCt;
 
-        Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Average ping: {avgPing * 1000:F2} ms (n = {pingCt.Format()}, t = {pingSpacingMs.Format("0.##")} ms).");
+        Logger.DevkitServer.LogConditional(Transmission.LogSource, $"Average ping: {avgPing * 1000:F2} ms (n = {pingCt.Format()}, t = {pingSpacingMs.Format("0.##")} ms).");
         return avgPing;
     }
 
@@ -550,16 +686,17 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         int packetLength = Math.Min(Transmission.Bandwidth, reader.Length - reader.Position);
         
         Buffer.BlockCopy(reader.InternalBuffer!, reader.Position, _clientSlowReceiveBuffer, dataIndex, packetLength);
+        ClientHintBytesProcessed += packetLength;
         reader.Skip(packetLength);
         if (_initialMissingSlowPackets > 0)
         {
             if (_missingSlowPackets > 0)
                 --_missingSlowPackets;
-            Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Recovered ({FormattingUtil.FormatCapacity(packetLength, colorize: true)}) (packet #{(packetIndex + 1).Format()}).", ConsoleColor.DarkCyan);
+            Logger.DevkitServer.LogConditional(Transmission.LogSource, $"Recovered ({FormattingUtil.FormatCapacity(packetLength, colorize: true)}) (packet #{(packetIndex + 1).Format()}).", ConsoleColor.DarkCyan);
         }
         else
         {
-            Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Received ({FormattingUtil.FormatCapacity(packetLength, colorize: true)}) (packet #{(packetIndex + 1).Format()}).", ConsoleColor.DarkCyan);
+            Logger.DevkitServer.LogConditional(Transmission.LogSource, $"Received ({FormattingUtil.FormatCapacity(packetLength, colorize: true)}) (packet #{(packetIndex + 1).Format()}).", ConsoleColor.DarkCyan);
         }
 
         ++_receivedSlowPackets;
@@ -579,8 +716,19 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                 Logger.DevkitServer.LogError(Transmission.LogSource, ex, $"Failed to set IsDirty = true on handler: {Transmission.Handler.GetType().Format()}.");
             }
         }
-
         ctx.Acknowledge(StandardErrorCode.Success);
+
+        DateTime now = DateTime.UtcNow;
+        if (!((now - _lastNeedsToSendProgressUpdate).TotalSeconds > 1d))
+            return;
+
+        _lastNeedsToSendProgressUpdate = now;
+
+#if CLIENT
+        SendProgressHint.Invoke(Transmission.TransmissionId, ClientHintBytesProcessed);
+#else
+        SendProgressHint.Invoke(Connections[0], Transmission.TransmissionId, ClientHintBytesProcessed);
+#endif
     }
 
     [UsedImplicitly]
@@ -651,7 +799,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         {
             missingPackets = new int[_pendingSlowPacketCount];
 
-            Logger.DevkitServer.LogDebug(Transmission.LogSource, $"All packets missing: * / {_pendingSlowPacketCount.Format()}.");
+            Logger.DevkitServer.LogConditional(Transmission.LogSource, $"All packets missing: * / {_pendingSlowPacketCount.Format()}.");
 
             for (int i = 0; i < _pendingSlowPacketCount; ++i)
                 missingPackets[i] = i;
@@ -674,7 +822,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
                         continue;
 
                     missingPackets[--missing] = i;
-                    Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Packet missing: {(i + 1).Format()} / {_pendingSlowPacketCount.Format()}.");
+                    Logger.DevkitServer.LogConditional(Transmission.LogSource, $"Packet missing: {(i + 1).Format()} / {_pendingSlowPacketCount.Format()}.");
                     break;
                 }
             }
@@ -733,7 +881,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         if (IsServer)
         {
 #if SERVER
-            RequestResponse sendEndResponse = await SendSlowEnd.Request(SendSlowMissedPackets, Connection, Transmission.WriteEndCancelled);
+            RequestResponse sendEndResponse = await SendSlowEnd.Request(SendSlowMissedPackets, Connections[0], Transmission.WriteEndCancelled);
 #else
             RequestResponse sendEndResponse = await SendSlowEnd.Request(SendSlowMissedPackets, Transmission.WriteEndCancelled);
 #endif
@@ -742,7 +890,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         else
         {
 #if SERVER
-            RequestResponse sendEndResponse = await SendSlowEnd.RequestAck(Connection, Transmission.WriteEndCancelled);
+            RequestResponse sendEndResponse = await SendSlowEnd.RequestAck(Connections[0], Transmission.WriteEndCancelled);
 #else
             RequestResponse sendEndResponse = await SendSlowEnd.RequestAck(Transmission.WriteEndCancelled);
 #endif
@@ -780,7 +928,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
             return checkupEndIndex - checkupStartIndex;
 
 
-        Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Received checkup: {checkupStartIndex.Format()} -> {checkupEndIndex.Format()}.");
+        Logger.DevkitServer.LogConditional(Transmission.LogSource, $"Received checkup: {checkupStartIndex.Format()} -> {checkupEndIndex.Format()}.");
         int missing = 0;
         for (int i = checkupStartIndex; i <= checkupEndIndex; ++i)
         {
@@ -798,6 +946,8 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         Transmission.FinalContent = new ArraySegment<byte>(bytes);
             
         ctx.Acknowledge(StandardErrorCode.Success);
+
+        ClientHintBytesProcessed = Transmission.FinalSize;
 
         if (Transmission.Handler != null)
         {
@@ -833,10 +983,8 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         _missingSlowPackets = 0;
         _receivedSlowPackets = 0;
 
-#if CLIENT
         if (_connectionSubbed != null)
             _connectionSubbed.BufferProgressUpdated -= OnHighSpeedProgressUpdate;
-#endif
 
         ActiveMessages.Remove(Transmission.TransmissionId, out _);
 
@@ -845,9 +993,43 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
     #region Receivers
     [NetCall(NetCallSource.FromEither, DevkitServerNetCall.Ping)]
-    private static void ReceiveSlowPing(MessageContext ctx)
+    private static void ReceiveSlowHighSpeedPing(MessageContext ctx)
     {
         ctx.Acknowledge();
+    }
+    [NetCall(NetCallSource.FromEither, DevkitServerNetCall.SendProgressHint)]
+    private static void ReceiveProgressHint(MessageContext ctx, Guid guid, long bytesProcessed)
+    {
+        if (!ActiveMessages.TryGetValue(guid, out LargeMessageTransmission transmission))
+        {
+            Logger.DevkitServer.LogWarning("LARGE MSG", $"Received unknown transmission: {guid.Format()}.");
+            ctx.Acknowledge(StandardErrorCode.NotFound);
+            return;
+        }
+
+        if (!transmission.Comms.IsServer)
+        {
+            Logger.DevkitServer.LogWarning(transmission.LogSource, $"Received server transmission: {guid.Format()}, but expected client.");
+            ctx.Acknowledge(StandardErrorCode.AccessViolation);
+            return;
+        }
+
+        transmission.Comms.ClientHintBytesProcessed = checked((int)bytesProcessed);
+
+        Logger.DevkitServer.LogConditional(transmission.LogSource, $"Received progress hint from client: {FormattingUtil.FormatCapacity(bytesProcessed, colorize: true)} / {FormattingUtil.FormatCapacity(transmission.FinalSize, colorize: true)}.");
+
+        if (transmission.Handler == null)
+            return;
+
+        transmission.Handler.ReceivedBytes = bytesProcessed;
+        try
+        {
+            transmission.Handler.IsDirty = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError(transmission.LogSource, ex, $"Failed to set IsDirty = true on handler: {transmission.Handler.GetType().Format()}.");
+        }
     }
 
     [NetCall(NetCallSource.FromEither, DevkitServerNetCall.SendStartLargeTransmission)]
@@ -956,28 +1138,32 @@ internal class LargeMessageTransmissionCommunications : IDisposable
     {
         foreach (LargeMessageTransmission transmission in ActiveMessages.Values)
         {
-            Logger.DevkitServer.LogDebug(transmission.LogSource, "== Large Message Transmission ==");
-            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  ID: {transmission.TransmissionId.Format()}");
-            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Is Server: {transmission.Comms.IsServer.Format()}");
-            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Was Cancelled: {transmission.WasCancelled.Format()}");
-            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Allow; High Speed: {transmission.AllowHighSpeed.Format()}, Compression: {transmission.AllowCompression.Format()}");
-            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Connection: {transmission.Connection.Format()}");
-            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Compressed: {transmission.IsCompressed.Format()}, High Speed: {transmission.IsHighSpeed.Format()}");
-            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Original Size: {transmission.OriginalSize.Format()} B, Final Size: {transmission.FinalSize.Format()} B");
-            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Bandwidth: {transmission.Bandwidth.Format()} B");
-            Logger.DevkitServer.LogDebug(transmission.LogSource, $"  Handler type: {transmission.HandlerType.Format()}");
-            Logger.DevkitServer.LogDebug(transmission.LogSource, $"   Projected packet count: {transmission.LowSpeedPacketCount.Format()}");
-            Logger.DevkitServer.LogDebug(transmission.LogSource, $"   Flags: {("0b" + Convert.ToString(transmission.Flags, 2)).Colorize(FormattingUtil.NumberColor)}");
+            Logger.DevkitServer.LogInfo(transmission.LogSource, "== Large Message Transmission ==");
+            Logger.DevkitServer.LogInfo(transmission.LogSource, $"  ID: {transmission.TransmissionId.Format()}");
+            Logger.DevkitServer.LogInfo(transmission.LogSource, $"  Is Server: {transmission.Comms.IsServer.Format()}");
+            Logger.DevkitServer.LogInfo(transmission.LogSource, $"  Was Cancelled: {transmission.WasCancelled.Format()}");
+            Logger.DevkitServer.LogInfo(transmission.LogSource, $"  Allow; High Speed: {transmission.AllowHighSpeed.Format()}, Compression: {transmission.AllowCompression.Format()}");
+#if SERVER
+            Logger.DevkitServer.LogInfo(transmission.LogSource, $"  Connection: {transmission.Connections.FormatList()}");
+#else
+            Logger.DevkitServer.LogInfo(transmission.LogSource, $"  Connection: {transmission.Connection.Format()}");
+#endif
+            Logger.DevkitServer.LogInfo(transmission.LogSource, $"  Compressed: {transmission.IsCompressed.Format()}, High Speed: {transmission.IsHighSpeed.Format()}");
+            Logger.DevkitServer.LogInfo(transmission.LogSource, $"  Original Size: {transmission.OriginalSize.Format()} B, Final Size: {transmission.FinalSize.Format()} B");
+            Logger.DevkitServer.LogInfo(transmission.LogSource, $"  Bandwidth: {transmission.Bandwidth.Format()} B");
+            Logger.DevkitServer.LogInfo(transmission.LogSource, $"  Handler type: {transmission.HandlerType.Format()}");
+            Logger.DevkitServer.LogInfo(transmission.LogSource, $"   Projected packet count: {transmission.LowSpeedPacketCount.Format()}");
+            Logger.DevkitServer.LogInfo(transmission.LogSource, $"   Flags: {("0b" + Convert.ToString(transmission.Flags, 2)).Colorize(FormattingUtil.NumberColor)}");
 
             if (transmission.Handler != null)
             {
-                Logger.DevkitServer.LogDebug(transmission.LogSource, $"Handler ({transmission.Handler.GetType().Format()}: {Environment.NewLine}" +
+                Logger.DevkitServer.LogInfo(transmission.LogSource, $"Handler ({transmission.Handler.GetType().Format()}: {Environment.NewLine}" +
                                                                      JsonSerializer.Serialize(transmission.Handler, transmission.HandlerType,
                                                                          DevkitServerConfig.SerializerSettings));
             }
 
-            Logger.DevkitServer.LogDebug(string.Empty, string.Empty);
-            Logger.DevkitServer.LogDebug(string.Empty, string.Empty);
+            Logger.DevkitServer.LogInfo(string.Empty, string.Empty);
+            Logger.DevkitServer.LogInfo(string.Empty, string.Empty);
         }
     }
     internal static IReadOnlyList<LargeMessageTransmission> GetReceivingMessages()
@@ -987,5 +1173,14 @@ internal class LargeMessageTransmissionCommunications : IDisposable
     internal static IReadOnlyList<LargeMessageTransmission> GetSendingMessages()
     {
         return ActiveMessages.Values.Where(x => x.Comms.IsServer).ToArray();
+    }
+
+    internal class UniTaskWrapper
+    {
+        public readonly UniTask FinalizeTask;
+        public UniTaskWrapper(UniTask finalizeTask)
+        {
+            FinalizeTask = finalizeTask;
+        }
     }
 }

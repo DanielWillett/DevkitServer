@@ -67,7 +67,7 @@ public static class EditorLevel
 
             data.WriteToData(true);
 
-            LargeMessageTransmission transmission = new LargeMessageTransmission(connection, data.Data)
+            LargeMessageTransmission transmission = new LargeMessageTransmission([ connection ], data.Data)
             {
                 LogSource = "SEND LEVEL",
                 HandlerType = typeof(LevelTransmissionHandler)
@@ -75,7 +75,7 @@ public static class EditorLevel
 
             try
             {
-                if (await transmission.Send(DevkitServerModule.UnloadToken))
+                if ((await transmission.Send(DevkitServerModule.UnloadToken))[0])
                 {
                     Logger.DevkitServer.LogInfo(transmission.LogSource, $"Sent level {Provider.map.Format(false)} (size: {FormattingUtil.FormatCapacity(transmission.OriginalSize, colorize: true)}) to {connection.Format()}.");
                     return;
