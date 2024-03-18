@@ -7,7 +7,7 @@
 public enum BinaryStringFormat : long
 {
     /// <summary>
-    /// Do not log anything. Doesn't affect the behavior of <see cref="FormattingUtil.BytesToStringOld(ReadOnlySpan{byte},BinaryStringFormat)"/>
+    /// Do not log anything. Doesn't affect the behavior of <see cref="FormattingUtil.FormatBinary(ReadOnlySpan{byte},BinaryStringFormat)"/>
     /// </summary>
     NoLogging,
 

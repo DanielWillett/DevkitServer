@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net481</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyTitle>TestPlugin</AssemblyTitle>
     <Product>TestPlugin</Product>
     <Copyright>Copyright ©  2023</Copyright>

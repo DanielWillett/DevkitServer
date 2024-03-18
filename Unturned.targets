@@ -260,13 +260,13 @@
             <Private>false</Private>
         </Reference>
       
-        <Reference Include="Newtonsoft.Json_2">
-            <HintPath>$(SharedPath)\Unturned_Data\Managed\Newtonsoft.Json.dll</HintPath>
+        <PackageReference Include="Newtonsoft.Json" Version="7.0.1">
             <FusionName>Newtonsoft.Json, Version=7.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed</FusionName>
             <SpecificVersion>true</SpecificVersion>
             <Aliases>NSJ</Aliases>
             <Private>false</Private>
-        </Reference>
+            <NoWarn>NU1903;NU1701</NoWarn>
+        </PackageReference>
         <Reference Include="AstarPathfindingProject">
             <HintPath>$(SharedPath)\Unturned_Data\Managed\AstarPathfindingProject.dll</HintPath>
             <Private>false</Private>

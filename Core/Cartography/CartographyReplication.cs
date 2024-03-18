@@ -95,7 +95,8 @@ public static class CartographyReplication
         {
             LogSource = "SEND " + (isChart ? "CHART" : "SATELLITE"),
             HandlerType = typeof(CartographyReplicationHandler),
-            Handler = new CartographyReplicationHandler()
+            Handler = new CartographyReplicationHandler(),
+            LoggingType = BinaryStringFormat.First64 | BinaryStringFormat.Last64 | BinaryStringFormat.RowLabels | BinaryStringFormat.ColumnLabels
         };
 
         try
@@ -138,6 +139,9 @@ public static class CartographyReplication
 
         protected internal override void OnStart()
         {
+#if DEBUG
+            Transmission.LoggingType = BinaryStringFormat.First64 | BinaryStringFormat.Last64 | BinaryStringFormat.RowLabels | BinaryStringFormat.ColumnLabels;
+#endif
             bool isChart;
 
             if (Transmission.LogSource.Equals("SEND CHART", StringComparison.Ordinal))

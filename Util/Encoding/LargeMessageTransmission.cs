@@ -362,17 +362,20 @@ public class LargeMessageTransmission : IDisposable
     /// <returns><see langword="false"/> if the message sending failed somehow, otherwise <see langword="true"/>.</returns>
     /// <exception cref="InvalidOperationException">Tried to send from the wrong side.</exception>
     /// <exception cref="OperationCanceledException"><paramref name="token"/> is cancelled.</exception>
+    /// <exception cref="FormatException"><see cref="Content"/> is <see langword="default"/> or empty.</exception>
 #if CLIENT
     public async UniTask<bool> Send(CancellationToken token = default)
 #else
     public async UniTask<bool[]> Send(CancellationToken token = default)
 #endif
     {
-        if (LoggingType)
-        {
-            string bytes = FormattingUtil.GetBytesHex(Content.Array!, offset: Content.Offset, len: Content.Count);
-        }
-        token = token == default ? _tknSource.Token : CancellationTokenSource.CreateLinkedTokenSource(token, _tknSource.Token).Token;
+        if (Content.Array == null || Content.Count == 0)
+            throw new FormatException("No content supplied to large transaction. Ensure the 'Content' property has a value and a non-zero count.");
+
+        if (LoggingType != BinaryStringFormat.NoLogging)
+            PrintLogging();
+        
+        token = !token.CanBeCanceled ? _tknSource.Token : CancellationTokenSource.CreateLinkedTokenSource(token, _tknSource.Token).Token;
         token.ThrowIfCancellationRequested();
 
         if (!Comms.IsServer)
@@ -521,6 +524,17 @@ public class LargeMessageTransmission : IDisposable
     {
         return AllowCompression && !IsCompressed ? Compress(token) : UniTask.CompletedTask;
     }
+    private void PrintLogging()
+    {
+        BinaryStringFormat format = LoggingType | BinaryStringFormat.NewLineAtBeginning;
+
+        int len = FormattingUtil.GetBinarySize(Content.Count, format);
+
+        Span<char> data = len > 384 ? new char[len] : stackalloc char[len];
+        FormattingUtil.FormatBinary(Content, data, format);
+
+        Logger.DevkitServer.LogInfo(LogSource, data);
+    }
 
     public void Dispose()
     {
@@ -556,13 +570,8 @@ public class LargeMessageTransmission : IDisposable
 
         Comms.Dispose();
 
-        if (LoggingType == BinaryStringFormat.NoLogging || Content.Array == null || Content.Count == 0)
-            return;
-
-        int len = FormattingUtil.GetBinarySize(Content.Count, LoggingType | BinaryStringFormat.NewLineAtBeginning);
-        Span<char> data = len > 256 ? new char[len] : stackalloc char[len];
-        FormattingUtil.FormatBinary(Content, data, LoggingType);
-        Logger.DevkitServer.LogInfo(LogSource, data);
+        if (LoggingType != BinaryStringFormat.NoLogging && Content.Array != null && Content.Count != 0)
+            PrintLogging();
     }
     internal void OnFinalContentCompleted()
     {

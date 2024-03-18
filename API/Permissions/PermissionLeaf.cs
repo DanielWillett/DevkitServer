@@ -16,7 +16,7 @@ public readonly struct PermissionLeaf : IEquatable<PermissionLeaf>, IEquatable<P
     /// A permission that can never be met.
     /// </summary>
     public static readonly PermissionLeaf Nil = new PermissionLeaf();
-
+    
     /// <summary>
     /// Prefix for Core permissions.
     /// </summary>

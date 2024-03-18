@@ -15,7 +15,15 @@ namespace DevkitServer.Util;
 public static class DevkitServerUtility
 {
     private static int? _maxTextureSize;
+
+    /// <summary>
+    /// The max size of texture allowed on the current GPU.
+    /// </summary>
     public static int MaxTextureDimensionSize => _maxTextureSize ??= Math.Min(16384, SystemInfo.maxTextureSize);
+
+    /// <summary>
+    /// If current language is 'English' or not.
+    /// </summary>
     public static bool LanguageIsEnglish => Provider.language.Length > 0 && Provider.language[0] == 'E' && Provider.language.Equals("English", StringComparison.Ordinal);
     [Pure]
     public static Bounds InflateBounds(ref Bounds bounds)
@@ -93,13 +101,13 @@ public static class DevkitServerUtility
             }
         }
 
-        if (uint.TryParse(str, NumberStyles.Number, CultureInfo.InvariantCulture, out uint acctId1))
+        if (str.Length >= 8 && uint.TryParse(str, NumberStyles.Number, CultureInfo.InvariantCulture, out uint acctId1))
         {
             steamId = new CSteamID(new AccountID_t(acctId1), EUniverse.k_EUniversePublic, EAccountType.k_EAccountTypeIndividual);
             return true;
         }
 
-        if (ulong.TryParse(str, NumberStyles.Number, CultureInfo.InvariantCulture, out ulong id))
+        if (str.Length >= 17 && ulong.TryParse(str, NumberStyles.Number, CultureInfo.InvariantCulture, out ulong id))
         {
             steamId = new CSteamID(id);
 
@@ -115,7 +123,7 @@ public static class DevkitServerUtility
             return true;
         }
 
-        if (ulong.TryParse(str, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong acctId2))
+        if (str.Length >= 15 && ulong.TryParse(str, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong acctId2))
         {
             steamId = new CSteamID(acctId2);
             return true;
@@ -915,6 +923,9 @@ public static class DevkitServerUtility
     /// <returns>The amount of elements removed.</returns>
     public static int RemoveAll<T>(this IList<T> list, Predicate<T> selector)
     {
+        if (list is List<T> sysList)
+            return sysList.RemoveAll(selector);
+        
         int c = 0;
         for (int i = list.Count - 1; i >= 0; --i)
         {
@@ -1202,12 +1213,14 @@ public static class DevkitServerUtility
     /// <summary>
     /// Counts the number of (base 10) digits in a number.
     /// </summary>
+    /// <remarks>Include separators every 3 digits.</remarks>
     [Pure]
     public static int CountDigits(int num, bool commas = false) => CountDigits((uint)Math.Abs(num), commas);
 
     /// <summary>
     /// Counts the number of (base 10) digits in a number.
     /// </summary>
+    /// <remarks>Include separators every 3 digits.</remarks>
     [Pure]
     public static int CountDigits(uint num, bool commas = false)
     {
@@ -1232,12 +1245,14 @@ public static class DevkitServerUtility
     /// <summary>
     /// Counts the number of (base 10) digits in a number.
     /// </summary>
+    /// <remarks>Include separators every 3 digits.</remarks>
     [Pure]
     public static int CountDigits(long num, bool commas = false) => CountDigits((ulong)Math.Abs(num), commas);
 
     /// <summary>
     /// Counts the number of (base 10) digits in a number.
     /// </summary>
+    /// <remarks>Include separators every 3 digits.</remarks>
     [Pure]
     public static int CountDigits(ulong num, bool commas = false)
     {

@@ -25,17 +25,17 @@ public class TestPlugin : Plugin<TestPluginConfig>
     protected override void Load()
     {
         Instance = this;
-        LogInfo("Loaded " + Name + ".");
-        LogInfo("On Server: " + Provider.serverID);
-        LogInfo("On Client: " + Provider.client);
+        this.LogInfo("Loaded " + Name + ".");
+        this.LogInfo("On Server: " + Provider.serverID);
+        this.LogInfo("On Client: " + Provider.client);
         bool test = HtmlDocument.IsWhiteSpace(' ');
         _ = test;
-        LogInfo("Config value: " + Configuration.TestArgumentOne + ".");
+        this.LogInfo("Config value: " + Configuration.TestArgumentOne + ".");
     }
 
     protected override void Unload()
     {
         Instance = null;
-        LogInfo("Unloaded " + Name + ".");
+        this.LogInfo("Unloaded " + Name + ".");
     }
 }

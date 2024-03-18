@@ -15,16 +15,16 @@ internal class TestPluginSubmodule : Plugin
 
     protected override void Load()
     {
-        LogInfo("Loaded " + Name + ".");
+        this.LogInfo("Loaded " + Name + ".");
 #if SERVER
-        LogInfo("On Server: " + Provider.serverID);
+        this.LogInfo("On Server: " + Provider.serverID);
 #elif CLIENT
-        LogInfo("On Client: " + Provider.client);
+        this.LogInfo("On Client: " + Provider.client);
 #endif
     }
     protected override void Unload()
     {
-        LogInfo("Unloaded " + Name + ".");
+        this.LogInfo("Unloaded " + Name + ".");
     }
 
     protected override LocalDatDictionary DefaultLocalization => new LocalDatDictionary

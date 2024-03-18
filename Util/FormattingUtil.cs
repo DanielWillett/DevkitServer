@@ -1570,10 +1570,10 @@ public static class FormattingUtil
 
         if (last != -1 && first != -1)
         {
-            if (last + first > byteCt)
-            {
-                last = -1; first = -1;
-            }
+            if (last + first <= byteCt)
+                return;
+
+            last = -1; first = -1;
         }
         else if (last > byteCt)
             last = -1;
@@ -1600,15 +1600,15 @@ public static class FormattingUtil
         AssertValidBinaryLoggingFormat(format, nameof(format));
         int ct = GetBytesToStringSizeIntl((uint)bytes.Length, format);
         Span<char> span = ct > 384 ? new char[ct] : stackalloc char[ct];
-        FormatBinary(bytes, span, format);
-        return new string(span);
+        int len = FormatBinary(bytes, span, format);
+        return new string(span[..len]);
     }
 
     /// <summary>
     /// Convert binary data to a formatted display string and write it to a span.
     /// </summary>
     /// <remarks>Use <see cref="GetBinarySize"/> to get the length of the span beforehand.</remarks>
-    public static unsafe int FormatBinary(ReadOnlySpan<byte> bytes, Span<char> output, BinaryStringFormat format)
+    public static int FormatBinary(ReadOnlySpan<byte> bytes, Span<char> output, BinaryStringFormat format)
     {
         GetBytesToStringMetrics((uint)bytes.Length, format, out int byteSize, out int columnCount, out int first, out int last);
 
@@ -1656,114 +1656,12 @@ public static class FormattingUtil
         if (first == -1 && last == -1)
         {
             len = (uint)bytes.Length;
-            fixed (byte* ptr = &bytes.GetPinnableReference())
+            
+            for (int i = 0; i < len; ++i)
             {
-                for (uint i = 0; i < len; ++i)
+                if (i % columnCount == 0)
                 {
-                    if (i % columnCount == 0)
-                    {
-                        if (i != 0 || (format & BinaryStringFormat.NewLineAtBeginning) != 0 || (format & BinaryStringFormat.ColumnLabels) != 0)
-                        {
-                            newLine.CopyTo(output[spanOffset..]);
-                            spanOffset += newLine.Length;
-                        }
-
-                        if ((format & BinaryStringFormat.RowLabels) != 0)
-                        {
-                            output[spanOffset] = '0';
-                            output[spanOffset + 1] = 'x';
-                            WriteRowLabel(i, output[(spanOffset + 2)..], rowLblSize - 3);
-                            spanOffset += rowLblSize;
-                            output[spanOffset - 1] = ' ';
-                        }
-                    }
-                    else
-                    {
-                        output[spanOffset] = ' ';
-                        ++spanOffset;
-                    }
-
-                    WriteByteBySize(ptr[i], output[spanOffset..], byteSize);
-                    spanOffset += byteSize;
-                }
-            }
-
-            if (spanOffset != output.Length)
-                throw new InvalidOperationException($"Failed to correctly calculate the length of a byte-to-string sequence (expected: {output.Length}, actual: {spanOffset}).");
-
-            return spanOffset;
-        }
-
-        if (first == -1)
-            first = 0;
-        if (last == -1)
-            last = 0;
-
-        len = (uint)(first + last);
-        fixed (byte* ptr = &bytes.GetPinnableReference())
-        {
-            int columnOffset = 0;
-            for (uint i = 0; i <= len; ++i)
-            {
-                uint index;
-                if (i >= (uint)first)
-                {
-                    uint indexWithinLast = (uint)last - (i - (uint)first);
-                    index = (uint)bytes.Length - indexWithinLast - 1;
-                }
-                else
-                {
-                    index = i;
-                }
-                if (i == (uint)first)
-                {
-                    if (first != 0u || (format & BinaryStringFormat.ColumnLabels) != 0)
-                    {
-                        newLine.CopyTo(output[spanOffset..]);
-                        spanOffset += newLine.Length;
-                    }
-                    output[spanOffset] = '.';
-                    output[spanOffset + 1] = '.';
-                    output[spanOffset + 2] = '.';
-                    output[spanOffset + 3] = ' ';
-                    output[spanOffset + 4] = '(';
-                    spanOffset += 5;
-                    uint ttlLen = (uint)bytes.Length - len;
-                    if ((format & BinaryStringFormat.ByteCountUnits) != 0)
-                    {
-                        int capacityCount = FormatCapacity(ttlLen, output[spanOffset..]);
-                        output[spanOffset + capacityCount] = ')';
-                        spanOffset += capacityCount + 1;
-                    }
-                    else
-                    {
-                        ttlLen.TryFormat(output[spanOffset..], out int written, "N0", CultureInfo.InvariantCulture);
-                        spanOffset += written;
-                        output[spanOffset] = ' ';
-                        output[spanOffset + 1] = 'B';
-                        output[spanOffset + 2] = ')';
-                        spanOffset += 3;
-                    }
-                    if (last != 0 && (index + 1) % columnCount != 0)
-                    {
-                        newLine.CopyTo(output[spanOffset..]);
-                        spanOffset += newLine.Length;
-                        if ((format & BinaryStringFormat.RowLabels) != 0)
-                        {
-                            output[spanOffset] = '0';
-                            output[spanOffset + 1] = 'x';
-                            WriteRowLabel(index, output[(spanOffset + 2)..], rowLblSize - 3);
-                            spanOffset += rowLblSize;
-                            output[spanOffset - 1] = ' ';
-                        }
-                        columnOffset = (((int)index + 1) - ((int)index + 1) / columnCount * columnCount);
-                    }
-                    continue;
-                }
-
-                if (index % columnCount == 0)
-                {
-                    if (index != 0 || (format & BinaryStringFormat.NewLineAtBeginning) != 0 || (format & BinaryStringFormat.ColumnLabels) != 0)
+                    if (i != 0 || (format & BinaryStringFormat.NewLineAtBeginning) != 0 || (format & BinaryStringFormat.ColumnLabels) != 0)
                     {
                         newLine.CopyTo(output[spanOffset..]);
                         spanOffset += newLine.Length;
@@ -1773,7 +1671,7 @@ public static class FormattingUtil
                     {
                         output[spanOffset] = '0';
                         output[spanOffset + 1] = 'x';
-                        WriteRowLabel(index, output[(spanOffset + 2)..], rowLblSize - 3);
+                        WriteRowLabel((uint)i, output[(spanOffset + 2)..], rowLblSize - 3);
                         spanOffset += rowLblSize;
                         output[spanOffset - 1] = ' ';
                     }
@@ -1784,23 +1682,120 @@ public static class FormattingUtil
                     ++spanOffset;
                 }
 
-                if (columnOffset > 0)
-                {
-                    int c = columnOffset * (byteSize + 1) - 1;
-                    for (int j = 0; j < c; ++j)
-                        output[spanOffset + j] = ' ';
-
-                    spanOffset += c;
-                    columnOffset = 0;
-                }
-
-                WriteByteBySize(ptr[index], output[spanOffset..], byteSize);
+                WriteByteBySize(bytes[i], output[spanOffset..], byteSize);
                 spanOffset += byteSize;
             }
+
+            if (spanOffset != output.Length)
+                 throw new InvalidOperationException($"Failed to correctly calculate the length of a byte-to-string sequence (expected: {output.Length}, actual: {spanOffset}).");
+
+            return spanOffset;
+        }
+
+        if (first == -1)
+            first = 0;
+        if (last == -1)
+            last = 0;
+
+        len = (uint)(first + last);
+        int columnOffset = 0;
+        for (uint i = 0; i <= len; ++i)
+        {
+            uint index;
+            if (i >= (uint)first)
+            {
+                uint indexWithinLast = (uint)last - (i - (uint)first);
+                index = (uint)bytes.Length - indexWithinLast - 1;
+            }
+            else
+            {
+                index = i;
+            }
+            if (i == (uint)first)
+            {
+                if (first != 0u || (format & BinaryStringFormat.ColumnLabels) != 0)
+                {
+                    newLine.CopyTo(output[spanOffset..]);
+                    spanOffset += newLine.Length;
+                }
+                output[spanOffset] = '.';
+                output[spanOffset + 1] = '.';
+                output[spanOffset + 2] = '.';
+                output[spanOffset + 3] = ' ';
+                output[spanOffset + 4] = '(';
+                spanOffset += 5;
+                uint ttlLen = (uint)bytes.Length - len;
+                if ((format & BinaryStringFormat.ByteCountUnits) != 0)
+                {
+                    int capacityCount = FormatCapacity(ttlLen, output[spanOffset..]);
+                    output[spanOffset + capacityCount] = ')';
+                    spanOffset += capacityCount + 1;
+                }
+                else
+                {
+                    ttlLen.TryFormat(output[spanOffset..], out int written, "N0", CultureInfo.InvariantCulture);
+                    spanOffset += written;
+                    output[spanOffset] = ' ';
+                    output[spanOffset + 1] = 'B';
+                    output[spanOffset + 2] = ')';
+                    spanOffset += 3;
+                }
+                if (last != 0 && (index + 1) % columnCount != 0)
+                {
+                    newLine.CopyTo(output[spanOffset..]);
+                    spanOffset += newLine.Length;
+                    if ((format & BinaryStringFormat.RowLabels) != 0)
+                    {
+                        output[spanOffset] = '0';
+                        output[spanOffset + 1] = 'x';
+                        WriteRowLabel(index, output[(spanOffset + 2)..], rowLblSize - 3);
+                        spanOffset += rowLblSize;
+                        output[spanOffset - 1] = ' ';
+                    }
+                    columnOffset = (((int)index + 1) - ((int)index + 1) / columnCount * columnCount);
+                }
+                continue;
+            }
+
+            if (index % columnCount == 0)
+            {
+                if (index != 0 || (format & BinaryStringFormat.NewLineAtBeginning) != 0 || (format & BinaryStringFormat.ColumnLabels) != 0)
+                {
+                    newLine.CopyTo(output[spanOffset..]);
+                    spanOffset += newLine.Length;
+                }
+
+                if ((format & BinaryStringFormat.RowLabels) != 0)
+                {
+                    output[spanOffset] = '0';
+                    output[spanOffset + 1] = 'x';
+                    WriteRowLabel(index, output[(spanOffset + 2)..], rowLblSize - 3);
+                    spanOffset += rowLblSize;
+                    output[spanOffset - 1] = ' ';
+                }
+            }
+            else
+            {
+                output[spanOffset] = ' ';
+                ++spanOffset;
+            }
+
+            if (columnOffset > 0)
+            {
+                int c = columnOffset * (byteSize + 1) - 1;
+                for (int j = 0; j < c; ++j)
+                    output[spanOffset + j] = ' ';
+
+                spanOffset += c;
+                columnOffset = 0;
+            }
+
+            WriteByteBySize(bytes[(int)index], output[spanOffset..], byteSize);
+            spanOffset += byteSize;
         }
 
         if (spanOffset != output.Length)
-            throw new InvalidOperationException($"Failed to correctly calculate the length of a byte-to-string sequence (expected: {output.Length}, actual: {spanOffset}). Please report this as a bug.");
+             throw new InvalidOperationException($"Failed to correctly calculate the length of a byte-to-string sequence (expected: {output.Length}, actual: {spanOffset}).");
 
         return spanOffset;
     }

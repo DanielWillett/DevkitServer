@@ -1,5 +1,4 @@
-﻿extern alias NSJ;
-using DevkitServer.API;
+﻿using DevkitServer.API;
 using DevkitServer.Configuration.Converters;
 using DevkitServer.Levels;
 using System.Text.Json.Serialization;
