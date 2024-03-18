@@ -18,6 +18,10 @@ jobs:
       uses: actions/checkout@v4
       with:
         ref: 'master'
+    - name: SetupDotNet
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '5.0.x'
     - name: Build Server
       run: dotnet build "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True"
     - name: Test Server
