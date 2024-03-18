@@ -1,0 +1,28 @@
+on:
+  workflow_dispatch:
+    inputs:
+      sem_version:
+        description: "Version"
+        required: true
+        type: string
+      change_notes:
+        description: "Change Notes"
+        required: true
+        type: string
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Build Server
+      run: dotnet build --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }}"
+    - name: Test Server
+      run: dotnet test --configuration ServerRelease --no-build
+    - name: Build Client
+      run: dotnet build --configuration ClientRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }}"
+    - name: Test Client
+      run: dotnet test --configuration ClientRelease --no-build
+    - name: Pack Server
+      run: dotnet pack --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }}" --no-build --output .
