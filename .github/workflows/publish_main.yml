@@ -29,14 +29,14 @@ jobs:
         base64: ${{ secrets.DEVKITSERVER_SNK }}
         output-path: ${{ runner.temp }}/devkitserver.dll.snk
     - name: Build Server
-      run: dotnet build "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }}"
+      run: dotnet build "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True"
     - name: Test Server
       run: dotnet test "DevkitServer.Tests/DevkitServer.Tests.csproj" --configuration ServerRelease "/p:IsInGitHubActions=True"
     - name: Build Client
-      run: dotnet build "DevkitServer.csproj" --configuration ClientRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }}"
+      run: dotnet build "DevkitServer.csproj" --configuration ClientRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True"
     - name: Test Client
       run: dotnet test "DevkitServer.Tests/DevkitServer.Tests.csproj" --configuration ClientRelease "/p:IsInGitHubActions=True"
     - name: Pack Server
-      run: dotnet pack "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }}" --no-build --output .
+      run: dotnet pack "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True" --no-build --output .
     - name: Pack Client
-      run: dotnet pack "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }}" --no-build --output .
+      run: dotnet pack "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True" --no-build --output .
