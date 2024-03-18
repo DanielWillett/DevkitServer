@@ -17,12 +17,12 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     - name: Build Server
-      run: dotnet build --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }}"
+      run: dotnet build ./DevkitServer.csproj --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }}"
     - name: Test Server
-      run: dotnet test --configuration ServerRelease --no-build
+      run: dotnet test ./DevkitServer.Tests/DevkitServer.Tests.csproj --configuration ServerRelease --no-build
     - name: Build Client
-      run: dotnet build --configuration ClientRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }}"
+      run: dotnet build ./DevkitServer.csproj --configuration ClientRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }}"
     - name: Test Client
-      run: dotnet test --configuration ClientRelease --no-build
+      run: dotnet test ./DevkitServer.Tests/DevkitServer.Tests.csproj --configuration ClientRelease --no-build
     - name: Pack Server
-      run: dotnet pack --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }}" --no-build --output .
+      run: dotnet pack ./DevkitServer.csproj --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }}" --no-build --output .
