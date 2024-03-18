@@ -768,7 +768,8 @@ public class ByteWriter
         Write(flag);
         if (flag == 0)
             str += ", " + type.Assembly.GetName().Name;
-        Write(ns + "." + str);
+
+        Write(ns.Length == 0 ? str : (ns + "." + str));
     }
     public void WriteShort(string n)
     {
