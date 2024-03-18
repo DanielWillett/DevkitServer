@@ -65,7 +65,7 @@
     <!-- Copy libraries for EXEs. -->
     <ItemGroup Condition="'$(OutputType)' != 'Library' Or '$(TestProjectType)' != ''">
       <Reference Update="*">
-        <Private>true</Private>
+        <Private>false</Private>
       </Reference>
       <PackageReference Update="*">
         <Private>true</Private>
