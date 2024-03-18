@@ -18,13 +18,19 @@ jobs:
       uses: actions/checkout@v4
       with:
         ref: 'master'
+    - name: SetupDotNet
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '5.0.x'
     - name: Build Server
-      run: dotnet build "DevkitServer.sln" --project "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True"
+      run: dotnet build "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True"
     - name: Test Server
-      run: dotnet test "DevkitServer.sln" --project "DevkitServer.Tests/DevkitServer.Tests.csproj" --configuration ServerRelease "/p:IsInGitHubActions=True" --no-build
+      run: dotnet test "DevkitServer.Tests/DevkitServer.Tests.csproj" --configuration ServerRelease "/p:IsInGitHubActions=True"
     - name: Build Client
-      run: dotnet build "DevkitServer.sln" --project "DevkitServer.csproj" --configuration ClientRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True"
+      run: dotnet build "DevkitServer.csproj" --configuration ClientRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True"
     - name: Test Client
-      run: dotnet test "DevkitServer.sln" --project "DevkitServer.Tests/DevkitServer.Tests.csproj" --configuration ClientRelease "/p:IsInGitHubActions=True" --no-build 
+      run: dotnet test "DevkitServer.Tests/DevkitServer.Tests.csproj" --configuration ClientRelease "/p:IsInGitHubActions=True"
     - name: Pack Server
-      run: dotnet pack "DevkitServer.sln" --project "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True" --no-build --output .
+      run: dotnet pack "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True" --no-build --output .
+    - name: Pack Client
+      run: dotnet pack "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True" --no-build --output .
