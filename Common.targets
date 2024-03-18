@@ -1,5 +1,5 @@
 <Project>
-    <Import Project="./Unturned.targets"/>
+    <Import Project="$(SolutionDir)Unturned.targets"/>
 
 
     <!-- Packages -->

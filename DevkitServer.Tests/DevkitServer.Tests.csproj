@@ -44,6 +44,7 @@
       <HintPath>$(SharedManagedPath)\SDG.Glazier.Runtime.dll</HintPath>
       <Private>True</Private>
       <SpecificVersion>True</SpecificVersion>
+      <FusionName>SDG.Glazier.Runtime, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null</FusionName>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(SharedManagedPath)\UnityEngine.CoreModule.dll</HintPath>

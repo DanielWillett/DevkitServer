@@ -65,7 +65,7 @@
   </ItemGroup>
 
   <!-- Signing -->
-  <PropertyGroup Condition="exists('C:\Users\danny\OneDrive\Documents\DevkitServer\devkitserver.dll.snk')">
+  <PropertyGroup Condition=" '$(IsInGitHubActions)' == '' And exists('C:\Users\danny\OneDrive\Documents\DevkitServer\devkitserver.dll.snk')">
     <SignAssembly>True</SignAssembly>
     <AssemblyOriginatorKeyFile>C:\Users\danny\OneDrive\Documents\DevkitServer\devkitserver.dll.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
