@@ -152,6 +152,8 @@ public class DevkitServerUtilityTests
         Assert.AreEqual(value, color);
     }
     [TestMethod]
+
+    // windows
     [DataRow(@"C:\AFolder\BFolder\CFolder", @"C:\AFolder\BFolder\CFolder\d.exe", true)]
     [DataRow(@"C:\AFolder\BFolder\CFolder", @"C:\AFolder\BFolder\CFolder2\d.exe", false)]
     [DataRow(@"C:\AFolder\BFolder\DFolder", @"C:\AFolder\BFolder\CFolder2\d.exe", false)]
@@ -160,18 +162,49 @@ public class DevkitServerUtilityTests
     [DataRow(@"C:\AFolder\BFolder\CFolder", @"C:\AFolder\BFolder\CFolder\..\..\d.exe", false)]
     [DataRow(@"C:\AFolder\BFolder\CFolder", @"C:\AFolder\BFolder\CFolder2\..\..\d.exe", false)]
     [DataRow(@"C:\AFolder\BFolder\DFolder", @"C:\AFolder\BFolder\CFolder2\..\..\d.exe", false)]
+
+    // unix
+    [DataRow("/AFolder/BFolder/CFolder", "/AFolder/BFolder/CFolder/d.exe", true)]
+    [DataRow("/AFolder/BFolder/CFolder", "/AFolder/BFolder/CFolder2/d.exe", false)]
+    [DataRow("/AFolder/BFolder/DFolder", "/AFolder/BFolder/CFolder2/d.exe", false)]
+    [DataRow("", "/AFolder/BFolder/CFolder2/d.exe", true)]
+    [DataRow("/AFolder/BFolder/CFolder2", "", false)]
+    [DataRow("/AFolder/BFolder/CFolder", "/AFolder/BFolder/CFolder/../../d.exe", false)]
+    [DataRow("/AFolder/BFolder/CFolder", "/AFolder/BFolder/CFolder2/../../d.exe", false)]
+    [DataRow("/AFolder/BFolder/DFolder", "/AFolder/BFolder/CFolder2/../../d.exe", false)]
     public void TestCheckParent(string relativeTo, string folder, bool expectedMatch)
     {
+        OperatingSystem os = Environment.OSVersion;
+
+        if (os.Platform == PlatformID.Unix && (relativeTo.Contains('\\') || folder.Contains('\\')))
+            return;
+        if (os.Platform == PlatformID.Win32NT && (relativeTo.Contains('/') || folder.Contains('/')))
+            return;
+
         bool isParent = FileUtil.IsChildOf(relativeTo, folder);
 
         Assert.AreEqual(expectedMatch, isParent);
     }
     [TestMethod]
+
+    // windows
     [DataRow(@"C:\AFolder\BFolder\CFolder", @"C:\AFolder\BFolder\CFolder\d.exe", "d.exe")]
     [DataRow(@"C:\AFolder\BFolder\CFolder", @"C:\AFolder\BFolder\CFolder\DFolder\d.exe", @"DFolder\d.exe")]
     [DataRow(@"C:\AFolder\BFolder\CFolder", @"C:\AFolder\BFolder\CFolder\DFolder\..\d.exe", "d.exe")]
+
+    // unix
+    [DataRow("/AFolder/BFolder/CFolder", "/AFolder/BFolder/CFolder/d.exe", "d.exe")]
+    [DataRow("/AFolder/BFolder/CFolder", "/AFolder/BFolder/CFolder/DFolder/d.exe", "DFolder/d.exe")]
+    [DataRow("/AFolder/BFolder/CFolder", "/AFolder/BFolder/CFolder/DFolder/../d.exe", "d.exe")]
     public void TestGetRelativePath(string relativeTo, string folder, string expected)
     {
+        OperatingSystem os = Environment.OSVersion;
+
+        if (os.Platform == PlatformID.Unix && (relativeTo.Contains('\\') || folder.Contains('\\')))
+            return;
+        if (os.Platform == PlatformID.Win32NT && (relativeTo.Contains('/') || folder.Contains('/')))
+            return;
+
         string path = Path.GetRelativePath(relativeTo, folder);
 
         Assert.AreEqual(expected, path);
