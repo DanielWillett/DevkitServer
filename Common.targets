@@ -58,7 +58,7 @@
         <Message Text="Building client module... $(PackageId)" Importance="high" Condition="$(DefineConstants.Contains(CLIENT))"/>
         <Message Text="Installation Location: &quot;$(SharedPath)&quot;." Importance="high"/>
         <Message Text="Library Location: &quot;$(IncludedLibrariesPath)&quot;." Importance="high"/>
-        <Message Text="Solution Location: &quot;$(SolutionDir)&quot;." Importance="high"/>
+        <Message Text="Project Location: &quot;$(SolutionDir)&quot;." Importance="high"/>
         <Message Text="Defines: $(DefineConstants)." Importance="high"/>
     </Target>
 

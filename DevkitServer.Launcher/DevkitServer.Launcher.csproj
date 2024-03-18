@@ -30,6 +30,8 @@
     <RootNamespace>DevkitServer.Launcher</RootNamespace>
     <NeutralLanguage>en-US</NeutralLanguage>
     <Configurations>ServerRelease</Configurations>
+
+    <SolutionDir>$(ProjectDir)..\</SolutionDir>
   </PropertyGroup>
 
   <Import Project="$(SolutionDir)Unturned.targets" />

@@ -17,6 +17,8 @@
     <Configurations>ServerRelease;ServerDebug;ClientDebug;ClientRelease</Configurations>
     <UserSecretsId>4c764434-f553-478a-85a4-097ac2bea241</UserSecretsId>
     <NoWarn>NU1605;MSB3243</NoWarn>
+
+    <SolutionDir>$(ProjectDir)..\</SolutionDir>
   </PropertyGroup>
   <Import Project="$(SolutionDir)Common.targets" />
   <ItemGroup>

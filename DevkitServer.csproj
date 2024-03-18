@@ -38,6 +38,8 @@
     <NeutralLanguage>en-US</NeutralLanguage>
     <AssemblyVersion>$(Version).0</AssemblyVersion>
     <FileVersion>$(Version).0</FileVersion>
+
+    <SolutionDir>$(ProjectDir)</SolutionDir>
   </PropertyGroup>
 
   <Import Project="$(SolutionDir)Common.targets" />

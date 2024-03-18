@@ -37,6 +37,8 @@
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <DebugType>portable</DebugType>
+
+    <SolutionDir>$(ProjectDir)..\</SolutionDir>
   </PropertyGroup>
 
   <Import Project="$(SolutionDir)Unturned.targets" />
