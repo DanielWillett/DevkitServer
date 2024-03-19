@@ -1,0 +1,38 @@
+on:
+  workflow_dispatch:
+    inputs:
+      sem_version:
+        description: "Version"
+        required: true
+        type: string
+      change_notes:
+        description: "Change Notes"
+        required: true
+        type: string
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        ref: 'master'
+        
+    - name: Decode DevkitServer.Resources .snk
+      uses: akiojin/decode-base64-github-action@v0.1.0
+      id: decode-base64
+      with:
+        base64: ${{ secrets.DEVKITSERVER_RESX_SNK }}
+        output-path: ${{ runner.temp }}/devkitserver.resources.dll.snk
+        
+    - name: Build Resources
+      run: dotnet build "DevkitServer.Resources/DevkitServer.Resources.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True"
+
+    - name: Pack Resources
+      run: dotnet pack "DevkitServer.Resources/DevkitServer.Resources.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True" --no-build --output .
+    
+ #  - name: Push Packages
+ #    run: dotnet nuget push *.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
+ #    env:
+ #      NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
