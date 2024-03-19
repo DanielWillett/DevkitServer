@@ -1,3 +1,4 @@
+name: Publish Resources NuGet Release
 on:
   workflow_dispatch:
     inputs:
