@@ -1,3 +1,5 @@
+[![.github/workflows/build_release.yml](https://github.com/DanielWillett/DevkitServer/actions/workflows/build_release.yml/badge.svg?branch=master&event=push)](https://github.com/DanielWillett/DevkitServer/actions/workflows/build_release.yml)
+
 **THIS PROJECT IS NOT YET STABLE, DO NOT USE FOR ANY REAL PROJECTS**
 
 # Devkit Server
