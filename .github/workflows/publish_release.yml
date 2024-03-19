@@ -1,3 +1,4 @@
+name: Publish NuGet Release
 on:
   workflow_dispatch:
     inputs:
@@ -49,7 +50,29 @@ jobs:
     - name: Pack Client
       run: dotnet pack "DevkitServer.csproj" --configuration ClientRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True" --no-build --output .
   
-    - name: Push Packages
-      run: dotnet nuget push *.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
-      env:
-        NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
+#   - name: Push Packages
+#     run: dotnet nuget push *.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
+#     env:
+#       NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
+        
+  create_tag:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: 'master'
+          fetch-depth: 0
+          
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v0.9.7
+        with:
+          versionSpec: '5.x'
+        
+      - name: Create Tag
+        run: git tag ${{ inputs.sem_version }}
+        
+      - name: Push Tag
+        run: git push origin ${{ inputs.sem_version }}
