@@ -1,0 +1,16 @@
+on:
+  workflow_dispatch:
+    inputs:
+      sem_version:
+        description: "Version"
+        required: true
+        type: string
+      change_notes:
+        description: "Change Notes"
+        required: true
+        type: string
+jobs:
+  call-build:
+    uses: ./.github/workflows/build_release.yml
+    secrets: inherit
+    
