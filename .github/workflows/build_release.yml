@@ -9,10 +9,6 @@ on:
         description: "Change Notes"
         required: true
         type: string
-      snk:
-        description: "Strong Name Key Base64"
-        required: true
-        type: string
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -32,7 +28,7 @@ jobs:
       uses: akiojin/decode-base64-github-action@v0.1.0
       id: decode-base64
       with:
-        base64: ${{ inputs.snk }}
+        base64: ${{ secrets.DEVKITSERVER_SNK }}
         output-path: ${{ runner.temp }}/devkitserver.dll.snk
         
     - name: Build Server
