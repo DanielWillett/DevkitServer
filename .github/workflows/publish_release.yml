@@ -16,4 +16,14 @@ jobs:
     with:
       sem_version: ${{ inputs.sem_version }}
       change_notes: ${{ inputs.change_notes }}
+      
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - name: Pack Server
+      run: dotnet pack "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True" --no-build --output .
     
+    - name: Pack Client
+      run: dotnet pack "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True" --no-build --output .
+  
