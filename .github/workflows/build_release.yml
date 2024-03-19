@@ -1,14 +1,9 @@
 on:
-  workflow_dispatch:
-    inputs:
-      sem_version:
-        description: "Version"
-        required: true
-        type: string
-      change_notes:
-        description: "Change Notes"
-        required: true
-        type: string
+  pull_request:
+    types: [opened, reopened]
+  push:
+    branches: [ "master" ]
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -32,10 +27,10 @@ jobs:
         output-path: ${{ runner.temp }}/devkitserver.dll.snk
         
     - name: Build Server
-      run: dotnet build "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True"
+      run: dotnet build "DevkitServer.csproj" --configuration ServerRelease "/p:IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True"
 
     - name: Build Client
-      run: dotnet build "DevkitServer.csproj" --configuration ClientRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True"
+      run: dotnet build "DevkitServer.csproj" --configuration ClientRelease "/p:IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True"
     
     - name: Test Server
       run: dotnet test "DevkitServer.Tests/DevkitServer.Tests.csproj" --configuration ServerRelease "/p:IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True"
