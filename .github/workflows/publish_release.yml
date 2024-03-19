@@ -79,7 +79,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
       - name: Create Tag
-        run: git tag -a v${{ inputs.sem_version }} -m "DevkitServer v${{ inputs.sem_version }}"
+        run: git tag -a v${{ inputs.sem_version }} -m "DevkitServer v${{ inputs.sem_version }} - ${{ inputs.change_notes }}"
         
       - name: Push Tag
         run: git push origin --tags
