@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 10
     steps:
     - name: Build
-      uses: DanielWillett/DevkitServer/.github/workflows/build_release.yml
+      uses: DanielWillett/DevkitServer/.github/workflows/build_release.yml@master
       with:
         sem_version: ${{ inputs.sem_version }}
         change_notes: ${{ inputs.change_notes }}
