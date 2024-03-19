@@ -9,6 +9,16 @@ on:
         description: "Change Notes"
         required: true
         type: string
+  workflow_call:
+    inputs:
+      sem_version:
+        description: "Version"
+        required: true
+        type: string
+      change_notes:
+        description: "Change Notes"
+        required: true
+        type: string
 jobs:
   build:
     runs-on: ubuntu-latest
