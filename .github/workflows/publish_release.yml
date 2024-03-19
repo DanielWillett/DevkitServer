@@ -49,12 +49,7 @@ jobs:
     - name: Pack Client
       run: dotnet pack "DevkitServer.csproj" --configuration ClientRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True" --no-build --output .
   
-    - name: Push Server
-      run: dotnet nuget push DevkitServer.Server.${{ inputs.sem_version }}-server.nupkg --source https://nuget.pkg.github.com/acraven/index.json --api-key ${GITHUB_TOKEN}
+    - name: Push Packages
+      run: dotnet nuget push *.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Push Client
-      run: dotnet nuget push DevkitServer.Client.${{ inputs.sem_version }}-client.nupkg --source https://nuget.pkg.github.com/acraven/index.json --api-key ${GITHUB_TOKEN}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
