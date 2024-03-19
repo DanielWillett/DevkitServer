@@ -65,9 +65,14 @@ jobs:
         with:
           ref: 'master'
           fetch-depth: 0
+          
+      - name: SetupOrigin
+        run: git remote set-url --push origin https://DanielWillett:$GITHUB_TOKEN@github.com/DevkitServer
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
       - name: Create Tag
-        run: git tag v${{ inputs.sem_version }}
+        run: git tag -a v${{ inputs.sem_version }} -m "DevkitServer v${{ inputs.sem_version }}"
         
       - name: Push Tag
-        run: git push origin v${{ inputs.sem_version }}
+        run: git push origin --tags
