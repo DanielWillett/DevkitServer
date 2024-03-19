@@ -52,9 +52,3 @@ jobs:
       
     - name: Test Client
       run: dotnet test "DevkitServer.Tests/DevkitServer.Tests.csproj" --configuration ClientRelease "/p:IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True"
-    
-    - name: Pack Server
-      run: dotnet pack "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True" --no-build --output .
-    
-    - name: Pack Client
-      run: dotnet pack "DevkitServer.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True" --no-build --output .
