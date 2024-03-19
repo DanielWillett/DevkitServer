@@ -9,14 +9,8 @@ on:
         description: "Change Notes"
         required: true
         type: string
-  workflow_call:
-    inputs:
-      sem_version:
-        description: "Version"
-        required: true
-        type: string
-      change_notes:
-        description: "Change Notes"
+      snk:
+        description: "Strong Name Key Base64"
         required: true
         type: string
 jobs:
@@ -38,7 +32,7 @@ jobs:
       uses: akiojin/decode-base64-github-action@v0.1.0
       id: decode-base64
       with:
-        base64: ${{ secrets.DEVKITSERVER_SNK }}
+        base64: ${{ inputs.snk }}
         output-path: ${{ runner.temp }}/devkitserver.dll.snk
         
     - name: Build Server
