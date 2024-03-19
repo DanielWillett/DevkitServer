@@ -399,7 +399,7 @@ public class CommandHandler : ICommandHandler, IDisposable
         shouldExecuteCommand = false;
         if (text.Length > 0 && !Parser.TryRunCommand(
 #if SERVER
-                null,
+                player,
 #endif
 #if CLIENT
                 false,
@@ -407,7 +407,7 @@ public class CommandHandler : ICommandHandler, IDisposable
                 text, ref shouldList, true))
         {
 #if SERVER
-            SendHelpMessage(null);
+            SendHelpMessage(player);
 #else
             // run as server command or send chat
             if (Array.IndexOf(CommandParser.Prefixes, text[0]) != -1)

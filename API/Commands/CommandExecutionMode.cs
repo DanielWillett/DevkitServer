@@ -72,9 +72,9 @@ public enum CommandExecutionMode
     IgnoreControlMode = 1 << 6,
 
     /// <summary>
-    /// Only run this command in multiplayer play mode while using <see cref="CameraController.Player"/> in multiplayer edit mode. Includes <see cref="RequireMultiPlaying"/>.
+    /// Only run this command in multiplayer play mode while using <see cref="CameraController.Player"/> in multiplayer edit mode. Includes <see cref="RequireMultiEditing"/>.
     /// </summary>
-    PlayerControlModeOnly = (1 << 7) | RequireMultiPlaying,
+    PlayerControlModeOnly = (1 << 7) | RequireMultiEditing,
 
     /// <summary>
     /// This command is only enabled in multiplayer and singleplayer play modes.

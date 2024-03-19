@@ -177,7 +177,10 @@ public static class CommandEx
         if ((mode & CommandExecutionMode.RequirePlaying) == CommandExecutionMode.RequirePlaying)
         {
 #if SERVER
-            if (!Provider.isServer || (mode & CommandExecutionMode.IgnoreControlMode) != 0 || ctx.EditorUser == null || ctx.EditorUser.Control.Controller != CameraController.Player)
+            if ((mode & CommandExecutionMode.IgnoreControlMode) != 0 && DevkitServerModule.IsEditing)
+                throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBePlayer");
+
+            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 && ctx.EditorUser != null && ctx.EditorUser.Control.Controller != CameraController.Player)
                 throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBePlayer");
 #else
             if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserControl.LocalController != CameraController.Player : Level.isEditor)
@@ -188,7 +191,10 @@ public static class CommandEx
         if ((mode & CommandExecutionMode.RequireEditing) == CommandExecutionMode.RequireEditing)
         {
 #if SERVER
-            if (!Provider.isServer || !DevkitServerModule.IsEditing || (mode & CommandExecutionMode.IgnoreControlMode) != 0 || ctx.EditorUser != null && ctx.EditorUser.Control.Controller != CameraController.Editor)
+            if ((mode & CommandExecutionMode.IgnoreControlMode) != 0 && !DevkitServerModule.IsEditing)
+                throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeEditor");
+
+            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 && (!DevkitServerModule.IsEditing || ctx.EditorUser == null || ctx.EditorUser.Control.Controller != CameraController.Editor))
                 throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeEditor");
 #else
             if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserControl.LocalController != CameraController.Editor : !Level.isEditor)
@@ -233,7 +239,7 @@ public static class CommandEx
             if (!Provider.hasCheats)
                 throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandRequiresCheats");
 #else
-            if (Provider.isServer ? !Provider.hasCheats : Provider.CurrentServerAdvertisement is not { hasCheats: true })
+            if (Provider.isServer ? !Provider.hasCheats : Provider.CurrentServerAdvertisement is { hasCheats: false })
                 throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandRequiresCheats");
 #endif
         }
@@ -266,10 +272,10 @@ public static class CommandEx
         if ((mode & CommandExecutionMode.RequirePlaying) == CommandExecutionMode.RequirePlaying)
         {
 #if SERVER
-            if (!Provider.isServer)
+            if ((mode & CommandExecutionMode.IgnoreControlMode) != 0 && DevkitServerModule.IsEditing)
                 return false;
 #else
-            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserControl.LocalController != CameraController.Player : Level.isEditor)
+            if ((mode & CommandExecutionMode.IgnoreControlMode) != 0 && Level.isEditor)
                 return false;
 #endif
         }
@@ -277,10 +283,10 @@ public static class CommandEx
         if ((mode & CommandExecutionMode.RequireEditing) == CommandExecutionMode.RequireEditing)
         {
 #if SERVER
-            if (!Provider.isServer || !DevkitServerModule.IsEditing)
+            if ((mode & CommandExecutionMode.IgnoreControlMode) != 0 && !DevkitServerModule.IsEditing)
                 return false;
 #else
-            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserControl.LocalController != CameraController.Editor : !Level.isEditor)
+            if ((mode & CommandExecutionMode.IgnoreControlMode) != 0 && !Level.isEditor)
                 return false;
 #endif
         }
@@ -291,7 +297,7 @@ public static class CommandEx
             if (!Provider.isServer)
                 return false;
 #else
-            if (Level.editing == null)
+            if ((Provider.isServer && Provider.isClient && Provider.clients.Count == 1) || !Level.isLoaded)
                 return false;
 #endif
         }
@@ -301,7 +307,7 @@ public static class CommandEx
 #if SERVER
             return false;
 #else
-            if (!Provider.isServer || !Provider.isClient || Level.editing == null)
+            if (!Provider.isServer || !Provider.isClient || Provider.clients.Count != 1 || !Level.isLoaded)
                 return false;
 #endif
         }
@@ -316,10 +322,21 @@ public static class CommandEx
 #endif
         }
 
+        if ((mode & CommandExecutionMode.RequireCheatsEnabled) == CommandExecutionMode.RequireCheatsEnabled)
+        {
+#if SERVER
+            if (!Provider.hasCheats)
+                return false;
+#else
+            if (Provider.isServer ? !Provider.hasCheats : Provider.CurrentServerAdvertisement is { hasCheats: false })
+                return false;
+#endif
+        }
+
         if ((mode & CommandExecutionMode.PlayerControlModeOnly) == CommandExecutionMode.PlayerControlModeOnly)
         {
 #if CLIENT
-            if (!DevkitServerModule.IsEditing)
+            if (!DevkitServerModule.IsEditing || UserControl.LocalController != CameraController.Player)
                 return false;
 #endif
         }
