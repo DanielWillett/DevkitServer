@@ -98,10 +98,12 @@
             <HintPath>$(SharedManagedPath)\SDG.NetPak.Runtime.dll</HintPath>
             <Private>true</Private>
         </Reference>
+      <!--
         <Reference Include="SDG.HostBans.Runtime">
             <HintPath>$(SharedManagedPath)\SDG.HostBans.Runtime.dll</HintPath>
             <Private>true</Private>
         </Reference>
+      -->
         <Reference Include="SystemEx">
             <HintPath>$(SharedManagedPath)\SystemEx.dll</HintPath>
             <Private>true</Private>
@@ -115,10 +117,12 @@
         </Reference>
 
         <!-- Unity -->
+      <!--
         <Reference Include="StandardAssets">
             <HintPath>$(SharedManagedPath)\StandardAssets.dll</HintPath>
             <Private>true</Private>
         </Reference>
+      -->
         <Reference Include="UnityEngine">
             <HintPath>$(SharedManagedPath)\UnityEngine.dll</HintPath>
             <Private>true</Private>
@@ -147,6 +151,7 @@
             <HintPath>$(SharedManagedPath)\UnityEngine.UnityWebRequestModule.dll</HintPath>
             <Private>true</Private>
         </Reference>
+      <!--
         <Reference Include="UnityEngine.AccessibilityModule">
             <HintPath>$(SharedManagedPath)\UnityEngine.AccessibilityModule.dll</HintPath>
             <Private>true</Private>
@@ -247,16 +252,20 @@
             <HintPath>$(SharedManagedPath)\UnityEngine.WindModule.dll</HintPath>
             <Private>true</Private>
         </Reference>
+      -->
 
         <!-- Third-Party -->
+      <!--
         <Reference Include="BattlEye">
             <HintPath>$(SharedManagedPath)\BattlEye.dll</HintPath>
             <Private>true</Private>
         </Reference>
+      -->
         <Reference Include="HighlightingSystem">
             <HintPath>$(SharedManagedPath)\HighlightingSystem.dll</HintPath>
             <Private>true</Private>
         </Reference>
+      <!--
         <Reference Include="Mono.Posix">
             <HintPath>$(SharedManagedPath)\Mono.Posix.dll</HintPath>
             <Private>true</Private>
@@ -281,7 +290,8 @@
             <HintPath>$(SharedManagedPath)\Pathfinding.Poly2Tri.dll</HintPath>
             <Private>true</Private>
         </Reference>
-      
+      -->
+
         <PackageReference Include="Newtonsoft.Json" Version="7.0.1">
             <FusionName>Newtonsoft.Json, Version=7.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed</FusionName>
             <SpecificVersion>true</SpecificVersion>
@@ -309,20 +319,25 @@
             <HintPath>$(SharedManagedPath)\SDG.Glazier.Runtime.dll</HintPath>
             <Private>true</Private>
         </Reference>
+      <!--
         <Reference Include="Unturned.LiveConfig.Runtime">
           <HintPath>$(SharedManagedPath)\Unturned.LiveConfig.Runtime.dll</HintPath>
           <Private>true</Private>
         </Reference>
-
+      -->
         <!-- Unity -->
+
+      <!--
         <Reference Include="Unity.TextMeshPro">
             <HintPath>$(SharedManagedPath)\Unity.TextMeshPro.dll</HintPath>
             <Private>true</Private>
         </Reference>
+      -->
         <Reference Include="UnityEngine.IMGUIModule">
             <HintPath>$(SharedManagedPath)\UnityEngine.IMGUIModule.dll</HintPath>
             <Private>true</Private>
         </Reference>
+      <!--
         <Reference Include="UnityEngine.InputModule">
             <HintPath>$(SharedManagedPath)\UnityEngine.InputModule.dll</HintPath>
             <Private>true</Private>
@@ -335,10 +350,12 @@
             <HintPath>$(SharedManagedPath)\UnityEngine.TextRenderingModule.dll</HintPath>
             <Private>true</Private>
         </Reference>
+      -->
         <Reference Include="UnityEngine.InputLegacyModule">
             <HintPath>$(SharedManagedPath)\UnityEngine.InputLegacyModule.dll</HintPath>
             <Private>true</Private>
         </Reference>
+      <!--
         <Reference Include="Unity.Postprocessing.Runtime">
             <HintPath>$(SharedManagedPath)\Unity.Postprocessing.Runtime.dll</HintPath>
             <Private>true</Private>
@@ -379,10 +396,12 @@
             <HintPath>$(SharedManagedPath)\UnityEngine.TextCoreTextEngineModule.dll</HintPath>
             <Private>true</Private>
         </Reference>
+      -->
         <Reference Include="UnityEngine.TextRenderingModule">
             <HintPath>$(SharedManagedPath)\UnityEngine.TextRenderingModule.dll</HintPath>
             <Private>true</Private>
         </Reference>
+      <!--
         <Reference Include="UnityEngine.UIElementsModule">
             <HintPath>$(SharedManagedPath)\UnityEngine.UIElementsModule.dll</HintPath>
             <Private>true</Private>
@@ -411,6 +430,7 @@
             <HintPath>$(SharedManagedPath)\UnityEngine.XRModule.dll</HintPath>
             <Private>true</Private>
         </Reference>
+      -->
       
     </ItemGroup>
 
