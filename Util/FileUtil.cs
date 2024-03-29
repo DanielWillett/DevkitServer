@@ -268,7 +268,7 @@ public static class FileUtil
                         (exceptions ??= new List<Exception>(1)).Add(ex);
                     }
                 }
-                else if (info is DirectoryInfo { Exists: false } dir)
+                else if (info is DirectoryInfo dir)
                 {
                     try
                     {

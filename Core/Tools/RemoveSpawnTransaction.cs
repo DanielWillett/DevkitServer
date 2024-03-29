@@ -16,27 +16,27 @@ public class RemoveSpawnTransaction(BaseSpawnpointNode node) : IDevkitTransactio
 
     public void forget()
     {
-        if (node == null || _isActive)
+        if (Node == null || _isActive)
             return;
-        node.RemoveSpawnFromList(true);
+        Node.RemoveSpawnFromList(true);
     }
 
     public void undo()
     {
-        if (node != null)
+        if (Node != null)
         {
-            node.AddSpawnToList();
-            node.gameObject.SetActive(node.ShouldBeVisible);
+            Node.AddSpawnToList();
+            Node.gameObject.SetActive(Node.ShouldBeVisible);
         }
         _isActive = true;
     }
 
     public void redo()
     {
-        if (node != null)
+        if (Node != null)
         {
-            node.RemoveSpawnFromList(false);
-            node.gameObject.SetActive(false);
+            Node.RemoveSpawnFromList(false);
+            Node.gameObject.SetActive(false);
         }
         _isActive = false;
     }

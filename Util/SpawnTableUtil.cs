@@ -1047,7 +1047,7 @@ public static class SpawnTableUtil
     }
 
     /// <summary>
-    /// Gets the currently slected table in the spawn UI. <paramref name="index"/> will be  but will still return <see langword="true"/>.
+    /// Gets the currently slected table in the spawn UI.
     /// </summary>
     /// <returns>-1 if nothing is selected or an invalid spawn type is given, otherwise the table index.</returns>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -1119,7 +1119,7 @@ public static class SpawnTableUtil
     }
 
     /// <summary>
-    /// Gets the currently slected tier asset in the spawn UI. <paramref name="index"/> will be <see langword="null"/> if nothing is selected but will still return <see langword="true"/>.
+    /// Gets the currently slected tier asset in the spawn UI. <paramref name="identifier"/> will be <see langword="null"/> if nothing is selected but will still return <see langword="true"/>.
     /// </summary>
     /// <returns><see langword="false"/> in the case of a reflection failure or invalid spawn type, otherwise <see langword="true"/>.</returns>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
@@ -4374,7 +4374,7 @@ public static class SpawnTableUtil
     }
 
     /// <summary>
-    /// Locally adds a spawn table tier asset to the provided <paramref name="spawnType"/> tier at <paramref name="spawnTierIdentifier"/> with the given <paramref name="legacyId"/>.
+    /// Locally adds a spawn table tier asset to the provided <paramref name="spawnTierIdentifier"/> at <paramref name="spawnTierIdentifier"/> with the given <paramref name="legacyId"/>.
     /// </summary>
     /// <remarks>Non-replicating.</remarks>
     /// <returns>Table index of the created table, or null if the ID already exists in the tier.</returns>
@@ -4739,7 +4739,7 @@ public static class SpawnTableUtil
     }
 
     /// <summary>
-    /// Adds a spawn table tier asset of the provided <paramref name="spawnType"/> to the spawn tier at <paramref name="spawnTierIdentifier"/> with the given <paramref name="name"/>. You can not add slots to zombies.
+    /// Adds a spawn table tier asset of the provided <paramref name="spawnType"/> to the spawn tier at <paramref name="spawnTierIdentifier"/>. You can not add slots to zombies.
     /// </summary>
     /// <remarks>Replicates to clients.</remarks>
     /// <returns>Identifier of the created tier, or null if it already exists.</returns>
@@ -4945,7 +4945,7 @@ public static class SpawnTableUtil
     }
 
     /// <summary>
-    /// Sends a request to the server to add a spawn table tier asset with the specified <paramref name="spawnType"/>, <paramref name="legacyId"/>, and <paramref name="parentTierIdentifier"/>.
+    /// Sends a request to the server to add a spawn table tier asset with the specified <paramref name="parentTierIdentifier"/>, <paramref name="legacyId"/>, and <paramref name="parentTierIdentifier"/>.
     /// </summary>
     /// <param name="legacyId">ID of the asset used. <see cref="ItemSpawn"/> and <see cref="ZombieCloth"/> should be <see cref="ItemAsset"/>, <see cref="VehicleSpawn"/> should be <see cref="VehicleAsset"/>, and <see cref="AnimalSpawn"/> should be <see cref="AnimalAsset"/>.</param>
     /// <remarks>Thread-safe.</remarks>

@@ -245,8 +245,6 @@ public class LargeMessageTransmission : IDisposable
         OriginalSize = reader.ReadInt32();
         FinalSize = reader.ReadInt32();
         HandlerType = reader.ReadType();
-        //string? type = reader.ReadTypeInfo();
-        //Logger.DevkitServer.LogDebug(LogSource, $"Handler type: {type.Format()}.");
 
         if (HandlerType != null)
         {
@@ -518,7 +516,7 @@ public class LargeMessageTransmission : IDisposable
     }
     private UniTask Unfinalize(CancellationToken token = default)
     {
-        return IsCompressed ? Decompress(token) : UniTask.CompletedTask;
+        return Decompress(token);
     }
     private UniTask Finalize(CancellationToken token = default)
     {

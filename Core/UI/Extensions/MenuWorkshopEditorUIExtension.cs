@@ -28,7 +28,7 @@ internal class MenuWorkshopEditorUIExtension
 
     private void OnClickedRefresh(ISleekElement button)
     {
-        AssetUtil.RefreshLevelsUI();
+        AssetUtil.RescanAllLevels();
     }
 }
 #endif

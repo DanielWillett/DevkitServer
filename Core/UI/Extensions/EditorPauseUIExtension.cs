@@ -11,12 +11,12 @@ using System.Reflection;
 using DevkitServer.Core.Cartography;
 
 namespace DevkitServer.Core.UI.Extensions;
-
 [UIExtension(typeof(EditorPauseUI))]
 internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
 {
     private int _isPatched;
 
+#pragma warning disable CS0649
     [ExistingMember("saveButton", FailureBehavior = ExistingMemberFailureBehavior.Ignore)]
     private readonly SleekButtonIcon? _saveButton;
     
@@ -38,6 +38,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
     private readonly SleekFullscreenBox _container;
 
 #nullable restore
+#pragma warning restore CS0649
 
     private readonly ISleekLabel? _chartingLabel;
     private readonly ISleekLabel? _satelliteLabel;

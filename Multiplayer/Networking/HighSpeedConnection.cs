@@ -249,12 +249,9 @@ public class HighSpeedConnection : ITransportConnection
     }
     private void MessageReady(ArraySegment<byte> payload)
     {
-        DevkitServerUtility.QueueOnMainThread(() =>
-        {
-            MessageOverhead overhead = new MessageOverhead(payload);
-            Logger.DevkitServer.LogDebug("HIGH SPEED CONNECTION", "HS message received: " + overhead.Format() + ".");
-            HighSpeedNetFactory.Receive(this, payload, in overhead);
-        });
+        MessageOverhead overhead = new MessageOverhead(payload);
+        Logger.DevkitServer.LogDebug("HIGH SPEED CONNECTION", "HS message received: " + overhead.Format() + ".");
+        HighSpeedNetFactory.Receive(this, payload, in overhead);
     }
 #if SERVER
     internal void Verify(ITransportConnection connection, ulong steam64)

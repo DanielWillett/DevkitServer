@@ -361,6 +361,11 @@ public static class VanillaCommandInfo
             mode = CommandExecutionMode.RequireMultiplayer;
             dedicatedServerOnly = true;
         }
+        else if (command.Name.Equals("CommandToggleNpcCutsceneMode", StringComparison.Ordinal))
+        {
+            mode = CommandExecutionMode.RequireCheatsEnabled | CommandExecutionMode.RequirePlaying;
+            serverOnly = true;
+        }
         else if (command.Name.Equals("CommandUnadmin", StringComparison.Ordinal))
         {
             mode = CommandExecutionMode.RequireMultiplayer;

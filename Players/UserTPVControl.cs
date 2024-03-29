@@ -299,55 +299,62 @@ internal sealed class EditorClothes : MonoBehaviour
             Destroy(model.gameObject);
             model = null;
         }
-        if (enabled)
-        {
-            GameObject hairModel = Resources.Load<GameObject>(prefix + "s/" + index.ToString(CultureInfo.InvariantCulture) + "/" + prefix);
-            if (hairModel != null)
-            {
-                model = Instantiate(hairModel, transform.position + CosmeticPositionOffset, transform.rotation * CosmeticRotationOffset, transform).transform;
-                model.name = prefix + index.ToString(CultureInfo.InvariantCulture);
-                Transform m0 = model.Find("Model_0");
-                if (m0 != null)
-                    m0.GetComponent<Renderer>().sharedMaterial = _materialHair;
-                model.DestroyRigidbody();
-            }
-        }
+
+        if (!enabled)
+            return;
+
+        GameObject hairModel = Resources.Load<GameObject>(prefix + "s/" + index.ToString(CultureInfo.InvariantCulture) + "/" + prefix);
+        if (hairModel == null)
+            return;
+
+        model = Instantiate(hairModel, transform.position + CosmeticPositionOffset, transform.rotation * CosmeticRotationOffset, transform).transform;
+        model.name = prefix + index.ToString(CultureInfo.InvariantCulture);
+        Transform m0 = model.Find("Model_0");
+
+        if (m0 != null)
+            m0.GetComponent<Renderer>().sharedMaterial = _materialHair;
+
+        model.DestroyRigidbody();
     }
     private void ApplyIfDirty<TAsset>(EconomyItem<TAsset> item, ref Transform? model, string namePrefix) where TAsset : ItemGearAsset
     {
-        if (item.isDirty)
+        if (!item.isDirty)
+            return;
+
+        if (model != null)
         {
-            if (model != null)
-            {
-                Destroy(model.gameObject);
-                model = null;
-            }
-            TAsset? asset = item.Asset;
-            GameObject? instance = asset == null ? null : AssetUtil.GetItemInstance(asset);
-            if (instance != null && asset!.shouldBeVisible(false))
-            {
-                model = Instantiate(instance, transform.position + CosmeticPositionOffset, transform.rotation * CosmeticRotationOffset, transform).transform;
-                model.name = namePrefix + "_" + asset.GUID.ToString("N");
-                model.transform.localScale = new Vector3(1f, !_isLeftHanded || !(GetShouldMirrorLeftHandedModel != null && GetShouldMirrorLeftHandedModel(asset)) ? 1f : -1f, 1f);
-                if (asset.shouldDestroyClothingColliders)
-                    CallDestroyCollidersInChildren?.Invoke(model.gameObject, true);
-                model.DestroyRigidbody();
-                if (_isVisual && _isMythic)
-                {
-                    MythicAsset? mythic = item.MythicAsset;
-                    CenterHeadEffect(null, transform, model);
-                    if (mythic != null)
-                        ItemTool.applyEffect(model, mythic.id, EEffectType.HOOK);
-                }
-                ApplyHairOverride(asset, model);
-            }
-            item.isDirty = false;
+            Destroy(model.gameObject);
+            model = null;
         }
+
+        TAsset? asset = item.Asset;
+        GameObject? instance = asset == null ? null : AssetUtil.GetItemInstance(asset);
+        if (instance != null && asset!.shouldBeVisible(false))
+        {
+            model = Instantiate(instance, transform.position + CosmeticPositionOffset, transform.rotation * CosmeticRotationOffset, transform).transform;
+            model.name = namePrefix + "_" + asset.GUID.ToString("N");
+            model.transform.localScale = new Vector3(1f, !_isLeftHanded || !(GetShouldMirrorLeftHandedModel != null && GetShouldMirrorLeftHandedModel(asset)) ? 1f : -1f, 1f);
+            if (asset.shouldDestroyClothingColliders)
+                CallDestroyCollidersInChildren?.Invoke(model.gameObject, true);
+
+            model.DestroyRigidbody();
+
+            if (_isVisual && _isMythic)
+            {
+                MythicAsset? mythic = item.MythicAsset;
+                CenterHeadEffect(null, transform, model);
+                if (mythic != null)
+                    ItemTool.applyEffect(model, mythic.id, EEffectType.HOOK);
+            }
+            ApplyHairOverride(asset, model);
+        }
+
+        item.isDirty = false;
     }
     [HarmonyPatch(typeof(HumanClothes), "centerHeadEffect")]
     [HarmonyReversePatch]
     [UsedImplicitly]
-    private void CenterHeadEffect(object? instance, Transform? skull, Transform model) { }
+    private static void CenterHeadEffect(object? instance, Transform? skull, Transform model) { }
     private void ApplyHairOverride(ItemGearAsset itemAsset, Transform rootModel)
     {
         if (string.IsNullOrEmpty(itemAsset.hairOverride))

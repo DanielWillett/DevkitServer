@@ -22,7 +22,9 @@ public static class AssetUtil
     private static readonly Action<MasterBundleConfig, AssetBundle>? SetAssetBundle;
     private static readonly Action<MasterBundleConfig>? CheckOwnerCustomDataAndMaybeUnload;
     private static readonly StaticGetter<List<MasterBundleConfig>>? AllMasterBundlesGetter;
+    private static readonly StaticGetter<List<LevelInfo>>? KnownLevelsGetter = Accessor.GenerateStaticGetter<Level, List<LevelInfo>>("knownLevels");
 
+    private static readonly Action? CallScanKnownLevels = Accessor.GenerateStaticCaller<Level, Action>("ScanKnownLevels");
     private static readonly InstanceGetter<Asset, AssetOrigin>? GetAssetOrigin = Accessor.GenerateInstanceGetter<Asset, AssetOrigin>("origin");
     private static readonly InstanceGetter<NPCRewardsList, INPCReward[]>? GetRewardsFromList = Accessor.GenerateInstanceGetter<NPCRewardsList, INPCReward[]>("rewards");
     private static readonly InstanceGetter<Module, List<IModuleNexus>>? GetNexii = Accessor.GenerateInstanceGetter<Module, List<IModuleNexus>>("nexii");
@@ -81,6 +83,7 @@ public static class AssetUtil
     /// <summary>
     /// Loads one file (<paramref name="path"/>) synchronously, doesn't add it to current mapping. Call <see cref="SyncAssetsFromOrigin"/> to do this after you're done with the <paramref name="origin"/>.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static void LoadFileSync(string path, AssetOrigin origin)
     {
         ThreadUtil.assertIsGameThread();
@@ -107,8 +110,11 @@ public static class AssetUtil
     /// <summary>
     /// Loads one master bundle (<paramref name="masterBundleDatFilePath"/>) synchronously.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static void LoadMasterBundleSync(string masterBundleDatFilePath, AssetOrigin origin)
     {
+        ThreadUtil.assertIsGameThread();
+
         if (!Assets.shouldLoadAnyAssets)
             return;
         DatDictionary dict = ReadFileWithoutHash(masterBundleDatFilePath);
@@ -138,8 +144,11 @@ public static class AssetUtil
     /// Loads all asset files from <paramref name="directory"/>.
     /// </summary>
     /// <remarks>Do not reuse <paramref name="origin"/>.</remarks>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static void LoadAssetsSync(string directory, AssetOrigin origin, bool includeSubDirectories = true, bool loadMasterBundles = true)
     {
+        ThreadUtil.assertIsGameThread();
+
         if (!Assets.shouldLoadAnyAssets)
             return;
         LoadAssetsSyncIntl(directory, origin, includeSubDirectories, loadMasterBundles, true);
@@ -148,8 +157,11 @@ public static class AssetUtil
     /// <summary>
     /// Adds all the assets loaded from <paramref name="origin"/> to the current asset mapping.
     /// </summary>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
     public static void SyncAssetsFromOrigin(AssetOrigin origin)
     {
+        ThreadUtil.assertIsGameThread();
+
         if (SyncAssetsFromOriginMethod == null)
         {
             Logger.DevkitServer.LogWarning(nameof(SyncAssetsFromOrigin), $"Unable to sync assets from origin: {origin.name.Format()}.");
@@ -164,8 +176,6 @@ public static class AssetUtil
     [Pure]
     public static DatDictionary ReadFileWithoutHash(string path)
     {
-        ThreadUtil.assertIsGameThread();
-
         using FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         using StreamReader inputReader = new StreamReader(fileStream);
         return Parser.Parse(inputReader);
@@ -218,6 +228,68 @@ public static class AssetUtil
         }
 
         return origin;
+    }
+
+    /// <summary>
+    /// Tells the game to scan for any level changes; new levels or removed levels. If you need to re-read config files, use <see cref="RescanLevel"/> instead.
+    /// </summary>
+    /// <returns><see langword="false"/> in the case of a refelction error, otherwise <see langword="true"/>.</returns>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    public static bool ScanForKnownLevelChanges()
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (CallScanKnownLevels == null)
+            return false;
+
+        CallScanKnownLevels();
+        return true;
+    }
+
+    /// <summary>
+    /// Causes the game to re-read (or remove if the level has been deleted) the <see cref="LevelInfo"/> of the level at path <paramref name="path"/> if it's been scanned.
+    /// </summary>
+    /// <returns><see langword="false"/> in the case of a refelction error, otherwise <see langword="true"/>, even if the level wasn't found (it'll be re-scanned anyway if it exists).</returns>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    public static bool RescanLevel(string path)
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (KnownLevelsGetter == null)
+            return false;
+
+        List<LevelInfo> levels = KnownLevelsGetter();
+        int index = levels.FindIndex(levelInfo => string.Equals(levelInfo.path, path, StringComparison.Ordinal));
+            
+        if (index >= 0)
+            levels.RemoveAt(index);
+
+        CallScanKnownLevels?.Invoke();
+#if CLIENT
+        Level.broadcastLevelsRefreshed();
+#endif
+        return true;
+    }
+
+    /// <summary>
+    /// Causes the game to re-read (or remove if the levels have been deleted) all <see cref="LevelInfo"/> that have been scanned.
+    /// </summary>
+    /// <returns><see langword="false"/> in the case of a refelction error, otherwise <see langword="true"/>.</returns>
+    /// <exception cref="NotSupportedException">Not on main thread.</exception>
+    public static bool RescanAllLevels()
+    {
+        ThreadUtil.assertIsGameThread();
+
+        if (KnownLevelsGetter == null)
+            return false;
+
+        List<LevelInfo> levels = KnownLevelsGetter();
+        levels.Clear();
+        CallScanKnownLevels?.Invoke();
+#if CLIENT
+        Level.broadcastLevelsRefreshed();
+#endif
+        return true;
     }
 
     private static void LoadAssetsSyncIntl(string directory, AssetOrigin origin, bool includeSubDirectories, bool loadMasterBundles, bool apply)
@@ -288,15 +360,6 @@ public static class AssetUtil
         else if (File.Exists(englishLang))
             translationData = ReadFileWithoutHash(englishLang);
     }
-#if CLIENT
-    /// <summary>
-    /// Refreshes the Levels UI for singleplayer, editor, and server browser menu.
-    /// </summary>
-    public static void RefreshLevelsUI()
-    {
-        Level.broadcastLevelsRefreshed();
-    }
-#endif
     static AssetUtil()
     {
         try

@@ -10,14 +10,11 @@ internal struct EditorInputPacket
     public Vector2 Rotation;
     public bool LastFrameBeforeChangingController;
     public byte LastTeleportId;
-    // public float DeltaTime;
 
     private const int PosIntBitCt = 16;
     private const int PosDecBitCt = 8;
     private const int RotIntBitCt = 10;
     private const int RotDecBitCt = 7;
-    // private const int DtIntBitCt = 4;
-    // private const int DtDecBitCt = 11;
     public static bool Read(NetPakReader reader, Version sourceVersion, out EditorInputPacket packet)
     {
         _ = sourceVersion;

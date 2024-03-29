@@ -126,7 +126,7 @@ public abstract class RaycastChartColorProvider : ISamplingChartColorProvider
     }
 
     /// <summary>
-    /// Faster implementation of <see cref="WaterUtility.isPointUnderwater"/>.
+    /// Faster implementation of <see cref="WaterUtility.isPointUnderwater(Vector3)"/>.
     /// </summary>
     protected bool IsPointUnderwaterFast(Vector3 point)
     {

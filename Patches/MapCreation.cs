@@ -1,4 +1,5 @@
 ﻿extern alias NSJ;
+using System.Globalization;
 using DevkitServer.API;
 using DevkitServer.Configuration;
 using SDG.Framework.Devkit;
@@ -79,6 +80,7 @@ public static class MapCreation
     /// <br/>• Player clip volumes are added as a world border based on the selected size.
     /// <br/>• Cartography volume is added.
     /// <br/>• Water volume is added.
+    /// <br/>• Non-breathable oxygen volume with falloff is added.
     /// </summary>
     public static void CreateMap(string mapName, ELevelSize size, ELevelType type)
     {
@@ -116,7 +118,7 @@ public static class MapCreation
 
         Logger.DevkitServer.LogInfo(nameof(MapCreation), $"Level created: {mapName.Colorize(MapArgb)}. Size: {size.Format()}. Type: {type.Format()}. Owner: {Provider.client.Format()} ({Provider.clientName.Format(false)}).");
 #endif
-        string lvlPath = Path.Combine(ReadWrite.PATH, "Maps", mapName);
+        string lvlPath = Path.GetFullPath(Path.Combine(ReadWrite.PATH, "Maps", mapName));
 
         Guid assetGuid = LevelAsset.defaultLevel.GUID;
 
@@ -138,6 +140,7 @@ public static class MapCreation
             AssetOrigin origin = new AssetOrigin { name = "Map \"" + mapName + "\"", workshopFileId = 0ul };
 
             AssetUtil.LoadFileSync(path, origin);
+            AssetUtil.SyncAssetsFromOrigin(origin);
         }
 
         FileUtil.CheckDirectory(false, lvlPath);
@@ -149,6 +152,7 @@ public static class MapCreation
             Use_Legacy_Ground = false,
             Use_Legacy_Oxygen_Height = false,
             Use_Legacy_Snow_Height = false,
+            Version = "3.0.0.0",
             Asset = new AssetReference<LevelAsset>(assetGuid),
             Tips = 1,
 #if SERVER
@@ -211,7 +215,7 @@ public static class MapCreation
         int ground2Size = size is ELevelSize.TINY or ELevelSize.SMALL ? (worldSize * 2) : (worldSize + 2 * Landscape.TILE_SIZE_INT);
         int tiles = Mathf.CeilToInt(ground2Size / Landscape.TILE_SIZE);
         int half = Mathf.CeilToInt(tiles / 2f);
-        writer.writeValue("Available_Instance_ID", 12);
+        writer.writeValue("Available_Instance_ID", 13);
         writer.beginArray("Items");
         writer.beginObject();
         writer.writeValue("Type", typeof(Landscape).AssemblyQualifiedName);
@@ -254,6 +258,9 @@ public static class MapCreation
         writer.endArray();
         writer.endObject();
         writer.endObject();
+
+
+        // Foliage System and Volume
 
         writer.beginObject();
         writer.writeValue("Type", typeof(FoliageSystem).AssemblyQualifiedName);
@@ -300,6 +307,8 @@ public static class MapCreation
         writer.endObject();
 
 
+        // Cartography Volume
+
         writer.beginObject();
         writer.writeValue("Type", typeof(CartographyVolume).AssemblyQualifiedName);
         writer.writeValue("Instance_ID", 4);
@@ -328,46 +337,89 @@ public static class MapCreation
         writer.endObject();
         writer.endObject();
 
+        float defaultSeaLevel = 0.1f * Level.TERRAIN;
+
+        float oxygenHeight = Level.HEIGHT - defaultSeaLevel;
+        float oxygenY = defaultSeaLevel + oxygenHeight;
+        float falloff = oxygenHeight / 2;
+
+        float oxygenSize = worldSize - 2 * border;
+
+        writer.beginObject();
+        writer.writeValue("Type", typeof(OxygenVolume).AssemblyQualifiedName);
+        writer.writeValue("Instance_ID", 5);
+        writer.beginObject("Item");
+
+        writer.beginObject("Position");
+        writer.writeValue("X", center.x);
+        writer.writeValue("Y", oxygenY);
+        writer.writeValue("Z", center.y);
+        writer.endObject();
+
+        writer.beginObject("Rotation");
+        writer.writeValue("X", 0f);
+        writer.writeValue("Y", 0f);
+        writer.writeValue("Z", 0f);
+        writer.writeValue("W", 1f);
+        writer.endObject();
+
+        writer.beginObject("Scale");
+        writer.writeValue("X", oxygenSize + falloff * 2);
+        writer.writeValue("Y", oxygenHeight);
+        writer.writeValue("Z", oxygenSize + falloff * 2);
+        writer.endObject();
+        writer.writeValue("Shape", "Box");
+        writer.writeValue("Falloff", falloff);
+        writer.writeValue("Is_Breathable", "false");
+
+        writer.endObject();
+        writer.endObject();
+
+
+        // Player Clip Volumes
+
         // bottom
         WritePlayerClip(
             new Vector3(center.x, -Level.HEIGHT - 4f, center.y),
             Quaternion.Euler(-90f, 0f, 0f),
             new Vector3(worldSize - border * 2 + Level.CLIP * 2, worldSize - border * 2 + Level.CLIP * 2, 1f),
-            5);
+            6);
 
         // top
         WritePlayerClip(
             new Vector3(center.x, Level.HEIGHT + 4f, center.y),
             Quaternion.Euler(-90f, 0f, 0f),
             new Vector3(worldSize - border * 2 + Level.CLIP * 2, worldSize - border * 2 + Level.CLIP * 2, 1f),
-            6);
+            7);
 
         // sides
         WritePlayerClip(
             new Vector3(center.x, 0f, center.y + (-worldSize / 2f + border)),
             Quaternion.identity,
             new Vector3(worldSize - border * 2, Level.HEIGHT * 2 + 8f, 1f),
-            7);
+            8);
         WritePlayerClip(
             new Vector3(center.x + (worldSize / 2f - border), 0f, center.y),
             Quaternion.Euler(0f, -90f, 0f),
             new Vector3(worldSize - border * 2, Level.HEIGHT * 2 + 8f, 1f),
-            8);
+            9);
         WritePlayerClip(
             new Vector3(center.x + (-worldSize / 2f + border), 0f, center.y),
             Quaternion.Euler(0f, 90f, 0f),
             new Vector3(worldSize - border * 2, Level.HEIGHT * 2 + 8f, 1f),
-            9);
+            10);
         WritePlayerClip(
             new Vector3(center.x, 0f, center.y + (worldSize / 2f - border)),
             Quaternion.Euler(0f, 180f, 0f),
             new Vector3(worldSize - border * 2, Level.HEIGHT * 2 + 8f, 1f),
-            10);
+            11);
 
+
+        // Water Volume
 
         writer.beginObject();
         writer.writeValue("Type", typeof(WaterVolume).AssemblyQualifiedName);
-        writer.writeValue("Instance_ID", 11);
+        writer.writeValue("Instance_ID", 12);
         writer.beginObject("Item");
 
         writer.beginObject("Position");
@@ -398,6 +450,11 @@ public static class MapCreation
         writer.endObject();
 
         tw.Flush();
+
+#if CLIENT
+        // update cached config file
+        AssetUtil.RescanLevel(lvlPath);
+#endif
 
         void WriteTile(int posX, int posY)
         {

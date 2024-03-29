@@ -28,7 +28,7 @@ internal class MenuPlaySingleplayerUIExtension
 
     private void OnClickedRefresh(ISleekElement button)
     {
-        AssetUtil.RefreshLevelsUI();
+        AssetUtil.RescanAllLevels();
     }
 }
 #endif

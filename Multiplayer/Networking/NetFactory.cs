@@ -730,6 +730,24 @@ public static class NetFactory
         if (!FillParameters(in overhead, ref ctx, connection, call, message, hs, ref parameters))
             return false;
 
+        if (DevkitServerModule.IsMainThread)
+        {
+            InvokeMethodIntl(in overhead, ref ctx, methodInfo, call, message, hs, parameters!);
+        }
+        else
+        {
+            MessageContext context2 = ctx;
+            DevkitServerUtility.QueueOnMainThread(() =>
+            {
+                MessageContext context = context2;
+                InvokeMethodIntl(in context.Overhead, ref context, methodInfo, call, message, hs, parameters!);
+            });
+        }
+
+        return true;
+    }
+    private static void InvokeMethodIntl(in MessageOverhead overhead, ref MessageContext ctx, NetMethodInfo methodInfo, BaseNetCall call, ArraySegment<byte> message, bool hs, object[] parameters)
+    {
         object? res;
         try
         {
@@ -738,7 +756,7 @@ public static class NetFactory
         catch (Exception ex)
         {
             PrintInvokeError(in overhead, methodInfo.Method, ex);
-            return true;
+            return;
         }
         if (res is int resp)
         {
@@ -846,8 +864,6 @@ public static class NetFactory
 #if METHOD_LOGGING
         Logger.DevkitServer.LogDebug(Source, $"  Invoked net method: {methodInfo.Method.Format()}.", ConsoleColor.DarkYellow);
 #endif
-
-        return true;
     }
     private static void PrintInvokeError(in MessageOverhead overhead, MethodBase method, Exception ex)
     {

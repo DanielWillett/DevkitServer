@@ -1,10 +1,12 @@
 ﻿using Cysharp.Threading.Tasks;
 using DevkitServer.API.Multiplayer;
 using DevkitServer.API.Permissions;
-using DevkitServer.API.UI;
 using DevkitServer.Core.Permissions;
-using DevkitServer.Multiplayer;
 using DevkitServer.Util.Encoding;
+#if SERVER
+using DevkitServer.API.UI;
+using DevkitServer.Multiplayer;
+#endif
 
 namespace DevkitServer.Core.Cartography;
 public static class CartographyReplication
@@ -34,6 +36,7 @@ public static class CartographyReplication
 #if SERVER
         transportConnections ??= Provider.GatherClientConnections();
 
+        // since this is an async function, we can't use pooled lists
         if (transportConnections is PooledTransportConnectionList)
             transportConnections = transportConnections.ToList();
 #endif
@@ -58,6 +61,7 @@ public static class CartographyReplication
             Logger.DevkitServer.LogWarning(nameof(CartographyReplication), ex, $"Error reading {(isChart ? "chart" : "satellite")}, trying again on the main thread.");
             try
             {
+                // ReSharper disable once MethodHasAsyncOverloadWithCancellation
                 bytes = File.ReadAllBytes(path);
             }
             catch (Exception ex2)
@@ -86,7 +90,7 @@ public static class CartographyReplication
 #else
         byte[] imgData = texture.EncodeToJPG(100);
 #endif
-
+        Object.Destroy(texture);
 #if SERVER
         LargeMessageTransmission transmission = new LargeMessageTransmission(transportConnections, imgData, 24576)
 #else
@@ -96,7 +100,7 @@ public static class CartographyReplication
             LogSource = "SEND " + (isChart ? "CHART" : "SATELLITE"),
             HandlerType = typeof(CartographyReplicationHandler),
             Handler = new CartographyReplicationHandler(),
-            LoggingType = BinaryStringFormat.First64 | BinaryStringFormat.Last64 | BinaryStringFormat.RowLabels | BinaryStringFormat.ColumnLabels
+            AllowCompression = false
         };
 
         try
@@ -139,9 +143,6 @@ public static class CartographyReplication
 
         protected internal override void OnStart()
         {
-#if DEBUG
-            Transmission.LoggingType = BinaryStringFormat.First64 | BinaryStringFormat.Last64 | BinaryStringFormat.RowLabels | BinaryStringFormat.ColumnLabels;
-#endif
             bool isChart;
 
             if (Transmission.LogSource.Equals("SEND CHART", StringComparison.Ordinal))
@@ -166,6 +167,8 @@ public static class CartographyReplication
                 });
                 return;
             }
+
+            Logger.DevkitServer.LogInfo(Transmission.LogSource, $"Receiving {(isChart ? "chart" : "satellite")} image...");
 
 #if SERVER
             PermissionLeaf leaf = isChart ? VanillaPermissions.BakeCartographyChart : VanillaPermissions.BakeCartographyGPS;
@@ -235,7 +238,7 @@ public static class CartographyReplication
 
                 if (data == null)
                 {
-                    Logger.DevkitServer.LogError(nameof(CartographyReplication), $"Invalid JPG or PNG data received for {(isChart ? "chart" : "satellite")} from {Transmission.Connections[0].Format()}.");
+                    Logger.DevkitServer.LogError(nameof(CartographyReplication), $"Invalid JPG or PNG data received for {(isChart ? "chart" : "satellite")} from {Transmission.Connections[0].Format()} (content is null).");
                     return;
                 }
 

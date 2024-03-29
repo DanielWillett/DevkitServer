@@ -409,7 +409,7 @@ public static class HighSpeedNetFactory
 #endif
     internal static void Receive(HighSpeedConnection connection, ArraySegment<byte> bytes, in MessageOverhead overhead)
     {
-        NetFactory.OnReceived(bytes, connection, overhead, true);
+        NetFactory.OnReceived(bytes, connection, in overhead, true);
     }
 }
 

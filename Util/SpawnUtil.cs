@@ -2271,7 +2271,6 @@ public static class SpawnUtil
     /// <remarks>Does not replicate.</remarks>
     /// <returns>Index of the created spawnpoint.</returns>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="spawnTable"/> does not reference a valid spawn table.</exception>
     /// <exception cref="InvalidOperationException">Too many spawns in the world (255).</exception>
     public static int AddPlayerSpawnpointLocal(Vector3 position, float yaw = 0f, bool isAlt = false)
     {
@@ -2565,7 +2564,6 @@ public static class SpawnUtil
     /// <remarks>Replicates to clients.</remarks>
     /// <returns>Index of the created spawnpoint.</returns>
     /// <exception cref="NotSupportedException">Not on main thread.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="spawnTable"/> does not reference a valid spawn table.</exception>
     /// <exception cref="InvalidOperationException">Too many spawns in the world (255).</exception>
     public static int AddPlayerSpawnpoint(Vector3 position, float yaw = 0f, bool isAlt = false, EditorUser? owner = null)
     {

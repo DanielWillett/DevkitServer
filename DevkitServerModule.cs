@@ -72,7 +72,7 @@ public sealed class DevkitServerModule : IModuleNexus
     internal static NetCall ClientAskSave = new NetCall(DevkitServerNetCall.AskSave);
     public static string CommitId => _commitIdShort ??= DevkitServer.CommitId.Commit.Length > 7 ? DevkitServer.CommitId.Commit.Substring(0, 7) : DevkitServer.CommitId.Commit;
     public static string LongCommitId => DevkitServer.CommitId.Commit;
-    public Assembly Assembly { [MethodImpl(MethodImplOptions.NoInlining)] get; } = Assembly.GetExecutingAssembly();
+    public Assembly Assembly { get; } = Assembly.GetExecutingAssembly();
     internal static string HelpMessage => CommandLocalization.format("Help");
     public static GameObject GameObjectHost { get; private set; } = null!;
     public static DevkitServerModuleComponent ComponentHost { get; private set; } = null!;
@@ -901,20 +901,20 @@ public sealed class DevkitServerModule : IModuleNexus
 
     internal static void Fault()
     {
-        if (!LoadFaulted)
-        {
-            LoadFaulted = true;
-            Logger.DevkitServer.LogWarning("Init", "DevkitServer terminated.");
-            Assets? instance = AssetUtil.AssetsInstance;
-            if (instance != null)
-                instance.StopAllCoroutines();
-            Logger.ClearLoadingErrors();
+        if (LoadFaulted)
+            return;
+
+        LoadFaulted = true;
+        Logger.DevkitServer.LogWarning("Init", "DevkitServer terminated.");
+        Assets? instance = AssetUtil.AssetsInstance;
+        if (instance != null)
+            instance.StopAllCoroutines();
+        Logger.ClearLoadingErrors();
 #if SERVER
-            Provider.shutdown(10, "DevkitServer failed to load.");
+        Provider.shutdown(10, "DevkitServer failed to load.");
 #else
-            TimeUtility.InvokeAfterDelay(() => Provider.QuitGame("DevkitServer failed to load."), 10f);
+        TimeUtility.InvokeAfterDelay(() => Provider.QuitGame("DevkitServer failed to load."), 10f);
 #endif
-        }
     }
 
     private static void OnEditorCreated()

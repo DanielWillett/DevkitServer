@@ -16,6 +16,7 @@ public class EditorUIExtension : ContainerUIExtension
     private SleekLoadingScreenProgressBar? _loadingProgress;
     private ISleekBox? _loadingBox;
     private bool _subbed;
+    private bool _lastFadeSetting;
     protected override SleekWindow Parent => EditorUI.window;
     protected override void OnShown()
     {
@@ -75,7 +76,9 @@ public class EditorUIExtension : ContainerUIExtension
         Container.AddChild(_loadingBox);
         Container.AddChild(_loadingProgress);
         if (DevkitServerModule.IsEditing)
+        {
             UpdateAllNametags();
+        }
         Logger.DevkitServer.LogDebug(nameof(EditorUIExtension), "Shown editor extension");
     }
     protected override void OnHidden()
@@ -113,7 +116,7 @@ public class EditorUIExtension : ContainerUIExtension
     {
         if (Container == null)
             return;
-        if (user == EditorUser.User)
+        if (user == EditorUser.User || _lastFadeSetting != OptionsSettings.shouldNametagFadeOut)
         {
             UpdateAllNametags();
             return;
@@ -163,9 +166,19 @@ public class EditorUIExtension : ContainerUIExtension
             if (!nametag.IsVisible)
                 nametag.IsVisible = true;
 
-            float magnitude = new Vector2(adjScreenPos.x - 0.5f, adjScreenPos.y - 0.5f).magnitude;
-            float t = Mathf.InverseLerp(0.0125f, 0.1f, magnitude);
-            nametag.TextColor = new SleekColor(ESleekTint.FONT, Mathf.Lerp(0.1f, 0.75f, t));
+            float alpha;
+            if (OptionsSettings.shouldNametagFadeOut)
+            {
+                float magnitude = new Vector2(adjScreenPos.x - 0.5f, adjScreenPos.y - 0.5f).magnitude;
+                float t = Mathf.InverseLerp(0.0125f, 0.1f, magnitude);
+                alpha = Mathf.Lerp(0.1f, 0.75f, t);
+            }
+            else
+            {
+                alpha = 0.75f;
+            }
+
+            nametag.TextColor = new SleekColor(ESleekTint.FONT, alpha);
         }
     }
 
@@ -189,6 +202,7 @@ public class EditorUIExtension : ContainerUIExtension
     {
         if (Container == null)
             return;
+        _lastFadeSetting = OptionsSettings.shouldNametagFadeOut;
         foreach (EditorUser u in UserManager.Users)
         {
             if (u.IsOwner)

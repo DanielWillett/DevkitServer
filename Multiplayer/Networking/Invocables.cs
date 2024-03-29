@@ -229,20 +229,20 @@ public class NetCallCustom : BaseNetCall
     }
     public void Invoke(HighSpeedConnection connection, WriterTask task)
     {
-        MessageOverhead overhead = new MessageOverhead(DefaultFlags, Guid, Id, 0);
+        MessageOverhead overhead = new MessageOverhead(DefaultFlags | MessageFlags.HighSpeed, Guid, Id, 0);
         Invoke(ref overhead, connection, task);
     }
     public NetTask Request(BaseNetCall listener, HighSpeedConnection connection, WriterTask task, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
     {
         NetTask task2 = listener.Listen(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(RequestFlags, Guid, Id, 0, task2.RequestId);
+        MessageOverhead overhead = new MessageOverhead(RequestFlags | MessageFlags.HighSpeed, Guid, Id, 0, task2.RequestId);
         Invoke(ref overhead, connection, task);
         return task2;
     }
     public NetTask RequestAck(HighSpeedConnection connection, WriterTask task, int timeoutMs = NetTask.DefaultTimeoutMilliseconds)
     {
         NetTask task2 = ListenAck(timeoutMs);
-        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags, Guid, Id, 0, task2.RequestId);
+        MessageOverhead overhead = new MessageOverhead(AcknowledgeRequestFlags | MessageFlags.HighSpeed, Guid, Id, 0, task2.RequestId);
         Invoke(ref overhead, connection, task);
         return task2;
     }

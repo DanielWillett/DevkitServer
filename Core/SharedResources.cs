@@ -25,4 +25,5 @@ internal static class SharedResources
         Logger.DevkitServer.LogDebug(nameof(LoadFromBundle), $"Found logic shader: {LogicShader?.name.Format()}.");
 #endif
     }
+
 }

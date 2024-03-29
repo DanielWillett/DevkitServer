@@ -109,22 +109,16 @@ internal static class ClientUserMovement
         Vector2 rotation = new Vector2(MainCamera.instance.transform.localEulerAngles.x, editorObject.eulerAngles.y);
         if (rotation.x > 180f)
             rotation.x -= 360f;
-        // double time = _lastTime;
-        // _lastTime = Time.realtimeSinceStartupAsDouble;
         if (_packets.Length > 0)
         {
             ref EditorInputPacket packet = ref _packets[_packets.Length - 1];
             if (UserControl.LocalController != CameraController.Editor && packet.LastFrameBeforeChangingController)
                 return;
-
-            // if (position == packet.Position && rotation == packet.Rotation)
-            //     return;
         }
 
         EditorInputPacket newPacket = default;
         newPacket.Position = position;
         newPacket.Rotation = rotation;
-        // newPacket.DeltaTime = (float)(_lastTime - time);
         newPacket.ClientInputFrame = frame;
         newPacket.LastFrameBeforeChangingController = UserControl.LocalController != CameraController.Editor;
         newPacket.LastTeleportId = LastWasTeleport ? (byte)0 : LastTeleportId;
