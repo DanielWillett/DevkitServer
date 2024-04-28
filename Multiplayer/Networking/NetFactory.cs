@@ -1,6 +1,7 @@
 ﻿#if DEBUG
 #define METHOD_LOGGING
 #define REFLECTION_LOGGING
+#define PRINT_DATA
 #endif
 
 using Cysharp.Threading.Tasks;
@@ -20,6 +21,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using DanielWillett.SpeedBytes.Formatting;
 #if CLIENT
 using DevkitServer.Multiplayer.Sync;
 #endif
@@ -1001,20 +1003,34 @@ public static class NetFactory
             connection, in MessageOverhead overhead, bool hs)
     {
         int size = overhead.Size;
-        if (size > message.Count)
+        if (size > message.Count - overhead.Length)
         {
             Logger.DevkitServer.LogError(Source, $"Message overhead read a size larger than the message payload: {size.Format()} B.");
             goto rtn;
         }
+#if METHOD_LOGGING || PRINT_DATA
+#if SERVER
+        string log = $"Received message from {connection.Format()}: {overhead.Format()}.";
+#elif CLIENT
+        string log = $"Received message: {overhead.Format()}.";
+#endif
 
 #if METHOD_LOGGING
-#if SERVER
-        Logger.DevkitServer.LogDebug(Source, $"Received message from {connection.Format()}: {overhead.Format()}.", ConsoleColor.DarkYellow);
-#elif CLIENT
-        Logger.DevkitServer.LogDebug(Source, $"Received message: {overhead.Format()}.", ConsoleColor.DarkYellow);
-#endif
-#endif
+        if (message.Array!.Length - message.Offset > overhead.Length)
+        {
+            log += Environment.NewLine;
+            log += FormattingUtil.FormatBinary(message.Array, 16, message.Offset, overhead.Length, "000", true);
+        }
 
+        if (size > 0)
+        {
+            log += ByteFormatter.FormatBinary(message.AsSpan().Slice(overhead.Length, size),
+                ByteStringFormat.NewLineAtBeginning | ByteStringFormat.RowLabels | ByteStringFormat.ColumnLabels | ByteStringFormat.Columns32 | ByteStringFormat.Base16
+                | ByteStringFormat.First128 | ByteStringFormat.Last128);
+        }
+#endif
+        Logger.DevkitServer.LogDebug(Source, log);
+#endif
         int index = overhead.Length;
 
         if ((hs ? HighSpeedInvokers : Invokers).TryGetValue(overhead.MessageId, out BaseNetCall call))
@@ -1857,7 +1873,7 @@ public enum NetCallSource : byte
     FromClient = 1,
     FromEither = 2,
     /// <summary>
-    /// Equivalent to using the <see cref="API.IgnoreAttribute"/>.
+    /// Equivalent to using the <see cref="IgnoreAttribute"/>.
     /// </summary>
     None = 3
 }

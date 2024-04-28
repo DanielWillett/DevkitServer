@@ -157,9 +157,9 @@ internal class DevkitServerResources
             Lib("DanielWillett.ReflectionTools", "LICENSE.txt"), new Version(0, 0, 29, 0)),
 
         new DevkitServerFileResource("DanielWillett.SpeedBytes",
-            Lib("DanielWillett.SpeedBytes", "DanielWillett.SpeedBytes.dll"), new Version(0, 0, 32, 0)),
+            Lib("DanielWillett.SpeedBytes", "DanielWillett.SpeedBytes.dll"), new Version(0, 0, 36, 0)),
         new DevkitServerFileResource("DanielWillett.SpeedBytes.Unity",
-            Lib("DanielWillett.SpeedBytes", "DanielWillett.SpeedBytes.Unity.dll"), new Version(0, 0, 34, 0)),
+            Lib("DanielWillett.SpeedBytes", "DanielWillett.SpeedBytes.Unity.dll"), new Version(0, 0, 36, 0)),
         new DevkitServerFileResource("DanielWillett.SpeedBytes.LICENSE",
             Lib("DanielWillett.SpeedBytes", "LICENSE.txt"), new Version(0, 0, 29, 0)),
 

@@ -16,7 +16,7 @@
         <PackageReference Include="Lib.Harmony" Version="2.3.3">
             <Private>false</Private>
         </PackageReference>
-        <PackageReference Include="DanielWillett.SpeedBytes" Version="[1.1.1,)">
+        <PackageReference Include="DanielWillett.SpeedBytes" Version="[1.1.2,)">
             <Private>false</Private>
         </PackageReference>
         <PackageReference Include="DanielWillett.SpeedBytes.Unity" Version="[1.1.1,)">

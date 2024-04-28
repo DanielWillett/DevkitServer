@@ -3,6 +3,7 @@ using DevkitServer.API.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
 using System.IO.Compression;
 using DanielWillett.SpeedBytes;
+using DanielWillett.SpeedBytes.Formatting;
 using CompressionLevel = System.IO.Compression.CompressionLevel;
 using DeflateStream = System.IO.Compression.DeflateStream;
 
@@ -47,7 +48,7 @@ public class LargeMessageTransmission : IDisposable
     /// <summary>
     /// How sent or received data should be logged as binary. Must be set server-side (like in the handler) to log received data.
     /// </summary>
-    public BinaryStringFormat LoggingType { get; set; } = BinaryStringFormat.NoLogging;
+    public ByteStringFormat LoggingType { get; set; } = ByteStringFormat.NoLogging;
 
     /// <summary>
     /// Is this a cancellable transmission?
@@ -371,7 +372,7 @@ public class LargeMessageTransmission : IDisposable
         if (Content.Array == null || Content.Count == 0)
             throw new FormatException("No content supplied to large transaction. Ensure the 'Content' property has a value and a non-zero count.");
 
-        if (LoggingType != BinaryStringFormat.NoLogging)
+        if (LoggingType != ByteStringFormat.NoLogging)
             PrintLogging();
         
         token = !token.CanBeCanceled ? _tknSource.Token : CancellationTokenSource.CreateLinkedTokenSource(token, _tknSource.Token).Token;
@@ -525,12 +526,12 @@ public class LargeMessageTransmission : IDisposable
     }
     private void PrintLogging()
     {
-        BinaryStringFormat format = LoggingType | BinaryStringFormat.NewLineAtBeginning;
+        ByteStringFormat format = LoggingType | ByteStringFormat.NewLineAtBeginning;
 
-        int len = FormattingUtil.GetBinarySize(Content.Count, format);
+        int len = ByteFormatter.GetMaxBinarySize(Content.Count, format);
 
         Span<char> data = len > 384 ? new char[len] : stackalloc char[len];
-        FormattingUtil.FormatBinary(Content, data, format);
+        ByteFormatter.FormatBinary(Content, data, format);
 
         Logger.DevkitServer.LogInfo(LogSource, data);
     }
@@ -569,7 +570,7 @@ public class LargeMessageTransmission : IDisposable
 
         Comms.Dispose();
 
-        if (LoggingType != BinaryStringFormat.NoLogging && Content.Array != null && Content.Count != 0)
+        if (LoggingType != ByteStringFormat.NoLogging && Content.Array != null && Content.Count != 0)
             PrintLogging();
     }
     internal void OnFinalContentCompleted()

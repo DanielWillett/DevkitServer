@@ -133,7 +133,7 @@ internal static class SelectionToolPatches
                     break;
                 }
 
-                for (int j = stopIndex + 1; j < i; ++j)
+                for (int j = stopIndex; j < i; ++j)
                 {
                     ctx.Emit(ctx[j].CopyWithoutSpecial());
                 }
@@ -386,19 +386,19 @@ internal static class SelectionToolPatches
                 netIds[++index] = netId;
                 ClientEvents.InvokeOnDeleteHierarchyObject(new DeleteHierarchyObjectProperties(obj, item, netId));
             }
+
+            if (ClientEvents.ListeningOnDeleteHierarchyObjects)
+            {
+                ++index;
+                if (index < HierarchyUtil.HierarchyItemBuffer.Count)
+                    Array.Resize(ref netIds, index);
+
+                ClientEvents.InvokeOnDeleteHierarchyObjects(new DeleteHierarchyObjectsProperties(netIds, CachedTime.DeltaTime));
+            }
         }
         finally
         {
             HierarchyUtil.HierarchyItemBuffer.Clear();
-        }
-
-        if (ClientEvents.ListeningOnDeleteHierarchyObjects)
-        {
-            ++index;
-            if (index < HierarchyUtil.HierarchyItemBuffer.Count)
-                Array.Resize(ref netIds, index);
-
-            ClientEvents.InvokeOnDeleteHierarchyObjects(new DeleteHierarchyObjectsProperties(netIds, CachedTime.DeltaTime));
         }
     }
 

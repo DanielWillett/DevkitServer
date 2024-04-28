@@ -188,7 +188,7 @@ public sealed class LevelData
 
         data.LevelFolderContent = VirtualDirectories.Read(_levelReader);
 
-        reader.LoadNew(Array.Empty<byte>());
+        reader.LoadNew(ArraySegment<byte>.Empty);
         return data;
     }
     public void WriteToData(bool flush)

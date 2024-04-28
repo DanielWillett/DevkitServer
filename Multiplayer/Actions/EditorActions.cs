@@ -1,5 +1,5 @@
 ﻿#if DEBUG
-// #define PRINT_ACTION_DETAIL
+#define PRINT_ACTION_DETAIL
 #define PRINT_ACTION_SIMPLE
 #endif
 
@@ -245,11 +245,11 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
                 if (_pendingActions[i] is TAction t && ((IReplacableAction)t).TryReplaceFrom(repl))
                 {
 #if PRINT_ACTION_DETAIL
-                    Logger.LogDebug($"Action {action.Format()} replaced to {t.Format()}" +
-                                    $", time: {CachedTime.RealtimeSinceStartup:F2}" +
-                                    $", fps: {1f / CachedTime.DeltaTime:F0}" +
-                                    $", queue: {_pendingActions.Count}.{Environment.NewLine}" +
-                                    JsonSerializer.Serialize(t, t.GetType(), DevkitServerConfig.SerializerSettings));
+                    Logger.DevkitServer.LogDebug(Source, $"Action {action.Format()} replaced to {t.Format()}" +
+                                                         $", time: {CachedTime.RealtimeSinceStartup:F2}" +
+                                                         $", fps: {1f / CachedTime.DeltaTime:F0}" +
+                                                         $", queue: {_pendingActions.Count}.{Environment.NewLine}" +
+                                                         JsonSerializer.Serialize(t, t.GetType(), DevkitServerConfig.SerializerSettings));
 #elif PRINT_ACTION_SIMPLE
                     Logger.DevkitServer.LogDebug(Source, $"Action {action.Format()} replaced to {t.Format()}.");
 #endif
@@ -260,11 +260,11 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
 
         _pendingActions.Add(action);
 #if PRINT_ACTION_DETAIL
-        Logger.LogDebug($"Action queued to write: {action.Format()}" +
-                        $", time: {CachedTime.RealtimeSinceStartup:F2}" +
-                        $", fps: {1f / CachedTime.DeltaTime:F0}" +
-                        $", queue: {_pendingActions.Count}.{Environment.NewLine}" +
-                        JsonSerializer.Serialize(action, action.GetType(), DevkitServerConfig.SerializerSettings));
+        Logger.DevkitServer.LogDebug(Source, $"Action queued to write: {action.Format()}" +
+                                             $", time: {CachedTime.RealtimeSinceStartup:F2}" +
+                                             $", fps: {1f / CachedTime.DeltaTime:F0}" +
+                                             $", queue: {_pendingActions.Count}.{Environment.NewLine}" +
+                                             JsonSerializer.Serialize(action, action.GetType(), DevkitServerConfig.SerializerSettings));
 #elif PRINT_ACTION_SIMPLE
         Logger.DevkitServer.LogDebug(Source, $"Action queued to write: {action.Format()}.");
 #endif
@@ -405,11 +405,11 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
         {
             action.Apply();
 #if PRINT_ACTION_DETAIL
-            Logger.LogDebug($"Action applied: {action.Format()}" +
-                            $", time: {CachedTime.RealtimeSinceStartup:F2}" +
-                            $", fps: {1f / CachedTime.DeltaTime:F0}" +
-                            $", queue: {listener.QueueSize}.{Environment.NewLine}" +
-                            JsonSerializer.Serialize(action, action.GetType(), DevkitServerConfig.SerializerSettings));
+            Logger.DevkitServer.LogDebug(Source, $"Action applied: {action.Format()}" +
+                                                 $", time: {CachedTime.RealtimeSinceStartup:F2}" +
+                                                 $", fps: {1f / CachedTime.DeltaTime:F0}" +
+                                                 $", queue: {listener.QueueSize}.{Environment.NewLine}" +
+                                                 JsonSerializer.Serialize(action, action.GetType(), DevkitServerConfig.SerializerSettings));
 #elif PRINT_ACTION_SIMPLE
             Logger.DevkitServer.LogDebug(Source, $"Action applied: {action.Format()}.");
 #endif
