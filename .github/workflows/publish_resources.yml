@@ -33,7 +33,7 @@ jobs:
     - name: Pack Resources
       run: dotnet pack "DevkitServer.Resources/DevkitServer.Resources.csproj" --configuration ServerRelease "/p:Version=${{ inputs.sem_version }};PackageReleaseNotes=${{ inputs.change_notes }};IsInGitHubActions=True;AssemblyOriginatorKeyFile=${{ steps.decode-base64.outputs.output-path }};SignAssembly=True" --no-build --output .
     
- #  - name: Push Packages
- #    run: dotnet nuget push *.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
- #    env:
- #      NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
+    - name: Push Packages
+      run: dotnet nuget push *.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
+      env:
+        NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
