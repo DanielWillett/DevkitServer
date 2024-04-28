@@ -1,9 +1,12 @@
-﻿using DevkitServer.API;
+﻿using DanielWillett.ReflectionTools;
 using DevkitServer.Levels;
 using DevkitServer.Plugins;
 using DevkitServer.Util.Encoding;
 using System.Reflection;
+using DanielWillett.SpeedBytes;
+#if SERVER
 using DevkitServer.Players;
+#endif
 
 namespace DevkitServer.Multiplayer.Levels;
 
@@ -271,7 +274,7 @@ public static class ReplicatedLevelDataRegistry
             writer.Write(data.ReplicatedLevelData.Count);
 
             // doing it this way allows us to go back and write the length of the block for extra safety
-            ByteWriter? tempWriter = writer.Stream != null ? new ByteWriter(false, 512) : null;
+            ByteWriter? tempWriter = writer.Stream != null ? new ByteWriter(512) : null;
 
             for (int i = 0; i < data.ReplicatedLevelData.Count; ++i)
             {
@@ -344,7 +347,7 @@ public static class ReplicatedLevelDataRegistry
         fixed (byte* ptr = &writer.Buffer[pos])
         {
             *(int*)ptr = size;
-            ByteWriter.EndianCheck(ptr, sizeof(int));
+            UnsafeBitConverter.EndianCheck(ptr, sizeof(int));
         }
 #if DEBUG
         if (srcInfo.Assembly != null)

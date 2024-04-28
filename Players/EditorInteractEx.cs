@@ -1,4 +1,5 @@
 ﻿#if CLIENT
+using DanielWillett.ReflectionTools;
 using DevkitServer.API;
 
 namespace DevkitServer.Players;
@@ -6,7 +7,7 @@ namespace DevkitServer.Players;
 [EarlyTypeInit]
 public class EditorInteractEx
 {
-    public static Type? EditorInteractType { get; } = Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract");
+    public static Type? EditorInteractType { get; } = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract");
 
     private static readonly StaticGetter<RaycastHit>? GetWorldHit = Accessor.GenerateStaticPropertyGetter<RaycastHit>(EditorInteractType, "worldHit");
     private static readonly StaticGetter<RaycastHit>? GetObjectHit = Accessor.GenerateStaticPropertyGetter<RaycastHit>(EditorInteractType, "objectHit");

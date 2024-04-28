@@ -1,19 +1,20 @@
-﻿using Cysharp.Threading.Tasks;
+﻿#define REFLECTION_TOOLS_ENABLE_HARMONY_LOG
+
+using Cysharp.Threading.Tasks;
+using DanielWillett.ReflectionTools;
 using DevkitServer.API;
 using DevkitServer.Configuration;
+using DevkitServer.Levels;
 using DevkitServer.Multiplayer;
 using DevkitServer.Players;
 using HarmonyLib;
 using SDG.Framework.Landscapes;
+using SDG.NetPak;
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
-using DevkitServer.Levels;
-using SDG.NetPak;
 using Version = System.Version;
-
 #if CLIENT
 using DevkitServer.API.UI;
 using DevkitServer.API.Multiplayer;
@@ -24,6 +25,7 @@ using DevkitServer.Util.Encoding;
 using DevkitServer.Multiplayer.Networking;
 using Unturned.SystemEx;
 #endif
+
 
 namespace DevkitServer.Patches;
 [HarmonyPatch]
@@ -47,20 +49,7 @@ internal static class PatchesMain
         Directory.CreateDirectory(path);
 
         path = Path.Combine(path, "harmony.log");
-        Environment.SetEnvironmentVariable("HARMONY_LOG_FILE", path);
-        try
-        {
-            using FileStream str = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
-            byte[] bytes = Encoding.UTF8.GetBytes(DateTimeOffset.UtcNow.ToString("R") + Environment.NewLine);
-            str.Write(bytes, 0, bytes.Length);
-            str.Flush();
-        }
-        catch (Exception ex)
-        {
-            CommandWindow.LogError("Unable to clear previous harmony log.");
-            CommandWindow.LogError(ex);
-        }
-        Harmony.DEBUG = true;
+        HarmonyLog.ResetConditional(path, enableDebug: true);
 
         Patcher = new Harmony(HarmonyId);
     }
@@ -117,11 +106,11 @@ internal static class PatchesMain
         Type? handlerType = null;
         try
         {
-            handlerType = Accessor.AssemblyCSharp.GetType("SDG.Unturned.ServerMessageHandler_GetWorkshopFiles", false, false);
+            handlerType = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.ServerMessageHandler_GetWorkshopFiles", false, false);
             if (handlerType == null)
                 Logger.DevkitServer.LogWarning(Source, $"Type not found: {"ServerMessageHandler_GetWorkshopFiles".Colorize(FormattingColorType.Class)}. Can't hide map name from joining players.");
             else if (handlerType.GetMethod("ReadMessage", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } method)
-                Patcher.Patch(method, transpiler: Accessor.GetHarmonyMethod(TranspileWorkshopRequest));
+                Patcher.Patch(method, transpiler: Accessor.Active.GetHarmonyMethod(TranspileWorkshopRequest));
             else
                 Logger.DevkitServer.LogWarning(Source, $"Method not found: {FormattingUtil.FormatMethod(typeof(void), handlerType, "ReadMessage",
                     [(typeof(ITransportConnection), "transportConnection"), (typeof(NetPakReader), "reader")],
@@ -138,8 +127,8 @@ internal static class PatchesMain
         {
             if (typeof(Provider).GetMethod("onClientTransportReady", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } definingMethod)
             {
-                if (Accessor.TryGetLambdaMethod(definingMethod, out MethodInfo lambdaMethod, [ typeof(NetPakWriter) ]))
-                    Patcher.Patch(lambdaMethod, transpiler: Accessor.GetHarmonyMethod(TranspileWriteWorkshopRequest));
+                if (Accessor.Active.TryGetLambdaMethod(definingMethod, out MethodInfo lambdaMethod, [ typeof(NetPakWriter) ]))
+                    Patcher.Patch(lambdaMethod, transpiler: Accessor.Active.GetHarmonyMethod(TranspileWriteWorkshopRequest));
                 else
                 {
                     Logger.DevkitServer.LogWarning(Source, $"Lambda method not found in {definingMethod.Format()}. Can't join DevkitServer servers.");
@@ -166,7 +155,7 @@ internal static class PatchesMain
             MethodInfo? method = typeof(Level).GetMethod(nameof(Level.includeHash), BindingFlags.Public | BindingFlags.Static);
             if (method != null)
             {
-                Patcher.Patch(method, prefix: Accessor.GetHarmonyMethod(PatchLevelIncludeHatch));
+                Patcher.Patch(method, prefix: Accessor.Active.GetHarmonyMethod(PatchLevelIncludeHatch));
             }
         }
         catch (Exception ex)
@@ -181,7 +170,7 @@ internal static class PatchesMain
             {
                 MethodInfo? method = typeof(MenuWorkshopEditorUI).GetMethod("onClickedAddButton", BindingFlags.NonPublic | BindingFlags.Static);
                 if (method != null)
-                    Patcher.Patch(method, transpiler: Accessor.GetHarmonyMethod(MapCreation.TranspileOnClickedAddLevelButton));
+                    Patcher.Patch(method, transpiler: Accessor.Active.GetHarmonyMethod(MapCreation.TranspileOnClickedAddLevelButton));
                 else
                     Logger.DevkitServer.LogWarning(Source, $"Method not found to patch map creation: {FormattingUtil.FormatMethod(typeof(void),
                         typeof(MenuWorkshopEditorUI), "onClickedAddButton", [ (typeof(ISleekElement), "button") ], isStatic: true)}.");
@@ -198,7 +187,7 @@ internal static class PatchesMain
             MethodInfo? method = typeof(Provider).GetMethod("updateSteamRichPresence", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
             if (method != null)
             {
-                Patcher.Patch(method, transpiler: Accessor.GetHarmonyMethod(TranspileUpdateSteamRichPresence));
+                Patcher.Patch(method, transpiler: Accessor.Active.GetHarmonyMethod(TranspileUpdateSteamRichPresence));
                 FailedRichPresencePatch = false;
             }
             else
@@ -216,7 +205,7 @@ internal static class PatchesMain
         try
         {
             MethodInfo method = Accessor.GetMethod(Level.save)!;
-            Patcher.Patch(method, prefix: Accessor.GetHarmonyMethod(OnLevelSaving), finalizer: Accessor.GetHarmonyMethod(OnLevelSavedFinalizer));
+            Patcher.Patch(method, prefix: Accessor.Active.GetHarmonyMethod(OnLevelSaving), finalizer: Accessor.Active.GetHarmonyMethod(OnLevelSavedFinalizer));
         }
         catch (Exception ex)
         {
@@ -235,7 +224,7 @@ internal static class PatchesMain
             }
             else
             {
-                Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostfixLevelInit));
+                Patcher.Patch(method, postfix: Accessor.Active.GetHarmonyMethod(PostfixLevelInit));
                 Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add a on begin level load call.");
             }
         }
@@ -248,16 +237,16 @@ internal static class PatchesMain
         // EditorInteract.Update
         try
         {
-            MethodInfo? method = Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract")?.GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
+            MethodInfo? method = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract")?.GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
             if (method != null)
-                Patcher.Patch(method, prefix: Accessor.GetHarmonyMethod(EditorInteractUpdatePrefix));
+                Patcher.Patch(method, prefix: Accessor.Active.GetHarmonyMethod(EditorInteractUpdatePrefix));
             else
                 Logger.DevkitServer.LogWarning(Source, $"Method not found to patch editor looking while not in Editor controller: {FormattingUtil.FormatMethod(typeof(void),
-                                               Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.");
+                                               AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.");
         }
         catch (Exception ex)
         {
-            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.");
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.");
         }
 
         // LoadingUI.onClickedCancelButton
@@ -266,7 +255,7 @@ internal static class PatchesMain
             MethodInfo? method = typeof(LoadingUI).GetMethod("onClickedCancelButton", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
             if (method != null)
             {
-                Patcher.Patch(method, prefix: Accessor.GetHarmonyMethod(OnClickedCancelLoadingPrefix));
+                Patcher.Patch(method, prefix: Accessor.Active.GetHarmonyMethod(OnClickedCancelLoadingPrefix));
             }
         }
         catch (Exception ex)
@@ -281,7 +270,7 @@ internal static class PatchesMain
         Type? handlerType = null;
         try
         {
-            handlerType = Accessor.AssemblyCSharp.GetType("SDG.Unturned.ServerMessageHandler_GetWorkshopFiles", false, false);
+            handlerType = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.ServerMessageHandler_GetWorkshopFiles", false, false);
             if (handlerType != null && handlerType.GetMethod("ReadMessage", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } method)
                 Patcher.Unpatch(method, Accessor.GetMethod(TranspileWorkshopRequest));
         }
@@ -295,7 +284,7 @@ internal static class PatchesMain
         try
         {
             if (typeof(Provider).GetMethod("onClientTransportReady", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } definingMethod
-                && Accessor.TryGetLambdaMethod(definingMethod, out MethodInfo lambdaMethod, [typeof(NetPakWriter)]))
+                && Accessor.Active.TryGetLambdaMethod(definingMethod, out MethodInfo lambdaMethod, [ typeof(NetPakWriter) ]))
             {
                 Patcher.Unpatch(lambdaMethod, Accessor.GetMethod(TranspileWriteWorkshopRequest));
             }
@@ -339,7 +328,7 @@ internal static class PatchesMain
         // EditorInteract.Update
         try
         {
-            MethodInfo? method = Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract")?.GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
+            MethodInfo? method = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract")?.GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
             if (method != null)
             {
                 Patcher.Unpatch(method, Accessor.GetMethod(EditorInteractUpdatePrefix));
@@ -347,7 +336,7 @@ internal static class PatchesMain
         }
         catch (Exception ex)
         {
-            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to unpatch method: {FormattingUtil.FormatMethod(typeof(void), Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.");
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to unpatch method: {FormattingUtil.FormatMethod(typeof(void), AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"), "Update", arguments: Type.EmptyTypes)}.");
         }
 
         try
@@ -380,7 +369,6 @@ internal static class PatchesMain
         }
 #endif
     }
-    private const string DefaultGetWorkshopHeaderString = "Hello!";
 #if CLIENT
     private static void WritePasswordHash(NetPakWriter writer)
     {
@@ -573,6 +561,7 @@ internal static class PatchesMain
         Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), " Looks good.");
         return true;
     }
+    private const string DefaultGetWorkshopHeaderString = "Hello!";
     private static IEnumerable<CodeInstruction> TranspileWorkshopRequest(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
     {
         List<CodeInstruction> ins = [..instructions];
@@ -587,21 +576,21 @@ internal static class PatchesMain
             if (!ins[i].LoadsConstant(DefaultGetWorkshopHeaderString))
                 continue;
 
-            Label? lbl = PatchUtil.GetNextBranchTarget(ins, i);
+            Label? lbl = PatchUtility.GetNextBranchTarget(ins, i);
             if (!lbl.HasValue)
             {
                 Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Failed to find label target.");
                 return ins;
             }
 
-            i = PatchUtil.FindLabelDestinationIndex(ins, lbl.Value, i);
+            i = PatchUtility.FindLabelDestinationIndex(ins, lbl.Value, i);
             if (i == -1)
             {
                 Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Failed to find label index.");
                 return ins;
             }
 
-            ins.Insert(i, new CodeInstruction(OpCodes.Ldarg_0).WithStartingInstructionNeeds(ins[i]));
+            ins.Insert(i, new CodeInstruction(OpCodes.Ldarg_0).WithStartBlocksFrom(ins[i]));
             ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldarg_1));
             ins.Insert(i + 2, new CodeInstruction(OpCodes.Call, Accessor.GetMethod(ReadPasswordHash)));
             Label label = generator.DefineLabel();
@@ -772,22 +761,22 @@ internal static class PatchesMain
         int hidden3Times = 0;
         for (int i = 0; i < ins.Count; ++i)
         {
-            if (PatchUtil.MatchPattern(ins, i, 
+            if (PatchUtility.MatchPattern(ins, i, 
                     x => x.Calls(getLevelInfo),
                     x => x.Calls(getLocalizedName)
                         ))
             {
                 CodeInstruction newCodeIns = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(GetLevelNameOrHidden));
-                newCodeIns.WithStartingInstructionNeeds(ins[i]);
-                newCodeIns.WithEndingInstructionNeeds(ins[i + 1]);
+                PatchUtility.TransferStartingInstructionNeeds(ins[i], newCodeIns);
+                PatchUtility.TransferEndingInstructionNeeds(ins[i + 1], newCodeIns);
                 ins[i] = newCodeIns;
                 ins.RemoveAt(i + 1);
                 --i;
                 ++hidden3Times;
             }
-            else if (localizationField != null && PatchUtil.MatchPattern(ins, i,
-                    x => x.LoadsField(localizationField)
-                        ))
+            else if (localizationField != null && PatchUtility.MatchPattern(ins, i,
+                                                    x => x.LoadsField(localizationField)
+                    ))
             {
                 ins[i].operand = newLocalization;
             }
@@ -856,17 +845,17 @@ internal static class PatchesMain
         bool patchedOutEditorUI = false;
         for (int i = 1; i < ins.Count; ++i)
         {
-            if (PatchUtil.MatchPattern(ins, i,
+            if (PatchUtility.MatchPattern(ins, i,
                     x => playerUIInstance != null && x.LoadsField(playerUIInstance) ||
                          editorUIInstance != null && x.LoadsField(editorUIInstance),
                     x => x.opcode != OpCodes.Ldnull) && ins[i - 1].operand is Label label)
             {
                 Label lbl = generator.DefineLabel();
-                ins.Insert(i, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
+                ins.Insert(i, new CodeInstruction(OpCodes.Call, AccessorExtensions.IsDevkitServerGetter));
                 ins.Insert(i + 1, new CodeInstruction(OpCodes.Brfalse, lbl));
                 ins.Insert(i + 2, new CodeInstruction(OpCodes.Call, getController));
                 CameraController current = ins[i + 3].LoadsField(playerUIInstance) ? CameraController.Player : CameraController.Editor;
-                ins.Insert(i + 3, PatchUtil.LoadConstantI4((int)current));
+                ins.Insert(i + 3, PatchUtility.LoadConstantI4((int)current));
                 ins.Insert(i + 4, new CodeInstruction(OpCodes.Bne_Un, label));
                 i += 5;
                 ins[i].labels.Add(lbl);
@@ -975,7 +964,7 @@ internal static class PatchesMain
             if (!Version.TryParse(val, out Version version) || !DevkitServerModule.IsCompatibleWith(version))
             {
                 DevkitServerUtility.CustomDisconnect(DevkitServerModule.MainLocalization.Translate("VersionKickMessage",
-                    version?.ToString(4) ?? "[Unspecified]", Accessor.DevkitServer.GetName().Version.ToString(4)), ESteamConnectionFailureInfo.CUSTOM);
+                    version?.ToString(4) ?? "[Unspecified]", AccessorExtensions.DevkitServer.GetName().Version.ToString(4)), ESteamConnectionFailureInfo.CUSTOM);
                 return;
             }
 
@@ -983,7 +972,7 @@ internal static class PatchesMain
             CustomNetMessageListeners.SendLocalMappings();
 
             Logger.DevkitServer.LogInfo(nameof(RulesReady), $"Connecting to a server running {DevkitServerModule.ModuleName.Colorize(DevkitServerModule.ModuleColor)} " +
-                           $"v{version.Format()} (You are running {Accessor.DevkitServer.GetName().Version.Format()})...");
+                           $"v{version.Format()} (You are running {AccessorExtensions.DevkitServer.GetName().Version.Format()})...");
 
             EditorLevel.RequestLevel();
         }
@@ -1254,7 +1243,7 @@ internal static class PatchesMain
     [HarmonyPrefix]
     private static void AdvertiseConfig()
     {
-        Version version = Accessor.DevkitServer.GetName().Version;
+        Version version = AccessorExtensions.DevkitServer.GetName().Version;
         Logger.DevkitServer.LogDebug(nameof(AdvertiseConfig), $"Setting SteamGameServer KeyValue {DevkitServerModule.ServerRule.Format()} to {version.Format()}.");
         SteamGameServer.SetKeyValue(DevkitServerModule.ServerRule, version.ToString(4));
     }
@@ -1342,7 +1331,7 @@ internal static class PatchesMain
         {
             CodeInstruction ins = list[i];
             if (c < 2 && i < list.Count - 5 && getLvlHash != null && mtd != null
-                && Accessor.IsDevkitServerGetter != null &&
+                && AccessorExtensions.IsDevkitServerGetter != null &&
                 list[i].opcode == OpCodes.Ldarg_0 && list[i + 1].LoadsConstant(ESteamRejection.WRONG_HASH_LEVEL) &&
                 list[i + 2].Calls(reject) && list[i + 3].opcode == OpCodes.Ret)
             {
@@ -1420,37 +1409,37 @@ internal static class PatchesMain
     [HarmonyPatch(typeof(VehicleManager), "onLevelLoaded")]
     [HarmonyTranspiler]
     [UsedImplicitly]
-    private static IEnumerable<CodeInstruction> VehicleManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.AddIsEditorCall(instructions, __method);
+    private static IEnumerable<CodeInstruction> VehicleManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.Active.AddIsEditorCall(instructions, __method);
 
     [HarmonyPatch(typeof(BarricadeManager), "onLevelLoaded")]
     [HarmonyTranspiler]
     [UsedImplicitly]
-    private static IEnumerable<CodeInstruction> BarricadeManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.AddIsEditorCall(instructions, __method);
+    private static IEnumerable<CodeInstruction> BarricadeManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.Active.AddIsEditorCall(instructions, __method);
 
     // [HarmonyPatch(typeof(AnimalManager), "onLevelLoaded")]
     // [HarmonyTranspiler]
     // [UsedImplicitly]
-    // private static IEnumerable<CodeInstruction> AnimalManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.AddIsEditorCall(instructions, __method);
+    // private static IEnumerable<CodeInstruction> AnimalManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.Active.AddIsEditorCall(instructions, __method);
 
     [HarmonyPatch(typeof(GroupManager), "onLevelLoaded")]
     [HarmonyTranspiler]
     [UsedImplicitly]
-    private static IEnumerable<CodeInstruction> GroupManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.AddIsEditorCall(instructions, __method);
+    private static IEnumerable<CodeInstruction> GroupManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.Active.AddIsEditorCall(instructions, __method);
 
     // [HarmonyPatch(typeof(ObjectManager), "onLevelLoaded")]
     // [HarmonyTranspiler]
     // [UsedImplicitly]
-    // private static IEnumerable<CodeInstruction> ObjectManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.AddIsEditorCall(instructions, __method);
+    // private static IEnumerable<CodeInstruction> ObjectManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.Active.AddIsEditorCall(instructions, __method);
 
     [HarmonyPatch(typeof(StructureManager), "onLevelLoaded")]
     [HarmonyTranspiler]
     [UsedImplicitly]
-    private static IEnumerable<CodeInstruction> StructureManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.AddIsEditorCall(instructions, __method);
+    private static IEnumerable<CodeInstruction> StructureManagerLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.Active.AddIsEditorCall(instructions, __method);
 
     [HarmonyPatch(typeof(VehicleManager), "onPostLevelLoaded")]
     [HarmonyTranspiler]
     [UsedImplicitly]
-    private static IEnumerable<CodeInstruction> VehicleManagerPostLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.AddIsEditorCall(instructions, __method);
+    private static IEnumerable<CodeInstruction> VehicleManagerPostLevelLoadedTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase __method) => Accessor.Active.AddIsEditorCall(instructions, __method);
 #endif
 #region Landscape.writeMaps
 

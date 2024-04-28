@@ -1,6 +1,6 @@
 ﻿#if CLIENT
 using Cysharp.Threading.Tasks;
-using DevkitServer.API;
+using DanielWillett.ReflectionTools;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Devkit.Spawns;
 using DevkitServer.API.Permissions;
@@ -2171,7 +2171,7 @@ internal static class SpawnsEditorPatches
         bool patched = false;
         for (int i = 0; i < ins.Count; ++i)
         {
-            if (spawnType == SpawnType.None || setIsSpawning == null || !PatchUtil.MatchPattern(ins, i,
+            if (spawnType == SpawnType.None || setIsSpawning == null || !PatchUtility.MatchPattern(ins, i,
                     x => x.LoadsConstant(),
                     x => x.Calls(setIsSpawning)))
             {
@@ -2180,7 +2180,7 @@ internal static class SpawnsEditorPatches
 
             if (!ins[i].LoadsConstant(0))
             {
-                CodeInstruction newInst = PatchUtil.LoadConstantI4((int)spawnType);
+                CodeInstruction newInst = PatchUtility.LoadConstantI4((int)spawnType);
                 ins[i].MoveBlocksAndLabels(newInst);
                 ins[i] = newInst;
                 ins[i + 1] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(Open)!);

@@ -41,13 +41,13 @@
                 <SharedManagedPath>$(SharedPath)\Unturned_Data\Managed</SharedManagedPath>
             </PropertyGroup>
         </When>
-      <Otherwise>
-          <PropertyGroup Condition="$(DefineConstants.Contains(SERVER))">
-              <SharedManagedPath>$(SolutionDir)Libraries\Server</SharedManagedPath>
-          </PropertyGroup>
-          <PropertyGroup Condition="$(DefineConstants.Contains(CLIENT)) Or '$(Configuration)'=='Debug' Or '$(Configuration)'=='Release'">
-              <SharedManagedPath>$(SolutionDir)Libraries\Client</SharedManagedPath>
-          </PropertyGroup>
+        <Otherwise>
+            <PropertyGroup Condition="$(DefineConstants.Contains(SERVER))">
+                <SharedManagedPath>$(SolutionDir)Libraries\Server</SharedManagedPath>
+            </PropertyGroup>
+            <PropertyGroup Condition="$(DefineConstants.Contains(CLIENT)) Or '$(Configuration)'=='Debug' Or '$(Configuration)'=='Release'">
+                <SharedManagedPath>$(SolutionDir)Libraries\Client</SharedManagedPath>
+            </PropertyGroup>
       </Otherwise>
     </Choose>
 

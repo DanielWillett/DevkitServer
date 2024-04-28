@@ -1,15 +1,16 @@
 ﻿#if CLIENT
+using DanielWillett.ReflectionTools;
 using DevkitServer.API;
+using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
 using DevkitServer.API.UI;
 using DevkitServer.Core.Permissions;
+using DevkitServer.Models;
 using DevkitServer.Multiplayer.Actions;
+using DevkitServer.Multiplayer.Levels;
 using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
-using DevkitServer.API.Abstractions;
-using DevkitServer.Models;
-using DevkitServer.Multiplayer.Levels;
 
 namespace DevkitServer.Patches;
 
@@ -105,7 +106,7 @@ internal static class RoadsPatches
         for (int i = 0; i < ins.Count; i++)
         {
             // deleting roads by road
-            if (!removingRoad && PatchUtil.MatchPattern(ins, i,
+            if (!removingRoad && PatchUtility.MatchPattern(ins, i,
                     x => removeRoad != null && x.Calls(removeRoad)))
             {
                 ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(RemoveRoad));
@@ -114,7 +115,7 @@ internal static class RoadsPatches
             }
 
             // deleting road verticies
-            if (!removingVertex && PatchUtil.MatchPattern(ins, i,
+            if (!removingVertex && PatchUtility.MatchPattern(ins, i,
                     x => removeVertex != null && x.Calls(removeVertex)))
             {
                 ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(RemoveVertex));
@@ -125,14 +126,14 @@ internal static class RoadsPatches
                     continue;
 
                 int i2 = i;
-                if (PatchUtil.ContinueUntil(ins, ref i2, x => x.Calls(deselect), true) >= 0)
+                if (PatchUtility.ContinueUntil(ins, ref i2, x => x.Calls(deselect), true) >= 0)
                 {
                     ins[i2] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(PostRemoveElement)).MoveLabelsFrom(ins[i2]);
                 }
             }
 
             // move tangent with 'E'
-            if (!movingTangent && PatchUtil.MatchPattern(ins, i,
+            if (!movingTangent && PatchUtility.MatchPattern(ins, i,
                     x => moveTangent != null && x.Calls(moveTangent)))
             {
                 ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(MoveTangent));
@@ -141,7 +142,7 @@ internal static class RoadsPatches
             }
 
             // move vertex with 'E'
-            if (!movingVertex && PatchUtil.MatchPattern(ins, i,
+            if (!movingVertex && PatchUtility.MatchPattern(ins, i,
                     x => moveVertex != null && x.Calls(moveVertex)))
             {
                 ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(MoveVertex));
@@ -150,7 +151,7 @@ internal static class RoadsPatches
             }
 
             // add vertex by left clicking
-            if (PatchUtil.MatchPattern(ins, i,
+            if (PatchUtility.MatchPattern(ins, i,
                     x => addVertex != null && x.Calls(addVertex)))
             {
                 ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(AddVertex));
@@ -159,7 +160,7 @@ internal static class RoadsPatches
             }
 
             // add road by left clicking
-            if (!addingRoad && PatchUtil.MatchPattern(ins, i,
+            if (!addingRoad && PatchUtility.MatchPattern(ins, i,
                     x => addRoad != null && x.Calls(addRoad)))
             {
                 ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(AddRoad));

@@ -3,6 +3,8 @@ using DevkitServer.Models;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Util.Encoding;
 using System.Text;
+using DanielWillett.SpeedBytes;
+using DanielWillett.SpeedBytes.Unity;
 #if SERVER
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Permissions;

@@ -128,39 +128,6 @@
   <data name="Lib.Harmony.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\Lib.Harmony\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="Lib.Harmony.README" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\Lib.Harmony\README.md;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="Lib.Harmony.XmlDocs" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\Lib.Harmony\0Harmony.xml;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="Lib.Harmony.Dependencies" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\Lib.Harmony\0Harmony.deps.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="Mono.Cecil" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\Lib.Harmony\Mono.Cecil\Mono.Cecil.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="Mono.Cecil.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\Lib.Harmony\Mono.Cecil\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="MonoMod.Common" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\Lib.Harmony\MonoMod.Common\MonoMod.Common.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="MonoMod.Common.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\Lib.Harmony\MonoMod.Common\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="System.Reflection.Emit.ILGeneration" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\Lib.Harmony\System.Reflection.Emit.ILGeneration\System.Reflection.Emit.ILGeneration.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="System.Reflection.Emit.ILGeneration.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\Lib.Harmony\System.Reflection.Emit.ILGeneration\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="System.Reflection.Emit.Lightweight" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\Lib.Harmony\System.Reflection.Emit.Lightweight\System.Reflection.Emit.Lightweight.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
-  <data name="System.Reflection.Emit.Lightweight.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\Lib.Harmony\System.Reflection.Emit.Lightweight\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
-  </data>
   <data name="netstandard" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\.NET Standard 2.1\netstandard.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
@@ -179,8 +146,23 @@
   <data name="DanielWillett.StackCleaner.Symbols" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\DanielWillett.StackCleaner\DanielWillett.StackCleaner.pdb;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="FWD.DanielWillett.ReflectionTools" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\..\Module\Libraries\ForwardingTargets\DanielWillett.ReflectionTools.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  <data name="DanielWillett.ReflectionTools" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\DanielWillett.ReflectionTools\DanielWillett.ReflectionTools.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="DanielWillett.ReflectionTools.Harmony" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\DanielWillett.ReflectionTools\DanielWillett.ReflectionTools.Harmony.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="DanielWillett.ReflectionTools.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\DanielWillett.ReflectionTools\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="DanielWillett.SpeedBytes" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\DanielWillett.SpeedBytes\DanielWillett.SpeedBytes.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="DanielWillett.SpeedBytes.Harmony" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\DanielWillett.SpeedBytes\DanielWillett.SpeedBytes.Unity.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="DanielWillett.SpeedBytes.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\..\Module\Libraries\DanielWillett.SpeedBytes\LICENSE.txt;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="FWD.DanielWillett.UnturnedUITools" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\ForwardingTargets\DanielWillett.UnturnedUITools.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>

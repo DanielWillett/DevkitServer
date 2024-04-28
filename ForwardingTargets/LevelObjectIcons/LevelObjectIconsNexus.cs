@@ -6,6 +6,7 @@ using HarmonyLib;
 using SDG.Framework.Modules;
 using SDG.Unturned;
 using System;
+using DevkitServer.API;
 using UnityEngine;
 
 namespace DanielWillett.LevelObjectIcons;
@@ -22,7 +23,7 @@ public sealed class LevelObjectIconsNexus : IModuleNexus
     };
     public static Asset? SelectedAsset => LevelObjectUtil.SelectedAsset;
     public static Local Localization = DevkitServerModule.MainLocalization;
-    public static Harmony Patcher => PatchUtil.DevkitServerModulePatcher;
+    public static Harmony Patcher => AccessorExtensions.DevkitServerModulePatcher;
     public static GameObject GameObjectHost => DevkitServerModule.GameObjectHost;
     public static void SaveConfig() => DevkitServerConfig.Save();
     public static void ReloadConfig() => DevkitServerConfig.Reload();

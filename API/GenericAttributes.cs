@@ -2,34 +2,6 @@
 
 namespace DevkitServer.API;
 
-
-/// <summary>
-/// Define a generic priority for a member.
-/// </summary>
-[AttributeUsage(AttributeTargets.All, Inherited = false)]
-public sealed class LoadPriorityAttribute : Attribute
-{
-    /// <summary>
-    /// Generic load priority. Higher values will be used first.
-    /// </summary>
-    public int Priority { get; }
-
-    /// <summary>
-    /// Define a generic priority for a member.
-    /// </summary>
-    /// <param name="priority">Higher values are considered first.</param>
-    public LoadPriorityAttribute(int priority)
-    {
-        Priority = priority;
-    }
-}
-
-/// <summary>
-/// Define that a member should be ignored.
-/// </summary>
-[AttributeUsage(AttributeTargets.All, Inherited = false)]
-public sealed class IgnoreAttribute : Attribute;
-
 /// <summary>
 /// Identifies which plugin a member belongs to.
 /// </summary>

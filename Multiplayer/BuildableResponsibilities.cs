@@ -1,8 +1,9 @@
-﻿using DevkitServer.Configuration;
+﻿using DanielWillett.SpeedBytes;
+using DanielWillett.SpeedBytes.Compression;
+using DevkitServer.Configuration;
 using DevkitServer.Models;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
-using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.Multiplayer;
 
@@ -13,7 +14,7 @@ public sealed class BuildableResponsibilities : IReplicatedLevelDataSource<Build
     private const string Source = "BUILDABLE RESPONSIBILITIES";
     private const ushort FileDataVersion = 0;
 
-    private static readonly ByteWriter Writer = new ByteWriter(false);
+    private static readonly ByteWriter Writer = new ByteWriter();
     private static readonly ByteReader Reader = new ByteReader { LogOnError = false, ThrowOnError = true };
 #endif
 

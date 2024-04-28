@@ -13,16 +13,19 @@
         <PackageReference Include="DanielWillett.StackCleaner" Version="[1.4.2,)">
             <Private>false</Private>
         </PackageReference>
-        <!-- Harmony (Other Frameworks) -->
-        <PackageReference Include="Lib.Harmony" Condition="'$(TargetFramework)' != 'netstandard2.1'" Version="2.2.2">
+        <PackageReference Include="Lib.Harmony" Version="2.3.3">
             <Private>false</Private>
         </PackageReference>
-        <!-- Harmony (.NET Standard 2.1 Redist) -->
-        <PackageReference Include="Lib.Harmony" Condition="'$(TargetFramework)' == 'netstandard2.1'" Version="2.2.2" ExcludeAssets="Compile">
+        <PackageReference Include="DanielWillett.SpeedBytes" Version="[1.1.0,)">
             <Private>false</Private>
-            <NoWarn>NU1701</NoWarn>
         </PackageReference>
-        <PackageReference Include="DanielWillett.ReflectionTools" Condition="'$(TargetFramework)' == 'netstandard2.1'" Version="2.0.1">
+        <PackageReference Include="DanielWillett.SpeedBytes.Unity" Version="[1.1.1,)">
+            <Private>false</Private>
+        </PackageReference>
+        <PackageReference Include="DanielWillett.ReflectionTools" Version="[3.0.0-prerelease2,)">
+            <Private>false</Private>
+        </PackageReference>
+        <PackageReference Include="DanielWillett.ReflectionTools.Harmony" Version="[3.0.0-prerelease1,)">
             <Private>false</Private>
         </PackageReference>
     </ItemGroup>

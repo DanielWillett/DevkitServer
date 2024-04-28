@@ -1,5 +1,6 @@
-﻿using DevkitServer.Plugins;
-using DevkitServer.Util.Encoding;
+﻿using DanielWillett.ReflectionTools;
+using DanielWillett.SpeedBytes;
+using DevkitServer.Plugins;
 using SDG.Framework.Devkit;
 using SDG.Framework.Foliage;
 using SDG.Framework.Landscapes;
@@ -66,7 +67,7 @@ public static class HierarchyItemTypeIdentifierEx
 
             if (pluginSource != null)
                 pluginSource.LogInfo(Source, $"Registered hierarchy item identifier factory: {type.Format()}.");
-            else if (type.Assembly == Accessor.DevkitServer)
+            else if (type.Assembly == AccessorExtensions.DevkitServer)
                 Logger.DevkitServer.LogInfo(Source, $"Registered hierarchy item identifier factory: {type.Format()}.");
             else
                 Logger.DevkitServer.LogInfo(Source, $"Registered hierarchy item identifier factory: {type.Format()} from {type.Assembly}.");
@@ -76,7 +77,7 @@ public static class HierarchyItemTypeIdentifierEx
                 Type removedType = removed.Value.Type;
                 if (removed.Value.Plugin != null)
                     removed.Value.Plugin.LogDebug(Source, $" + Deregistered duplicate hierarchy item identifier factory: {removedType.Format()}.");
-                else if (removedType.Assembly == Accessor.DevkitServer)
+                else if (removedType.Assembly == AccessorExtensions.DevkitServer)
                     Logger.DevkitServer.LogDebug(Source, $" + Deregistered duplicate hierarchy item identifier factory: {removedType.Format()}.");
                 else
                     Logger.DevkitServer.LogDebug(Source, $" + Deregistered duplicate hierarchy item identifier factory: {removedType.Format()} from {removedType.Assembly.Format()}.");
@@ -102,7 +103,7 @@ public static class HierarchyItemTypeIdentifierEx
                 Type removedType = info.Type;
                 if (info.Plugin != null)
                     info.Plugin.LogInfo(Source, $"Deregistered hierarchy item identifier factory: {removedType.Format()}.");
-                else if (removedType.Assembly == Accessor.DevkitServer)
+                else if (removedType.Assembly == AccessorExtensions.DevkitServer)
                     Logger.DevkitServer.LogDebug(Source, $"Deregistered hierarchy item identifier factory: {removedType.Format()}.");
                 else
                     Logger.DevkitServer.LogDebug(Source, $"Deregistered hierarchy item identifier factory: {removedType.Format()} from {removedType.Assembly.Format()}.");
@@ -165,7 +166,7 @@ public static class HierarchyItemTypeIdentifierEx
                     }
                     else
                     {
-                        if (type.Assembly == Accessor.DevkitServer)
+                        if (type.Assembly == AccessorExtensions.DevkitServer)
                             Logger.DevkitServer.LogError(Source, ex, $"Error in hierarchy item identifier factory: {type.Format()}.");
                         else
                             Logger.DevkitServer.LogError(Source, ex, $"Error in hierarchy item identifier factory: {type.Format()} from {type.Assembly.Format()}.");
@@ -507,10 +508,10 @@ public sealed class NodeItemTypeIdentifier : IHierarchyItemTypeIdentifier
 
         try
         {
-            Type t = Accessor.AssemblyCSharp.GetType("SDG.Unturned." + nodeType.Name + "SystemV2", false, true) ??
-                     Accessor.AssemblyCSharp.GetType("SDG.Unturned." + nodeType.Name + "System", false, true) ??
-                     Accessor.AssemblyCSharp.GetType("SDG.Framework.Devkit." + nodeType.Name + "SystemV2", false, true) ??
-                     Accessor.AssemblyCSharp.GetType("SDG.Framework.Devkit." + nodeType.Name + "System", false, true);
+            Type t = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned." + nodeType.Name + "SystemV2", false, true) ??
+                     AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned." + nodeType.Name + "System", false, true) ??
+                     AccessorExtensions.AssemblyCSharp.GetType("SDG.Framework.Devkit." + nodeType.Name + "SystemV2", false, true) ??
+                     AccessorExtensions.AssemblyCSharp.GetType("SDG.Framework.Devkit." + nodeType.Name + "System", false, true);
             if (t == null || !typeof(TempNodeSystemBase).IsAssignableFrom(t))
                 Logger.DevkitServer.LogWarning(nameof(NodeItemTypeIdentifier), $"Unknown node type: {nodeType.Format()}.");
             else
@@ -811,10 +812,10 @@ public sealed class VolumeItemTypeIdentifier : IHierarchyItemTypeIdentifier
 
         try
         {
-            Type t = Accessor.AssemblyCSharp.GetType("SDG.Unturned." + nodeType.Name + "ManagerV2", false, true) ??
-                     Accessor.AssemblyCSharp.GetType("SDG.Unturned." + nodeType.Name + "Manager", false, true) ??
-                     Accessor.AssemblyCSharp.GetType("SDG.Framework.Devkit." + nodeType.Name + "ManagerV2", false, true) ??
-                     Accessor.AssemblyCSharp.GetType("SDG.Framework.Devkit." + nodeType.Name + "Manager", false, true);
+            Type t = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned." + nodeType.Name + "ManagerV2", false, true) ??
+                     AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned." + nodeType.Name + "Manager", false, true) ??
+                     AccessorExtensions.AssemblyCSharp.GetType("SDG.Framework.Devkit." + nodeType.Name + "ManagerV2", false, true) ??
+                     AccessorExtensions.AssemblyCSharp.GetType("SDG.Framework.Devkit." + nodeType.Name + "Manager", false, true);
             if (t == null || !typeof(VolumeManagerBase).IsAssignableFrom(t))
                 Logger.DevkitServer.LogWarning(nameof(VolumeItemTypeIdentifier), $"Unknown volume type: {nodeType.Format()}.");
             else

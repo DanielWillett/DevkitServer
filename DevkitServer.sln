@@ -36,8 +36,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DevkitServer.Resources", "D
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ForwardingTargets", "ForwardingTargets", "{301F51A2-F0E4-4FD8-8768-B1397BC303D4}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReflectionTools", "ForwardingTargets\ReflectionTools\ReflectionTools.csproj", "{3A0F7D69-FF15-4B81-8810-1E33182E49E9}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UnturnedUITools", "ForwardingTargets\UnturnedUITools\UnturnedUITools.csproj", "{B49049FB-A585-4AEA-AE83-C45E1A0FDFC5}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LevelObjectIcons", "ForwardingTargets\LevelObjectIcons\LevelObjectIcons.csproj", "{CD1E6D27-9BB9-43E1-977A-8BD0E1D8D635}"
@@ -106,14 +104,6 @@ Global
 		{58A685A9-9ACA-4592-8F91-FF574C88C3DD}.Release|Any CPU.Build.0 = ClientRelease|Any CPU
 		{58A685A9-9ACA-4592-8F91-FF574C88C3DD}.ServerDebug|Any CPU.ActiveCfg = ServerDebug|Any CPU
 		{58A685A9-9ACA-4592-8F91-FF574C88C3DD}.ServerRelease|Any CPU.ActiveCfg = ServerRelease|Any CPU
-		{3A0F7D69-FF15-4B81-8810-1E33182E49E9}.ClientDebug|Any CPU.ActiveCfg = Release|Any CPU
-		{3A0F7D69-FF15-4B81-8810-1E33182E49E9}.ClientRelease|Any CPU.ActiveCfg = Release|Any CPU
-		{3A0F7D69-FF15-4B81-8810-1E33182E49E9}.Debug|Any CPU.ActiveCfg = Release|Any CPU
-		{3A0F7D69-FF15-4B81-8810-1E33182E49E9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3A0F7D69-FF15-4B81-8810-1E33182E49E9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3A0F7D69-FF15-4B81-8810-1E33182E49E9}.ServerDebug|Any CPU.ActiveCfg = Release|Any CPU
-		{3A0F7D69-FF15-4B81-8810-1E33182E49E9}.ServerRelease|Any CPU.ActiveCfg = Release|Any CPU
-		{3A0F7D69-FF15-4B81-8810-1E33182E49E9}.ServerRelease|Any CPU.Build.0 = Release|Any CPU
 		{B49049FB-A585-4AEA-AE83-C45E1A0FDFC5}.ClientDebug|Any CPU.ActiveCfg = ClientRelease|Any CPU
 		{B49049FB-A585-4AEA-AE83-C45E1A0FDFC5}.ClientRelease|Any CPU.ActiveCfg = ClientRelease|Any CPU
 		{B49049FB-A585-4AEA-AE83-C45E1A0FDFC5}.ClientRelease|Any CPU.Build.0 = ClientRelease|Any CPU
@@ -141,7 +131,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{3A0F7D69-FF15-4B81-8810-1E33182E49E9} = {301F51A2-F0E4-4FD8-8768-B1397BC303D4}
 		{B49049FB-A585-4AEA-AE83-C45E1A0FDFC5} = {301F51A2-F0E4-4FD8-8768-B1397BC303D4}
 		{CD1E6D27-9BB9-43E1-977A-8BD0E1D8D635} = {301F51A2-F0E4-4FD8-8768-B1397BC303D4}
 	EndGlobalSection

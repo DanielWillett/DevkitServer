@@ -1,5 +1,5 @@
-﻿using System.Collections.Concurrent;
-using DevkitServer.Util.Encoding;
+﻿using DanielWillett.SpeedBytes;
+using System.Collections.Concurrent;
 
 namespace DevkitServer.API.Storage;
 

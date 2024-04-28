@@ -8,6 +8,7 @@ using DevkitServer.Configuration;
 using DevkitServer.Levels;
 using DevkitServer.Patches;
 using System.Reflection;
+using DanielWillett.ReflectionTools;
 using DevkitServer.Core.Cartography;
 
 namespace DevkitServer.Core.UI.Extensions;
@@ -198,7 +199,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
             MethodInfo? method = typeof(EditorPauseUI).GetMethod("onClickedChartButton", BindingFlags.NonPublic | BindingFlags.Static);
             if (method != null)
             {
-                PatchesMain.Patcher.Patch(method, Accessor.GetHarmonyMethod(OnClickingChartButton));
+                PatchesMain.Patcher.Patch(method, Accessor.Active.GetHarmonyMethod(OnClickingChartButton));
             }
             else Logger.DevkitServer.LogWarning(nameof(EditorPauseUIExtension),
                 $"Method not found: {FormattingUtil.FormatMethod(typeof(ClickedButton), "onClickedChartButton", isStatic: true)}.");
@@ -214,7 +215,7 @@ internal class EditorPauseUIExtension : UIExtension, IUnpatchableUIExtension
             MethodInfo? method = typeof(EditorPauseUI).GetMethod("onClickedMapButton", BindingFlags.NonPublic | BindingFlags.Static);
             if (method != null)
             {
-                PatchesMain.Patcher.Patch(method, Accessor.GetHarmonyMethod(OnClickingSatelliteButton));
+                PatchesMain.Patcher.Patch(method, Accessor.Active.GetHarmonyMethod(OnClickingSatelliteButton));
             }
             else Logger.DevkitServer.LogWarning(nameof(EditorPauseUIExtension),
                 $"Method not found: {FormattingUtil.FormatMethod(typeof(ClickedButton), "onClickedMapButton", isStatic: true)}.");

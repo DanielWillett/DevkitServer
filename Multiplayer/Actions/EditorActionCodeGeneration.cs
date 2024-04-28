@@ -1,7 +1,8 @@
-﻿using DevkitServer.API;
-using DevkitServer.API.Abstractions;
+﻿using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools.Emit;
+using DanielWillett.SpeedBytes;
+using DevkitServer.API;
 using DevkitServer.API.Multiplayer;
-using DevkitServer.Util.Encoding;
 using SDG.Framework.Utilities;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -242,10 +243,10 @@ internal static class EditorActionsCodeGeneration
 
                 // ActionSettingsCollection? settings = settings.GetSetting(<type>);
                 writeGenerator.Emit(OpCodes.Ldloc, writeActionSettings);
-                PatchUtil.LoadConstantI4(writeGenerator, (int)attr.ActionSetting);
+                EmitUtility.LoadConstantI4(writeGenerator, (int)attr.ActionSetting);
                 writeGenerator.Emit(getSettings.GetCallRuntime(), getSettings);
                 readGenerator.Emit(OpCodes.Ldloc, readActionSettings);
-                PatchUtil.LoadConstantI4(readGenerator, (int)attr.ActionSetting);
+                EmitUtility.LoadConstantI4(readGenerator, (int)attr.ActionSetting);
                 readGenerator.Emit(getSettings.GetCallRuntime(), getSettings);
 
                 // if (settings == null) goto updateValuePop;
@@ -385,7 +386,7 @@ internal static class EditorActionsCodeGeneration
                     writeGenerator.Emit(OpCodes.Dup);
                     // collection.Flags |= <Type>
                     writeGenerator.Emit(flagsProperty.GetMethod.GetCallRuntime(), flagsProperty.GetMethod);
-                    PatchUtil.LoadConstantI4(writeGenerator, (int)attr.ActionSetting);
+                    EmitUtility.LoadConstantI4(writeGenerator, (int)attr.ActionSetting);
                     writeGenerator.Emit(OpCodes.Or);
                     writeGenerator.Emit(flagsProperty.GetSetMethod(true).GetCallRuntime(), flagsProperty.GetSetMethod(true));
                     used.Add(attr.ActionSetting);
@@ -459,7 +460,7 @@ internal static class EditorActionsCodeGeneration
                 if (gap)
                 {
                     createGenerator.Emit(OpCodes.Ldarg_0);
-                    PatchUtil.LoadConstantI4(createGenerator, (int)actionType);
+                    EmitUtility.LoadConstantI4(createGenerator, (int)actionType);
                     if (i < lbls.Count - 1)
                         createGenerator.Emit(OpCodes.Bne_Un, lbls[i + 1].lbl);
                     else
@@ -510,7 +511,7 @@ internal static class EditorActionsCodeGeneration
             }
             MethodInfo? write = ByteWriter.GetWriteMethod(property.PropertyType);
             MethodInfo? read = ByteReader.GetReadMethod(property.PropertyType);
-            if (write == null || read == null || write.GetParameters().Length != 1 || read.GetParameters().Length != 0 || !write.GetParameters()[0].ParameterType.IsAssignableFrom(property.PropertyType) || read.ReturnType == typeof(void) || !property.PropertyType.IsAssignableFrom(read.ReturnType))
+            if (write == null || read == null)
             {
                 Logger.DevkitServer.LogWarning(EditorActions.Source, $"Unable to find a read or write method for {property.Format()}'s type: {property.PropertyType.Format()} when creating the read/write methods.");
                 return;
@@ -526,9 +527,9 @@ internal static class EditorActionsCodeGeneration
             byteWriteGenerator.Emit(flagsProperty.GetMethod.GetCallRuntime(), flagsProperty.GetMethod);
             byteReadGenerator.Emit(flagsProperty.GetMethod.GetCallRuntime(), flagsProperty.GetMethod);
             toStringGenerator.Emit(flagsProperty.GetMethod.GetCallRuntime(), flagsProperty.GetMethod);
-            PatchUtil.LoadConstantI4(byteWriteGenerator, (int)setting);
-            PatchUtil.LoadConstantI4(byteReadGenerator, (int)setting);
-            PatchUtil.LoadConstantI4(toStringGenerator, (int)setting);
+            EmitUtility.LoadConstantI4(byteWriteGenerator, (int)setting);
+            EmitUtility.LoadConstantI4(byteReadGenerator, (int)setting);
+            EmitUtility.LoadConstantI4(toStringGenerator, (int)setting);
             byteWriteGenerator.Emit(OpCodes.And);
             byteReadGenerator.Emit(OpCodes.And);
             toStringGenerator.Emit(OpCodes.And);

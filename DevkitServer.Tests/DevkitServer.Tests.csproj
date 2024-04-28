@@ -16,14 +16,16 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Configurations>ServerRelease;ServerDebug;ClientDebug;ClientRelease</Configurations>
     <UserSecretsId>4c764434-f553-478a-85a4-097ac2bea241</UserSecretsId>
-    <NoWarn>NU1605;MSB3243</NoWarn>
+    <NoWarn>NU1605;MSB3243;CS0067</NoWarn>
 
     <SolutionDir>$(ProjectDir)..\</SolutionDir>
   </PropertyGroup>
   <Import Project="$(SolutionDir)Common.targets" />
   <ItemGroup>
     <PackageReference Remove="Newtonsoft.Json" />
-    <PackageReference Include="Newtonsoft.Json" Version="9.0.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="9.0.1">
+      <NoWarn>NU1903</NoWarn>
+    </PackageReference>
   </ItemGroup>
 
   <Import Project="$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets" Condition="Exists('$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets')" />

@@ -2,6 +2,7 @@
 using DevkitServer.API.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
 using System.IO.Compression;
+using DanielWillett.SpeedBytes;
 using CompressionLevel = System.IO.Compression.CompressionLevel;
 using DeflateStream = System.IO.Compression.DeflateStream;
 
@@ -240,7 +241,7 @@ public class LargeMessageTransmission : IDisposable
         Flags = reader.ReadUInt8();
         Bandwidth = reader.ReadUInt16();
 
-        LogSource = reader.ReadAsciiSmall();
+        LogSource = reader.ReadShortString();
 
         OriginalSize = reader.ReadInt32();
         FinalSize = reader.ReadInt32();
@@ -290,7 +291,7 @@ public class LargeMessageTransmission : IDisposable
         writer.Write(Flags);
         writer.Write((ushort)Bandwidth);
 
-        writer.WriteAsciiSmall(LogSource);
+        writer.WriteShort(LogSource);
 
         writer.Write(OriginalSize);
         writer.Write(FinalSize);

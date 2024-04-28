@@ -1,10 +1,11 @@
-﻿using DevkitServer.API;
+﻿using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools.Emit;
+using DevkitServer.API;
 using DevkitServer.API.Permissions;
 using DevkitServer.API.UI;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer.Networking;
 #if CLIENT
-using DevkitServer.API.Abstractions;
 using DevkitServer.Multiplayer;
 using HarmonyLib;
 using SDG.Framework.Devkit;
@@ -146,7 +147,7 @@ public class UserControl : MonoBehaviour
     }
     static UserControl()
     {
-        Type? type = Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract");
+        Type? type = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract");
         if (type == null)
         {
             Logger.DevkitServer.LogWarning(Source, "Unable to find type: SDG.Unturned.EditorInteract.");

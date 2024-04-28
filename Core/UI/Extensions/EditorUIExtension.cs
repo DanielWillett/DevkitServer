@@ -28,7 +28,7 @@ public class EditorUIExtension : ContainerUIExtension
             _subbed = true;
         }
 
-        Version version = Accessor.DevkitServer.GetName().Version;
+        Version version = AccessorExtensions.DevkitServer.GetName().Version;
 
         _testLabel = Glazier.Get().CreateLabel();
         _testLabel.TextAlignment = TextAnchor.LowerLeft;
@@ -116,7 +116,7 @@ public class EditorUIExtension : ContainerUIExtension
     {
         if (Container == null)
             return;
-        if (user == EditorUser.User || _lastFadeSetting != OptionsSettings.shouldNametagFadeOut)
+        if (user == EditorUser.User || _lastFadeSetting != /* todo OptionsSettings.shouldNametagFadeOut */ true)
         {
             UpdateAllNametags();
             return;
@@ -167,7 +167,7 @@ public class EditorUIExtension : ContainerUIExtension
                 nametag.IsVisible = true;
 
             float alpha;
-            if (OptionsSettings.shouldNametagFadeOut)
+            if (/* todo OptionsSettings.shouldNametagFadeOut */ true)
             {
                 float magnitude = new Vector2(adjScreenPos.x - 0.5f, adjScreenPos.y - 0.5f).magnitude;
                 float t = Mathf.InverseLerp(0.0125f, 0.1f, magnitude);
@@ -202,7 +202,7 @@ public class EditorUIExtension : ContainerUIExtension
     {
         if (Container == null)
             return;
-        _lastFadeSetting = OptionsSettings.shouldNametagFadeOut;
+        _lastFadeSetting = /* todo OptionsSettings.shouldNametagFadeOut */ true;
         foreach (EditorUser u in UserManager.Users)
         {
             if (u.IsOwner)

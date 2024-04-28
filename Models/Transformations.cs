@@ -1,4 +1,6 @@
-﻿using DevkitServer.Util.Encoding;
+﻿using DanielWillett.SpeedBytes;
+using DanielWillett.SpeedBytes.Unity;
+using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.Models;
 public readonly struct PreviewTransformation

@@ -1,7 +1,8 @@
-﻿using System.Reflection;
-using System.Reflection.Emit;
+﻿using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools.Emit;
 using DevkitServer.API;
-using DevkitServer.API.Abstractions;
+using System.Reflection;
+using System.Reflection.Emit;
 
 namespace DevkitServer.Util;
 public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
@@ -118,7 +119,7 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         MethodInfo invoke = type.GetMethod("Invoke", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
         if (invoke.ReturnType != typeof(void))
             throw new InvalidOperationException("Can't make a multicast event out of a non-void-returning delegate.");
-        MethodInfo logError = Accessor.LogErrorException;
+        MethodInfo logError = AccessorExtensions.LogErrorException;
 
         MethodInfo getDeclaringType = wrapperType.GetProperty(nameof(DeclaringType), BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy)!.GetMethod!;
         MethodInfo getTypeName = typeof(Type).GetProperty(nameof(Type.Name), BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)!.GetMethod!;
@@ -186,14 +187,14 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         il.Emit(OpCodes.Ldloc_0);
         il.Emit(OpCodes.Ldelem_Ref);
         for (int i = 1; i < types.Length; ++i)
-            PatchUtil.EmitArgument(il, i, false, false);
+            EmitUtility.EmitArgument(il, i, false, false);
 
         il.Emit(OpCodes.Callvirt, invoke);
 
         if (shouldAllowIndex > -1)
         {
             // if (!shouldAllow) return;
-            PatchUtil.EmitArgument(il, shouldAllowIndex + 1, false, true);
+            EmitUtility.EmitArgument(il, shouldAllowIndex + 1, false, true);
             il.Emit(defaultShouldAllowValue ? OpCodes.Brtrue_S : OpCodes.Brfalse_S, incrLbl);
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Call, Accessor.GetMethod(new Action<object>(Monitor.Exit))!);
@@ -209,7 +210,7 @@ public class CachedMulticastEvent<TDelegate> where TDelegate : MulticastDelegate
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(getErrorMessage.GetCallRuntime(), getErrorMessage);
 
-        PatchUtil.LoadConstantI4(il, (int)ConsoleColor.Red);
+        EmitUtility.LoadConstantI4(il, (int)ConsoleColor.Red);
 
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(getDeclaringType.GetCallRuntime(), getDeclaringType);

@@ -1,5 +1,6 @@
-﻿using DevkitServer.Multiplayer.Networking;
-using DevkitServer.Util.Encoding;
+﻿using DanielWillett.SpeedBytes;
+using DanielWillett.SpeedBytes.Compression;
+using DevkitServer.Multiplayer.Networking;
 
 namespace DevkitServer.Multiplayer.Levels;
 public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<NavigationNetIdReplicatedLevelData>

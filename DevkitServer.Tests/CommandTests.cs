@@ -235,7 +235,7 @@ public class CommandTests
         public void TransitionCommandExecutionToServer(CommandContext ctx) => throw new NotImplementedException();
 #endif
     }
-    [API.Ignore]
+    [Ignore]
     private class TestCommand : CoreLogger, IExecutableCommand
     {
         public CommandExecutionMode Mode { get; }

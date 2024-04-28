@@ -1,4 +1,6 @@
-﻿using DevkitServer.API;
+﻿using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools.Emit;
+using DevkitServer.API;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Players;
 #if SERVER
@@ -360,9 +362,9 @@ public static class UserManager
 
         IOpCodeEmitter emitter = method.AsEmitter(false);
 
-        Type? loopback = Accessor.AssemblyCSharp.GetType("SDG.NetTransport.Loopback.TransportConnection_Loopback");
-        Type? steamNetworking = Accessor.AssemblyCSharp.GetType("SDG.NetTransport.SteamNetworking.TransportConnection_SteamNetworking");
-        Type? steamSockets = Accessor.AssemblyCSharp.GetType("SDG.NetTransport.SteamNetworkingSockets.TransportConnection_SteamNetworkingSockets");
+        Type? loopback = AccessorExtensions.AssemblyCSharp.GetType("SDG.NetTransport.Loopback.TransportConnection_Loopback");
+        Type? steamNetworking = AccessorExtensions.AssemblyCSharp.GetType("SDG.NetTransport.SteamNetworking.TransportConnection_SteamNetworking");
+        Type? steamSockets = AccessorExtensions.AssemblyCSharp.GetType("SDG.NetTransport.SteamNetworkingSockets.TransportConnection_SteamNetworkingSockets");
 
         MethodInfo? getClientSteamId = loopback == null ? null : typeof(Provider).GetProperty(nameof(Provider.client),
             BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static, null, typeof(CSteamID), Type.EmptyTypes,

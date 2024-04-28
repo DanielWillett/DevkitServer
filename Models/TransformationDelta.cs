@@ -1,4 +1,5 @@
-﻿using DevkitServer.Util.Encoding;
+﻿using DanielWillett.SpeedBytes;
+using DanielWillett.SpeedBytes.Unity;
 
 namespace DevkitServer.Models;
 

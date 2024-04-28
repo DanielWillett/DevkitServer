@@ -1,19 +1,19 @@
-﻿using System;
-using System.IO;
-using System.Linq;
+﻿using DanielWillett.SpeedBytes;
 using DevkitServer.API;
 using DevkitServer.API.Permissions;
 using DevkitServer.Core.Logging.Loggers;
 using DevkitServer.Plugins;
-using DevkitServer.Util.Encoding;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
+using System.IO;
+using System.Linq;
 
 namespace DevkitServer.Tests;
 
 [TestClass]
 public class PermissionTests
 {
-    private static IDevkitServerLogger _logger;
+    private static IDevkitServerLogger _logger = null!;
     
     private const string LongPluginId = "testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttesttest";
     [ClassInitialize]
@@ -291,7 +291,7 @@ public class PermissionTests
         Assert.AreEqual(branch, PermissionBranch.Read(reader));
     }
 
-    [API.Ignore]
+    [Ignore]
     private class TestPlugin : CoreLogger, IDevkitServerPlugin
     {
         public string PermissionPrefix { get; set; }
@@ -309,26 +309,6 @@ public class PermissionTests
             Name = name;
         }
 
-        public void LogDebug(string message, ConsoleColor color = ConsoleColor.DarkGray)
-        {
-            Console.WriteLine(message);
-        }
-        public void LogInfo(string message, ConsoleColor color = ConsoleColor.DarkCyan)
-        {
-            Console.WriteLine(message);
-        }
-        public void LogWarning(string message, ConsoleColor color = ConsoleColor.Yellow)
-        {
-            Console.WriteLine(message);
-        }
-        public void LogError(string message, ConsoleColor color = ConsoleColor.Red)
-        {
-            Console.WriteLine(message);
-        }
-        public void LogError(Exception ex)
-        {
-            Console.WriteLine(ex.ToString());
-        }
         public void Load() { }
         public void Unload() { }
 

@@ -1,4 +1,5 @@
-﻿using DevkitServer.Multiplayer.Networking;
+﻿using DanielWillett.SpeedBytes;
+using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Util.Encoding;
 using SDG.Framework.Devkit;
 

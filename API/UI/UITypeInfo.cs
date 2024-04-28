@@ -1,5 +1,5 @@
 ﻿#if CLIENT
-using DevkitServer.API.Abstractions;
+using DanielWillett.ReflectionTools.Emit;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -44,7 +44,7 @@ public class UITypeInfo
     public UIScene Scene { get; set; }
 
     /// <summary>
-    /// Name of the property to get the UI in <see cref="UIAccessor"/>.
+    /// Name of the property to get the UI in <see cref="DanielWillett.UITools.Util.UIAccessor"/>.
     /// </summary>
     public string? EmitProperty { get; set; }
 

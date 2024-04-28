@@ -4,6 +4,8 @@
 #endif
 
 using Cysharp.Threading.Tasks;
+using DanielWillett.ReflectionTools;
+using DanielWillett.SpeedBytes;
 using DevkitServer.API;
 using DevkitServer.API.Multiplayer;
 using DevkitServer.API.Permissions;
@@ -11,7 +13,6 @@ using DevkitServer.Multiplayer.Actions;
 using DevkitServer.Multiplayer.Movement;
 using DevkitServer.Patches;
 using DevkitServer.Plugins;
-using DevkitServer.Util.Encoding;
 using HarmonyLib;
 using SDG.NetPak;
 using System.Collections.Concurrent;
@@ -246,7 +247,7 @@ public static class NetFactory
         Type? netMessagesType;
         try
         {
-            netMessagesType = Accessor.AssemblyCSharp.GetType(netMessagesName, true, false);
+            netMessagesType = AccessorExtensions.AssemblyCSharp.GetType(netMessagesName, true, false);
             if (netMessagesType == null)
             {
                 Logger.DevkitServer.LogError(Source, $"Unable to find type {netMessagesName.Colorize(FormattingColorType.Class)}!");
@@ -480,7 +481,7 @@ public static class NetFactory
         PullFromTransportConnectionListPool = null;
         try
         {
-            MethodInfo? method = Accessor.AssemblyCSharp
+            MethodInfo? method = AccessorExtensions.AssemblyCSharp
                 .GetType("SDG.Unturned.TransportConnectionListPool", true, false)?.GetMethod("Get",
                     BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
             if (method != null)
@@ -732,7 +733,7 @@ public static class NetFactory
 
         if (DevkitServerModule.IsMainThread)
         {
-            InvokeMethodIntl(in overhead, ref ctx, methodInfo, call, message, hs, parameters!);
+            InvokeMethodIntl(in overhead, ref ctx, methodInfo, parameters!);
         }
         else
         {
@@ -740,13 +741,13 @@ public static class NetFactory
             DevkitServerUtility.QueueOnMainThread(() =>
             {
                 MessageContext context = context2;
-                InvokeMethodIntl(in context.Overhead, ref context, methodInfo, call, message, hs, parameters!);
+                InvokeMethodIntl(in context.Overhead, ref context, methodInfo, parameters!);
             });
         }
 
         return true;
     }
-    private static void InvokeMethodIntl(in MessageOverhead overhead, ref MessageContext ctx, NetMethodInfo methodInfo, BaseNetCall call, ArraySegment<byte> message, bool hs, object[] parameters)
+    private static void InvokeMethodIntl(in MessageOverhead overhead, ref MessageContext ctx, NetMethodInfo methodInfo, object[] parameters)
     {
         object? res;
         try
@@ -1856,7 +1857,7 @@ public enum NetCallSource : byte
     FromClient = 1,
     FromEither = 2,
     /// <summary>
-    /// Equivalent to using the <see cref="IgnoreAttribute"/>.
+    /// Equivalent to using the <see cref="API.IgnoreAttribute"/>.
     /// </summary>
     None = 3
 }

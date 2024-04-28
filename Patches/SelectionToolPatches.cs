@@ -1,5 +1,6 @@
 ﻿#if CLIENT
-using DevkitServer.API;
+using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools.Formatting;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
 using DevkitServer.API.UI;
@@ -31,6 +32,7 @@ internal static class SelectionToolPatches
     {
         Type st = typeof(SelectionTool);
         Type dtu = typeof(DevkitTransactionUtility);
+        TranspileContext ctx = new TranspileContext(method, generator, instructions);
 
         MethodInfo moveHandleInvoker = new Action<Vector3, Quaternion, Vector3, bool, bool>(OnMoveHandle).Method;
         MethodInfo requestInstantiationInvoker = new Action<Vector3>(OnRequestInstantiaion).Method;
@@ -40,42 +42,58 @@ internal static class SelectionToolPatches
         MethodInfo? moveHandle = st.GetMethod("moveHandle", BindingFlags.Instance | BindingFlags.NonPublic, null, [ typeof(Vector3), typeof(Quaternion), typeof(Vector3), typeof(bool), typeof(bool) ], null);
         if (moveHandle == null)
         {
-            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: SelectionTool.moveHandle.");
+            ctx.Fail(new MethodDefinition("moveHandle")
+                .DeclaredIn(st, isStatic: false)
+                .ReturningVoid()
+                .WithParameter<Vector3>("position")
+                .WithParameter<Quaternion>("rotation")
+                .WithParameter<Vector3>("scale")
+                .WithParameter<bool>("doRotation")
+                .WithParameter<bool>("hasScale")
+            );
             DevkitServerModule.Fault();
+            return instructions;
         }
 
         MethodInfo? requestInstantiation = st.GetMethod("RequestInstantiation", BindingFlags.Instance | BindingFlags.NonPublic, null, [ typeof(Vector3) ], null);
         if (requestInstantiation == null)
         {
-            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: SelectionTool.RequestInstantiation.");
+            ctx.Fail(new MethodDefinition("RequestInstantiation")
+                .DeclaredIn(st, isStatic: false)
+                .ReturningVoid()
+                .WithParameter<Vector3>("position")
+            );
             DevkitServerModule.Fault();
+            return instructions;
         }
 
         MethodInfo? transformSelection = st.GetMethod("transformSelection", BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null);
         if (transformSelection == null)
         {
-            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: SelectionTool.transformSelection.");
+            ctx.Fail(new MethodDefinition("transformSelection")
+                .DeclaredIn(st, isStatic: false)
+                .ReturningVoid()
+                .WithNoParameters()
+            );
             DevkitServerModule.Fault();
+            return instructions;
         }
 
         MethodInfo? recordDestruction = dtu.GetMethod(nameof(DevkitTransactionUtility.recordDestruction), BindingFlags.Static | BindingFlags.Public, null, [ typeof(GameObject) ], null);
         if (recordDestruction == null)
         {
-            Logger.DevkitServer.LogWarning(Source, $"{method.Format()} - Unable to find method: DevkitTransactionUtility.recordDestruction.");
+            ctx.Fail(new MethodDefinition("recordDestruction")
+                .DeclaredIn(typeof(DevkitTransactionUtility), isStatic: true)
+                .ReturningVoid()
+                .WithParameter<GameObject>("go")
+            );
             DevkitServerModule.Fault();
+            return instructions;
         }
 
-        Label stLbl = generator.DefineLabel();
-
-        List<CodeInstruction> ins = [..instructions];
-        int i = 0;
-        // todo PatchUtil.InsertActionRateLimiter(ref i, stLbl, ins);
-        StackTracker tracker = new StackTracker(ins, method);
-        for (; i < ins.Count; ++i)
+        while (ctx.MoveNext())
         {
-            CodeInstruction c = ins[i];
-            if (i == 0)
-                c.labels.Add(stLbl);
+            CodeInstruction c = ctx.Instruction;
             MethodInfo? invoker = null;
             if (moveHandle != null && c.Calls(moveHandle))
                 invoker = moveHandleInvoker;
@@ -84,50 +102,74 @@ internal static class SelectionToolPatches
 
             if (invoker != null)
             {
-                int lastLdArg0 = tracker.GetLastUnconsumedIndex(i, OpCodes.Ldarg_0, method);
-                if (lastLdArg0 != -1)
+                int lastLdArg0 = ctx.GetLastUnconsumedIndex(OpCodes.Ldarg_0, method);
+
+                if (lastLdArg0 == -1)
+                    continue;
+
+                int i = ctx.CaretIndex;
+                ctx.CaretIndex = i + 1;
+
+                for (int j = lastLdArg0 + 1; j < i; ++j)
                 {
-                    ins.Insert(i + 1, new CodeInstruction(OpCodes.Call, invoker));
-
-                    for (int j = i - 1; j > lastLdArg0; --j)
-                    {
-                        ins.Insert(i + 1, ins[j].CopyWithoutSpecial());
-                    }
-
-                    i += i - lastLdArg0;
-                    Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Patched in {invoker.Format()}.");
+                    ctx.Emit(ctx[j].CopyWithoutSpecial());
                 }
+
+                ctx.Emit(invoker.GetCallRuntime(), invoker);
+                ctx.LogDebug($"Patched in {Accessor.Formatter.Format(invoker)}.");
             }
             else if (recordDestruction != null && c.Calls(recordDestruction))
             {
-                ins.Insert(i + 1, new CodeInstruction(OpCodes.Call, recordDestructionInvoker));
+                int i = ctx.CaretIndex;
+                ctx.CaretIndex = i + 1;
+
+                int stopIndex = -1;
                 for (int j = i - 1; j >= 0; --j)
                 {
-                    ins.Insert(i + 1, ins[j].CopyWithoutSpecial());
-                    if (ins[j].operand is LocalBuilder bld && typeof(IEnumerator<DevkitSelection>).IsAssignableFrom(bld.LocalType))
-                        break;
+                    if (ctx[j].operand is not LocalBuilder bld || !typeof(IEnumerator<DevkitSelection>).IsAssignableFrom(bld.LocalType))
+                        continue;
+
+                    stopIndex = j;
+                    break;
                 }
-                Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Patched in {recordDestructionInvoker.Format()}.");
+
+                for (int j = stopIndex + 1; j < i; ++j)
+                {
+                    ctx.Emit(ctx[j].CopyWithoutSpecial());
+                }
+
+                ctx.Emit(recordDestructionInvoker.GetCallRuntime(), recordDestructionInvoker);
+
+                ctx.LogDebug($"Patched in {Accessor.Formatter.Format(recordDestructionInvoker)}.");
             }
             else if (requestInstantiation != null && c.Calls(requestInstantiation))
             {
-                int lastLdArg0 = tracker.GetLastUnconsumedIndex(i, OpCodes.Ldarg_0, method);
-                if (lastLdArg0 != -1)
-                {
-                    CodeInstruction ldarg0 = ins[lastLdArg0];
-                    ins.RemoveAt(lastLdArg0);
-                    ins[lastLdArg0].labels.AddRange(ldarg0.labels);
-                    ins[lastLdArg0].blocks.AddRange(ldarg0.blocks);
-                    --i;
-                    ins[i] = new CodeInstruction(OpCodes.Call, requestInstantiationInvoker);
-                    ins[i].labels.AddRange(c.labels);
-                    ins[i].blocks.AddRange(c.blocks);
-                }
-                Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Replaced instantiation request {requestInstantiation.Format()} with {requestInstantiationInvoker.Format()}.");
+                int lastLdArg0 = ctx.GetLastUnconsumedIndex(OpCodes.Ldarg_0, method);
+
+                if (lastLdArg0 == -1)
+                    continue;
+
+                CodeInstruction newCall = new CodeInstruction(OpCodes.Call, requestInstantiationInvoker);
+
+                int i = ctx.CaretIndex;
+                ctx.CaretIndex = lastLdArg0;
+
+                BlockInfo blk = ctx.Remove(1);
+                blk.SetupBlockStart(ctx.Instruction);
+
+                ctx.CaretIndex = i - 1;
+
+                blk = ctx.Remove(1);
+                blk.SetupBlockStart(newCall);
+                blk.SetupBlockEnd(newCall);
+
+                ctx.Emit(newCall);
+
+                ctx.LogDebug($"Replaced instantiation request {Accessor.Formatter.Format(requestInstantiation)} with {Accessor.Formatter.Format(requestInstantiationInvoker)}.");
             }
         }
 
-        return ins;
+        return ctx;
     }
 
     [HarmonyPatch(typeof(SelectionTool), "OnHandleTranslatedAndRotated")]

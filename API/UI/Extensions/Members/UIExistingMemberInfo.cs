@@ -1,5 +1,6 @@
 ﻿#if CLIENT
-using DevkitServer.API.Abstractions;
+using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools.Emit;
 using System.Reflection;
 using System.Reflection.Emit;
 

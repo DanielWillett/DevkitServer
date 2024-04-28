@@ -1,4 +1,5 @@
-﻿using DevkitServer.API;
+﻿using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools.Emit;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
 using DevkitServer.API.UI;
@@ -11,6 +12,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using Progress = Pathfinding.Progress;
 #if CLIENT
+using DevkitServer.API;
 using DevkitServer.API.UI.Extensions;
 using DevkitServer.Core.UI.Extensions;
 using DevkitServer.Multiplayer.Actions;
@@ -132,7 +134,7 @@ internal static class NavigationPatches
         ins.Insert(2, new CodeInstruction(methodInfo.GetCallRuntime(), methodInfo));
         ins.Insert(3, new CodeInstruction(OpCodes.Ret));
 #if CLIENT
-        ins.Insert(4, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
+        ins.Insert(4, new CodeInstruction(OpCodes.Call, AccessorExtensions.IsDevkitServerGetter));
 #endif
         ins[4].labels.Add(lbl);
 #if CLIENT
@@ -851,45 +853,45 @@ internal static class NavigationPatches
 
         for (int i = 0; i < ins.Count; ++i)
         {
-            if (!remove && select != null && removeFlag != null && PatchUtil.MatchPattern(ins, i,
+            if (!remove && select != null && removeFlag != null && PatchUtility.MatchPattern(ins, i,
                     x => x.opcode.IsOfType(OpCodes.Ldfld, fuzzy: true),
                     x => x.opcode.IsLdc(@null: true),
                     x => x.Calls(select),
                     x => x.Calls(removeFlag)
                     ))
             {
-                ins[i + 1] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(RemoveFlag)).WithEndingInstructionNeeds(ins[i + 3]);
+                ins[i + 1] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(RemoveFlag)).WithEndBlocksFrom(ins[i + 3]);
                 ins.RemoveRange(i + 2, 2);
                 remove = true;
                 i -= 2;
             }
-            else if (!remove && select != null && removeFlag != null && PatchUtil.MatchPattern(ins, i,
+            else if (!remove && select != null && removeFlag != null && PatchUtility.MatchPattern(ins, i,
                     x => x.opcode.IsLdc(@null: true),
                     x => x.Calls(select),
                     x => x.opcode.IsOfType(OpCodes.Ldfld, fuzzy: true),
                     x => x.Calls(removeFlag)
                     ))
             {
-                ins[i + 3] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(RemoveFlag)).WithEndingInstructionNeeds(ins[i + 3]);
+                ins[i + 3] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(RemoveFlag)).WithEndBlocksFrom(ins[i + 3]);
                 ins.RemoveRange(i, 2);
                 remove = true;
                 i -= 2;
             }
-            else if (!remove && PatchUtil.MatchPattern(ins, i, x => x.Calls(removeFlag)))
+            else if (!remove && PatchUtility.MatchPattern(ins, i, x => x.Calls(removeFlag)))
             {
-                ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(RemoveFlag)).WithEndingInstructionNeeds(ins[i]);
+                ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(RemoveFlag)).WithEndBlocksFrom(ins[i]);
                 remove = true;
             }
             
-            if (!move && moveFlag != null && PatchUtil.MatchPattern(ins, i, x => x.Calls(moveFlag)))
+            if (!move && moveFlag != null && PatchUtility.MatchPattern(ins, i, x => x.Calls(moveFlag)))
             {
-                ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(MoveFlag)).WithEndingInstructionNeeds(ins[i]);
+                ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(MoveFlag)).WithEndBlocksFrom(ins[i]);
                 move = true;
             }
             
-            if (!add && addFlag != null && PatchUtil.MatchPattern(ins, i, x => x.Calls(addFlag)))
+            if (!add && addFlag != null && PatchUtility.MatchPattern(ins, i, x => x.Calls(addFlag)))
             {
-                ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(AddFlag)).WithEndingInstructionNeeds(ins[i]);
+                ins[i] = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(AddFlag)).WithEndBlocksFrom(ins[i]);
                 add = true;
             }
         }

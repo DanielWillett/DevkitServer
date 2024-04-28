@@ -1,11 +1,11 @@
 ﻿#if CLIENT
-using DevkitServer.API;
+using DanielWillett.ReflectionTools;
 using DevkitServer.API.Cartography;
 using DevkitServer.API.Cartography.Compositors;
 
 namespace DevkitServer.Core.Cartography.Compositors;
 
-[LoadPriority(0)]
+[Priority(0)]
 internal class OverlayCartographyCompositor : ICartographyCompositor
 {
     public bool SupportsSatellite => true;

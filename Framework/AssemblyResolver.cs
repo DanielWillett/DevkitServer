@@ -2,7 +2,6 @@
 using DevkitServer.Plugins;
 using SDG.Framework.Modules;
 using System.Reflection;
-using DevkitServer.API.Logging;
 using Module = SDG.Framework.Modules.Module;
 
 namespace DevkitServer.Framework;
@@ -81,7 +80,7 @@ internal class AssemblyResolver : IDisposable
             ref UnsupportedModule unsupportedModule = ref _unsupportedModules[i];
             foreach (Module module in ModuleHook.modules)
             {
-                if (module.assemblies != null && module.assemblies.Any(x => x == Accessor.DevkitServer))
+                if (module.assemblies != null && module.assemblies.Any(x => x == AccessorExtensions.DevkitServer))
                     continue;
 
                 foreach (ModuleAssembly asmInfo in module.config.Assemblies)

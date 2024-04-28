@@ -1,5 +1,6 @@
 ﻿#if CLIENT
-using DevkitServer.API.Abstractions;
+using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools.Emit;
 using DevkitServer.Core.UI.Handlers;
 using HarmonyLib;
 using System.Collections.ObjectModel;
@@ -274,7 +275,7 @@ public static class UIAccessTools
         }
     }
 
-    public static Type? PlayerBrowserRequestUIType { get; } = Accessor.AssemblyCSharp.GetType("SDG.Unturned.PlayerBrowserRequestUI", false);
+    public static Type? PlayerBrowserRequestUIType { get; } = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.PlayerBrowserRequestUI", false);
     public static PlayerBarricadeStereoUI? PlayerBarricadeStereoUI
     {
         get
@@ -291,7 +292,7 @@ public static class UIAccessTools
             return playerUI != null ? GetPlayerBarricadeMannequinUI?.Invoke(playerUI) : null;
         }
     }
-    public static Type? PlayerGroupUIType { get; } = Accessor.AssemblyCSharp.GetType("SDG.Unturned.PlayerGroupUI", false);
+    public static Type? PlayerGroupUIType { get; } = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.PlayerGroupUI", false);
     public static object? PlayerGroupUI
     {
         get
@@ -497,7 +498,7 @@ public static class UIAccessTools
             return menuSurvivorsClothingUI != null ? GetMenuSurvivorsClothingBoxUI?.Invoke(menuSurvivorsClothingUI) : null;
         }
     }
-    public static Type? ItemStoreMenuType { get; } = Accessor.AssemblyCSharp.GetType("SDG.Unturned.ItemStoreMenu", false);
+    public static Type? ItemStoreMenuType { get; } = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.ItemStoreMenu", false);
     public static object? ItemStoreMenu
     {
         get
@@ -506,8 +507,8 @@ public static class UIAccessTools
             return menuSurvivorsClothingUI != null ? GetItemStoreMenu?.Invoke(menuSurvivorsClothingUI) : null;
         }
     }
-    public static Type? ItemStoreCartMenuType { get; } = Accessor.AssemblyCSharp.GetType("SDG.Unturned.ItemStoreCartMenu", false);
-    public static Type? ItemStoreDetailsMenuType { get; } = Accessor.AssemblyCSharp.GetType("SDG.Unturned.ItemStoreDetailsMenu", false);
+    public static Type? ItemStoreCartMenuType { get; } = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.ItemStoreCartMenu", false);
+    public static Type? ItemStoreDetailsMenuType { get; } = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.ItemStoreDetailsMenu", false);
     public static object? ItemStoreCartMenu => GetItemStoreCartMenu?.Invoke();
     public static object? ItemStoreDetailsMenu => GetItemStoreDetailsMenu?.Invoke();
     public static MenuWorkshopSubmitUI? MenuWorkshopSubmitUI
@@ -881,17 +882,63 @@ public static class UIAccessTools
 
         return GenerateUICaller<TDelegate>(uiType, method, throwOnFailure);
     }
+
+    private static Type[] _funcTypes;
+    private static Type[] _actionTypes;
+    internal static void CheckFuncArrays()
+    {
+        _funcTypes ??= new Type[]
+        {
+            typeof (Func<,>),
+            typeof (Func<,,>),
+            typeof (Func<,,,>),
+            typeof (Func<,,,,>),
+            typeof (Func<,,,,,>),
+            typeof (Func<,,,,,,>),
+            typeof (Func<,,,,,,,>),
+            typeof (Func<,,,,,,,,>),
+            typeof (Func<,,,,,,,,,>),
+            typeof (Func<,,,,,,,,,,>),
+            typeof (Func<,,,,,,,,,,,>),
+            typeof (Func<,,,,,,,,,,,,>),
+            typeof (Func<,,,,,,,,,,,,,>),
+            typeof (Func<,,,,,,,,,,,,,,>),
+            typeof (Func<,,,,,,,,,,,,,,,>),
+            typeof (Func<,,,,,,,,,,,,,,,,>)
+        };
+
+        _actionTypes ??= new Type[16]
+        {
+            typeof (Action<>),
+            typeof (Action<,>),
+            typeof (Action<,,>),
+            typeof (Action<,,,>),
+            typeof (Action<,,,,>),
+            typeof (Action<,,,,,>),
+            typeof (Action<,,,,,,>),
+            typeof (Action<,,,,,,,>),
+            typeof (Action<,,,,,,,,>),
+            typeof (Action<,,,,,,,,,>),
+            typeof (Action<,,,,,,,,,,>),
+            typeof (Action<,,,,,,,,,,,>),
+            typeof (Action<,,,,,,,,,,,,>),
+            typeof (Action<,,,,,,,,,,,,,>),
+            typeof (Action<,,,,,,,,,,,,,,>),
+            typeof (Action<,,,,,,,,,,,,,,,>)
+        };
+    }
     public static Delegate? GenerateUICaller(Type? uiType, MethodInfo method, bool throwOnFailure = false)
     {
-        Accessor.CheckFuncArrays();
+        if (_funcTypes == null || _actionTypes == null)
+            CheckFuncArrays();
 
         bool rtn = method.ReturnType != typeof(void);
         ParameterInfo[] p = method.GetParameters();
-        if (p.Length > (rtn ? Accessor.FuncTypes!.Length : Accessor.ActionTypes!.Length))
+        if (p.Length > (rtn ? _funcTypes!.Length : _actionTypes!.Length))
         {
-            Logger.DevkitServer.LogWarning(Source, "Method " + method.Format() + " can not have more than " + (rtn ? Accessor.FuncTypes!.Length : Accessor.ActionTypes!.Length) + " arguments!");
+            Logger.DevkitServer.LogWarning(Source, "Method " + method.Format() + " can not have more than " + (rtn ? _funcTypes!.Length : _actionTypes!.Length) + " arguments!");
             if (throwOnFailure)
-                throw new ArgumentException("Method can not have more than " + (rtn ? Accessor.FuncTypes!.Length : Accessor.ActionTypes!.Length) + " arguments!", nameof(method));
+                throw new ArgumentException("Method can not have more than " + (rtn ? _funcTypes!.Length : _actionTypes!.Length) + " arguments!", nameof(method));
             return null;
         }
         Type deleType;
@@ -903,14 +950,14 @@ public static class UIAccessTools
                 for (int i = 1; i < p2.Length - 1; ++i)
                     p2[i] = p[i].ParameterType;
                 p2[^1] = method.ReturnType;
-                deleType = Accessor.FuncTypes![p.Length].MakeGenericType(p2);
+                deleType = _funcTypes![p.Length].MakeGenericType(p2);
             }
             else
             {
                 Type[] p2 = new Type[p.Length];
                 for (int i = 1; i < p2.Length; ++i)
                     p2[i] = p[i].ParameterType;
-                deleType = Accessor.ActionTypes![p.Length];
+                deleType = _actionTypes![p.Length];
                 deleType = deleType.MakeGenericType(p2);
             }
         }
@@ -1017,7 +1064,7 @@ public static class UIAccessTools
             Type accessTools = typeof(UIAccessTools);
             MethodInfo getEditorTerrainUI = accessTools.GetProperty(nameof(EditorTerrainUI), BindingFlags.Public | BindingFlags.Static)!.GetMethod;
             const MethodAttributes attr = MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig;
-            Assembly sdg = Accessor.AssemblyCSharp;
+            Assembly sdg = AccessorExtensions.AssemblyCSharp;
 
             /*
              * TERRAIN
@@ -1898,7 +1945,7 @@ public static class UIAccessTools
                 CustomVolumeMenuHandler volumeHandler = new CustomVolumeMenuHandler();
                 CustomNodeMenuHandler nodeHandler = new CustomNodeMenuHandler();
                 CustomSleekWrapperDestroyHandler sleekWrapperHandler = new CustomSleekWrapperDestroyHandler();
-                List<Type> types = Accessor.GetTypesSafe(Accessor.AssemblyCSharp);
+                List<Type> types = Accessor.GetTypesSafe(AccessorExtensions.AssemblyCSharp);
                 foreach (Type menuType in types
                              .Where(x =>
                                  x.Name.Equals("Menu", StringComparison.Ordinal) &&

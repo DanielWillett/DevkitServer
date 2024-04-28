@@ -1,4 +1,5 @@
 ﻿#if CLIENT
+using DanielWillett.ReflectionTools;
 using DevkitServer.API;
 using DevkitServer.API.Abstractions;
 using DevkitServer.Multiplayer;
@@ -107,7 +108,7 @@ internal sealed class EditorClothes : MonoBehaviour
     private static readonly StaticGetter<int>? GetFaceEmissionTexturePropertyID = Accessor.GenerateStaticGetter<HumanClothes, int>("faceEmissionTexturePropertyID");
     private static readonly InstanceGetter<ItemClothingAsset, bool>? GetShouldMirrorLeftHandedModel = Accessor.GenerateInstanceGetter<ItemClothingAsset, bool>("shouldMirrorLeftHandedModel");
     private static readonly Action<GameObject, bool>? CallDestroyCollidersInChildren =
-        Accessor.GenerateStaticCaller<Action<GameObject, bool>>(Accessor.AssemblyCSharp
+        Accessor.GenerateStaticCaller<Action<GameObject, bool>>(AccessorExtensions.AssemblyCSharp
             .GetType("SDG.Unturned.PrefabUtil")
             ?.GetMethod("DestroyCollidersInChildren", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)!);
 

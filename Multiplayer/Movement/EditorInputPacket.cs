@@ -54,7 +54,7 @@ internal struct EditorInputPacket
     }
     public readonly void WriteVersioned(NetPakWriter writer)
     {
-        Version v = Accessor.DevkitServer.GetName().Version;
+        Version v = AccessorExtensions.DevkitServer.GetName().Version;
         writer.WriteUInt32((uint)(((byte)v.Major << 24) | ((byte)v.Minor << 16) | ((byte)v.Build << 8) | (byte)v.Revision));
 
         Write(writer);

@@ -1,5 +1,5 @@
 ﻿#if CLIENT
-using DevkitServer.API;
+using DanielWillett.ReflectionTools;
 using DevkitServer.API.UI;
 using HarmonyLib;
 using System.Reflection;
@@ -94,7 +94,7 @@ internal abstract class CustomSelectionToolMenuHandler(Type? type, string backup
         bool add = false, remove = false;
         for (int i = 0; i < ins.Count; ++i)
         {
-            if (!add && PatchUtil.FollowPattern(ins, ref i,
+            if (!add && PatchUtility.FollowPattern(ins, ref i,
                     x => x.opcode == OpCodes.Ldfld,
                     x => addMethod != null && x.Calls(addMethod)
                     ))
@@ -106,7 +106,7 @@ internal abstract class CustomSelectionToolMenuHandler(Type? type, string backup
                 i += 3;
             }
 
-            if (!remove && PatchUtil.MatchPattern(ins, i,
+            if (!remove && PatchUtility.MatchPattern(ins, i,
                     x => x.opcode == OpCodes.Ldfld,
                     x => removeMethod != null && x.Calls(removeMethod)
                 ))

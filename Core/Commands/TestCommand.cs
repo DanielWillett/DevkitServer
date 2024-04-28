@@ -1,4 +1,5 @@
 ﻿using Cysharp.Threading.Tasks;
+using DanielWillett.ReflectionTools;
 using DevkitServer.API;
 using DevkitServer.API.Cartography;
 using DevkitServer.API.Commands;
@@ -175,7 +176,7 @@ internal static class CommandTests
         Stopwatch sw = Stopwatch.StartNew();
         await ChartCartography.CaptureChart(outputFile: Path.Combine(FileUtil.DesktopOrCurrentDir, "Chart.png"), token: token);
         sw.Stop();
-        ctx.ReplyString($"DevkitServer time: {sw.GetElapsedMilliseconds():F2}.");
+        ctx.ReplyString($"DevkitServer time: {sw.GetElapsedMilliseconds():F2} ms.");
 
         if (!ctx.HasArg(0))
             return;
@@ -186,7 +187,7 @@ internal static class CommandTests
         sw.Restart();
         Level.CaptureChartImage();
         sw.Stop();
-        ctx.ReplyString($"Vanilla time: {sw.GetElapsedMilliseconds():F2}.");
+        ctx.ReplyString($"Vanilla time: {sw.GetElapsedMilliseconds():F2} ms.");
     }
 #if CLIENT
     private static async UniTask satellite(CommandContext ctx, CancellationToken token)
@@ -194,7 +195,7 @@ internal static class CommandTests
         Stopwatch sw = Stopwatch.StartNew();
         await SatelliteCartography.CaptureSatellite(outputFile: Path.Combine(FileUtil.DesktopOrCurrentDir, "Map.png"), token: token);
         sw.Stop();
-        ctx.ReplyString($"DevkitServer time: {sw.GetElapsedMilliseconds():F2}.");
+        ctx.ReplyString($"DevkitServer time: {sw.GetElapsedMilliseconds():F2} ms.");
 
         if (!ctx.HasArg(0))
             return;
@@ -205,7 +206,7 @@ internal static class CommandTests
         sw.Restart();
         Level.CaptureSatelliteImage();
         sw.Stop();
-        ctx.ReplyString($"Vanilla time: {sw.GetElapsedMilliseconds():F2}.");
+        ctx.ReplyString($"Vanilla time: {sw.GetElapsedMilliseconds():F2} ms.");
     }
     private static void grab(CommandContext ctx)
     {

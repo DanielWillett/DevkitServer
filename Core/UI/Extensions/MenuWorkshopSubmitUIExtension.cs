@@ -1,5 +1,6 @@
 ﻿#if CLIENT
-using DevkitServer.API;
+using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools.Emit;
 using DevkitServer.API.UI.Extensions;
 using DevkitServer.API.UI.Extensions.Members;
 using DevkitServer.Patches;
@@ -114,7 +115,7 @@ internal class MenuWorkshopSubmitUIExtension : IDisposable
         bool br0 = false, br1 = false, br2 = false;
         for (int i = 0; i < ins.Count; ++i)
         {
-            if (PatchUtil.MatchPattern(ins, i,
+            if (PatchUtility.MatchPattern(ins, i,
                     x => checkEntered != null && x.Calls(checkEntered),
                     x => x.opcode.IsBrAny()))
             {
@@ -124,7 +125,7 @@ internal class MenuWorkshopSubmitUIExtension : IDisposable
                 br0 = true;
                 i += 2;
             }
-            else if (br0 && PatchUtil.FollowPattern(ins, ref i,
+            else if (br0 && PatchUtility.FollowPattern(ins, ref i,
                     x => prepareUgcStep1 != null && x.Calls(prepareUgcStep1)
                 ))
             {
@@ -132,7 +133,7 @@ internal class MenuWorkshopSubmitUIExtension : IDisposable
                 ins.Insert(i + 1, new CodeInstruction(OpCodes.Brtrue, prepareInsteadOfCreate));
                 br1 = true;
             }
-            else if (br1 && PatchUtil.FollowPattern(ins, ref i,
+            else if (br1 && PatchUtility.FollowPattern(ins, ref i,
                     x => createUgc != null && x.Calls(createUgc)
                 ))
             {

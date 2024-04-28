@@ -1,6 +1,6 @@
 ﻿using DevkitServer.Multiplayer.Networking;
-using DevkitServer.Util.Encoding;
 using System.Collections.Concurrent;
+using DanielWillett.SpeedBytes;
 #if SERVER
 using DevkitServer.Multiplayer.Levels;
 #endif

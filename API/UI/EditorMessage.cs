@@ -1,4 +1,5 @@
-﻿using DevkitServer.API.Abstractions;
+﻿using DanielWillett.ReflectionTools;
+using DevkitServer.API.Abstractions;
 using DevkitServer.API.Permissions;
 using DevkitServer.Multiplayer.Networking;
 #if CLIENT
@@ -61,7 +62,7 @@ public static class EditorMessage
                 CodeInstruction c = new CodeInstruction(OpCodes.Ldarg_0);
                 c.labels.AddRange(instr.labels);
                 yield return c;
-                c = PatchUtil.LoadConstantI4((int)CustomMessage);
+                c = PatchUtility.LoadConstantI4((int)CustomMessage);
                 yield return c;
                 Label lbl = generator.DefineLabel();
                 Label lbl2 = generator.DefineLabel();

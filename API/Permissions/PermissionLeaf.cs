@@ -1,5 +1,5 @@
-﻿using DevkitServer.Plugins;
-using DevkitServer.Util.Encoding;
+﻿using DanielWillett.SpeedBytes;
+using DevkitServer.Plugins;
 using StackCleaner;
 using System.Text.Json;
 using System.Text.Json.Serialization;

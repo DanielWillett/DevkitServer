@@ -1,10 +1,10 @@
 ﻿using DevkitServer.API;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
-using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Reflection;
+using DanielWillett.ReflectionTools;
 using Unturned.SystemEx;
 #if SERVER
 using DevkitServer.Patches;
@@ -791,12 +791,6 @@ public static class DevkitServerUtility
     /// <returns>'S' if <paramref name="num"/> != 1, otherwise an empty string.</returns>
     [Pure]
     public static string UpperS(this int num) => num == 1 ? string.Empty : "S";
-
-    /// <summary>
-    /// Gets the elapsed milliseconds from a <see cref="Stopwatch"/> as a <see cref="double"/> instead of <see cref="long"/>.
-    /// </summary>
-    [Pure]
-    public static double GetElapsedMilliseconds(this Stopwatch stopwatch) => stopwatch.ElapsedTicks / (double)Stopwatch.Frequency * 1000d;
 
     /// <summary>
     /// From a schedule and interval, chooses the next date time based on the current time.

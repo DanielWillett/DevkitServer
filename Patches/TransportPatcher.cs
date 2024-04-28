@@ -1,4 +1,5 @@
-﻿using DevkitServer.API;
+﻿using DanielWillett.ReflectionTools;
+using DevkitServer.API;
 using DevkitServer.API.Multiplayer;
 using HarmonyLib;
 using SDG.NetTransport.SteamNetworkingSockets;
@@ -57,7 +58,7 @@ public static class TransportPatcher
             MethodInfo? method = typeof(ServerTransport_SteamNetworkingSockets).GetMethod("HandleState_Connected", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             if (method != null)
             {
-                PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionEstablished));
+                PatchesMain.Patcher.Patch(method, postfix: Accessor.Active.GetHarmonyMethod(PostFixOnTransportConnectionEstablished));
                 Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when transport connections are established.");
             }
             else Logger.DevkitServer.LogWarning(Source, "Method not found: ServerTransport_SteamNetworkingSockets.HandleState_Connected.");
@@ -73,7 +74,7 @@ public static class TransportPatcher
             MethodInfo? method = typeof(ServerTransport_SteamNetworkingSockets).GetMethod("CloseConnection", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             if (method != null)
             {
-                PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionClosed));
+                PatchesMain.Patcher.Patch(method, postfix: Accessor.Active.GetHarmonyMethod(PostFixOnTransportConnectionClosed));
                 Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when transport connections are disposed.");
             }
             else Logger.DevkitServer.LogWarning(Source, "Method not found: ServerTransport_SteamNetworkingSockets.CloseConnection.");
@@ -89,7 +90,7 @@ public static class TransportPatcher
             MethodInfo? method = typeof(ClientTransport_SteamNetworkingSockets).GetMethod("HandleState_Connected", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             if (method != null)
             {
-                PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionEstablished));
+                PatchesMain.Patcher.Patch(method, postfix: Accessor.Active.GetHarmonyMethod(PostFixOnTransportConnectionEstablished));
                 Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when the client transport connection is established.");
             }
             else Logger.DevkitServer.LogWarning(Source, "Method not found: ClientTransport_SteamNetworkingSockets.HandleState_Connected.");
@@ -105,7 +106,7 @@ public static class TransportPatcher
             MethodInfo? method = typeof(ClientTransport_SteamNetworkingSockets).GetMethod(nameof(ClientTransport_SteamNetworkingSockets.TearDown), BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             if (method != null)
             {
-                PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionClosed));
+                PatchesMain.Patcher.Patch(method, postfix: Accessor.Active.GetHarmonyMethod(PostFixOnTransportConnectionClosed));
                 Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when the client transport connection is disposed.");
             }
             else Logger.DevkitServer.LogWarning(Source, "Method not found: ClientTransport_SteamNetworkingSockets.TearDown.");
@@ -126,7 +127,7 @@ public static class TransportPatcher
             MethodInfo? method = typeof(ServerTransport_SteamNetworkingSockets).GetMethod("HandleState_Connected", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             if (method != null)
             {
-                PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionEstablished));
+                PatchesMain.Patcher.Patch(method, postfix: Accessor.Active.GetHarmonyMethod(PostFixOnTransportConnectionEstablished));
                 Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when transport connections are established.");
             }
         }
@@ -141,7 +142,7 @@ public static class TransportPatcher
             MethodInfo? method = typeof(ServerTransport_SteamNetworkingSockets).GetMethod("CloseConnection", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             if (method != null)
             {
-                PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionClosed));
+                PatchesMain.Patcher.Patch(method, postfix: Accessor.Active.GetHarmonyMethod(PostFixOnTransportConnectionClosed));
                 Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when transport connections are disposed.");
             }
         }
@@ -156,7 +157,7 @@ public static class TransportPatcher
             MethodInfo? method = typeof(ClientTransport_SteamNetworkingSockets).GetMethod("HandleState_Connected", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             if (method != null)
             {
-                PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionEstablished));
+                PatchesMain.Patcher.Patch(method, postfix: Accessor.Active.GetHarmonyMethod(PostFixOnTransportConnectionEstablished));
                 Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when the client transport connection is established.");
             }
         }
@@ -171,7 +172,7 @@ public static class TransportPatcher
             MethodInfo? method = typeof(ClientTransport_SteamNetworkingSockets).GetMethod(nameof(ClientTransport_SteamNetworkingSockets.TearDown), BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
             if (method != null)
             {
-                PatchesMain.Patcher.Patch(method, postfix: Accessor.GetHarmonyMethod(PostFixOnTransportConnectionClosed));
+                PatchesMain.Patcher.Patch(method, postfix: Accessor.Active.GetHarmonyMethod(PostFixOnTransportConnectionClosed));
                 Logger.DevkitServer.LogDebug(Source, $"Postfixed {method.Format()} to add an event for when the client transport connection is disposed.");
             }
         }
@@ -190,7 +191,7 @@ public static class TransportPatcher
 
 #if SERVER
     private static readonly StaticGetter<CommandLineString>? GetNetTransportFlag =
-        Accessor.GenerateStaticGetter<CommandLineString>(Accessor.AssemblyCSharp.GetType("SDG.Unturned.NetTransportFactory", false)!, "clImpl");
+        Accessor.GenerateStaticGetter<CommandLineString>(AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.NetTransportFactory", false)!, "clImpl");
     internal static void WarnUnsupportedTransport()
     {
         if (GetNetTransportFlag?.Invoke() is { hasValue: true, value: { } flag } && !flag.Equals("SteamNetworkingSockets", StringComparison.OrdinalIgnoreCase) && !flag.Equals(DevkitServerModule.ModuleName, StringComparison.OrdinalIgnoreCase))

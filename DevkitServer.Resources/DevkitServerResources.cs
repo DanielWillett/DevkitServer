@@ -103,35 +103,37 @@ internal class DevkitServerResources
         // New Libraries
 
         new DevkitServerFileResource("Lib.Harmony",
-            Lib("Lib.Harmony", "0Harmony.dll"), new Version(0, 0, 23, 0)),
+            Lib("Lib.Harmony", "0Harmony.dll"), new Version(0, 0, 29, 0)),
         new DevkitServerFileResource("Lib.Harmony.LICENSE",
-            Lib("Lib.Harmony", "LICENSE.txt"), new Version(0, 0, 15, 0)),
+            Lib("Lib.Harmony", "LICENSE.txt"), new Version(0, 0, 29, 0)),
+
+        // legacy harmony files
         new DevkitServerFileResource("Lib.Harmony.README",
-            Lib("Lib.Harmony", "README.md"), new Version(0, 0, 15, 0)),
+            Lib("Lib.Harmony", "README.md"), new Version(0, 0, 29, 0)) { Delete = true },
         new DevkitServerFileResource("Lib.Harmony.XmlDocs",
-            Lib("Lib.Harmony", "0Harmony.xml"), new Version(0, 0, 15, 0)),
+            Lib("Lib.Harmony", "0Harmony.xml"), new Version(0, 0, 29, 0)) { Delete = true },
         new DevkitServerFileResource("Lib.Harmony.Dependencies",
-            Lib("Lib.Harmony", "0Harmony.deps.json"), new Version(0, 0, 15, 0)),
+            Lib("Lib.Harmony", "0Harmony.deps.json"), new Version(0, 0, 29, 0)) { Delete = true },
 
         new DevkitServerFileResource("Mono.Cecil",
-            Lib("Lib.Harmony", "Mono.Cecil", "Mono.Cecil.dll"), new Version(0, 0, 22, 0)),
+            Lib("Lib.Harmony", "Mono.Cecil", "Mono.Cecil.dll"), new Version(0, 0, 29, 0)) { Delete = true },
         new DevkitServerFileResource("Mono.Cecil.LICENSE",
-            Lib("Lib.Harmony", "Mono.Cecil", "LICENSE.txt"), new Version(0, 0, 15, 0)),
+            Lib("Lib.Harmony", "Mono.Cecil", "LICENSE.txt"), new Version(0, 0, 29, 0)) { Delete = true },
 
         new DevkitServerFileResource("MonoMod.Common",
-            Lib("Lib.Harmony", "MonoMod.Common", "MonoMod.Common.dll"), new Version(0, 0, 22, 0)),
+            Lib("Lib.Harmony", "MonoMod.Common", "MonoMod.Common.dll"), new Version(0, 0, 29, 0)) { Delete = true },
         new DevkitServerFileResource("MonoMod.Common.LICENSE",
-            Lib("Lib.Harmony", "MonoMod.Common", "LICENSE.txt"), new Version(0, 0, 15, 0)),
+            Lib("Lib.Harmony", "MonoMod.Common", "LICENSE.txt"), new Version(0, 0, 29, 0)) { Delete = true },
 
         new DevkitServerFileResource("System.Reflection.Emit.ILGeneration",
-            Lib("Lib.Harmony", "System.Reflection.Emit.ILGeneration", "System.Reflection.Emit.ILGeneration.dll"), new Version(0, 0, 22, 0)),
+            Lib("Lib.Harmony", "System.Reflection.Emit.ILGeneration", "System.Reflection.Emit.ILGeneration.dll"), new Version(0, 0, 29, 0)) { Delete = true },
         new DevkitServerFileResource("System.Reflection.Emit.ILGeneration.LICENSE",
-            Lib("Lib.Harmony", "System.Reflection.Emit.ILGeneration", "LICENSE.txt"), new Version(0, 0, 15, 0)),
+            Lib("Lib.Harmony", "System.Reflection.Emit.ILGeneration", "LICENSE.txt"), new Version(0, 0, 29, 0)) { Delete = true },
 
         new DevkitServerFileResource("System.Reflection.Emit.Lightweight",
-            Lib("Lib.Harmony", "System.Reflection.Emit.Lightweight", "System.Reflection.Emit.Lightweight.dll"), new Version(0, 0, 22, 0)),
+            Lib("Lib.Harmony", "System.Reflection.Emit.Lightweight", "System.Reflection.Emit.Lightweight.dll"), new Version(0, 0, 29, 0)) { Delete = true },
         new DevkitServerFileResource("System.Reflection.Emit.Lightweight.LICENSE",
-            Lib("Lib.Harmony", "System.Reflection.Emit.Lightweight", "LICENSE.txt"), new Version(0, 0, 15, 0)),
+            Lib("Lib.Harmony", "System.Reflection.Emit.Lightweight", "LICENSE.txt"), new Version(0, 0, 29, 0)) { Delete = true },
 
         new DevkitServerFileResource("netstandard",
             Lib(".NET Standard 2.1", "netstandard.dll"), new Version(0, 0, 23, 0)),
@@ -147,8 +149,23 @@ internal class DevkitServerResources
         new DevkitServerFileResource("DanielWillett.StackCleaner.Symbols",
             Lib("DanielWillett.StackCleaner", "DanielWillett.StackCleaner.pdb"), new Version(0, 0, 15, 0)),
 
+        new DevkitServerFileResource("DanielWillett.ReflectionTools",
+            Lib("DanielWillett.ReflectionTools", "DanielWillett.ReflectionTools.dll"), new Version(0, 0, 29, 0)),
+        new DevkitServerFileResource("DanielWillett.ReflectionTools",
+            Lib("DanielWillett.ReflectionTools", "DanielWillett.ReflectionTools.Harmony.dll"), new Version(0, 0, 29, 0)),
+        new DevkitServerFileResource("DanielWillett.ReflectionTools.LICENSE",
+            Lib("DanielWillett.ReflectionTools", "LICENSE.txt"), new Version(0, 0, 29, 0)),
+
+        new DevkitServerFileResource("DanielWillett.SpeedBytes",
+            Lib("DanielWillett.SpeedBytes", "DanielWillett.SpeedBytes.dll"), new Version(0, 0, 29, 0)),
+        new DevkitServerFileResource("DanielWillett.SpeedBytes",
+            Lib("DanielWillett.SpeedBytes", "DanielWillett.SpeedBytes.Unity.dll"), new Version(0, 0, 29, 0)),
+        new DevkitServerFileResource("DanielWillett.SpeedBytes.LICENSE",
+            Lib("DanielWillett.SpeedBytes", "LICENSE.txt"), new Version(0, 0, 29, 0)),
+
+        // legacy reflection tools forwarding
         new DevkitServerFileResource("FWD.DanielWillett.ReflectionTools",
-            LibFwd("DanielWillett.ReflectionTools.dll"), new Version(0, 0, 24, 0)),
+            LibFwd("DanielWillett.ReflectionTools.dll"), new Version(0, 0, 29, 0)) { Delete = true },
         new DevkitServerFileResource("FWD.DanielWillett.UnturnedUITools",
             LibFwd("DanielWillett.UnturnedUITools.dll"), new Version(0, 0, 24, 0)) { Side = Side.Client },
         new DevkitServerFileResource("FWD.DanielWillett.LevelObjectIcons",

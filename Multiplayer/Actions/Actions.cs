@@ -1,5 +1,5 @@
-﻿using System.Text.Json.Serialization;
-using DevkitServer.Util.Encoding;
+﻿using DanielWillett.SpeedBytes;
+using System.Text.Json.Serialization;
 
 namespace DevkitServer.Multiplayer.Actions;
 
@@ -118,10 +118,7 @@ public interface IReflectableAction : IAction
 {
     void SendUndo(ITransportConnection sender);
 }
-public interface IServersideAction : IAction
-{
-
-}
+public interface IServersideAction : IAction;
 public interface IReplacableAction : IAction
 {
     bool TryReplaceFrom(IReplacableAction action);

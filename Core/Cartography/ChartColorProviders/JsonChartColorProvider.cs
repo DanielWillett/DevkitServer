@@ -1,4 +1,4 @@
-﻿using DevkitServer.API;
+﻿using DanielWillett.ReflectionTools;
 using DevkitServer.API.Cartography;
 using DevkitServer.API.Cartography.ChartColorProviders;
 using DevkitServer.Configuration;
@@ -8,7 +8,7 @@ using System.Text.Json;
 
 namespace DevkitServer.Core.Cartography.ChartColorProviders;
 
-[LoadPriority(-1)]
+[Priority(-1)]
 public class JsonChartColorProvider : RaycastChartColorProvider
 {
     public JsonChartColorData Data { get; protected set; } = null!;

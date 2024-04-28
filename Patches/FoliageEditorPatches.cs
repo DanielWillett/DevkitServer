@@ -1,4 +1,5 @@
 ﻿#if CLIENT
+using DanielWillett.ReflectionTools;
 using DevkitServer.API;
 using DevkitServer.Multiplayer;
 using DevkitServer.Multiplayer.Actions;
@@ -13,7 +14,7 @@ namespace DevkitServer.Patches;
 [HarmonyPatch]
 internal static class FoliageEditorPatches
 {
-    internal static readonly Type FoliageEditor = Accessor.AssemblyCSharp.GetType("SDG.Unturned.FoliageEditor");
+    internal static readonly Type FoliageEditor = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.FoliageEditor");
 
     internal static InstanceGetter<object, IComparable>? GetEditMode = Accessor.GenerateInstanceGetter<IComparable>(FoliageEditor!, "mode", throwOnError: false);
 
@@ -95,9 +96,9 @@ internal static class FoliageEditorPatches
                 {
                     if (ps[^1].ParameterType is { IsByRef: true } p && p.GetElementType() == typeof(int))
                     {
-                        LocalBuilder? bld = PatchUtil.GetLocal(ins[i - 1], out int index, false);
-                        yield return PatchUtil.GetLocalCodeInstruction(bld!, index, false);
-                        yield return PatchUtil.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, true);
+                        LocalBuilder? bld = PatchUtility.GetLocal(ins[i - 1], out int index, false);
+                        yield return PatchHelpers.GetLocalCodeInstruction(bld!, index, false);
+                        yield return PatchHelpers.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, true);
                         Logger.DevkitServer.LogDebug("FOLIAGE PATCHES", "Inserted set sample count local instruction.");
                     }
                     yield return c;
@@ -107,11 +108,11 @@ internal static class FoliageEditorPatches
                         if (l.opcode == OpCodes.Ldloca_S || l.opcode == OpCodes.Ldloca)
                         {
                             if (l.operand is LocalBuilder lbl)
-                                yield return PatchUtil.GetLocalCodeInstruction(lbl, lbl.LocalIndex, false,
+                                yield return PatchHelpers.GetLocalCodeInstruction(lbl, lbl.LocalIndex, false,
                                     false);
                             else
                                 yield return new CodeInstruction(l.opcode == OpCodes.Ldloca_S ? OpCodes.Ldarg_S : OpCodes.Ldarg, l.operand);
-                            yield return PatchUtil.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, false);
+                            yield return PatchHelpers.GetLocalCodeInstruction(sampleCount, sampleCount.LocalIndex, false);
                             Logger.DevkitServer.LogDebug("FOLIAGE PATCHES", "Inserted get sample count local instruction.");
                         }
                         else
@@ -139,14 +140,14 @@ internal static class FoliageEditorPatches
                 yield return new CodeInstruction(OpCodes.Call, findLevelObjectUtil);
                 yield return new CodeInstruction(OpCodes.Brfalse, lbl);
                 yield return new CodeInstruction(OpCodes.Dup);
-                yield return PatchUtil.GetLocalCodeInstruction(lvlObject, lvlObject.LocalIndex, true);
+                yield return PatchHelpers.GetLocalCodeInstruction(lvlObject, lvlObject.LocalIndex, true);
                 yield return new CodeInstruction(OpCodes.Call, lvlObjTransformGetter);
                 yield return new CodeInstruction(OpCodes.Call, transformPosGetter);
-                yield return PatchUtil.GetLocalCodeInstruction(lvlObjectPos, lvlObjectPos.LocalIndex, true);
+                yield return PatchHelpers.GetLocalCodeInstruction(lvlObjectPos, lvlObjectPos.LocalIndex, true);
                 c.labels.Add(lbl);
                 yield return c;
-                yield return PatchUtil.GetLocalCodeInstruction(lvlObjectPos, lvlObjectPos.LocalIndex, false);
-                yield return PatchUtil.GetLocalCodeInstruction(lvlObject, lvlObject.LocalIndex, false);
+                yield return PatchHelpers.GetLocalCodeInstruction(lvlObjectPos, lvlObjectPos.LocalIndex, false);
+                yield return PatchHelpers.GetLocalCodeInstruction(lvlObject, lvlObject.LocalIndex, false);
                 yield return new CodeInstruction(OpCodes.Call, levelObjectRemovedInvoker);
                 Logger.DevkitServer.LogDebug("FOLIAGE PATCHES", "Patched invoker for " + lvlObjRemove.Format() + ".");
                 ++lod;
@@ -185,7 +186,7 @@ internal static class FoliageEditorPatches
             CodeInstruction c = ins[i];
             if (c.opcode == OpCodes.Callvirt && c.operand is MethodInfo method2 && method2.Name.Equals("addFoliage", StringComparison.Ordinal))
             {
-                PatchUtil.CheckCopiedMethodPatchOutOfDate(ref method2, addFoliageInvoker);
+                PatchHelpers.CheckCopiedMethodPatchOutOfDate(ref method2, addFoliageInvoker);
                 if (method2 != null)
                 {
                     ParameterInfo[] ps = method2.GetParameters();

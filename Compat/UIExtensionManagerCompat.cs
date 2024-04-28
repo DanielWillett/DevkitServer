@@ -8,6 +8,7 @@ using DevkitServer.API.UI.Extensions.Members;
 using DevkitServer.Plugins;
 using SDG.Framework.Modules;
 using System.Reflection;
+using DanielWillett.ReflectionTools;
 using Module = SDG.Framework.Modules.Module;
 
 namespace DevkitServer.Compat;
@@ -90,12 +91,12 @@ internal class UIExtensionManagerCompat : IUIExtensionManager
             return;
         IDevkitServerPlugin plugin = PluginLoader.FindOrCreateModulePlugin(module);
         List<Type> types = Accessor.GetTypesSafe(assembly, true);
-        foreach (Type type in types.OrderByDescending(GetPriority))
+        foreach (Type type in types.OrderByDescending(Accessor.GetPriority))
         {
             if (type.TryGetAttributeSafe(out DanielWillett.UITools.API.Extensions.UIExtensionAttribute attribute))
                 continue;
             
-            API.UI.Extensions.UIExtensionInfo info = new API.UI.Extensions.UIExtensionInfo(type, attribute.ParentType, GetPriority(type), plugin)
+            API.UI.Extensions.UIExtensionInfo info = new API.UI.Extensions.UIExtensionInfo(type, attribute.ParentType, type.GetPriority(), plugin)
             {
                 SuppressUIExtensionParentWarning = attribute.SuppressUIExtensionParentWarning || typeof(DanielWillett.UITools.API.Extensions.UIExtension).IsAssignableFrom(type)
             };
@@ -136,18 +137,6 @@ internal class UIExtensionManagerCompat : IUIExtensionManager
             UIExtensionManager.LogError($"Error invoking OnClosed from {instantiation.GetType().Format()}.", info.Plugin, info.Assembly);
             UIExtensionManager.LogError(ex, info.Plugin, info.Assembly);
         }
-    }
-    public static bool IsIgnored(MemberInfo member) => Attribute.IsDefined(member, typeof(DanielWillett.ReflectionTools.IgnoreAttribute));
-    public static int GetPriority(MemberInfo member)
-    {
-        int p1 = member.GetPriority();
-        if (p1 != 0)
-            return p1;
-
-        return member.GetAttributeSafe(typeof(DanielWillett.ReflectionTools.PriorityAttribute), true) is
-            DanielWillett.ReflectionTools.PriorityAttribute p
-            ? p.Priority
-            : 0;
     }
 
     public static bool IsAssignableFromUIExtension(Type type) => typeof(DanielWillett.UITools.API.Extensions.UIExtension).IsAssignableFrom(type);

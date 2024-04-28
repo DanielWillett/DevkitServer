@@ -1,9 +1,10 @@
 ﻿using Cysharp.Threading.Tasks;
+using DanielWillett.ReflectionTools;
+using DanielWillett.SpeedBytes;
 using DevkitServer.API;
 using DevkitServer.API.Storage;
 using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Levels;
-using DevkitServer.Util.Encoding;
 using System.Diagnostics;
 #if CLIENT
 using DevkitServer.Core.UI.Extensions;
@@ -194,7 +195,7 @@ public sealed class LevelData
     {
         ThreadUtil.assertIsGameThread();
 
-        ByteWriter writer = _levelWriter ??= new ByteWriter(false, 134217728); // 128 MiB
+        ByteWriter writer = _levelWriter ??= new ByteWriter(134217728); // 128 MiB
         writer.Write(DataVersion);
         Version = DataVersion;
 

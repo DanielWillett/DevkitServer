@@ -1,7 +1,6 @@
 ﻿using NuGet.Common;
 using SDG.Unturned;
 using System;
-using System.Threading.Tasks;
 using ILogger = NuGet.Common.ILogger;
 
 namespace DevkitServer.Launcher;
@@ -31,21 +30,6 @@ internal class DevkitServerLauncherLogger : ILogger
         else
             CommandWindow.Log(GetPrefix(level) + data + (data.Length > 0 && data[data.Length - 1] == '.' ? string.Empty : "."));
     }
-    public void Log(ILogMessage message)
-    {
-        string data = GetPrefix(message.Level, message.Time.UtcDateTime) +
-                      "[" + message.WarningLevel + "] " + message.Code + " " +
-                      message.Message +
-                      (message.Message.Length > 0 && message.Message[message.Message.Length - 1] == '.' ? string.Empty : ".");
-
-        if (message.Level == LogLevel.Warning)
-            CommandWindow.LogWarning(data);
-        else if (message.Level == LogLevel.Error)
-            CommandWindow.LogError(data);
-        else
-            CommandWindow.Log(data);
-    }
-
     public void LogDebug(string data)
     {
         Log(LogLevel.Debug, data);
@@ -79,14 +63,9 @@ internal class DevkitServerLauncherLogger : ILogger
     {
         Log(LogLevel.Information, data);
     }
-    Task ILogger.LogAsync(LogLevel level, string data)
+
+    public void LogErrorSummary(string data)
     {
-        Log(level, data);
-        return Task.CompletedTask;
-    }
-    Task ILogger.LogAsync(ILogMessage message)
-    {
-        Log(message);
-        return Task.CompletedTask;
+        Log(LogLevel.Error, data);
     }
 }

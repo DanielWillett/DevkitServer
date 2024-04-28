@@ -1,4 +1,5 @@
-﻿using DevkitServer.API.Abstractions;
+﻿using DanielWillett.SpeedBytes;
+using DevkitServer.API.Abstractions;
 using DevkitServer.Util.Encoding;
 
 namespace DevkitServer.API;

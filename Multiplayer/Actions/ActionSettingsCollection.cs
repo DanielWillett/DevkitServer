@@ -1,5 +1,6 @@
 ﻿using DevkitServer.Util.Encoding;
 using System.Text;
+using DanielWillett.SpeedBytes;
 
 namespace DevkitServer.Multiplayer.Actions;
 public class ActionSettingsCollection : IBrushRadiusAction, IBrushFalloffAction, IBrushStrengthAction, IBrushSensitivityAction, IBrushTargetAction, ICoordinatesAction, IAssetAction, IAutoFoundation, IAutoSlope, IInstanceIdAction, INetId64Action

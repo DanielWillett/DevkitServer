@@ -1,5 +1,8 @@
-﻿using DevkitServer.API;
+﻿using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools.Emit;
+using DevkitServer.API;
 using DevkitServer.Multiplayer.Networking;
+using DevkitServer.Util.Encoding;
 using HarmonyLib;
 using StackCleaner;
 using System.Globalization;
@@ -8,7 +11,6 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
 using System.Text.RegularExpressions;
-using DevkitServer.Util.Encoding;
 using Unturned.SystemEx;
 using Version = System.Version;
 #if SERVER
@@ -18,7 +20,7 @@ using DevkitServer.Multiplayer;
 namespace DevkitServer.Util;
 
 /// <summary>
-/// Methods for formatting strings and termi
+/// Methods for formatting strings and members.
 /// </summary>
 public static class FormattingUtil
 {
@@ -374,7 +376,7 @@ public static class FormattingUtil
     }
 
     /// <summary>
-    /// Counts the amount of characters that will be returned by <see cref="FormatCapacity(long,Span{char},int,bool)"/>
+    /// Counts the amount of characters that will be returned by <see cref="FormatCapacity(long,Span{char},int)"/>
     /// </summary>
     [Pure]
     public static int GetCapacityLength(long length, int decimals = 1)
@@ -400,10 +402,7 @@ public static class FormattingUtil
 
         double len = length / _sizeIncrements[inc];
         if (neg) len = -len;
-
-        Span<char> format = stackalloc char[1 + DevkitServerUtility.CountDigits(decimals)];
-        format[0] = 'N';
-        decimals.TryFormat(format[1..], out _, provider: CultureInfo.InvariantCulture);
+        
         return (neg ? 1 : 0) + DevkitServerUtility.CountDigits((long)Math.Floor(len), commas: true) + 2 + decimals + _sizeCodes![inc].Length;
     }
 

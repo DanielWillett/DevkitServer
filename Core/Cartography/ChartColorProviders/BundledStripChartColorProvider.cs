@@ -1,4 +1,4 @@
-﻿using DevkitServer.API;
+﻿using DanielWillett.ReflectionTools;
 using DevkitServer.API.Cartography;
 using DevkitServer.API.Cartography.ChartColorProviders;
 using SDG.Framework.Landscapes;
@@ -8,7 +8,7 @@ namespace DevkitServer.Core.Cartography.ChartColorProviders;
 /// <summary>
 /// The vanilla method of getting chart colors. Loads Height_Strip and Layer_Strip from the Charts.unity3d bundle in the root level directory.
 /// </summary>
-[LoadPriority(-2)]
+[Priority(-2)]
 public class BundledStripChartColorProvider : RaycastChartColorProvider
 {
     private Color32[] _heightPixels = null!;

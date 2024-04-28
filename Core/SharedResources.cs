@@ -16,7 +16,7 @@ internal static class SharedResources
 #if CLIENT
         if (LogicShader == null || !LogicShader.name.Equals("Unlit/DS_Passthrough"))
         {
-            Material mat = bundle.load<Material>("resources/mat_passthrough");
+            Material? mat = bundle.load<Material>("resources/mat_passthrough");
             LogicShader = mat == null ? Shader.Find("Unlit/Color") : mat.shader;
         }
         else

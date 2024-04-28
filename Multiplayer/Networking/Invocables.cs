@@ -1,6 +1,8 @@
-﻿using DevkitServer.API;
+﻿using DanielWillett.ReflectionTools;
+using DevkitServer.API;
 using DevkitServer.Util.Encoding;
 using System.Reflection;
+using DanielWillett.SpeedBytes;
 
 namespace DevkitServer.Multiplayer.Networking;
 
@@ -78,24 +80,24 @@ public class NetCallCustom : BaseNetCall
     public delegate void WriterTask(ByteWriter writer);
     public delegate void Method(MessageContext context, ByteReader reader);
     public delegate Task MethodAsync(MessageContext context, ByteReader reader);
-    private readonly ByteWriter _writer;
+    private readonly PrependableWriter _writer;
     private bool _throwOnError;
     internal NetCallCustom(DevkitServerNetCall method, int capacity = 0, bool highSpeed = false) : this((ushort)method, capacity, highSpeed) { }
     internal NetCallCustom(ushort method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriter(true, capacity + MessageOverhead.MaximumSize);
+        _writer = new PrependableWriter(true, capacity + MessageOverhead.MaximumSize);
     }
     public NetCallCustom(Guid method, int capacity = 0, bool highSpeed = false) : base(method, highSpeed)
     {
-        _writer = new ByteWriter(true, capacity + MessageOverhead.MaximumSize);
+        _writer = new PrependableWriter(true, capacity + MessageOverhead.MaximumSize);
     }
     public NetCallCustom(Method method, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriter(true, capacity + MessageOverhead.MaximumSize);
+        _writer = new PrependableWriter(true, capacity + MessageOverhead.MaximumSize);
     }
     public NetCallCustom(MethodAsync method, int capacity = 0) : base(method)
     {
-        _writer = new ByteWriter(true, capacity + MessageOverhead.MaximumSize);
+        _writer = new PrependableWriter(true, capacity + MessageOverhead.MaximumSize);
     }
     internal override void SetThrowOnError(bool value) => _throwOnError = value;
     public override bool Read(ArraySegment<byte> message, out object[] parameters)

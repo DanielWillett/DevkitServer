@@ -1,19 +1,19 @@
 {
 	"IsEnabled": true,
 	"Name": "DevkitServer.Launcher",
-	"Version": "1.0.0.3",
+	"Version": "1.0.0.4",
 	"Assemblies":
 	[
-		{
-			"Path": "/Libraries/NuGet/NuGet.Common.dll",
-			"Role": "Both_Optional"
-		},
 		{
 			"Path": "/Libraries/NuGet/NuGet.Versioning.dll",
 			"Role": "Both_Optional"
 		},
 		{
-			"Path": "/Libraries/NuGet/NuGet.Configuration.dll",
+			"Path": "/Libraries/NuGet/NuGet.Packaging.Core.Types.dll",
+			"Role": "Both_Optional"
+		},
+		{
+			"Path": "/Libraries/NuGet/NuGet.Common.dll",
 			"Role": "Both_Optional"
 		},
 		{
@@ -21,19 +21,15 @@
 			"Role": "Both_Optional"
 		},
 		{
+			"Path": "/Libraries/NuGet/NuGet.Packaging.Core.dll",
+			"Role": "Both_Optional"
+		},
+		{
 			"Path": "/Libraries/NuGet/NuGet.Frameworks.dll",
 			"Role": "Both_Optional"
 		},
 		{
-			"Path": "/Libraries/System.Xml.Linq/System.Xml.Linq.dll",
-			"Role": "Both_Optional"
-		},
-		{
 			"Path": "/Libraries/System.IO.Compression/System.IO.Compression.dll",
-			"Role": "Both_Optional"
-		},
-		{
-			"Path": "/Libraries/System.IO.Compression.FileSystem/System.IO.Compression.FileSystem.dll",
 			"Role": "Both_Optional"
 		},
 		{

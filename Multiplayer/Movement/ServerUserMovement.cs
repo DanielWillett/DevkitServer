@@ -67,7 +67,7 @@ internal static class ServerUserMovement
 
         writer.WriteUInt8((byte)c);
 
-        Version v = Accessor.DevkitServer.GetName().Version;
+        Version v = AccessorExtensions.DevkitServer.GetName().Version;
         writer.WriteUInt32((uint)(((byte)v.Major << 24) | ((byte)v.Minor << 16) | ((byte)v.Build << 8) | (byte)v.Revision));
 
         foreach (EditorUser user in UserManager.Users)

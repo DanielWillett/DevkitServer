@@ -1,4 +1,5 @@
-﻿using DevkitServer.API;
+﻿using DanielWillett.ReflectionTools;
+using DevkitServer.API;
 using DevkitServer.API.Abstractions;
 using DevkitServer.API.Cartography.ChartColorProviders;
 using DevkitServer.API.Multiplayer;
@@ -680,7 +681,7 @@ public static class PluginLoader
     public static IDevkitServerPlugin? FindPluginForAssembly(Assembly assembly)
     {
         // check if the assembly just has one plugin
-        if (assembly == Accessor.DevkitServer) return null;
+        if (assembly == AccessorExtensions.DevkitServer) return null;
         lock (AssembliesIntl)
         {
             for (int i = 0; i < AssembliesIntl.Count; ++i)
@@ -708,7 +709,7 @@ public static class PluginLoader
 
         // check if the assembly just has one plugin
         Assembly asm = relaventType.Assembly;
-        if (asm == Accessor.DevkitServer) return null;
+        if (asm == AccessorExtensions.DevkitServer) return null;
         lock (AssembliesIntl)
         {
             for (int i = 0; i < AssembliesIntl.Count; ++i)

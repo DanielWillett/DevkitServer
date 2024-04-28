@@ -1,4 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
+using DanielWillett.SpeedBytes;
 
 namespace DevkitServer.Util.Encoding;
 public static unsafe class UnsafeBitConverter
@@ -320,5 +321,14 @@ public static unsafe class UnsafeBitConverter
             stack[i] = litEndStrt[i];
         for (int i = 0; i < size; i++)
             litEndStrt[i] = stack[size - i - 1];
+    }
+
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static void EndianCheck(byte* litEndStrt, int size)
+    {
+        if (size <= 1 || BitConverter.IsLittleEndian)
+            return;
+        Reverse(litEndStrt, size);
     }
 }

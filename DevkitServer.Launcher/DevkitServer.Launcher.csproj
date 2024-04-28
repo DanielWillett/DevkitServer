@@ -37,8 +37,8 @@
   <Import Project="$(SolutionDir)Unturned.targets" />
 
   <ItemGroup>
-    <PackageReference Remove="Newtonsoft.Json" />
-    <PackageReference Include="NuGet.Packaging" Version="6.8.0" />
+    <!--<PackageReference Remove="Newtonsoft.Json" />-->
+    <PackageReference Include="NuGet.Packaging" Version="[4.2.0,4.2.0]" />
   </ItemGroup>
 
   <ItemGroup>

@@ -3,6 +3,7 @@
 #endif
 #define TILE_SYNC
 using Cysharp.Threading.Tasks;
+using DanielWillett.ReflectionTools;
 using DevkitServer.API;
 using DevkitServer.API.Cartography;
 using DevkitServer.Configuration;
@@ -16,6 +17,7 @@ using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Multiplayer.Sync;
 using DevkitServer.Patches;
 using DevkitServer.Plugins;
+using DevkitServer.Util.Encoding;
 using SDG.Framework.Modules;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
@@ -101,7 +103,7 @@ public sealed class DevkitServerModule : IModuleNexus
     public static bool DevkitServerLoaded => Module != null;
     public static bool InitializedLogging { get; private set; }
     public static bool InitializedPluginLoader { get; internal set; }
-    public static string AssemblyPath => _asmPath ??= Accessor.DevkitServer.Location;
+    public static string AssemblyPath => _asmPath ??= AccessorExtensions.DevkitServer.Location;
     public static bool IsAuthorityEditor =>
 #if CLIENT
         Level.isEditor && !IsEditing;
@@ -266,7 +268,7 @@ public sealed class DevkitServerModule : IModuleNexus
             for (int i = ModuleHook.modules.Count - 1; i >= 0; i--)
             {
                 Module mdl = ModuleHook.modules[i];
-                if (!mdl.isEnabled || mdl.assemblies == null || mdl.assemblies.All(x => x != Accessor.DevkitServer))
+                if (!mdl.isEnabled || mdl.assemblies == null || mdl.assemblies.All(x => x != AccessorExtensions.DevkitServer))
                     continue;
 
                 module = mdl;
@@ -311,6 +313,8 @@ public sealed class DevkitServerModule : IModuleNexus
             // Initialize UniTask
             if (!PlayerLoopHelper.HasBeenInitialized)
                 PlayerLoopHelper.Init();
+
+            DevkitServerEncodingExtensions.Register();
 
             GameObjectHost = new GameObject(ModuleName);
             ComponentHost = GameObjectHost.AddComponent<DevkitServerModuleComponent>();
@@ -416,7 +420,7 @@ public sealed class DevkitServerModule : IModuleNexus
             GameObject? editor = (GameObject?)Resources.Load("Edit/Editor");
             if (editor != null)
             {
-                Component comp = editor.GetComponentInChildren(Accessor.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"));
+                Component comp = editor.GetComponentInChildren(AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.EditorInteract"));
                 if (comp != null)
                     Object.DestroyImmediate(comp);
                 else
@@ -475,7 +479,7 @@ public sealed class DevkitServerModule : IModuleNexus
             SpawnsNetIdDatabase.Init();
             RoadNetIdDatabase.Init();
             NavigationNetIdDatabase.Init();
-            ReplicatedLevelDataRegistry.RegisterFromAssembly(Accessor.DevkitServer, null, null);
+            ReplicatedLevelDataRegistry.RegisterFromAssembly(AccessorExtensions.DevkitServer, null, null);
 
             PluginLoader.LoadPlugins();
 
@@ -589,7 +593,7 @@ public sealed class DevkitServerModule : IModuleNexus
                 }
             }
 
-            UIExtensionManager.Reflect(Accessor.DevkitServer);
+            UIExtensionManager.Reflect(AccessorExtensions.DevkitServer);
         }
         catch (Exception ex)
         {
@@ -1110,7 +1114,7 @@ public sealed class DevkitServerModule : IModuleNexus
 #endif
     public static bool IsCompatibleWith(Version otherVersion)
     {
-        Version thisVersion = Accessor.DevkitServer.GetName().Version;
+        Version thisVersion = AccessorExtensions.DevkitServer.GetName().Version;
         return thisVersion.Major == otherVersion.Major && thisVersion.Minor == otherVersion.Minor;
     }
     /// <exception cref="InvalidOperationException">Thrown when <see cref="IsEditing"/> is not <see langword="true"/>.</exception>

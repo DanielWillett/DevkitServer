@@ -8,7 +8,8 @@
 // #define UI_EXT_DEBUG
 #endif
 
-using DevkitServer.API.Abstractions;
+using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools.Emit;
 using DevkitServer.API.UI.Extensions.Members;
 using DevkitServer.Patches;
 using DevkitServer.Plugins;
@@ -285,7 +286,7 @@ public static class UIExtensionManager
 
     internal static void LogDebug(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
-        string src = assembly != null && assembly != Accessor.DevkitServer
+        string src = assembly != null && assembly != AccessorExtensions.DevkitServer
                         ? Source + " | " + assembly.GetName().Name.ToUpperInvariant()
                         : Source;
 
@@ -296,7 +297,7 @@ public static class UIExtensionManager
     }
     internal static void LogInfo(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
-        string src = assembly != null && assembly != Accessor.DevkitServer
+        string src = assembly != null && assembly != AccessorExtensions.DevkitServer
             ? Source + " | " + assembly.GetName().Name.ToUpperInvariant()
             : Source;
 
@@ -307,7 +308,7 @@ public static class UIExtensionManager
     }
     internal static void LogWarning(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
-        string src = assembly != null && assembly != Accessor.DevkitServer
+        string src = assembly != null && assembly != AccessorExtensions.DevkitServer
             ? Source + " | " + assembly.GetName().Name.ToUpperInvariant()
             : Source;
 
@@ -318,7 +319,7 @@ public static class UIExtensionManager
     }
     internal static void LogError(string message, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
-        string src = assembly != null && assembly != Accessor.DevkitServer
+        string src = assembly != null && assembly != AccessorExtensions.DevkitServer
             ? Source + " | " + assembly.GetName().Name.ToUpperInvariant()
             : Source;
 
@@ -329,7 +330,7 @@ public static class UIExtensionManager
     }
     internal static void LogError(Exception ex, IDevkitServerPlugin? plugin = null, Assembly? assembly = null)
     {
-        string src = assembly != null && assembly != Accessor.DevkitServer
+        string src = assembly != null && assembly != AccessorExtensions.DevkitServer
             ? Source + " | " + assembly.GetName().Name.ToUpperInvariant()
             : Source;
 
@@ -349,9 +350,9 @@ public static class UIExtensionManager
             if (!type.TryGetAttributeSafe(out UIExtensionAttribute attribute))
                 continue;
 
-            LoadPriorityAttribute? priority = type.GetAttributeSafe<LoadPriorityAttribute>();
+            int priority = type.GetPriority();
             IDevkitServerPlugin? plugin = null;
-            if (type.Assembly != Accessor.DevkitServer)
+            if (type.Assembly != AccessorExtensions.DevkitServer)
             {
                 plugin = PluginLoader.FindPluginForMember(type);
                 if (plugin == null)
@@ -363,7 +364,7 @@ public static class UIExtensionManager
                 }
             }
 
-            UIExtensionInfo info = new UIExtensionInfo(type, attribute.ParentType, priority == null ? 0 : priority.Priority, plugin)
+            UIExtensionInfo info = new UIExtensionInfo(type, attribute.ParentType, priority, plugin)
             {
                 SuppressUIExtensionParentWarning = attribute.SuppressUIExtensionParentWarning
             };
@@ -818,12 +819,10 @@ public static class UIExtensionManager
                      .Concat<MemberInfo>(info.ImplementationType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.FlattenHierarchy))
                      .Concat(info.ImplementationType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.FlattenHierarchy)
                          .Where(x => !x.IsSpecialName))
-                     .OrderByDescending<MemberInfo, int>(DevkitServerModule.AssemblyResolver.TriedToLoadUIExtensionModule
-                         ? Compat.UIExtensionManagerCompat.GetPriority
-                         : x => x.GetPriority(true))
+                     .OrderByDescending(Accessor.GetPriority)
                      .ThenBy(x => x.Name))
         {
-            if (member.IsIgnored() || DevkitServerModule.AssemblyResolver.TriedToLoadUIExtensionModule && Compat.UIExtensionManagerCompat.IsIgnored(member))
+            if (member.IsIgnored())
                 continue;
 
             try
@@ -1642,21 +1641,19 @@ public static class UIExtensionManager
         if (!PatchInfo.TryGetValue(method, out UIExtensionExistingMemberPatchInfo info))
         {
             LogWarning($"Unable to patch {method.Format()}: Could not find existing member info for {declType.Format()}.", null, method.DeclaringType?.Assembly);
-            return PatchUtil.Throw<InvalidOperationException>($"Could not find existing member info for {declType.Name}.");
+            return PatchUtility.Throw<InvalidOperationException>($"Could not find existing member info for {declType.Name}.");
         }
-        List<CodeInstruction> inst = new List<CodeInstruction>();
 
-        DebuggableEmitter il = new DebuggableEmitter(generator.AsEmitter(), method, inst);
-
+        TranspileContext ctx = new TranspileContext(method, generator, Array.Empty<CodeInstruction>());
         if (!info.MemberInfo.ExistingIsStatic)
         {
             if (typeof(UIExtension).IsAssignableFrom(info.Extension.ImplementationType) &&
                 typeof(UIExtension).GetProperty(nameof(UIExtension.Instance), BindingFlags.Instance | BindingFlags.Public)?.GetGetMethod(true) is { } prop)
             {
                 // this.Instance
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Call, prop);
-                il.Emit(OpCodes.Castclass, info.Extension.ParentType);
+                ctx.Emit(OpCodes.Ldarg_0);
+                ctx.Emit(OpCodes.Call, prop);
+                ctx.Emit(OpCodes.Castclass, info.Extension.ParentType);
             }
             else if (DevkitServerModule.AssemblyResolver.TriedToLoadUIExtensionModule &&
                      Compat.UIExtensionManagerCompat.IsAssignableFromUIExtension(info.Extension.ImplementationType)
@@ -1665,26 +1662,26 @@ public static class UIExtensionManager
                          .GetGetMethod(true) is { } prop2)
             {
                 // this.Instance
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(OpCodes.Call, prop2);
-                il.Emit(OpCodes.Castclass, info.Extension.ParentType);
+                ctx.Emit(OpCodes.Ldarg_0);
+                ctx.Emit(OpCodes.Call, prop2);
+                ctx.Emit(OpCodes.Castclass, info.Extension.ParentType);
             }
             else
             {
-                UIAccessTools.LoadUIToILGenerator(il, info.Extension.ParentType);
+                UIAccessTools.LoadUIToILGenerator(ctx, info.Extension.ParentType);
             }
         }
 
-        info.MemberInfo.EmitApply(il, true);
+        info.MemberInfo.EmitApply(ctx, true);
 
-        il.Emit(OpCodes.Ret);
+        ctx.Emit(OpCodes.Ret);
         LogDebug($"Transpiled {method.Format()} for extension for {info.Extension.ParentType.Format()}.", info.Extension.Plugin, info.Extension.Assembly);
-        return inst;
+        return ctx;
     }
     private static readonly MethodInfo TranspileSetterPropertyMethod = typeof(UIExtensionManager).GetMethod(nameof(TranspileSetterProperty), BindingFlags.NonPublic | BindingFlags.Static)!;
 
     [UsedImplicitly]
-    private static IEnumerable<CodeInstruction> TranspileSetterProperty(IEnumerable<CodeInstruction> instructions, MethodBase method) => PatchUtil.Throw<NotImplementedException>($"{method.Name.Replace("set_", "")} can not have a setter, as it is a UI extension implementation.");
+    private static IEnumerable<CodeInstruction> TranspileSetterProperty(IEnumerable<CodeInstruction> instructions, MethodBase method) => PatchUtility.Throw<NotImplementedException>($"{method.Name.Replace("set_", "")} can not have a setter, as it is a UI extension implementation.");
 
     /// <summary>
     /// Represents a patch for an existing member.

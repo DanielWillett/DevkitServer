@@ -3,6 +3,7 @@ using StackCleaner;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using DanielWillett.ReflectionTools;
 using DevkitServer.Configuration;
 using DevkitServer.Patches;
 
@@ -758,7 +759,7 @@ public static class LoggerExtensions
         {
             MethodInfo? method = typeof(LogFile).GetMethod(nameof(LogFile.writeLine), BindingFlags.Instance | BindingFlags.Public);
             if (method != null)
-                PatchesMain.Patcher.Patch(method, prefix: Accessor.GetHarmonyMethod(OnLinePrinted));
+                PatchesMain.Patcher.Patch(method, prefix: Accessor.Active.GetHarmonyMethod(OnLinePrinted));
         }
         catch (Exception ex)
         {

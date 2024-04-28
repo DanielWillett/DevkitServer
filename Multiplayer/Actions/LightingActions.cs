@@ -1,5 +1,5 @@
-﻿using DevkitServer.API.Lighting;
-using DevkitServer.Util.Encoding;
+﻿using DanielWillett.SpeedBytes;
+using DevkitServer.API.Lighting;
 #if SERVER
 using DevkitServer.API.Permissions;
 using DevkitServer.Configuration;
@@ -40,6 +40,7 @@ public sealed class LightingActions
         }
 #endif
     }
+#if CLIENT
     private void OnSetLightingFloat(in SetLightingFloatProperties properties)
     {
         EditorActions.QueueAction(new SetLightingFloatAction
@@ -86,6 +87,7 @@ public sealed class LightingActions
             LightingTime = properties.Time
         });
     }
+#endif
 }
 
 [Action(DevkitServerActionType.SetLightingFloat, 9, 0)]

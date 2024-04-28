@@ -1,6 +1,7 @@
 ﻿using Cysharp.Threading.Tasks;
+using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools.Emit;
 using DevkitServer.API;
-using DevkitServer.API.Abstractions;
 using SDG.Framework.Modules;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -376,7 +377,7 @@ public static class AssetUtil
             }
 
             MethodInfo method = typeof(AssetUtil).GetMethod(nameof(GetData), BindingFlags.Static | BindingFlags.NonPublic)!;
-            Type? assetInfo = Accessor.AssemblyCSharp.GetType("SDG.Unturned.AssetsWorker+AssetDefinition", false, false);
+            Type? assetInfo = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.AssetsWorker+AssetDefinition", false, false);
             if (assetInfo == null)
             {
                 Logger.DevkitServer.LogError(Source, "Type not found: AssetsWorker.AssetDefinition.");
@@ -423,7 +424,7 @@ public static class AssetUtil
                 Logger.DevkitServer.LogError(Source, "Missing field in AssetsWorker.AssetDefinition.");
             }
 
-            DynamicMethod dm = new DynamicMethod("LoadAsset", typeof(void), new Type[] { typeof(string), typeof(AssetOrigin) }, typeof(AssetUtil).Module, true);
+            DynamicMethod dm = new DynamicMethod("LoadAsset", typeof(void), [ typeof(string), typeof(AssetOrigin) ], typeof(AssetUtil).Module, true);
             IOpCodeEmitter generator = dm.GetILGenerator().AsEmitter();
             dm.DefineParameter(0, ParameterAttributes.None, "path");
             dm.DefineParameter(1, ParameterAttributes.None, "assetOrigin");

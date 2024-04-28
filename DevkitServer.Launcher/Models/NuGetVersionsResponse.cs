@@ -1,4 +1,6 @@
-﻿using Newtonsoft.Json;
+﻿extern alias NSJ;
+
+using NSJ::Newtonsoft.Json;
 using System;
 
 namespace DevkitServer.Launcher.Models;

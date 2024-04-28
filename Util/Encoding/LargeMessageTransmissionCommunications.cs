@@ -4,6 +4,7 @@ using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Networking;
 using System.Collections.Concurrent;
 using System.Text.Json;
+using DanielWillett.SpeedBytes;
 
 namespace DevkitServer.Util.Encoding;
 internal class LargeMessageTransmissionCommunications : IDisposable

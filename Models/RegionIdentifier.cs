@@ -1,4 +1,4 @@
-﻿using DevkitServer.Util.Encoding;
+﻿using DanielWillett.SpeedBytes;
 using System.Globalization;
 using System.Runtime.InteropServices;
 

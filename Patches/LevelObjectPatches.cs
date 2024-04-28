@@ -1,8 +1,10 @@
-﻿using DevkitServer.Models;
+﻿using DanielWillett.ReflectionTools;
+using DevkitServer.Models;
 using DevkitServer.Multiplayer.Levels;
 using HarmonyLib;
 using System.Reflection;
 using System.Reflection.Emit;
+using DanielWillett.ReflectionTools.Emit;
 #if CLIENT
 using DevkitServer.API;
 using DevkitServer.API.Permissions;
@@ -194,7 +196,7 @@ internal static class LevelObjectPatches
             }
 
             // start using handle
-            if (!patchedHandleDown && PatchUtil.MatchPattern(ins, i,
+            if (!patchedHandleDown && PatchUtility.MatchPattern(ins, i,
 
                     // EditorObjects.pointSelection()
                     x => pointSelection != null && x.Calls(pointSelection),
@@ -202,8 +204,8 @@ internal static class LevelObjectPatches
                     x => x.LoadsField(handles)
                 ))
             {
-                Label? @goto = PatchUtil.GetNextBranchTarget(ins, i);
-                PatchUtil.ReturnIfFalse(ins, generator, ref i, CheckCanMove, @goto);
+                Label? @goto = PatchUtility.GetNextBranchTarget(ins, i);
+                PatchUtility.ReturnIfFalse(ins, generator, ref i, CheckCanMove, @goto);
                 patchedHandleDown = true;
                 continue;
             }
@@ -216,16 +218,16 @@ internal static class LevelObjectPatches
             }
 
             // delete selection
-            if (!patchedDelete && PatchUtil.FollowPattern(ins, ref i,
+            if (!patchedDelete && PatchUtility.FollowPattern(ins, ref i,
 
                     // ( if pressed delete
                     x => x.LoadsConstant(KeyCode.Delete),
-                    x => x.Calls(Accessor.GetKeyDown),
+                    x => x.Calls(AccessorExtensions.GetKeyDown),
                     x => x.opcode.IsBr(brtrue: true),
 
                     // or pressed backspace )
                     x => x.LoadsConstant(KeyCode.Backspace),
-                    x => x.Calls(Accessor.GetKeyDown),
+                    x => x.Calls(AccessorExtensions.GetKeyDown),
                     x => x.opcode.IsBr(brfalse: true),
 
                     // and selection count is greater than zero
@@ -234,32 +236,32 @@ internal static class LevelObjectPatches
                     null,
                     x => x.opcode.IsBrAny()))
             {
-                Label? @goto = PatchUtil.GetNextBranchTarget(ins, i - 1);
-                PatchUtil.ReturnIfFalse(ins, generator, ref i, OnDeleteSelection, @goto);
+                Label? @goto = PatchUtility.GetNextBranchTarget(ins, i - 1);
+                PatchUtility.ReturnIfFalse(ins, generator, ref i, OnDeleteSelection, @goto);
                 Logger.DevkitServer.LogDebug(Source, "Patched deleting objects.");
                 patchedDelete = true;
                 continue;
             }
 
             // copy
-            if (!patchedCopy && PatchUtil.MatchPattern(ins, i,
+            if (!patchedCopy && PatchUtility.MatchPattern(ins, i,
                     x => x.LoadsField(copiedObjects),
                     x => x.Calls(clearCopiedObjects)
                 ))
             {
-                Label? @goto = PatchUtil.GetNextBranchTarget(ins, i - 1);
-                PatchUtil.ReturnIfFalse(ins, generator, ref i, CheckCanCopy, @goto);
+                Label? @goto = PatchUtility.GetNextBranchTarget(ins, i - 1);
+                PatchUtility.ReturnIfFalse(ins, generator, ref i, CheckCanCopy, @goto);
                 Logger.DevkitServer.LogDebug(Source, "Patched copying objects.");
                 patchedCopy = true;
                 continue;
             }
 
             // paste
-            if (!patchedPaste && PatchUtil.FollowPattern(ins, ref i,
+            if (!patchedPaste && PatchUtility.FollowPattern(ins, ref i,
 
                     // if pressed v
                     x => x.LoadsConstant(KeyCode.V),
-                    x => x.Calls(Accessor.GetKeyDown),
+                    x => x.Calls(AccessorExtensions.GetKeyDown),
                     x => x.opcode.IsBr(brfalse: true),
 
                     // and copies count is greater than zero
@@ -270,33 +272,33 @@ internal static class LevelObjectPatches
 
                     // and holding control
                     x => x.LoadsConstant(KeyCode.LeftControl),
-                    x => x.Calls(Accessor.GetKey),
+                    x => x.Calls(AccessorExtensions.GetKey),
                     x => x.opcode.IsBr(brfalse: true)
                 ))
             {
-                Label? @goto = PatchUtil.GetNextBranchTarget(ins, i - 1);
+                Label? @goto = PatchUtility.GetNextBranchTarget(ins, i - 1);
                 if (!@goto.HasValue)
                     continue;
 
                 Label notDevkitServerLabel = generator.DefineLabel();
                 ins[i].labels.Add(notDevkitServerLabel);
-                ins.Insert(i, new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter));
+                ins.Insert(i, new CodeInstruction(OpCodes.Call, AccessorExtensions.IsDevkitServerGetter));
                 ins.Insert(i + 1, new CodeInstruction(OpCodes.Brfalse, notDevkitServerLabel));
                 i += 2;
                 ins.Insert(i, new CodeInstruction(OpCodes.Call, new Action(Paste).Method));
                 ins.Insert(i + 1, new CodeInstruction(OpCodes.Br, @goto.Value));
-                PatchUtil.ReturnIfFalse(ins, generator, ref i, CheckCanPaste, @goto);
+                PatchUtility.ReturnIfFalse(ins, generator, ref i, CheckCanPaste, @goto);
                 i += 2;
                 Logger.DevkitServer.LogDebug(Source, "Patched pasteing objects.");
                 patchedPaste = true;
-                int index2 = PatchUtil.FindLabelDestinationIndex(ins, @goto.Value, i);
+                int index2 = PatchUtility.FindLabelDestinationIndex(ins, @goto.Value, i);
                 if (index2 >= 0)
                     i = index2;
                 continue;
             }
 
             // ctrl n (paste transform)
-            if (!patchedPasteTransform && PatchUtil.MatchPattern(ins, i,
+            if (!patchedPasteTransform && PatchUtility.MatchPattern(ins, i,
 
                     // pointSelection()
                     x => pointSelection != null && x.Calls(pointSelection),
@@ -308,17 +310,17 @@ internal static class LevelObjectPatches
                     x => x.opcode.IsBrAny())
                 )
             {
-                Label? @goto = PatchUtil.GetNextBranchTarget(ins, i - 1);
-                PatchUtil.ReturnIfFalse(ins, generator, ref i, CheckCanMove, @goto);
+                Label? @goto = PatchUtility.GetNextBranchTarget(ins, i - 1);
+                PatchUtility.ReturnIfFalse(ins, generator, ref i, CheckCanMove, @goto);
                 ins[i].labels.AddRange(ins[i + 1].labels);
                 ins[i + 1].labels.Clear();
                 i += 6;
-                PatchUtil.ContinueUntil(ins, ref i, x => x.Calls(calculateHandleOffsets), false);
+                PatchUtility.ContinueUntil(ins, ref i, x => x.Calls(calculateHandleOffsets), false);
                 CodeInstruction instr = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(OnMoveOneObject));
                 ins.Insert(i++, instr);
                 instr.labels.AddRange(ins[i].labels);
                 ins[i].labels.Clear();
-                PatchUtil.ContinueUntil(ins, ref i, x => x.opcode.IsBrAny(), false);
+                PatchUtility.ContinueUntil(ins, ref i, x => x.opcode.IsBrAny(), false);
                 instr = new CodeInstruction(OpCodes.Call, Accessor.GetMethod(PreIsFinalExternallyTransforming));
                 ins.Insert(i++, instr);
                 instr.labels.AddRange(ins[i].labels);
@@ -329,7 +331,7 @@ internal static class LevelObjectPatches
             }
 
             // instantiate object
-            if (!patchedInstantiate && PatchUtil.MatchPattern(ins, i,
+            if (!patchedInstantiate && PatchUtility.MatchPattern(ins, i,
                     x => registerAddObject != null && x.Calls(registerAddObject),
                     x => x.opcode.IsStLoc()
                     ))
@@ -341,7 +343,7 @@ internal static class LevelObjectPatches
                 ++i;
 
                 if (addSelection != null)
-                    PatchUtil.RemoveUntil(ins, i, x => x.Calls(addSelection), true);
+                    PatchHelpers.RemoveUntil(ins, i, x => x.Calls(addSelection), true);
                 
                 patchedInstantiate = true;
             }
@@ -833,11 +835,11 @@ internal static class LevelObjectPatches
                 indexRangeSt = i;
                 ins.Insert(i, ins[i - 2].CopyWithoutSpecial());
                 ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldfld, field));
-                ins.Insert(i + 2, PatchUtil.GetLocalCodeInstruction(lcl, -1, true, false));
+                ins.Insert(i + 2, PatchHelpers.GetLocalCodeInstruction(lcl, -1, true, false));
                 ins.Insert(i + 4, ins[i - 2].CopyWithoutSpecial());
                 ins.Insert(i + 5, ins[i - 1].CopyWithoutSpecial());
-                valueLcl = PatchUtil.GetLocal(ins[i - 1], out valueLclIndex, false);
-                ins.Insert(i + 6, PatchUtil.GetLocalCodeInstruction(lcl, -1, false, false));
+                valueLcl = PatchUtility.GetLocal(ins[i - 1], out valueLclIndex, false);
+                ins.Insert(i + 6, PatchHelpers.GetLocalCodeInstruction(lcl, -1, false, false));
                 ins.Insert(i + 7, new CodeInstruction(OpCodes.Call, new Action<LevelObject, AssetReference<MaterialPaletteAsset>, AssetReference<MaterialPaletteAsset>>(OnCustomMaterialPaletteOverrideUpdated).Method));
                 i += 7;
                 patchedInner = true;
@@ -845,7 +847,7 @@ internal static class LevelObjectPatches
             }
             else if (patchedInner && !patchedOuter && ins[i].opcode == OpCodes.Endfinally)
             {
-                ins.Insert(i, PatchUtil.GetLocalCodeInstruction(valueLcl, valueLclIndex, false));
+                ins.Insert(i, PatchHelpers.GetLocalCodeInstruction(valueLcl, valueLclIndex, false));
                 ins.Insert(i + 1, new CodeInstruction(OpCodes.Call, new Action<AssetReference<MaterialPaletteAsset>>(EndCustomMaterialPaletteOverrideChangeGroup).Method));
                 i += 2;
                 patchedOuter = true;
@@ -935,10 +937,10 @@ internal static class LevelObjectPatches
                 indexRangeSt = i;
                 ins.Insert(i, ins[i - 2].CopyWithoutSpecial());
                 ins.Insert(i + 1, new CodeInstruction(OpCodes.Ldfld, field));
-                ins.Insert(i + 2, PatchUtil.GetLocalCodeInstruction(lcl, -1, true, false));
+                ins.Insert(i + 2, PatchHelpers.GetLocalCodeInstruction(lcl, -1, true, false));
                 ins.Insert(i + 4, ins[i - 2].CopyWithoutSpecial());
                 ins.Insert(i + 5, ins[i - 1].CopyWithoutSpecial());
-                ins.Insert(i + 6, PatchUtil.GetLocalCodeInstruction(lcl, -1, false, false));
+                ins.Insert(i + 6, PatchHelpers.GetLocalCodeInstruction(lcl, -1, false, false));
                 ins.Insert(i + 7, new CodeInstruction(OpCodes.Call, new Action<LevelObject, int, int>(OnMaterialIndexOverrideUpdated).Method));
                 i += 7;
                 patchedInner = true;
@@ -1130,7 +1132,7 @@ internal static class LevelObjectPatches
             if (destroyMethod != null && ins[i].Calls(destroyMethod))
             {
                 ins.Insert(i, new CodeInstruction(OpCodes.Dup));
-                ins.Insert(i + 1, PatchUtil.GetLocalCodeInstruction(lcl, -1, true, false));
+                ins.Insert(i + 1, PatchHelpers.GetLocalCodeInstruction(lcl, -1, true, false));
                 i += 2;
                 destroyPatch = true;
             }
@@ -1140,7 +1142,7 @@ internal static class LevelObjectPatches
                 LocalBuilder? lclIndexB = null, lclXB = null, lclYB = null;
                 for (int j = i - 1; j >= 0; --j)
                 {
-                    int index = PatchUtil.GetLocalIndex(ins[j], false);
+                    int index = PatchUtility.GetLocalIndex(ins[j], false);
                     if (index == -1) continue;
                     switch (++ct)
                     {
@@ -1161,10 +1163,10 @@ internal static class LevelObjectPatches
                     if (ct >= 2)
                         break;
                 }
-                ins.Insert(i + 1, PatchUtil.GetLocalCodeInstruction(lcl, -1, false, false));
-                ins.Insert(i + 2, PatchUtil.GetLocalCodeInstruction(lclXB, lclX, false, false));
-                ins.Insert(i + 3, PatchUtil.GetLocalCodeInstruction(lclYB, lclY, false, false));
-                ins.Insert(i + 4, PatchUtil.GetLocalCodeInstruction(lclIndexB, lclIndex, false, false));
+                ins.Insert(i + 1, PatchHelpers.GetLocalCodeInstruction(lcl, -1, false, false));
+                ins.Insert(i + 2, PatchHelpers.GetLocalCodeInstruction(lclXB, lclX, false, false));
+                ins.Insert(i + 3, PatchHelpers.GetLocalCodeInstruction(lclYB, lclY, false, false));
+                ins.Insert(i + 4, PatchHelpers.GetLocalCodeInstruction(lclIndexB, lclIndex, false, false));
                 ins.Insert(i + 5, new CodeInstruction(invoker.GetCallRuntime(), invoker));
                 removePatch = true;
                 break;

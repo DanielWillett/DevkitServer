@@ -1,4 +1,5 @@
-﻿using DevkitServer.Configuration;
+﻿using DanielWillett.SpeedBytes;
+using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Multiplayer.Networking;
 using DevkitServer.Players;
@@ -375,7 +376,7 @@ public sealed class NavigationSync : AuthoritativeSync<NavigationSync>
         CreateFileStream();
 
         Flag flag = flags[nav];
-        ByteWriter writer = new ByteWriter(false)
+        ByteWriter writer = new ByteWriter
         {
             Stream = _fs,
             Buffer = Buffer

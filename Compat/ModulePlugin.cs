@@ -1,4 +1,5 @@
-﻿using DevkitServer.API;
+﻿using DanielWillett.ReflectionTools;
+using DevkitServer.API;
 using DevkitServer.Core.Logging.Loggers;
 using DevkitServer.Plugins;
 using SDG.Framework.Modules;
@@ -8,7 +9,7 @@ namespace DevkitServer.Compat;
 /// <summary>
 /// Plugin representing a foreign module for compatability reasons.
 /// </summary>
-[LoadPriority(int.MinValue)]
+[Priority(int.MinValue)]
 [Ignore]
 public class ModulePlugin : CoreLogger, IDevkitServerColorPlugin
 {

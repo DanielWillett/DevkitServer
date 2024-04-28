@@ -1,9 +1,9 @@
-﻿using DevkitServer.API.Permissions;
+﻿using DanielWillett.SpeedBytes;
+using DevkitServer.API.Permissions;
 #if SERVER
 using DevkitServer.Configuration;
 using DevkitServer.Core.Permissions;
 using DevkitServer.Multiplayer;
-using DevkitServer.Util.Encoding;
 #endif
 
 namespace DevkitServer.Core.Commands.Subsystem;
@@ -94,7 +94,7 @@ public class DevkitServerPermissions : IUserPermissionHandler, IPermissionHandle
         ReloadIntl();
         for (int i = 0; i < _permissionGroups.Count; ++i)
             EventPermissionGroupRegistered.TryInvoke(_permissionGroups[i]);
-        _writer = new ByteWriter(false, 512);
+        _writer = new ByteWriter(512);
         _reader = new ByteReader();
 #endif
     }

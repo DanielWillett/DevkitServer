@@ -13,6 +13,7 @@ using SDG.Framework.Devkit.Tools;
 using SDG.Framework.Landscapes;
 using System.Reflection;
 using System.Reflection.Emit;
+using DanielWillett.ReflectionTools;
 
 namespace DevkitServer.Patches;
 [HarmonyPatch]
@@ -217,7 +218,7 @@ internal static class TerrainEditorPatches
                     if (permission != null && hasPermission != null)
                     {
                         lbl = generator.DefineLabel();
-                        yield return new CodeInstruction(OpCodes.Call, Accessor.IsDevkitServerGetter);
+                        yield return new CodeInstruction(OpCodes.Call, AccessorExtensions.IsDevkitServerGetter);
                         yield return new CodeInstruction(OpCodes.Brfalse, lbl.Value);
                         if (permission != null)
                         {
@@ -252,12 +253,12 @@ internal static class TerrainEditorPatches
                     if (lbl.HasValue)
                         c2.labels.Add(lbl.Value);
                     yield return c2;
-                    yield return PatchUtil.GetLocalCodeInstruction(localBounds, localBounds.LocalIndex, true);
+                    yield return PatchHelpers.GetLocalCodeInstruction(localBounds, localBounds.LocalIndex, true);
                     yield return c;
                     yield return n;
                     yield return ins[i + 2];
                     yield return ins[i + 3];
-                    yield return PatchUtil.GetLocalCodeInstruction(localBounds, localBounds.LocalIndex, false);
+                    yield return PatchHelpers.GetLocalCodeInstruction(localBounds, localBounds.LocalIndex, false);
                     MethodInfo? invoker = null;
                     // heightmap
                     if (method == rampHandler)
@@ -304,7 +305,7 @@ internal static class TerrainEditorPatches
             else if (addTileCt == 0 && addTile != null && c.Calls(addTile) && n != null)
             {
                 addTileCt = lHMarkDirty == null ? 2 : 1;
-                addTileLcl2 = PatchUtil.GetLocal(n, out addTileLcl, true);
+                addTileLcl2 = PatchUtility.GetLocal(n, out addTileLcl, true);
                 if (addTileLcl2 == null)
                     addTileCt = 2;
                 if (addTileCt == 2)
@@ -316,7 +317,7 @@ internal static class TerrainEditorPatches
             else if (addTileCt == 1 && c.Calls(lHMarkDirty!))
             {
                 yield return c;
-                yield return PatchUtil.GetLocalCodeInstruction(addTileLcl2, addTileLcl, false);
+                yield return PatchHelpers.GetLocalCodeInstruction(addTileLcl2, addTileLcl, false);
                 yield return new CodeInstruction(OpCodes.Call, addTileInvoker);
                 Logger.DevkitServer.LogDebug(nameof(TerrainEditorUpdateTranspiler), "Patched in OnAddTile call.");
                 addTileCt = 2;

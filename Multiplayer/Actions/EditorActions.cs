@@ -11,6 +11,7 @@ using DevkitServer.Util.Encoding;
 using SDG.Framework.Utilities;
 using SDG.NetPak;
 using System.Reflection;
+using DanielWillett.SpeedBytes;
 
 #if SERVER
 using DevkitServer.API.UI;
@@ -41,7 +42,7 @@ public sealed class EditorActions : MonoBehaviour, IActionListener
     private const float ActionFlushInterval = 0.125f;
 
     private static readonly ByteReader Reader = new ByteReader { ThrowOnError = true };
-    private static readonly ByteWriter Writer = new ByteWriter(false, 8192);
+    private static readonly ByteWriter Writer = new ByteWriter(8192);
 
     /// <remarks>Reversed for everyone but the owner. </remarks>
     private readonly List<IAction> _pendingActions = new List<IAction>();

@@ -1,4 +1,4 @@
-﻿using DevkitServer.Util.Encoding;
+﻿using DanielWillett.SpeedBytes;
 
 namespace DevkitServer.Multiplayer;
 internal sealed class InstanceIdResponsibilityTable(string savePath, string source)
@@ -10,7 +10,7 @@ internal sealed class InstanceIdResponsibilityTable(string savePath, string sour
 #else
     private readonly HashSet<uint> Responsibilities = new HashSet<uint>(32);
 #endif
-    private static readonly ByteWriter Writer = new ByteWriter(false);
+    private static readonly ByteWriter Writer = new ByteWriter();
     private static readonly ByteReader Reader = new ByteReader { LogOnError = true };
     
     public string SavePath { get; } = savePath;
@@ -59,12 +59,11 @@ internal sealed class InstanceIdResponsibilityTable(string savePath, string sour
                     break;
                 }
 #if SERVER
-                if (Responsibilities.ContainsKey(instanceId))
-                {
-                    save = true;
-                    Responsibilities[instanceId] = steam64;
-                }
-                else Responsibilities.Add(instanceId, steam64);
+                if (Responsibilities.TryAdd(instanceId, steam64))
+                    continue;
+
+                save = true;
+                Responsibilities[instanceId] = steam64;
 #else
                 if (!Responsibilities.Add(instanceId))
                     save = true;

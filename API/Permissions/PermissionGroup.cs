@@ -1,5 +1,6 @@
-﻿using DevkitServer.Configuration;
-using DevkitServer.Util.Encoding;
+﻿using DanielWillett.SpeedBytes;
+using DanielWillett.SpeedBytes.Unity;
+using DevkitServer.Configuration;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 #if CLIENT

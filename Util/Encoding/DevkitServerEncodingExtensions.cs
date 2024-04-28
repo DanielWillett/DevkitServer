@@ -1,45 +1,34 @@
-﻿using DevkitServer.Models;
-using System.Collections.ObjectModel;
-using System.Reflection;
-using System.Runtime.Serialization;
+﻿using DanielWillett.SpeedBytes;
+using DanielWillett.SpeedBytes.Unity;
+using DevkitServer.API;
 using DevkitServer.Multiplayer.Actions;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace DevkitServer.Util.Encoding;
 
-[Serializable]
-public class ByteEncoderException : Exception
+[EarlyTypeInit(1)]
+public static class DevkitServerEncodingExtensions
 {
-    public ByteEncoderException() { }
-    public ByteEncoderException(string message) : base(message) { }
-    public ByteEncoderException(string message, Exception inner) : base(message, inner) { }
-    protected ByteEncoderException(SerializationInfo info, StreamingContext context) : base(info, context) { }
-}
-[Serializable]
-public class ByteBufferOverflowException : ByteEncoderException
-{
-    public ByteBufferOverflowException() { }
-    public ByteBufferOverflowException(string message) : base(message) { }
-    public ByteBufferOverflowException(string message, Exception inner) : base(message, inner) { }
-    protected ByteBufferOverflowException(SerializationInfo info, StreamingContext context) : base(info, context) { }
-}
-public static class EncodingEx
-{
-    internal static readonly Type[] ValidTypes =
+    static DevkitServerEncodingExtensions()
     {
-        typeof(ulong), typeof(float), typeof(long), typeof(ushort), typeof(short), typeof(byte), typeof(int), typeof(uint), typeof(bool), typeof(char), typeof(sbyte), typeof(double),
-        typeof(string), typeof(decimal), typeof(DateTime), typeof(DateTimeOffset), typeof(TimeSpan), typeof(Guid),
-        typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Quaternion), typeof(Color), typeof(Color32), typeof(Bounds), typeof(Type),
-        typeof(RegionIdentifier), typeof(NetId), typeof(NetId64), typeof(CSteamID),
-        typeof(ulong?), typeof(float?), typeof(long?), typeof(ushort?), typeof(short?), typeof(byte?), typeof(int?), typeof(uint?), typeof(bool?), typeof(char?), typeof(sbyte?),
-        typeof(double?), typeof(decimal?), typeof(DateTime?), typeof(DateTimeOffset?), typeof(TimeSpan?), typeof(Guid?),
-        typeof(Vector2?), typeof(Vector3?), typeof(Vector4?), typeof(Quaternion?), typeof(Color?), typeof(Color32?), typeof(Bounds?), typeof(NetId?), typeof(NetId64?),
-        typeof(CSteamID?)
-    };
-    internal static readonly Type[] ValidArrayTypes =
+        // register auto-serializable types
+        ByteEncoders.TryAddAutoSerializableStructType(Write, WriteNullable, ReadNetId, ReadNullableNetId);
+        ByteEncoders.TryAddAutoSerializableStructType(Write, WriteNullable, ReadNetId64, ReadNullableNetId64);
+        ByteEncoders.TryAddAutoSerializableStructType(Write, WriteNullable, ReadCSteamID, ReadNullableCSteamID);
+
+        SpeedBytesUnityExtensions.Register();
+    }
+
+    /// <summary>
+    /// Must be called to register types for auto-serialization.
+    /// </summary>
+    /// <remarks>This registration actually happens in the type initializer but this method will invoke that, as will any other method in this class.</remarks>
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+    public static void Register()
     {
-        typeof(ulong), typeof(float), typeof(long), typeof(ushort), typeof(short), typeof(byte), typeof(int), typeof(uint), typeof(bool), typeof(sbyte), typeof(decimal), typeof(char),
-        typeof(double), typeof(string), typeof(DateTime), typeof(DateTimeOffset), typeof(Guid), typeof(Type)
-    };
+
+    }
 
     /// <summary>
     /// Max size of a terrain tool <see cref="Bounds"/> written with <see cref="WriteTerrainToolBounds"/>.
@@ -72,32 +61,6 @@ public static class EncodingEx
     /// </summary>
     /// <remarks>Maximum is just this but positive.</remarks>
     public const int Int24MinValue = -Int24MaxValue;
-
-    /// <summary>
-    /// A list of all (non-array) types that can be automatically read and written by <see cref="ByteReader"/> and <see cref="ByteWriter"/>. 
-    /// </summary>
-    /// <remarks>Includes nullable types as separate entries. Enums are not included but are all also valid.</remarks>
-    public static readonly IReadOnlyList<Type> ValidReadWriteTypes = new ReadOnlyCollection<Type>(ValidTypes);
-
-    /// <summary>
-    /// A list of all array types that can be automatically read and written by <see cref="ByteReader"/> and <see cref="ByteWriter"/>. 
-    /// </summary>
-    /// <remarks>The types in this array represent the element type, not the actual array type. Enums are not included but are all also valid.</remarks>
-    public static readonly IReadOnlyList<Type> ValidArrayReadWriteTypes = new ReadOnlyCollection<Type>(ValidArrayTypes);
-
-    /// <summary>
-    /// Checks if a type can be automatically read and written by <see cref="ByteReader"/> and <see cref="ByteWriter"/>.
-    /// </summary>
-    public static bool IsValidAutoType(Type type)
-    {
-        if (type.IsEnum) return true;
-        if (type.IsArray)
-        {
-            type = type.GetElementType()!;
-            return type != null && ValidArrayTypes.Contains(type);
-        }
-        return ValidTypes.Contains(type);
-    }
 
     /// <summary>
     /// Reads a bounds inflated to be written as an integer in a compressed manner.
@@ -406,9 +369,135 @@ public static class EncodingEx
                 {
                     writer.Write((byte)TypeCode.Object);
                     writer.Write(type);
-                    writerMethod.Invoke(writer, new object[] { value });
+                    writerMethod.Invoke(writer, [ value ]);
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Write a <see cref="NetId"/> to the buffer.
+    /// </summary>
+    public static void Write(this ByteWriter writer, NetId n)
+    {
+        writer.Write(n.id);
+    }
+
+    /// <summary>
+    /// Reads a <see cref="NetId"/> from the buffer.
+    /// </summary>
+    public static NetId ReadNetId(this ByteReader reader)
+    {
+        return new NetId(reader.ReadUInt32());
+    }
+
+    /// <summary>
+    /// Write a <see cref="NetId"/> to the buffer.
+    /// </summary>
+    public static void WriteNullable(this ByteWriter writer, NetId? n)
+    {
+        if (!n.HasValue)
+        {
+            writer.Write(false);
+            return;
+        }
+
+        writer.Write(true);
+        writer.Write(n.Value.id);
+    }
+
+    /// <summary>
+    /// Reads a <see cref="NetId"/> from the buffer.
+    /// </summary>
+    public static NetId? ReadNullableNetId(this ByteReader reader)
+    {
+        if (!reader.ReadBool())
+            return null;
+
+        return new NetId(reader.ReadUInt32());
+    }
+
+    /// <summary>
+    /// Write a <see cref="NetId64"/> to the buffer.
+    /// </summary>
+    public static void Write(this ByteWriter writer, NetId64 n)
+    {
+        writer.Write(n.Id);
+    }
+
+    /// <summary>
+    /// Reads a <see cref="NetId64"/> from the buffer.
+    /// </summary>
+    public static NetId64 ReadNetId64(this ByteReader reader)
+    {
+        return new NetId64(reader.ReadUInt64());
+    }
+
+    /// <summary>
+    /// Write a <see cref="NetId64"/> to the buffer.
+    /// </summary>
+    public static void WriteNullable(this ByteWriter writer, NetId64? n)
+    {
+        if (!n.HasValue)
+        {
+            writer.Write(false);
+            return;
+        }
+
+        writer.Write(true);
+        writer.Write(n.Value.Id);
+    }
+
+    /// <summary>
+    /// Reads a <see cref="NetId64"/> from the buffer.
+    /// </summary>
+    public static NetId64? ReadNullableNetId64(this ByteReader reader)
+    {
+        if (!reader.ReadBool())
+            return null;
+
+        return new NetId64(reader.ReadUInt64());
+    }
+
+    /// <summary>
+    /// Write a <see cref="CSteamID"/> to the buffer.
+    /// </summary>
+    public static void Write(this ByteWriter writer, CSteamID n)
+    {
+        writer.Write(n.m_SteamID);
+    }
+
+    /// <summary>
+    /// Reads a <see cref="CSteamID"/> from the buffer.
+    /// </summary>
+    public static CSteamID ReadCSteamID(this ByteReader reader)
+    {
+        return new CSteamID(reader.ReadUInt64());
+    }
+
+    /// <summary>
+    /// Write a <see cref="CSteamID"/> to the buffer.
+    /// </summary>
+    public static void WriteNullable(this ByteWriter writer, CSteamID? n)
+    {
+        if (!n.HasValue)
+        {
+            writer.Write(false);
+            return;
+        }
+
+        writer.Write(true);
+        writer.Write(n.Value.m_SteamID);
+    }
+
+    /// <summary>
+    /// Reads a <see cref="CSteamID"/> from the buffer.
+    /// </summary>
+    public static CSteamID? ReadNullableCSteamID(this ByteReader reader)
+    {
+        if (!reader.ReadBool())
+            return null;
+
+        return new CSteamID(reader.ReadUInt64());
     }
 }
