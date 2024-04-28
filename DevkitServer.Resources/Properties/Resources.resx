@@ -158,7 +158,7 @@
   <data name="DanielWillett.SpeedBytes" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\DanielWillett.SpeedBytes\DanielWillett.SpeedBytes.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="DanielWillett.SpeedBytes.Harmony" type="System.Resources.ResXFileRef, System.Windows.Forms">
+  <data name="DanielWillett.SpeedBytes.Unity" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\..\Module\Libraries\DanielWillett.SpeedBytes\DanielWillett.SpeedBytes.Unity.dll;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="DanielWillett.SpeedBytes.LICENSE" type="System.Resources.ResXFileRef, System.Windows.Forms">
