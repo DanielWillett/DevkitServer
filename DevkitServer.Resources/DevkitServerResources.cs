@@ -151,8 +151,8 @@ internal class DevkitServerResources
 
         new DevkitServerFileResource("DanielWillett.ReflectionTools",
             Lib("DanielWillett.ReflectionTools", "DanielWillett.ReflectionTools.dll"), new Version(0, 0, 29, 0)),
-        new DevkitServerFileResource("DanielWillett.ReflectionTools",
-            Lib("DanielWillett.ReflectionTools", "DanielWillett.ReflectionTools.Harmony.dll"), new Version(0, 0, 29, 0)),
+        new DevkitServerFileResource("DanielWillett.ReflectionTools.Harmony",
+            Lib("DanielWillett.ReflectionTools", "DanielWillett.ReflectionTools.Harmony.dll"), new Version(0, 0, 30, 0)),
         new DevkitServerFileResource("DanielWillett.ReflectionTools.LICENSE",
             Lib("DanielWillett.ReflectionTools", "LICENSE.txt"), new Version(0, 0, 29, 0)),
 
