@@ -159,7 +159,7 @@ internal class DevkitServerResources
         new DevkitServerFileResource("DanielWillett.SpeedBytes",
             Lib("DanielWillett.SpeedBytes", "DanielWillett.SpeedBytes.dll"), new Version(0, 0, 32, 0)),
         new DevkitServerFileResource("DanielWillett.SpeedBytes",
-            Lib("DanielWillett.SpeedBytes", "DanielWillett.SpeedBytes.Unity.dll"), new Version(0, 0, 29, 0)),
+            Lib("DanielWillett.SpeedBytes", "DanielWillett.SpeedBytes.Unity.dll"), new Version(0, 0, 33, 0)),
         new DevkitServerFileResource("DanielWillett.SpeedBytes.LICENSE",
             Lib("DanielWillett.SpeedBytes", "LICENSE.txt"), new Version(0, 0, 29, 0)),
 
