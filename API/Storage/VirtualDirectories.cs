@@ -268,6 +268,9 @@ public static class VirtualDirectories
         {
             string path = FileUtil.UnformatUniversalPath(reader.ReadString());
             int fileSize = reader.ReadInt32();
+            if (fileSize <= 0)
+                continue;
+
             reader.ReadBlockTo(buffer.AsSpan(index, fileSize));
             files[i] = new VirtualFile(path, new ArraySegment<byte>(buffer, index, fileSize));
             index += fileSize;

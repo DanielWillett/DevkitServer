@@ -1565,6 +1565,13 @@ public static class UIAccessTools
                         : null
             });
 
+            Add(new UITypeInfo(nameof(MenuPlayServerBookmarksUI))
+            {
+                ParentName = nameof(SDG.Unturned.MenuPlayUI),
+                Scene = UIScene.Menu,
+                EmitProperty = nameof(MenuPlayServerBookmarksUI)
+            });
+
             Add(new UITypeInfo(nameof(SDG.Unturned.MenuPlayServerInfoUI))
             {
                 ParentName = nameof(SDG.Unturned.MenuPlayUI),
