@@ -76,7 +76,9 @@ public static class ChartCartography
     private static unsafe Texture2D? CaptureChartSync(LevelInfo level, string outputFile)
     {
         // must be ran at the end of frame
+#if CLIENT
         _lastCartoKeepalive = 0;
+#endif
 
         Vector2Int imgSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds);
 
