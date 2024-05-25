@@ -141,31 +141,37 @@ internal class LargeMessageTransmissionCommunications : IDisposable
     }
     
 #if SERVER
-    internal async UniTask<bool[]> Send(CancellationToken token, UniTaskWrapper finalize, bool forceLowSpeed = false)
+    internal async UniTask<bool[]> Send(CancellationToken token, UniTaskWrapper finalize, bool forceLowSpeed = false, int connectionIndex = -1)
 #else
     internal async UniTask<bool> Send(CancellationToken token, UniTaskWrapper finalize, bool forceLowSpeed = false)
 #endif
     {
 #if SERVER
-        BitArray forceHighSpeed = new BitArray(Connections.Count);
-        for (int i = 0; i < Connections.Count; ++i)
+        int connCt = connectionIndex == -1 ? Connections.Count : 1;
+        BitArray forceHighSpeed = new BitArray(connCt);
+        for (int i = 0; i < connCt; ++i)
             forceHighSpeed[i] = Connections[i] is HighSpeedConnection;
         
-        HighSpeedConnection?[]? highSpeedConnections = !forceLowSpeed ? await HighSpeedNetFactory.TryGetOrCreateAndVerify(Connections, true, token).AsUniTask() : null;
+        HighSpeedConnection?[]? highSpeedConnections = !forceLowSpeed ? await HighSpeedNetFactory.TryGetOrCreateAndVerify(connectionIndex == -1 ? Connections : [ Connections[connectionIndex] ], true, token).AsUniTask() : null;
 
-        BitArray lowSpeedUpload = new BitArray(Connections.Count);
+        BitArray lowSpeedUpload = new BitArray(connCt);
         if (highSpeedConnections != null)
         {
-            for (int i = 0; i < Connections.Count; ++i)
+            for (int i = 0; i < connCt; ++i)
             {
                 if (highSpeedConnections[i] is not { Verified: true, Client.Connected: true })
                     lowSpeedUpload[i] = true;
             }
         }
-
-        if (Connections.Count > 1)
+        else
         {
-            for (int i = 0; i < Connections.Count; ++i)
+            for (int i = 0; i < connCt; ++i)
+                lowSpeedUpload[i] = true;
+        }
+
+        if (connCt > 1)
+        {
+            for (int i = 0; i < connCt; ++i)
             {
                 Logger.DevkitServer.LogDebug(Transmission.LogSource, $"(Connection {i.Format()} {Connections[i].Format()}): " + (lowSpeedUpload[i]
                     ? "Using low-speed (Steamworks) upload option."
@@ -198,10 +204,10 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         try
         {
 #if SERVER
-            UniTask<bool>[] tasks = new UniTask<bool>[Connections.Count];
-            for (int i = 0; i < Connections.Count; ++i)
+            UniTask<bool>[] tasks = new UniTask<bool>[connCt];
+            for (int i = 0; i < connCt; ++i)
             {
-                int index = i;
+                int index = connectionIndex == -1 ? i : connectionIndex;
                 tasks[i] = UniTask.Create(async () =>
                 {
                     bool success;
@@ -275,11 +281,11 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         return success;
 #else
         if (successes == null)
-            return new bool[Connections.Count];
+            return new bool[connCt];
 
-        for (int i = 0; i < Connections.Count; ++i)
+        for (int i = 0; i < connCt; ++i)
         {
-            Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Sent data ({Transmission.OriginalSize.Format()} B -> {Transmission.FinalSize.Format()} B) in {(CachedTime.RealtimeSinceStartup - startTime).Format("F2")} seconds to {Connections[i].Format()}.", ConsoleColor.DarkCyan);
+            Logger.DevkitServer.LogDebug(Transmission.LogSource, $"Sent data ({Transmission.OriginalSize.Format()} B -> {Transmission.FinalSize.Format()} B) in {(CachedTime.RealtimeSinceStartup - startTime).Format("F2")} seconds to {Connections[(connectionIndex == -1 ? i : connectionIndex)].Format()}.", ConsoleColor.DarkCyan);
         }
 
         return successes;
@@ -309,7 +315,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 
 #if SERVER
             if (!ReferenceEquals(Connections[index], highSpeedConnection))
-                await Send(token, new UniTaskWrapper(UniTask.CompletedTask), true);
+                await Send(token, new UniTaskWrapper(UniTask.CompletedTask), true, index);
 #else
             if (!ReferenceEquals(Connection, highSpeedConnection))
                 await Send(token, new UniTaskWrapper(UniTask.CompletedTask), true);
