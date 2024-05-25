@@ -16,13 +16,30 @@ public abstract class RaycastChartColorProvider : ISamplingChartColorProvider
     public virtual bool TryInitialize(in CartographyCaptureData data, bool isExplicitlyDefined)
     {
         _allWaterVolumes = WaterVolumeManager.Get().GetAllVolumes().ToArray();
-        _waterVolumeCenters = new Vector3[_allWaterVolumes.Length];
-        _waterVolumeExtents = new Vector3[_allWaterVolumes.Length];
+        int l = _allWaterVolumes.Count(x => x != null);
+        if (l != _allWaterVolumes.Length)
+        {
+            WaterVolume[] newWtrVlms = new WaterVolume[l];
+            int index = -1;
+            for (int i = 0; i < _allWaterVolumes.Length; ++i)
+            {
+                WaterVolume volume = _allWaterVolumes[i];
+                
+                if (volume == null)
+                    continue;
+
+                newWtrVlms[++index] = volume;
+            }
+
+            _allWaterVolumes = newWtrVlms;
+        }
+
+        _waterVolumeCenters = new Vector3[l];
+        _waterVolumeExtents = new Vector3[l];
 
         for (int i = 0; i < _allWaterVolumes.Length; ++i)
         {
             WaterVolume volume = _allWaterVolumes[i];
-
             Bounds bounds = volume.CalculateWorldBounds();
             _waterVolumeCenters[i] = bounds.center;
             _waterVolumeExtents[i] = bounds.extents;

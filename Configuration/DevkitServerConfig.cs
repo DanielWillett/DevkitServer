@@ -423,6 +423,12 @@ public class DevkitServerSystemConfig : SchemaConfiguration
     [JsonPropertyName("hide_map_name")]
     public bool HideMapNameFromRichPresence { get; set; }
 
+    /// <summary>
+    /// The max amount of area in pixels rendered on a chart at once. Lower this if you're crashing due to running out of memory when trying to render a chart.
+    /// </summary>
+    [JsonPropertyName("max_chart_render_chunk_size")]
+    public int MaxChartRenderChunkSize { get; set; }
+
 #if CLIENT
     /// <summary>
     /// Falls back to the vanilla chart and map functions when in singleplayer edit mode.
@@ -525,6 +531,12 @@ public class DevkitServerSystemConfig : SchemaConfiguration
     public bool SyncEditorWeather { get; set; }
 
     /// <summary>
+    /// Set this to true to not kick clients for missing or mismatched assets. A message will still be logged.
+    /// </summary>
+    [JsonPropertyName("disable_asset_validation")]
+    public bool DisableAssetValidation { get; set; }
+
+    /// <summary>
     /// Default permissions a user has.
     /// </summary>
     [JsonPropertyName("default_permissions")]
@@ -580,6 +592,7 @@ public class DevkitServerSystemConfig : SchemaConfiguration
         SyncEditorWeather = false;
         MaxClientEditFPS = 50;
         PasswordAttempts = 4;
+        MaxChartRenderChunkSize = 4096;
 #endif
     }
 #if SERVER

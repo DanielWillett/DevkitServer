@@ -720,6 +720,10 @@
     "disable_default_provider_search": {
       "description": "Disables searching other modules for default icon providers for the LevelObjectIcons extension. Set this to true if errors arise from ApplyDefaultProviders.",
       "type": "boolean"
+    },
+    "max_chart_render_chunk_size": {
+        "description": "The max amount of area in pixels rendered on a chart at once. Lower this if you're crashing due to running out of memory when trying to render a chart.",
+        "type": "boolean"
     }
   }
 }

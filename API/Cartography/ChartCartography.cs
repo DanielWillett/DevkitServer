@@ -1,6 +1,7 @@
 ﻿using Cysharp.Threading.Tasks;
 using DanielWillett.ReflectionTools;
 using DevkitServer.API.Cartography.ChartColorProviders;
+using DevkitServer.Configuration;
 using DevkitServer.Core.Cartography;
 using DevkitServer.Core.Cartography.ChartColorProviders;
 using DevkitServer.Core.Cartography.Jobs;
@@ -22,6 +23,10 @@ public static class ChartCartography
         new ChartColorProviderInfo(typeof(BundledStripChartColorProvider), null!, -2),
         new ChartColorProviderInfo(typeof(JsonChartColorProvider), null!, -1)
     ];
+
+#if CLIENT
+    private static double _lastCartoKeepalive;
+#endif
 
     /// <summary>
     /// The quality of charts when rendered to a JPEG image.
@@ -71,6 +76,7 @@ public static class ChartCartography
     private static unsafe Texture2D? CaptureChartSync(LevelInfo level, string outputFile)
     {
         // must be ran at the end of frame
+        _lastCartoKeepalive = 0;
 
         Vector2Int imgSize = CartographyTool.GetImageSizeCheckMaxTextureSize(out bool wasSizeOutOfBounds);
 
@@ -93,14 +99,17 @@ public static class ChartCartography
 
         if (colorProvider == null)
         {
-            Logger.DevkitServer.LogError(nameof(ChartCartography), $"No available color providers. See {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/Cartography Rendering.md", false).Format(false)} for how to set up a chart color provider.");
-            return null;
+            Logger.DevkitServer.LogWarning(nameof(ChartCartography), $"No available color providers. See {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/Cartography Rendering.md", false).Format(false)} for how to set up a chart color provider. Defaulting to Washington vanilla.");
+            colorProvider = new FallbackChartColorProvider();
+            colorProvider.TryInitialize(in data, true);
         }
 
         object? captureState = CartographyTool.SavePreCaptureState();
         if (captureState == null)
             Logger.DevkitServer.LogWarning(nameof(ChartCartography), "Failed to save/load pre-capture state during chart capture. Check for updates or report this as a bug.");
 
+        Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Creating chart with image size {data.ImageSize.x.Format()}x{data.ImageSize.y.Format()} = {(data.ImageSize.x * data.ImageSize.y).Format()}px.");
+        
         Stopwatch sw = new Stopwatch();
         try
         {
@@ -110,13 +119,13 @@ public static class ChartCartography
                 switch (colorProvider)
                 {
                     case RaycastChartColorProvider simpleColorProvider:
-                        CaptureBackgroundUsingJobs(simpleColorProvider, ptr, in data, providerInfo);
+                        CaptureBackgroundUsingJobs(simpleColorProvider, ptr, in data, providerInfo, sw);
                         break;
                     case ISamplingChartColorProvider sampleColorProvider:
-                        CaptureBackground(sampleColorProvider, ptr, in data, providerInfo);
+                        CaptureBackground(sampleColorProvider, ptr, in data, providerInfo, sw);
                         break;
                     case IFullChartColorProvider fullColorProvider:
-                        fullColorProvider.CaptureChart(in data, ptr);
+                        fullColorProvider.CaptureChart(in data, ptr, sw);
                         break;
                     default:
                         if (providerInfo.Plugin != null)
@@ -133,6 +142,11 @@ public static class ChartCartography
             sw.Stop();
 
             Logger.DevkitServer.LogInfo(nameof(ChartCartography), $"Captured chart background in {sw.GetElapsedMilliseconds().Format("F2")} ms.");
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.DevkitServer.LogWarning(nameof(ChartCartography), "Chart capture was cancelled early because you either disconnected from or connected to a server while the chart was rendering.");
+            return null;
         }
         finally
         {
@@ -154,7 +168,7 @@ public static class ChartCartography
         if (!CartographyCompositing.CompositeForeground(outputTexture, configData, in data))
         {
             sw.Stop();
-            Logger.DevkitServer.LogInfo(nameof(ChartCartography), $"No compositing was done.");
+            Logger.DevkitServer.LogInfo(nameof(ChartCartography), "No compositing was done.");
         }
         else
         {
@@ -173,11 +187,67 @@ public static class ChartCartography
         return outputTexture;
     }
 
-    private static unsafe void CaptureBackgroundUsingJobs(RaycastChartColorProvider colorProvider, byte* outputRgb24Image, in CartographyCaptureData data, ChartColorProviderInfo providerInfo)
+    private readonly ref struct CartographyChunkData
+    {
+        public readonly int StartX;
+        public readonly int StartY;
+        public readonly int EndX;
+        public readonly int EndY;
+        public CartographyChunkData(int startX, int startY, int endX, int endY)
+        {
+            StartX = startX;
+            StartY = startY;
+            EndX = endX;
+            EndY = endY;
+        }
+    }
+    private static unsafe void CaptureBackgroundUsingJobs(RaycastChartColorProvider colorProvider, byte* outputRgb24Image, in CartographyCaptureData data, ChartColorProviderInfo providerInfo, Stopwatch jobStopwatch)
     {
         int imageSizeX = data.ImageSize.x, imageSizeY = data.ImageSize.y;
 
+        int maxChunkSize = DevkitServerConfig.Config?.MaxChartRenderChunkSize ?? 4096;
+        if (maxChunkSize <= 0)
+            maxChunkSize = 4096;
+        
+        if (imageSizeX > maxChunkSize || imageSizeY > maxChunkSize)
+        {
+            // split into chunks to prevent running out of memory
+            int chunkSizeX = imageSizeX / 2 < maxChunkSize ? (imageSizeX - 1) / 2 + 1 : maxChunkSize;
+            int chunkSizeY = imageSizeY / 2 < maxChunkSize ? (imageSizeY - 1) / 2 + 1 : maxChunkSize;
+            Logger.DevkitServer.LogDebug(nameof(ChartCartography), $"Chunks: {chunkSizeX.Format()}x{chunkSizeY.Format()}.");
+            int x = 0;
+            do
+            {
+                int y = 0;
+                do
+                {
+                    CartographyChunkData chunk = new CartographyChunkData(x, y, Math.Min(x + chunkSizeX, imageSizeX) - 1, Math.Min(y + chunkSizeY, imageSizeY) - 1);
+                    Logger.DevkitServer.LogDebug(nameof(ChartCartography), $" Chunk: ({chunk.StartX.Format()} to {chunk.EndX.Format()}, {chunk.StartY.Format()} to {chunk.EndY.Format()}).");
+
+                    if (!CaptureBackgroundUsingJobsChunk(colorProvider, outputRgb24Image, in data, in chunk, providerInfo, jobStopwatch))
+                        return;
+
+                    y += chunkSizeY;
+                }
+                while (y + chunkSizeY <= imageSizeY);
+                x += chunkSizeX;
+            }
+            while (x + chunkSizeX <= imageSizeX);
+            return;
+        }
+
+        CartographyChunkData fullChunk = new CartographyChunkData(0, 0, imageSizeX - 1, imageSizeY - 1);
+        CaptureBackgroundUsingJobsChunk(colorProvider, outputRgb24Image, in data, in fullChunk, providerInfo, jobStopwatch);
+    }
+    private static unsafe bool CaptureBackgroundUsingJobsChunk(RaycastChartColorProvider colorProvider, byte* outputRgb24Image, in CartographyCaptureData data, in CartographyChunkData chunk, ChartColorProviderInfo providerInfo, Stopwatch jobStopwatch)
+    {
+        int imageSizeX = chunk.EndX - chunk.StartX + 1;
+        int imageSizeY = chunk.EndX - chunk.StartX + 1;
         int pixelCount = imageSizeX * imageSizeY;
+#if CLIENT
+        float dt = Math.Min(0.1f, CachedTime.DeltaTime);
+        bool wasConnected = Provider.isConnected;
+#endif
 
         NativeArray<RaycastCommand> commands = new NativeArray<RaycastCommand>(pixelCount * 4, Allocator.TempJob);
         NativeArray<Vector2> raycastPoints = new NativeArray<Vector2>(pixelCount, Allocator.TempJob);
@@ -187,13 +257,16 @@ public static class ChartCartography
         PhysicsScene physx;
         try
         {
+#if CLIENT
+            CheckKeepAlive(jobStopwatch, dt, wasConnected);
+#endif
             _transformCache = new Dictionary<int, TransformCacheEntry>(16384);
 
             Vector2 v2 = default;
 
-            for (int imgX = 0; imgX < imageSizeX; ++imgX)
+            for (int imgX = chunk.StartX; imgX <= chunk.EndX; ++imgX)
             {
-                for (int imgY = 0; imgY < imageSizeY; ++imgY)
+                for (int imgY = chunk.StartY; imgY <= chunk.EndY; ++imgY)
                 {
                     v2.x = imgX;
                     v2.y = imgY;
@@ -219,7 +292,15 @@ public static class ChartCartography
 
             handle = RaycastCommand.ScheduleBatch(commands, results, 8192, handle);
 
+#if CLIENT
+            CheckKeepAlive(jobStopwatch, dt, wasConnected);
+#endif
+
             handle.Complete();
+
+#if CLIENT
+            CheckKeepAlive(jobStopwatch, dt, wasConnected);
+#endif
 
             physx = Physics.defaultPhysicsScene;
         }
@@ -233,13 +314,18 @@ public static class ChartCartography
             commands.Dispose();
             raycastPoints.Dispose();
         }
-        
+
+#if CLIENT
+        CheckKeepAlive(jobStopwatch, dt, wasConnected);
+#endif
+
         i = -1;
         try
         {
-            for (int imgX = 0; imgX < imageSizeX; ++imgX)
+            int fullImgSizeX = data.ImageSize.x;
+            for (int imgX = chunk.StartX; imgX <= chunk.EndX; ++imgX)
             {
-                for (int imgY = 0; imgY < imageSizeY; ++imgY)
+                for (int imgY = chunk.StartY; imgY <= chunk.EndY; ++imgY)
                 {
                     RaycastHit hit1 = results[++i];
                     RaycastHit hit2 = results[++i];
@@ -257,13 +343,18 @@ public static class ChartCartography
                         (byte)((c1.b + c2.b + c3.b + c4.b) / 4),
                         255);
 
-                    int index = (imgX + imgY * imageSizeX) * 3;
+                    int index = (imgX + imgY * fullImgSizeX) * 3;
                     outputRgb24Image[index] = color.r;
                     outputRgb24Image[index + 1] = color.g;
                     outputRgb24Image[index + 2] = color.b;
                 }
+
+#if CLIENT
+                CheckKeepAlive(jobStopwatch, dt, wasConnected);
+#endif
             }
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             if (providerInfo.Plugin != null)
@@ -282,6 +373,26 @@ public static class ChartCartography
 
             results.Dispose();
         }
+
+#if CLIENT
+        static void CheckKeepAlive(Stopwatch jobStopwatch, float dt, bool wasConnected)
+        {
+            if (Provider.isConnected)
+            {
+                double elapsedSeconds = jobStopwatch.GetElapsedMilliseconds() * 1000d;
+
+                if (elapsedSeconds - _lastCartoKeepalive <= dt)
+                    return;
+
+                _lastCartoKeepalive = elapsedSeconds;
+                CartographyHelper.KeepClientAlive();
+            }
+
+            if (wasConnected != Provider.isConnected)
+                throw new OperationCanceledException("Disconnected from or connected to a server mid-render.");
+        }
+#endif
+        return true;
     }
 
 #nullable disable
@@ -335,13 +446,15 @@ public static class ChartCartography
         }
     }
 
-    private static unsafe void CaptureBackground(ISamplingChartColorProvider colorProvider, byte* outputRgb24Image, in CartographyCaptureData data, ChartColorProviderInfo providerInfo)
+    private static unsafe void CaptureBackground(ISamplingChartColorProvider colorProvider, byte* outputRgb24Image, in CartographyCaptureData data, ChartColorProviderInfo providerInfo, Stopwatch jobStopwatch)
     {
         int imageSizeX = data.ImageSize.x, imageSizeY = data.ImageSize.y;
 
         const int rgb24Size = 3;
 
         Vector2 v2 = default;
+        float dt = Math.Min(0.1f, CachedTime.DeltaTime);
+        bool wasConnected = Provider.isConnected;
 
         try
         {
@@ -362,8 +475,21 @@ public static class ChartCartography
                     outputRgb24Image[index + 1] = color.g;
                     outputRgb24Image[index + 2] = color.b;
                 }
+
+#if CLIENT
+                double elapsedSeconds = jobStopwatch.GetElapsedMilliseconds() * 1000d;
+                if (elapsedSeconds - _lastCartoKeepalive > dt)
+                {
+                    _lastCartoKeepalive = elapsedSeconds;
+                    CartographyHelper.KeepClientAlive();
+                }
+
+                if (wasConnected != Provider.isConnected)
+                    throw new OperationCanceledException("Disconnected from or connected to a server mid-render.");
+#endif
             }
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             if (providerInfo.Plugin != null)

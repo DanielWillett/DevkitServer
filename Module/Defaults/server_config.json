@@ -113,6 +113,16 @@
   "sync_editor_weather": false,
 
   /*
+   *  Set this to 'true' to not kick clients for missing or mismatched assets. A message will still be logged.
+   */
+  "disable_asset_validation": false,
+  
+  /*
+   *  The max amount of area in pixels rendered on a chart at once. Lower this if you're crashing due to running out of memory when trying to render a chart.
+   */
+  "max_chart_render_chunk_size": 4096,
+
+  /*
    *  Default permission groups a user has. For example:
    *  [ "viewer" ].
    *

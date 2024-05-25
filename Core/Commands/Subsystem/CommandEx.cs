@@ -195,7 +195,7 @@ public static class CommandEx
             if ((mode & CommandExecutionMode.IgnoreControlMode) != 0 && !DevkitServerModule.IsEditing)
                 throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeEditor");
 
-            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 && (!DevkitServerModule.IsEditing || ctx.EditorUser == null || ctx.EditorUser.Control.Controller != CameraController.Editor))
+            if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 && (!DevkitServerModule.IsEditing || ctx.EditorUser != null && ctx.EditorUser.Control.Controller != CameraController.Editor))
                 throw ctx.Reply(DevkitServerModule.CommandLocalization, "CommandMustBeEditor");
 #else
             if ((mode & CommandExecutionMode.IgnoreControlMode) == 0 ? UserControl.LocalController != CameraController.Editor : !Level.isEditor)

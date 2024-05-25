@@ -188,7 +188,7 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
 
         return true;
     }
-    internal static void RegisterObject(LevelObject obj, NetId netId) => ClaimNetId(LevelObjectAssignments, obj.instanceID, obj.transform, netId);
+    internal static void RegisterObject(LevelObject obj, NetId netId) => ClaimNetId(LevelObjectAssignments, obj.instanceID, obj.GetTransform()!, netId);
     internal static void RegisterBuildable(LevelBuildableObject obj, RegionIdentifier id, NetId netId) => ClaimNetId(BuildableAssignments, id, obj.transform, netId);
 #if SERVER
     internal static void AssignExisting()
@@ -227,7 +227,7 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
     }
 #endif
 
-    private static void ClaimNetId<T>(Dictionary<T, NetId> registry, T value, Transform transform, NetId netId)
+    private static void ClaimNetId<T>(Dictionary<T, NetId> registry, T value, Transform transform, NetId netId) where T : struct
     {
         if (registry.TryGetValue(value, out NetId old))
         {
@@ -250,6 +250,12 @@ public sealed class LevelObjectNetIdDatabase : IReplicatedLevelDataSource<LevelO
                 if (Level.isLoaded)
                     Logger.DevkitServer.LogDebug(Source, $"Released old NetId pairing: {old.Format()}.");
             }
+        }
+
+        if (transform == null)
+        {
+            Logger.DevkitServer.LogDebug(Source, $"Null transform claiming net id {netId.Format()}.");
+            return;
         }
 
         registry[value] = netId;

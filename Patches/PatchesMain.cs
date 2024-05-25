@@ -63,8 +63,8 @@ internal static class PatchesMain
             Patcher.PatchAll();
 #if SERVER
             ServerGizmoPatches.Patch();
-#endif
-#if CLIENT
+            ClientAssetIntegrityPatches.Patch();
+#elif CLIENT
             LevelObjectPatches.OptionalPatches();
             SpawnsEditorPatches.ManualPatches();
             RoadsPatches.OptionalPatches();
@@ -90,6 +90,8 @@ internal static class PatchesMain
             TransportPatcher.ManualUnpatch();
 #if CLIENT
             LightingPatches.DoUnpatching();
+#elif SERVER
+            ClientAssetIntegrityPatches.Unpatch();
 #endif
             DoManualUnpatches();
             Patcher.UnpatchAll(HarmonyId);

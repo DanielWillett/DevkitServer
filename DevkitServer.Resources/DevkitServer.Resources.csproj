@@ -14,7 +14,7 @@
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
     <PackageId>DevkitServer.Resources</PackageId>
     <Title>DevkitServer.Resources</Title>
-    <Version>0.0.36</Version>
+    <Version>0.0.37</Version>
     <Authors>DanielWillett</Authors>
     <Company>DanielWillett</Company>
     <Description>Module config resources for DevkitServer, a multiplayer map editor module for nturned.</Description>
