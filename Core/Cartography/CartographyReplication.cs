@@ -99,8 +99,7 @@ public static class CartographyReplication
         {
             LogSource = "SEND " + (isChart ? "CHART" : "SATELLITE"),
             HandlerType = typeof(CartographyReplicationHandler),
-            Handler = new CartographyReplicationHandler(),
-            AllowCompression = false
+            Handler = new CartographyReplicationHandler()
         };
 
         try

@@ -57,7 +57,16 @@ public static class ChartCartography
         else
             outputFile = Path.Combine(level.path, "Chart.png");
 
-        Texture2D? texture = CaptureChartSync(level, outputFile);
+        Texture2D? texture;
+        try
+        {
+            texture = CaptureChartSync(level, outputFile);
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogError(nameof(ChartCartography), ex, "Failed to capture chart.");
+            return null;
+        }
 
         if (texture == null)
             return null;
@@ -244,7 +253,7 @@ public static class ChartCartography
     private static unsafe bool CaptureBackgroundUsingJobsChunk(RaycastChartColorProvider colorProvider, byte* outputRgb24Image, in CartographyCaptureData data, in CartographyChunkData chunk, ChartColorProviderInfo providerInfo, Stopwatch jobStopwatch)
     {
         int imageSizeX = chunk.EndX - chunk.StartX + 1;
-        int imageSizeY = chunk.EndX - chunk.StartX + 1;
+        int imageSizeY = chunk.EndY - chunk.StartY + 1;
         int pixelCount = imageSizeX * imageSizeY;
 #if CLIENT
         float dt = Math.Min(0.1f, CachedTime.DeltaTime);
@@ -306,9 +315,10 @@ public static class ChartCartography
 
             physx = Physics.defaultPhysicsScene;
         }
-        catch
+        catch (Exception ex)
         {
             results.Dispose();
+            Logger.DevkitServer.LogConditional(nameof(ChartCartography), ex);
             throw;
         }
         finally
@@ -370,7 +380,7 @@ public static class ChartCartography
         }
         finally
         {
-            _transformCache.Clear();
+            _transformCache?.Clear();
             _transformCache = null;
 
             results.Dispose();

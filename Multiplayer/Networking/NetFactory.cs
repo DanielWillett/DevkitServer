@@ -2,6 +2,7 @@
 #define METHOD_LOGGING
 #define REFLECTION_LOGGING
 #define PRINT_DATA
+//#define MESSAGE_ENUM_LOGGING
 #endif
 
 using Cysharp.Threading.Tasks;
@@ -37,7 +38,7 @@ public static class NetFactory
     /// <summary>The maximum amount of time in seconds a listener is guaranteed to stay active.</summary>
     public const double MaxListenTimeout = 600d;
 
-    private const string Source = "NET FACTORY";
+    internal const string Source = "NET FACTORY";
 
     /// <summary>The maximum recommended low-speed packet size (due to steamworks throughput limitations).</summary>
 #if CLIENT
@@ -52,6 +53,10 @@ public static class NetFactory
 #nullable restore
     private static float _inByteCtStTime;
     private static float _outByteCtStTime;
+    private static uint _disallowedServerBits;
+    private static uint _disallowedClientBits;
+    private static uint _disallowedServerBitMask;
+    private static uint _disallowedClientBitMask;
 
     private static readonly List<ListenerTimestamp> LocalListenerTimestamps = new List<ListenerTimestamp>(32);
     private static readonly ConcurrentDictionary<long, Listener> LocalListeners = new ConcurrentDictionary<long, Listener>();
@@ -100,6 +105,16 @@ public static class NetFactory
     public static int NewWriteBitCount { get; private set; }
 
     /// <summary>
+    /// Old max bits count of the message enum for receiving data. On the server this would be <see cref="EServerMessage"/>, and on the client it would be <see cref="EClientMessage"/>.
+    /// </summary>
+    public static int OldReceiveBitCount { get; private set; }
+
+    /// <summary>
+    /// Old max bits count of the message enum for sending data. On the server this would be <see cref="EClientMessage"/>, and on the client it would be <see cref="EServerMessage"/>.
+    /// </summary>
+    public static int OldWriteBitCount { get; private set; }
+
+    /// <summary>
     /// Message listeners for the DevkitServer message block. On the server these are of type NetMessages.ServerReadHandler, and on the client they're of type NetMessages.ClientReadHandler.
     /// </summary>
     public static IReadOnlyList<Delegate> Listeners { get; private set; } = Array.Empty<Delegate>();
@@ -112,13 +127,6 @@ public static class NetFactory
     internal static bool ReclaimMessageBlock()
     {
         Type devkitType = typeof(DevkitServerMessage);
-#if SERVER
-        Type vanilla = typeof(EServerMessage);
-        Type vanillaSend = typeof(EClientMessage);
-#else
-        Type vanilla = typeof(EClientMessage);
-        Type vanillaSend = typeof(EServerMessage);
-#endif
         List<(ICustomNetMessageListener, PluginAssembly)> pluginListeners = [];
         foreach (PluginAssembly assembly in PluginLoader.Assemblies
                      .OrderBy(x => x.Assembly.GetName().Name)
@@ -129,14 +137,87 @@ public static class NetFactory
         }
 
         // calculates the minimum amount of bits needed to represent the number.
-        int GetMinBitCount(int n) => (int)Math.Floor(Math.Log(n, 2)) + 1;
+        static int GetMinBitCount(int n) => (int)Math.Floor(Math.Log(n, 2)) + 1;
 
-        ReceiveBlockOffset = vanilla.GetFields(BindingFlags.Static | BindingFlags.Public).Length;
-        WriteBlockOffset = vanillaSend.GetFields(BindingFlags.Static | BindingFlags.Public).Length;
-        DevkitServerBlockSize = devkitType.GetFields(BindingFlags.Static | BindingFlags.Public).Length;
-        BlockSize = DevkitServerBlockSize + pluginListeners.Count;
-        int origReceiveBitCount = GetMinBitCount(ReceiveBlockOffset);
-        int origWriteBitCount = GetMinBitCount(WriteBlockOffset);
+        FieldInfo[] clientFields = typeof(EClientMessage).GetFields(BindingFlags.Static | BindingFlags.Public);
+        FieldInfo[] serverFields = typeof(EServerMessage).GetFields(BindingFlags.Static | BindingFlags.Public);
+        FieldInfo[] devkitServerFields = devkitType.GetFields(BindingFlags.Static | BindingFlags.Public);
+
+        int clientBlockSize = clientFields.Max(x => Convert.ToInt32(x.GetValue(null))) + 1;
+        int serverBlockSize = serverFields.Max(x => Convert.ToInt32(x.GetValue(null))) + 1;
+        int devkitServerBlockSize = devkitServerFields.Max(x => Convert.ToInt32(x.GetValue(null))) + 1;
+
+#if SERVER
+        ReceiveBlockOffset = serverBlockSize;
+        WriteBlockOffset = clientBlockSize;
+#else
+        ReceiveBlockOffset = clientBlockSize;
+        WriteBlockOffset = serverBlockSize;
+#endif
+        // since GetWorkshopFiles and DownloadWorkshopFiles are sent before the client could possibly know if the server is a DevkitServer server,
+        // we need to make sure none of the lower bits that overlap with the vanilla block are the same as these.
+        //
+        // This way we can read/write GetWorkshopFiles and DownloadWorkshopFiles in the vanilla block size
+        // and use these messages to check if it's a DevkitServer server or not
+        FieldInfo? disallowedClientField = clientFields.FirstOrDefault(x => x.Name.Equals(nameof(EClientMessage.DownloadWorkshopFiles), StringComparison.Ordinal));
+        FieldInfo? disallowedServerField = serverFields.FirstOrDefault(x => x.Name.Equals(nameof(EServerMessage.GetWorkshopFiles), StringComparison.Ordinal));
+
+        if (disallowedClientField != null)
+            _disallowedClientBits = unchecked( (uint)Convert.ToInt32(disallowedClientField.GetValue(null)) );
+        else
+            _disallowedClientBits = uint.MaxValue;
+
+        if (disallowedServerField != null)
+            _disallowedServerBits = unchecked( (uint)Convert.ToInt32(disallowedServerField.GetValue(null)) );
+        else
+            _disallowedServerBits = uint.MaxValue;
+
+        _disallowedClientBitMask = 0;
+        _disallowedServerBitMask = 0;
+
+        int clientBitCount = GetMinBitCount(clientFields.Length);
+        for (int i = 0; i < clientBitCount; ++i)
+            _disallowedClientBitMask |= 1u << i;
+
+        int serverBitCount = GetMinBitCount(clientFields.Length);
+        for (int i = 0; i < serverBitCount; ++i)
+            _disallowedServerBitMask |= 1u << i;
+
+        int nextOffset = DevkitServerBlockSize;
+        for (int i = 0; i < pluginListeners.Count; ++i)
+        {
+            do
+            {
+                ++nextOffset;
+            } while (((unchecked( (uint)nextOffset ) + clientBlockSize) & _disallowedClientBitMask) == _disallowedClientBits || ((unchecked( (uint)nextOffset ) + serverBlockSize) & _disallowedServerBitMask) == _disallowedServerBits);
+        }
+
+        int pluginListenerBlockSize = nextOffset + 1;
+
+        DevkitServerBlockSize = devkitServerBlockSize;
+        BlockSize = DevkitServerBlockSize + pluginListenerBlockSize;
+        OldReceiveBitCount = GetMinBitCount(ReceiveBlockOffset);
+        OldWriteBitCount = GetMinBitCount(WriteBlockOffset);
+
+        bool anyDisallowed = false;
+        foreach (FieldInfo dsEnumField in devkitServerFields.Where(x => ((unchecked( (uint)Convert.ToInt32(x.GetValue(null)) ) + serverBlockSize) & _disallowedClientBitMask) == _disallowedClientBits))
+        {
+            Logger.DevkitServer.LogError(Source, $"DevkitServer enum field {dsEnumField.Name.Colorize(FormattingColorType.Enum)} overlaps the disallowed client bits.");
+            anyDisallowed = true;
+        }
+        foreach (FieldInfo dsEnumField in devkitServerFields.Where(x => ((unchecked( (uint)Convert.ToInt32(x.GetValue(null))) + clientBlockSize) & _disallowedServerBitMask) == _disallowedServerBits))
+        {
+            Logger.DevkitServer.LogError(Source, $"DevkitServer enum field {dsEnumField.Name.Colorize(FormattingColorType.Enum)} overlaps the disallowed server bits.");
+            anyDisallowed = true;
+        }
+
+        if (anyDisallowed)
+        {
+            NewReceiveBitCount = OldReceiveBitCount;
+            NewWriteBitCount = OldWriteBitCount;
+            BlockSize = 0;
+            return false;
+        }
 
         NewReceiveBitCount = GetMinBitCount(ReceiveBlockOffset + BlockSize);
         NewWriteBitCount = GetMinBitCount(WriteBlockOffset + BlockSize);
@@ -144,14 +225,21 @@ public static class NetFactory
         Logger.DevkitServer.LogDebug(Source, "Collected message block data: " +
                         $"Offsets: (Receive = {ReceiveBlockOffset.Format()}, Write = {WriteBlockOffset.Format()}) | " +
                         $"Size = {BlockSize.Format()} | " +
-                        $"Original Bit Count = (Receive: {origReceiveBitCount.Format()}b, Write: {origWriteBitCount.Format()}b) | " +
-                        $"Final Bit Count = (Receive: {NewReceiveBitCount.Format()}b, Write: {NewWriteBitCount.Format()}b).");
+                        $"Original Bit Count = (Receive: {OldReceiveBitCount.Format()}b, Write: {OldWriteBitCount.Format()}b) | " +
+                        $"Final Bit Count = (Receive: {NewReceiveBitCount.Format()}b, Write: {NewWriteBitCount.Format()}b) |" +
+                        $"Disallowed client bits = 0b{Convert.ToString(_disallowedClientBits, 2)} (mask: 0b{Convert.ToString(_disallowedClientBitMask)}) |" +
+                        $"Disallowed server bits = 0b{Convert.ToString(_disallowedServerBits, 2)} (mask: 0b{Convert.ToString(_disallowedServerBitMask)})" +
+                        ".");
 
         // initialize DevkitMessage callbacks
         MethodInfo[] methods = new MethodInfo[BlockSize];
 
+        MethodInfo identity = Accessor.GetMethod(ReceiveIdentity)!;
+        for (int i = 0; i < methods.Length; ++i)
+            methods[i] = identity;
+
         // vanilla callbacks
-        methods[(int)DevkitServerMessage.InvokeMethod] = typeof(NetFactory).GetMethod(nameof(ReceiveMessage), BindingFlags.NonPublic | BindingFlags.Static)!;
+        methods[(int)DevkitServerMessage.InvokeNetCall] = typeof(NetFactory).GetMethod(nameof(ReceiveMessage), BindingFlags.NonPublic | BindingFlags.Static)!;
 #if CLIENT
         methods[(int)DevkitServerMessage.MovementRelay] = typeof(ClientUserMovement).GetMethod(nameof(ClientUserMovement.ReceiveRemoteMovementPackets), BindingFlags.NonPublic | BindingFlags.Static)!;
         methods[(int)DevkitServerMessage.SendTileData] = typeof(TileSync).GetMethod(nameof(TileSync.ReceiveTileData), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -165,9 +253,16 @@ public static class NetFactory
         MethodInfo? interfaceMethod = typeof(ICustomNetMessageListener).GetMethod(nameof(ICustomNetMessageListener.OnRawMessageReceived), BindingFlags.Public | BindingFlags.Instance);
         if (interfaceMethod != null)
         {
-            for (int i = DevkitServerBlockSize; i < BlockSize; ++i)
+            nextOffset = DevkitServerBlockSize;
+            for (int i = 0; i < pluginListeners.Count; ++i)
             {
-                (ICustomNetMessageListener listener, PluginAssembly assembly) = pluginListeners[i - DevkitServerBlockSize];
+                while (((unchecked( (uint)nextOffset ) + clientBlockSize) & _disallowedClientBitMask) == _disallowedClientBits
+                       || ((unchecked( (uint)nextOffset ) + serverBlockSize) & _disallowedServerBitMask) == _disallowedServerBits)
+                {
+                    ++nextOffset;
+                }
+
+                (ICustomNetMessageListener listener, PluginAssembly assembly) = pluginListeners[i];
                 Type listenerType = listener.GetType();
                 MethodInfo? implMethod = Accessor.GetImplementedMethod(listenerType, interfaceMethod);
                 if (implMethod == null)
@@ -177,7 +272,8 @@ public static class NetFactory
                     continue;
                 }
 
-                methods[i] = implMethod;
+                methods[nextOffset] = implMethod;
+                ++nextOffset;
 
                 assembly.LogInfo(Source, $"Registered {typeof(ICustomNetMessageListener).Format()} of type {listenerType.Format()} (receivable on: {listener.ReceivingSide.Format()}).");
             }
@@ -292,25 +388,25 @@ public static class NetFactory
         CustomNetMessageListeners.LocalMappings.Clear();
         CustomNetMessageListeners.InverseLocalMappings.Clear();
 
+        int pluginListenerIndex = -1;
         for (int i = 0; i < methods.Length; ++i)
         {
             MethodInfo? m = methods[i];
+            if (m == null || m == identity)
+                continue;
 
             int index = readCallbacks.Length + i;
-
+            
             DevkitServerMessage messageIndex = (DevkitServerMessage)i;
             if (i >= DevkitServerBlockSize)
             {
-                (ICustomNetMessageListener listener, PluginAssembly assembly) = pluginListeners[i - DevkitServerBlockSize];
+                (ICustomNetMessageListener listener, PluginAssembly assembly) = pluginListeners[++pluginListenerIndex];
                 Type listenerType = listener.GetType();
                 if ((listener.ReceivingSide & receivingSide) == 0)
                 {
                     assembly.LogInfo(Source, $"Skipping implementing {listenerType.Format()} as it's not received on this connection side ({receivingSide.Format()}).");
                     continue;
                 }
-
-                if (m == null)
-                    continue;
 
                 try
                 {
@@ -327,9 +423,6 @@ public static class NetFactory
             }
             else
             {
-                if (m == null)
-                    continue;
-
                 try
                 {
                     nArr.SetValue(listeners[i] = m.CreateDelegate(callbackType), index);
@@ -348,12 +441,13 @@ public static class NetFactory
 
         if (DevkitServerModule.IsEditing)
             CustomNetMessageListeners.SendLocalMappings();
-
+        
+        Logger.DevkitServer.LogDebug(Source, "Reclaimed networking block.");
         return true;
 
     reset:
-        NewReceiveBitCount = origReceiveBitCount;
-        NewWriteBitCount = origWriteBitCount;
+        NewReceiveBitCount = OldReceiveBitCount;
+        NewWriteBitCount = OldWriteBitCount;
         BlockSize = 0;
         Listeners = Array.Empty<Delegate>();
 
@@ -558,6 +652,19 @@ public static class NetFactory
         rtn.AddRange(connections);
         return rtn;
     }
+    private static void ReceiveIdentity(
+#if SERVER
+        ITransportConnection transportConnection,
+#endif
+        NetPakReader reader)
+    {
+        Logger.DevkitServer.LogWarning(Source, "Received message with no listener"
+#if SERVER
+                              + $" from {transportConnection.Format()}"
+#endif
+                              + "."
+        );
+    }
 
 
     [UsedImplicitly]
@@ -578,7 +685,7 @@ public static class NetFactory
             return;
         }
 
-        IncrementByteCount(DevkitServerMessage.InvokeMethod, false, len + sizeof(ushort));
+        IncrementByteCount(DevkitServerMessage.InvokeNetCall, false, len + sizeof(ushort));
 
         if (!reader.ReadBytesPtr(len, out byte[] bytes, out int offset))
         {
@@ -613,6 +720,7 @@ public static class NetFactory
         OnReceived(data, GetPlayerTransportConnection(), in ovh, false);
 #endif
     }
+
     [UsedImplicitly]
     private static bool ReadEnumPatch(NetPakReader reader,
 #if SERVER
@@ -622,9 +730,51 @@ public static class NetFactory
 #endif
         ref bool __result)
     {
+        int bitDiff = NewReceiveBitCount - OldReceiveBitCount;
+        if (!reader.ReadBits(OldReceiveBitCount, out uint num))
+        {
+            value = default;
+            __result = false;
+            return false;
+        }
+
+#if SERVER
+        EServerMessage msg = (EServerMessage)num;
+        if (msg == EServerMessage.GetWorkshopFiles)
+        {
+            value = msg;
+            __result = true;
+#if MESSAGE_ENUM_LOGGING
+            Logger.DevkitServer.LogDebug(Source, $"Incoming message with type: {msg.Format()} (read with vanilla bit count: {OldReceiveBitCount}).");
+#endif
+            return false;
+        }
+#else
+        EClientMessage msg = (EClientMessage)num;
+        if (msg == EClientMessage.DownloadWorkshopFiles)
+        {
+            value = msg;
+            __result = true;
+#if MESSAGE_ENUM_LOGGING
+            Logger.DevkitServer.LogDebug(Source, $"Incoming message with type: {msg.Format()} (read with vanilla bit count: {OldReceiveBitCount}).");
+#endif
+            return false;
+        }
+#endif
         if (DevkitServerModule.IsEditing)
         {
-            bool flag = reader.ReadBits(NewReceiveBitCount, out uint num);
+            if (bitDiff != 0)
+            {
+                if (!reader.ReadBits(bitDiff, out uint restOfBits))
+                {
+                    Logger.DevkitServer.LogError(Source, $"Unable to read other {bitDiff} bits of a {DevkitServerModule.ColorizedModuleName} message.");
+                    value = default;
+                    __result = false;
+                    return false;
+                }
+                num |= restOfBits << bitDiff;
+            }
+
             if (num <= ReceiveBlockOffset + BlockSize)
             {
 #if SERVER
@@ -632,7 +782,14 @@ public static class NetFactory
 #else
                 value = (EClientMessage)num;
 #endif
-                __result = flag;
+                __result = true;
+#if MESSAGE_ENUM_LOGGING
+                Logger.DevkitServer.LogDebug(Source, $"Incoming message with type: {
+                    ((uint)value >= ReceiveBlockOffset
+                        ? ((DevkitServerMessage)((uint)value - ReceiveBlockOffset)).ToString().Colorize(DevkitServerModule.ModuleColor)
+                        : value.Format())
+                } (read with {DevkitServerModule.ColorizedModuleName} bit count: {NewReceiveBitCount}).");
+#endif
             }
             else
             {
@@ -641,6 +798,16 @@ public static class NetFactory
             }
             return false;
         }
+
+#if SERVER
+        value = (EServerMessage)num;
+#else
+        value = (EClientMessage)num;
+#endif
+        __result = num < ReceiveBlockOffset;
+#if MESSAGE_ENUM_LOGGING
+        Logger.DevkitServer.LogDebug(Source, $"Incoming message with type: {value.Format()} (read with vanilla bit count: {OldReceiveBitCount}).");
+#endif
 
         return true;
     }
@@ -654,14 +821,29 @@ public static class NetFactory
 #endif
         , ref bool __result)
     {
-        if (DevkitServerModule.IsEditing)
+        uint v = (uint)value;
+#if CLIENT
+        if (value == EServerMessage.GetWorkshopFiles | !DevkitServerModule.IsEditing)
+#elif SERVER
+        if (value == EClientMessage.DownloadWorkshopFiles | !DevkitServerModule.IsEditing)
+#endif
         {
-            uint v = (uint)value;
-            __result = writer.WriteBits(v, NewWriteBitCount);
+            __result = writer.WriteBits(v, OldWriteBitCount);
+#if MESSAGE_ENUM_LOGGING
+            Logger.DevkitServer.LogDebug(Source, $"Outgoing message with type: {value.Format()} (written with vanilla bit count: {OldWriteBitCount}).");
+#endif
             return false;
         }
 
-        return true;
+        __result = writer.WriteBits(v, NewWriteBitCount);
+#if MESSAGE_ENUM_LOGGING
+        Logger.DevkitServer.LogDebug(Source, $"Outgoing message with type: {
+            ((uint)value >= WriteBlockOffset
+                ? ((DevkitServerMessage)((uint)value - WriteBlockOffset)).ToString().Colorize(DevkitServerModule.ModuleColor)
+                : value.Format())
+        } (written with {DevkitServerModule.ColorizedModuleName} bit count: {NewWriteBitCount}).");
+#endif
+        return false;
     }
 
     /// <summary>
@@ -1033,7 +1215,9 @@ public static class NetFactory
 #endif
         int index = overhead.Length;
 
-        if ((hs ? HighSpeedInvokers : Invokers).TryGetValue(overhead.MessageId, out BaseNetCall call))
+        if ((overhead.Flags & MessageFlags.Guid) != 0
+                ? (hs ? GuidHighSpeedInvokers : GuidInvokers).TryGetValue(overhead.MessageGuid, out BaseNetCall call)
+                : (hs ? HighSpeedInvokers : Invokers).TryGetValue(overhead.MessageId, out call))
         {
             ParseMessage(in overhead, connection, call, new ArraySegment<byte>(message.Array!, message.Offset + index, message.Count - index), size, hs);
         }
@@ -1719,7 +1903,7 @@ public static class NetFactory
         ThreadUtil.assertIsGameThread();
 
         Writer.Reset();
-        int msg = WriteBlockOffset + (int)DevkitServerMessage.InvokeMethod;
+        int msg = WriteBlockOffset + (int)DevkitServerMessage.InvokeNetCall;
 #if SERVER
         Writer.WriteEnum((EClientMessage)msg);
 #else
@@ -1733,7 +1917,7 @@ public static class NetFactory
 
         Writer.WriteUInt16((ushort)len);
         Writer.WriteBytes(bytes, offset, len);
-        IncrementByteCount(DevkitServerMessage.InvokeMethod, true, len);
+        IncrementByteCount(DevkitServerMessage.InvokeNetCall, true, len);
         Writer.Flush();
 #if METHOD_LOGGING
         Logger.DevkitServer.LogDebug(Source, "Sending " + len.Format() + " B to " +
@@ -1770,7 +1954,7 @@ public static class NetFactory
         NetPakWriter writer = DevkitServerModule.IsMainThread ? Writer : new NetPakWriter { buffer = new byte[bytes.Length + 8] };
 
         writer.Reset();
-        writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)DevkitServerMessage.InvokeMethod));
+        writer.WriteEnum((EClientMessage)(WriteBlockOffset + (int)DevkitServerMessage.InvokeNetCall));
         writer.WriteUInt16((ushort)bytes.Length);
         writer.WriteBytes(bytes);
         writer.Flush();
@@ -1783,7 +1967,7 @@ public static class NetFactory
         }
         Logger.DevkitServer.LogDebug(Source, $"Sending {bytes.Length.Format()} B to {connections.Count.Format()} user(s): {overhead.Format()}.", ConsoleColor.DarkYellow);
 #endif
-        IncrementByteCount(DevkitServerMessage.InvokeMethod, true, bytes.Length * connections.Count);
+        IncrementByteCount(DevkitServerMessage.InvokeNetCall, true, bytes.Length * connections.Count);
         for (int i = 0; i < connections.Count; ++i)
         {
             if (connections[i] is HighSpeedConnection conn)
@@ -1883,12 +2067,11 @@ public enum NetCallSource : byte
 /// </summary>
 public enum DevkitServerMessage : uint
 {
-    InvokeMethod = 0,
-    InvokeGuidMethod = 1,
-    MovementRelay = 2,
-    SendTileData = 3,
-    ActionRelay = 4,
-    SendNavigationData = 5
+    InvokeNetCall = 0,
+    MovementRelay = 1,
+    SendTileData = 2,
+    ActionRelay = 3,
+    SendNavigationData = 4
 }
 public delegate void SentMessage(ITransportConnection connection, in MessageOverhead overhead, byte[] message);
 public delegate void ReceivedMessage(ITransportConnection connection, in MessageOverhead overhead, byte[] message);

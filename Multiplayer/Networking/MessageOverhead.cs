@@ -7,7 +7,7 @@ using DevkitServer.API;
 namespace DevkitServer.Multiplayer.Networking;
 
 /// <summary>
-/// Represents the header for <see cref="DevkitServerMessage.InvokeMethod"/> messges.
+/// Represents the header for <see cref="DevkitServerMessage.InvokeNetCall"/> messges.
 /// </summary>
 [StructLayout(LayoutKind.Explicit, Size = MaximumSize)]
 public readonly struct MessageOverhead : ITerminalFormattable

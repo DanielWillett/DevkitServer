@@ -316,13 +316,13 @@ public static class TransportPatcher
             CustomNetMessageListeners.SendLocalMappings();
         }
         else
-            Logger.DevkitServer.LogDebug(Source, $"Client transport connection either connected to not a DevkitServer server or is unable to tell as of yet.");
+            Logger.DevkitServer.LogDebug(Source, "Client transport connection either connected to not a DevkitServer server or is unable to tell as of yet.");
 
         EventOnTransportConnectionCreated.TryInvoke(__instance);
     }
     private static void PostFixOnTransportConnectionClosed(ClientTransport_SteamNetworkingSockets __instance)
     {
-        Logger.DevkitServer.LogDebug(Source, $"Client transport connection torn down.");
+        Logger.DevkitServer.LogDebug(Source, "Client transport connection torn down.");
 
         EventOnTransportConnectionDestroyed?.TryInvoke(__instance);
     }

@@ -6,7 +6,7 @@ using DevkitServer.Players;
 namespace DevkitServer.Multiplayer.Networking;
 
 /// <summary>
-/// Contains context for <see cref="DevkitServerMessage.InvokeMethod"/> messges, such as the overhead, connection source, and if it was sent over a High-Speed connection.
+/// Contains context for <see cref="DevkitServerMessage.InvokeNetCall"/> messges, such as the overhead, connection source, and if it was sent over a High-Speed connection.
 /// </summary>
 /// <remarks>Simulate with <see cref="CreateFromCaller"/>.</remarks>
 public readonly struct MessageContext

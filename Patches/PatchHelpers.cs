@@ -131,9 +131,9 @@ public static class PatchHelpers
                 yield return new CodeInstruction(OpCodes.Or);
                 yield return new CodeInstruction(OpCodes.Not);
                 if (__method != null)
-                    Logger.DevkitServer.LogDebug("Accessor.AddIsEditorCall", $"Inserted editor call to {__method.Format()}.");
+                    Logger.DevkitServer.LogDebug("PatchHelpers.AddIsEditorCall", $"Inserted editor call to {__method.Format()}.");
                 else
-                    Logger.DevkitServer.LogDebug("Accessor.AddIsEditorCall", "Inserted editor call to unknown method.");
+                    Logger.DevkitServer.LogDebug("PatchHelpers.AddIsEditorCall", "Inserted editor call to unknown method.");
             }
             else
                 yield return instr;
@@ -147,20 +147,20 @@ public static class PatchHelpers
     {
         if (method == null)
         {
-            Logger.DevkitServer.LogError("AccessorExtensions.AddFunctionStepthrough", "Error adding function stepthrough to method, not found.");
+            Logger.DevkitServer.LogError("PatchHelpers.AddFunctionStepthrough", "Error adding function stepthrough to method, not found.");
             return false;
         }
         try
         {
             PatchesMain.Patcher.Patch(method,
-                transpiler: new HarmonyMethod(typeof(AccessorExtensions).GetMethod(nameof(AddFunctionStepthroughTranspiler),
+                transpiler: new HarmonyMethod(typeof(PatchHelpers).GetMethod(nameof(AddFunctionStepthroughTranspiler),
                     BindingFlags.NonPublic | BindingFlags.Static)));
-            Logger.DevkitServer.LogInfo("AccessorExtensions.AddFunctionStepthrough", $"Added stepthrough to: {method.Format()}.");
+            Logger.DevkitServer.LogInfo("PatchHelpers.AddFunctionStepthrough", $"Added stepthrough to: {method.Format()}.");
             return true;
         }
         catch (Exception ex)
         {
-            Logger.DevkitServer.LogError("AccessorExtensions.AddFunctionStepthrough", ex, $"Error adding function stepthrough to {method.Format()}.");
+            Logger.DevkitServer.LogError("PatchHelpers.AddFunctionStepthrough", ex, $"Error adding function stepthrough to {method.Format()}.");
             return false;
         }
     }
@@ -171,20 +171,20 @@ public static class PatchHelpers
     {
         if (method == null)
         {
-            Logger.DevkitServer.LogError("Accessor.AddFunctionIOLogging", "Error adding function IO logging to method, not found.");
+            Logger.DevkitServer.LogError("PatchHelpers.AddFunctionIOLogging", "Error adding function IO logging to method, not found.");
             return false;
         }
         try
         {
             PatchesMain.Patcher.Patch(method,
-                transpiler: new HarmonyMethod(typeof(Accessor).GetMethod(nameof(AddFunctionIOTranspiler),
+                transpiler: new HarmonyMethod(typeof(PatchHelpers).GetMethod(nameof(AddFunctionIOTranspiler),
                     BindingFlags.NonPublic | BindingFlags.Static)));
-            Logger.DevkitServer.LogInfo("Accessor.AddFunctionIOLogging", $"Added function IO logging to: {method.Format()}.");
+            Logger.DevkitServer.LogInfo("PatchHelpers.AddFunctionIOLogging", $"Added function IO logging to: {method.Format()}.");
             return true;
         }
         catch (Exception ex)
         {
-            Logger.DevkitServer.LogError("Accessor.AddFunctionIOLogging", ex, $"Error adding function IO logging to {method.Format()}.");
+            Logger.DevkitServer.LogError("PatchHelpers.AddFunctionIOLogging", ex, $"Error adding function IO logging to {method.Format()}.");
             return false;
         }
     }

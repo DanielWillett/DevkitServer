@@ -32,7 +32,7 @@ internal class DevkitServerResources
 
         // Defaults
         new DevkitServerFileResource(Path.Combine("Defaults", "client_config.json"), new Version(0, 0, 37, 0)) { Side = Side.Client },
-        new DevkitServerFileResource(Path.Combine("Defaults", "server_config.json"), new Version(0, 0, 37, 0)) { Side = Side.Server },
+        new DevkitServerFileResource(Path.Combine("Defaults", "server_config.json"), new Version(0, 0, 38, 0)) { Side = Side.Server },
         new DevkitServerFileResource(Path.Combine("Defaults", "backup_config.json"), new Version(0, 0, 28, 0)),
         new DevkitServerFileResource(Path.Combine("Defaults", "permission_groups.json"), new Version(0, 0, 15, 0)) { Side = Side.Server },
         new DevkitServerFileResource(Path.Combine("Defaults", "chart_colors.json"), new Version(0, 0, 27, 0)),

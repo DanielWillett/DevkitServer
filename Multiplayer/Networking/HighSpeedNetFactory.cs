@@ -72,7 +72,14 @@ public static class HighSpeedNetFactory
                 RequestResponse response = await hsTask;
                 if (!response.Responded || response.ErrorCode is not (int)StandardErrorCode.Success)
                 {
-                    Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", $"Failed to create high-speed connection for {connection.Format()}.");
+                    if (response.ErrorCode is (int)StandardErrorCode.NotSupported)
+                    {
+                        Logger.DevkitServer.LogInfo("HIGH SPEED NETWORKING", $"Can't create a high-speed connection for {connection.Format()} since they connected using a server code.");
+                    }
+                    else
+                    {
+                        Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", $"Failed to create high-speed connection for {connection.Format()}.");
+                    }
                     return null;
                 }
             }
@@ -152,7 +159,14 @@ public static class HighSpeedNetFactory
                         RequestResponse response = await hsTask;
                         if (!response.Responded || response.ErrorCode is not (int)StandardErrorCode.Success)
                         {
-                            Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", $"Failed to create high-speed connection ({i.Format()}) for {connection.Format()}.");
+                            if (response.ErrorCode is (int)StandardErrorCode.NotSupported)
+                            {
+                                Logger.DevkitServer.LogInfo("HIGH SPEED NETWORKING", $"Can't create a high-speed connection ({i.Format()}) for {connection.Format()} since they connected using a server code.");
+                            }
+                            else
+                            {
+                                Logger.DevkitServer.LogWarning("HIGH SPEED NETWORKING", $"Failed to create high-speed connection ({i.Format()}) for {connection.Format()}.");
+                            }
                             return;
                         }
                     }
@@ -297,6 +311,11 @@ public static class HighSpeedNetFactory
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.OpenHighSpeedClient)]
     private static void ReceiveOpenHighSpeedClient(MessageContext ctx, ushort port)
     {
+        if (Provider.CurrentServerAdvertisement == null)
+        {
+            ctx.Acknowledge(StandardErrorCode.NotSupported);
+            return;
+        }
         HighSpeedConnection? connection = HighSpeedConnection.Instance;
         if (connection == null)
         {

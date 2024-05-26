@@ -1,10 +1,10 @@
 ﻿using Cysharp.Threading.Tasks;
+using DanielWillett.SpeedBytes;
 using DevkitServer.API.Multiplayer;
 using DevkitServer.Configuration;
 using DevkitServer.Multiplayer.Networking;
 using System.Collections.Concurrent;
 using System.Text.Json;
-using DanielWillett.SpeedBytes;
 
 namespace DevkitServer.Util.Encoding;
 internal class LargeMessageTransmissionCommunications : IDisposable
@@ -147,6 +147,9 @@ internal class LargeMessageTransmissionCommunications : IDisposable
 #endif
     {
 #if SERVER
+
+        forceLowSpeed &= !Provider.configData.Server.Use_FakeIP;
+
         int connCt = connectionIndex == -1 ? Connections.Count : 1;
         BitArray forceHighSpeed = new BitArray(connCt);
         for (int i = 0; i < connCt; ++i)
@@ -665,7 +668,7 @@ internal class LargeMessageTransmissionCommunications : IDisposable
         int packetIndex = reader.ReadInt32();
         if (_pendingSlowPacketCount <= 0)
         {
-            Logger.DevkitServer.LogError(Transmission.LogSource, "Received data before a start level message.");
+            Logger.DevkitServer.LogError(Transmission.LogSource, "Received data before a start packet.");
             ctx.Acknowledge(StandardErrorCode.AccessViolation);
             return;
         }

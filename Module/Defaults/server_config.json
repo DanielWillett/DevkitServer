@@ -148,6 +148,8 @@
    *  Configure a TCP server to send/receive large packets (like the map, cartography renders, etc) much quicker than over Steamworks servers.
    *  It is secured using a key sent over your Steam connection.
    *
+   *  High-speed servers don't work with when using Fake IP and/or connecting using a Server Code.
+   *
    *  Highly recommended to set this up if possible.
    *  You will need to port-forward "high_speed_tcp_port" with TCP protocol and possibly allow it in your firewall.
    *

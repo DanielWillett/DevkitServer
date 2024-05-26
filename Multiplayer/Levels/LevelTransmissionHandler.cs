@@ -1,5 +1,6 @@
 ﻿using DevkitServer.API.Multiplayer;
 #if CLIENT
+using System.Reflection;
 using Cysharp.Threading.Tasks;
 using DevkitServer.API.Storage;
 using DevkitServer.API.UI;
@@ -19,8 +20,13 @@ internal class LevelTransmissionHandler : BaseLargeMessageTransmissionClientHand
 
     protected internal override void OnStart()
     {
-        _mapName = Provider.CurrentServerAdvertisement?.map ?? "<unknown_map>";
+        _mapName = Provider.CurrentServerAdvertisement?.map ?? Provider.map ?? "Map";
         LoadingUI.SetIsDownloading(true);
+
+        if (IsUsingPackets && typeof(LoadingUI).GetField("tipLabel", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static)?.GetValue(null) is ISleekLabel tipLabel)
+        {
+            tipLabel.Text = DevkitServerModule.MainLocalization.Translate("HighSpeedTip");
+        }
 
         if (IsUsingPackets)
             return;

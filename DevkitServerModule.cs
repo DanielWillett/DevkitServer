@@ -70,6 +70,7 @@ public sealed class DevkitServerModule : IModuleNexus
     private static string? _commitIdShort;
     internal static AssemblyResolver AssemblyResolver = null!;
     private static int? _mainThreadId;
+    public static string ColorizedModuleName => ModuleName.Colorize(ModuleColor);
 
     internal static NetCall ClientAskSave = new NetCall(DevkitServerNetCall.AskSave);
     public static string CommitId => _commitIdShort ??= DevkitServer.CommitId.Commit.Length > 7 ? DevkitServer.CommitId.Commit.Substring(0, 7) : DevkitServer.CommitId.Commit;
@@ -141,7 +142,11 @@ public sealed class DevkitServerModule : IModuleNexus
         { "BackingUpInProgress", "Backing up..." },
         { "BackupAndSaveButton", "Backup And Save" },
         { "TooManyPasswordAttempts", "Too many incorrect password attempts. Try again in {0} second(s)." },
-        { "UnknownIPv4AndSteam64", "Unknown IPv4 and Steam64 ID of connecting user - can't join a password-protected server." } 
+        { "UnknownIPv4AndSteam64", "Unknown IPv4 and Steam64 ID of connecting user - can't join a password-protected server." },
+        { "HighSpeedTip", $"Want to download the map faster? Have the server owner set up the <b>high speed</b> server settings in <color=#{
+            ModuleColor.r.ToString("X2", CultureInfo.InvariantCulture)
+            + ModuleColor.g.ToString("X2", CultureInfo.InvariantCulture)
+            + ModuleColor.b.ToString("X2", CultureInfo.InvariantCulture)}>{ModuleName}</color>'s <#dddddd>server_config.json</color>." }
     };
     public static Local CommandLocalization { get; private set; } = null!;
 
@@ -337,11 +342,11 @@ public sealed class DevkitServerModule : IModuleNexus
         {
             if (InitializedLogging)
             {
-                Logger.DevkitServer.LogError("Init", ex, $"Error setting up {ModuleName.Colorize(ModuleColor)}.");
+                Logger.DevkitServer.LogError("Init", ex, $"Error setting up {ColorizedModuleName}.");
             }
             else
             {
-                CommandWindow.LogError($"Error setting up {ModuleName}.");
+                CommandWindow.LogError($"Error setting up {ColorizedModuleName}.");
                 CommandWindow.LogError(ex);
             }
             Fault();
@@ -471,7 +476,6 @@ public sealed class DevkitServerModule : IModuleNexus
             GameObject objectItemGeneratorHost = new GameObject("ObjectIconGenerator", typeof(Light), typeof(ObjectIconGenerator), typeof(Camera));
             objectItemGeneratorHost.transform.SetParent(GameObjectHost.transform, true);
             objectItemGeneratorHost.hideFlags = HideFlags.DontSave;
-            Object.DontDestroyOnLoad(objectItemGeneratorHost);
 #endif
             AssetUtil.OnBeginLevelLoading += OnLevelStartLoading;
             LevelObjectNetIdDatabase.Init();
@@ -488,19 +492,21 @@ public sealed class DevkitServerModule : IModuleNexus
                 Fault();
                 goto fault;
             }
+
+            Logger.DevkitServer.LogInfo(NetFactory.Source, $"Hijacked {"Unturned".Colorize(UnturnedColor)}'s networking.");
             CreateDirectoryAttribute.DisposeLoadList();
         }
         catch (Exception ex)
         {
             Fault();
-            Logger.DevkitServer.LogError("Init", ex, $"Error loading {ModuleName.Colorize(ModuleColor)}");
+            Logger.DevkitServer.LogError("Init", ex, $"Error loading {ColorizedModuleName}");
         }
         fault:
         watch.Stop();
         if (UnturnedLoaded)
         {
             if (InitializedLogging)
-                Logger.DevkitServer.LogInfo("Init", $"{ModuleName.Colorize(ModuleColor)} initializer took {watch.GetElapsedMilliseconds().Format("F2")} ms.");
+                Logger.DevkitServer.LogInfo("Init", $"{ColorizedModuleName} initializer took {watch.GetElapsedMilliseconds().Format("F2")} ms.");
             else
                 CommandWindow.Log($"{ModuleName} initializer took {watch.GetElapsedMilliseconds():F2} ms.");
         }
@@ -518,7 +524,7 @@ public sealed class DevkitServerModule : IModuleNexus
             {
                 if (InitializedLogging)
                 {
-                    Logger.DevkitServer.LogError("Init", ex, $"Error unloading {ModuleName.Colorize(ModuleColor)}.");
+                    Logger.DevkitServer.LogError("Init", ex, $"Error unloading {ColorizedModuleName}.");
                 }
                 else
                 {
@@ -529,7 +535,7 @@ public sealed class DevkitServerModule : IModuleNexus
         }
         else
         {
-            string modName = ModuleName.Colorize(ModuleColor);
+            string modName = ColorizedModuleName;
             string license = "GNU General Public License".Colorize(new Color32(255, 204, 102, 255));
             Color32 nameColor = new Color32(86, 98, 246, 255);
             Logger.DevkitServer.LogInfo("Legal", $"{modName} (by @{"blazingflame".Colorize(nameColor)} on {"Discord".Colorize(new Color32(116, 131, 196, 255))} or " +

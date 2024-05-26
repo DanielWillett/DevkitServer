@@ -11,7 +11,6 @@ using HarmonyLib;
 using SDG.Framework.Landscapes;
 using SDG.NetPak;
 using System.Diagnostics;
-using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 using Version = System.Version;
@@ -23,6 +22,7 @@ using DevkitServer.Util.Encoding;
 #endif
 #if SERVER
 using DevkitServer.Multiplayer.Networking;
+using System.Globalization;
 using Unturned.SystemEx;
 #endif
 
@@ -112,11 +112,24 @@ internal static class PatchesMain
             if (handlerType == null)
                 Logger.DevkitServer.LogWarning(Source, $"Type not found: {"ServerMessageHandler_GetWorkshopFiles".Colorize(FormattingColorType.Class)}. Can't hide map name from joining players.");
             else if (handlerType.GetMethod("ReadMessage", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } method)
+            {
                 Patcher.Patch(method, transpiler: Accessor.Active.GetHarmonyMethod(TranspileWorkshopRequest));
+
+                if (Accessor.Active.TryGetLambdaMethod(method, out MethodInfo writeMethod, [ typeof(NetPakWriter) ], null))
+                {
+                    Patcher.Patch(writeMethod, transpiler: Accessor.Active.GetHarmonyMethod(TranspileWorkshopRequestResponse));
+                }
+                else
+                {
+                    Logger.DevkitServer.LogWarning(Source, $"Lambda method not found in {method.Format()}. Player's won't be able to join via server code.");
+                    DevkitServerModule.Fault();
+                }
+            }
             else
                 Logger.DevkitServer.LogWarning(Source, $"Method not found: {FormattingUtil.FormatMethod(typeof(void), handlerType, "ReadMessage",
                     [(typeof(ITransportConnection), "transportConnection"), (typeof(NetPakReader), "reader")],
                     isStatic: true)}. Can't hide map from joining players (by checking password before sending mods).");
+
         }
         catch (Exception ex)
         {
@@ -125,6 +138,28 @@ internal static class PatchesMain
                 isStatic: true)}. Can't hide map from joining players (by checking password before sending mods).");
         }
 #elif CLIENT
+        Type? handlerType = null;
+        try
+        {
+            handlerType = AccessorExtensions.AssemblyCSharp.GetType("SDG.Unturned.ClientMessageHandler_DownloadWorkshopFiles", false, false);
+            if (handlerType == null)
+                Logger.DevkitServer.LogWarning(Source, $"Type not found: {"ClientMessageHandler_DownloadWorkshopFiles".Colorize(FormattingColorType.Class)}. Can't hide map name from joining players.");
+            else if (handlerType.GetMethod("ReadMessage", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } method)
+            {
+                Patcher.Patch(method, transpiler: Accessor.Active.GetHarmonyMethod(TranspileWorkshopResponse));
+            }
+            else
+                Logger.DevkitServer.LogWarning(Source, $"Method not found: {FormattingUtil.FormatMethod(typeof(void), handlerType, "ReadMessage",
+                    [(typeof(ITransportConnection), "transportConnection"), (typeof(NetPakReader), "reader")],
+                    isStatic: true)}. May have issues joining the server, especially with server codes.");
+        
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch method: {FormattingUtil.FormatMethod(typeof(void), handlerType, "ReadMessage",
+                [(typeof(ITransportConnection), "transportConnection"), (typeof(NetPakReader), "reader")],
+                isStatic: true)}. Can't hide map from joining players (by checking password before sending mods).");
+        }
         try
         {
             if (typeof(Provider).GetMethod("onClientTransportReady", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } definingMethod)
@@ -401,8 +436,72 @@ internal static class PatchesMain
 
         return t;
     }
+    private static IEnumerable<CodeInstruction> TranspileWorkshopResponse(IEnumerable<CodeInstruction> instructions, ILGenerator generator, MethodBase method)
+    {
+        TranspileContext ctx = new TranspileContext(method, generator, instructions);
+
+        MethodInfo? receiveWorkshopResponse = typeof(Provider).GetMethod("receiveWorkshopResponse", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+        while (ctx.MoveNext())
+        {
+            if (!ctx.Instruction.Calls(receiveWorkshopResponse))
+                continue;
+
+            int oldIndex = ctx.CaretIndex;
+            ctx.CaretIndex = ctx.GetLastUnconsumedIndex(null);
+            ctx.EmitAbove(method.IsStatic ? OpCodes.Ldarg_0 : OpCodes.Ldarg_1);
+            ctx.EmitAbove(OpCodes.Call, Accessor.GetMethod(ReadDevkitServerMarker)!);
+            ctx.CaretIndex = oldIndex + 2;
+        }
+        return ctx;
+    }
+    private static void ReadDevkitServerMarker(NetPakReader reader)
+    {
+        if (!reader.ReadUInt32(out uint dsVsn))
+        {
+            DevkitServerModule.IsEditing = false;
+            Logger.DevkitServer.LogInfo(nameof(ReadDevkitServerMarker), $"Connecting to a server not running {DevkitServerModule.ColorizedModuleName}.");
+            DevkitServerServers[Provider.server.m_SteamID] = uint.MaxValue;
+            return;
+        }
+
+        DevkitServerServers[Provider.server.m_SteamID] = dsVsn;
+
+        if (dsVsn == 0u)
+        {
+            DevkitServerModule.IsEditing = false;
+            Logger.DevkitServer.LogInfo(nameof(ReadDevkitServerMarker), $"Connecting to a server running {DevkitServerModule.ColorizedModuleName} but not in edit mode.");
+            return;
+        }
+
+        DevkitServerModule.IsEditing = true;
+        Logger.DevkitServer.LogInfo(nameof(ReadDevkitServerMarker), $"Connecting to a server running {DevkitServerModule.ColorizedModuleName}.");
+    }
+
+    internal static uint? GetKnownServerDevkitServerVersion(CSteamID serverId) => DevkitServerServers.TryGetValue(serverId.m_SteamID, out uint v) ? v : null;
+    private static readonly Dictionary<ulong, uint> DevkitServerServers = new Dictionary<ulong, uint>();
 #endif
 #if SERVER
+    private static void WriteDevkitServerTag(NetPakWriter writer)
+    {
+        writer.WriteUInt32(1);
+    }
+    private static IEnumerable<CodeInstruction> TranspileWorkshopRequestResponse(IEnumerable<CodeInstruction> instructions, MethodBase method)
+    {
+        List<CodeInstruction> t = [
+            ..instructions,
+            new CodeInstruction(method.IsStatic ? OpCodes.Ldarg_0 : OpCodes.Ldarg_1),
+            new CodeInstruction(OpCodes.Call, Accessor.GetMethod(WriteDevkitServerTag)!)
+        ];
+
+        if (t.Count <= 2 || t[^3].opcode != OpCodes.Ret)
+            return t;
+
+        // move ret to end of list
+        t.Add(t[^3]);
+        t.RemoveAt(t.Count - 4);
+
+        return t;
+    }
     private static readonly Dictionary<uint, KeyValuePair<int, float>> PasswordTriesIPv4 = new Dictionary<uint, KeyValuePair<int, float>>(16);
     private static readonly Dictionary<ulong, KeyValuePair<int, float>> PasswordTriesSteam64 = new Dictionary<ulong, KeyValuePair<int, float>>(16);
     private static bool ReadPasswordHash(ITransportConnection connection, NetPakReader reader)
@@ -814,7 +913,7 @@ internal static class PatchesMain
         {
             editorField.SetValue(null, editor);
             areaField.SetValue(editor, area);
-            Logger.DevkitServer.LogDebug(Source, $"Patched issue with EditorUI not loading (set Editor._area and Editor._editor in OnEnable).");
+            Logger.DevkitServer.LogDebug(Source, "Patched issue with EditorUI not loading (set Editor._area and Editor._editor in OnEnable).");
         }
         else
         {
@@ -910,6 +1009,7 @@ internal static class PatchesMain
             return false;
         }
 
+        // connecting from menu
         if (Provider.CurrentServerAdvertisement != null)
         {
             if (!_hasRulesSub)
@@ -919,7 +1019,38 @@ internal static class PatchesMain
             }
 
             Provider.provider.matchmakingService.refreshRules(Provider.CurrentServerAdvertisement.ip, Provider.CurrentServerAdvertisement.queryPort);
+            return false;
         }
+
+        // connecting via server code
+        uint? knownServerVersion = GetKnownServerDevkitServerVersion(Provider.server);
+        if (!knownServerVersion.HasValue)
+        {
+            Logger.DevkitServer.LogError(Source, "Unable to verify whether or not this server is running DevkitServer. The server may need updated.");
+            try
+            {
+                Provider.RequestDisconnect("Unable to verify whether or not this server is running DevkitServer. The server may need updated.");
+            }
+            catch (Exception ex)
+            {
+                Logger.DevkitServer.LogWarning(nameof(LaunchPatch), ex, "Error trying to disconnect from server.");
+                Level.exit();
+            }
+            return false;
+        }
+
+        if (knownServerVersion.Value > 0 && knownServerVersion.Value != uint.MaxValue)
+        {
+            DevkitServerModule.IsEditing = true;
+            CustomNetMessageListeners.SendLocalMappings();
+            EditorLevel.RequestLevel();
+        }
+        else
+        {
+            DevkitServerModule.IsEditing = false;
+            ProceedWithLaunch();
+        }
+
         return false;
     }
     private static void ProceedWithLaunch()
@@ -973,7 +1104,7 @@ internal static class PatchesMain
             DevkitServerModule.IsEditing = true;
             CustomNetMessageListeners.SendLocalMappings();
 
-            Logger.DevkitServer.LogInfo(nameof(RulesReady), $"Connecting to a server running {DevkitServerModule.ModuleName.Colorize(DevkitServerModule.ModuleColor)} " +
+            Logger.DevkitServer.LogInfo(nameof(RulesReady), $"Connecting to a server running {DevkitServerModule.ColorizedModuleName} " +
                            $"v{version.Format()} (You are running {AccessorExtensions.DevkitServer.GetName().Version.Format()})...");
 
             EditorLevel.RequestLevel();
@@ -985,10 +1116,6 @@ internal static class PatchesMain
             ProceedWithLaunch();
         }
     }
-
-    private static readonly MethodInfo IsPlayerControlledOrNotEditingMethod =
-        typeof(PatchesMain).GetMethod(nameof(IsPlayerControlledOrNotEditing),
-            BindingFlags.Static | BindingFlags.NonPublic)!;
 
     private static bool IsPlayerControlledOrNotEditing()
     {
@@ -1079,22 +1206,58 @@ internal static class PatchesMain
             Logger.DevkitServer.LogWarning(Source, "Unable to find getter: Provider.isConnected.");
             DevkitServerModule.Fault();
         }
+
+        MethodInfo? isEditing = typeof(Level).GetProperty(nameof(Level.isEditor), BindingFlags.Static | BindingFlags.Public)?.GetMethod;
+        if (isEditing == null)
+        {
+            Logger.DevkitServer.LogWarning(Source, "Unable to find getter: Level.isEditor.");
+            DevkitServerModule.Fault();
+        }
+
+        FieldInfo? playerWindow = typeof(PlayerUI).GetField("container", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+        if (playerWindow == null)
+        {
+            Logger.DevkitServer.LogWarning(Source, "Unable to find static field: PlayerUI.container.");
+            DevkitServerModule.Fault();
+        }
+
+        FieldInfo? editorWindow = typeof(EditorUI).GetField("window", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+        if (editorWindow == null)
+        {
+            Logger.DevkitServer.LogWarning(Source, "Unable to find static field: EditorUI.window.");
+            DevkitServerModule.Fault();
+        }
+
         List<CodeInstruction> inst = new List<CodeInstruction>(instructions);
-        bool one = isConnected == null;
+        bool oneConn = isConnected == null;
+        bool oneEdit = isEditing == null;
         for (int i = 0; i < inst.Count; ++i)
         {
             CodeInstruction c = inst[i];
             yield return c;
-            if (!one && c.Calls(isConnected))
+            if (!oneConn && c.Calls(isConnected))
             {
-                yield return new CodeInstruction(OpCodes.Call, IsPlayerControlledOrNotEditingMethod);
+                yield return new CodeInstruction(OpCodes.Call, Accessor.GetMethod(IsPlayerControlledOrNotEditing)!);
                 yield return new CodeInstruction(OpCodes.And);
-                one = true;
+                yield return new CodeInstruction(OpCodes.Ldsfld, playerWindow);
+                yield return new CodeInstruction(OpCodes.Ldnull);
+                yield return new CodeInstruction(OpCodes.Ceq);
+                yield return new CodeInstruction(OpCodes.Not);
+                yield return new CodeInstruction(OpCodes.And);
+                oneConn = true;
                 Logger.DevkitServer.LogDebug(Source, $"{method.Format()} - Patched connection state checker.");
+            }
+            else if (!oneEdit && c.Calls(isEditing))
+            {
+                yield return new CodeInstruction(OpCodes.Ldsfld, editorWindow);
+                yield return new CodeInstruction(OpCodes.Ldnull);
+                yield return new CodeInstruction(OpCodes.Ceq);
+                yield return new CodeInstruction(OpCodes.Not);
+                yield return new CodeInstruction(OpCodes.And);
             }
         }
 
-        if (!one)
+        if (!oneConn)
         {
             Logger.DevkitServer.LogWarning(Source, $"Unable to patch connection state checker in {method.Format()}.");
             DevkitServerModule.Fault();

@@ -522,7 +522,15 @@ public class LargeMessageTransmission : IDisposable
     }
     private UniTask Finalize(CancellationToken token = default)
     {
-        return AllowCompression && !IsCompressed ? Compress(token) : UniTask.CompletedTask;
+        if (AllowCompression && !IsCompressed)
+        {
+            return Compress(token);
+        }
+
+        IsCompressed = false;
+        FinalContent = Content;
+        FinalSize = Content.Count;
+        return UniTask.CompletedTask;
     }
     private void PrintLogging()
     {
