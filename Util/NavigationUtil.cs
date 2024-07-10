@@ -218,7 +218,7 @@ public static class NavigationUtil
                 return StandardErrorCode.GenericError;
 
             byte nav = (byte)flagIndex;
-            
+
             if (flag.width != size.x || flag.height != size.y)
                 SetFlagSizeLocal(nav, size);
 
@@ -237,15 +237,21 @@ public static class NavigationUtil
             if (flag.data.difficulty.GUID != difficultyAsset)
                 SetFlagDifficultyLocal(nav, new AssetReference<ZombieDifficultyAsset>(difficultyAsset));
 
-            Select(flag);
+            if (owner == Provider.client.m_SteamID)
+            {
+                Select(flag);
+            }
 
             // todo SyncIfAuthority(nav);
         }
         catch (Exception ex)
         {
-            Logger.DevkitServer.LogError(Source, ex, $"Failed to initialize road: {netId.Format()}.");
-            HoldUIUpdate = false;
+            Logger.DevkitServer.LogError(Source, ex, $"Failed to initialize flag: {netId.Format()}.");
             return StandardErrorCode.GenericError;
+        }
+        finally
+        {
+            HoldUIUpdate = false;
         }
 
         return StandardErrorCode.Success;
@@ -1656,7 +1662,7 @@ public static class NavigationUtil
 
 #if SERVER
     /// <summary>
-    /// Locally add a flag and call the necessary events.
+    /// Add a flag and call the necessary events.
     /// </summary>
     /// <remarks>Replicates to clients.</remarks>
     /// <param name="position">New position to move the flag to.</param>

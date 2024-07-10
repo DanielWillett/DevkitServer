@@ -161,7 +161,6 @@ internal class LightingPatches
     internal static void DoUnpatching()
     {
         OptionalPatches.Unpatch(ref _onDraggedAzimuthSlider);
-        OptionalPatches.Unpatch(ref _onDraggedAzimuthSlider);
         OptionalPatches.Unpatch(ref _onDraggedBiasSlider);
         OptionalPatches.Unpatch(ref _onDraggedFadeSlider);
         OptionalPatches.Unpatch(ref _onValuedSeaLevelSlider);

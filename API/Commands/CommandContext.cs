@@ -74,6 +74,7 @@ public class CommandContext : Exception
     /// <summary>
     /// Number of arguments provided, taking <see cref="ArgumentOffset"/> into account.
     /// </summary>
+    /// <remarks>This is not affected by <see cref="ArgumentOffset"/>.</remarks>
     public int ArgumentCount => Arguments.Length - ArgumentOffset;
 
     private bool ReplyingToConsole => IsConsole

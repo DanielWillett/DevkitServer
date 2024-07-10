@@ -345,7 +345,7 @@ internal sealed class EditorClothes : MonoBehaviour
                 MythicAsset? mythic = item.MythicAsset;
                 CenterHeadEffect(null, transform, model);
                 if (mythic != null)
-                    ItemTool.applyEffect(model, mythic.id, EEffectType.HOOK);
+                    ItemTool.ApplyMythicalEffect(model, mythic.id, EEffectType.HOOK);
             }
             ApplyHairOverride(asset, model);
         }

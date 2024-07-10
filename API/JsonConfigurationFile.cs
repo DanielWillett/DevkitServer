@@ -33,7 +33,7 @@ public class JsonConfigurationFile<TConfig> : IJsonSettingProvider, IConfigProvi
             lock (_sync)
             {
                 TConfig old = Interlocked.Exchange(ref _config, value);
-                if (old is IDisposable d)
+                if (old is IDisposable d && !ReferenceEquals(old, value))
                     d.Dispose();
             }
         }

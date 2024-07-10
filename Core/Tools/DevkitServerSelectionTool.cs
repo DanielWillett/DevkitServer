@@ -40,6 +40,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
     public bool IsAreaSelecting { get; private set; }
     public bool IsDraggingHandles { get; private set; }
     public bool CanAreaSelect { get; set; } = true;
+    public bool CanMoveOnInstantiate { get; set; }
     public bool CanMiddleClickPick { get; set; } = true;
     public bool HighlightHover { get; set; } = true;
     public bool RootSelections { get; set; } = true;
@@ -290,25 +291,25 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
                 {
                     if (DevkitSelectionManager.selection.Count > 0)
                     {
-                        if (!hasTransformPerms)
+                        if (InputUtil.IsHoldingControl() || !CanMoveOnInstantiate)
                         {
-                            EditorMessage.SendNoPermissionMessage(transformPermissionMissing);
+                            TryRequestInstantiation(in hit);
                         }
                         else
                         {
-                            SimulateHandleMovement(hit.point, Quaternion.identity, Vector3.one, false, false);
+                            if (!hasTransformPerms)
+                            {
+                                EditorMessage.SendNoPermissionMessage(transformPermissionMissing);
+                            }
+                            else
+                            {
+                                SimulateHandleMovement(hit.point, Quaternion.identity, Vector3.one, false, false);
+                            }
                         }
                     }
                     else
                     {
-                        if (DevkitServerModule.IsEditing && !HasPermissionToInstantiate(out PermissionLeaf instantiatePermission))
-                        {
-                            EditorMessage.SendNoPermissionMessage(instantiatePermission);
-                        }
-                        else
-                        {
-                            RequestInstantiation(hit.point, Quaternion.FromToRotation(Vector3.up, hit.normal), Vector3.one);
-                        }
+                        TryRequestInstantiation(in hit);
                     }
                 }
             }
@@ -525,6 +526,17 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
             UserMovement.SetEditorTransform(HandlePosition - 15f * MainCamera.instance.transform.forward, MainCamera.instance.transform.rotation);
         }
     }
+    private void TryRequestInstantiation(in RaycastHit hit)
+    {
+        if (DevkitServerModule.IsEditing && !HasPermissionToInstantiate(out PermissionLeaf instantiatePermission))
+        {
+            EditorMessage.SendNoPermissionMessage(instantiatePermission);
+        }
+        else
+        {
+            RequestInstantiation(hit.point, Quaternion.FromToRotation(Vector3.up, hit.normal), Vector3.one);
+        }
+    }
     protected void BeginAreaSelecting()
     {
         // start area selecting
@@ -562,6 +574,8 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         if (!apply)
             DevkitTransactionManager.undo();
     }
+    protected virtual void Equip() { }
+    protected virtual void Dequip() { }
     void IDevkitTool.equip()
     {
         GLRenderer.render += OnGLRenderIntl;
@@ -570,9 +584,13 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         Handles.OnTransformed += OnHandleTransformed;
         DevkitSelectionManager.clear();
         _handleModeDirty = true;
+
+        Equip();
     }
     void IDevkitTool.dequip()
     {
+        Dequip();
+
         if (_hoverHighlight != null)
         {
             HighlighterUtil.Unhighlight(_hoverHighlight.transform, 0.1f);
@@ -643,6 +661,7 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         if (IsAreaSelecting)
             DevkitServerGLUtility.DrawSelectBox(BeginAreaSelect, EndAreaSelect);
     }
+
     protected virtual void Delete(DevkitSelection selection)
     {
         bool destroy = true;
@@ -658,7 +677,8 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         else
             Object.Destroy(selection.gameObject);
     }
-    protected virtual void Paste(IReadOnlyList<GameObject> copyBuffer)
+
+    protected virtual void Paste(IList<GameObject> copyBuffer)
     {
         DevkitSelectionManager.clear();
         
@@ -670,7 +690,10 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
             if (go == null)
                 continue;
             IDevkitSelectionCopyableHandler? handler = go.GetComponent<IDevkitSelectionCopyableHandler>();
-            GameObject copy = handler == null ? Object.Instantiate(go) : handler.copySelection();
+            GameObject? copy = handler == null ? Object.Instantiate(go) : handler.copySelection();
+            if (copy == null)
+                continue;
+
             if (!DevkitServerModule.IsEditing)
                 DevkitTransactionUtility.recordInstantiation(copy);
             else copy.SetActive(true);
@@ -679,8 +702,11 @@ public abstract class DevkitServerSelectionTool : IDevkitTool
         
         if (!DevkitServerModule.IsEditing)
             DevkitTransactionManager.endTransaction();
+
         _handleModeDirty = true;
     }
+
+    protected void InvalidateHandleMode() => _handleModeDirty = true;
     public void SimulateHandleMovement(Vector3 newPosition, Quaternion newRotation, Vector3 newScale, bool hasRotation, bool hasScale)
     {
         if (!DevkitServerModule.IsEditing)

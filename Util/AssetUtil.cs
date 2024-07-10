@@ -70,10 +70,60 @@ public static class AssetUtil
         };
     }
     /// <summary>
-    /// Returns the asset category (<see cref="EAssetType"/>) of <typeparamref name="TAsset"/>. Effeciently cached.
+    /// Returns the asset category (<see cref="EAssetType"/>) of <typeparamref name="TAsset"/>. Efficiently cached.
     /// </summary>
     [Pure]
     public static EAssetType GetAssetCategory<TAsset>() where TAsset : Asset => GetAssetCategoryCache<TAsset>.Category;
+
+    /// <summary>
+    /// Returns the asset category (<see cref="EAssetType"/>) of <paramref name="assetType"/>.
+    /// </summary>
+    [Pure]
+    public static EAssetType GetAssetCategory(Type assetType)
+    {
+        if (typeof(ItemAsset).IsAssignableFrom(assetType))
+        {
+            return EAssetType.ITEM;
+        }
+        if (typeof(VehicleAsset).IsAssignableFrom(assetType))
+        {
+            return EAssetType.VEHICLE;
+        }
+        if (typeof(ObjectAsset).IsAssignableFrom(assetType))
+        {
+            return EAssetType.OBJECT;
+        }
+        if (typeof(EffectAsset).IsAssignableFrom(assetType))
+        {
+            return EAssetType.EFFECT;
+        }
+        if (typeof(AnimalAsset).IsAssignableFrom(assetType))
+        {
+            return EAssetType.ANIMAL;
+        }
+        if (typeof(SpawnAsset).IsAssignableFrom(assetType))
+        {
+            return EAssetType.SPAWN;
+        }
+        if (typeof(SkinAsset).IsAssignableFrom(assetType))
+        {
+            return EAssetType.SKIN;
+        }
+        if (typeof(MythicAsset).IsAssignableFrom(assetType))
+        {
+            return EAssetType.MYTHIC;
+        }
+        if (typeof(ResourceAsset).IsAssignableFrom(assetType))
+        {
+            return EAssetType.RESOURCE;
+        }
+        if (typeof(DialogueAsset).IsAssignableFrom(assetType) || typeof(QuestAsset).IsAssignableFrom(assetType) || typeof(VendorAsset).IsAssignableFrom(assetType))
+        {
+            return EAssetType.NPC;
+        }
+
+        return EAssetType.NONE;
+    }
 
     /// <summary>
     /// Returns a read-only list of all loaded master bundles, or empty in the case of a reflection failure.
@@ -523,53 +573,7 @@ public static class AssetUtil
     }
     private static class GetAssetCategoryCache<TAsset> where TAsset : Asset
     {
-        public static readonly EAssetType Category;
-        static GetAssetCategoryCache()
-        {
-            Type type = typeof(TAsset);
-            if (typeof(ItemAsset).IsAssignableFrom(type))
-            {
-                Category = EAssetType.ITEM;
-            }
-            else if (typeof(VehicleAsset).IsAssignableFrom(type))
-            {
-                Category = EAssetType.VEHICLE;
-            }
-            else if (typeof(ObjectAsset).IsAssignableFrom(type))
-            {
-                Category = EAssetType.OBJECT;
-            }
-            else if (typeof(EffectAsset).IsAssignableFrom(type))
-            {
-                Category = EAssetType.EFFECT;
-            }
-            else if (typeof(AnimalAsset).IsAssignableFrom(type))
-            {
-                Category = EAssetType.ANIMAL;
-            }
-            else if (typeof(SpawnAsset).IsAssignableFrom(type))
-            {
-                Category = EAssetType.SPAWN;
-            }
-            else if (typeof(SkinAsset).IsAssignableFrom(type))
-            {
-                Category = EAssetType.SKIN;
-            }
-            else if (typeof(MythicAsset).IsAssignableFrom(type))
-            {
-                Category = EAssetType.MYTHIC;
-            }
-            else if (typeof(ResourceAsset).IsAssignableFrom(type))
-            {
-                Category = EAssetType.RESOURCE;
-            }
-            else if (typeof(DialogueAsset).IsAssignableFrom(type) || typeof(QuestAsset).IsAssignableFrom(type) || typeof(VendorAsset).IsAssignableFrom(type))
-            {
-                Category = EAssetType.NPC;
-            }
-            else
-                Category = EAssetType.NONE;
-        }
+        public static readonly EAssetType Category = GetAssetCategory(typeof(TAsset));
     }
 
     internal static async UniTask InvokeOnBeginLevelLoading(CancellationToken token)

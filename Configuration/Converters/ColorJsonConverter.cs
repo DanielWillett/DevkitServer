@@ -151,7 +151,7 @@ public sealed class ColorJsonConverter : JsonConverter<Color>
             string str = reader.GetString()!;
             if (str.Length > 0 && str[0] == '#')
             {
-                if (ColorUtility.TryParseHtmlString(str, out Color color))
+                if (DevkitServerUtility.TryParseColor(str, out Color color))
                     return color;
 
                 throw new JsonException("String notation for Color must provide 3 or 4 float elements.");
@@ -171,7 +171,7 @@ public sealed class ColorJsonConverter : JsonConverter<Color>
                 if (strs.Length > 3 && !float.TryParse(strs[3].Replace(')', ' '), NumberStyles.Number, CultureInfo.InvariantCulture, out a))
                     throw new JsonException("Invalid alpha channel in Color string notation.");
             }
-            else if (ColorUtility.TryParseHtmlString("#" + str, out Color color))
+            else if (DevkitServerUtility.TryParseColor(str, out Color color))
                 return color;
             else
                 throw new JsonException("String notation for Color must provide 3 or 4 float elements or a \"#ffffff\" notation.");
@@ -194,6 +194,11 @@ public sealed class ColorJsonConverter : JsonConverter<Color>
     }
     public override void Write(Utf8JsonWriter writer, Color value, JsonSerializerOptions options)
     {
-        writer.WriteStringValue("#" + (value.a < 1f ? ColorUtility.ToHtmlStringRGBA(value) : ColorUtility.ToHtmlStringRGB(value)).ToLowerInvariant());
+        Color32 c32 = value;
+        string str = "#" + c32.r.ToString("X2", CultureInfo.InvariantCulture) + c32.g.ToString("X2", CultureInfo.InvariantCulture) + c32.b.ToString("X2", CultureInfo.InvariantCulture);
+        if (c32.a != byte.MaxValue)
+            str += c32.a.ToString("X2", CultureInfo.InvariantCulture);
+
+        writer.WriteStringValue(str.ToLowerInvariant());
     }
 }

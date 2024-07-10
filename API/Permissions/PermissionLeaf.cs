@@ -30,7 +30,7 @@ public readonly struct PermissionLeaf : IEquatable<PermissionLeaf>, IEquatable<P
     /// <summary>
     /// Prefix for invalid permissions.
     /// </summary>
-    public const string InvalidPrefix = "devkitserver";
+    public const string InvalidPrefix = "unknown";
 
     private readonly byte _flags;
 

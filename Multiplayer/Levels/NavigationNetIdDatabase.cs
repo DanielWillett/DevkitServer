@@ -60,7 +60,7 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
     }
 #if CLIENT
     [NetCall(NetCallSource.FromServer, DevkitServerNetCall.SendBindNavigation)]
-    private static StandardErrorCode ReceiveBindHierarchyItem(MessageContext ctx, byte nav, NetId netId)
+    private static StandardErrorCode ReceiveBindNavigation(MessageContext ctx, byte nav, NetId netId)
     {
         RegisterNavigation(nav, netId);
         return StandardErrorCode.Success;
@@ -93,7 +93,6 @@ public sealed class NavigationNetIdDatabase : IReplicatedLevelDataSource<Navigat
     }
     public static bool TryGetNavigation(NetId netId, out byte nav)
     {
-
         object? value = NetIdRegistry.Get(netId);
 
         if (value is byte navId)

@@ -125,8 +125,8 @@ public static class CartographyTool
     {
         _lvl ??= new CartographyData();
 
-        Vector3 n = new Vector3((worldPos.x / _lvl.IntlCaptureSize.x + 0.5f) * _lvl.IntlMapImageSize.x, 0f, (worldPos.z / _lvl.IntlCaptureSize.y + 0.5f) * _lvl.IntlMapImageSize.y);
-        return _lvl.IntlTransformMatrixInverse.MultiplyPoint3x4(n);
+        Vector2 lcl = _lvl.IntlTransformMatrixInverse.MultiplyPoint3x4(worldPos);
+        return new Vector2((lcl.x / _lvl.IntlCaptureSize.x + 0.5f) * _lvl.IntlMapImageSize.x, (lcl.y / _lvl.IntlCaptureSize.y + 0.5f) * _lvl.IntlMapImageSize.y);
     }
 
     /// <summary>
