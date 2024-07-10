@@ -34,17 +34,18 @@ internal class AssemblyResolver : IDisposable
 
     internal AssemblyResolver()
     {
+        ModuleHook.PreVanillaAssemblyResolve += ModuleHookOnPreVanillaAssemblyResolve;
         AppDomain.CurrentDomain.AssemblyLoad += CurrentDomainAssemblyLoad;
-        AppDomain.CurrentDomain.AssemblyResolve += CurrentDomainOnAssemblyResolve;
     }
 
-    private static void CurrentDomainAssemblyLoad(object sender, AssemblyLoadEventArgs args)
+    private static Assembly? ModuleHookOnPreVanillaAssemblyResolve(object sender, ResolveEventArgs args)
     {
-        Log($"Assembly loaded: \"{args.LoadedAssembly.FullName}\".");
-    }
+        if (args.Name.StartsWith("DevkitServer,"))
+        {
+            Log($"Plugin \"{args.RequestingAssembly.GetName().Name}\" was built against an older version of {DevkitServerModule.ColorizedModuleName}: {new AssemblyName(args.Name).Version.Format()}.");
+            return AccessorExtensions.DevkitServer;
+        }
 
-    private static Assembly? CurrentDomainOnAssemblyResolve(object sender, ResolveEventArgs args)
-    {
         if (DevkitServerModule.InitializedPluginLoader)
         {
             PluginLibrary? library = PluginLoader.ResolveAssembly(args.Name);
@@ -62,6 +63,16 @@ internal class AssemblyResolver : IDisposable
         return null;
     }
 
+    private static void CurrentDomainAssemblyLoad(object sender, AssemblyLoadEventArgs args)
+    {
+        if (args.LoadedAssembly.GetName().Name.Equals("DevkitServer"))
+        {
+            Logger.DevkitServer.LogWarning(Source, "A plugin tried to reference an older version of DevkitServer.");
+        }
+
+        Log($"Assembly loaded: \"{args.LoadedAssembly.FullName}\".");
+    }
+
     internal static void Log(string msg)
     {
         Logger.DevkitServer.LogInfo(Source, msg.Colorize(LogColorArgb));
@@ -70,7 +81,7 @@ internal class AssemblyResolver : IDisposable
     public void Dispose()
     {
         AppDomain.CurrentDomain.AssemblyLoad -= CurrentDomainAssemblyLoad;
-        AppDomain.CurrentDomain.AssemblyResolve -= CurrentDomainOnAssemblyResolve;
+        ModuleHook.PreVanillaAssemblyResolve -= ModuleHookOnPreVanillaAssemblyResolve;
     }
 
     internal void ShutdownUnsupportedModules()
