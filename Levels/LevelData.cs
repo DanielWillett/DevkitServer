@@ -84,11 +84,19 @@ public sealed class LevelData
                     Logger.DevkitServer.LogDebug(nameof(GatherLevelData), "Deleting existing...");
                     foreach (FileSystemInfo sys in new DirectoryInfo(newPath).EnumerateFileSystemInfos("*", SearchOption.TopDirectoryOnly))
                     {
-                        if (sys is FileInfo file)
-                            file.Delete();
-                        else if (sys is DirectoryInfo dir)
-                            dir.Delete(true);
+                        try
+                        {
+                            if (sys is FileInfo file)
+                                file.Delete();
+                            else if (sys is DirectoryInfo dir)
+                                dir.Delete(true);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.DevkitServer.LogWarning(nameof(GatherLevelData), ex, $"  Error deleting {(sys is FileInfo ? "file" : "directory")} {sys.FullName.Format()}.");
+                        }
                     }
+
                     Logger.DevkitServer.LogDebug(nameof(GatherLevelData), "  Done deleting existing...");
                 }
 
@@ -98,7 +106,22 @@ public sealed class LevelData
                     await ts.Task.ConfigureAwait(false);
                     try
                     {
-                        FileUtil.CopyDirectory(oldPath, newPath, overwrite: false, skipExisting: true);
+                        DirectoryInfo gitFolder = new DirectoryInfo(Path.Combine(oldPath, ".git"));
+                        string gitAttributes = Path.Combine(oldPath, ".gitattributes");
+                        string gitIgnore = Path.Combine(oldPath, ".gitignore");
+                        FileUtil.CopyDirectory(oldPath, newPath, overwrite: false, skipExisting: true, shouldInclude:
+                            file =>
+                            {
+                                if (file.FullName.Equals(gitAttributes, StringComparison.Ordinal) ||
+                                    file.FullName.Equals(gitIgnore,     StringComparison.Ordinal))
+                                {
+                                    return false;
+                                }
+
+                                DirectoryInfo? dir = file.Directory;
+                                return !(dir != null && (string.Equals(dir.FullName, gitFolder.FullName, StringComparison.Ordinal) || FileUtil.IsChildOf(gitFolder, dir)));
+                            }, shouldIncludeDirectory:
+                            dir => !string.Equals(dir.FullName, gitFolder.FullName, StringComparison.Ordinal) && !FileUtil.IsChildOf(gitFolder, dir));
                     }
                     catch (Exception ex)
                     {
@@ -117,17 +140,28 @@ public sealed class LevelData
             try
             {
                 Level.save();
-            }
-            finally
-            {
+
                 ShouldActivateSaveLockOnLevelSave = true;
                 ts?.TrySetResult(0);
+
+                if (saveToTemp)
+                    SetFilePath(Level.info, oldPath);
+
+                dirtyState?.Apply();
             }
+            catch (Exception ex)
+            {
+                // not using finally in case log throws error
+                ShouldActivateSaveLockOnLevelSave = true;
+                ts?.TrySetResult(0);
 
-            if (saveToTemp)
-                SetFilePath(Level.info, oldPath);
+                if (saveToTemp)
+                    SetFilePath(Level.info, oldPath);
 
-            dirtyState?.Apply();
+                dirtyState?.Apply();
+
+                Logger.DevkitServer.LogError(nameof(GatherLevelData), ex, $"Error saving level {Level.info.getLocalizedName().Format(false)} to {newPath.Format()}.");
+            }
 
 #if SERVER
             if (replicatedLevelDataUser.GetEAccountType() == EAccountType.k_EAccountTypeIndividual)
@@ -144,7 +178,7 @@ public sealed class LevelData
             {
                 try
                 {
-                    data.LevelFolderContent = await VirtualDirectories.CreateAsync(newPath, ShouldSendFile, null, token).ConfigureAwait(false);
+                    data.LevelFolderContent = await VirtualDirectories.CreateAsync(newPath, ShouldSendFile, ShouldSendDirectory, token).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -214,7 +248,7 @@ public sealed class LevelData
         }
     }
 
-    internal static bool ShouldSendFile(FileInfo file)
+    internal static bool ShouldSendFile(FileInfo file, DirectoryInfo rootDir)
     {
         string nm = file.Name;
         string? origDir = file.DirectoryName;
@@ -235,6 +269,31 @@ public sealed class LevelData
             dir.Equals("Screenshots", StringComparison.Ordinal))
             return false;
 
+        if (file.Name.Equals(".gitignore", StringComparison.Ordinal) ||
+            file.Name.Equals(".gitattributes", StringComparison.Ordinal))
+        {
+            return file.Directory == null || !rootDir.FullName.Equals(file.Directory.FullName);
+        }
+
+        // ignore .git folder
+        if (file.FullName.Contains(".git", StringComparison.OrdinalIgnoreCase))
+        {
+            DirectoryInfo gitFolder = new DirectoryInfo(Path.Combine(rootDir.FullName, ".git"));
+            DirectoryInfo? fileDir = file.Directory;
+            if (fileDir != null && (gitFolder.FullName.Equals(fileDir.FullName) || FileUtil.IsChildOf(gitFolder, fileDir)))
+                return false;
+        }
+
         return true;
+    }
+
+    internal static bool ShouldSendDirectory(DirectoryInfo directory, DirectoryInfo rootDir)
+    {
+        // ignore .git folder
+        if (!directory.FullName.Contains(".git", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        DirectoryInfo gitFolder = new DirectoryInfo(Path.Combine(rootDir.FullName, ".git"));
+        return !gitFolder.FullName.Equals(directory.FullName) && !FileUtil.IsChildOf(gitFolder, directory);
     }
 }

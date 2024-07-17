@@ -30,8 +30,8 @@ public sealed class BackupConfiguration : SchemaConfiguration
             BackupInterval = TimeSpan.FromHours(3),
             BackupScheduleInterval = ScheduleInterval.Daily,
             UTCBackupSchedule = false,
-            BackupSchedule = new DateTime[]
-            {
+            BackupSchedule =
+            [
                 new DateTime(1, 1, 1, 0, 0, 0, DateTimeKind.Local),  // 12:00 AM
                 new DateTime(1, 1, 1, 3, 0, 0, DateTimeKind.Local),  //  3:00 AM
                 new DateTime(1, 1, 1, 6, 0, 0, DateTimeKind.Local),  //  6:00 AM
@@ -40,13 +40,14 @@ public sealed class BackupConfiguration : SchemaConfiguration
                 new DateTime(1, 1, 1, 15, 0, 0, DateTimeKind.Local), //  3:00 PM
                 new DateTime(1, 1, 1, 18, 0, 0, DateTimeKind.Local), //  6:00 PM
                 new DateTime(1, 1, 1, 21, 0, 0, DateTimeKind.Local), //  9:00 PM
-            },
+            ],
             MaxBackups = 24,
             MaxBackupSizeMegabytes = 2097.152d, // 2GiB
             SaveBackupLogs = true,
             BackupOnStartupCooldown = TimeSpan.FromHours(3),
             BackupOnStartup = true,
-            SkipInactiveBackup = true
+            SkipInactiveBackup = true,
+            SaveOnBackup = false
         };
     }
     public enum BackupBehavior

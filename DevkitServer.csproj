@@ -18,7 +18,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <DisableImplicitFrameworkReferences>false</DisableImplicitFrameworkReferences>
-    <Version>0.0.31</Version>
+    <Version>0.0.32</Version>
     <Authors>DanielWillett</Authors>
     <Company>DanielWillett</Company>
     <Description>Module for Unturned that enables multi-user map editing.</Description>

@@ -924,7 +924,7 @@ internal static class PatchesMain
     [HarmonyPatch(typeof(LoadingUI), "Update")]
     [HarmonyTranspiler]
     [UsedImplicitly]
-    private static IEnumerable<CodeInstruction> TranspileInitializePlayer(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
+    private static IEnumerable<CodeInstruction> TranspileLoadingUIUpdate(IEnumerable<CodeInstruction> instructions, MethodBase method, ILGenerator generator)
     {
         FieldInfo? playerUIInstance = typeof(PlayerUI).GetField("instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
         if (playerUIInstance == null)

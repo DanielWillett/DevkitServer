@@ -21,7 +21,7 @@ public static class VirtualDirectories
     /// </summary>
     /// <exception cref="DirectoryNotFoundException"/>
     public static VirtualDirectoryRoot Create(string directoryRoot,
-        Predicate<FileInfo>? shouldIncludeFile = null, Predicate<DirectoryInfo>? shouldIncludeDirectory = null)
+        Func<FileInfo, DirectoryInfo, bool>? shouldIncludeFile = null, Func<DirectoryInfo, DirectoryInfo, bool>? shouldIncludeDirectory = null)
     {
         DirectoryInfo info = new DirectoryInfo(directoryRoot);
 
@@ -34,7 +34,7 @@ public static class VirtualDirectories
         {
             if (sysInfo is FileInfo file)
             {
-                if (shouldIncludeFile != null && !shouldIncludeFile(file))
+                if (shouldIncludeFile != null && !shouldIncludeFile(file, info))
                     continue;
 
                 long fileSize = file.Length;
@@ -47,7 +47,7 @@ public static class VirtualDirectories
             }
             else if (sysInfo is DirectoryInfo directory)
             {
-                if (shouldIncludeDirectory != null && !shouldIncludeDirectory(directory))
+                if (shouldIncludeDirectory != null && !shouldIncludeDirectory(directory, info))
                     continue;
 
                 builder.Directories.Add(Path.GetRelativePath(builder.Root, directory.FullName));
@@ -64,7 +64,7 @@ public static class VirtualDirectories
     /// <exception cref="DirectoryNotFoundException"/>
     /// <exception cref="OperationCanceledException"/>
     public static async Task<VirtualDirectoryRoot> CreateAsync(string directoryRoot,
-        Predicate<FileInfo>? shouldIncludeFile = null, Predicate<DirectoryInfo>? shouldIncludeDirectory = null,
+        Func<FileInfo, DirectoryInfo, bool>? shouldIncludeFile = null, Func<DirectoryInfo, DirectoryInfo, bool>? shouldIncludeDirectory = null,
         CancellationToken token = default)
     {
         DirectoryInfo info = new DirectoryInfo(directoryRoot);
@@ -78,14 +78,14 @@ public static class VirtualDirectories
         {
             if (sysInfo is FileInfo file)
             {
-                if (shouldIncludeFile != null && !shouldIncludeFile(file))
+                if (shouldIncludeFile != null && !shouldIncludeFile(file, info))
                     continue;
 
                 builder.FilePaths.Enqueue(file.FullName);
             }
             else if (sysInfo is DirectoryInfo directory)
             {
-                if (shouldIncludeDirectory != null && !shouldIncludeDirectory(directory))
+                if (shouldIncludeDirectory != null && !shouldIncludeDirectory(directory, info))
                     continue;
 
                 builder.Directories.Add(Path.GetRelativePath(builder.Root, directory.FullName));

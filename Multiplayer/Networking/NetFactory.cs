@@ -2,7 +2,7 @@
 #define METHOD_LOGGING
 #define REFLECTION_LOGGING
 #define PRINT_DATA
-//#define MESSAGE_ENUM_LOGGING
+#define MESSAGE_ENUM_LOGGING
 #endif
 
 using Cysharp.Threading.Tasks;
@@ -730,6 +730,12 @@ public static class NetFactory
 #endif
         ref bool __result)
     {
+#if CLIENT
+        // singleplayer
+        if (Provider.isServer)
+            return true;
+#endif
+
         int bitDiff = NewReceiveBitCount - OldReceiveBitCount;
         if (!reader.ReadBits(OldReceiveBitCount, out uint num))
         {
@@ -821,6 +827,12 @@ public static class NetFactory
 #endif
         , ref bool __result)
     {
+#if CLIENT
+        // singleplayer
+        if (Provider.isServer)
+            return true;
+#endif
+        
         uint v = (uint)value;
 #if CLIENT
         if (value == EServerMessage.GetWorkshopFiles | !DevkitServerModule.IsEditing)

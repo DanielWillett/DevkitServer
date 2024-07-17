@@ -116,7 +116,7 @@ public class EditorUIExtension : ContainerUIExtension
     {
         if (Container == null)
             return;
-        if (user == EditorUser.User || _lastFadeSetting != /* todo OptionsSettings.shouldNametagFadeOut */ true)
+        if (user == EditorUser.User || _lastFadeSetting != OptionsSettings.shouldNametagFadeOut)
         {
             UpdateAllNametags();
             return;
@@ -167,7 +167,7 @@ public class EditorUIExtension : ContainerUIExtension
                 nametag.IsVisible = true;
 
             float alpha;
-            if (/* todo OptionsSettings.shouldNametagFadeOut */ true)
+            if (OptionsSettings.shouldNametagFadeOut)
             {
                 float magnitude = new Vector2(adjScreenPos.x - 0.5f, adjScreenPos.y - 0.5f).magnitude;
                 float t = Mathf.InverseLerp(0.0125f, 0.1f, magnitude);
@@ -202,7 +202,7 @@ public class EditorUIExtension : ContainerUIExtension
     {
         if (Container == null)
             return;
-        _lastFadeSetting = /* todo OptionsSettings.shouldNametagFadeOut */ true;
+        _lastFadeSetting = OptionsSettings.shouldNametagFadeOut;
         foreach (EditorUser u in UserManager.Users)
         {
             if (u.IsOwner)

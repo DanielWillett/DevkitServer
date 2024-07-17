@@ -31,8 +31,6 @@ public class UserControl : MonoBehaviour
     private static readonly NetCall<ulong, CameraController> SendUpdateController = new NetCall<ulong, CameraController>(DevkitServerNetCall.SendUpdateController);
     [UsedImplicitly]
     private static readonly NetCall<CameraController> RequestUpdateController = new NetCall<CameraController>(DevkitServerNetCall.RequestUpdateController);
-    [UsedImplicitly]
-    private static readonly NetCall RequestInitialState = new NetCall(DevkitServerNetCall.RequestInitialState);
 #if CLIENT
     // internal static CameraController CleaningUpController;
     internal static MethodInfo GetLocalControllerMethod = typeof(UserControl).GetProperty(nameof(LocalController), BindingFlags.Static | BindingFlags.Public)?.GetMethod!;
@@ -126,12 +124,6 @@ public class UserControl : MonoBehaviour
         CameraController.Player => User.Player?.player.look.aim,
         _ => null
     };
-
-    [UsedImplicitly]
-    private static readonly Action<PlayerUI> RestartPlayerUI = Accessor.GenerateInstanceCaller<PlayerUI, Action<PlayerUI>>("InitializePlayer", throwOnError: true, allowUnsafeTypeBinding: true)!;
-#if SERVER
-    private static readonly Action<Player, SteamPlayer> SendInitialState = Accessor.GenerateInstanceCaller<Player, Action<Player, SteamPlayer>>("SendInitialPlayerState", throwOnError: true, allowUnsafeTypeBinding: true)!;
-#endif
 
 #if CLIENT
     private static readonly Func<IDevkitTool?>? GetDevkitTool;
@@ -235,16 +227,6 @@ public class UserControl : MonoBehaviour
 
         Logger.DevkitServer.LogDebug(Source, $"User input module created for {User.SteamId.m_SteamID.Format()} ( owner: {IsOwner.Format()} ).");
     }
-#if SERVER
-    [NetCall(NetCallSource.FromClient, DevkitServerNetCall.RequestInitialState)]
-    private static void ReceiveRequestInitialState(MessageContext ctx)
-    {
-        EditorUser? user = ctx.GetCaller();
-        if (user == null || !user.IsOnline || user.Player?.player == null)
-            return;
-        SendInitialState(user.Player.player, user.Player);
-    }
-#endif
 
     private void HandleControllerUpdated()
     {

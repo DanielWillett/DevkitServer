@@ -236,7 +236,7 @@ public static class FileUtil
     /// Recursively copy a directory from <paramref name="source"/> to <paramref name="destination"/>.
     /// </summary>
     /// <exception cref="AggregateException">Errors reading or writing files.</exception>
-    public static void CopyDirectory(string source, string destination, bool overwrite = true, bool skipExisting = false, Predicate<FileInfo>? shouldInclude = null)
+    public static void CopyDirectory(string source, string destination, bool overwrite = true, bool skipExisting = false, Predicate<FileInfo>? shouldInclude = null, Predicate<DirectoryInfo>? shouldIncludeDirectory = null)
     {
         DirectoryInfo sourceInfo = new DirectoryInfo(source);
         if (!sourceInfo.Exists)
@@ -273,6 +273,8 @@ public static class FileUtil
                 {
                     try
                     {
+                        if (shouldIncludeDirectory != null && !shouldIncludeDirectory(dir))
+                            continue;
                         string path = Path.Combine(dstInfo.FullName, Path.GetRelativePath(sourceInfo.FullName, dir.FullName));
                         Directory.CreateDirectory(path);
                     }

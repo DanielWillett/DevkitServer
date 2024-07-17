@@ -284,7 +284,8 @@ public class EditorUser : MonoBehaviour, IComparable<EditorUser>
     }
     internal static void OnEnemyConnected(SteamPlayer player)
     {
-        UserManager.AddUser(player);
+        if (DevkitServerModule.IsEditing)
+            UserManager.AddUser(player);
     }
     internal static void OnClientDisconnected()
     {

@@ -109,6 +109,8 @@
 
   /*
    *  Also save the world when an automatic backup runs.
+   *
+   *  Default: false
    */
   "save_level_on_backup": false
 }
