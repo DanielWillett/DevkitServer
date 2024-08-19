@@ -104,7 +104,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="DanielWillett.UnturnedUITools" Version="1.3.0" />
+    <PackageReference Include="DanielWillett.UnturnedUITools" Version="1.4.3" />
     <PackageReference Include="DanielWillett.LevelObjectIcons" Version="1.1.1" />
     <PackageReference Include="Microsoft.Bcl.HashCode" Version="[1.1.1,)" />
   </ItemGroup>

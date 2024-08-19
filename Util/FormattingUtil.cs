@@ -2,7 +2,6 @@
 using DanielWillett.ReflectionTools.Emit;
 using DevkitServer.API;
 using DevkitServer.Multiplayer.Networking;
-using DevkitServer.Util.Encoding;
 using HarmonyLib;
 using StackCleaner;
 using System.Globalization;
@@ -76,39 +75,82 @@ public static class FormattingUtil
         return RemoveTMProRichTextRegex.Replace(text, string.Empty);
     }
 
-    /// <summary>
-    /// Converts a <see cref="ConsoleColor"/> value to a 8-bit foreground color virtual terminal sequence.
-    /// </summary>
-    /// <remarks>See <see href="https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences#text-formatting"/>.</remarks>
-    public static unsafe string GetForegroundSequenceString(ConsoleColor color, bool background)
-    {
-        char* chrs = stackalloc char[5];
-        SetForegroundSequenceCode(chrs, 0, color, background);
-        return new string(chrs, 0, 5);
-    }
+#pragma warning disable CS8500
     internal static unsafe string WrapMessageWithColor(ConsoleColor color, ReadOnlySpan<char> message)
     {
-        int l = 5 + message.Length + ForegroundResetSequence.Length;
-        char* chrs = stackalloc char[l];
-        SetForegroundSequenceCode(chrs, 0, color, false);
-        ForegroundResetSequence.AsSpan().CopyTo(new Span<char>(chrs + (l - ForegroundResetSequence.Length), ForegroundResetSequence.Length));
-        message.CopyTo(new Span<char>(chrs + 5, l - 5));
-        return new string(chrs, 0, l);
+        WrapMessageWithColor8BitState state = default;
+        state.Message = &message;
+        state.Color = color;
+
+        return string.Create(5 + message.Length + ForegroundResetSequence.Length, state, (span, state) =>
+        {
+            WriteTerminalColorSequenceCode(span, 0, state.Color, false);
+            ForegroundResetSequence.AsSpan().CopyTo(span.Slice(span.Length - ForegroundResetSequence.Length, ForegroundResetSequence.Length));
+            state.Message->CopyTo(span[5..]);
+        });
     }
+
+    private unsafe struct WrapMessageWithColor8BitState
+    {
+        public ReadOnlySpan<char>* Message;
+        public ConsoleColor Color;
+    }
+
     internal static unsafe string WrapMessageWithColor(int argb, ReadOnlySpan<char> message)
     {
-        byte r = unchecked((byte)(argb >> 16));
-        byte g = unchecked((byte)(argb >> 8));
-        byte b = unchecked((byte)argb);
-        int l1 = 10 + (r > 9 ? r > 99 ? 3 : 2 : 1) + (g > 9 ? g > 99 ? 3 : 2 : 1) + (b > 9 ? b > 99 ? 3 : 2 : 1);
-        int l = l1 + message.Length + ForegroundResetSequence.Length;
-        char* chrs = stackalloc char[l];
-        SetForegroundSequenceString(chrs, 0, r, g, b, false);
-        ForegroundResetSequence.AsSpan().CopyTo(new Span<char>(chrs + (l - ForegroundResetSequence.Length), ForegroundResetSequence.Length));
-        message.CopyTo(new Span<char>(chrs + l1, l - l1));
-        return new string(chrs, 0, l);
+        if (unchecked((byte)(argb >> 24)) == 0) // console color
+        {
+            ConsoleColor color = (ConsoleColor)argb;
+            return WrapMessageWithColor(color, message);
+        }
+
+        WrapMessageWithColorRGBState state = default;
+        state.Message = &message;
+        state.R = unchecked((byte)(argb >> 16));
+        state.G = unchecked((byte)(argb >> 8));
+        state.B = unchecked((byte)argb);
+        state.ColorLength = 10 + (state.R > 9 ? state.R > 99 ? 3 : 2 : 1) + (state.G > 9 ? state.G > 99 ? 3 : 2 : 1) + (state.B > 9 ? state.B > 99 ? 3 : 2 : 1);
+
+        return string.Create(state.ColorLength + message.Length + ForegroundResetSequence.Length, state, (span, state) =>
+        {
+            WriteTerminalColorSequenceCode(span, 0, state.R, state.G, state.B, false);
+            ForegroundResetSequence.AsSpan().CopyTo(span.Slice(span.Length - ForegroundResetSequence.Length, ForegroundResetSequence.Length));
+            state.Message->CopyTo(span[state.ColorLength..]);
+        });
     }
-    private static unsafe void SetForegroundSequenceCode(char* data, int index, ConsoleColor color, bool background)
+
+    private unsafe struct WrapMessageWithColorRGBState
+    {
+        public ReadOnlySpan<char>* Message;
+        public byte R;
+        public byte G;
+        public byte B;
+        public int ColorLength;
+    }
+#pragma warning restore CS8500
+
+    /// <summary>
+    /// Converts a <see cref="ConsoleColor"/> value to a 8-bit color virtual terminal sequence.
+    /// </summary>
+    /// <remarks>See <see href="https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences#text-formatting"/>.</remarks>
+    public static string GetTerminalColorSequenceString(ConsoleColor color, bool background)
+    {
+        GetTerminalColorSequence8BitState state = default;
+        state.Color = color;
+        state.Background = background;
+        return string.Create(5, state, (span, state) =>
+        {
+            WriteTerminalColorSequenceCode(span, 0, state.Color, state.Background);
+        });
+    }
+
+    private struct GetTerminalColorSequence8BitState
+    {
+        public ConsoleColor Color;
+        public bool Background;
+    }
+
+    private static void WriteTerminalColorSequenceCode(Span<char> data, int index, ConsoleColor color, bool background)
     {
         int num = color switch
         {
@@ -140,25 +182,39 @@ public static class FormattingUtil
     }
 
     /// <summary>
-    /// Converts an ARGB value to an extended foreground color virtual terminal sequence.
+    /// Converts an ARGB value to an extended color virtual terminal sequence.
     /// </summary>
     /// <remarks>See <see href="https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences#extended-colors"/>.</remarks>
-    public static unsafe string GetForegroundSequenceString(int argb, bool background)
+    public static string GetTerminalColorSequenceString(int argb, bool background)
     {
         if (unchecked((byte)(argb >> 24)) == 0) // console color
         {
             ConsoleColor color = (ConsoleColor)argb;
-            return GetForegroundSequenceString(color, background);
+            return GetTerminalColorSequenceString(color, background);
         }
-        byte r = unchecked((byte)(argb >> 16));
-        byte g = unchecked((byte)(argb >> 8));
-        byte b = unchecked((byte)argb);
-        int l = 10 + (r > 9 ? r > 99 ? 3 : 2 : 1) + (g > 9 ? g > 99 ? 3 : 2 : 1) + (b > 9 ? b > 99 ? 3 : 2 : 1);
-        char* chrs = stackalloc char[l];
-        SetForegroundSequenceString(chrs, 0, r, g, b, background);
-        return new string(chrs, 0, l);
+
+        GetTerminalColorSequenceRGBState state = default;
+        state.Background = background;
+        state.R = unchecked((byte)(argb >> 16));
+        state.G = unchecked((byte)(argb >> 8));
+        state.B = unchecked((byte)argb);
+        int l = 10 + (state.R > 9 ? state.R > 99 ? 3 : 2 : 1) + (state.G > 9 ? state.G > 99 ? 3 : 2 : 1) + (state.B > 9 ? state.B > 99 ? 3 : 2 : 1);
+
+        return string.Create(l, state, (span, state) =>
+        {
+            WriteTerminalColorSequenceCode(span, 0, state.R, state.B, state.G, state.Background);
+        });
     }
-    private static unsafe void SetForegroundSequenceString(char* data, int index, byte r, byte g, byte b, bool background)
+
+    private struct GetTerminalColorSequenceRGBState
+    {
+        public byte R;
+        public byte G;
+        public byte B;
+        public bool Background;
+    }
+
+    private static void WriteTerminalColorSequenceCode(Span<char> data, int index, byte r, byte g, byte b, bool background)
     {
         // https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences#extended-colors
         data[index] = ConsoleEscapeCharacter;
@@ -707,8 +763,8 @@ public static class FormattingUtil
     public static string Format(this Label label) => (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
                                                          ? string.Empty
                                                          : (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                                                             ? GetForegroundSequenceString(FormatProvider.StackCleaner.Configuration.Colors!.StructColor, false)
-                                                             : GetForegroundSequenceString(ToConsoleColor(FormatProvider.StackCleaner.Configuration.Colors!.StructColor), false))) + "Label #" + label.GetLabelId() +
+                                                             ? GetTerminalColorSequenceString(FormatProvider.StackCleaner.Configuration.Colors!.StructColor, false)
+                                                             : GetTerminalColorSequenceString(ToConsoleColor(FormatProvider.StackCleaner.Configuration.Colors!.StructColor), false))) + "Label #" + label.GetLabelId() +
                                                      GetResetSuffix();
 
     /// <summary>
@@ -847,9 +903,9 @@ public static class FormattingUtil
                 _ => new Color32(86, 156, 214, 255)
             });
             if (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor)
-                clr = GetForegroundSequenceString(argb, false);
+                clr = GetTerminalColorSequenceString(argb, false);
             else
-                clr = GetForegroundSequenceString(ToConsoleColor(argb), false);
+                clr = GetTerminalColorSequenceString(ToConsoleColor(argb), false);
         }
 
         if (clr != null)
@@ -877,8 +933,8 @@ public static class FormattingUtil
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string clr = FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetForegroundSequenceString(ToArgb(StringColor), false)
-                : GetForegroundSequenceString(ToConsoleColor(ToArgb(StringColor)), false);
+                ? GetTerminalColorSequenceString(ToArgb(StringColor), false)
+                : GetTerminalColorSequenceString(ToConsoleColor(ToArgb(StringColor)), false);
 
             if (quotes)
                 return clr + "\"" + str + "\"" + ForegroundResetSequence;
@@ -1163,7 +1219,7 @@ public static class FormattingUtil
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            string ansiString = GetForegroundSequenceString(color, false);
+            string ansiString = GetTerminalColorSequenceString(color, false);
             return ansiString + str.Replace(ForegroundResetSequence, ansiString) + ForegroundResetSequence;
         }
 
@@ -1178,8 +1234,8 @@ public static class FormattingUtil
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string ansiString = (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetForegroundSequenceString(ToArgb(color), false)
-                : GetForegroundSequenceString(ToConsoleColor(ToArgb(color)), false));
+                ? GetTerminalColorSequenceString(ToArgb(color), false)
+                : GetTerminalColorSequenceString(ToConsoleColor(ToArgb(color)), false));
             return ansiString + str.Replace(ForegroundResetSequence, ansiString) + ForegroundResetSequence;
         }
 
@@ -1194,8 +1250,8 @@ public static class FormattingUtil
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string ansiString = (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetForegroundSequenceString(ToArgb(color), false)
-                : GetForegroundSequenceString(ToConsoleColor(ToArgb(color)), false));
+                ? GetTerminalColorSequenceString(ToArgb(color), false)
+                : GetTerminalColorSequenceString(ToConsoleColor(ToArgb(color)), false));
             return ansiString + str.Replace(ForegroundResetSequence, ansiString) + ForegroundResetSequence;
         }
 
@@ -1210,8 +1266,8 @@ public static class FormattingUtil
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string ansiString = (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetForegroundSequenceString(argb, false)
-                : GetForegroundSequenceString(ToConsoleColor(argb), false));
+                ? GetTerminalColorSequenceString(argb, false)
+                : GetTerminalColorSequenceString(ToConsoleColor(argb), false));
             return ansiString + str.Replace(ForegroundResetSequence, ansiString) + ForegroundResetSequence;
         }
 
@@ -1262,8 +1318,8 @@ public static class FormattingUtil
             int argb = ToArgb(tokenType);
 
             string ansiString = (config.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetForegroundSequenceString(argb, false)
-                : GetForegroundSequenceString(ToConsoleColor(argb), false));
+                ? GetTerminalColorSequenceString(argb, false)
+                : GetTerminalColorSequenceString(ToConsoleColor(argb), false));
             return ansiString + str.Replace(ForegroundResetSequence, ansiString) + ForegroundResetSequence;
         }
 
@@ -1277,7 +1333,7 @@ public static class FormattingUtil
     {
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
-            string ansiString = GetForegroundSequenceString(color, false);
+            string ansiString = GetTerminalColorSequenceString(color, false);
             return ansiString + str.Replace(ForegroundResetSequence, ansiString);
         }
 
@@ -1292,8 +1348,8 @@ public static class FormattingUtil
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string ansiString = FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetForegroundSequenceString(ToArgb(color), false)
-                : GetForegroundSequenceString(ToConsoleColor(ToArgb(color)), false);
+                ? GetTerminalColorSequenceString(ToArgb(color), false)
+                : GetTerminalColorSequenceString(ToConsoleColor(ToArgb(color)), false);
             return ansiString + str.Replace(ForegroundResetSequence, ansiString);
         }
 
@@ -1308,8 +1364,8 @@ public static class FormattingUtil
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string ansiString = FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetForegroundSequenceString(ToArgb(color), false)
-                : GetForegroundSequenceString(ToConsoleColor(ToArgb(color)), false);
+                ? GetTerminalColorSequenceString(ToArgb(color), false)
+                : GetTerminalColorSequenceString(ToConsoleColor(ToArgb(color)), false);
             return ansiString + str.Replace(ForegroundResetSequence, ansiString);
         }
 
@@ -1324,8 +1380,8 @@ public static class FormattingUtil
         if (FormatProvider.StackCleaner.Configuration.ColorFormatting != StackColorFormatType.None)
         {
             string ansiString = FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetForegroundSequenceString(argb, false)
-                : GetForegroundSequenceString(ToConsoleColor(argb), false);
+                ? GetTerminalColorSequenceString(argb, false)
+                : GetTerminalColorSequenceString(ToConsoleColor(argb), false);
             return ansiString + str.Replace(ForegroundResetSequence, ansiString) + ForegroundResetSequence;
         }
 
@@ -1340,8 +1396,8 @@ public static class FormattingUtil
         return FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
             ? string.Empty
             : (FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.ExtendedANSIColor
-                ? GetForegroundSequenceString(argb, false)
-                : GetForegroundSequenceString(ToConsoleColor(argb), false));
+                ? GetTerminalColorSequenceString(argb, false)
+                : GetTerminalColorSequenceString(ToConsoleColor(argb), false));
     }
 
     /// <summary>
@@ -1351,7 +1407,7 @@ public static class FormattingUtil
     {
         return FormatProvider.StackCleaner.Configuration.ColorFormatting == StackColorFormatType.None
             ? string.Empty
-            : GetForegroundSequenceString(color, false);
+            : GetTerminalColorSequenceString(color, false);
     }
 
     /// <summary>
@@ -1704,7 +1760,7 @@ public static class FormattingUtil
                     else if (!CompareRichTextTag(ptr, endIndex, i, options))
                         continue;
 
-                    Append(ref rtn, ptr + nextCopyStartIndex, writeIndex, i - nextCopyStartIndex);
+                    Append(ref rtn, new ReadOnlySpan<char>(ptr + nextCopyStartIndex, i - nextCopyStartIndex), writeIndex);
                     writeIndex += i - nextCopyStartIndex;
                     nextCopyStartIndex = endIndex + 1;
                     i = endIndex;
@@ -1728,7 +1784,7 @@ public static class FormattingUtil
                     }
                 }
             }
-            Append(ref rtn, ptr + nextCopyStartIndex, writeIndex, str.Length - nextCopyStartIndex);
+            Append(ref rtn, new ReadOnlySpan<char>(ptr + nextCopyStartIndex, str.Length - nextCopyStartIndex), writeIndex);
             writeIndex += str.Length - nextCopyStartIndex;
             if (useColor)
                 AppendDefaults(nonDefaults, ref writeIndex, ref rtn, argbBackground, argbForeground, format);
@@ -1742,8 +1798,7 @@ public static class FormattingUtil
             {
                 if (argbBackground == DefaultBackground)
                 {
-                    fixed (char* ptr2 = BackgroundResetSequence)
-                        Append(ref rtn, ptr2, writeIndex, BackgroundResetSequence.Length);
+                    Append(ref rtn, BackgroundResetSequence.AsSpan(), writeIndex);
                     writeIndex += BackgroundResetSequence.Length;
                 }
                 else if (format == StackColorFormatType.ExtendedANSIColor)
@@ -1753,8 +1808,7 @@ public static class FormattingUtil
                     ConsoleColor consoleColor = ToConsoleColor(argbBackground);
                     if (consoleColor == ConsoleColor.Black)
                     {
-                        fixed (char* ptr2 = BackgroundResetSequence)
-                            Append(ref rtn, ptr2, writeIndex, BackgroundResetSequence.Length);
+                        Append(ref rtn, BackgroundResetSequence.AsSpan(), writeIndex);
                         writeIndex += BackgroundResetSequence.Length;
                     }
                     else
@@ -1766,8 +1820,7 @@ public static class FormattingUtil
             {
                 if (argbForeground == DefaultForeground)
                 {
-                    fixed (char* ptr2 = ForegroundResetSequence)
-                        Append(ref rtn, ptr2, writeIndex, ForegroundResetSequence.Length);
+                    Append(ref rtn, ForegroundResetSequence.AsSpan(), writeIndex);
                     writeIndex += ForegroundResetSequence.Length;
                 }
                 else if (format == StackColorFormatType.ExtendedANSIColor)
@@ -1777,8 +1830,7 @@ public static class FormattingUtil
                     ConsoleColor consoleColor = ToConsoleColor(argbForeground);
                     if (consoleColor == ConsoleColor.Gray)
                     {
-                        fixed (char* ptr2 = ForegroundResetSequence)
-                            Append(ref rtn, ptr2, writeIndex, ForegroundResetSequence.Length);
+                        Append(ref rtn, ForegroundResetSequence.AsSpan(), writeIndex);
                         writeIndex += ForegroundResetSequence.Length;
                     }
                     else
@@ -1833,13 +1885,13 @@ public static class FormattingUtil
                     if (endIndex == -1 || !CompareRichTextTag(ptr, endIndex, i, options))
                         continue;
 
-                    Append(ref rtn, ptr + nextCopyStartIndex, writeIndex, i - nextCopyStartIndex);
+                    Append(ref rtn, new ReadOnlySpan<char>(ptr + nextCopyStartIndex, i - nextCopyStartIndex), writeIndex);
                     writeIndex += i - nextCopyStartIndex;
                     nextCopyStartIndex = endIndex + 1;
                     i = endIndex;
                 }
             }
-            Append(ref rtn, ptr + nextCopyStartIndex, writeIndex, str.Length - nextCopyStartIndex);
+            Append(ref rtn, new ReadOnlySpan<char>(ptr + nextCopyStartIndex, str.Length - nextCopyStartIndex), writeIndex);
             writeIndex += str.Length - nextCopyStartIndex;
         }
 
@@ -1980,32 +2032,32 @@ public static class FormattingUtil
             RemoveRichTextOptions.TextWidth
         ];
     }
-    private static unsafe void Append(ref char[] arr, char* data, int index, int length)
+    private static void Append(ref char[] arr, ReadOnlySpan<char> data, int index)
     {
-        if (length == 0) return;
+        if (data.Length == 0) return;
 
-        if (index + length > arr.Length)
+        if (index + data.Length > arr.Length)
         {
             char[] old = arr;
-            arr = new char[index + length];
+            arr = new char[index + data.Length];
             Buffer.BlockCopy(old, 0, arr, 0, old.Length * sizeof(char));
         }
-        for (int i = 0; i < length; ++i)
-            arr[i + index] = data[i];
+
+        data.CopyTo(arr.AsSpan(index));
     }
-    private static unsafe int AppendANSIForegroundCode(ref char[] data, int index, ConsoleColor color, bool background)
+    private static int AppendANSIForegroundCode(ref char[] data, int index, ConsoleColor color, bool background)
     {
-        char* ptr = stackalloc char[5];
-        SetForegroundSequenceCode(ptr, 0, color, background);
-        Append(ref data, ptr, index, 5);
+        Span<char> ptr = stackalloc char[5];
+        WriteTerminalColorSequenceCode(ptr, 0, color, background);
+        Append(ref data, ptr, index);
         return 5;
     }
-    private static unsafe int AppendExtANSIForegroundCode(ref char[] data, int index, byte r, byte g, byte b, bool background)
+    private static int AppendExtANSIForegroundCode(ref char[] data, int index, byte r, byte g, byte b, bool background)
     {
         int l = 10 + (r > 9 ? r > 99 ? 3 : 2 : 1) + (g > 9 ? g > 99 ? 3 : 2 : 1) + (b > 9 ? b > 99 ? 3 : 2 : 1);
-        char* ptr = stackalloc char[l];
-        SetForegroundSequenceString(ptr, 0, r, g, b, background);
-        Append(ref data, ptr, index, l);
+        Span<char> ptr = stackalloc char[l];
+        WriteTerminalColorSequenceCode(ptr, 0, r, g, b, background);
+        Append(ref data, ptr, index);
         return l;
     }
     /// <summary>
@@ -2174,7 +2226,7 @@ public enum RemoveRichTextOptions : ulong
     /// <summary>
     /// All rich text tags.
     /// </summary>
-    All = Align | Alpha | Bold | LineBreak | CharacterSpacing | Font | FontWeight | Gradient | Italic | Indent |
+    All = Align | Alpha | Bold | LineBreak | Color | CharacterSpacing | Font | FontWeight | Gradient | Italic | Indent |
           LineHeight | LineIndent | Link | Lowercase | Material | Margin | Mark | Monospace | NoLineBreak |
           NoParse | PageBreak | Position | Quad | Rotate | Strikethrough | Size | Smallcaps | Space | Sprite |
           Style | Subscript | Superscript | Underline | Uppercase | VerticalOffset | TextWidth

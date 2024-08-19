@@ -110,12 +110,12 @@ internal class UIExtensionManagerCompat : IUIExtensionManager
 
     public static void InvokeOnOpened(object instantiation, API.UI.Extensions.UIExtensionInfo info)
     {
-        if (instantiation is not DanielWillett.UITools.API.Extensions.UIExtension extension)
+        if (instantiation is not DanielWillett.UITools.API.IUIExtension extension)
             return;
 
         try
         {
-            extension.InvokeOnOpened();
+            extension.OnOpened();
         }
         catch (Exception ex)
         {
@@ -125,12 +125,12 @@ internal class UIExtensionManagerCompat : IUIExtensionManager
     }
     public static void InvokeOnClosed(object instantiation, API.UI.Extensions.UIExtensionInfo info)
     {
-        if (instantiation is not DanielWillett.UITools.API.Extensions.UIExtension extension)
+        if (instantiation is not DanielWillett.UITools.API.IUIExtension extension)
             return;
 
         try
         {
-            extension.InvokeOnClosed();
+            extension.OnClosed();
         }
         catch (Exception ex)
         {

@@ -220,7 +220,7 @@ public static class Logger
         {
             if (color.HasValue)
             {
-                ReadOnlySpan<char> fg = FormattingUtil.GetForegroundSequenceString(color.Value, false);
+                ReadOnlySpan<char> fg = FormattingUtil.GetTerminalColorSequenceString(color.Value, false);
                 if (!outputMessage.StartsWith(fg))
                     ANSIFileLogger.LogWriter.Write(fg);
             }

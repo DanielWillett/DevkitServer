@@ -22,10 +22,10 @@
         <PackageReference Include="DanielWillett.SpeedBytes.Unity" Version="[1.1.1,)">
             <Private>false</Private>
         </PackageReference>
-        <PackageReference Include="DanielWillett.ReflectionTools" Version="[3.0.0-prerelease2,)">
+        <PackageReference Include="DanielWillett.ReflectionTools" Version="[3.0.0,)">
             <Private>false</Private>
         </PackageReference>
-        <PackageReference Include="DanielWillett.ReflectionTools.Harmony" Version="[3.0.0-prerelease1,)">
+        <PackageReference Include="DanielWillett.ReflectionTools.Harmony" Version="[3.0.0,)">
             <Private>false</Private>
         </PackageReference>
     </ItemGroup>

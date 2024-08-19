@@ -472,7 +472,7 @@ public static class LoggerExtensions
 
         if (message.IsEmpty)
         {
-            foregroundSequence = FormattingUtil.GetForegroundSequenceString(argb, false);
+            foregroundSequence = FormattingUtil.GetTerminalColorSequenceString(argb, false);
             return null;
         }
         
@@ -494,7 +494,7 @@ public static class LoggerExtensions
     public static int GetReplaceResetsWithConsoleColorInfo(ReadOnlySpan<char> message, out ReadOnlySpan<char> foregroundSequence, out bool anyFound, int argb)
     {
         ReadOnlySpan<char> reset = FormattingUtil.ForegroundResetSequence;
-        ReadOnlySpan<char> foreground = FormattingUtil.GetForegroundSequenceString(argb, false);
+        ReadOnlySpan<char> foreground = FormattingUtil.GetTerminalColorSequenceString(argb, false);
 
         int amt = message.Count(reset);
 
@@ -619,7 +619,7 @@ public static class LoggerExtensions
         foreach (Component comp in comps)
         {
             Logger.Terminal.Write($" Parent: {comp.transform.gameObject.name}", color, true, severity);
-            Logger.Terminal.Write($" Type: {comp.GetType().Format()}{FormattingUtil.GetForegroundSequenceString(color, false)}", color, true, severity);
+            Logger.Terminal.Write($" Type: {comp.GetType().Format()}{FormattingUtil.GetTerminalColorSequenceString(color, false)}", color, true, severity);
             Logger.Terminal.Write(" ========================================", color, true, severity);
         }
         int childCt = go.transform.childCount;
@@ -639,7 +639,7 @@ public static class LoggerExtensions
     {
         string ind = indent == 0 ? string.Empty : new string(' ', indent);
         bool inner = indent > 0;
-        ReadOnlySpan<char> foregroundSpan = FormattingUtil.GetForegroundSequenceString(baseColorArgb, false);
+        ReadOnlySpan<char> foregroundSpan = FormattingUtil.GetTerminalColorSequenceString(baseColorArgb, false);
         int len = GetSourceLength(source, foregroundSpan, out ReadOnlySpan<char> sourceSpan, out bool anyResetsInSource);
 
         string? srcString;
@@ -654,7 +654,7 @@ public static class LoggerExtensions
         if (srcString.Length == 0)
             srcString = null;
 
-        string prefix = FormattingUtil.GetForegroundSequenceString(baseColorArgb, false) ?? string.Empty;
+        string prefix = FormattingUtil.GetTerminalColorSequenceString(baseColorArgb, false) ?? string.Empty;
         string suffix = FormattingUtil.GetResetSuffix();
         ConsoleColor? color = baseColorArgb >> 24 == 0 ? (ConsoleColor)baseColorArgb : null;
 
