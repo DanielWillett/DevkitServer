@@ -263,6 +263,7 @@ public sealed class DevkitServerModule : IModuleNexus
     }
     void IModuleNexus.initialize()
     {
+        CommandWindow.Log("Initializing DevkitServer.");
         Stopwatch watch = Stopwatch.StartNew();
         Module? module = null;
         InitializedLogging = false;

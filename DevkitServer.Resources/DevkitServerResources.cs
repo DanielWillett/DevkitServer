@@ -150,9 +150,9 @@ internal class DevkitServerResources
             Lib("DanielWillett.StackCleaner", "DanielWillett.StackCleaner.pdb"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("DanielWillett.ReflectionTools",
-            Lib("DanielWillett.ReflectionTools", "DanielWillett.ReflectionTools.dll"), new Version(0, 0, 29, 0)),
+            Lib("DanielWillett.ReflectionTools", "DanielWillett.ReflectionTools.dll"), new Version(0, 0, 39, 0)),
         new DevkitServerFileResource("DanielWillett.ReflectionTools.Harmony",
-            Lib("DanielWillett.ReflectionTools", "DanielWillett.ReflectionTools.Harmony.dll"), new Version(0, 0, 30, 0)),
+            Lib("DanielWillett.ReflectionTools", "DanielWillett.ReflectionTools.Harmony.dll"), new Version(0, 0, 39, 0)),
         new DevkitServerFileResource("DanielWillett.ReflectionTools.LICENSE",
             Lib("DanielWillett.ReflectionTools", "LICENSE.txt"), new Version(0, 0, 29, 0)),
 
@@ -167,7 +167,7 @@ internal class DevkitServerResources
         new DevkitServerFileResource("FWD.DanielWillett.ReflectionTools",
             LibFwd("DanielWillett.ReflectionTools.dll"), new Version(0, 0, 29, 0)) { Delete = true },
         new DevkitServerFileResource("FWD.DanielWillett.UnturnedUITools",
-            LibFwd("DanielWillett.UnturnedUITools.dll"), new Version(0, 0, 24, 0)) { Side = Side.Client },
+            LibFwd("DanielWillett.UnturnedUITools.dll"), new Version(0, 0, 39, 0)) { Side = Side.Client },
         new DevkitServerFileResource("FWD.DanielWillett.LevelObjectIcons",
             LibFwd("DanielWillett.LevelObjectIcons.dll"), new Version(0, 0, 24, 0)) { Side = Side.Client },
 

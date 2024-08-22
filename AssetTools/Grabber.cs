@@ -5,6 +5,8 @@ using System.Globalization;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using DanielWillett.ReflectionTools;
+using DanielWillett.ReflectionTools.Formatting;
 using UnityEngine.Rendering;
 
 namespace DevkitServer.AssetTools;
@@ -126,6 +128,7 @@ public static class Grabber
 
                 Directory.CreateDirectory(outPath);
 
+                string? dir;
                 // meshes, materials, textures
                 if (gameObject.TryGetComponent(out Renderer renderer))
                 {
@@ -143,7 +146,7 @@ public static class Grabber
                     }
                     for (int i = 0; i < materials.Length; ++i)
                     {
-                        string dir = Path.Combine(outPath, "Materials", i.ToString(CultureInfo.InvariantCulture) + "_" + materials[i].name);
+                        dir = Path.Combine(outPath, "Materials", i.ToString(CultureInfo.InvariantCulture) + "_" + materials[i].name);
                         FileUtil.CheckDirectory(false, dir);
                         using FileStream stream2 = new FileStream(Path.Combine(dir, "material.json"), FileMode.Create, FileAccess.Write, FileShare.Read);
                         ExportMaterialJson(materials[i], stream2, dir);
@@ -151,86 +154,37 @@ public static class Grabber
                 }
                 
                 // component and thier values values
-                using FileStream compStream = new FileStream(Path.Combine(outPath, "components.txt"), FileMode.Create, FileAccess.Write, FileShare.Read);
+
+                string compDetailPath = Path.Combine(outPath, "components.txt");
+                dir = Path.GetDirectoryName(compDetailPath);
+                if (dir != null)
+                    Directory.CreateDirectory(dir);
+
+                using FileStream compStream = new FileStream(compDetailPath, FileMode.Create, FileAccess.Write, FileShare.Read);
                 using StreamWriter writer = new StreamWriter(compStream, Encoding.UTF8, 512, leaveOpen: false);
                 Component[] components = gameObject.GetComponents<Component>();
-                ITerminalFormatProvider oldProvider = FormattingUtil.FormatProvider;
 
-                FormattingUtil.FormatProvider = new CustomTerminalFormatProvider(new StackTraceCleaner(new StackCleanerConfiguration
-                {
-                    ColorFormatting = StackColorFormatType.None
-                }));
-                
+                IOpCodeFormatter formatter = new DefaultOpCodeFormatter();
+
+                writer.WriteLine("# GameObject");
+
+                LogVariables(typeof(GameObject), gameObject, writer, formatter);
+                writer.WriteLine();
+                writer.WriteLine();
+
                 writer.WriteLine($"# Components ({components.Length})");
                 for (int i = 0; i < components.Length; ++i)
                 {
-                    Type type = components[i].GetType();
+                    Component comp = components[i];
+                    Type type = comp.GetType();
+
                     writer.WriteLine();
                     writer.Write(type.FullName);
                     writer.WriteLine(":");
 
-                    foreach (PropertyInfo property in type.GetProperties(BindingFlags.Instance | BindingFlags.FlattenHierarchy | BindingFlags.Public)
-                                 .Where(x => x.GetMethod != null))
-                    {
-                        writer.Write("    ");
-                        writer.Write(property.Format());
-                        writer.Write(" = ");
-
-                        try
-                        {
-                            object? val = property.GetValue(components[i]);
-                            try
-                            {
-                                writer.Write(val == null ? "null" : ("\"" + val.Format("0.########") + "\""));
-                            }
-                            catch (Exception ex)
-                            {
-                                writer.Write("FMT ERROR: " + ex.GetType().Name + " " + ex.Message);
-                                try
-                                {
-                                    writer.Write("\"" + val.Format() + "\"");
-                                }
-                                catch (Exception ex2)
-                                {
-                                    writer.Write("RETRY FMT ERROR: " + ex2.GetType().Name + " " + ex2.Message);
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            writer.Write("GET ERROR: " + ex.GetType().Name + " " + ex.Message);
-                        }
-                        
-                        writer.WriteLine(';');
-                    }
-
-                    foreach (FieldInfo field in type.GetFields(BindingFlags.Instance | BindingFlags.FlattenHierarchy | BindingFlags.Public))
-                    {
-                        writer.Write("    ");
-                        writer.Write(field.Format());
-                        writer.Write(" = ");
-                        object? val = field.GetValue(components[i]);
-                        try
-                        {
-                            writer.Write(val == null ? "null" : ("\"" + val.Format("0.########") + "\""));
-                        }
-                        catch (Exception ex)
-                        {
-                            writer.Write("FMT ERROR: " + ex.GetType().Name + " " + ex.Message);
-                            try
-                            {
-                                writer.Write("\"" + val.Format() + "\"");
-                            }
-                            catch (Exception ex2)
-                            {
-                                writer.Write("RETRY FMT ERROR: " + ex2.GetType().Name + " " + ex2.Message);
-                            }
-                        }
-                        writer.WriteLine(';');
-                    }
+                    LogVariables(type, comp, writer, formatter);
                 }
 
-                FormattingUtil.FormatProvider = oldProvider;
                 int children = gameObject.transform.childCount;
                 writer.WriteLine();
                 writer.WriteLine();
@@ -247,6 +201,61 @@ public static class Grabber
             }
             default:
                 throw new NotSupportedException("Saving " + @object.GetType().Name);
+        }
+
+        void LogVariables(Type type, object instance, StreamWriter writer, IOpCodeFormatter formatter)
+        {
+            foreach (IVariable variable in type.GetProperties(BindingFlags.Instance | BindingFlags.FlattenHierarchy | BindingFlags.Public).Select(x => x.AsVariable()).Concat(
+                             type.GetFields(BindingFlags.Instance | BindingFlags.FlattenHierarchy | BindingFlags.Public).Select(x => x.AsVariable()))
+                         .OrderBy(x =>
+                         {
+                             if (x.DeclaringType == null)
+                                 return 0;
+                             int level = 0;
+                             x.DeclaringType.ForEachBaseType((_, _) => ++level, includeParent: false, excludeSystemBase: true);
+                             return level;
+                         })
+                         .ThenBy(x => x.Member.Name))
+            {
+                writer.Write("    ");
+                writer.Write(variable.Format(formatter));
+                writer.Write(" = ");
+
+                try
+                {
+                    object? val = variable.GetValue(instance);
+                    try
+                    {
+                        string valToString = val switch
+                        {
+                            string str => "\"" + str + "\"",
+                            IFormattable formattable and (float or double or decimal) => formattable.ToString("0.########", CultureInfo.InvariantCulture),
+                            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+                            Type t => formatter.Format(t),
+                            MethodBase mtd => formatter.Format(mtd),
+                            FieldInfo fld => formatter.Format(fld),
+                            PropertyInfo prop => formatter.Format(prop),
+                            EventInfo evt => formatter.Format(evt),
+                            ParameterInfo prm => formatter.Format(prm),
+                            Array array => "[" + string.Join(", ", array) + "]",
+                            IList collection => "[" + string.Join(", ", collection) + "]",
+                            IEnumerable enumerable => "{" + string.Join(", ", enumerable) + "}",
+                            _ => val?.ToString() ?? "null"
+                        };
+                        writer.Write(valToString);
+                    }
+                    catch (Exception)
+                    {
+                        writer.Write(val?.ToString() ?? "null");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    writer.Write("GET ERROR: " + ex.GetType().Name + " " + ex.Message);
+                }
+
+                writer.WriteLine(';');
+            }
         }
     }
     private static void ExportMesh(Mesh mesh, Stream stream, string? exportDirectory, Material[]? materials)
