@@ -49,16 +49,6 @@ public static class AccessorExtensions
     internal static Type[]? FuncTypes;
     internal static Type[]? ActionTypes;
 
-    public static bool TryMarkLabel(this IOpCodeEmitter emitter, Label? label)
-    {
-        if (!label.HasValue)
-            return false;
-        
-        emitter.MarkLabel(label.Value);
-        return true;
-
-    }
-
     /// <summary>
     /// The instance of harmony used for patching in <see cref="DevkitServerModule"/>. This shouldn't be used for patching.
     /// </summary>
