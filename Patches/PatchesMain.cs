@@ -17,12 +17,14 @@ using Version = System.Version;
 #if CLIENT
 using DevkitServer.API.UI;
 using DevkitServer.API.Multiplayer;
+using DevkitServer.Multiplayer.Cryptography;
 using DevkitServer.Multiplayer.Levels;
 using DevkitServer.Util.Encoding;
 #endif
 #if SERVER
 using DevkitServer.Multiplayer.Networking;
 using System.Globalization;
+using DevkitServer.Multiplayer.Cryptography;
 using Unturned.SystemEx;
 #endif
 
@@ -418,6 +420,10 @@ internal static class PatchesMain
             writer.WriteBit(true);
             writer.WriteBytes(Provider.serverPasswordHash);
         }
+
+        byte[] publicKey = UserCryptographyStore.ResetAndGetKey();
+        writer.WriteUInt16((ushort)publicKey.Length);
+        writer.WriteBytes(publicKey);
     }
     private static IEnumerable<CodeInstruction> TranspileWriteWorkshopRequest(IEnumerable<CodeInstruction> instructions, MethodBase method)
     {
@@ -658,6 +664,21 @@ internal static class PatchesMain
             PasswordTriesIPv4.Remove(ipv4.value);
         if (steam64.UserSteam64())
             PasswordTriesSteam64.Remove(steam64.m_SteamID);
+
+        if (!reader.ReadUInt16(out ushort publicKeyLength) || !reader.ReadBytesPtr(publicKeyLength, out byte[] keyArray, out int keyOffset))
+        {
+            Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), " Failed to read RSA public key (likely a vanilla client connecting).");
+
+            if (!DevkitServerModule.IsEditing)
+                return true;
+
+            Provider.reject(connection, ESteamRejection.SERVER_MODULE_DESYNC);
+            return false;
+        }
+
+        byte[] publicKey = new byte[publicKeyLength];
+        Buffer.BlockCopy(keyArray, keyOffset, publicKey, 0, publicKeyLength);
+        UserCryptographyStore.AddUser(steam64, ipv4, publicKey);
 
         Logger.DevkitServer.LogDebug(nameof(ReadPasswordHash), " Looks good.");
         return true;

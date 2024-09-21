@@ -1,6 +1,7 @@
 ﻿using Cysharp.Threading.Tasks;
 using DanielWillett.ReflectionTools;
 using DevkitServer.Core.Cartography;
+using SDG.Framework.Water;
 using System.Diagnostics;
 using System.Reflection;
 using UnityEngine.Rendering;
@@ -96,7 +97,7 @@ public static class SatelliteCartography
 
         LevelCartographyConfigData? configData = LevelCartographyConfigData.ReadFromLevel(level);
 
-        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, false);
+        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, WaterVolumeManager.worldSeaLevel, false);
 
         renderCamera.transform.SetPositionAndRotation(CartographyTool.CaptureBounds.center with
         {

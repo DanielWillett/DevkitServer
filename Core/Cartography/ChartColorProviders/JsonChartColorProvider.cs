@@ -32,7 +32,7 @@ public class JsonChartColorProvider : RaycastChartColorProvider
             path = Path.Combine(data.Level.path, "Editor", "Charts.json");
             if (!File.Exists(path))
             {
-                path = Path.Combine(data.Level.path, "Charts.json");
+                path = Path.Combine(data.Level.path, "chart_colors.json");
                 if (!File.Exists(path))
                 {
                     path = Path.Combine(data.Level.path, "Charts.json");
@@ -124,8 +124,8 @@ public class JsonChartColorProvider : RaycastChartColorProvider
         ResourceColor = Data.ResourceColor.GetValueOrDefault(JsonChartColorData.Defaults.ResourceColor!.Value) with { a = 255 };
         LargeColor = Data.LargeColor.GetValueOrDefault(JsonChartColorData.Defaults.LargeColor!.Value) with { a = 255 };
         MediumColor = Data.MediumColor.GetValueOrDefault(JsonChartColorData.Defaults.MediumColor!.Value) with { a = 255 };
+        WaterColor = Data.WaterColor.GetValueOrDefault(JsonChartColorData.Defaults.WaterColor!.Value) with { a = 255 };
         FallbackColor = Data.FallbackColor.GetValueOrDefault(JsonChartColorData.Defaults.FallbackColor!.Value) with { a = 255 };
-
         return base.TryInitialize(in data, isExplicitlyDefined);
 
     }
@@ -143,7 +143,7 @@ public class JsonChartColorProvider : RaycastChartColorProvider
             if (IsPointUnderwaterFast(terrainPoint))
                 return WaterColor;
 
-            return Data.InterpolateChart(data.MinHeight, data.MaxHeight, terrainPoint.y) ?? FallbackColor;
+            return Data.InterpolateChart(data.SeaLevel, data.MaxHeight, terrainPoint.y) ?? FallbackColor;
         }
 
         if (chartType == EObjectChart.HIGHWAY)
@@ -170,6 +170,14 @@ public class JsonChartColorProvider : RaycastChartColorProvider
         if (chartType == EObjectChart.MEDIUM || layer == LayerMasks.MEDIUM)
             return MediumColor;
 
-        return FallbackColor;
+        return layer switch
+        {
+            0 => HighwayColor,
+            1 => RoadColor,
+            2 => ObjectRoadColor,
+            3 => PathColor,
+            4 => CliffColor,
+            _ => FallbackColor
+        };
     }
 }

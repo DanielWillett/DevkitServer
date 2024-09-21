@@ -140,7 +140,7 @@ public class BundledStripChartColorProvider : RaycastChartColorProvider
                 return _heightPixels[0];
 
             float heightAlpha = Mathf.InverseLerp(data.MinHeight, data.MaxHeight, terrainPoint.y);
-            return _heightPixels[(int)(heightAlpha * (_heightPixels.Length - 1) + 1)];
+            return _heightPixels[Math.Clamp((int)(heightAlpha * (_heightPixels.Length - 1) + 1), 1, _heightPixels.Length - 1)];
         }
 
         layer = chartType switch
@@ -155,6 +155,6 @@ public class BundledStripChartColorProvider : RaycastChartColorProvider
             _ => layer
         };
 
-        return _layerPixels[layer];
+        return _layerPixels[Math.Min(layer, 31)];
     }
 }

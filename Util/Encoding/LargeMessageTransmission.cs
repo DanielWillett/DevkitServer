@@ -2,6 +2,7 @@
 using DevkitServer.API.Multiplayer;
 using DevkitServer.Multiplayer.Networking;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using DanielWillett.SpeedBytes;
 using DanielWillett.SpeedBytes.Formatting;
 using CompressionLevel = System.IO.Compression.CompressionLevel;
@@ -38,12 +39,25 @@ public class LargeMessageTransmission : IDisposable
     /// <summary>
     /// If using a TCP connection is allowed.
     /// </summary>
+    /// <remarks>Default: <see langword="true"/>.</remarks>
     public bool AllowHighSpeed { get; set; } = true;
 
     /// <summary>
     /// If compression using a <see cref="DeflateStream"/> is allowed.
     /// </summary>
+    /// <remarks>Default: <see langword="true"/>.</remarks>
     public bool AllowCompression { get; set; } = true;
+
+    /// <summary>
+    /// If RSA encryption is used.
+    /// </summary>
+    /// <remarks>Default: <see langword="true"/>.</remarks>
+    public bool UseEncryption { get; set; } = true;
+
+    /// <summary>
+    /// The public key to decrypt the data.
+    /// </summary>
+    public byte[]? PublicRSADecryptionKey { get; private set; }
 
     /// <summary>
     /// How sent or received data should be logged as binary. Must be set server-side (like in the handler) to log received data.
@@ -95,6 +109,11 @@ public class LargeMessageTransmission : IDisposable
     /// Was the data compressed? Will be set after beginning sending for server-side.
     /// </summary>
     public bool IsCompressed { get; private set; }
+
+    /// <summary>
+    /// Was the data encrypted with an RSA key.
+    /// </summary>
+    public bool IsEncrypted { get; private set; }
 
     /// <summary>
     /// Was the data sent over a high-speed (TCP) connection? Will be set after beginning sending for server-side.
@@ -173,7 +192,8 @@ public class LargeMessageTransmission : IDisposable
             (AllowCompression ? 2 : 0) |
             (IsCompressed ? 4 : 0) |
             (IsHighSpeed ? 8 : 0) |
-            (IsCancellable ? 16 : 0));
+            (IsCancellable ? 16 : 0) |
+            (IsEncrypted ? 32 : 0));
         set
         {
             AllowHighSpeed = (value & 1) != 0;
@@ -181,6 +201,7 @@ public class LargeMessageTransmission : IDisposable
             IsCompressed = (value & 4) != 0;
             IsHighSpeed = (value & 8) != 0;
             IsCancellable = (value & 16) != 0;
+            IsEncrypted = (value & 32) != 0;
         }
     }
 
@@ -434,6 +455,31 @@ public class LargeMessageTransmission : IDisposable
 
         return sent;
     }
+    
+    private async UniTask Encrypt(CancellationToken token = default)
+    {
+        using (RSA rsa = RSA.Create())
+        {
+            using (Aes aes = Aes.Create())
+            {
+                aes.GenerateIV();
+                RSAOAEPKeyExchangeFormatter formatter = new RSAOAEPKeyExchangeFormatter(rsa);
+                byte[] sessionKey = formatter.CreateKeyExchange(aes.Key, typeof(Aes));
+                byte[] iv = aes.IV;
+
+                using (MemoryStream ms = new MemoryStream())
+                using (CryptoStream cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write))
+                {
+                    cs.Write(FinalContent);
+                    cs.Close();
+
+                    ms.TryGetBuffer(out ArraySegment<byte> seg);
+                    FinalContent = seg;
+                }
+            }
+        }
+    }
+
     private async UniTask Compress(CancellationToken token = default)
     {
         ArraySegment<byte> source = Content;
@@ -520,17 +566,21 @@ public class LargeMessageTransmission : IDisposable
     {
         return Decompress(token);
     }
-    private UniTask Finalize(CancellationToken token = default)
+    private async UniTask Finalize(CancellationToken token = default)
     {
         if (AllowCompression && !IsCompressed)
         {
-            return Compress(token);
+            await Compress(token);
+        }
+
+        if (UseEncryption && !IsEncrypted)
+        {
+            await Encrypt(token);
         }
 
         IsCompressed = false;
         FinalContent = Content;
         FinalSize = Content.Count;
-        return UniTask.CompletedTask;
     }
     private void PrintLogging()
     {

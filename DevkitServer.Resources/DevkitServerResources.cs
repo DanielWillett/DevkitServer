@@ -36,7 +36,7 @@ internal class DevkitServerResources
         new DevkitServerFileResource(Path.Combine("Defaults", "backup_config.json"), new Version(0, 0, 28, 0)),
         new DevkitServerFileResource(Path.Combine("Defaults", "permission_groups.json"), new Version(0, 0, 15, 0)) { Side = Side.Server },
         new DevkitServerFileResource(Path.Combine("Defaults", "chart_colors.json"), new Version(0, 0, 27, 0)),
-        new DevkitServerFileResource(Path.Combine("Defaults", "cartography_config.json"), new Version(0, 0, 27, 0)),
+        new DevkitServerFileResource(Path.Combine("Defaults", "cartography_config.json"), new Version(0, 0, 39, 0)),
 
         // Schemas
         new DevkitServerFileResource(Path.Combine("Schemas", "client_config_schema.json"), new Version(0, 0, 37, 0)) { Side = Side.Client },
@@ -44,7 +44,7 @@ internal class DevkitServerResources
         new DevkitServerFileResource(Path.Combine("Schemas", "backup_schema.json"), new Version(0, 0, 28, 0)),
         new DevkitServerFileResource(Path.Combine("Schemas", "permission_groups_schema.json"), new Version(0, 0, 15, 0)) { Side = Side.Server },
         new DevkitServerFileResource(Path.Combine("Schemas", "chart_colors_schema.json"), new Version(0, 0, 27, 0)),
-        new DevkitServerFileResource(Path.Combine("Schemas", "cartography_config_schema.json"), new Version(0, 0, 27, 0)),
+        new DevkitServerFileResource(Path.Combine("Schemas", "cartography_config_schema.json"), new Version(0, 0, 39, 0)),
 
         // Root
         new DevkitServerFileResource(@"DevkitServer.module", new Version(0, 0, 17, 0)),

@@ -42,6 +42,7 @@ using DevkitServer.Util.Debugging;
 #endif
 #endif
 #if SERVER
+using DevkitServer.Multiplayer.Cryptography;
 using DevkitServer.Multiplayer.Movement;
 using HighlightingSystem;
 #endif
@@ -333,6 +334,9 @@ public sealed class DevkitServerModule : IModuleNexus
             BundleOrigin = AssetUtil.CreateAssetOrigin(ModuleName, 0ul, true);
 
             PatchesMain.Init();
+#if SERVER
+            UserCryptographyStore.Initialize();
+#endif
 #if CLIENT
             MovementUtil.Init();
             LoggerExtensions.ClientPatchUnturnedLogs();
@@ -1047,6 +1051,7 @@ public sealed class DevkitServerModule : IModuleNexus
         Provider.onServerDisconnected -= UserManager.RemoveUser;
         Level.onLevelLoaded -= OnLevelLoaded;
         HighSpeedServer.Deinit();
+        UserCryptographyStore.Shutdown();
 #else
         DevkitServerGLUtility.Shutdown();
         Provider.onClientConnected -= EditorUser.OnClientConnected;

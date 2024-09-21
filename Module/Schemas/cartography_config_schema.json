@@ -15,6 +15,14 @@
       "items": {
         "type": "string"
       }
+    },
+    "chart_type_overrides": {
+      "description": "Override the chart type for specific objects or resources.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "enum": [ "GROUND", "IGNORE", "HIGHWAY", "ROAD", "STREET", "PATH", "LARGE", "MEDIUM", "WATER", "CLIFF" ]
+      }
     }
   }
 }

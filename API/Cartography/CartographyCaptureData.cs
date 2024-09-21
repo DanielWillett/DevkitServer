@@ -41,11 +41,16 @@ public readonly ref struct CartographyCaptureData
     public readonly float MinHeight;
 
     /// <summary>
+    /// Min y value for coloring terrain.
+    /// </summary>
+    public readonly float SeaLevel;
+
+    /// <summary>
     /// Is this a chart or a satellite render?
     /// </summary>
     public readonly bool IsChart;
 
-    internal CartographyCaptureData(LevelInfo level, string outputPath, Vector2Int imageSize, Vector3 captureSize, Vector3 captureCenter, bool isChart)
+    internal CartographyCaptureData(LevelInfo level, string outputPath, Vector2Int imageSize, Vector3 captureSize, Vector3 captureCenter, float seaLevel, bool isChart)
     {
         Level = level;
         OutputPath = outputPath;
@@ -55,5 +60,6 @@ public readonly ref struct CartographyCaptureData
         MaxHeight = captureCenter.y + captureSize.y / 2f;
         MinHeight = captureCenter.y - captureSize.y / 2f;
         IsChart = isChart;
+        SeaLevel = seaLevel;
     }
 }

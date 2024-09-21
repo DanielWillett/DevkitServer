@@ -6,6 +6,7 @@ using DevkitServer.Core.Cartography;
 using DevkitServer.Core.Cartography.ChartColorProviders;
 using DevkitServer.Core.Cartography.Jobs;
 using DevkitServer.Plugins;
+using SDG.Framework.Water;
 using System.Diagnostics;
 using Unity.Collections;
 using Unity.Jobs;
@@ -102,7 +103,7 @@ public static class ChartCartography
 
         LevelCartographyConfigData? configData = LevelCartographyConfigData.ReadFromLevel(level);
 
-        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, true);
+        CartographyCaptureData data = new CartographyCaptureData(level, outputFile, imgSize, captureBounds.size, captureBounds.center, WaterVolumeManager.worldSeaLevel, true);
 
         byte[] outputRGB24Image = new byte[imgSize.x * imgSize.y * 3];
 
@@ -110,7 +111,7 @@ public static class ChartCartography
 
         if (colorProvider == null)
         {
-            Logger.DevkitServer.LogWarning(nameof(ChartCartography), $"No available color providers. See {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/Cartography Rendering.md", false).Format(false)} for how to set up a chart color provider. Defaulting to Washington vanilla.");
+            Logger.DevkitServer.LogWarning(nameof(ChartCartography), $"No available color providers. See {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/Cartography/Charts.md", false).Format(false)} for how to set up a chart color provider. Defaulting to Washington vanilla.");
             colorProvider = new FallbackChartColorProvider();
             colorProvider.TryInitialize(in data, true);
         }
@@ -130,13 +131,13 @@ public static class ChartCartography
                 switch (colorProvider)
                 {
                     case RaycastChartColorProvider simpleColorProvider:
-                        CaptureBackgroundUsingJobs(simpleColorProvider, ptr, in data, providerInfo, sw);
+                        CaptureBackgroundUsingJobs(simpleColorProvider, configData, ptr, in data, providerInfo, sw);
                         break;
                     case ISamplingChartColorProvider sampleColorProvider:
-                        CaptureBackground(sampleColorProvider, ptr, in data, providerInfo, sw);
+                        CaptureBackground(sampleColorProvider, configData, ptr, in data, providerInfo, sw);
                         break;
                     case IFullChartColorProvider fullColorProvider:
-                        fullColorProvider.CaptureChart(in data, ptr, sw);
+                        fullColorProvider.CaptureChart(in data, configData, ptr, sw);
                         break;
                     default:
                         if (providerInfo.Plugin != null)
@@ -212,7 +213,7 @@ public static class ChartCartography
             EndY = endY;
         }
     }
-    private static unsafe void CaptureBackgroundUsingJobs(RaycastChartColorProvider colorProvider, byte* outputRgb24Image, in CartographyCaptureData data, ChartColorProviderInfo providerInfo, Stopwatch jobStopwatch)
+    private static unsafe void CaptureBackgroundUsingJobs(RaycastChartColorProvider colorProvider, LevelCartographyConfigData? config, byte* outputRgb24Image, in CartographyCaptureData data, ChartColorProviderInfo providerInfo, Stopwatch jobStopwatch)
     {
         int imageSizeX = data.ImageSize.x, imageSizeY = data.ImageSize.y;
 
@@ -235,7 +236,7 @@ public static class ChartCartography
                     CartographyChunkData chunk = new CartographyChunkData(x, y, Math.Min(x + chunkSizeX, imageSizeX) - 1, Math.Min(y + chunkSizeY, imageSizeY) - 1);
                     Logger.DevkitServer.LogDebug(nameof(ChartCartography), $" Chunk: ({chunk.StartX.Format()} to {chunk.EndX.Format()}, {chunk.StartY.Format()} to {chunk.EndY.Format()}).");
 
-                    if (!CaptureBackgroundUsingJobsChunk(colorProvider, outputRgb24Image, in data, in chunk, providerInfo, jobStopwatch))
+                    if (!CaptureBackgroundUsingJobsChunk(colorProvider, config, outputRgb24Image, in data, in chunk, providerInfo, jobStopwatch))
                         return;
 
                     y += chunkSizeY;
@@ -248,9 +249,9 @@ public static class ChartCartography
         }
 
         CartographyChunkData fullChunk = new CartographyChunkData(0, 0, imageSizeX - 1, imageSizeY - 1);
-        CaptureBackgroundUsingJobsChunk(colorProvider, outputRgb24Image, in data, in fullChunk, providerInfo, jobStopwatch);
+        CaptureBackgroundUsingJobsChunk(colorProvider, config, outputRgb24Image, in data, in fullChunk, providerInfo, jobStopwatch);
     }
-    private static unsafe bool CaptureBackgroundUsingJobsChunk(RaycastChartColorProvider colorProvider, byte* outputRgb24Image, in CartographyCaptureData data, in CartographyChunkData chunk, ChartColorProviderInfo providerInfo, Stopwatch jobStopwatch)
+    private static unsafe bool CaptureBackgroundUsingJobsChunk(RaycastChartColorProvider colorProvider, LevelCartographyConfigData? config, byte* outputRgb24Image, in CartographyCaptureData data, in CartographyChunkData chunk, ChartColorProviderInfo providerInfo, [UsedImplicitly] Stopwatch jobStopwatch)
     {
         int imageSizeX = chunk.EndX - chunk.StartX + 1;
         int imageSizeY = chunk.EndY - chunk.StartY + 1;
@@ -344,10 +345,10 @@ public static class ChartCartography
                     RaycastHit hit3 = results[++i];
                     RaycastHit hit4 = results[++i];
 
-                    Color32 c1 = Sample(colorProvider, in data, ref hit1, ref physx);
-                    Color32 c2 = Sample(colorProvider, in data, ref hit2, ref physx);
-                    Color32 c3 = Sample(colorProvider, in data, ref hit3, ref physx);
-                    Color32 c4 = Sample(colorProvider, in data, ref hit4, ref physx);
+                    Color32 c1 = Sample(colorProvider, config, in data, ref hit1, ref physx);
+                    Color32 c2 = Sample(colorProvider, config, in data, ref hit2, ref physx);
+                    Color32 c3 = Sample(colorProvider, config, in data, ref hit3, ref physx);
+                    Color32 c4 = Sample(colorProvider, config, in data, ref hit4, ref physx);
 
                     Color32 color = new Color32(
                         (byte)((c1.r + c2.r + c3.r + c4.r) / 4),
@@ -437,36 +438,69 @@ public static class ChartCartography
         _transformCache.Add(colliderId, (transform, layer));
         return transform;
     }
-    private static Color32 Sample(RaycastChartColorProvider prov, in CartographyCaptureData data, ref RaycastHit hit, ref PhysicsScene physx)
-    {
-        while (true)
-        {
-            Transform? transform = GetTransformAndLayerFast(ref hit, out int layer);
 
+    private static readonly RaycastHit[] IgnoreHitBuffer = new RaycastHit[32];
+    private static readonly IComparer<RaycastHit> HeightComparer = new RaycastHeightComparer();
+
+    private static Color32 Sample(RaycastChartColorProvider prov, LevelCartographyConfigData? config, in CartographyCaptureData data, ref RaycastHit hit, ref PhysicsScene physx)
+    {
+        Transform? transform = GetTransformAndLayerFast(ref hit, out int layer);
+
+        EObjectChart chartType = EObjectChart.NONE;
+        if (layer == LayerMasks.ENVIRONMENT)
+            layer = RaycastChartColorProvider.GetRoadLayer(transform!, config, out chartType);
+
+        if (chartType == EObjectChart.NONE)
+            chartType = prov.GetChartType(ref hit, config, transform, layer);
+
+        if (chartType != EObjectChart.IGNORE)
+            return prov.GetColor(in data, chartType, transform, layer, ref hit);
+
+        int ct = physx.Raycast(
+            hit.point,
+            new Vector3(0f, -1f, 0f),
+            IgnoreHitBuffer,
+            maxDistance: Mathf.Max(data.CaptureSize.y, Level.HEIGHT - (data.CaptureCenter.y - data.CaptureSize.y / 2f)),
+            layerMask: RayMasks.CHART,
+            queryTriggerInteraction: QueryTriggerInteraction.Ignore
+        );
+
+        Array.Sort(IgnoreHitBuffer, 0, ct, HeightComparer);
+
+        for (int i = 0; i < ct; ++i)
+        {
+            ref RaycastHit secondaryHit = ref IgnoreHitBuffer[i];
+            Transform? transform2 = GetTransformAndLayerFast(ref secondaryHit, out layer);
+
+            if (ReferenceEquals(transform2, transform))
+                continue;
+
+            chartType = EObjectChart.NONE;
             if (layer == LayerMasks.ENVIRONMENT)
-                layer = RaycastChartColorProvider.GetRoadLayer(transform!);
-            
-            EObjectChart chartType = prov.GetChartType(ref hit, transform, layer);
+                layer = RaycastChartColorProvider.GetRoadLayer(transform2!, config, out chartType);
+
+            if (chartType == EObjectChart.NONE)
+                chartType = prov.GetChartType(ref secondaryHit, config, transform2, layer);
 
             if (chartType != EObjectChart.IGNORE)
-                return prov.GetColor(in data, chartType, transform, layer, ref hit);
-
-            Vector3 rayOrigin = hit.point;
-            rayOrigin = new Vector3(rayOrigin.x, rayOrigin.y - 0.01f, rayOrigin.z);
-
-            physx.Raycast(rayOrigin, new Vector3(0f, -1f, 0f), out hit, Math.Max(data.CaptureSize.y, Level.HEIGHT - (data.CaptureCenter.y - data.CaptureSize.y / 2f)), RayMasks.CHART, QueryTriggerInteraction.Ignore);
+                return prov.GetColor(in data, chartType, transform2, layer, ref secondaryHit);
         }
+
+        transform = null;
+        return prov.GetColor(in data, EObjectChart.GROUND, transform, layer, ref hit);
     }
 
-    private static unsafe void CaptureBackground(ISamplingChartColorProvider colorProvider, byte* outputRgb24Image, in CartographyCaptureData data, ChartColorProviderInfo providerInfo, Stopwatch jobStopwatch)
+    private static unsafe void CaptureBackground(ISamplingChartColorProvider colorProvider, LevelCartographyConfigData? config, byte* outputRgb24Image, in CartographyCaptureData data, ChartColorProviderInfo providerInfo, [UsedImplicitly] Stopwatch jobStopwatch)
     {
         int imageSizeX = data.ImageSize.x, imageSizeY = data.ImageSize.y;
 
         const int rgb24Size = 3;
 
         Vector2 v2 = default;
+#if CLIENT
         float dt = Math.Min(0.1f, CachedTime.DeltaTime);
         bool wasConnected = Provider.isConnected;
+#endif
 
         try
         {
@@ -481,7 +515,7 @@ public static class ChartCartography
                     v2.x = worldCoordinates.x;
                     v2.y = worldCoordinates.z;
 
-                    Color32 color = colorProvider.SampleChartPosition(in data, v2);
+                    Color32 color = colorProvider.SampleChartPosition(in data, config, v2);
                     int index = (x + y * imageSizeX) * rgb24Size;
                     outputRgb24Image[index] = color.r;
                     outputRgb24Image[index + 1] = color.g;
@@ -664,5 +698,10 @@ public static class ChartCartography
                 }
             }
         }
+    }
+
+    private class RaycastHeightComparer : IComparer<RaycastHit>
+    {
+        public int Compare(RaycastHit a, RaycastHit b) => a.distance.CompareTo(b.distance);
     }
 }

@@ -6,6 +6,8 @@ using System.Text.Json.Serialization;
 namespace DevkitServer.Core.Cartography;
 public class LevelCartographyConfigData : SchemaConfiguration
 {
+    private Dictionary<Guid, EObjectChart>? _dictionaryCache;
+    private EObjectChart[]? _roadMaterials;
     protected override string GetSchemaURI() => DevkitServerModule.GetRelativeRepositoryUrl("Module/Schemas/cartography_config.json", true);
 
     [JsonPropertyName("override_chart_color_provider")]
@@ -13,6 +15,91 @@ public class LevelCartographyConfigData : SchemaConfiguration
 
     [JsonPropertyName("override_active_compositors")]
     public string[]? ActiveCompositors { get; set; }
+
+    [JsonPropertyName("chart_type_overrides")]
+    public Dictionary<string, string>? ChartOverrides { get; set; }
+
+    /// <summary>
+    /// Attempts to resolve a guid from <see cref="ChartOverrides"/>.
+    /// </summary>
+    public bool TryGetObjectChartOverride(Guid guid, out EObjectChart chart)
+    {
+        if (ChartOverrides == null || ChartOverrides.Count == 0)
+        {
+            chart = EObjectChart.NONE;
+            return false;
+        }
+
+        if (_dictionaryCache == null)
+        {
+            CreateCaches();
+        }
+
+        return _dictionaryCache!.TryGetValue(guid, out chart);
+    }
+
+    /// <summary>
+    /// Attempts to resolve a guid from <see cref="ChartOverrides"/>.
+    /// </summary>
+    public bool TryGetRoadMaterialChartOverride(byte material, out EObjectChart chart)
+    {
+        if (ChartOverrides == null || ChartOverrides.Count == 0)
+        {
+            chart = EObjectChart.NONE;
+            return false;
+        }
+
+        if (_roadMaterials == null)
+        {
+            CreateCaches();
+        }
+
+        if (material >= _roadMaterials!.Length)
+        {
+            chart = EObjectChart.NONE;
+            return false;
+        }
+
+        chart = _roadMaterials[material];
+        return true;
+    }
+
+    private void CreateCaches()
+    {
+        _dictionaryCache = new Dictionary<Guid, EObjectChart>(ChartOverrides.Count);
+        _roadMaterials = new EObjectChart[LevelRoads.materials.Length];
+        for (int i = 0; i < _roadMaterials.Length; ++i)
+        {
+            RoadMaterial material = LevelRoads.materials[i];
+            _roadMaterials[i] = material.isConcrete ? material.width <= 8d ? EObjectChart.ROAD : EObjectChart.HIGHWAY : EObjectChart.PATH;
+        }
+
+        foreach (KeyValuePair<string, string> ovr in ChartOverrides)
+        {
+            if (!Enum.TryParse(ovr.Value, true, out EObjectChart value))
+            {
+                Logger.DevkitServer.LogWarning(nameof(LevelCartographyConfigData), $"Invalid chart type in cartography config: \"{ovr.Key.Format()}\". This row will be ignored.");
+                continue;
+            }
+
+            if (Guid.TryParse(ovr.Key, out Guid parsedGuid))
+            {
+                _dictionaryCache.Add(parsedGuid, value);
+            }
+            else
+            {
+                int index = Array.FindIndex(LevelRoads.materials, x => x.material != null && x.material.mainTexture != null && x.material.mainTexture.name.Equals(ovr.Key, StringComparison.Ordinal));
+                if (index != -1)
+                {
+                    _roadMaterials[index] = value;
+                }
+                else
+                {
+                    Logger.DevkitServer.LogWarning(nameof(LevelCartographyConfigData), $"Invalid GUID in cartography config: \"{ovr.Key.Format()}\". This row will be ignored.");
+                }
+            }
+        }
+    }
 
     public static LevelCartographyConfigData? ReadFromLevel(LevelInfo? info)
     {
@@ -73,7 +160,7 @@ public class LevelCartographyConfigData : SchemaConfiguration
         catch (Exception ex)
         {
             Logger.DevkitServer.LogError(nameof(LevelCartographyConfigData), ex, $"Unable to read {file.Format()} for cartography config. Json parser exception. Using default options.");
-            Logger.DevkitServer.LogInfo(nameof(LevelCartographyConfigData), $"See {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/Cartography Rendering.md", false).Format(false)} for how to format your cartography config.");
+            Logger.DevkitServer.LogInfo(nameof(LevelCartographyConfigData), $"See {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/Cartography/Introduction.md", false).Format(false)} for how to format your cartography config.");
             return null;
         }
 
@@ -81,7 +168,7 @@ public class LevelCartographyConfigData : SchemaConfiguration
             return data;
 
         Logger.DevkitServer.LogWarning(nameof(LevelCartographyConfigData), $"Unable to read {file.Format()} for cartography config. No value available. Using default options.");
-        Logger.DevkitServer.LogInfo(nameof(LevelCartographyConfigData), $"[{nameof(LevelCartographyConfigData)}] See {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/Cartography Rendering.md", false).Format(false)} for how to format your cartography config.");
+        Logger.DevkitServer.LogInfo(nameof(LevelCartographyConfigData), $"[{nameof(LevelCartographyConfigData)}] See {DevkitServerModule.GetRelativeRepositoryUrl("Documentation/Cartography/Introduction.md", false).Format(false)} for how to format your cartography config.");
         return null;
     }
 }
