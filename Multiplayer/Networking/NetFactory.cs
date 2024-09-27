@@ -1,8 +1,8 @@
 ﻿#if DEBUG
-#define METHOD_LOGGING
-#define REFLECTION_LOGGING
-#define PRINT_DATA
-#define MESSAGE_ENUM_LOGGING
+//#define METHOD_LOGGING
+//#define REFLECTION_LOGGING
+//#define PRINT_DATA
+//#define MESSAGE_ENUM_LOGGING
 #endif
 
 using Cysharp.Threading.Tasks;
@@ -22,7 +22,9 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+#if PRINT_DATA
 using DanielWillett.SpeedBytes.Formatting;
+#endif
 #if CLIENT
 using DevkitServer.Multiplayer.Sync;
 #endif

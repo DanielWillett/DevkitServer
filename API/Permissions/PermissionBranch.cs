@@ -379,8 +379,17 @@ public readonly struct PermissionBranch : IEquatable<PermissionBranch>, IEquatab
 
         if (WildcardLevel == 0)
             return Path.Equals(leaf.Path, StringComparison.InvariantCultureIgnoreCase);
-        
-        return leaf.Level >= WildcardLevel && leaf.Path.AsSpan().StartsWith(Path.AsSpan(0, Path.Length - 1), StringComparison.InvariantCultureIgnoreCase);
+
+        ReadOnlySpan<char> leafPath = leaf.Path.AsSpan();
+        ReadOnlySpan<char> branchPathWithoutStar = Path.AsSpan(0, Path.Length - 1);
+
+        // make sure "a::b.c.*" contains "a::b.c"
+        if (leaf.Level == WildcardLevel - 1)
+        {
+            return leafPath.Equals(branchPathWithoutStar[..^1], StringComparison.InvariantCultureIgnoreCase);
+        }
+
+        return leaf.Level >= WildcardLevel && leafPath.StartsWith(branchPathWithoutStar, StringComparison.InvariantCultureIgnoreCase);
     }
 
     /// <summary>

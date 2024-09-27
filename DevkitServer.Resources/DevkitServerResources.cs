@@ -13,7 +13,7 @@ internal class DevkitServerResources
         GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true, true);
     }
 
-    private static readonly Version LastBundleUpdate = new Version(0, 0, 10, 0);
+    private static readonly Version LastBundleUpdate = new Version(0, 0, 40, 0);
 
     /*
      * Defines all resource files and the last time (DevkitServer.Resources version) they were updated.
@@ -150,9 +150,9 @@ internal class DevkitServerResources
             Lib("DanielWillett.StackCleaner", "DanielWillett.StackCleaner.pdb"), new Version(0, 0, 15, 0)),
 
         new DevkitServerFileResource("DanielWillett.ReflectionTools",
-            Lib("DanielWillett.ReflectionTools", "DanielWillett.ReflectionTools.dll"), new Version(0, 0, 39, 0)),
+            Lib("DanielWillett.ReflectionTools", "DanielWillett.ReflectionTools.dll"), new Version(0, 0, 40, 0)),
         new DevkitServerFileResource("DanielWillett.ReflectionTools.Harmony",
-            Lib("DanielWillett.ReflectionTools", "DanielWillett.ReflectionTools.Harmony.dll"), new Version(0, 0, 39, 0)),
+            Lib("DanielWillett.ReflectionTools", "DanielWillett.ReflectionTools.Harmony.dll"), new Version(0, 0, 40, 0)),
         new DevkitServerFileResource("DanielWillett.ReflectionTools.LICENSE",
             Lib("DanielWillett.ReflectionTools", "LICENSE.txt"), new Version(0, 0, 29, 0)),
 

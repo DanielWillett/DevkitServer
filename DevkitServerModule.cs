@@ -58,6 +58,9 @@ public sealed class DevkitServerModule : IModuleNexus
 #endif
     public static readonly bool IsRelease = !IsDebug;
 
+    internal const string PluginFrameworkTag = "ds";
+    internal const SteamServerAdvertisement.EPluginFramework PluginFrameworkType = (SteamServerAdvertisement.EPluginFramework)15; // using an arbitrary higher number in case he adds more
+
     public static readonly string RepositoryUrl = "https://github.com/DanielWillett/DevkitServer"; // don't suffix these with '/'
     public static readonly string RawRepositoryUrl = "https://raw.githubusercontent.com/DanielWillett/DevkitServer";
     public const string ModuleName = "DevkitServer";
@@ -147,7 +150,8 @@ public sealed class DevkitServerModule : IModuleNexus
         { "HighSpeedTip", $"Want to download the map faster? Have the server owner set up the <b>high speed</b> server settings in <color=#{
             ModuleColor.r.ToString("X2", CultureInfo.InvariantCulture)
             + ModuleColor.g.ToString("X2", CultureInfo.InvariantCulture)
-            + ModuleColor.b.ToString("X2", CultureInfo.InvariantCulture)}>{ModuleName}</color>'s <#dddddd>server_config.json</color>." }
+            + ModuleColor.b.ToString("X2", CultureInfo.InvariantCulture)}>{ModuleName}</color>'s <#dddddd>server_config.json</color>." },
+        { "Plugins_Column_DevkitServer_Tooltip", "This server uses DevkitServer." }
     };
     public static Local CommandLocalization { get; private set; } = null!;
 
@@ -367,7 +371,17 @@ public sealed class DevkitServerModule : IModuleNexus
 #if CLIENT
             ReloadRichPresenceLocalization();
 #endif
-            PluginAdvertising.Get().AddPlugin(MainLocalization.format("Name"));
+#if SERVER
+            // adds the plugin to the server lobby screen and sets the plugin framework type to 'Unknown'.
+            IPluginAdvertising pluginAdvService = PluginAdvertising.Get();
+            pluginAdvService.AddPlugin(MainLocalization.format("Name"));
+            pluginAdvService
+                .GetType()
+                .GetProperty("PluginFrameworkTag", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy)
+                ?.GetSetMethod(true)
+                ?.Invoke(pluginAdvService, [ PluginFrameworkTag ]);
+#endif
+
             _tknSrc = new CancellationTokenSource();
             Logger.DevkitServer.LogInfo("Init", "DevkitServer loading...");
 
@@ -643,6 +657,8 @@ public sealed class DevkitServerModule : IModuleNexus
 #endif
     private static void OnLevelLoaded(int level)
     {
+        ComponentHost.StartCoroutine(TryLoadBundle(null));
+
         if (level == Level.BUILD_INDEX_MENU)
         {
 #if CLIENT
@@ -901,6 +917,7 @@ public sealed class DevkitServerModule : IModuleNexus
             Bundle.unload();
             Bundle = null;
         }
+
         Bundle = new MasterBundle(bundle, string.Empty, "DevkitServer Base");
         BundleConfig = bundle;
         Logger.DevkitServer.LogInfo(nameof(TryLoadBundle), $"Loaded bundle: {bundle.assetBundleNameWithoutExtension.Format(false)} from {path.Format(false)}.");

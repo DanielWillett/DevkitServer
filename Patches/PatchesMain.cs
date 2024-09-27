@@ -13,6 +13,8 @@ using SDG.NetPak;
 using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Emit;
+using DanielWillett.ReflectionTools.Emit;
+using DanielWillett.ReflectionTools.Formatting;
 using Version = System.Version;
 #if CLIENT
 using DevkitServer.API.UI;
@@ -140,6 +142,48 @@ internal static class PatchesMain
                 isStatic: true)}. Can't hide map from joining players (by checking password before sending mods).");
         }
 #elif CLIENT
+
+        // add case to plugin framework enum parser for DevkitServer
+        try
+        {
+            ConstructorInfo? steamServerAdvertisementCtor = typeof(SteamServerAdvertisement).GetConstructor(
+                BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance, null, CallingConventions.Any,
+                [ typeof(gameserveritem_t), typeof(SteamServerAdvertisement.EInfoSource) ], null);
+                
+            if (steamServerAdvertisementCtor == null)
+            {
+                Logger.DevkitServer.LogWarning(Source, $"Failed to find construtor for {typeof(SteamServerAdvertisement).Format()}. Can't display custom DevkitServer plugin framework.");
+            }
+            else
+            {
+                Patcher.Patch(steamServerAdvertisementCtor, transpiler: Accessor.GetMethod(AddDevkitServerPluginFrameworkTranspiler));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch construtor for {typeof(SteamServerAdvertisement).Format()}. Can't display custom DevkitServer plugin framework.");
+        }
+        try
+        {
+            ConstructorInfo? sleekServerCtor = typeof(SleekServer).GetConstructor(
+                BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance, null, CallingConventions.Any,
+                [ typeof(ESteamServerList), typeof(SteamServerAdvertisement) ], null);
+
+            if (sleekServerCtor == null)
+            {
+                Logger.DevkitServer.LogWarning(Source, $"Failed to find construtor for {typeof(SleekServer).Format()}. Can't display custom DevkitServer plugin framework.");
+            }
+            else
+            {
+                Patcher.Patch(sleekServerCtor, transpiler: Accessor.GetMethod(AddDevkitServerPluginFrameworkToUITranspiler));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to patch construtor for {typeof(SleekServer).Format()}. Can't display custom DevkitServer plugin framework.");
+        }
+
+
         Type? handlerType = null;
         try
         {
@@ -320,6 +364,39 @@ internal static class PatchesMain
                 isStatic: true)}.");
         }
 #elif CLIENT
+
+        // add case to plugin framework enum parser for DevkitServer
+        try
+        {
+            ConstructorInfo? steamServerAdvertisementCtor = typeof(SteamServerAdvertisement).GetConstructor(
+                BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance, null, CallingConventions.Any,
+                [typeof(gameserveritem_t), typeof(SteamServerAdvertisement.EInfoSource)], null);
+
+            if (steamServerAdvertisementCtor != null)
+            {
+                Patcher.Unpatch(steamServerAdvertisementCtor, Accessor.GetMethod(AddDevkitServerPluginFrameworkTranspiler));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to unpatch construtor for {typeof(SteamServerAdvertisement).Format()}. Can't display custom DevkitServer plugin framework.");
+        }
+        try
+        {
+            ConstructorInfo? sleekServerCtor = typeof(SleekServer).GetConstructor(
+                BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance, null, CallingConventions.Any,
+                [typeof(ESteamServerList), typeof(SteamServerAdvertisement)], null);
+
+            if (sleekServerCtor != null)
+            {
+                Patcher.Unpatch(sleekServerCtor, Accessor.GetMethod(AddDevkitServerPluginFrameworkToUITranspiler));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.DevkitServer.LogWarning(Source, ex, $"Failed to unpatch construtor for {typeof(SleekServer).Format()}. Can't display custom DevkitServer plugin framework.");
+        }
+
         try
         {
             if (typeof(Provider).GetMethod("onClientTransportReady", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) is { } definingMethod
@@ -409,6 +486,277 @@ internal static class PatchesMain
 #endif
     }
 #if CLIENT
+    private static IEnumerable<CodeInstruction> AddDevkitServerPluginFrameworkTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator ilGenerator, MethodBase method)
+    {
+        TranspileContext ctx = new TranspileContext(method, ilGenerator, instructions);
+
+        MethodInfo? setPluginFramework = typeof(SteamServerAdvertisement)
+            .GetProperty("pluginFramework", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            ?.GetSetMethod(true);
+        
+        if (setPluginFramework == null)
+        {
+            return ctx.Fail(new PropertyDefinition("pluginFramework")
+                .DeclaredIn<SteamServerAdvertisement>(isStatic: false)
+                .WithPropertyType<SteamServerAdvertisement.EPluginFramework>()
+                .WithNoGetter()
+            );
+        }
+
+        MethodInfo? stringEquals = typeof(string).GetMethod(nameof(string.Equals), BindingFlags.Public | BindingFlags.Instance, null, CallingConventions.Any, [ typeof(string) ], null);
+
+        if (stringEquals == null)
+        {
+            return ctx.Fail(new MethodDefinition(nameof(string.Equals))
+                .DeclaredIn<string>(isStatic: false)
+                .Returning<bool>()
+                .WithParameter<string>("value")
+            );
+        }
+
+        while (ctx.MoveNext())
+        {
+            if (!PatchUtility.FollowPattern(ctx,
+                    x => x.IsLdloc(),
+                    x => x.LoadsConstant("om"),
+                    null,
+                    x => x.opcode.IsBrAny(),
+                    x => x.opcode == OpCodes.Ldarg_0,
+                    x => x.LoadsConstant((int)SteamServerAdvertisement.EPluginFramework.OpenMod),
+                    x => x.Calls(setPluginFramework),
+                    x => x.opcode.IsBrAny()
+                ))
+            {
+                continue;
+            }
+
+            Label ifNotThis = ctx.DefineLabel();
+            ctx.EmitAbove(emit =>
+            {
+                Label ifThis = (Label)ctx[ctx.CaretIndex - 1].operand;
+
+                CodeInstruction loadInstruction = ctx[ctx.CaretIndex - 8];
+                
+                // load string
+                if (loadInstruction.opcode == OpCodes.Ldloc_S)
+                    emit.Emit(loadInstruction.opcode, Convert.ToByte(loadInstruction.operand));
+                else if (loadInstruction.opcode == OpCodes.Ldloc)
+                    emit.Emit(loadInstruction.opcode, Convert.ToUInt16(loadInstruction.operand));
+                else
+                    emit.Emit(loadInstruction.opcode);
+
+                emit.LoadConstantString(DevkitServerModule.PluginFrameworkTag)
+                    .Invoke(stringEquals)
+                    .BranchIfFalse(ifNotThis)
+                    .LoadArgument(0)
+                    .LoadConstantInt32((int)DevkitServerModule.PluginFrameworkType)
+                    .Invoke(setPluginFramework)
+                    .Branch(ifThis);
+            });
+
+            ctx.MarkLabel(ifNotThis);
+            ctx.ApplyBlocksAndLabels();
+
+            break;
+        }
+
+        return ctx;
+    }
+
+    private static IEnumerable<CodeInstruction> AddDevkitServerPluginFrameworkToUITranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator ilGenerator, MethodBase method)
+    {
+        TranspileContext ctx = new TranspileContext(method, ilGenerator, instructions);
+
+        MethodInfo? setTextureMethod = typeof(ISleekImage)
+            .GetProperty(nameof(ISleekImage.Texture), BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            ?.GetSetMethod(true);
+        
+        if (setTextureMethod == null)
+        {
+            return ctx.Fail(new PropertyDefinition(nameof(ISleekImage.Texture))
+                .DeclaredIn<ISleekImage>(isStatic: false)
+                .WithPropertyType<Texture>()
+                .WithNoGetter()
+            );
+        }
+        MethodInfo? setTooltipMethod = typeof(ISleekWithTooltip)
+            .GetProperty(nameof(ISleekWithTooltip.TooltipText), BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            ?.GetSetMethod(true);
+        
+        if (setTooltipMethod == null)
+        {
+            return ctx.Fail(new PropertyDefinition(nameof(ISleekWithTooltip.TooltipText))
+                .DeclaredIn<ISleekWithTooltip>(isStatic: false)
+                .WithPropertyType<string>()
+                .WithNoGetter()
+            );
+        }
+
+        MethodInfo? getPluginFramework = typeof(SteamServerAdvertisement)
+            .GetProperty("pluginFramework", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            ?.GetGetMethod(true);
+
+        if (getPluginFramework == null)
+        {
+            return ctx.Fail(new PropertyDefinition("pluginFramework")
+                .DeclaredIn<SteamServerAdvertisement>(isStatic: false)
+                .WithPropertyType<SteamServerAdvertisement.EPluginFramework>()
+                .WithNoSetter()
+            );
+        }
+
+        FieldInfo? pluginBoxField = typeof(SleekServer).GetField("pluginsBox", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+
+        if (pluginBoxField == null)
+        {
+            return ctx.Fail(new FieldDefinition("pluginsBox")
+                .DeclaredIn<SleekServer>(isStatic: false)
+                .WithFieldType<ISleekBox>()
+            );
+        }
+
+        // local that stores the plugin framework value
+        LocalReference lclPluginFrameworkRef = default;
+        LocalReference lclImageRef = default;
+
+        while (ctx.MoveNext())
+        {
+            // find plugin framework local
+            if (lclPluginFrameworkRef.Local == null && lclPluginFrameworkRef.Index < 0)
+            {
+                if (!ctx.Instruction.Calls(getPluginFramework))
+                {
+                    continue;
+                }
+
+                if (!ctx.MoveNext())
+                    break;
+
+                LocalBuilder? lcl = PatchUtility.GetLocal(ctx.Instruction, out int index, true);
+                if (lcl == null && index < 0)
+                    continue;
+
+                lclPluginFrameworkRef = lcl ?? (LocalReference)index;
+            }
+
+            int branchIndex;
+            if (PatchUtility.FollowPattern(ctx,
+                    x => x.opcode == OpCodes.Switch,
+                    x => x.opcode.IsBrAny(),
+                    x => x.opcode.IsLdLoc()
+                ))
+            {
+                LocalBuilder? lcl = PatchUtility.GetLocal(ctx[ctx.CaretIndex - 1], out int index, false);
+                if (lcl == null && index < 0)
+                    continue;
+
+                branchIndex = ctx.CaretIndex - 2;
+                Label lbl = (Label)ctx[branchIndex].operand;
+
+                ctx.CaretIndex = PatchUtility.FindLabelDestinationIndex(ctx, lbl);
+
+                lclImageRef = lcl ?? (LocalReference)index;
+            }
+            else continue;
+
+            Logger.DevkitServer.LogInfo(nameof(AddDevkitServerPluginFrameworkTranspiler), "emitting patch.");
+
+            Label ifNotThis = ctx.DefineLabel();
+
+            ctx.EmitAbove(emit =>
+            {
+                Label lastToBranchToThis = emit.AddLabel();
+                ctx[branchIndex].operand = lastToBranchToThis;
+                // branch last option to end of switch
+                emit.Branch(ifNotThis)
+                    .MarkLabel(lastToBranchToThis);
+
+                     // check if type is equal
+                emit.LoadLocalValue(lclPluginFrameworkRef)
+                    .LoadConstantInt32((int)DevkitServerModule.PluginFrameworkType)
+                    .BranchIfNotEqual(ifNotThis)
+
+                     // load image and set texture
+                    .LoadLocalValue(lclImageRef)
+                    .Invoke(Accessor.GetMethod(GetIcon)!)
+                    .Invoke(setTextureMethod)
+
+                     // load box and set tooltip
+                    .LoadArgument(0)
+                    .LoadInstanceFieldValue(pluginBoxField)
+                    .Invoke(Accessor.GetMethod(GetTooltip)!)
+                    .Invoke(setTooltipMethod);
+            });
+
+            ctx.MarkLabel(ifNotThis);
+            ctx.ApplyBlocksAndLabels();
+        }
+
+        return ctx;
+    }
+
+    // replaces the orderMap field on ServerListComparer_PluginsDefault with one long enough to allow 'ds' to be used with sorting
+    private static int[]? _orderMap;
+
+    [HarmonyPatch(typeof(ServerListComparer_PluginsDefault), MethodType.Constructor)]
+    [HarmonyPrefix]
+    [UsedImplicitly]
+    private static bool ServerListComparerPluginsDefaultPrefix(out int[] ___orderMap)
+    {
+        _orderMap ??= new int[(int)DevkitServerModule.PluginFrameworkType + 1];
+        _orderMap[^1] = 2;
+        Array.Fill(_orderMap, 1, 1, _orderMap.Length - 2);
+        ___orderMap = _orderMap;
+        return false;
+    }
+
+    // this can be uncommented to replace openmod server icons with DevkitServer server icons for testing
+
+    // [HarmonyPatch(typeof(SteamServerAdvertisement), "parseTagValue")]
+    // [HarmonyPrefix]
+    // [UsedImplicitly]
+    // private static bool ParseTagValuePrefix(string tags, string startKey, string endKey, ref string __result)
+    // {
+    //     if (startKey != "<pf>")
+    //     {
+    //         return false;
+    //     }
+    // 
+    //     int num1 = tags.IndexOf(startKey);
+    //     if (num1 == -1)
+    //     {
+    //         __result = null;
+    //         return false;
+    //     }
+    //     int startIndex = num1 + startKey.Length;
+    //     int num2 = tags.IndexOf(endKey, startIndex);
+    //     if (num2 == -1)
+    //     {
+    //         __result = null;
+    //         return false;
+    //     }
+    //     __result = num2 == startIndex ? null : tags.Substring(startIndex, num2 - startIndex);
+    // 
+    //     if (__result == "om")
+    //     {
+    //         __result = DevkitServerModule.PluginFrameworkTag;
+    //     }
+    // 
+    //     return false;
+    // }
+
+    private static Texture GetIcon()
+    {
+        return DevkitServerModule.Bundle == null
+            ? MenuPlayUI.serverListUI.icons.load<Texture2D>("Unknown")
+            : DevkitServerModule.Bundle.load<Texture2D>("icons/devkitserver_80");
+    }
+    
+    private static string GetTooltip()
+    {
+        return DevkitServerModule.MainLocalization.Translate("Plugins_Column_DevkitServer_Tooltip");
+    }
+
     private static void WritePasswordHash(NetPakWriter writer)
     {
         if (string.IsNullOrEmpty(Provider.serverPassword) || Provider.serverPasswordHash.Length != 20)

@@ -160,6 +160,7 @@ public class PermissionTests
     [TestMethod]
     [DataRow("devkitserver::context.test", "devkitserver::context.test")]
     [DataRow("devkitserver::context.*", "devkitserver::context.test")]
+    [DataRow("devkitserver::context.*", "devkitserver::context")]
     [DataRow("devkitserver::*", "devkitserver::context.test")]
     [DataRow("*", "devkitserver::context.test")]
     [DataRow("unturned::context.test.test.test.test.test.test.*", "unturned::context.test.test.test.test.test.test.leaf")]

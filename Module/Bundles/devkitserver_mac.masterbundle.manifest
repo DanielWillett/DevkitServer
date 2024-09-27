@@ -1,12 +1,12 @@
 ManifestFileVersion: 0
-CRC: 277095750
+CRC: 3508676581
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: c9bf4bb45b4ba0d58eab1738559c7f35
+    Hash: ffbaba95a4762ea5fe874e331f6449bf
   TypeTreeHash:
     serializedVersion: 2
-    Hash: c4fe1fdcbb1a331074c17958100faf9a
+    Hash: a7a21288fe2bd6ae3724c7054e7a1302
 HashAppended: 0
 ClassTypes:
 - Class: 1
@@ -25,10 +25,13 @@ ClassTypes:
   Script: {instanceID: 0}
 - Class: 48
   Script: {instanceID: 0}
+- Class: 213
+  Script: {instanceID: 0}
 SerializeReferenceClassIdentifiers: []
 Assets:
 - Assets/DevkitServer/Resources/S_Passthrough.shader
 - Assets/DevkitServer/Resources/TPV_Char_Server.prefab
 - Assets/DevkitServer/Resources/SM_TPV.fbx
+- Assets/DevkitServer/Icons/DevkitServer_80.png
 - Assets/DevkitServer/Resources/MAT_Passthrough.mat
 Dependencies: []
