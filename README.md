@@ -124,7 +124,7 @@ Then set `enable_high_speed_support` to `true` in the `server_config.json` file 
 # Compiling
 
 ## Target
-DevkitServer targets .NET Standard 2.1 with a custom redistribution of Lib.Harmony (because the original is not compatible with compiling in .NET Standard 2.1).
+DevkitServer targets .NET Standard 2.1.
 
 ## Strong Naming
 
